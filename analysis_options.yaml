@@ -1,0 +1,25 @@
+# Analysis options for the poemath project.
+# 详见 https://dart.dev/tools/analysis 与 https://pub.dev/packages/flutter_lints
+
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # 未使用的 import / 变量视为警告
+    unused_import: warning
+    unused_local_variable: warning
+    todo: ignore
+
+linter:
+  rules:
+    prefer_const_constructors: true
+    prefer_const_literals_to_create_immutables: true
+    avoid_print: true
+    always_use_package_imports: false
+    prefer_final_locals: true
+    require_trailing_commas: true
+    sort_child_properties_last: true

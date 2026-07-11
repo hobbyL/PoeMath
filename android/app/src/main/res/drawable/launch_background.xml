@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Simple solid background used by the LaunchTheme during app cold start. -->
+    <item android:drawable="?android:colorBackground" />
+</layer-list>
