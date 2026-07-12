@@ -11,6 +11,9 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/domain/achievement_checker.dart';
+import 'package:poemath/domain/level_calculator.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/session_result_dialog.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -194,6 +197,28 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     final repo = ref.read(mathSessionRepoProvider);
     await repo.save(session);
+
+    // 更新用户统计：口算做题数 + 星星
+    final statsRepo = ref.read(userStatsRepoProvider);
+    await statsRepo.addMathResults(
+      problems: problems.length,
+      correct: correctCount,
+    );
+    if (stars > 0) {
+      await statsRepo.addStars(stars);
+    }
+
+    // 等级自动计算
+    final updatedStats = statsRepo.get();
+    final newLevel = LevelCalculator.calculate(updatedStats.totalStars);
+    if (newLevel != updatedStats.level) {
+      await statsRepo.updateLevel(newLevel);
+    }
+
+    // 成就自动检查
+    final achievementRepo = ref.read(achievementRepoProvider);
+    final checker = AchievementChecker(achievementRepo);
+    await checker.check(statsRepo.get());
 
     if (!mounted) return;
 
