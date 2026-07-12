@@ -4,10 +4,13 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 
 class MathMistakePage extends ConsumerWidget {
   const MathMistakePage({super.key});
@@ -190,9 +193,26 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
 
                 // 操作按钮
                 const SizedBox(height: SpacingTokens.sm),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  spacing: SpacingTokens.xs,
+                  runSpacing: SpacingTokens.xs,
+                  alignment: WrapAlignment.end,
                   children: [
+                    // 再练一次
+                    TextButton.icon(
+                      onPressed: () => _repractice(context),
+                      icon: const Icon(Icons.replay, size: 16),
+                      label: const Text('再练一次'),
+                    ),
+                    // 生成同类新题
+                    TextButton.icon(
+                      onPressed: () => _generateSimilar(context),
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: const Text('同类新题'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: ColorTokens.mathPurple,
+                      ),
+                    ),
                     if (!mistake.isResolved)
                       TextButton.icon(
                         onPressed: () async {
@@ -261,5 +281,41 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
         }),
       ],
     );
+  }
+
+  /// 再练一次：弹出对话框重新回答同一题。
+  Future<void> _repractice(BuildContext context) async {
+    final mistake = widget.mistake;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => MistakeRepracticeDialog(
+        problemText: mistake.problemText,
+        correctAnswer: mistake.correctAnswer,
+      ),
+    );
+
+    if (result == null) return; // 取消
+
+    final repo = ref.read(mathMistakeRepoProvider);
+    await repo.incrementRetry(mistake.id);
+
+    if (result) {
+      // 答对了，标记已解决
+      await repo.resolve(mistake.id);
+    }
+
+    ref.invalidate(mathMistakesProvider);
+  }
+
+  /// 生成同类新题：设置年级和学期，导航到练习页。
+  void _generateSimilar(BuildContext context) {
+    final mistake = widget.mistake;
+
+    // 设置年级（从错题记录中获取）
+    ref.read(mathGradeProvider.notifier).state = mistake.grade;
+    // 学期默认上学期（错题不记录学期，取决于当前设置即可）
+    ref.read(mathBatchSizeProvider.notifier).state = 5; // 少量同类题
+
+    context.push(AppRoutes.mathPractice);
   }
 }
