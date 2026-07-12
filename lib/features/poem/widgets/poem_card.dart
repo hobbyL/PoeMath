@@ -86,8 +86,8 @@ class PoemCard extends StatelessWidget {
             color: secondary,
             size: 16,
           ),
-        if (poem.isRequired) _buildTag('必背', secondary),
         ...poem.tags.take(3).map((tag) => _buildTag(tag, primary)),
+        if (poem.isRequired) _buildTag('必背', secondary),
       ],
     );
   }
