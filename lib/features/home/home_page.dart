@@ -302,17 +302,21 @@ class HomePage extends ConsumerWidget {
         const SizedBox(width: SpacingTokens.sm),
         Expanded(
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              _QuickActionButton(
-                icon: Icons.error_outline_rounded,
-                label: '错题本',
-                color: theme.colorScheme.error,
-                onTap: () => context.push(AppRoutes.mathMistake),
+              SizedBox(
+                width: double.infinity,
+                child: _QuickActionButton(
+                  icon: Icons.error_outline_rounded,
+                  label: '错题本',
+                  color: theme.colorScheme.error,
+                  onTap: () => context.push(AppRoutes.mathMistake),
+                ),
               ),
               if (mistakeCount > 0)
                 Positioned(
-                  right: 4,
-                  top: 4,
+                  right: -2,
+                  top: -2,
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: const BoxDecoration(
