@@ -46,9 +46,9 @@ class PoemCard extends StatelessWidget {
                     ),
                   ),
                   if (isFavorite)
-                    const Icon(
+                    Icon(
                       Icons.favorite,
-                      color: ColorTokens.poemSeal,
+                      color: theme.colorScheme.secondary,
                       size: 18,
                     ),
                   if (poem.isRequired)
@@ -59,13 +59,13 @@ class PoemCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: ColorTokens.poemCinnabar.withValues(alpha: 0.1),
+                        color: theme.colorScheme.secondary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         '必背',
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: ColorTokens.poemCinnabar,
+                          color: theme.colorScheme.secondary,
                         ),
                       ),
                     ),

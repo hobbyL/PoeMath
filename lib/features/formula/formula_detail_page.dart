@@ -34,7 +34,7 @@ class FormulaDetailPage extends ConsumerWidget {
           IconButton(
             icon: Icon(
               isFav ? Icons.bookmark : Icons.bookmark_border,
-              color: isFav ? ColorTokens.mathYellow : null,
+              color: isFav ? theme.colorScheme.secondary : null,
             ),
             onPressed: () async {
               final repo = ref.read(formulaFavoriteRepoProvider);
@@ -52,12 +52,12 @@ class FormulaDetailPage extends ConsumerWidget {
             // 分类 + 年级标签
             Row(
               children: [
-                _buildTag(context, formula.category, ColorTokens.mathPurple),
+                _buildTag(context, formula.category, theme.colorScheme.primary),
                 const SizedBox(width: SpacingTokens.sm),
                 _buildTag(
                   context,
                   '${formula.grade}年级',
-                  ColorTokens.mathBlue,
+                  theme.colorScheme.secondary,
                 ),
               ],
             ),
@@ -72,13 +72,13 @@ class FormulaDetailPage extends ConsumerWidget {
                         formula.formulaLatex,
                         textStyle: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: ColorTokens.mathPurple,
+                          color: theme.colorScheme.primary,
                         ),
                         onErrorFallback: (_) => Text(
                           formula.formulaText,
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: ColorTokens.mathPurple,
+                            color: theme.colorScheme.primary,
                             letterSpacing: 1.5,
                           ),
                           textAlign: TextAlign.center,
@@ -88,7 +88,7 @@ class FormulaDetailPage extends ConsumerWidget {
                         formula.formulaText,
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: ColorTokens.mathPurple,
+                          color: theme.colorScheme.primary,
                           letterSpacing: 1.5,
                         ),
                         textAlign: TextAlign.center,
@@ -115,7 +115,7 @@ class FormulaDetailPage extends ConsumerWidget {
                             '${param.symbol}：',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: ColorTokens.mathPurple,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
                           Expanded(
@@ -226,7 +226,7 @@ class FormulaDetailPage extends ConsumerWidget {
         color: Theme.of(context).colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
         border: Border.all(
-          color: ColorTokens.mathPurple.withValues(alpha: 0.2),
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
         ),
       ),
       child: child,
@@ -247,12 +247,12 @@ class FormulaDetailPage extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: ColorTokens.mathPurple),
+              Icon(icon, size: 18, color: theme.colorScheme.primary),
               const SizedBox(width: SpacingTokens.xs),
               Text(
                 label,
                 style: theme.textTheme.titleSmall?.copyWith(
-                  color: ColorTokens.mathPurple,
+                  color: theme.colorScheme.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),

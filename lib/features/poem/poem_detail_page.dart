@@ -89,7 +89,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           IconButton(
             icon: Icon(
               _isSpeaking ? Icons.stop_circle_outlined : Icons.volume_up,
-              color: _isSpeaking ? ColorTokens.poemSeal : null,
+              color: _isSpeaking ? theme.colorScheme.secondary : null,
             ),
             tooltip: _isSpeaking ? '停止朗读' : '朗读全文',
             onPressed: () => _toggleTts(poem),
@@ -99,7 +99,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
             IconButton(
               icon: Icon(
                 pinyinVisible ? Icons.text_fields : Icons.text_fields_outlined,
-                color: pinyinVisible ? ColorTokens.poemGreen : null,
+                color: pinyinVisible ? theme.colorScheme.primary : null,
               ),
               tooltip: pinyinVisible ? '隐藏拼音' : '显示拼音',
               onPressed: _togglePinyin,
@@ -108,7 +108,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           IconButton(
             icon: Icon(
               isFav ? Icons.favorite : Icons.favorite_border,
-              color: isFav ? ColorTokens.poemSeal : null,
+              color: isFav ? theme.colorScheme.secondary : null,
             ),
             onPressed: () async {
               final repo = ref.read(poemFavoriteRepoProvider);
@@ -229,7 +229,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         color: Theme.of(context).colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: ColorTokens.poemDivider,
+          color: Theme.of(context).colorScheme.outlineVariant,
         ),
       ),
       child: child,
@@ -250,7 +250,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           Text(
             label,
             style: theme.textTheme.titleSmall?.copyWith(
-              color: ColorTokens.poemGreen,
+              color: theme.colorScheme.primary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -274,7 +274,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           Text(
             '注释',
             style: theme.textTheme.titleSmall?.copyWith(
-              color: ColorTokens.poemGreen,
+              color: theme.colorScheme.primary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -355,10 +355,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       context,
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.history,
             size: 18,
-            color: ColorTokens.poemGreen,
+            color: theme.colorScheme.primary,
           ),
           const SizedBox(width: SpacingTokens.sm),
           Text(

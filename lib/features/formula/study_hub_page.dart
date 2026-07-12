@@ -137,11 +137,11 @@ class StudyHubPage extends ConsumerWidget {
                         ),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: ColorTokens.mathPurple
+                            backgroundColor: theme.colorScheme.primary
                                 .withValues(alpha: 0.15),
-                            child: const Icon(
+                            child: Icon(
                               Icons.functions,
-                              color: ColorTokens.mathPurple,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
                           title: Text(
@@ -160,7 +160,7 @@ class StudyHubPage extends ConsumerWidget {
                                 ? Icons.bookmark
                                 : Icons.bookmark_border,
                             color: isFav
-                                ? ColorTokens.mathYellow
+                                ? theme.colorScheme.secondary
                                 : null,
                             size: 20,
                           ),

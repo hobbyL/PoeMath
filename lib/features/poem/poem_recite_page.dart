@@ -170,7 +170,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                   height: 2,
                   letterSpacing: 2,
                   color: _showAnswer
-                      ? ColorTokens.poemGreen
+                      ? theme.colorScheme.primary
                       : theme.colorScheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
@@ -189,7 +189,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
         Text(
           '请默写全文',
           style: theme.textTheme.titleMedium?.copyWith(
-            color: ColorTokens.poemGreen,
+            color: theme.colorScheme.primary,
           ),
         ),
         const SizedBox(height: SpacingTokens.md),
@@ -217,15 +217,15 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
             width: double.infinity,
             padding: const EdgeInsets.all(SpacingTokens.md),
             decoration: BoxDecoration(
-              color: ColorTokens.poemGreen.withValues(alpha: 0.05),
+              color: theme.colorScheme.primary.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ColorTokens.poemGreen),
+              border: Border.all(color: theme.colorScheme.primary),
             ),
             child: Text(
               lines.join('\n'),
               style: theme.textTheme.bodyLarge?.copyWith(
                 height: 2,
-                color: ColorTokens.poemGreen,
+                color: theme.colorScheme.primary,
               ),
               textAlign: TextAlign.center,
             ),
