@@ -83,6 +83,70 @@ flutter analyze
 flutter build apk --release
 ```
 
+## CI/CD
+
+项目配置了两条 GitHub Actions 流水线：
+
+### 自动测试（push / PR）
+
+每次 push 到 `main` 或提交 PR 时自动触发：
+
+```
+analyze → test
+```
+
+在 GitHub 仓库的 **Actions** 页面查看运行状态。
+
+### 自动构建发版（tag）
+
+打 `v*` 格式的 tag 时自动触发完整构建并发布到 GitHub Release：
+
+```
+analyze → test → build release APK → 创建 GitHub Release
+```
+
+#### 使用方式
+
+```bash
+# 1. 推送代码，等 CI 测试通过
+git push origin main
+
+# 2. 打 tag 触发构建
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+构建完成后在 [Releases](../../releases) 页面下载 APK。
+
+#### 版本号规则
+
+- tag `v1.2.3` → 应用版本名 `1.2.3`，构建号 `10203`
+- 应用内「我的」页面底部自动显示当前版本号
+
+#### 签名配置
+
+使用固定签名密钥，确保每次构建的 APK 可覆盖安装。需在 GitHub 仓库 **Settings → Secrets → Actions** 中配置：
+
+| Secret | 说明 |
+|--------|------|
+| `KEYSTORE_BASE64` | base64 编码的 JKS 签名文件 |
+| `KEYSTORE_PASSWORD` | keystore 密码 |
+| `KEY_ALIAS` | key 别名 |
+| `KEY_PASSWORD` | key 密码 |
+
+生成签名密钥：
+
+```bash
+keytool -genkey -v \
+  -keystore poemath-release.jks \
+  -alias poemath \
+  -keyalg RSA -keysize 2048 \
+  -validity 10000
+
+# 转 base64 后填入 KEYSTORE_BASE64
+base64 -i poemath-release.jks | pbcopy
+```
+
 ## 数据来源
 
 - 古诗词数据基于公开古诗词数据库整理，经人工校对
