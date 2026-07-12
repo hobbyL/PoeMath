@@ -1,26 +1,77 @@
 // lib/features/poem/poem_detail_page.dart
 //
-// 诗词详情页：展示全文、拼音、译文、赏析、注释，可收藏和开始背诵。
+// 诗词详情页：展示全文、拼音、译文、赏析、注释，可收藏、TTS朗读和开始背诵。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/data/models/poem.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
-class PoemDetailPage extends ConsumerWidget {
+/// TTS 服务 Provider。
+final _ttsServiceProvider = Provider<TtsService>((ref) {
+  final settings = ref.watch(settingsRepositoryProvider);
+  final service = TtsService(settings);
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+/// 拼音显隐状态 Provider（读取 SettingsRepository 的持久化值）。
+final _pinyinVisibleProvider = StateProvider<bool>((ref) {
+  final settings = ref.watch(settingsRepositoryProvider);
+  return settings.pinyinVisible;
+});
+
+class PoemDetailPage extends ConsumerStatefulWidget {
   const PoemDetailPage({super.key, required this.poemId});
 
   final String poemId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final poem = ref.watch(poemByIdProvider(poemId));
-    final isFav = ref.watch(isFavoriteProvider(poemId));
-    final progress = ref.watch(poemProgressProvider(poemId));
+  ConsumerState<PoemDetailPage> createState() => _PoemDetailPageState();
+}
+
+class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
+  bool _isSpeaking = false;
+
+  @override
+  void dispose() {
+    // 退出页面时停止朗读
+    ref.read(_ttsServiceProvider).stop();
+    super.dispose();
+  }
+
+  Future<void> _toggleTts(Poem poem) async {
+    final tts = ref.read(_ttsServiceProvider);
+    if (_isSpeaking) {
+      await tts.stop();
+      setState(() => _isSpeaking = false);
+    } else {
+      setState(() => _isSpeaking = true);
+      await tts.speak(poem.content);
+      if (mounted) setState(() => _isSpeaking = false);
+    }
+  }
+
+  Future<void> _togglePinyin() async {
+    final current = ref.read(_pinyinVisibleProvider);
+    final newValue = !current;
+    ref.read(_pinyinVisibleProvider.notifier).state = newValue;
+    final settings = ref.read(settingsRepositoryProvider);
+    await settings.setPinyinVisible(newValue);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final poem = ref.watch(poemByIdProvider(widget.poemId));
+    final isFav = ref.watch(isFavoriteProvider(widget.poemId));
+    final progress = ref.watch(poemProgressProvider(widget.poemId));
+    final pinyinVisible = ref.watch(_pinyinVisibleProvider);
     final theme = Theme.of(context);
 
     if (poem == null) {
@@ -34,6 +85,26 @@ class PoemDetailPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(poem.title),
         actions: [
+          // TTS 朗读按钮
+          IconButton(
+            icon: Icon(
+              _isSpeaking ? Icons.stop_circle_outlined : Icons.volume_up,
+              color: _isSpeaking ? ColorTokens.poemSeal : null,
+            ),
+            tooltip: _isSpeaking ? '停止朗读' : '朗读全文',
+            onPressed: () => _toggleTts(poem),
+          ),
+          // 拼音显隐切换
+          if (poem.pinyin.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                pinyinVisible ? Icons.text_fields : Icons.text_fields_outlined,
+                color: pinyinVisible ? ColorTokens.poemGreen : null,
+              ),
+              tooltip: pinyinVisible ? '隐藏拼音' : '显示拼音',
+              onPressed: _togglePinyin,
+            ),
+          // 收藏按钮
           IconButton(
             icon: Icon(
               isFav ? Icons.favorite : Icons.favorite_border,
@@ -41,8 +112,8 @@ class PoemDetailPage extends ConsumerWidget {
             ),
             onPressed: () async {
               final repo = ref.read(poemFavoriteRepoProvider);
-              await repo.toggle(poemId);
-              ref.invalidate(isFavoriteProvider(poemId));
+              await repo.toggle(widget.poemId);
+              ref.invalidate(isFavoriteProvider(widget.poemId));
             },
           ),
         ],
@@ -89,8 +160,8 @@ class PoemDetailPage extends ConsumerWidget {
               ),
             ),
 
-            // 拼音
-            if (poem.pinyin.isNotEmpty) ...[
+            // 拼音（根据开关控制显隐）
+            if (poem.pinyin.isNotEmpty && pinyinVisible) ...[
               const SizedBox(height: SpacingTokens.md),
               _buildLabeledSection(context, '拼音', poem.pinyin),
             ],
@@ -140,7 +211,7 @@ class PoemDetailPage extends ConsumerWidget {
           padding: const EdgeInsets.all(SpacingTokens.md),
           child: FilledButton.icon(
             onPressed: () {
-              context.push(AppRoutes.poemReciteOf(poemId));
+              context.push(AppRoutes.poemReciteOf(widget.poemId));
             },
             icon: const Icon(Icons.record_voice_over),
             label: const Text('开始背诵'),
