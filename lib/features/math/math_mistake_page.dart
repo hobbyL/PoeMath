@@ -192,70 +192,74 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
                     mistake.solutionStepsJson!.isNotEmpty)
                   _buildSteps(context, mistake.solutionStepsJson!),
 
-                // 操作按钮（一行四个）
-                const SizedBox(height: SpacingTokens.sm),
+                // 操作按钮（一行四个，图标+文字竖排）
+                const SizedBox(height: SpacingTokens.md),
                 Row(
                   children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => _repractice(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: SpacingTokens.xs,
-                          ),
-                        ),
-                        child: const Text('再练一次', style: TextStyle(fontSize: 12)),
-                      ),
+                    _buildActionButton(
+                      icon: Icons.replay,
+                      label: '再练一次',
+                      onTap: () => _repractice(context),
+                      color: theme.colorScheme.primary,
                     ),
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => _generateSimilar(context),
-                        style: TextButton.styleFrom(
-                          foregroundColor: theme.colorScheme.primary,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: SpacingTokens.xs,
-                          ),
-                        ),
-                        child: const Text('同类新题', style: TextStyle(fontSize: 12)),
-                      ),
+                    _buildActionButton(
+                      icon: Icons.auto_awesome,
+                      label: '同类新题',
+                      onTap: () => _generateSimilar(context),
+                      color: theme.colorScheme.primary,
                     ),
                     if (!mistake.isResolved)
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () async {
-                            final repo = ref.read(mathMistakeRepoProvider);
-                            await repo.resolve(mistake.id);
-                            ref.invalidate(mathMistakesProvider);
-                          },
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: SpacingTokens.xs,
-                            ),
-                          ),
-                          child: const Text('已掌握', style: TextStyle(fontSize: 12)),
-                        ),
-                      ),
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () async {
+                      _buildActionButton(
+                        icon: Icons.check,
+                        label: '已掌握',
+                        onTap: () async {
                           final repo = ref.read(mathMistakeRepoProvider);
-                          await repo.delete(mistake.id);
+                          await repo.resolve(mistake.id);
                           ref.invalidate(mathMistakesProvider);
                         },
-                        style: TextButton.styleFrom(
-                          foregroundColor: theme.colorScheme.error,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: SpacingTokens.xs,
-                          ),
-                        ),
-                        child: const Text('删除', style: TextStyle(fontSize: 12)),
+                        color: theme.colorScheme.primary,
                       ),
+                    _buildActionButton(
+                      icon: Icons.delete_outline,
+                      label: '删除',
+                      onTap: () async {
+                        final repo = ref.read(mathMistakeRepoProvider);
+                        await repo.delete(mistake.id);
+                        ref.invalidate(mathMistakesProvider);
+                      },
+                      color: theme.colorScheme.error,
                     ),
                   ],
                 ),
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required Color color,
+  }) {
+    return Expanded(
+      child: TextButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 14, color: color),
+        label: Text(
+          label,
+          style: TextStyle(fontSize: 11, color: color),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.xs,
+            vertical: SpacingTokens.xs,
+          ),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       ),
     );
