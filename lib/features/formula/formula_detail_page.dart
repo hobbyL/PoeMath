@@ -3,6 +3,7 @@
 // 公式详情页：公式展示、参数说明、记忆技巧、例题、收藏。
 
 import 'package:flutter/material.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -62,19 +63,36 @@ class FormulaDetailPage extends ConsumerWidget {
             ),
             const SizedBox(height: SpacingTokens.lg),
 
-            // 公式展示
+            // 公式展示（LaTeX 渲染，解析失败时降级为纯文本）
             _buildSection(
               context,
               child: Center(
-                child: Text(
-                  formula.formulaText,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: ColorTokens.mathPurple,
-                    letterSpacing: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                child: formula.formulaLatex.isNotEmpty
+                    ? Math.tex(
+                        formula.formulaLatex,
+                        textStyle: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: ColorTokens.mathPurple,
+                        ),
+                        onErrorFallback: (_) => Text(
+                          formula.formulaText,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: ColorTokens.mathPurple,
+                            letterSpacing: 1.5,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : Text(
+                        formula.formulaText,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: ColorTokens.mathPurple,
+                          letterSpacing: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
               ),
             ),
 
