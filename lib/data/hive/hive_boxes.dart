@@ -25,24 +25,24 @@ class HiveBoxes {
   const HiveBoxes._();
 
   // ============ 静态数据 Box ============
-  static late final Box<Poem> poems;
-  static late final Box<Author> authors;
-  static late final Box<Formula> formulas;
+  static late Box<Poem> poems;
+  static late Box<Author> authors;
+  static late Box<Formula> formulas;
 
   // ============ 动态数据 Box ============
-  static late final Box<PoemProgress> poemProgress;
-  static late final Box<PoemFavorite> poemFavorites;
-  static late final Box<ReviewSchedule> reviewSchedules;
-  static late final Box<MathMistake> mathMistakes;
-  static late final Box<MathSession> mathSessions;
-  static late final Box<FormulaFavorite> formulaFavorites;
-  static late final Box<Achievement> achievements;
-  static late final Box<CheckIn> checkIns;
-  static late final Box<UserStats> userStats;
+  static late Box<PoemProgress> poemProgress;
+  static late Box<PoemFavorite> poemFavorites;
+  static late Box<ReviewSchedule> reviewSchedules;
+  static late Box<MathMistake> mathMistakes;
+  static late Box<MathSession> mathSessions;
+  static late Box<FormulaFavorite> formulaFavorites;
+  static late Box<Achievement> achievements;
+  static late Box<CheckIn> checkIns;
+  static late Box<UserStats> userStats;
 
   // ============ KV Box ============
-  static late final Box<dynamic> settings;
-  static late final Box<dynamic> meta;
+  static late Box<dynamic> settings;
+  static late Box<dynamic> meta;
 
   /// 打开所有 Box。必须在 registerHiveAdapters() 之后调用。
   static Future<void> init() async {

@@ -21,8 +21,12 @@ import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/user_stats.dart';
 
-/// 注册所有 Hive TypeAdapter（幂等：重复注册会被 Hive 忽略）。
+bool _adaptersRegistered = false;
+
+/// 注册所有 Hive TypeAdapter（幂等：仅首次调用生效）。
 void registerHiveAdapters() {
+  if (_adaptersRegistered) return;
+  _adaptersRegistered = true;
   // 静态数据模型
   Hive.registerAdapter(PoemAdapter());               // typeId: 0
   Hive.registerAdapter(AuthorAdapter());              // typeId: 1
