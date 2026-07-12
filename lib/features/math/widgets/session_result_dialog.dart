@@ -64,7 +64,7 @@ class SessionResultDialog extends StatelessWidget {
                 i < starsEarned ? Icons.star_rounded : Icons.star_outline_rounded,
                 size: 40,
                 color: i < starsEarned
-                    ? ColorTokens.mathYellow
+                    ? ColorTokens.poemGold
                     : theme.colorScheme.onSurfaceVariant,
               );
             }),
@@ -106,7 +106,7 @@ class SessionResultDialog extends StatelessWidget {
           value,
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w600,
-            color: ColorTokens.mathPurple,
+            color: theme.colorScheme.primary,
           ),
         ),
       ],

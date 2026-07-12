@@ -32,7 +32,7 @@ class MathMistakePage extends ConsumerWidget {
                   Icon(
                     Icons.check_circle_outline,
                     size: 64,
-                    color: ColorTokens.mathMint.withValues(alpha: 0.5),
+                    color: ColorTokens.success.withValues(alpha: 0.5),
                   ),
                   const SizedBox(height: SpacingTokens.md),
                   Text(
@@ -87,7 +87,7 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
         side: mistake.isResolved
-            ? const BorderSide(color: ColorTokens.mathMint)
+            ? const BorderSide(color: ColorTokens.success)
             : BorderSide.none,
       ),
       child: InkWell(
@@ -116,7 +116,7 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
                     const Icon(
                       Icons.check_circle,
                       size: 20,
-                      color: ColorTokens.mathMint,
+                      color: ColorTokens.success,
                     ),
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
@@ -168,7 +168,7 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: ColorTokens.mathCoral.withValues(alpha: 0.1),
+                    color: ColorTokens.error.withValues(alpha: 0.1),
                     borderRadius:
                         BorderRadius.circular(SpacingTokens.radiusSmall),
                   ),
@@ -176,7 +176,7 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
                     _errorTypeLabels[mistake.errorType] ??
                         mistake.errorType!,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: ColorTokens.mathCoral,
+                      color: ColorTokens.error,
                     ),
                   ),
                 ),
@@ -210,7 +210,7 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
                       icon: const Icon(Icons.auto_awesome, size: 16),
                       label: const Text('同类新题'),
                       style: TextButton.styleFrom(
-                        foregroundColor: ColorTokens.mathPurple,
+                        foregroundColor: theme.colorScheme.primary,
                       ),
                     ),
                     if (!mistake.isResolved)
@@ -255,7 +255,7 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
         Text(
           '解题步骤',
           style: theme.textTheme.titleSmall?.copyWith(
-            color: ColorTokens.mathPurple,
+            color: theme.colorScheme.primary,
             fontWeight: FontWeight.w600,
           ),
         ),

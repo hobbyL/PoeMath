@@ -36,17 +36,18 @@ class GradeSemesterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
 
     return Card(
       elevation: isSelected ? 4 : 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
         side: isSelected
-            ? const BorderSide(color: ColorTokens.mathPurpleDeep, width: 2)
+            ? BorderSide(color: primary, width: 2)
             : BorderSide.none,
       ),
       color: isSelected
-          ? ColorTokens.mathPurple.withValues(alpha: 0.08)
+          ? primary.withValues(alpha: 0.08)
           : theme.colorScheme.surface,
       child: InkWell(
         onTap: onTap,
@@ -59,7 +60,7 @@ class GradeSemesterCard extends StatelessWidget {
                 _gradeIcons[grade] ?? Icons.school,
                 size: 32,
                 color: isSelected
-                    ? ColorTokens.mathPurpleDeep
+                    ? primary
                     : theme.colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: SpacingTokens.md),
@@ -72,7 +73,7 @@ class GradeSemesterCard extends StatelessWidget {
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: isSelected
-                            ? ColorTokens.mathPurpleDeep
+                            ? primary
                             : theme.colorScheme.onSurface,
                       ),
                     ),
@@ -91,7 +92,7 @@ class GradeSemesterCard extends StatelessWidget {
               Icon(
                 Icons.chevron_right,
                 color: isSelected
-                    ? ColorTokens.mathPurpleDeep
+                    ? primary
                     : theme.colorScheme.onSurfaceVariant,
               ),
             ],

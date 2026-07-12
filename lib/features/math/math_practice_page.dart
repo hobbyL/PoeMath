@@ -267,7 +267,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
               child: Text(
                 '✓ $correctCount',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: ColorTokens.mathMint,
+                  color: ColorTokens.success,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -283,8 +283,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
             LinearProgressIndicator(
               value: (currentIndex + 1) / problems.length,
               backgroundColor:
-                  ColorTokens.mathPurple.withValues(alpha: 0.1),
-              color: ColorTokens.mathPurple,
+                  theme.colorScheme.primary.withValues(alpha: 0.1),
+              color: theme.colorScheme.primary,
               borderRadius: BorderRadius.circular(4),
             ),
             const SizedBox(height: SpacingTokens.xl),
@@ -336,13 +336,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       padding: const EdgeInsets.all(SpacingTokens.md),
       decoration: BoxDecoration(
         color: judgement.isCorrect
-            ? ColorTokens.mathMint.withValues(alpha: 0.15)
-            : ColorTokens.mathCoral.withValues(alpha: 0.15),
+            ? ColorTokens.success.withValues(alpha: 0.15)
+            : ColorTokens.error.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
         border: Border.all(
           color: judgement.isCorrect
-              ? ColorTokens.mathMint
-              : ColorTokens.mathCoral,
+              ? ColorTokens.success
+              : ColorTokens.error,
         ),
       ),
       child: Column(
@@ -414,7 +414,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
             width: double.infinity,
             padding: const EdgeInsets.all(SpacingTokens.md),
             decoration: BoxDecoration(
-              color: ColorTokens.mathBlue.withValues(alpha: 0.08),
+              color: theme.colorScheme.primary.withValues(alpha: 0.08),
               borderRadius:
                   BorderRadius.circular(SpacingTokens.radiusMedium),
             ),
@@ -429,8 +429,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                       Container(
                         width: 24,
                         height: 24,
-                        decoration: const BoxDecoration(
-                          color: ColorTokens.mathPurple,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
@@ -458,7 +458,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                               Text(
                                 judgement.correctSteps[i].resultHint,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: ColorTokens.mathPurpleDeep,
+                                  color: theme.colorScheme.primary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

@@ -68,8 +68,8 @@ class _MistakeRepracticeDialogState extends State<MistakeRepracticeDialog> {
               padding: const EdgeInsets.all(SpacingTokens.md),
               decoration: BoxDecoration(
                 color: _isCorrect!
-                    ? ColorTokens.mathMint.withValues(alpha: 0.15)
-                    : ColorTokens.mathCoral.withValues(alpha: 0.15),
+                    ? ColorTokens.success.withValues(alpha: 0.15)
+                    : ColorTokens.error.withValues(alpha: 0.15),
                 borderRadius:
                     BorderRadius.circular(SpacingTokens.radiusMedium),
               ),

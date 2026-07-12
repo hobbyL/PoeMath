@@ -49,8 +49,8 @@ class MathTabPage extends ConsumerWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    ColorTokens.mathPurple.withValues(alpha: 0.15),
-                    ColorTokens.mathBlue.withValues(alpha: 0.1),
+                    theme.colorScheme.primary.withValues(alpha: 0.15),
+                    theme.colorScheme.secondary.withValues(alpha: 0.1),
                   ],
                 ),
                 borderRadius:
@@ -163,7 +163,7 @@ class MathTabPage extends ConsumerWidget {
           value,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: ColorTokens.mathPurple,
+            color: theme.colorScheme.primary,
           ),
         ),
         const SizedBox(height: SpacingTokens.xs),
