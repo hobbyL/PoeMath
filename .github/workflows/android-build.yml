@@ -57,6 +57,14 @@ jobs:
           fi
           printf 'storeFile=poemath-release.jks\nstorePassword=${{ secrets.KEYSTORE_PASSWORD }}\nkeyAlias=${{ secrets.KEY_ALIAS }}\nkeyPassword=${{ secrets.KEY_PASSWORD }}\n' > android/key.properties
 
+      - name: Verify keystore
+        run: |
+          keytool -list -keystore android/app/poemath-release.jks \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -storetype PKCS12 || {
+            echo "::error::Keystore verification failed — check KEYSTORE_PASSWORD secret"
+            exit 1
+          }
+
       # -------- 构建 --------
       - name: Install dependencies
         run: flutter pub get
