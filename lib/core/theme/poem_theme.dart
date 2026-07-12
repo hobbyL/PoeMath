@@ -16,19 +16,21 @@ class PoemTheme {
 
   /// 亮色主题：宣纸底 + 墨绿主色 + 朱砂点缀。
   static ThemeData light() {
+    const primary = ColorTokens.poemGreen;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.light,
+      primary: primary,
+      onPrimary: Colors.white,
+      secondary: ColorTokens.poemCinnabar,
+      onSecondary: Colors.white,
+      surface: ColorTokens.poemPaper,
+      onSurface: ColorTokens.poemInk,
+      error: ColorTokens.error,
+    );
     final base = ThemeData.light(useMaterial3: true);
     return base.copyWith(
-      colorScheme: base.colorScheme.copyWith(
-        primary: ColorTokens.poemGreen,
-        onPrimary: Colors.white,
-        secondary: ColorTokens.poemCinnabar,
-        onSecondary: Colors.white,
-        secondaryContainer: ColorTokens.poemGreen.withValues(alpha: 0.15),
-        onSecondaryContainer: ColorTokens.poemGreen,
-        surface: ColorTokens.poemPaper,
-        onSurface: ColorTokens.poemInk,
-        error: ColorTokens.error,
-      ),
+      colorScheme: scheme,
       scaffoldBackgroundColor: ColorTokens.poemPaper,
       dividerColor: ColorTokens.poemDivider,
       textTheme: _textTheme(ColorTokens.poemInk),
@@ -38,24 +40,27 @@ class PoemTheme {
         elevation: 0,
         centerTitle: true,
       ),
+      chipTheme: _chipTheme(primary),
       extensions: const <ThemeExtension<dynamic>>[PoemThemeExt()],
     );
   }
 
   /// 暗色主题：深色底 + 墨绿主色（护眼模式）。
   static ThemeData dark() {
+    const primary = ColorTokens.poemGreen;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.dark,
+      primary: primary,
+      onPrimary: Colors.white,
+      secondary: ColorTokens.poemCinnabar,
+      surface: ColorTokens.darkSurface,
+      onSurface: ColorTokens.darkTextPrimary,
+      error: ColorTokens.error,
+    );
     final base = ThemeData.dark(useMaterial3: true);
     return base.copyWith(
-      colorScheme: base.colorScheme.copyWith(
-        primary: ColorTokens.poemGreen,
-        onPrimary: Colors.white,
-        secondary: ColorTokens.poemCinnabar,
-        secondaryContainer: ColorTokens.poemGreen.withValues(alpha: 0.2),
-        onSecondaryContainer: ColorTokens.poemGreen,
-        surface: ColorTokens.darkSurface,
-        onSurface: ColorTokens.darkTextPrimary,
-        error: ColorTokens.error,
-      ),
+      colorScheme: scheme,
       scaffoldBackgroundColor: ColorTokens.darkBackground,
       dividerColor: ColorTokens.poemDivider,
       textTheme: _textTheme(ColorTokens.darkTextPrimary),
@@ -65,7 +70,18 @@ class PoemTheme {
         elevation: 0,
         centerTitle: true,
       ),
+      chipTheme: _chipTheme(primary),
       extensions: const <ThemeExtension<dynamic>>[PoemThemeExt()],
+    );
+  }
+
+  /// ChoiceChip / FilterChip 选中态跟随 primary。
+  static ChipThemeData _chipTheme(Color primary) {
+    return ChipThemeData(
+      selectedColor: primary.withValues(alpha: 0.15),
+      checkmarkColor: primary,
+      secondarySelectedColor: primary.withValues(alpha: 0.15),
+      showCheckmark: true,
     );
   }
 

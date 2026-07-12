@@ -16,20 +16,22 @@ class MathTheme {
 
   /// 亮色主题：温白底 + 薰衣草紫主色 + 奶油黄/樱花粉次级色。
   static ThemeData light() {
+    const primary = ColorTokens.mathPurple;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.light,
+      primary: primary,
+      onPrimary: Colors.white,
+      secondary: ColorTokens.mathYellow,
+      onSecondary: ColorTokens.mathTextDark,
+      tertiary: ColorTokens.mathPink,
+      surface: ColorTokens.mathSurface,
+      onSurface: ColorTokens.mathTextDark,
+      error: ColorTokens.mathCoral,
+    );
     final base = ThemeData.light(useMaterial3: true);
     return base.copyWith(
-      colorScheme: base.colorScheme.copyWith(
-        primary: ColorTokens.mathPurple,
-        onPrimary: Colors.white,
-        secondary: ColorTokens.mathYellow,
-        onSecondary: ColorTokens.mathTextDark,
-        secondaryContainer: ColorTokens.mathPurple.withValues(alpha: 0.15),
-        onSecondaryContainer: ColorTokens.mathPurple,
-        tertiary: ColorTokens.mathPink,
-        surface: ColorTokens.mathSurface,
-        onSurface: ColorTokens.mathTextDark,
-        error: ColorTokens.mathCoral,
-      ),
+      colorScheme: scheme,
       scaffoldBackgroundColor: ColorTokens.mathBackground,
       textTheme: _textTheme(ColorTokens.mathTextDark),
       appBarTheme: const AppBarTheme(
@@ -38,25 +40,28 @@ class MathTheme {
         elevation: 0,
         centerTitle: true,
       ),
+      chipTheme: _chipTheme(primary),
       extensions: const <ThemeExtension<dynamic>>[MathThemeExt()],
     );
   }
 
   /// 暗色主题（占位）：深色底 + 薰衣草紫。
   static ThemeData dark() {
+    const primary = ColorTokens.mathPurple;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.dark,
+      primary: primary,
+      onPrimary: Colors.white,
+      secondary: ColorTokens.mathYellow,
+      tertiary: ColorTokens.mathPink,
+      surface: ColorTokens.darkSurface,
+      onSurface: ColorTokens.darkTextPrimary,
+      error: ColorTokens.mathCoral,
+    );
     final base = ThemeData.dark(useMaterial3: true);
     return base.copyWith(
-      colorScheme: base.colorScheme.copyWith(
-        primary: ColorTokens.mathPurple,
-        onPrimary: Colors.white,
-        secondary: ColorTokens.mathYellow,
-        secondaryContainer: ColorTokens.mathPurple.withValues(alpha: 0.2),
-        onSecondaryContainer: ColorTokens.mathPurple,
-        tertiary: ColorTokens.mathPink,
-        surface: ColorTokens.darkSurface,
-        onSurface: ColorTokens.darkTextPrimary,
-        error: ColorTokens.mathCoral,
-      ),
+      colorScheme: scheme,
       scaffoldBackgroundColor: ColorTokens.darkBackground,
       textTheme: _textTheme(ColorTokens.darkTextPrimary),
       appBarTheme: const AppBarTheme(
@@ -65,7 +70,18 @@ class MathTheme {
         elevation: 0,
         centerTitle: true,
       ),
+      chipTheme: _chipTheme(primary),
       extensions: const <ThemeExtension<dynamic>>[MathThemeExt()],
+    );
+  }
+
+  /// ChoiceChip / FilterChip 选中态跟随 primary。
+  static ChipThemeData _chipTheme(Color primary) {
+    return ChipThemeData(
+      selectedColor: primary.withValues(alpha: 0.15),
+      checkmarkColor: primary,
+      secondarySelectedColor: primary.withValues(alpha: 0.15),
+      showCheckmark: true,
     );
   }
 
