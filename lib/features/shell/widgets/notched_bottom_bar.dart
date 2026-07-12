@@ -38,9 +38,10 @@ class NotchedBottomBar extends StatelessWidget {
   final IconData centerIcon;
 
   static const double _barHeight = 68.0;
-  static const double _notchRadius = 32.0;
+  static const double _notchRadius = 30.0;
   static const double _fabDiameter = 56.0;
-  static const double _fabTopReserve = 24.0;
+  /// FAB 伸出底栏顶部的高度（仅露出上半弧的一部分）。
+  static const double _fabTopReserve = 20.0;
 
   @override
   Widget build(BuildContext context) {
@@ -85,13 +86,17 @@ class NotchedBottomBar extends StatelessWidget {
               ),
             ),
           ),
-          // 2) 中央凸起按钮 — 中心对齐底栏顶部凹槽
+          // 2) 中央凸起按钮 — 大部分嵌入底栏凹槽内，仅上弧露出
           Positioned(
-            bottom: _barHeight - _fabDiameter / 2,
-            child: _CenterFab(
-              icon: centerIcon,
-              backgroundColor: primary,
-              onTap: onCenterTap,
+            bottom: _barHeight - _fabDiameter + _fabTopReserve,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: _CenterFab(
+                icon: centerIcon,
+                backgroundColor: primary,
+                onTap: onCenterTap,
+              ),
             ),
           ),
         ],
