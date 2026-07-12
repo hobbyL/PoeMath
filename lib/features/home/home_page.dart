@@ -348,11 +348,8 @@ class HomePage extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(SpacingTokens.md),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
+        color: theme.colorScheme.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant,
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

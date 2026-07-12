@@ -226,11 +226,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(SpacingTokens.md),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
       ),
       child: child,
     );
