@@ -2,7 +2,7 @@
 //
 // 层级：features/shell
 // 职责：应用启动页。
-//       1. 展示品牌"诗算宝" + slogan + 占位 Lottie。
+//       1. 展示品牌"韵算" + slogan + 占位 Lottie。
 //       2. 执行首次数据导入（DataBootstrap），显示进度条。
 //       3. 导入完成后构建诗词索引，然后进入首页。
 

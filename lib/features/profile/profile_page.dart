@@ -143,7 +143,7 @@ class ProfilePage extends ConsumerWidget {
             Center(
               child: ref.watch(_packageInfoProvider).when(
                     data: (info) => Text(
-                      '诗算宝 v${info.version} (${info.buildNumber})',
+                      '韵算 v${info.version} (${info.buildNumber})',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant
                             .withValues(alpha: 0.5),

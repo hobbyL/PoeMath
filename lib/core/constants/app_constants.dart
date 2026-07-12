@@ -7,7 +7,7 @@ class AppConstants {
   const AppConstants._();
 
   /// 产品名（用户可见）
-  static const String appName = '诗算宝';
+  static const String appName = '韵算';
 
   /// 英文短名
   static const String appNameEn = 'PoeMath';
