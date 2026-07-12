@@ -1,20 +1,34 @@
-name: Build Android APK
+name: Build & Release Android APK
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch: # 手动触发
+    tags:
+      - 'v*' # 仅在打 v 开头的 tag 时触发，如 v0.0.1, v1.0.0
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write # 创建 Release 需要写权限
 
     steps:
       - uses: actions/checkout@v4
 
+      # -------- 从 tag 提取版本号 --------
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          echo "version_name=$TAG" >> $GITHUB_OUTPUT
+          # 用 tag 中的数字生成 versionCode: 0.0.1 → 1, 1.2.3 → 10203
+          IFS='.' read -r major minor patch <<< "$TAG"
+          VERSION_CODE=$(( ${major:-0} * 10000 + ${minor:-0} * 100 + ${patch:-0} ))
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "tag=v$TAG" >> $GITHUB_OUTPUT
+          echo "→ versionName=$TAG, versionCode=$VERSION_CODE"
+
+      # -------- 环境准备 --------
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -28,6 +42,18 @@ jobs:
           channel: stable
           cache: true
 
+      # -------- 签名配置 --------
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/poemath-release.jks
+          cat > android/key.properties << EOF
+          storeFile=poemath-release.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+
+      # -------- 构建 --------
       - name: Install dependencies
         run: flutter pub get
 
@@ -37,17 +63,37 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      - name: Build APK (debug)
-        run: flutter build apk --debug
+      - name: Build release APK
+        run: |
+          flutter build apk --release \
+            --build-name=${{ steps.version.outputs.version_name }} \
+            --build-number=${{ steps.version.outputs.version_code }}
 
-      - name: Build APK (release)
-        run: flutter build apk --release
+      - name: Rename APK with version
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/PoeMath-${{ steps.version.outputs.tag }}.apk
 
-      - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
+      # -------- 发布 Release --------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: apk-release
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 30
+          name: 诗算宝 ${{ steps.version.outputs.tag }}
+          body: |
+            ## 诗算宝 ${{ steps.version.outputs.tag }}
+
+            版本号: `${{ steps.version.outputs.version_name }}`
+            构建号: `${{ steps.version.outputs.version_code }}`
+
+            ### 安装说明
+            1. 下载下方 APK 文件
+            2. 在 Android 设备上打开安装
+            3. 首次安装可能需要允许「安装未知来源应用」
+
+            ---
+            > ⚠️ 请务必从此 Release 页面下载，确保签名一致可覆盖安装。
+          files: build/app/outputs/flutter-apk/PoeMath-${{ steps.version.outputs.tag }}.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

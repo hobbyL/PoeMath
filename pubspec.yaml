@@ -38,6 +38,9 @@ dependencies:
   # 音效（Phase 5 使用，Phase 0 声明）
   audioplayers: ^6.1.0
 
+  # 版本信息（运行时读取 tag 写入的版本号）
+  package_info_plus: ^8.1.3
+
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
