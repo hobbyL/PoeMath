@@ -15,9 +15,12 @@ class AppConstants {
   /// 版本号（build 时可覆盖）
   static const String appVersion = '0.1.0';
 
+  /// 数据版本号（修改后首次启动会重新导入 asset 数据）
+  static const String dataVersion = '1.0.0';
+
   /// slogan
   static const String slogan = '读诗、算数，慢慢来';
 
-  /// Splash 停留时长（毫秒）
-  static const int splashDurationMs = 300;
+  /// Splash 最短停留时长（毫秒）— 仅在跳过导入时生效
+  static const int splashMinDurationMs = 300;
 }

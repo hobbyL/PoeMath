@@ -12,6 +12,8 @@ import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
 
+import '../helpers/hive_test_helper.dart';
+
 void main() {
   test('AppTheme.resolve 返回不同 subject 的正确主色', () {
     final poemLight =
@@ -23,29 +25,40 @@ void main() {
     expect(mathLight.colorScheme.primary, ColorTokens.mathPurple);
   });
 
-  testWidgets('切换 activeSubject 时派生的 lightTheme 应随之变化', (tester) async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
+  group('widget 主题切换', () {
+    setUp(() async {
+      await setUpHiveForTesting();
+    });
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const App(),
-      ),
-    );
-    // 让 splash + 路由跳转完成
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pumpAndSettle(const Duration(seconds: 1));
+    tearDown(() async {
+      await tearDownHiveForTesting();
+    });
 
-    // 初始 poem 主题
-    final ThemeData light1 = container.read(lightThemeProvider);
-    expect(light1.colorScheme.primary, ColorTokens.poemGreen);
+    testWidgets('切换 activeSubject 时派生的 lightTheme 应随之变化', (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
 
-    // 切到 math
-    container.read(activeSubjectProvider.notifier).state = AppSubject.math;
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const App(),
+        ),
+      );
+      // 让 splash + 路由跳转完成（用 pump 代替 pumpAndSettle 避免动画超时）
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 200));
 
-    final ThemeData light2 = container.read(lightThemeProvider);
-    expect(light2.colorScheme.primary, ColorTokens.mathPurple);
+      // 初始 poem 主题
+      final ThemeData light1 = container.read(lightThemeProvider);
+      expect(light1.colorScheme.primary, ColorTokens.poemGreen);
+
+      // 切到 math
+      container.read(activeSubjectProvider.notifier).state = AppSubject.math;
+      await tester.pump();
+
+      final ThemeData light2 = container.read(lightThemeProvider);
+      expect(light2.colorScheme.primary, ColorTokens.mathPurple);
+    });
   });
 }

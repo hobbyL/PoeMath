@@ -1,0 +1,485 @@
+[
+  {
+    "id": "formula_perimeter_rect",
+    "category": "几何周长",
+    "name": "长方形周长",
+    "formula_text": "C = (a + b) × 2",
+    "formula_latex": "C = (a + b) \\times 2",
+    "grade": 3,
+    "params": [
+      {"symbol": "C", "meaning": "周长"},
+      {"symbol": "a", "meaning": "长"},
+      {"symbol": "b", "meaning": "宽"}
+    ],
+    "memory_tip": "长加宽再乘二。",
+    "example": "长 5 cm、宽 3 cm，周长 = (5+3)×2 = 16 cm。",
+    "related_formulas": ["formula_perimeter_square", "formula_area_rect"]
+  },
+  {
+    "id": "formula_perimeter_square",
+    "category": "几何周长",
+    "name": "正方形周长",
+    "formula_text": "C = 4a",
+    "formula_latex": "C = 4a",
+    "grade": 3,
+    "params": [
+      {"symbol": "C", "meaning": "周长"},
+      {"symbol": "a", "meaning": "边长"}
+    ],
+    "memory_tip": "四条边一样长，边长乘 4。",
+    "example": "边长 6 cm，周长 = 4×6 = 24 cm。",
+    "related_formulas": ["formula_area_square"]
+  },
+  {
+    "id": "formula_perimeter_circle",
+    "category": "几何周长",
+    "name": "圆的周长",
+    "formula_text": "C = 2πr = πd",
+    "formula_latex": "C = 2\\pi r = \\pi d",
+    "grade": 6,
+    "params": [
+      {"symbol": "C", "meaning": "周长"},
+      {"symbol": "r", "meaning": "半径"},
+      {"symbol": "d", "meaning": "直径"},
+      {"symbol": "π", "meaning": "圆周率约 3.14"}
+    ],
+    "memory_tip": "两 π r，也可以 π 乘直径。",
+    "example": "半径 5 cm，周长 = 2×3.14×5 = 31.4 cm。",
+    "related_formulas": ["formula_area_circle"]
+  },
+  {
+    "id": "formula_area_rect",
+    "category": "几何面积",
+    "name": "长方形面积",
+    "formula_text": "S = a × b",
+    "formula_latex": "S = a \\times b",
+    "grade": 3,
+    "params": [
+      {"symbol": "S", "meaning": "面积"},
+      {"symbol": "a", "meaning": "长"},
+      {"symbol": "b", "meaning": "宽"}
+    ],
+    "memory_tip": "长乘宽。",
+    "example": "长 8 m、宽 4 m，面积 = 8×4 = 32 m²。",
+    "related_formulas": ["formula_perimeter_rect"]
+  },
+  {
+    "id": "formula_area_square",
+    "category": "几何面积",
+    "name": "正方形面积",
+    "formula_text": "S = a²",
+    "formula_latex": "S = a^2",
+    "grade": 3,
+    "params": [
+      {"symbol": "S", "meaning": "面积"},
+      {"symbol": "a", "meaning": "边长"}
+    ],
+    "memory_tip": "边长自己乘自己。",
+    "example": "边长 6 cm，面积 = 6×6 = 36 cm²。",
+    "related_formulas": ["formula_perimeter_square"]
+  },
+  {
+    "id": "formula_area_parallelogram",
+    "category": "几何面积",
+    "name": "平行四边形面积",
+    "formula_text": "S = a × h",
+    "formula_latex": "S = a \\times h",
+    "grade": 5,
+    "params": [
+      {"symbol": "S", "meaning": "面积"},
+      {"symbol": "a", "meaning": "底"},
+      {"symbol": "h", "meaning": "高（对应底的垂直高度）"}
+    ],
+    "memory_tip": "底乘对应的高。",
+    "example": "底 10 cm、高 6 cm，面积 = 10×6 = 60 cm²。",
+    "related_formulas": ["formula_area_triangle"]
+  },
+  {
+    "id": "formula_area_triangle",
+    "category": "几何面积",
+    "name": "三角形面积",
+    "formula_text": "S = a × h ÷ 2",
+    "formula_latex": "S = \\frac{a h}{2}",
+    "grade": 5,
+    "params": [
+      {"symbol": "S", "meaning": "面积"},
+      {"symbol": "a", "meaning": "底"},
+      {"symbol": "h", "meaning": "高"}
+    ],
+    "memory_tip": "底乘高除以二。",
+    "example": "底 8 cm、高 5 cm，面积 = 8×5÷2 = 20 cm²。",
+    "related_formulas": ["formula_area_parallelogram"]
+  },
+  {
+    "id": "formula_area_trapezoid",
+    "category": "几何面积",
+    "name": "梯形面积",
+    "formula_text": "S = (a + b) × h ÷ 2",
+    "formula_latex": "S = \\frac{(a + b) h}{2}",
+    "grade": 5,
+    "params": [
+      {"symbol": "S", "meaning": "面积"},
+      {"symbol": "a", "meaning": "上底"},
+      {"symbol": "b", "meaning": "下底"},
+      {"symbol": "h", "meaning": "高"}
+    ],
+    "memory_tip": "上底加下底，再乘高除以二。",
+    "example": "上底 3、下底 7、高 4，面积 = (3+7)×4÷2 = 20。",
+    "related_formulas": ["formula_area_triangle"]
+  },
+  {
+    "id": "formula_area_circle",
+    "category": "几何面积",
+    "name": "圆的面积",
+    "formula_text": "S = π × r²",
+    "formula_latex": "S = \\pi r^2",
+    "grade": 6,
+    "params": [
+      {"symbol": "S", "meaning": "面积"},
+      {"symbol": "r", "meaning": "半径"},
+      {"symbol": "π", "meaning": "圆周率约 3.14"}
+    ],
+    "memory_tip": "π 乘半径的平方。",
+    "example": "半径 3 cm，面积 = 3.14×3² = 28.26 cm²。",
+    "related_formulas": ["formula_perimeter_circle"]
+  },
+  {
+    "id": "formula_volume_cuboid",
+    "category": "几何体积",
+    "name": "长方体体积",
+    "formula_text": "V = a × b × h",
+    "formula_latex": "V = a b h",
+    "grade": 5,
+    "params": [
+      {"symbol": "V", "meaning": "体积"},
+      {"symbol": "a", "meaning": "长"},
+      {"symbol": "b", "meaning": "宽"},
+      {"symbol": "h", "meaning": "高"}
+    ],
+    "memory_tip": "长乘宽乘高。",
+    "example": "3×4×5 的长方体，体积 = 60 立方单位。",
+    "related_formulas": ["formula_volume_cube", "formula_surface_cuboid"]
+  },
+  {
+    "id": "formula_volume_cube",
+    "category": "几何体积",
+    "name": "正方体体积",
+    "formula_text": "V = a³",
+    "formula_latex": "V = a^3",
+    "grade": 5,
+    "params": [
+      {"symbol": "V", "meaning": "体积"},
+      {"symbol": "a", "meaning": "棱长"}
+    ],
+    "memory_tip": "棱长的立方。",
+    "example": "棱长 4 cm，体积 = 4³ = 64 cm³。",
+    "related_formulas": ["formula_volume_cuboid", "formula_surface_cube"]
+  },
+  {
+    "id": "formula_volume_cylinder",
+    "category": "几何体积",
+    "name": "圆柱体积",
+    "formula_text": "V = S底 × h = π × r² × h",
+    "formula_latex": "V = \\pi r^2 h",
+    "grade": 6,
+    "params": [
+      {"symbol": "V", "meaning": "体积"},
+      {"symbol": "r", "meaning": "底面半径"},
+      {"symbol": "h", "meaning": "高"}
+    ],
+    "memory_tip": "底面积乘高。",
+    "example": "r=2、h=5，体积 = 3.14×4×5 = 62.8 立方单位。",
+    "related_formulas": ["formula_volume_cone", "formula_area_circle"]
+  },
+  {
+    "id": "formula_volume_cone",
+    "category": "几何体积",
+    "name": "圆锥体积",
+    "formula_text": "V = (1/3) × π × r² × h",
+    "formula_latex": "V = \\frac{1}{3} \\pi r^2 h",
+    "grade": 6,
+    "params": [
+      {"symbol": "V", "meaning": "体积"},
+      {"symbol": "r", "meaning": "底面半径"},
+      {"symbol": "h", "meaning": "高"}
+    ],
+    "memory_tip": "等底等高的圆柱体积的三分之一。",
+    "example": "r=3、h=6，体积 = (1/3)×3.14×9×6 = 56.52。",
+    "related_formulas": ["formula_volume_cylinder"]
+  },
+  {
+    "id": "formula_surface_cube",
+    "category": "几何面积",
+    "name": "正方体表面积",
+    "formula_text": "S = 6a²",
+    "formula_latex": "S = 6a^2",
+    "grade": 5,
+    "params": [
+      {"symbol": "S", "meaning": "表面积"},
+      {"symbol": "a", "meaning": "棱长"}
+    ],
+    "memory_tip": "六个面都是正方形。",
+    "example": "棱长 3 cm，表面积 = 6×9 = 54 cm²。",
+    "related_formulas": ["formula_volume_cube"]
+  },
+  {
+    "id": "formula_surface_cuboid",
+    "category": "几何面积",
+    "name": "长方体表面积",
+    "formula_text": "S = 2 × (ab + ah + bh)",
+    "formula_latex": "S = 2(ab + ah + bh)",
+    "grade": 5,
+    "params": [
+      {"symbol": "S", "meaning": "表面积"},
+      {"symbol": "a", "meaning": "长"},
+      {"symbol": "b", "meaning": "宽"},
+      {"symbol": "h", "meaning": "高"}
+    ],
+    "memory_tip": "三对面之和的 2 倍。",
+    "example": "2×3×4，表面积 = 2×(6+8+12) = 52。",
+    "related_formulas": ["formula_volume_cuboid"]
+  },
+  {
+    "id": "formula_length_units",
+    "category": "单位换算",
+    "name": "长度单位进率",
+    "formula_text": "1 km = 1000 m；1 m = 10 dm = 100 cm = 1000 mm",
+    "formula_latex": "1\\,\\text{km} = 1000\\,\\text{m};\\ 1\\,\\text{m} = 100\\,\\text{cm}",
+    "grade": 3,
+    "params": [],
+    "memory_tip": "相邻单位进率是 10（毫米-厘米-分米-米），米到千米是 1000。",
+    "example": "2.5 m = 250 cm = 2500 mm。",
+    "related_formulas": ["formula_area_units", "formula_volume_units"]
+  },
+  {
+    "id": "formula_area_units",
+    "category": "单位换算",
+    "name": "面积单位进率",
+    "formula_text": "1 m² = 100 dm² = 10000 cm²；1 公顷 = 10000 m²",
+    "formula_latex": "1\\,\\text{m}^2 = 10000\\,\\text{cm}^2",
+    "grade": 3,
+    "params": [],
+    "memory_tip": "长度单位进率的平方。",
+    "example": "3 m² = 30000 cm²。",
+    "related_formulas": ["formula_length_units"]
+  },
+  {
+    "id": "formula_volume_units",
+    "category": "单位换算",
+    "name": "体积单位进率",
+    "formula_text": "1 m³ = 1000 dm³ = 1000000 cm³；1 dm³ = 1 L；1 cm³ = 1 mL",
+    "formula_latex": "1\\,\\text{m}^3 = 1000\\,\\text{dm}^3;\\ 1\\,\\text{L} = 1\\,\\text{dm}^3",
+    "grade": 5,
+    "params": [],
+    "memory_tip": "长度单位进率的立方；分米立方就是升。",
+    "example": "500 mL = 500 cm³。",
+    "related_formulas": ["formula_volume_cuboid"]
+  },
+  {
+    "id": "formula_mass_units",
+    "category": "单位换算",
+    "name": "质量单位进率",
+    "formula_text": "1 t = 1000 kg；1 kg = 1000 g",
+    "formula_latex": "1\\,\\text{t} = 1000\\,\\text{kg}",
+    "grade": 3,
+    "params": [],
+    "memory_tip": "吨、千克、克，每级进 1000。",
+    "example": "2.5 kg = 2500 g。",
+    "related_formulas": []
+  },
+  {
+    "id": "formula_time_units",
+    "category": "单位换算",
+    "name": "时间单位进率",
+    "formula_text": "1 天 = 24 时；1 时 = 60 分；1 分 = 60 秒",
+    "formula_latex": "1\\,\\text{天} = 24\\,\\text{时};\\ 1\\,\\text{时} = 60\\,\\text{分}",
+    "grade": 3,
+    "params": [],
+    "memory_tip": "一天 24 时，一时 60 分，一分 60 秒。",
+    "example": "1.5 小时 = 90 分钟 = 5400 秒。",
+    "related_formulas": []
+  },
+  {
+    "id": "formula_speed",
+    "category": "数量关系",
+    "name": "速度公式",
+    "formula_text": "路程 = 速度 × 时间；速度 = 路程 ÷ 时间；时间 = 路程 ÷ 速度",
+    "formula_latex": "s = v \\times t",
+    "grade": 4,
+    "params": [
+      {"symbol": "s", "meaning": "路程"},
+      {"symbol": "v", "meaning": "速度"},
+      {"symbol": "t", "meaning": "时间"}
+    ],
+    "memory_tip": "速时路三兄弟：路程 = 速度 × 时间。",
+    "example": "汽车每小时 60 km，行驶 3 小时 = 180 km。",
+    "related_formulas": ["formula_work", "formula_price"]
+  },
+  {
+    "id": "formula_price",
+    "category": "数量关系",
+    "name": "总价公式",
+    "formula_text": "总价 = 单价 × 数量",
+    "formula_latex": "\\text{总价} = \\text{单价} \\times \\text{数量}",
+    "grade": 4,
+    "params": [
+      {"symbol": "总价", "meaning": "全部的价格"},
+      {"symbol": "单价", "meaning": "每件的价格"},
+      {"symbol": "数量", "meaning": "件数"}
+    ],
+    "memory_tip": "单价乘数量就是总价。",
+    "example": "每支笔 3 元，买 5 支共 15 元。",
+    "related_formulas": ["formula_speed", "formula_work"]
+  },
+  {
+    "id": "formula_work",
+    "category": "数量关系",
+    "name": "工作总量公式",
+    "formula_text": "工作总量 = 工作效率 × 工作时间",
+    "formula_latex": "W = \\eta \\times t",
+    "grade": 6,
+    "params": [
+      {"symbol": "W", "meaning": "工作总量"},
+      {"symbol": "η", "meaning": "工作效率"},
+      {"symbol": "t", "meaning": "工作时间"}
+    ],
+    "memory_tip": "效率乘时间即总量；也可倒推。",
+    "example": "每小时装 20 台，8 小时共 160 台。",
+    "related_formulas": ["formula_speed"]
+  },
+  {
+    "id": "formula_law_add_commutative",
+    "category": "运算定律",
+    "name": "加法交换律",
+    "formula_text": "a + b = b + a",
+    "formula_latex": "a + b = b + a",
+    "grade": 4,
+    "params": [],
+    "memory_tip": "两个加数交换位置，和不变。",
+    "example": "25 + 78 = 78 + 25 = 103。",
+    "related_formulas": ["formula_law_add_associative"]
+  },
+  {
+    "id": "formula_law_add_associative",
+    "category": "运算定律",
+    "name": "加法结合律",
+    "formula_text": "(a + b) + c = a + (b + c)",
+    "formula_latex": "(a + b) + c = a + (b + c)",
+    "grade": 4,
+    "params": [],
+    "memory_tip": "先加谁都一样。",
+    "example": "25 + 37 + 63 = 25 + (37 + 63) = 125。",
+    "related_formulas": ["formula_law_add_commutative"]
+  },
+  {
+    "id": "formula_law_mul_commutative",
+    "category": "运算定律",
+    "name": "乘法交换律",
+    "formula_text": "a × b = b × a",
+    "formula_latex": "a \\times b = b \\times a",
+    "grade": 4,
+    "params": [],
+    "memory_tip": "交换因数位置，积不变。",
+    "example": "4 × 25 = 25 × 4 = 100。",
+    "related_formulas": ["formula_law_mul_associative", "formula_law_distributive"]
+  },
+  {
+    "id": "formula_law_mul_associative",
+    "category": "运算定律",
+    "name": "乘法结合律",
+    "formula_text": "(a × b) × c = a × (b × c)",
+    "formula_latex": "(a \\times b) \\times c = a \\times (b \\times c)",
+    "grade": 4,
+    "params": [],
+    "memory_tip": "先乘谁都一样。",
+    "example": "125 × 8 × 4 = 125 × (8 × 4) = 4000。",
+    "related_formulas": ["formula_law_mul_commutative"]
+  },
+  {
+    "id": "formula_law_distributive",
+    "category": "运算定律",
+    "name": "乘法分配律",
+    "formula_text": "(a + b) × c = a × c + b × c",
+    "formula_latex": "(a + b) \\times c = a c + b c",
+    "grade": 4,
+    "params": [],
+    "memory_tip": "括号里的每个数都要乘一次外面的数。",
+    "example": "25 × 12 = 25 × (10 + 2) = 250 + 50 = 300。",
+    "related_formulas": ["formula_law_mul_commutative"]
+  },
+  {
+    "id": "formula_fraction_add_same_denom",
+    "category": "分数小数",
+    "name": "同分母分数加减",
+    "formula_text": "a/c ± b/c = (a ± b)/c",
+    "formula_latex": "\\frac{a}{c} \\pm \\frac{b}{c} = \\frac{a \\pm b}{c}",
+    "grade": 5,
+    "params": [],
+    "memory_tip": "分母不变，分子相加减。",
+    "example": "3/7 + 2/7 = 5/7。",
+    "related_formulas": ["formula_fraction_add_diff_denom"]
+  },
+  {
+    "id": "formula_fraction_add_diff_denom",
+    "category": "分数小数",
+    "name": "异分母分数加减",
+    "formula_text": "a/b ± c/d = (ad ± bc)/(bd)",
+    "formula_latex": "\\frac{a}{b} \\pm \\frac{c}{d} = \\frac{ad \\pm bc}{bd}",
+    "grade": 5,
+    "params": [],
+    "memory_tip": "先通分，再按同分母法则。",
+    "example": "1/2 + 1/3 = 3/6 + 2/6 = 5/6。",
+    "related_formulas": ["formula_fraction_add_same_denom"]
+  },
+  {
+    "id": "formula_fraction_multiply",
+    "category": "分数小数",
+    "name": "分数乘法",
+    "formula_text": "(a/b) × (c/d) = (a × c)/(b × d)",
+    "formula_latex": "\\frac{a}{b} \\times \\frac{c}{d} = \\frac{ac}{bd}",
+    "grade": 6,
+    "params": [],
+    "memory_tip": "分子乘分子，分母乘分母，能约先约。",
+    "example": "2/3 × 3/4 = 6/12 = 1/2。",
+    "related_formulas": ["formula_fraction_divide"]
+  },
+  {
+    "id": "formula_fraction_divide",
+    "category": "分数小数",
+    "name": "分数除法",
+    "formula_text": "(a/b) ÷ (c/d) = (a/b) × (d/c)",
+    "formula_latex": "\\frac{a}{b} \\div \\frac{c}{d} = \\frac{a}{b} \\times \\frac{d}{c}",
+    "grade": 6,
+    "params": [],
+    "memory_tip": "除以一个数等于乘它的倒数。",
+    "example": "2/3 ÷ 4/5 = 2/3 × 5/4 = 10/12 = 5/6。",
+    "related_formulas": ["formula_fraction_multiply"]
+  },
+  {
+    "id": "formula_percentage",
+    "category": "比例",
+    "name": "百分数",
+    "formula_text": "百分数 = (比较量 ÷ 标准量) × 100%",
+    "formula_latex": "\\%= \\frac{a}{b} \\times 100",
+    "grade": 6,
+    "params": [
+      {"symbol": "a", "meaning": "比较量"},
+      {"symbol": "b", "meaning": "标准量"}
+    ],
+    "memory_tip": "分子除分母乘 100，加百分号。",
+    "example": "20 是 50 的 40%。",
+    "related_formulas": ["formula_ratio"]
+  },
+  {
+    "id": "formula_ratio",
+    "category": "比例",
+    "name": "比例基本性质",
+    "formula_text": "若 a : b = c : d，则 a × d = b × c",
+    "formula_latex": "a : b = c : d \\Rightarrow ad = bc",
+    "grade": 6,
+    "params": [],
+    "memory_tip": "内项之积等于外项之积。",
+    "example": "3 : 4 = 6 : x → 3x = 24 → x = 8。",
+    "related_formulas": ["formula_percentage"]
+  }
+]

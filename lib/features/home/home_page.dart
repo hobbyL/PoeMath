@@ -15,7 +15,7 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(AppConstants.appName)),
+      appBar: AppBar(title: const Text(AppConstants.appName)),
       body: Padding(
         padding: const EdgeInsets.all(SpacingTokens.lg),
         child: Center(

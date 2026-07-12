@@ -17,7 +17,7 @@ import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 import 'package:poemath/features/shell/splash_page.dart';
 
-/// Provider<GoRouter>：整个应用共享一份 GoRouter 实例。
+/// `Provider<GoRouter>`：整个应用共享一份 GoRouter 实例。
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.splash,
