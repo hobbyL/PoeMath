@@ -109,13 +109,14 @@ class HomePage extends ConsumerWidget {
     WidgetRef ref,
   ) {
     final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(SpacingTokens.lg),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [ColorTokens.mathPurple, ColorTokens.mathBlue],
+        gradient: LinearGradient(
+          colors: [primary, primary.withValues(alpha: 0.6)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -175,10 +176,10 @@ class HomePage extends ConsumerWidget {
               child: const Text('打卡'),
             ),
           if (isCheckedIn)
-            const Icon(
+            Icon(
               Icons.check_circle_rounded,
               size: 48,
-              color: ColorTokens.mathMint,
+              color: theme.colorScheme.onPrimary,
             ),
         ],
       ),
@@ -190,6 +191,10 @@ class HomePage extends ConsumerWidget {
     UserStats stats,
     int learnedPoems,
   ) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final secondary = theme.colorScheme.secondary;
+
     return Row(
       children: [
         Expanded(
@@ -198,7 +203,7 @@ class HomePage extends ConsumerWidget {
             icon: Icons.menu_book_rounded,
             value: '$learnedPoems',
             label: '已学诗词',
-            color: ColorTokens.poemGreen,
+            color: primary,
           ),
         ),
         const SizedBox(width: SpacingTokens.sm),
@@ -208,7 +213,7 @@ class HomePage extends ConsumerWidget {
             icon: Icons.calculate_rounded,
             value: '${stats.mathTotalProblems}',
             label: '口算做题',
-            color: ColorTokens.mathPurple,
+            color: secondary,
           ),
         ),
         const SizedBox(width: SpacingTokens.sm),
@@ -218,7 +223,7 @@ class HomePage extends ConsumerWidget {
             icon: Icons.star_rounded,
             value: '${stats.totalStars}',
             label: '总星星',
-            color: ColorTokens.mathYellow,
+            color: ColorTokens.poemGold,
           ),
         ),
       ],
@@ -262,74 +267,70 @@ class HomePage extends ConsumerWidget {
   }
 
   Widget _buildQuickActions(BuildContext context, int mistakeCount) {
-    return Column(
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final secondary = theme.colorScheme.secondary;
+
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _QuickActionButton(
-                icon: Icons.menu_book_rounded,
-                label: '背诗词',
-                color: ColorTokens.poemGreen,
-                onTap: () => context.go(AppRoutes.poemTab),
-              ),
-            ),
-            const SizedBox(width: SpacingTokens.sm),
-            Expanded(
-              child: _QuickActionButton(
-                icon: Icons.calculate_rounded,
-                label: '做口算',
-                color: ColorTokens.mathPurple,
-                onTap: () => context.go(AppRoutes.mathTab),
-              ),
-            ),
-          ],
+        Expanded(
+          child: _QuickActionButton(
+            icon: Icons.menu_book_rounded,
+            label: '背诗词',
+            color: primary,
+            onTap: () => context.go(AppRoutes.poemTab),
+          ),
         ),
-        const SizedBox(height: SpacingTokens.sm),
-        Row(
-          children: [
-            Expanded(
-              child: _QuickActionButton(
-                icon: Icons.functions_rounded,
-                label: '查公式',
-                color: ColorTokens.mathBlue,
-                onTap: () => context.go(AppRoutes.studyHub),
+        const SizedBox(width: SpacingTokens.sm),
+        Expanded(
+          child: _QuickActionButton(
+            icon: Icons.calculate_rounded,
+            label: '做口算',
+            color: secondary,
+            onTap: () => context.go(AppRoutes.mathTab),
+          ),
+        ),
+        const SizedBox(width: SpacingTokens.sm),
+        Expanded(
+          child: _QuickActionButton(
+            icon: Icons.functions_rounded,
+            label: '查公式',
+            color: primary.withValues(alpha: 0.7),
+            onTap: () => context.go(AppRoutes.studyHub),
+          ),
+        ),
+        const SizedBox(width: SpacingTokens.sm),
+        Expanded(
+          child: Stack(
+            children: [
+              _QuickActionButton(
+                icon: Icons.error_outline_rounded,
+                label: '错题本',
+                color: theme.colorScheme.error,
+                onTap: () => context.push(AppRoutes.mathMistake),
               ),
-            ),
-            const SizedBox(width: SpacingTokens.sm),
-            Expanded(
-              child: Stack(
-                children: [
-                  _QuickActionButton(
-                    icon: Icons.error_outline_rounded,
-                    label: '错题本',
-                    color: ColorTokens.mathCoral,
-                    onTap: () => context.push(AppRoutes.mathMistake),
-                  ),
-                  if (mistakeCount > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: ColorTokens.error,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$mistakeCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+              if (mistakeCount > 0)
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: ColorTokens.error,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '$mistakeCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                ],
-              ),
-            ),
-          ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );
@@ -354,10 +355,10 @@ class HomePage extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.flag_rounded,
                 size: 20,
-                color: ColorTokens.mathCoral,
+                color: theme.colorScheme.secondary,
               ),
               const SizedBox(width: SpacingTokens.xs),
               Text(

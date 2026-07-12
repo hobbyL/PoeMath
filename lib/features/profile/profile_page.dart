@@ -43,11 +43,11 @@ class ProfilePage extends ConsumerWidget {
                   CircleAvatar(
                     radius: 40,
                     backgroundColor:
-                        ColorTokens.mathPurple.withValues(alpha: 0.15),
+                        theme.colorScheme.primary.withValues(alpha: 0.15),
                     child: Text(
                       stats.levelName,
                       style: theme.textTheme.headlineSmall?.copyWith(
-                        color: ColorTokens.mathPurple,
+                        color: theme.colorScheme.primary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -191,7 +191,7 @@ class ProfilePage extends ConsumerWidget {
                   context,
                   '${stats.poemsLearned}',
                   '已学诗词',
-                  ColorTokens.poemGreen,
+                  theme.colorScheme.primary,
                 ),
               ),
               Expanded(
@@ -199,7 +199,7 @@ class ProfilePage extends ConsumerWidget {
                   context,
                   '${stats.poemsMastered}',
                   '已掌握',
-                  ColorTokens.poemGreenDeep,
+                  theme.colorScheme.primary,
                 ),
               ),
               Expanded(
@@ -207,7 +207,7 @@ class ProfilePage extends ConsumerWidget {
                   context,
                   '$streak',
                   '连续打卡',
-                  ColorTokens.mathCoral,
+                  theme.colorScheme.secondary,
                 ),
               ),
             ],
@@ -220,7 +220,7 @@ class ProfilePage extends ConsumerWidget {
                   context,
                   '${stats.mathTotalProblems}',
                   '口算总题',
-                  ColorTokens.mathPurple,
+                  theme.colorScheme.secondary,
                 ),
               ),
               Expanded(
@@ -230,7 +230,7 @@ class ProfilePage extends ConsumerWidget {
                       ? '${(stats.mathAccuracy * 100).toStringAsFixed(0)}%'
                       : '-',
                   '正确率',
-                  ColorTokens.mathMint,
+                  ColorTokens.success,
                 ),
               ),
               Expanded(
