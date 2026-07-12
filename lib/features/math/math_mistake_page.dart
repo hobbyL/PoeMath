@@ -192,48 +192,63 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
                     mistake.solutionStepsJson!.isNotEmpty)
                   _buildSteps(context, mistake.solutionStepsJson!),
 
-                // 操作按钮
+                // 操作按钮（一行四个）
                 const SizedBox(height: SpacingTokens.sm),
-                Wrap(
-                  spacing: SpacingTokens.xs,
-                  runSpacing: SpacingTokens.xs,
-                  alignment: WrapAlignment.end,
+                Row(
                   children: [
-                    // 再练一次
-                    TextButton.icon(
-                      onPressed: () => _repractice(context),
-                      icon: const Icon(Icons.replay, size: 16),
-                      label: const Text('再练一次'),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => _repractice(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: SpacingTokens.xs,
+                          ),
+                        ),
+                        child: const Text('再练一次', style: TextStyle(fontSize: 12)),
+                      ),
                     ),
-                    // 生成同类新题
-                    TextButton.icon(
-                      onPressed: () => _generateSimilar(context),
-                      icon: const Icon(Icons.auto_awesome, size: 16),
-                      label: const Text('同类新题'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: theme.colorScheme.primary,
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => _generateSimilar(context),
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.colorScheme.primary,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: SpacingTokens.xs,
+                          ),
+                        ),
+                        child: const Text('同类新题', style: TextStyle(fontSize: 12)),
                       ),
                     ),
                     if (!mistake.isResolved)
-                      TextButton.icon(
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () async {
+                            final repo = ref.read(mathMistakeRepoProvider);
+                            await repo.resolve(mistake.id);
+                            ref.invalidate(mathMistakesProvider);
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: SpacingTokens.xs,
+                            ),
+                          ),
+                          child: const Text('已掌握', style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                    Expanded(
+                      child: TextButton(
                         onPressed: () async {
                           final repo = ref.read(mathMistakeRepoProvider);
-                          await repo.resolve(mistake.id);
+                          await repo.delete(mistake.id);
                           ref.invalidate(mathMistakesProvider);
                         },
-                        icon: const Icon(Icons.check, size: 16),
-                        label: const Text('标记已掌握'),
-                      ),
-                    TextButton.icon(
-                      onPressed: () async {
-                        final repo = ref.read(mathMistakeRepoProvider);
-                        await repo.delete(mistake.id);
-                        ref.invalidate(mathMistakesProvider);
-                      },
-                      icon: const Icon(Icons.delete_outline, size: 16),
-                      label: const Text('删除'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: theme.colorScheme.error,
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.colorScheme.error,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: SpacingTokens.xs,
+                          ),
+                        ),
+                        child: const Text('删除', style: TextStyle(fontSize: 12)),
                       ),
                     ),
                   ],
