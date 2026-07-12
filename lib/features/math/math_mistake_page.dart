@@ -82,19 +82,20 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
     final mistake = widget.mistake;
     final theme = Theme.of(context);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: SpacingTokens.sm),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        side: mistake.isResolved
-            ? const BorderSide(color: ColorTokens.success)
-            : BorderSide.none,
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
       child: InkWell(
         onTap: () => setState(() => _expanded = !_expanded),
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(SpacingTokens.md),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+            border: mistake.isResolved
+                ? Border.all(color: ColorTokens.success)
+                : null,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
