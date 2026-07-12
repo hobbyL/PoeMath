@@ -1,6 +1,7 @@
 // lib/features/math/widgets/grade_semester_card.dart
 //
-// 年级学期选择卡片。
+// 年级学期选择卡片：无边框、纯色背景、圆角，与首页卡片风格一致。
+// 选中状态仅显示边框，不变背景色。适合 Grid 一行两个布局。
 
 import 'package:flutter/material.dart';
 
@@ -38,65 +39,49 @@ class GradeSemesterCard extends StatelessWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
 
-    return Card(
-      elevation: isSelected ? 4 : 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        side: isSelected
-            ? BorderSide(color: primary, width: 2)
-            : BorderSide.none,
-      ),
-      color: isSelected
-          ? primary.withValues(alpha: 0.08)
-          : theme.colorScheme.surface,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        child: Padding(
-          padding: const EdgeInsets.all(SpacingTokens.md),
-          child: Row(
-            children: [
-              Icon(
-                _gradeIcons[grade] ?? Icons.school,
-                size: 32,
-                color: isSelected
-                    ? primary
-                    : theme.colorScheme.onSurfaceVariant,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.md,
+          vertical: SpacingTokens.sm,
+        ),
+        decoration: BoxDecoration(
+          color: primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+          border: isSelected ? Border.all(color: primary, width: 2) : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _gradeIcons[grade] ?? Icons.school,
+              size: 28,
+              color: isSelected
+                  ? primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              label,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: isSelected ? primary : theme.colorScheme.onSurface,
               ),
-              const SizedBox(width: SpacingTokens.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: isSelected
-                            ? primary
-                            : theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text(
-                      description,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              description,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 10,
               ),
-              Icon(
-                Icons.chevron_right,
-                color: isSelected
-                    ? primary
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

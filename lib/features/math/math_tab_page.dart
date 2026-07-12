@@ -104,11 +104,17 @@ class MathTabPage extends ConsumerWidget {
           ),
           const SizedBox(height: SpacingTokens.sm),
 
-          // 年级列表
+          // 年级列表（一行两个）
           Expanded(
-            child: ListView.builder(
+            child: GridView.builder(
               padding: const EdgeInsets.symmetric(
                 horizontal: SpacingTokens.md,
+              ),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: SpacingTokens.sm,
+                mainAxisSpacing: SpacingTokens.sm,
+                childAspectRatio: 2.2,
               ),
               itemCount: 6,
               itemBuilder: (context, index) {
@@ -116,18 +122,15 @@ class MathTabPage extends ConsumerWidget {
                 final config = GradePresets.get(grade, selectedSemester);
                 final isSelected = selectedGrade == grade;
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
-                  child: GradeSemesterCard(
-                    grade: grade,
-                    semester: selectedSemester,
-                    label: config.label,
-                    description: _configDescription(config),
-                    isSelected: isSelected,
-                    onTap: () {
-                      ref.read(mathGradeProvider.notifier).state = grade;
-                    },
-                  ),
+                return GradeSemesterCard(
+                  grade: grade,
+                  semester: selectedSemester,
+                  label: config.label,
+                  description: _configDescription(config),
+                  isSelected: isSelected,
+                  onTap: () {
+                    ref.read(mathGradeProvider.notifier).state = grade;
+                  },
                 );
               },
             ),
