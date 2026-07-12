@@ -1,10 +1,7 @@
 // lib/features/profile/profile_page.dart
 //
 // 层级：features/profile
-// 职责：个人中心占位页。Phase 0 特殊职责：提供 activeSubjectProvider / themeModeProvider
-//       的手动切换入口，用于视觉验收。
-//       - Segmented Toggle：切换 poem / math 学科主题
-//       - Switch：深色模式开关（跟随系统 / 强制深色）
+// 职责：个人中心 — 主题切换 + 统计面板 + 成就展示。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
+import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -21,6 +20,9 @@ class ProfilePage extends ConsumerWidget {
     final theme = Theme.of(context);
     final subject = ref.watch(activeSubjectProvider);
     final mode = ref.watch(themeModeProvider);
+    final stats = ref.watch(userStatsProvider);
+    final streak = ref.watch(streakProvider);
+    final unlockedCount = ref.watch(unlockedAchievementsCountProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('我的')),
@@ -28,7 +30,66 @@ class ProfilePage extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(SpacingTokens.lg),
           children: <Widget>[
-            // 学科主题切换
+            // 用户头像 + 等级
+            Center(
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor:
+                        ColorTokens.mathPurple.withValues(alpha: 0.15),
+                    child: Text(
+                      stats.levelName,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: ColorTokens.mathPurple,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.md,
+                      vertical: SpacingTokens.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: ColorTokens.poemGold.withValues(alpha: 0.12),
+                      borderRadius:
+                          BorderRadius.circular(SpacingTokens.radiusPill),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.stars_rounded,
+                          size: 16,
+                          color: ColorTokens.poemGold,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${stats.totalStars} 颗星星',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: ColorTokens.poemGold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.lg),
+
+            // 统计面板
+            _buildStatsPanel(context, stats, streak),
+            const SizedBox(height: SpacingTokens.lg),
+
+            // 成就展示
+            _buildAchievementSection(context, unlockedCount),
+            const SizedBox(height: SpacingTokens.xl),
+
+            // 主题切换
             Text('主题风格', style: theme.textTheme.titleLarge),
             const SizedBox(height: SpacingTokens.sm),
             SegmentedButton<AppSubject>(
@@ -52,7 +113,7 @@ class ProfilePage extends ConsumerWidget {
 
             const SizedBox(height: SpacingTokens.xl),
 
-            // 深色模式切换
+            // 外观切换
             Text('外观', style: theme.textTheme.titleLarge),
             const SizedBox(height: SpacingTokens.sm),
             SwitchListTile(
@@ -70,11 +131,173 @@ class ProfilePage extends ConsumerWidget {
               },
               child: const Text('跟随系统'),
             ),
-
-            const SizedBox(height: SpacingTokens.xl),
-            Text('本模块由 Phase 6 完善', style: theme.textTheme.bodyMedium),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatsPanel(
+    BuildContext context,
+    UserStats stats,
+    int streak,
+  ) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(SpacingTokens.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '学习统计',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem(
+                  context,
+                  '${stats.poemsLearned}',
+                  '已学诗词',
+                  ColorTokens.poemGreen,
+                ),
+              ),
+              Expanded(
+                child: _buildStatItem(
+                  context,
+                  '${stats.poemsMastered}',
+                  '已掌握',
+                  ColorTokens.poemGreenDeep,
+                ),
+              ),
+              Expanded(
+                child: _buildStatItem(
+                  context,
+                  '$streak',
+                  '连续打卡',
+                  ColorTokens.mathCoral,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: SpacingTokens.lg),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem(
+                  context,
+                  '${stats.mathTotalProblems}',
+                  '口算总题',
+                  ColorTokens.mathPurple,
+                ),
+              ),
+              Expanded(
+                child: _buildStatItem(
+                  context,
+                  stats.mathTotalProblems > 0
+                      ? '${(stats.mathAccuracy * 100).toStringAsFixed(0)}%'
+                      : '-',
+                  '正确率',
+                  ColorTokens.mathMint,
+                ),
+              ),
+              Expanded(
+                child: _buildStatItem(
+                  context,
+                  '${stats.longestStreak}',
+                  '最长连续',
+                  ColorTokens.poemGold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(
+    BuildContext context,
+    String value,
+    String label,
+    Color color,
+  ) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.xs),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAchievementSection(BuildContext context, int unlockedCount) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(SpacingTokens.md),
+      decoration: BoxDecoration(
+        color: ColorTokens.poemGold.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+        border: Border.all(
+          color: ColorTokens.poemGold.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.emoji_events_rounded,
+            size: 32,
+            color: ColorTokens.poemGold,
+          ),
+          const SizedBox(width: SpacingTokens.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '成就勋章',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  unlockedCount > 0
+                      ? '已解锁 $unlockedCount 个成就'
+                      : '开始学习，解锁你的第一个成就吧！',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right,
+            color: ColorTokens.poemGold,
+          ),
+        ],
       ),
     );
   }

@@ -9,12 +9,22 @@ import 'package:poemath/data/models/user_stats.dart';
 
 class UserStatsRepository {
   /// 获取当前 profile 的统计数据
+  ///
+  /// 若不存在则返回一个默认值（不立即写入 Hive，
+  /// 避免在同步 Provider 中触发 unawaited Future 导致测试挂起）。
   UserStats get() {
+    final key = ProfileScope.key('stats');
+    return HiveBoxes.userStats.get(key) ??
+        UserStats(profileId: ProfileScope.currentId);
+  }
+
+  /// 获取当前 profile 的统计数据，若不存在则创建并持久化。
+  Future<UserStats> getOrCreate() async {
     final key = ProfileScope.key('stats');
     var stats = HiveBoxes.userStats.get(key);
     if (stats == null) {
       stats = UserStats(profileId: ProfileScope.currentId);
-      HiveBoxes.userStats.put(key, stats);
+      await HiveBoxes.userStats.put(key, stats);
     }
     return stats;
   }

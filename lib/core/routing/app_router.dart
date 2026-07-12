@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/features/formula/formula_detail_page.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/math/math_mistake_page.dart';
@@ -78,6 +79,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.mathMistake,
         builder: (context, state) => const MathMistakePage(),
+      ),
+      // ============ 公式详情（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.formulaDetail,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return FormulaDetailPage(formulaId: id);
+        },
       ),
     ],
   );
