@@ -32,8 +32,6 @@ class _MainShellState extends ConsumerState<MainShell> {
     NavItem(icon: Icons.person_rounded, label: '我的'),
   ];
 
-  int _index = 0;
-
   /// 4 个非中央 tab 对应的目标路由
   String _routeOf(int i) {
     switch (i) {
@@ -50,14 +48,27 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
   }
 
-  void _switch(int i) {
-    setState(() => _index = i);
-    // Tab 联动主题切换：诗词 / 口算 tab 触发学科变更
+  /// 根据当前路由推导 tab index（解决外部导航时 tab 不同步问题）。
+  int _indexFromRoute(BuildContext context) {
+    final location = GoRouterState.of(context).uri.path;
+    if (location == AppRoutes.poemTab) return 1;
+    if (location == AppRoutes.mathTab) return 2;
+    if (location == AppRoutes.profile) return 3;
+    // home、studyHub 等均归为 index 0
+    return 0;
+  }
+
+  /// 按 tab index 联动学科主题。
+  void _applyTheme(int i) {
     if (i == 1) {
       ref.read(activeSubjectProvider.notifier).state = AppSubject.poem;
     } else if (i == 2) {
       ref.read(activeSubjectProvider.notifier).state = AppSubject.math;
     }
+  }
+
+  void _switch(int i) {
+    _applyTheme(i);
     context.go(_routeOf(i));
   }
 
@@ -67,11 +78,17 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = _indexFromRoute(context);
+
+    // 外部导航（如首页快捷入口 context.go）也需要联动主题，
+    // 写入是幂等的：相同值不触发重建。
+    _applyTheme(currentIndex);
+
     return Scaffold(
       body: widget.child,
       extendBody: true,
       bottomNavigationBar: NotchedBottomBar(
-        currentIndex: _index,
+        currentIndex: currentIndex,
         onTap: _switch,
         items: _tabs,
         onCenterTap: _onCenterTap,
