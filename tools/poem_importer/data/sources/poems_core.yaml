@@ -1,0 +1,789 @@
+# 核心层示例：30 首人教版部编教材古诗（含拼音/注释/译文/赏析）
+#
+# 说明：
+# - id 命名规则：poem_core_XXX
+# - grade / semester / textbook_unit 对齐 textbook_index.yaml
+# - pinyin 字段 optional；留空则由 lpinyin 自动生成，但下方每首均手工提供以确保多音字准确
+# - annotations 为逐词注释；translation 为白话译文；appreciation 为赏析
+# - is_required = true 表示新课标 75 首必背
+
+poems:
+  - id: poem_core_001
+    title: 咏鹅
+    author: 骆宾王
+    dynasty: 唐
+    grade: 1
+    semester: 上
+    textbook_unit: 语文一年级上·课文3
+    is_required: true
+    difficulty: 1
+    content: |
+      鹅，鹅，鹅，曲项向天歌。
+      白毛浮绿水，红掌拨清波。
+    pinyin: |
+      é ， é ， é ， qū xiàng xiàng tiān gē 。
+      bái máo fú lǜ shuǐ ， hóng zhǎng bō qīng bō 。
+    annotations:
+      - {word: 曲项, meaning: 弯着脖子}
+      - {word: 掌, meaning: 鹅的脚掌}
+      - {word: 拨, meaning: 划}
+    translation: 鹅呀鹅呀鹅呀，弯着脖子对天欢唱。雪白的羽毛漂浮在碧绿的水面上，红红的脚掌拨动着清清的水波。
+    appreciation: 全诗用词简单明快，色彩鲜明（白毛、绿水、红掌、清波），是儿童学习古诗的启蒙之作。相传为骆宾王七岁时所作。
+    background: 相传为骆宾王童年（约七岁）咏白鹅所作，是中国古代著名的启蒙诗。
+    famous_lines: ["白毛浮绿水，红掌拨清波"]
+    tags: [咏物, 动物, 启蒙, 五言古诗]
+
+  - id: poem_core_002
+    title: 江南
+    author: 汉乐府
+    dynasty: 汉
+    grade: 1
+    semester: 上
+    textbook_unit: 语文一年级上·课文5
+    is_required: true
+    difficulty: 1
+    content: |
+      江南可采莲，莲叶何田田。
+      鱼戏莲叶间。
+      鱼戏莲叶东，鱼戏莲叶西，
+      鱼戏莲叶南，鱼戏莲叶北。
+    pinyin: |
+      jiāng nán kě cǎi lián ， lián yè hé tián tián 。
+      yú xì lián yè jiān 。
+      yú xì lián yè dōng ， yú xì lián yè xī ，
+      yú xì lián yè nán ， yú xì lián yè běi 。
+    annotations:
+      - {word: 田田, meaning: 形容荷叶茂盛的样子}
+      - {word: 戏, meaning: 嬉戏、玩耍}
+    translation: 江南又到了可以采莲的季节，荷叶浮出水面重重叠叠。鱼儿在莲叶间嬉戏，一会儿游到东边，一会儿游到西边，一会儿游到南边，一会儿游到北边。
+    appreciation: 民歌以简朴的复沓句式呈现江南水乡的生动画面，鱼儿四方嬉游，充满生活情趣。
+    background: 汉代乐府民歌，最早见于《乐府诗集·相和歌辞》。
+    famous_lines: ["江南可采莲，莲叶何田田"]
+    tags: [江南, 采莲, 民歌, 儿童]
+
+  - id: poem_core_003
+    title: 画
+    author: 王维
+    dynasty: 唐
+    grade: 1
+    semester: 上
+    textbook_unit: 语文一年级上·课文6
+    is_required: false
+    difficulty: 1
+    content: |
+      远看山有色，近听水无声。
+      春去花还在,人来鸟不惊。
+    pinyin: |
+      yuǎn kàn shān yǒu sè ， jìn tīng shuǐ wú shēng 。
+      chūn qù huā hái zài ， rén lái niǎo bù jīng 。
+    annotations:
+      - {word: 色, meaning: 颜色，指山的颜色}
+      - {word: 惊, meaning: 惊动、受惊}
+    translation: 远远看去山有颜色，走近了听水却没有声音。春天过去了花仍然开放着，人走过来鸟也不飞走。
+    appreciation: 这是一首谜语诗，谜底就是"画"。诗以对比手法从视觉、听觉、时间、动静四个方面展现画作的特点，构思巧妙。
+    background: 相传为王维所作的题画诗，也有学者考证认为出自宋代僧人作品，教材中沿用旧说。
+    famous_lines: ["远看山有色，近听水无声"]
+    tags: [咏物, 题画, 五言绝句, 启蒙]
+
+  - id: poem_core_004
+    title: 悯农（其二）
+    author: 李绅
+    dynasty: 唐
+    grade: 1
+    semester: 上
+    textbook_unit: 语文一年级上·语文园地
+    is_required: true
+    difficulty: 1
+    content: |
+      锄禾日当午,汗滴禾下土。
+      谁知盘中餐,粒粒皆辛苦。
+    pinyin: |
+      chú hé rì dāng wǔ ， hàn dī hé xià tǔ 。
+      shuí zhī pán zhōng cān ， lì lì jiē xīn kǔ 。
+    annotations:
+      - {word: 锄禾, meaning: 用锄头松土除草}
+      - {word: 日当午, meaning: 太阳正当空、正中午}
+      - {word: 餐, meaning: 饭}
+      - {word: 皆, meaning: 都}
+    translation: 农民在中午最热的时候锄地，汗水一滴滴落到禾苗下的土里。谁知道我们碗中的饭，每一粒都饱含着农民的辛勤劳动。
+    appreciation: 全诗以极其朴素的语言描绘农民劳作的辛苦，教育后人珍惜粮食，是家喻户晓的劝勉之作。
+    background: 李绅早年目睹农民疾苦所作《悯农》组诗共二首，此为第二首。
+    famous_lines: ["谁知盘中餐，粒粒皆辛苦"]
+    tags: [劝勉, 农事, 惜粮, 五言绝句]
+
+  - id: poem_core_005
+    title: 静夜思
+    author: 李白
+    dynasty: 唐
+    grade: 1
+    semester: 下
+    textbook_unit: 语文一年级下·课文8
+    is_required: true
+    difficulty: 1
+    content: |
+      床前明月光,疑是地上霜。
+      举头望明月,低头思故乡。
+    pinyin: |
+      chuáng qián míng yuè guāng ， yí shì dì shàng shuāng 。
+      jǔ tóu wàng míng yuè ， dī tóu sī gù xiāng 。
+    annotations:
+      - {word: 疑, meaning: 好像}
+      - {word: 举头, meaning: 抬头}
+      - {word: 思, meaning: 思念}
+    translation: 床前洒下一片明亮的月光，好像地上结了一层白霜。抬起头望着天上的明月，低下头思念遥远的故乡。
+    appreciation: 全诗仅二十字，写得清新自然、耐人寻味。以"疑"字牵起视觉错觉，以"望"与"思"完成情感升华，是思乡诗的千古绝唱。
+    background: 李白客居扬州旅舍时所作，时年约二十六岁。
+    famous_lines: ["举头望明月，低头思故乡"]
+    tags: [思乡, 月亮, 五言绝句, 名篇]
+
+  - id: poem_core_006
+    title: 春晓
+    author: 孟浩然
+    dynasty: 唐
+    grade: 1
+    semester: 下
+    textbook_unit: 语文一年级下·课文12
+    is_required: true
+    difficulty: 1
+    content: |
+      春眠不觉晓,处处闻啼鸟。
+      夜来风雨声,花落知多少。
+    pinyin: |
+      chūn mián bù jué xiǎo ， chù chù wén tí niǎo 。
+      yè lái fēng yǔ shēng ， huā luò zhī duō shǎo 。
+    annotations:
+      - {word: 晓, meaning: 天亮}
+      - {word: 闻, meaning: 听见}
+      - {word: 啼鸟, meaning: 鸟叫}
+    translation: 春天睡得香甜，不知不觉天已亮了，到处都能听见鸟儿在啼叫。回想昨夜的风声雨声，不知那盛开的花儿被吹落了多少。
+    appreciation: 全诗从听觉入手，含蓄地传递出诗人对春天的喜爱与花落的怜惜之情，语言浅近而意境深远。
+    background: 孟浩然隐居鹿门山时所作，反映其闲适的隐居生活。
+    famous_lines: ["春眠不觉晓，处处闻啼鸟"]
+    tags: [春天, 五言绝句, 惜春, 名篇]
+
+  - id: poem_core_007
+    title: 赠汪伦
+    author: 李白
+    dynasty: 唐
+    grade: 1
+    semester: 下
+    textbook_unit: 语文一年级下·课文12
+    is_required: true
+    difficulty: 1
+    content: |
+      李白乘舟将欲行,忽闻岸上踏歌声。
+      桃花潭水深千尺,不及汪伦送我情。
+    pinyin: |
+      lǐ bái chéng zhōu jiāng yù xíng ， hū wén àn shàng tà gē shēng 。
+      táo huā tán shuǐ shēn qiān chǐ ， bù jí wāng lún sòng wǒ qíng 。
+    annotations:
+      - {word: 汪伦, meaning: 李白的朋友，泾川县桃花潭附近人}
+      - {word: 踏歌, meaning: 民间的一种边走边唱、以脚踏地为节拍的歌舞}
+      - {word: 桃花潭, meaning: 在今安徽泾县西南}
+      - {word: 不及, meaning: 比不上}
+    translation: 李白正乘船要离开，忽然听到岸上传来踏歌相送的歌声。桃花潭的水纵然有千尺深，也比不上汪伦送我的深情厚谊。
+    appreciation: 以夸张手法把无形的友情具象化为"千尺深潭"，情感真挚，语言明白如话，是送别诗的名篇。
+    background: 天宝十四年（755）李白游桃花潭时，村人汪伦盛情款待，临别赠此诗。
+    famous_lines: ["桃花潭水深千尺，不及汪伦送我情"]
+    tags: [送别, 友情, 七言绝句, 名篇]
+
+  - id: poem_core_008
+    title: 寻隐者不遇
+    author: 贾岛
+    dynasty: 唐
+    grade: 1
+    semester: 下
+    textbook_unit: 语文一年级下·语文园地
+    is_required: true
+    difficulty: 1
+    content: |
+      松下问童子,言师采药去。
+      只在此山中,云深不知处。
+    pinyin: |
+      sōng xià wèn tóng zǐ ， yán shī cǎi yào qù 。
+      zhǐ zài cǐ shān zhōng ， yún shēn bù zhī chù 。
+    annotations:
+      - {word: 隐者, meaning: 隐居在山林里的人}
+      - {word: 童子, meaning: 儿童，此处指隐者的徒弟}
+      - {word: 言, meaning: 说}
+      - {word: 云深, meaning: 云雾弥漫，指山高林密之处}
+    translation: 我在松树下向童子询问，他说师父上山采药去了。就在这座山中，云雾茫茫不知在哪里。
+    appreciation: 全诗以问答体展开，通过童子简短的三次回答，勾勒出隐者飘逸出尘的形象与深远的山林意境。
+    background: 贾岛访友（隐士）不遇后所作，具体年代不详。
+    famous_lines: ["只在此山中，云深不知处"]
+    tags: [隐逸, 山林, 五言绝句]
+
+  - id: poem_core_009
+    title: 池上
+    author: 白居易
+    dynasty: 唐
+    grade: 1
+    semester: 下
+    textbook_unit: 语文一年级下·语文园地
+    is_required: true
+    difficulty: 1
+    content: |
+      小娃撑小艇,偷采白莲回。
+      不解藏踪迹,浮萍一道开。
+    pinyin: |
+      xiǎo wá chēng xiǎo tǐng ， tōu cǎi bái lián huí 。
+      bù jiě cáng zōng jì ， fú píng yī dào kāi 。
+    annotations:
+      - {word: 撑, meaning: 用篙抵住水底使船前进}
+      - {word: 艇, meaning: 小船}
+      - {word: 不解, meaning: 不懂得}
+      - {word: 浮萍, meaning: 水面上漂浮的水草}
+    translation: 一个小娃娃撑着小船，偷偷地采了白莲回来。他不懂得隐藏自己的踪迹，水面浮萍留下一条明显的水痕。
+    appreciation: 全诗从"偷"字入手，写小孩子采莲后憨态可掬的样子，充满儿童天真烂漫的生活情趣。
+    background: 白居易任杭州刺史或苏州刺史期间所作，具体年代不详。
+    famous_lines: ["不解藏踪迹，浮萍一道开"]
+    tags: [儿童, 江南, 五言绝句]
+
+  - id: poem_core_010
+    title: 小池
+    author: 杨万里
+    dynasty: 宋
+    grade: 1
+    semester: 下
+    textbook_unit: 语文一年级下·语文园地
+    is_required: true
+    difficulty: 1
+    content: |
+      泉眼无声惜细流,树阴照水爱晴柔。
+      小荷才露尖尖角,早有蜻蜓立上头。
+    pinyin: |
+      quán yǎn wú shēng xī xì liú ， shù yīn zhào shuǐ ài qíng róu 。
+      xiǎo hé cái lù jiān jiān jiǎo ， zǎo yǒu qīng tíng lì shàng tóu 。
+    annotations:
+      - {word: 泉眼, meaning: 泉水流出的孔洞}
+      - {word: 惜, meaning: 舍不得}
+      - {word: 晴柔, meaning: 晴天里柔和的风光}
+      - {word: 尖尖角, meaning: 新出水的荷叶尖端}
+    translation: 泉眼无声地爱惜着细细的水流，树荫映照在水面上，喜爱这晴日的柔和。小荷刚刚露出尖尖的角，早已有蜻蜓立在它的上头。
+    appreciation: 全诗写初夏小池风光，尤其"小荷才露尖尖角"两句，以敏锐的观察捕捉到生命初生的细节，成为咏夏经典。
+    background: 杨万里晚年退居家乡吉水，写下大量田园写景诗，此为其一。
+    famous_lines: ["小荷才露尖尖角，早有蜻蜓立上头"]
+    tags: [初夏, 池塘, 七言绝句, 田园]
+
+  - id: poem_core_011
+    title: 梅花
+    author: 王安石
+    dynasty: 宋
+    grade: 2
+    semester: 上
+    textbook_unit: 语文二年级上·识字
+    is_required: true
+    difficulty: 1
+    content: |
+      墙角数枝梅,凌寒独自开。
+      遥知不是雪,为有暗香来。
+    pinyin: |
+      qiáng jiǎo shù zhī méi ， líng hán dú zì kāi 。
+      yáo zhī bù shì xuě ， wèi yǒu àn xiāng lái 。
+    annotations:
+      - {word: 凌寒, meaning: 冒着严寒}
+      - {word: 遥知, meaning: 远远地就知道}
+      - {word: 暗香, meaning: 幽幽的清香}
+    translation: 墙角有几枝梅花，冒着严寒独自开放。远远地就知道那不是雪，因为有幽幽的清香传来。
+    appreciation: 全诗以简练的语言写梅花凌寒独放的品格，暗喻诗人在政治漩涡中依然坚守的高洁情操。
+    background: 王安石变法失败后隐居江宁，晚年所作。
+    famous_lines: ["遥知不是雪，为有暗香来"]
+    tags: [咏物, 梅花, 五言绝句, 品格]
+
+  - id: poem_core_012
+    title: 登鹳雀楼
+    author: 王之涣
+    dynasty: 唐
+    grade: 2
+    semester: 上
+    textbook_unit: 语文二年级上·课文8
+    is_required: true
+    difficulty: 1
+    content: |
+      白日依山尽,黄河入海流。
+      欲穷千里目,更上一层楼。
+    pinyin: |
+      bái rì yī shān jìn ， huáng hé rù hǎi liú 。
+      yù qióng qiān lǐ mù ， gèng shàng yī céng lóu 。
+    annotations:
+      - {word: 鹳雀楼, meaning: 旧址在今山西永济，因常有鹳雀栖息而得名}
+      - {word: 白日, meaning: 太阳}
+      - {word: 依, meaning: 靠着}
+      - {word: 尽, meaning: 消失}
+      - {word: 欲, meaning: 想要}
+      - {word: 穷, meaning: 尽，看到底}
+      - {word: 千里目, meaning: 目力所及千里之远}
+    translation: 落日依傍着群山缓缓消失，黄河奔腾流入大海。想要看到千里外的风光，就要再登上一层楼。
+    appreciation: 前两句写景气势宏大，后两句蕴含"站得高看得远"的哲理，是激励人不断进取的千古名篇。
+    background: 王之涣游览鹳雀楼时所作。
+    famous_lines: ["欲穷千里目，更上一层楼"]
+    tags: [登楼, 哲理, 五言绝句, 名篇]
+
+  - id: poem_core_013
+    title: 望庐山瀑布
+    author: 李白
+    dynasty: 唐
+    grade: 2
+    semester: 上
+    textbook_unit: 语文二年级上·课文8
+    is_required: true
+    difficulty: 2
+    content: |
+      日照香炉生紫烟,遥看瀑布挂前川。
+      飞流直下三千尺,疑是银河落九天。
+    pinyin: |
+      rì zhào xiāng lú shēng zǐ yān ， yáo kàn pù bù guà qián chuān 。
+      fēi liú zhí xià sān qiān chǐ ， yí shì yín hé luò jiǔ tiān 。
+    annotations:
+      - {word: 香炉, meaning: 庐山香炉峰}
+      - {word: 紫烟, meaning: 太阳映照下的紫色烟雾}
+      - {word: 川, meaning: 河流}
+      - {word: 疑, meaning: 好像}
+      - {word: 九天, meaning: 天的最高处}
+    translation: 阳光照耀香炉峰升起紫色的云雾，远远看见瀑布挂在山川前面。飞泻的水流从三千尺高处直落而下，仿佛银河从九天之上倾泻下来。
+    appreciation: 李白以夸张与比喻双管齐下，赋予庐山瀑布磅礴的想象力，是山水诗的极致之作。
+    background: 李白青年时期游庐山所作。
+    famous_lines: ["飞流直下三千尺，疑是银河落九天"]
+    tags: [山水, 瀑布, 七言绝句, 名篇]
+
+  - id: poem_core_014
+    title: 咏柳
+    author: 贺知章
+    dynasty: 唐
+    grade: 2
+    semester: 下
+    textbook_unit: 语文二年级下·课文1
+    is_required: true
+    difficulty: 1
+    content: |
+      碧玉妆成一树高,万条垂下绿丝绦。
+      不知细叶谁裁出,二月春风似剪刀。
+    pinyin: |
+      bì yù zhuāng chéng yī shù gāo ， wàn tiáo chuí xià lǜ sī tāo 。
+      bù zhī xì yè shuí cái chū ， èr yuè chūn fēng sì jiǎn dāo 。
+    annotations:
+      - {word: 碧玉, meaning: 青绿色的玉}
+      - {word: 妆, meaning: 装饰、打扮}
+      - {word: 绦, meaning: 用丝编成的绳带}
+      - {word: 裁, meaning: 剪}
+    translation: 高高的柳树像用碧玉装扮的一样，垂下万千条绿色的丝带。不知这细细的柳叶是谁剪出来的，原来是二月春风像剪刀般裁出。
+    appreciation: 全诗以"妆""裁"两个动词把无形的春风化为有形的剪刀，把咏柳延展为咏春，构思新颖巧妙。
+    background: 贺知章晚年归乡后所作。
+    famous_lines: ["不知细叶谁裁出，二月春风似剪刀"]
+    tags: [春天, 咏物, 柳树, 七言绝句]
+
+  - id: poem_core_015
+    title: 村居
+    author: 高鼎
+    dynasty: 清
+    grade: 2
+    semester: 下
+    textbook_unit: 语文二年级下·课文1
+    is_required: true
+    difficulty: 1
+    content: |
+      草长莺飞二月天,拂堤杨柳醉春烟。
+      儿童散学归来早,忙趁东风放纸鸢。
+    pinyin: |
+      cǎo zhǎng yīng fēi èr yuè tiān ， fú dī yáng liǔ zuì chūn yān 。
+      ér tóng sàn xué guī lái zǎo ， máng chèn dōng fēng fàng zhǐ yuān 。
+    annotations:
+      - {word: 拂堤, meaning: 轻拂堤岸}
+      - {word: 醉春烟, meaning: 被春天的雾气所陶醉}
+      - {word: 散学, meaning: 放学}
+      - {word: 纸鸢, meaning: 风筝}
+    translation: 农历二月，青草生长莺鸟飞舞，杨柳轻拂堤岸沉醉在春烟中。儿童们放学后早早回家，趁着东风忙着放风筝。
+    appreciation: 全诗以田园视角描绘一幅早春孩童放风筝的欢乐画面，充满生活气息与生命活力。
+    background: 高鼎晚年归隐乡野所作。
+    famous_lines: ["儿童散学归来早，忙趁东风放纸鸢"]
+    tags: [春天, 儿童, 七言绝句, 田园]
+
+  - id: poem_core_016
+    title: 赋得古原草送别（节选）
+    author: 白居易
+    dynasty: 唐
+    grade: 2
+    semester: 下
+    textbook_unit: 语文二年级下·课文8
+    is_required: true
+    difficulty: 1
+    content: |
+      离离原上草,一岁一枯荣。
+      野火烧不尽,春风吹又生。
+    pinyin: |
+      lí lí yuán shàng cǎo ， yī suì yī kū róng 。
+      yě huǒ shāo bù jìn ， chūn fēng chuī yòu shēng 。
+    annotations:
+      - {word: 离离, meaning: 形容野草长得茂盛}
+      - {word: 枯荣, meaning: 枯萎和茂盛，指草的生命轮回}
+    translation: 原野上的青草茂盛无边，每年枯萎又重新生长。野火烧不尽它的根，春风一吹又焕发生机。
+    appreciation: 前两句写小草生生不息的规律，后两句凝练成千古名句，比喻生命顽强，广为传诵。
+    background: 白居易十六岁时以此诗应试考中，据说贽见顾况时凭"野火烧不尽"一句名震长安。
+    famous_lines: ["野火烧不尽，春风吹又生"]
+    tags: [咏物, 送别, 五言律诗, 生命]
+
+  - id: poem_core_017
+    title: 山行
+    author: 杜牧
+    dynasty: 唐
+    grade: 3
+    semester: 上
+    textbook_unit: 语文三年级上·课文4
+    is_required: true
+    difficulty: 2
+    content: |
+      远上寒山石径斜,白云生处有人家。
+      停车坐爱枫林晚,霜叶红于二月花。
+    pinyin: |
+      yuǎn shàng hán shān shí jìng xiá ， bái yún shēng chù yǒu rén jiā 。
+      tíng chē zuò ài fēng lín wǎn ， shuāng yè hóng yú èr yuè huā 。
+    annotations:
+      - {word: 寒山, meaning: 深秋时节的山}
+      - {word: 石径, meaning: 石头铺的小路}
+      - {word: 斜, meaning: 倾斜，此处读 xiá 以合韵}
+      - {word: 坐, meaning: 因为}
+      - {word: 霜叶, meaning: 秋霜打过的枫叶}
+    translation: 一条石头小路弯弯曲曲通向深秋的远山，白云生起的地方隐约有人家。停下车来是因为喜爱这傍晚的枫林，那经霜的枫叶红得比二月盛开的鲜花还要艳丽。
+    appreciation: 尾句以"红于二月花"翻新意，让秋景与春景相较而胜，一改传统悲秋色彩，被视为咏秋名句。
+    background: 杜牧晚年在秋日行经山中所作。
+    famous_lines: ["停车坐爱枫林晚，霜叶红于二月花"]
+    tags: [秋天, 山水, 七言绝句, 名篇]
+
+  - id: poem_core_018
+    title: 赠刘景文
+    author: 苏轼
+    dynasty: 宋
+    grade: 3
+    semester: 上
+    textbook_unit: 语文三年级上·课文4
+    is_required: true
+    difficulty: 2
+    content: |
+      荷尽已无擎雨盖,菊残犹有傲霜枝。
+      一年好景君须记,最是橙黄橘绿时。
+    pinyin: |
+      hé jìn yǐ wú qíng yǔ gài ， jú cán yóu yǒu ào shuāng zhī 。
+      yī nián hǎo jǐng jūn xū jì ， zuì shì chéng huáng jú lǜ shí 。
+    annotations:
+      - {word: 擎雨盖, meaning: 指荷叶}
+      - {word: 傲霜, meaning: 不惧秋霜}
+      - {word: 君, meaning: 您，指刘景文}
+    translation: 荷花凋谢，连挡雨的荷叶也没有了；菊花残败，还有傲霜挺立的枝条。一年最好的风光你要记住，那正是橙子金黄橘子青绿的初冬时节。
+    appreciation: 苏轼借初冬萧瑟中的橙黄橘绿，勉励友人乐观自处，是宋诗理趣与人生态度的名作。
+    background: 元祐五年（1090）苏轼任杭州知州时赠好友刘景文之作。
+    famous_lines: ["一年好景君须记，最是橙黄橘绿时"]
+    tags: [勉励, 秋冬, 七言绝句, 友情]
+
+  - id: poem_core_019
+    title: 夜书所见
+    author: 叶绍翁
+    dynasty: 宋
+    grade: 3
+    semester: 上
+    textbook_unit: 语文三年级上·课文4
+    is_required: true
+    difficulty: 2
+    content: |
+      萧萧梧叶送寒声,江上秋风动客情。
+      知有儿童挑促织,夜深篱落一灯明。
+    pinyin: |
+      xiāo xiāo wú yè sòng hán shēng ， jiāng shàng qiū fēng dòng kè qíng 。
+      zhī yǒu ér tóng tiǎo cù zhī ， yè shēn lí luò yī dēng míng 。
+    annotations:
+      - {word: 萧萧, meaning: 风吹树叶的声音}
+      - {word: 挑, meaning: 用细枝逗引}
+      - {word: 促织, meaning: 蟋蟀}
+      - {word: 篱落, meaning: 篱笆}
+    translation: 萧萧秋风吹动梧桐树叶送来阵阵寒意，江上的秋风勾起了旅人的思乡之情。忽见远处篱笆下有灯光，料想是孩子们正在捉蟋蟀。
+    appreciation: 前两句写景引发思乡愁思，后两句以远处灯下捉蟋蟀的儿童反衬客愁，写景生动，情感含蓄。
+    background: 叶绍翁客居他乡秋夜有感而作。
+    famous_lines: ["知有儿童挑促织，夜深篱落一灯明"]
+    tags: [思乡, 秋天, 七言绝句]
+
+  - id: poem_core_020
+    title: 望天门山
+    author: 李白
+    dynasty: 唐
+    grade: 3
+    semester: 上
+    textbook_unit: 语文三年级上·课文17
+    is_required: true
+    difficulty: 2
+    content: |
+      天门中断楚江开,碧水东流至此回。
+      两岸青山相对出,孤帆一片日边来。
+    pinyin: |
+      tiān mén zhōng duàn chǔ jiāng kāi ， bì shuǐ dōng liú zhì cǐ huí 。
+      liǎng àn qīng shān xiāng duì chū ， gū fān yī piàn rì biān lái 。
+    annotations:
+      - {word: 天门, meaning: 天门山，在今安徽当涂长江东岸}
+      - {word: 楚江, meaning: 长江流经楚地的一段}
+      - {word: 至此回, meaning: 至此处水流回旋}
+      - {word: 日边, meaning: 太阳升起的方向}
+    translation: 天门山被长江从中冲开，碧绿的江水东流到此回旋北去。两岸青山遥遥相对而出，一片孤帆从太阳升起的地方驶来。
+    appreciation: 全诗气势磅礴，动静相生，从"断""开""回""出""来"五个动词展现天门山险峻的地势与江流的雄伟。
+    background: 唐开元十三年（725）李白出蜀东下经天门山所作。
+    famous_lines: ["两岸青山相对出，孤帆一片日边来"]
+    tags: [山水, 长江, 七言绝句, 名篇]
+
+  - id: poem_core_021
+    title: 饮湖上初晴后雨
+    author: 苏轼
+    dynasty: 宋
+    grade: 3
+    semester: 上
+    textbook_unit: 语文三年级上·课文17
+    is_required: true
+    difficulty: 2
+    content: |
+      水光潋滟晴方好,山色空蒙雨亦奇。
+      欲把西湖比西子,淡妆浓抹总相宜。
+    pinyin: |
+      shuǐ guāng liàn yàn qíng fāng hǎo ， shān sè kōng méng yǔ yì qí 。
+      yù bǎ xī hú bǐ xī zǐ ， dàn zhuāng nóng mǒ zǒng xiāng yí 。
+    annotations:
+      - {word: 潋滟, meaning: 水面波光闪动的样子}
+      - {word: 空蒙, meaning: 迷茫、朦胧}
+      - {word: 西子, meaning: 春秋美女西施}
+      - {word: 相宜, meaning: 合适、相配}
+    translation: 晴天时，湖面波光粼粼景色正好；雨天时，山色朦胧显得别样奇妙。要把西湖比作美人西施，无论淡妆还是浓妆都恰到好处。
+    appreciation: 诗人以西施喻西湖，为西湖赢得"西子湖"美誉。全诗信手拈来，比喻绝妙，成为咏西湖之绝唱。
+    background: 熙宁六年（1073）苏轼任杭州通判时游西湖所作。
+    famous_lines: ["欲把西湖比西子，淡妆浓抹总相宜"]
+    tags: [山水, 西湖, 七言绝句, 名篇]
+
+  - id: poem_core_022
+    title: 九月九日忆山东兄弟
+    author: 王维
+    dynasty: 唐
+    grade: 3
+    semester: 下
+    textbook_unit: 语文三年级下·课文9
+    is_required: true
+    difficulty: 2
+    content: |
+      独在异乡为异客,每逢佳节倍思亲。
+      遥知兄弟登高处,遍插茱萸少一人。
+    pinyin: |
+      dú zài yì xiāng wéi yì kè ， měi féng jiā jié bèi sī qīn 。
+      yáo zhī xiōng dì dēng gāo chù ， biàn chā zhū yú shǎo yī rén 。
+    annotations:
+      - {word: 山东, meaning: 华山以东，指诗人家乡蒲州}
+      - {word: 异乡, meaning: 他乡}
+      - {word: 佳节, meaning: 美好的节日，此处指重阳节}
+      - {word: 倍, meaning: 加倍}
+      - {word: 茱萸, meaning: 一种香草，重阳节佩戴以驱邪}
+    translation: 独自一人在异乡做异客，每逢佳节就更加思念亲人。遥想兄弟们登上高处佩茱萸的时候，只少了我一人。
+    appreciation: '"独""异""倍"三字层层递进，把游子思亲之情写到极致，"每逢佳节倍思亲"成为千古共鸣的名句。'
+    background: 开元四年（716）王维十七岁在长安客居时所作。
+    famous_lines: ["独在异乡为异客，每逢佳节倍思亲"]
+    tags: [思乡, 重阳节, 七言绝句, 名篇]
+
+  - id: poem_core_023
+    title: 清明
+    author: 杜牧
+    dynasty: 唐
+    grade: 3
+    semester: 下
+    textbook_unit: 语文三年级下·语文园地
+    is_required: true
+    difficulty: 2
+    content: |
+      清明时节雨纷纷,路上行人欲断魂。
+      借问酒家何处有,牧童遥指杏花村。
+    pinyin: |
+      qīng míng shí jié yǔ fēn fēn ， lù shàng xíng rén yù duàn hún 。
+      jiè wèn jiǔ jiā hé chù yǒu ， mù tóng yáo zhǐ xìng huā cūn 。
+    annotations:
+      - {word: 清明, meaning: 二十四节气之一，也是祭祖踏青的节日}
+      - {word: 断魂, meaning: 形容非常悲伤}
+      - {word: 借问, meaning: 请问}
+      - {word: 杏花村, meaning: 泛指有酒家的村庄}
+    translation: 清明时节细雨绵绵，路上的行人个个像失了魂一般。请问哪里有酒家，牧童遥遥地指向杏花盛开的村子。
+    appreciation: 全诗以"雨纷纷""欲断魂"渲染清明气氛，末句以牧童遥指作结，情景相生，历来传诵。
+    background: 杜牧任池州刺史时清明外出所作。
+    famous_lines: ["借问酒家何处有，牧童遥指杏花村"]
+    tags: [清明, 节日, 七言绝句, 名篇]
+
+  - id: poem_core_024
+    title: 元日
+    author: 王安石
+    dynasty: 宋
+    grade: 3
+    semester: 下
+    textbook_unit: 语文三年级下·语文园地
+    is_required: true
+    difficulty: 2
+    content: |
+      爆竹声中一岁除,春风送暖入屠苏。
+      千门万户曈曈日,总把新桃换旧符。
+    pinyin: |
+      bào zhú shēng zhōng yī suì chú ， chūn fēng sòng nuǎn rù tú sū 。
+      qiān mén wàn hù tóng tóng rì ， zǒng bǎ xīn táo huàn jiù fú 。
+    annotations:
+      - {word: 元日, meaning: 农历正月初一}
+      - {word: 屠苏, meaning: 屠苏酒，古人过年饮的一种药酒}
+      - {word: 曈曈, meaning: 太阳初升明亮的样子}
+      - {word: 桃符, meaning: 挂在门上的桃木板，写有神名，用于驱邪，后演变为春联}
+    translation: 爆竹声中送走了旧的一年，春风送暖大家饮着屠苏酒。千家万户被初升的太阳照亮，人们把新的桃符换下旧的桃符。
+    appreciation: 全诗写出宋代春节的欢乐场景，也寄托着王安石变法改革万象更新之志。
+    background: 熙宁二年（1069）王安石拜相推行变法之初，逢新年所作。
+    famous_lines: ["千门万户曈曈日，总把新桃换旧符"]
+    tags: [春节, 节日, 七言绝句, 名篇]
+
+  - id: poem_core_025
+    title: 暮江吟
+    author: 白居易
+    dynasty: 唐
+    grade: 4
+    semester: 上
+    textbook_unit: 语文四年级上·课文9
+    is_required: true
+    difficulty: 2
+    content: |
+      一道残阳铺水中,半江瑟瑟半江红。
+      可怜九月初三夜,露似真珠月似弓。
+    pinyin: |
+      yī dào cán yáng pū shuǐ zhōng ， bàn jiāng sè sè bàn jiāng hóng 。
+      kě lián jiǔ yuè chū sān yè ， lù sì zhēn zhū yuè sì gōng 。
+    annotations:
+      - {word: 残阳, meaning: 快落山的太阳}
+      - {word: 铺, meaning: 洒、映}
+      - {word: 瑟瑟, meaning: 碧绿色}
+      - {word: 可怜, meaning: 可爱}
+      - {word: 真珠, meaning: 珍珠}
+    translation: 傍晚一道残阳铺洒在江面上，半江碧绿半江通红。可爱的九月初三之夜，露水像珍珠一样，新月像弯弓一样。
+    appreciation: 全诗从傍晚写到夜晚，色彩由"红""瑟瑟"转到"露珠""弯月"，笔触细腻，是白居易写景的名篇。
+    background: 长庆二年（822）白居易赴杭州刺史任途中所作。
+    famous_lines: ["可怜九月初三夜，露似真珠月似弓"]
+    tags: [山水, 傍晚, 七言绝句, 名篇]
+
+  - id: poem_core_026
+    title: 题西林壁
+    author: 苏轼
+    dynasty: 宋
+    grade: 4
+    semester: 上
+    textbook_unit: 语文四年级上·课文9
+    is_required: true
+    difficulty: 2
+    content: |
+      横看成岭侧成峰,远近高低各不同。
+      不识庐山真面目,只缘身在此山中。
+    pinyin: |
+      héng kàn chéng lǐng cè chéng fēng ， yuǎn jìn gāo dī gè bù tóng 。
+      bù shí lú shān zhēn miàn mù ， zhǐ yuán shēn zài cǐ shān zhōng 。
+    annotations:
+      - {word: 缘, meaning: 因为}
+      - {word: 面目, meaning: 面貌、真相}
+    translation: 横看是连绵起伏的山岭，侧看是巍峨险峻的山峰，从远、近、高、低不同的角度看都不一样。看不清庐山真正的面貌，是因为我自己正置身此山之中。
+    appreciation: 全诗写景后转入哲理："当局者迷"的道理化入山水之中，成为宋诗以哲入景的典范。
+    background: 元丰七年（1084）苏轼由黄州贬所前往汝州经过庐山时所作。
+    famous_lines: ["不识庐山真面目，只缘身在此山中"]
+    tags: [山水, 哲理, 七言绝句, 名篇]
+
+  - id: poem_core_027
+    title: 出塞
+    author: 王昌龄
+    dynasty: 唐
+    grade: 4
+    semester: 上
+    textbook_unit: 语文四年级上·课文21
+    is_required: true
+    difficulty: 2
+    content: |
+      秦时明月汉时关,万里长征人未还。
+      但使龙城飞将在,不教胡马度阴山。
+    pinyin: |
+      qín shí míng yuè hàn shí guān ， wàn lǐ cháng zhēng rén wèi huán 。
+      dàn shǐ lóng chéng fēi jiàng zài ， bù jiào hú mǎ dù yīn shān 。
+    annotations:
+      - {word: 秦时, meaning: 秦朝以来}
+      - {word: 但使, meaning: 只要}
+      - {word: 龙城飞将, meaning: 指西汉名将李广}
+      - {word: 胡马, meaning: 匈奴的战马，指入侵者}
+      - {word: 阴山, meaning: 在今内蒙古中部}
+    translation: 秦汉时的明月和边关依然如故，出征万里的战士至今未能归还。只要有龙城飞将军李广那样的将领在，绝不会让胡人的战马越过阴山。
+    appreciation: 以"秦时明月汉时关"开篇，跨越千年的时空感与家国情怀融为一体，被誉为唐人七绝之压卷。
+    background: 王昌龄边塞诗代表作，具体年代不详。
+    famous_lines: ["秦时明月汉时关，万里长征人未还"]
+    tags: [边塞, 爱国, 七言绝句, 名篇]
+
+  - id: poem_core_028
+    title: 独坐敬亭山
+    author: 李白
+    dynasty: 唐
+    grade: 4
+    semester: 下
+    textbook_unit: 语文四年级下·课文9
+    is_required: true
+    difficulty: 2
+    content: |
+      众鸟高飞尽,孤云独去闲。
+      相看两不厌,只有敬亭山。
+    pinyin: |
+      zhòng niǎo gāo fēi jìn ， gū yún dú qù xián 。
+      xiāng kàn liǎng bù yàn ， zhǐ yǒu jìng tíng shān 。
+    annotations:
+      - {word: 敬亭山, meaning: 在今安徽宣城北}
+      - {word: 尽, meaning: 完}
+      - {word: 闲, meaning: 悠闲}
+      - {word: 厌, meaning: 满足}
+    translation: 群鸟高高地飞尽了，孤单的云也悠然离去。你我相互对望却怎么也看不够，只有这敬亭山懂我。
+    appreciation: 前两句写"尽""去"，后两句以山拟人成为知己，表达孤独中的自适。
+    background: 天宝十二载（753）李白第七次游宣城时所作，此时诗人已步入晚年。
+    famous_lines: ["相看两不厌，只有敬亭山"]
+    tags: [山水, 孤独, 五言绝句, 名篇]
+
+  - id: poem_core_029
+    title: 望洞庭
+    author: 刘禹锡
+    dynasty: 唐
+    grade: 4
+    semester: 下
+    textbook_unit: 语文四年级下·课文9
+    is_required: true
+    difficulty: 2
+    content: |
+      湖光秋月两相和,潭面无风镜未磨。
+      遥望洞庭山水翠,白银盘里一青螺。
+    pinyin: |
+      hú guāng qiū yuè liǎng xiāng hé ， tán miàn wú fēng jìng wèi mó 。
+      yáo wàng dòng tíng shān shuǐ cuì ， bái yín pán lǐ yī qīng luó 。
+    annotations:
+      - {word: 相和, meaning: 相映衬}
+      - {word: 潭面, meaning: 洞庭湖面}
+      - {word: 镜未磨, meaning: 未打磨过的铜镜，喻湖面朦胧}
+      - {word: 青螺, meaning: 青色的田螺，此处比喻君山}
+    translation: 湖光与秋月交相辉映，无风的湖面像未磨的铜镜。远望洞庭山水青翠，宛如白银盘中盛着一枚青螺。
+    appreciation: 用"白银盘""青螺"两个形象比喻远望的洞庭湖与君山，构思新奇独具匠心。
+    background: 长庆四年（824）刘禹锡由夔州刺史转任和州刺史途中所作。
+    famous_lines: ["遥望洞庭山水翠，白银盘里一青螺"]
+    tags: [山水, 洞庭, 七言绝句, 名篇]
+
+  - id: poem_core_030
+    title: 忆江南
+    author: 白居易
+    dynasty: 唐
+    grade: 4
+    semester: 下
+    textbook_unit: 语文四年级下·课文9
+    is_required: true
+    difficulty: 2
+    content: |
+      江南好,风景旧曾谙。
+      日出江花红胜火,春来江水绿如蓝。
+      能不忆江南?
+    pinyin: |
+      jiāng nán hǎo ， fēng jǐng jiù céng ān 。
+      rì chū jiāng huā hóng shèng huǒ ， chūn lái jiāng shuǐ lǜ rú lán 。
+      néng bù yì jiāng nán ？
+    annotations:
+      - {word: 谙, meaning: 熟悉}
+      - {word: 江花, meaning: 江边的花}
+      - {word: 蓝, meaning: 蓝草，可制青绿染料}
+    translation: 江南美好，那里的风光我早已熟知。日出时江边的花红得像火焰，春天到来时江水碧绿如蓝草染成。怎能不让我思念江南呢？
+    appreciation: 全词只用二十七字，以"红胜火""绿如蓝"两句写尽江南春色，是词坛不朽名篇。
+    background: 白居易晚年在洛阳追忆早年杭州刺史任内的江南生活所作。
+    famous_lines: ["日出江花红胜火，春来江水绿如蓝"]
+    tags: [江南, 词, 春天, 名篇]

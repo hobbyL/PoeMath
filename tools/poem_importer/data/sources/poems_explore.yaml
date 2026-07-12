@@ -1,0 +1,194 @@
+# 拓展层示例：按主题标签整理的名篇（5-10 首示例）
+#
+# 说明：
+# - Phase 1 阶段全量目标为 ~500 首；本文件先保留 8 首示例作为管道端到端验证
+# - 全部走自动化脚本生成
+# - is_required = false，layer = explore
+
+poems:
+  - id: poem_exp_001
+    title: 望庐山瀑布
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    tags: [山水, 瀑布, 七言绝句, 名篇]
+    content: |
+      日照香炉生紫烟,遥看瀑布挂前川。
+      飞流直下三千尺,疑是银河落九天。
+    pinyin: |
+      rì zhào xiāng lú shēng zǐ yān ， yáo kàn pù bù guà qián chuān 。
+      fēi liú zhí xià sān qiān chǐ ， yí shì yín hé luò jiǔ tiān 。
+    annotations:
+      - {word: 香炉, meaning: 指香炉峰}
+      - {word: 川, meaning: 河流}
+      - {word: 九天, meaning: 天的极高处}
+    translation: 阳光照射香炉峰升起紫色烟雾，远远望见瀑布像一条河流悬挂在山前。飞流直下三千尺高，让人怀疑是银河从九天之上落下来。
+    appreciation: 以夸张与比喻手法写庐山瀑布的雄伟气势，为写景绝句名篇。
+    background: 开元十三年（725）李白游庐山所作。
+    famous_lines: ["飞流直下三千尺，疑是银河落九天"]
+
+  - id: poem_exp_002
+    title: 望天门山
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    tags: [山水, 长江, 七言绝句]
+    content: |
+      天门中断楚江开,碧水东流至此回。
+      两岸青山相对出,孤帆一片日边来。
+    pinyin: |
+      tiān mén zhōng duàn chǔ jiāng kāi ， bì shuǐ dōng liú zhì cǐ huí 。
+      liǎng àn qīng shān xiāng duì chū ， gū fān yī piàn rì biān lái 。
+    annotations:
+      - {word: 天门山, meaning: 位于安徽省当涂县}
+      - {word: 楚江, meaning: 长江流经楚地的一段}
+      - {word: 回, meaning: 回旋}
+    translation: 天门山被长江从中断开，碧绿的江水东流到此回旋。两岸青山相对着突现出来，一片孤帆从日出的方向驶来。
+    appreciation: 短短二十八字，将天门山雄奇景象与长江气势尽收笔下。
+    background: 开元十三年（725）李白初出蜀地时所作。
+    famous_lines: ["两岸青山相对出，孤帆一片日边来"]
+
+  - id: poem_exp_003
+    title: 惠崇春江晚景
+    author: 苏轼
+    dynasty: 宋
+    layer: explore
+    is_required: false
+    difficulty: 2
+    tags: [春天, 题画, 七言绝句]
+    content: |
+      竹外桃花三两枝,春江水暖鸭先知。
+      蒌蒿满地芦芽短,正是河豚欲上时。
+    pinyin: |
+      zhú wài táo huā sān liǎng zhī ， chūn jiāng shuǐ nuǎn yā xiān zhī 。
+      lóu hāo mǎn dì lú yá duǎn ， zhèng shì hé tún yù shàng shí 。
+    annotations:
+      - {word: 蒌蒿, meaning: 一种早春野草}
+      - {word: 芦芽, meaning: 芦苇的嫩芽}
+      - {word: 河豚, meaning: 一种鱼类}
+    translation: 竹林外桃花初开两三枝，春江水暖鸭子最先知晓。蒌蒿满地生长芦芽还短，正是河豚要溯江而上的时候。
+    appreciation: 苏轼为惠崇和尚画作《春江晚景》所题的诗，画中所有景物在诗中活了过来。
+    background: 元丰八年（1085）苏轼题惠崇《春江晚景》所作。
+    famous_lines: ["竹外桃花三两枝，春江水暖鸭先知"]
+
+  - id: poem_exp_004
+    title: 九月九日忆山东兄弟
+    author: 王维
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    tags: [思乡, 重阳, 节日, 七言绝句, 名篇]
+    content: |
+      独在异乡为异客,每逢佳节倍思亲。
+      遥知兄弟登高处,遍插茱萸少一人。
+    pinyin: |
+      dú zài yì xiāng wéi yì kè ， měi féng jiā jié bèi sī qīn 。
+      yáo zhī xiōng dì dēng gāo chù ， biàn chā zhū yú shǎo yī rén 。
+    annotations:
+      - {word: 异乡, meaning: 他乡}
+      - {word: 佳节, meaning: 美好的节日，这里指重阳节}
+      - {word: 茱萸, meaning: 一种植物，古人重阳节佩戴以避邪}
+    translation: 独自远在他乡做客，每逢佳节就更加思念亲人。遥想兄弟们登上高处，插着茱萸时会发现少了我一人。
+    appreciation: 「每逢佳节倍思亲」成为思乡怀亲的千古名句。
+    background: 王维十七岁时于长安所作。
+    famous_lines: ["每逢佳节倍思亲"]
+
+  - id: poem_exp_005
+    title: 元日
+    author: 王安石
+    dynasty: 宋
+    layer: explore
+    is_required: false
+    difficulty: 2
+    tags: [春节, 节日, 七言绝句, 名篇]
+    content: |
+      爆竹声中一岁除,春风送暖入屠苏。
+      千门万户曈曈日,总把新桃换旧符。
+    pinyin: |
+      bào zhú shēng zhōng yī suì chú ， chūn fēng sòng nuǎn rù tú sū 。
+      qiān mén wàn hù tóng tóng rì ， zǒng bǎ xīn táo huàn jiù fú 。
+    annotations:
+      - {word: 一岁除, meaning: 一年过去}
+      - {word: 屠苏, meaning: 一种古代新年时饮用的药酒}
+      - {word: 曈曈, meaning: 日出时明亮的样子}
+      - {word: 桃符, meaning: 春联的前身}
+    translation: 爆竹声中一年过去，春风送暖，人们喝着屠苏酒。太阳初升照耀千家万户，人们把新的春联换下旧的桃符。
+    appreciation: 描写春节习俗的名篇，也隐含王安石变法革新的抱负。
+    background: 熙宁二年（1069）王安石拜相实行变法时所作。
+    famous_lines: ["千门万户曈曈日，总把新桃换旧符"]
+
+  - id: poem_exp_006
+    title: 出塞
+    author: 王昌龄
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    tags: [边塞, 爱国, 七言绝句, 名篇]
+    content: |
+      秦时明月汉时关,万里长征人未还。
+      但使龙城飞将在,不教胡马度阴山。
+    pinyin: |
+      qín shí míng yuè hàn shí guān ， wàn lǐ cháng zhēng rén wèi huán 。
+      dàn shǐ lóng chéng fēi jiàng zài ， bù jiào hú mǎ dù yīn shān 。
+    annotations:
+      - {word: 但使, meaning: 只要}
+      - {word: 龙城飞将, meaning: 指汉代名将李广}
+      - {word: 阴山, meaning: 位于今内蒙古中部}
+    translation: 秦汉时的明月依然照耀着秦汉时的边关，万里长征的将士们还未归还。只要有李广那样的名将在，就不会让胡人的战马越过阴山。
+    appreciation: 首联气势宏大，尾联寄寓着渴望名将出世、保家卫国的强烈心愿。
+    background: 王昌龄任龙标尉之前的边塞诗。
+    famous_lines: ["但使龙城飞将在，不教胡马度阴山"]
+
+  - id: poem_exp_007
+    title: 示儿
+    author: 陆游
+    dynasty: 宋
+    layer: explore
+    is_required: false
+    difficulty: 3
+    tags: [爱国, 遗嘱, 七言绝句, 名篇]
+    content: |
+      死去元知万事空,但悲不见九州同。
+      王师北定中原日,家祭无忘告乃翁。
+    pinyin: |
+      sǐ qù yuán zhī wàn shì kōng ， dàn bēi bù jiàn jiǔ zhōu tóng 。
+      wáng shī běi dìng zhōng yuán rì ， jiā jì wú wàng gào nǎi wēng 。
+    annotations:
+      - {word: 元, meaning: 通"原"，本来}
+      - {word: 九州, meaning: 指整个中国}
+      - {word: 王师, meaning: 朝廷的军队}
+      - {word: 乃翁, meaning: 你的父亲}
+    translation: 我本来知道人死之后万事皆空，只悲哀没能亲眼看到中原统一。朝廷北伐平定中原的那一天，家中祭祀时别忘了告诉你的父亲。
+    appreciation: 陆游临终绝笔，字字血泪，是南宋爱国诗的绝唱。
+    background: 嘉定二年（1210）陆游临终前作。
+    famous_lines: ["王师北定中原日，家祭无忘告乃翁"]
+
+  - id: poem_exp_008
+    title: 石灰吟
+    author: 于谦
+    dynasty: 明
+    layer: explore
+    is_required: false
+    difficulty: 2
+    tags: [咏物, 品格, 七言绝句]
+    content: |
+      千锤万凿出深山,烈火焚烧若等闲。
+      粉骨碎身浑不怕,要留清白在人间。
+    pinyin: |
+      qiān chuí wàn záo chū shēn shān ， liè huǒ fén shāo ruò děng xián 。
+      fěn gǔ suì shēn hún bù pà ， yào liú qīng bái zài rén jiān 。
+    annotations:
+      - {word: 千锤万凿, meaning: 无数次敲打凿掘}
+      - {word: 若等闲, meaning: 好像很平常的事}
+      - {word: 浑, meaning: 完全}
+      - {word: 清白, meaning: 石灰的颜色，喻指高洁品格}
+    translation: 石灰经过千锤万凿才从深山中开采出来，把烈火焚烧当作平常的事。粉身碎骨也全然不怕，只要能把清白留在人间。
+    appreciation: 于谦借石灰自喻，托物言志，抒发自己刚正不阿、清白做人的志向。
+    background: 于谦十二岁所作，一生也确实做到了"粉骨碎身浑不怕"。
+    famous_lines: ["粉骨碎身浑不怕，要留清白在人间"]

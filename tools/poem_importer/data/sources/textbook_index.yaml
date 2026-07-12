@@ -1,0 +1,107 @@
+# 部编版（人教版）小学语文教材 1-6 年级古诗目录
+# 数据来源：人教版部编版《语文》1-6 年级教材（2019 修订版）
+#
+# 字段说明：
+#   grade    - 年级 (1-6)
+#   semester - 学期 ('上' | '下')
+#   unit     - 单元 / 课文编号（教材页码可选）
+#   title    - 诗题
+#   author   - 作者
+#   dynasty  - 朝代
+#   required - 是否为 75 首必背古诗（新课标）
+#
+# 说明：完整 130 首目录（112 篇课内 + 75 首必背去重后约 130）本文件在数据管道 MVP 阶段
+#     仅整理其中 30 首示例进入核心层，剩余 100 首待后续人工精校后补入。
+
+grade_1:
+  fall:
+    - {unit: 课文3, title: 咏鹅, author: 骆宾王, dynasty: 唐, required: true}
+    - {unit: 课文5, title: 江南, author: 汉乐府, dynasty: 汉, required: true}
+    - {unit: 课文6, title: 画, author: 王维, dynasty: 唐, required: false}
+    - {unit: 语文园地, title: 悯农（其二）, author: 李绅, dynasty: 唐, required: true}
+    - {unit: 语文园地, title: 古朗月行（节选）, author: 李白, dynasty: 唐, required: false}
+  spring:
+    - {unit: 课文8, title: 静夜思, author: 李白, dynasty: 唐, required: true}
+    - {unit: 课文12, title: 春晓, author: 孟浩然, dynasty: 唐, required: true}
+    - {unit: 课文12, title: 赠汪伦, author: 李白, dynasty: 唐, required: true}
+    - {unit: 语文园地, title: 寻隐者不遇, author: 贾岛, dynasty: 唐, required: true}
+    - {unit: 语文园地, title: 池上, author: 白居易, dynasty: 唐, required: true}
+    - {unit: 语文园地, title: 小池, author: 杨万里, dynasty: 宋, required: true}
+
+grade_2:
+  fall:
+    - {unit: 识字, title: 梅花, author: 王安石, dynasty: 宋, required: true}
+    - {unit: 语文园地, title: 小儿垂钓, author: 胡令能, dynasty: 唐, required: true}
+    - {unit: 课文8, title: 登鹳雀楼, author: 王之涣, dynasty: 唐, required: true}
+    - {unit: 课文8, title: 望庐山瀑布, author: 李白, dynasty: 唐, required: true}
+  spring:
+    - {unit: 课文1, title: 咏柳, author: 贺知章, dynasty: 唐, required: true}
+    - {unit: 课文1, title: 村居, author: 高鼎, dynasty: 清, required: true}
+    - {unit: 课文8, title: 赋得古原草送别（节选）, author: 白居易, dynasty: 唐, required: true}
+    - {unit: 课文15, title: 绝句, author: 杜甫, dynasty: 唐, required: true}
+    - {unit: 课文15, title: 晓出净慈寺送林子方, author: 杨万里, dynasty: 宋, required: true}
+
+grade_3:
+  fall:
+    - {unit: 课文4, title: 山行, author: 杜牧, dynasty: 唐, required: true}
+    - {unit: 课文4, title: 赠刘景文, author: 苏轼, dynasty: 宋, required: true}
+    - {unit: 课文4, title: 夜书所见, author: 叶绍翁, dynasty: 宋, required: true}
+    - {unit: 课文17, title: 望天门山, author: 李白, dynasty: 唐, required: true}
+    - {unit: 课文17, title: 饮湖上初晴后雨, author: 苏轼, dynasty: 宋, required: true}
+  spring:
+    - {unit: 课文1, title: 绝句, author: 杜甫, dynasty: 唐, required: false}
+    - {unit: 课文1, title: 惠崇春江晚景, author: 苏轼, dynasty: 宋, required: true}
+    - {unit: 课文1, title: 三衢道中, author: 曾几, dynasty: 宋, required: true}
+    - {unit: 课文9, title: 九月九日忆山东兄弟, author: 王维, dynasty: 唐, required: true}
+    - {unit: 语文园地, title: 清明, author: 杜牧, dynasty: 唐, required: true}
+    - {unit: 语文园地, title: 元日, author: 王安石, dynasty: 宋, required: true}
+
+grade_4:
+  fall:
+    - {unit: 课文9, title: 暮江吟, author: 白居易, dynasty: 唐, required: true}
+    - {unit: 课文9, title: 题西林壁, author: 苏轼, dynasty: 宋, required: true}
+    - {unit: 课文9, title: 雪梅, author: 卢钺, dynasty: 宋, required: false}
+    - {unit: 课文21, title: 出塞, author: 王昌龄, dynasty: 唐, required: true}
+    - {unit: 课文21, title: 凉州词, author: 王翰, dynasty: 唐, required: true}
+    - {unit: 课文21, title: 夏日绝句, author: 李清照, dynasty: 宋, required: true}
+  spring:
+    - {unit: 课文1, title: 宿新市徐公店, author: 杨万里, dynasty: 宋, required: true}
+    - {unit: 课文1, title: 清平乐·村居, author: 辛弃疾, dynasty: 宋, required: true}
+    - {unit: 课文9, title: 独坐敬亭山, author: 李白, dynasty: 唐, required: true}
+    - {unit: 课文9, title: 望洞庭, author: 刘禹锡, dynasty: 唐, required: true}
+    - {unit: 课文9, title: 忆江南, author: 白居易, dynasty: 唐, required: true}
+    - {unit: 课文22, title: 芙蓉楼送辛渐, author: 王昌龄, dynasty: 唐, required: true}
+    - {unit: 课文22, title: 塞下曲, author: 卢纶, dynasty: 唐, required: true}
+    - {unit: 课文22, title: 墨梅, author: 王冕, dynasty: 元, required: true}
+
+grade_5:
+  fall:
+    - {unit: 课文12, title: 示儿, author: 陆游, dynasty: 宋, required: true}
+    - {unit: 课文12, title: 题临安邸, author: 林升, dynasty: 宋, required: true}
+    - {unit: 课文12, title: 己亥杂诗, author: 龚自珍, dynasty: 清, required: true}
+    - {unit: 课文21, title: 山居秋暝, author: 王维, dynasty: 唐, required: true}
+    - {unit: 课文21, title: 枫桥夜泊, author: 张继, dynasty: 唐, required: true}
+    - {unit: 课文21, title: 长相思, author: 纳兰性德, dynasty: 清, required: false}
+  spring:
+    - {unit: 课文9, title: 从军行, author: 王昌龄, dynasty: 唐, required: true}
+    - {unit: 课文9, title: 秋夜将晓出篱门迎凉有感, author: 陆游, dynasty: 宋, required: true}
+    - {unit: 课文9, title: 闻官军收河南河北, author: 杜甫, dynasty: 唐, required: true}
+    - {unit: 课文1, title: 四时田园杂兴（其三十一）, author: 范成大, dynasty: 宋, required: true}
+    - {unit: 课文1, title: 稚子弄冰, author: 杨万里, dynasty: 宋, required: true}
+    - {unit: 课文1, title: 村晚, author: 雷震, dynasty: 宋, required: true}
+
+grade_6:
+  fall:
+    - {unit: 课文3, title: 宿建德江, author: 孟浩然, dynasty: 唐, required: true}
+    - {unit: 课文3, title: 六月二十七日望湖楼醉书, author: 苏轼, dynasty: 宋, required: true}
+    - {unit: 课文3, title: 西江月·夜行黄沙道中, author: 辛弃疾, dynasty: 宋, required: true}
+    - {unit: 课文17, title: 书湖阴先生壁, author: 王安石, dynasty: 宋, required: true}
+    - {unit: 课文17, title: 浪淘沙（其一）, author: 刘禹锡, dynasty: 唐, required: true}
+    - {unit: 课文17, title: 江南春, author: 杜牧, dynasty: 唐, required: true}
+  spring:
+    - {unit: 古诗三首, title: 马诗, author: 李贺, dynasty: 唐, required: true}
+    - {unit: 古诗三首, title: 石灰吟, author: 于谦, dynasty: 明, required: true}
+    - {unit: 古诗三首, title: 竹石, author: 郑燮, dynasty: 清, required: true}
+    - {unit: 古诗三首, title: 寒食, author: 韩翃, dynasty: 唐, required: true}
+    - {unit: 古诗三首, title: 迢迢牵牛星, author: 佚名, dynasty: 汉, required: true}
+    - {unit: 古诗三首, title: 十五夜望月, author: 王建, dynasty: 唐, required: true}

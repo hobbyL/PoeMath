@@ -1,0 +1,298 @@
+# 扩展层示例：唐诗三百首 / 宋词精选中的经典（10-20 首示例）
+#
+# 说明：
+# - Phase 1 阶段全量目标为 ~400 首；本文件先保留 12 首示例作为管道端到端验证
+# - 后续通过 yxcs/poems-db 数据源做半自动化生成
+# - is_required = false，layer = extended
+
+poems:
+  - id: poem_ext_001
+    title: 芙蓉楼送辛渐
+    author: 王昌龄
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      寒雨连江夜入吴,平明送客楚山孤。
+      洛阳亲友如相问,一片冰心在玉壶。
+    pinyin: |
+      hán yǔ lián jiāng yè rù wú ， píng míng sòng kè chǔ shān gū 。
+      luò yáng qīn yǒu rú xiāng wèn ， yī piàn bīng xīn zài yù hú 。
+    annotations:
+      - {word: 平明, meaning: 天刚亮}
+      - {word: 楚山, meaning: 楚地的山}
+      - {word: 冰心, meaning: 比喻纯洁清高的心}
+    translation: 寒雨连夜洒满江面，我到了吴地。清晨送你远行，只剩楚山孤零零地矗立着。洛阳的亲友们如果问起我，请告诉他们我的心依旧像玉壶中的冰一样纯洁。
+    appreciation: 以"冰心玉壶"作比，表明诗人品格清白，是送别与言志兼备的名作。
+    background: 王昌龄任江宁丞时送别友人辛渐所作。
+    famous_lines: ["洛阳亲友如相问，一片冰心在玉壶"]
+    tags: [送别, 品格, 七言绝句]
+
+  - id: poem_ext_002
+    title: 送元二使安西
+    author: 王维
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      渭城朝雨浥轻尘,客舍青青柳色新。
+      劝君更尽一杯酒,西出阳关无故人。
+    pinyin: |
+      wèi chéng zhāo yǔ yì qīng chén ， kè shè qīng qīng liǔ sè xīn 。
+      quàn jūn gèng jìn yī bēi jiǔ ， xī chū yáng guān wú gù rén 。
+    annotations:
+      - {word: 渭城, meaning: 在今陕西咸阳东北}
+      - {word: 浥, meaning: 湿润}
+      - {word: 阳关, meaning: 在今甘肃敦煌西南}
+    translation: 渭城清晨一场小雨润湿了轻尘，客舍旁的柳树新绿一片。劝你再干一杯酒吧，向西出了阳关就再没有老朋友了。
+    appreciation: 以"劝酒"作结，写尽送别的深情，历代传唱不绝，被谱为《阳关三叠》。
+    background: 王维送友人元二出使安西都护府时所作。
+    famous_lines: ["劝君更尽一杯酒，西出阳关无故人"]
+    tags: [送别, 边塞, 七言绝句, 名篇]
+
+  - id: poem_ext_003
+    title: 早发白帝城
+    author: 李白
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      朝辞白帝彩云间,千里江陵一日还。
+      两岸猿声啼不住,轻舟已过万重山。
+    pinyin: |
+      zhāo cí bái dì cǎi yún jiān ， qiān lǐ jiāng líng yī rì huán 。
+      liǎng àn yuán shēng tí bù zhù ， qīng zhōu yǐ guò wàn chóng shān 。
+    annotations:
+      - {word: 朝, meaning: 早晨}
+      - {word: 辞, meaning: 告别}
+      - {word: 白帝, meaning: 白帝城，在今重庆奉节}
+      - {word: 江陵, meaning: 在今湖北荆州}
+    translation: 清晨告别彩云缭绕的白帝城，千里江陵一天就能返回。两岸猿声啼叫不停，轻快的小船已经越过了万重山。
+    appreciation: 全诗写李白遇赦东归时的轻快心情，尤以"轻舟已过万重山"体现出畅快淋漓的意气。
+    background: 乾元二年（759）李白流放夜郎途中遇赦，返回江陵所作。
+    famous_lines: ["两岸猿声啼不住，轻舟已过万重山"]
+    tags: [山水, 长江, 七言绝句, 名篇]
+
+  - id: poem_ext_004
+    title: 黄鹤楼送孟浩然之广陵
+    author: 李白
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      故人西辞黄鹤楼,烟花三月下扬州。
+      孤帆远影碧空尽,唯见长江天际流。
+    pinyin: |
+      gù rén xī cí huáng hè lóu ， yān huā sān yuè xià yáng zhōu 。
+      gū fān yuǎn yǐng bì kōng jìn ， wéi jiàn cháng jiāng tiān jì liú 。
+    annotations:
+      - {word: 故人, meaning: 老朋友}
+      - {word: 烟花, meaning: 形容繁花似锦}
+      - {word: 天际, meaning: 天边}
+    translation: 老朋友向西告别了黄鹤楼，在繁花似锦的三月前往扬州。孤帆的远影渐渐消失在碧空的尽头，只见长江水滚滚流向天边。
+    appreciation: 以景写情，用"孤帆远影"托出无尽离思，是唐人送别诗的杰作。
+    background: 唐开元十六年（728）李白送好友孟浩然从武昌前往扬州所作。
+    famous_lines: ["孤帆远影碧空尽，唯见长江天际流"]
+    tags: [送别, 长江, 七言绝句, 名篇]
+
+  - id: poem_ext_005
+    title: 回乡偶书
+    author: 贺知章
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      少小离家老大回,乡音无改鬓毛衰。
+      儿童相见不相识,笑问客从何处来。
+    pinyin: |
+      shào xiǎo lí jiā lǎo dà huí ， xiāng yīn wú gǎi bìn máo cuī 。
+      ér tóng xiāng jiàn bù xiāng shí ， xiào wèn kè cóng hé chù lái 。
+    annotations:
+      - {word: 少小, meaning: 年轻时候}
+      - {word: 老大, meaning: 年老}
+      - {word: 鬓毛, meaning: 耳边的头发}
+      - {word: 衰, meaning: 稀疏（此处读 cuī 以合韵）}
+    translation: 我年轻时离开家乡，年老才回来，乡音未改鬓发已白。孩子们见到我却不认识，笑着问：客人您是从哪里来的？
+    appreciation: 以幽默的儿童一问反衬时光的沧桑，情感真挚而含蓄。
+    background: 天宝三载（744）贺知章八十六岁辞官归乡时所作。
+    famous_lines: ["儿童相见不相识，笑问客从何处来"]
+    tags: [思乡, 归乡, 七言绝句, 名篇]
+
+  - id: poem_ext_006
+    title: 泊船瓜洲
+    author: 王安石
+    dynasty: 宋
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      京口瓜洲一水间,钟山只隔数重山。
+      春风又绿江南岸,明月何时照我还。
+    pinyin: |
+      jīng kǒu guā zhōu yī shuǐ jiān ， zhōng shān zhǐ gé shù chóng shān 。
+      chūn fēng yòu lǜ jiāng nán àn ， míng yuè hé shí zhào wǒ huán 。
+    annotations:
+      - {word: 京口, meaning: 今江苏镇江}
+      - {word: 瓜洲, meaning: 今江苏扬州南部}
+      - {word: 钟山, meaning: 在今南京}
+    translation: 京口与瓜洲隔着一江之水，钟山也不过隔着几座山。春风又吹绿了江南两岸，明月什么时候才能照我回家？
+    appreciation: 尤以"春风又绿江南岸"一句中的"绿"字最为传神，是宋诗炼字的典范。
+    background: 熙宁八年（1075）王安石二度拜相赴京，途中泊船瓜洲所作。
+    famous_lines: ["春风又绿江南岸，明月何时照我还"]
+    tags: [思乡, 春天, 七言绝句, 名篇]
+
+  - id: poem_ext_007
+    title: 秋夕
+    author: 杜牧
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      银烛秋光冷画屏,轻罗小扇扑流萤。
+      天阶夜色凉如水,坐看牵牛织女星。
+    pinyin: |
+      yín zhú qiū guāng lěng huà píng ， qīng luó xiǎo shàn pū liú yíng 。
+      tiān jiē yè sè liáng rú shuǐ ， zuò kàn qiān niú zhī nǚ xīng 。
+    annotations:
+      - {word: 银烛, meaning: 白色的蜡烛}
+      - {word: 画屏, meaning: 有彩绘的屏风}
+      - {word: 轻罗, meaning: 轻薄的丝织品}
+      - {word: 天阶, meaning: 皇宫的台阶}
+    translation: 秋夜银烛映着画屏的清冷，宫女手持轻罗小扇扑打飞舞的流萤。夜色如凉水一般，宫女坐着凝望牛郎织女星。
+    appreciation: 以宫女扑萤、坐望双星，含蓄写出宫廷生活的寂寞与对爱情自由的向往。
+    background: 杜牧任京官时所作宫怨诗。
+    famous_lines: ["天阶夜色凉如水，坐看牵牛织女星"]
+    tags: [宫怨, 秋天, 七言绝句]
+
+  - id: poem_ext_008
+    title: 江雪
+    author: 柳宗元
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      千山鸟飞绝,万径人踪灭。
+      孤舟蓑笠翁,独钓寒江雪。
+    pinyin: |
+      qiān shān niǎo fēi jué ， wàn jìng rén zōng miè 。
+      gū zhōu suō lì wēng ， dú diào hán jiāng xuě 。
+    annotations:
+      - {word: 绝, meaning: 断绝}
+      - {word: 径, meaning: 小路}
+      - {word: 踪, meaning: 脚印}
+      - {word: 蓑笠, meaning: 蓑衣和斗笠}
+    translation: 群山中鸟已飞尽，条条小路上人迹全无。江上一叶孤舟，披蓑戴笠的老翁独自在寒江大雪中垂钓。
+    appreciation: 全诗以"绝""灭""孤""独"四字营造出极冷极清的意境，寄托诗人被贬永州后的清高孤傲。
+    background: 元和二年（807）柳宗元被贬永州时所作。
+    famous_lines: ["孤舟蓑笠翁，独钓寒江雪"]
+    tags: [山水, 冬天, 五言绝句, 名篇]
+
+  - id: poem_ext_009
+    title: 春夜喜雨
+    author: 杜甫
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 3
+    content: |
+      好雨知时节,当春乃发生。
+      随风潜入夜,润物细无声。
+      野径云俱黑,江船火独明。
+      晓看红湿处,花重锦官城。
+    pinyin: |
+      hǎo yǔ zhī shí jié ， dāng chūn nǎi fā shēng 。
+      suí fēng qián rù yè ， rùn wù xì wú shēng 。
+      yě jìng yún jù hēi ， jiāng chuán huǒ dú míng 。
+      xiǎo kàn hóng shī chù ， huā zhòng jǐn guān chéng 。
+    annotations:
+      - {word: 乃, meaning: 就}
+      - {word: 潜, meaning: 悄悄地}
+      - {word: 锦官城, meaning: 成都的别称}
+    translation: 好雨知道下雨的时节，正值春天万物萌发之时。它随着春风悄悄地在夜里降临，无声地滋润着万物。野外小路上乌云一片漆黑，江船上只有渔火独自明亮。清晨看那被雨水润红湿透之处，花朵沾着雨水在锦官城中沉甸甸地开放。
+    appreciation: 全诗以拟人手法赞美春夜细雨，"润物细无声"成为教育与关怀的千古名句。
+    background: 上元二年（761）杜甫居成都草堂时所作。
+    famous_lines: ["随风潜入夜，润物细无声"]
+    tags: [春天, 雨, 五言律诗, 名篇]
+
+  - id: poem_ext_010
+    title: 春望
+    author: 杜甫
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 3
+    content: |
+      国破山河在,城春草木深。
+      感时花溅泪,恨别鸟惊心。
+      烽火连三月,家书抵万金。
+      白头搔更短,浑欲不胜簪。
+    pinyin: |
+      guó pò shān hé zài ， chéng chūn cǎo mù shēn 。
+      gǎn shí huā jiàn lèi ， hèn bié niǎo jīng xīn 。
+      fēng huǒ lián sān yuè ， jiā shū dǐ wàn jīn 。
+      bái tóu sāo gèng duǎn ， hún yù bù shèng zān 。
+    annotations:
+      - {word: 国破, meaning: 国都沦陷}
+      - {word: 烽火, meaning: 战火}
+      - {word: 家书, meaning: 家信}
+      - {word: 抵, meaning: 值}
+      - {word: 簪, meaning: 别发的簪子}
+    translation: 国都虽已沦陷，山河依旧存在。春天的长安城草木丛生。感伤时事，看见花开也落泪；怅恨离别，听见鸟鸣也心惊。战火已经延续了几个月，一封家书胜过万两黄金。白发因忧愁而越搔越短，简直就要插不住簪子了。
+    appreciation: 全诗以春景反衬战乱之愁，"家书抵万金"成为战乱时代的共鸣之句。
+    background: 至德二载（757）杜甫身陷长安时所作。
+    famous_lines: ["烽火连三月，家书抵万金"]
+    tags: [爱国, 战乱, 五言律诗, 名篇]
+
+  - id: poem_ext_011
+    title: 悯农（其一）
+    author: 李绅
+    dynasty: 唐
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      春种一粒粟,秋收万颗子。
+      四海无闲田,农夫犹饿死。
+    pinyin: |
+      chūn zhòng yī lì sù ， qiū shōu wàn kē zǐ 。
+      sì hǎi wú xián tián ， nóng fū yóu è sǐ 。
+    annotations:
+      - {word: 粟, meaning: 谷子}
+      - {word: 犹, meaning: 仍然}
+    translation: 春天种下一粒谷子，秋天就能收获千万颗粮食。四海之内没有闲置的田地，可农夫仍然被饿死。
+    appreciation: 用鲜明的对比揭露封建剥削的残酷，是李绅《悯农》组诗中的第一首。
+    background: 李绅同情农民疾苦所作。
+    famous_lines: ["四海无闲田，农夫犹饿死"]
+    tags: [悯农, 五言绝句, 社会]
+
+  - id: poem_ext_012
+    title: 竹石
+    author: 郑燮
+    dynasty: 清
+    layer: extended
+    is_required: false
+    difficulty: 2
+    content: |
+      咬定青山不放松,立根原在破岩中。
+      千磨万击还坚劲,任尔东西南北风。
+    pinyin: |
+      yǎo dìng qīng shān bù fàng sōng ， lì gēn yuán zài pò yán zhōng 。
+      qiān mó wàn jī hái jiān jìng ， rèn ěr dōng xī nán běi fēng 。
+    annotations:
+      - {word: 咬定, meaning: 牢牢地扎根}
+      - {word: 立根, meaning: 扎根}
+      - {word: 磨, meaning: 磨难}
+      - {word: 任, meaning: 任凭}
+      - {word: 尔, meaning: 你}
+    translation: 竹子紧紧咬定青山不肯放松，把根深深地扎进破裂的岩石中。历经无数磨难打击依然坚韧挺拔，任凭你东南西北风怎样吹。
+    appreciation: 以物言志，郑板桥借竹子扎根岩石的坚韧，抒发自己不畏权贵的品格。
+    background: 郑板桥题写在自己所画的《竹石图》上的诗。
+    famous_lines: ["千磨万击还坚劲，任尔东西南北风"]
+    tags: [咏物, 竹子, 品格, 七言绝句]
