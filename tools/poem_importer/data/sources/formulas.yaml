@@ -434,10 +434,10 @@ formulas:
   - id: formula_ratio
     category: 比例
     name: 比例基本性质
-    formula_text: 若 a : b = c : d，则 a × d = b × c
+    formula_text: "若 a : b = c : d，则 a × d = b × c"
     formula_latex: "a : b = c : d \\Rightarrow ad = bc"
     grade: 6
     params: []
     memory_tip: 内项之积等于外项之积。
-    example: 3 : 4 = 6 : x → 3x = 24 → x = 8。
+    example: "3 : 4 = 6 : x → 3x = 24 → x = 8。"
     related_formulas: [formula_percentage]

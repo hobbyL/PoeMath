@@ -36,11 +36,12 @@ class ValidationReport {
 class SchemaValidator {
   ValidationReport validateAll(String assetDir) {
     final report = ValidationReport();
-    _validatePoems('$assetDir/poems_core.json', report, expectRequired: true);
+    _validatePoems('$assetDir/poems_core.json', report,
+        expectRequired: true, minimumCount: 130);
     _validatePoems('$assetDir/poems_extended.json', report,
-        expectRequired: false);
+        expectRequired: false, minimumCount: 400);
     _validatePoems('$assetDir/poems_explore.json', report,
-        expectRequired: false);
+        expectRequired: false, minimumCount: 500);
     _validateAuthors('$assetDir/authors.json', report);
     _validateFormulas('$assetDir/formulas.json', report);
     return report;
@@ -50,6 +51,7 @@ class SchemaValidator {
     String path,
     ValidationReport report, {
     required bool expectRequired,
+    required int minimumCount,
   }) {
     final file = File(path);
     if (!file.existsSync()) {
@@ -60,6 +62,10 @@ class SchemaValidator {
     if (decoded is! List) {
       report.errors.add('$path: root must be a JSON array');
       return;
+    }
+    if (decoded.length < minimumCount) {
+      report.warnings.add(
+          '$path: contains ${decoded.length} poems, below planned minimum $minimumCount');
     }
     final seenIds = <String>{};
     for (var i = 0; i < decoded.length; i++) {

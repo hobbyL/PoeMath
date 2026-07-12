@@ -6,29 +6,6 @@
 # - is_required = false，layer = extended
 
 poems:
-  - id: poem_ext_001
-    title: 芙蓉楼送辛渐
-    author: 王昌龄
-    dynasty: 唐
-    layer: extended
-    is_required: false
-    difficulty: 2
-    content: |
-      寒雨连江夜入吴,平明送客楚山孤。
-      洛阳亲友如相问,一片冰心在玉壶。
-    pinyin: |
-      hán yǔ lián jiāng yè rù wú ， píng míng sòng kè chǔ shān gū 。
-      luò yáng qīn yǒu rú xiāng wèn ， yī piàn bīng xīn zài yù hú 。
-    annotations:
-      - {word: 平明, meaning: 天刚亮}
-      - {word: 楚山, meaning: 楚地的山}
-      - {word: 冰心, meaning: 比喻纯洁清高的心}
-    translation: 寒雨连夜洒满江面，我到了吴地。清晨送你远行，只剩楚山孤零零地矗立着。洛阳的亲友们如果问起我，请告诉他们我的心依旧像玉壶中的冰一样纯洁。
-    appreciation: 以"冰心玉壶"作比，表明诗人品格清白，是送别与言志兼备的名作。
-    background: 王昌龄任江宁丞时送别友人辛渐所作。
-    famous_lines: ["洛阳亲友如相问，一片冰心在玉壶"]
-    tags: [送别, 品格, 七言绝句]
-
   - id: poem_ext_002
     title: 送元二使安西
     author: 王维
@@ -170,30 +147,6 @@ poems:
     famous_lines: ["天阶夜色凉如水，坐看牵牛织女星"]
     tags: [宫怨, 秋天, 七言绝句]
 
-  - id: poem_ext_008
-    title: 江雪
-    author: 柳宗元
-    dynasty: 唐
-    layer: extended
-    is_required: false
-    difficulty: 2
-    content: |
-      千山鸟飞绝,万径人踪灭。
-      孤舟蓑笠翁,独钓寒江雪。
-    pinyin: |
-      qiān shān niǎo fēi jué ， wàn jìng rén zōng miè 。
-      gū zhōu suō lì wēng ， dú diào hán jiāng xuě 。
-    annotations:
-      - {word: 绝, meaning: 断绝}
-      - {word: 径, meaning: 小路}
-      - {word: 踪, meaning: 脚印}
-      - {word: 蓑笠, meaning: 蓑衣和斗笠}
-    translation: 群山中鸟已飞尽，条条小路上人迹全无。江上一叶孤舟，披蓑戴笠的老翁独自在寒江大雪中垂钓。
-    appreciation: 全诗以"绝""灭""孤""独"四字营造出极冷极清的意境，寄托诗人被贬永州后的清高孤傲。
-    background: 元和二年（807）柳宗元被贬永州时所作。
-    famous_lines: ["孤舟蓑笠翁，独钓寒江雪"]
-    tags: [山水, 冬天, 五言绝句, 名篇]
-
   - id: poem_ext_009
     title: 春夜喜雨
     author: 杜甫
@@ -249,50 +202,3 @@ poems:
     background: 至德二载（757）杜甫身陷长安时所作。
     famous_lines: ["烽火连三月，家书抵万金"]
     tags: [爱国, 战乱, 五言律诗, 名篇]
-
-  - id: poem_ext_011
-    title: 悯农（其一）
-    author: 李绅
-    dynasty: 唐
-    layer: extended
-    is_required: false
-    difficulty: 2
-    content: |
-      春种一粒粟,秋收万颗子。
-      四海无闲田,农夫犹饿死。
-    pinyin: |
-      chūn zhòng yī lì sù ， qiū shōu wàn kē zǐ 。
-      sì hǎi wú xián tián ， nóng fū yóu è sǐ 。
-    annotations:
-      - {word: 粟, meaning: 谷子}
-      - {word: 犹, meaning: 仍然}
-    translation: 春天种下一粒谷子，秋天就能收获千万颗粮食。四海之内没有闲置的田地，可农夫仍然被饿死。
-    appreciation: 用鲜明的对比揭露封建剥削的残酷，是李绅《悯农》组诗中的第一首。
-    background: 李绅同情农民疾苦所作。
-    famous_lines: ["四海无闲田，农夫犹饿死"]
-    tags: [悯农, 五言绝句, 社会]
-
-  - id: poem_ext_012
-    title: 竹石
-    author: 郑燮
-    dynasty: 清
-    layer: extended
-    is_required: false
-    difficulty: 2
-    content: |
-      咬定青山不放松,立根原在破岩中。
-      千磨万击还坚劲,任尔东西南北风。
-    pinyin: |
-      yǎo dìng qīng shān bù fàng sōng ， lì gēn yuán zài pò yán zhōng 。
-      qiān mó wàn jī hái jiān jìng ， rèn ěr dōng xī nán běi fēng 。
-    annotations:
-      - {word: 咬定, meaning: 牢牢地扎根}
-      - {word: 立根, meaning: 扎根}
-      - {word: 磨, meaning: 磨难}
-      - {word: 任, meaning: 任凭}
-      - {word: 尔, meaning: 你}
-    translation: 竹子紧紧咬定青山不肯放松，把根深深地扎进破裂的岩石中。历经无数磨难打击依然坚韧挺拔，任凭你东南西北风怎样吹。
-    appreciation: 以物言志，郑板桥借竹子扎根岩石的坚韧，抒发自己不畏权贵的品格。
-    background: 郑板桥题写在自己所画的《竹石图》上的诗。
-    famous_lines: ["千磨万击还坚劲，任尔东西南北风"]
-    tags: [咏物, 竹子, 品格, 七言绝句]
