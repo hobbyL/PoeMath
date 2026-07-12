@@ -1,0 +1,14 @@
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 21
+  # Android adaptive icon (API 26+)
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
+  # Remove alpha channel for iOS (required by App Store)
+  remove_alpha_ios: true
+  # Web favicon
+  web:
+    generate: true
+    image_path: "assets/icons/app_icon.png"

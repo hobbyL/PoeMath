@@ -55,6 +55,9 @@ dev_dependencies:
   # 测试 mock
   mocktail: ^1.0.4
 
+  # App 图标生成
+  flutter_launcher_icons: ^0.14.3
+
 flutter:
   uses-material-design: true
 
