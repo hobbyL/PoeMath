@@ -44,8 +44,17 @@ jobs:
 
       # -------- 签名配置 --------
       - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/poemath-release.jks
+          echo -n "$KEYSTORE_BASE64" | base64 --decode > android/app/poemath-release.jks
+          # 校验 jks 文件完整性
+          FILE_SIZE=$(stat --format=%s android/app/poemath-release.jks)
+          echo "→ keystore file size: ${FILE_SIZE} bytes"
+          if [ "$FILE_SIZE" -lt 100 ]; then
+            echo "::error::Keystore file too small (${FILE_SIZE} bytes) — KEYSTORE_BASE64 secret may be corrupted"
+            exit 1
+          fi
           printf 'storeFile=poemath-release.jks\nstorePassword=${{ secrets.KEYSTORE_PASSWORD }}\nkeyAlias=${{ secrets.KEY_ALIAS }}\nkeyPassword=${{ secrets.KEY_PASSWORD }}\n' > android/key.properties
 
       # -------- 构建 --------
