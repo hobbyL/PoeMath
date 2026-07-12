@@ -12,6 +12,8 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
+import 'package:poemath/features/poem/poem_detail_page.dart';
+import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/poem_tab_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
@@ -50,6 +52,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ProfilePage(),
           ),
         ],
+      ),
+      // ============ 诗词详情（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.poemDetail,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return PoemDetailPage(poemId: id);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.poemRecite,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return PoemRecitePage(poemId: id);
+        },
       ),
     ],
   );
