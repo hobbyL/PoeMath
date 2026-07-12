@@ -1,7 +1,7 @@
 name: poemath
 description: "PoeMath (诗算宝) - 面向 6-12 岁儿童的诗词背诵与口算训练助手"
 publish_to: "none"
-version: 0.1.0+1
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
