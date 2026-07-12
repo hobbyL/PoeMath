@@ -72,14 +72,49 @@ class PoemTheme {
           fontWeight: FontWeight.w700,
           color: color,
         ),
+        displayMedium: TextStyle(
+          fontFamily: TypographyTokens.poemFontFamily,
+          fontSize: 28,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+        displaySmall: TextStyle(
+          fontFamily: TypographyTokens.poemFontFamily,
+          fontSize: 24,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+        headlineLarge: TextStyle(
+          fontFamily: TypographyTokens.poemFontFamily,
+          fontSize: TypographyTokens.fsHeadline,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
         headlineMedium: TextStyle(
           fontFamily: TypographyTokens.poemFontFamily,
           fontSize: TypographyTokens.fsHeadline,
           color: color,
         ),
+        headlineSmall: TextStyle(
+          fontFamily: TypographyTokens.poemFontFamily,
+          fontSize: 22,
+          color: color,
+        ),
         titleLarge: TextStyle(
           fontFamily: TypographyTokens.poemFontFamily,
           fontSize: TypographyTokens.fsTitle,
+          color: color,
+        ),
+        titleMedium: TextStyle(
+          fontFamily: TypographyTokens.uiFontFamily,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: color,
+        ),
+        titleSmall: TextStyle(
+          fontFamily: TypographyTokens.uiFontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
           color: color,
         ),
         bodyLarge: TextStyle(
@@ -93,9 +128,25 @@ class PoemTheme {
           fontSize: TypographyTokens.fsBody,
           color: color,
         ),
+        bodySmall: TextStyle(
+          fontFamily: TypographyTokens.uiFontFamily,
+          fontSize: TypographyTokens.fsCaption,
+          color: color,
+        ),
+        labelLarge: TextStyle(
+          fontFamily: TypographyTokens.uiFontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: color,
+        ),
         labelMedium: TextStyle(
           fontFamily: TypographyTokens.uiFontFamily,
           fontSize: TypographyTokens.fsLabel,
+          color: color,
+        ),
+        labelSmall: TextStyle(
+          fontFamily: TypographyTokens.uiFontFamily,
+          fontSize: 11,
           color: color,
         ),
       );

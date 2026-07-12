@@ -64,6 +64,7 @@ abstract class BaseGenerator {
       difficulty: problem.difficulty,
       resultForm: problem.resultForm,
       missingIndex: missingIndex,
+      expressionResult: problem.result, // 保留原始计算结果用于显示
     );
   }
 

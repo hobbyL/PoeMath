@@ -53,6 +53,9 @@ class ColorTokens {
   /// 薰衣草紫：主色
   static const Color mathPurple = Color(0xFFB5A0E8);
 
+  /// 薰衣草紫深：文字/强调（满足 WCAG 对比度）
+  static const Color mathPurpleDeep = Color(0xFF6B52B5);
+
   /// 奶油黄：次要色 / 高亮
   static const Color mathYellow = Color(0xFFFFD98A);
 

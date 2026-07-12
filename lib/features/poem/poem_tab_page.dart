@@ -83,7 +83,7 @@ class PoemTabPage extends ConsumerWidget {
                 : ListView.builder(
                     itemCount: poems.length,
                     padding: const EdgeInsets.only(
-                      bottom: SpacingTokens.xl,
+                      bottom: 100, // 为 NotchedBottomBar 预留空间
                     ),
                     itemBuilder: (context, index) {
                       final poem = poems[index];

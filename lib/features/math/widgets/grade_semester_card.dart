@@ -42,7 +42,7 @@ class GradeSemesterCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
         side: isSelected
-            ? const BorderSide(color: ColorTokens.mathPurple, width: 2)
+            ? const BorderSide(color: ColorTokens.mathPurpleDeep, width: 2)
             : BorderSide.none,
       ),
       color: isSelected
@@ -59,7 +59,7 @@ class GradeSemesterCard extends StatelessWidget {
                 _gradeIcons[grade] ?? Icons.school,
                 size: 32,
                 color: isSelected
-                    ? ColorTokens.mathPurple
+                    ? ColorTokens.mathPurpleDeep
                     : theme.colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: SpacingTokens.md),
@@ -72,7 +72,7 @@ class GradeSemesterCard extends StatelessWidget {
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: isSelected
-                            ? ColorTokens.mathPurple
+                            ? ColorTokens.mathPurpleDeep
                             : theme.colorScheme.onSurface,
                       ),
                     ),
@@ -91,7 +91,7 @@ class GradeSemesterCard extends StatelessWidget {
               Icon(
                 Icons.chevron_right,
                 color: isSelected
-                    ? ColorTokens.mathPurple
+                    ? ColorTokens.mathPurpleDeep
                     : theme.colorScheme.onSurfaceVariant,
               ),
             ],

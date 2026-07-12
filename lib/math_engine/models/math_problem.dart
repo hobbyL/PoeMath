@@ -90,6 +90,10 @@ class MathProblem {
   /// 未知项位置（仅 findMissing 模式使用，0-based 索引指向 operands）。
   final int? missingIndex;
 
+  /// 原始表达式计算结果（仅 findMissing 模式使用）。
+  /// 例如 2 - 2 = 0 求第二项，result=2(答案)，expressionResult=0(等号右边)。
+  final NumberValue? expressionResult;
+
   /// 余数（仅 withRemainder 形式使用）。
   final int? remainder;
 
@@ -112,6 +116,7 @@ class MathProblem {
     this.difficulty = 1,
     this.resultForm = ResultForm.integer,
     this.missingIndex,
+    this.expressionResult,
     this.remainder,
     this.compareRelation,
     this.compareTarget,
@@ -169,7 +174,9 @@ class MathProblem {
         buffer.write(operands[i].toString());
       }
     }
-    buffer.write(' = $result');
+    // 使用原始表达式计算结果，而非答案(missing operand)
+    final rhs = expressionResult ?? result;
+    buffer.write(' = $rhs');
     return buffer.toString();
   }
 

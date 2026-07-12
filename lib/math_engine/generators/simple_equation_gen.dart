@@ -101,6 +101,7 @@ class SimpleEquationGen extends BaseGenerator {
       grade: config.grade,
       difficulty: 3,
       missingIndex: missingIndex,
+      expressionResult: result, // 等号右边显示的值
     );
   }
 }

@@ -21,7 +21,8 @@ class StepSolver {
     final a = problem.operands[0];
     final b = problem.operands[1];
     final op = problem.operators[0];
-    final result = problem.result;
+    // findMissing 模式下 result 是答案(缺失项)，需要用 expressionResult 做解题步骤
+    final exprResult = problem.expressionResult ?? problem.result;
     final steps = <SolutionStep>[];
 
     switch (op) {
@@ -61,9 +62,9 @@ class StepSolver {
         }
         steps.add(
           SolutionStep(
-            description: '所以 $a + $b = $result',
-            expression: '$a + $b = $result',
-            resultHint: '$result',
+            description: '所以 $a + $b = $exprResult',
+            expression: '$a + $b = $exprResult',
+            resultHint: '$exprResult',
           ),
         );
 
@@ -101,9 +102,9 @@ class StepSolver {
         }
         steps.add(
           SolutionStep(
-            description: '所以 $a - $b = $result',
-            expression: '$a - $b = $result',
-            resultHint: '$result',
+            description: '所以 $a - $b = $exprResult',
+            expression: '$a - $b = $exprResult',
+            resultHint: '$exprResult',
           ),
         );
 
@@ -111,8 +112,8 @@ class StepSolver {
         steps.add(
           SolutionStep(
             description: '计算 $a × $b',
-            expression: '$a × $b = $result',
-            resultHint: '$result',
+            expression: '$a × $b = $exprResult',
+            resultHint: '$exprResult',
           ),
         );
 
@@ -120,7 +121,7 @@ class StepSolver {
         if (problem.resultForm == ResultForm.withRemainder) {
           final dividend = a.asInteger;
           final divisor = b.asInteger;
-          final quotient = result.asInteger;
+          final quotient = exprResult.asInteger;
           final remainder = problem.remainder ?? 0;
           steps.add(
             SolutionStep(
@@ -139,8 +140,8 @@ class StepSolver {
           steps.add(
             SolutionStep(
               description: '计算 $a ÷ $b',
-              expression: '$a ÷ $b = $result',
-              resultHint: '$result',
+              expression: '$a ÷ $b = $exprResult',
+              resultHint: '$exprResult',
             ),
           );
         }

@@ -449,14 +449,16 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                           children: [
                             Text(
                               judgement.correctSteps[i].description,
-                              style: theme.textTheme.bodySmall,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                              ),
                             ),
                             if (judgement
                                 .correctSteps[i].resultHint.isNotEmpty)
                               Text(
                                 judgement.correctSteps[i].resultHint,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: ColorTokens.mathPurple,
+                                  color: ColorTokens.mathPurpleDeep,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

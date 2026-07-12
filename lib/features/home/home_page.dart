@@ -94,7 +94,8 @@ class HomePage extends ConsumerWidget {
 
             // 今日目标
             _buildDailyGoal(context, ref),
-            const SizedBox(height: SpacingTokens.xl),
+            // 底部留白：为 NotchedBottomBar 预留空间 (barHeight + fabTopReserve)
+            const SizedBox(height: 100),
           ],
         ),
       ),
@@ -261,66 +262,74 @@ class HomePage extends ConsumerWidget {
   }
 
   Widget _buildQuickActions(BuildContext context, int mistakeCount) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _QuickActionButton(
-            icon: Icons.menu_book_rounded,
-            label: '背诗词',
-            color: ColorTokens.poemGreen,
-            onTap: () => context.go(AppRoutes.poemTab),
-          ),
-        ),
-        const SizedBox(width: SpacingTokens.sm),
-        Expanded(
-          child: _QuickActionButton(
-            icon: Icons.calculate_rounded,
-            label: '做口算',
-            color: ColorTokens.mathPurple,
-            onTap: () => context.go(AppRoutes.mathTab),
-          ),
-        ),
-        const SizedBox(width: SpacingTokens.sm),
-        Expanded(
-          child: _QuickActionButton(
-            icon: Icons.functions_rounded,
-            label: '查公式',
-            color: ColorTokens.mathBlue,
-            onTap: () => context.go(AppRoutes.studyHub),
-          ),
-        ),
-        const SizedBox(width: SpacingTokens.sm),
-        Expanded(
-          child: Stack(
-            children: [
-              _QuickActionButton(
-                icon: Icons.error_outline_rounded,
-                label: '错题本',
-                color: ColorTokens.mathCoral,
-                onTap: () => context.push(AppRoutes.mathMistake),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.menu_book_rounded,
+                label: '背诗词',
+                color: ColorTokens.poemGreen,
+                onTap: () => context.go(AppRoutes.poemTab),
               ),
-              if (mistakeCount > 0)
-                Positioned(
-                  right: 4,
-                  top: 4,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: ColorTokens.error,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '$mistakeCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.calculate_rounded,
+                label: '做口算',
+                color: ColorTokens.mathPurple,
+                onTap: () => context.go(AppRoutes.mathTab),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.functions_rounded,
+                label: '查公式',
+                color: ColorTokens.mathBlue,
+                onTap: () => context.go(AppRoutes.studyHub),
+              ),
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            Expanded(
+              child: Stack(
+                children: [
+                  _QuickActionButton(
+                    icon: Icons.error_outline_rounded,
+                    label: '错题本',
+                    color: ColorTokens.mathCoral,
+                    onTap: () => context.push(AppRoutes.mathMistake),
+                  ),
+                  if (mistakeCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: ColorTokens.error,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$mistakeCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );

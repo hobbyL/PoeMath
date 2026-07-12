@@ -85,9 +85,9 @@ class NotchedBottomBar extends StatelessWidget {
               ),
             ),
           ),
-          // 2) 中央凸起按钮
+          // 2) 中央凸起按钮 — 中心对齐底栏顶部凹槽
           Positioned(
-            bottom: _barHeight - 12,
+            bottom: _barHeight - _fabDiameter / 2,
             child: _CenterFab(
               icon: centerIcon,
               backgroundColor: primary,
