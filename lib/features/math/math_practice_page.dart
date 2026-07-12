@@ -1,0 +1,511 @@
+// lib/features/math/math_practice_page.dart
+//
+// 口算练习页：题目展示 → 用户输入 → 判定反馈 → 分步讲解。
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/data/models/math_mistake.dart';
+import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/session_result_dialog.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
+
+class MathPracticePage extends ConsumerStatefulWidget {
+  const MathPracticePage({super.key});
+
+  @override
+  ConsumerState<MathPracticePage> createState() => _MathPracticePageState();
+}
+
+class _MathPracticePageState extends ConsumerState<MathPracticePage> {
+  final _answerController = TextEditingController();
+  final _focusNode = FocusNode();
+
+  /// 当前判定结果（null = 尚未作答）
+  AnswerJudgement? _judgement;
+
+  /// 是否展示分步解答
+  bool _showSteps = false;
+
+  /// 练习开始时间
+  late final DateTime _startTime;
+
+  /// 当前 session ID
+  late final String _sessionId;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTime = DateTime.now();
+    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // 延迟到 build 之后初始化题目
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _generateProblems();
+    });
+  }
+
+  void _generateProblems() {
+    final grade = ref.read(mathGradeProvider);
+    final semester = ref.read(mathSemesterProvider);
+    final batchSize = ref.read(mathBatchSizeProvider);
+
+    final problems = MathEngine.generateBatch(
+      grade: grade,
+      semester: semester,
+      count: batchSize,
+    );
+
+    ref.read(mathProblemsProvider.notifier).state = problems;
+    ref.read(mathCurrentIndexProvider.notifier).state = 0;
+    ref.read(mathCorrectCountProvider.notifier).state = 0;
+    ref.read(mathAnsweredCountProvider.notifier).state = 0;
+  }
+
+  @override
+  void dispose() {
+    _answerController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _submitAnswer() {
+    final problem = ref.read(currentProblemProvider);
+    if (problem == null || _judgement != null) return;
+
+    final userAnswer = _answerController.text.trim();
+    if (userAnswer.isEmpty) return;
+
+    final judgement = MathEngine.judge(problem, userAnswer);
+    setState(() {
+      _judgement = judgement;
+      _showSteps = false;
+    });
+
+    ref.read(mathAnsweredCountProvider.notifier).update((s) => s + 1);
+    if (judgement.isCorrect) {
+      ref.read(mathCorrectCountProvider.notifier).update((s) => s + 1);
+    } else {
+      // 记录错题
+      _recordMistake(problem, userAnswer, judgement);
+    }
+  }
+
+  void _recordMistake(
+    MathProblem problem,
+    String userAnswer,
+    AnswerJudgement judgement,
+  ) {
+    final grade = ref.read(mathGradeProvider);
+    final repo = ref.read(mathMistakeRepoProvider);
+
+    final mistake = MathMistake(
+      id: '${_sessionId}_${ref.read(mathCurrentIndexProvider)}',
+      profileId: ProfileScope.currentId,
+      problemText: problem.problemText,
+      correctAnswer: problem.answerText,
+      userAnswer: userAnswer,
+      problemType: _problemTypeLabel(problem),
+      grade: grade,
+      errorType: judgement.diagnosis?.category,
+      solutionStepsJson: _stepsToJson(judgement.correctSteps),
+    );
+
+    repo.add(mistake);
+  }
+
+  String _problemTypeLabel(MathProblem problem) {
+    if (problem.resultForm == ResultForm.fraction) return 'fraction';
+    if (problem.resultForm == ResultForm.decimal) return 'decimal';
+    if (problem.resultForm == ResultForm.withRemainder) return 'remainder';
+    if (problem.operators.length > 1) return 'mixed';
+    final op = problem.operators.first;
+    switch (op) {
+      case Operator.add:
+        return 'addition';
+      case Operator.subtract:
+        return 'subtraction';
+      case Operator.multiply:
+        return 'multiplication';
+      case Operator.divide:
+        return 'division';
+    }
+  }
+
+  String? _stepsToJson(List<SolutionStep> steps) {
+    if (steps.isEmpty) return null;
+    // 简单的序列化：description|||expression|||resultHint
+    return steps
+        .map((s) => '${s.description}|||${s.expression}|||${s.resultHint}')
+        .join('\n');
+  }
+
+  void _nextProblem() {
+    final problems = ref.read(mathProblemsProvider);
+    final currentIndex = ref.read(mathCurrentIndexProvider);
+
+    if (currentIndex + 1 >= problems.length) {
+      _finishSession();
+      return;
+    }
+
+    ref.read(mathCurrentIndexProvider.notifier).update((s) => s + 1);
+    _answerController.clear();
+    setState(() {
+      _judgement = null;
+      _showSteps = false;
+    });
+    _focusNode.requestFocus();
+  }
+
+  Future<void> _finishSession() async {
+    final grade = ref.read(mathGradeProvider);
+    final problems = ref.read(mathProblemsProvider);
+    final correctCount = ref.read(mathCorrectCountProvider);
+    final duration = DateTime.now().difference(_startTime).inSeconds;
+
+    // 计算星星：90%+ → 3星, 70%+ → 2星, 50%+ → 1星
+    final accuracy = problems.isNotEmpty ? correctCount / problems.length : 0.0;
+    final stars = accuracy >= 0.9
+        ? 3
+        : accuracy >= 0.7
+            ? 2
+            : accuracy >= 0.5
+                ? 1
+                : 0;
+
+    // 保存 session
+    final session = MathSession(
+      id: _sessionId,
+      profileId: ProfileScope.currentId,
+      grade: grade,
+      problemType: 'mixed',
+      totalProblems: problems.length,
+      correctCount: correctCount,
+      durationSeconds: duration,
+      starsEarned: stars,
+      finishedAt: DateTime.now(),
+    );
+
+    final repo = ref.read(mathSessionRepoProvider);
+    await repo.save(session);
+
+    if (!mounted) return;
+
+    final action = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => SessionResultDialog(
+        totalProblems: problems.length,
+        correctCount: correctCount,
+        durationSeconds: duration,
+        starsEarned: stars,
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (action == 'review') {
+      context.pushReplacement(AppRoutes.mathMistake);
+    } else {
+      context.pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final problems = ref.watch(mathProblemsProvider);
+    final currentIndex = ref.watch(mathCurrentIndexProvider);
+    final correctCount = ref.watch(mathCorrectCountProvider);
+    final problem = ref.watch(currentProblemProvider);
+    final theme = Theme.of(context);
+
+    if (problems.isEmpty || problem == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('口算练习')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${currentIndex + 1} / ${problems.length}'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: SpacingTokens.md),
+            child: Center(
+              child: Text(
+                '✓ $correctCount',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: ColorTokens.mathMint,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(SpacingTokens.lg),
+        child: Column(
+          children: [
+            // 进度条
+            LinearProgressIndicator(
+              value: (currentIndex + 1) / problems.length,
+              backgroundColor:
+                  ColorTokens.mathPurple.withValues(alpha: 0.1),
+              color: ColorTokens.mathPurple,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            const SizedBox(height: SpacingTokens.xl),
+
+            // 题目显示
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 题目文本
+                    Text(
+                      problem.problemText,
+                      style: TypographyTokens.mathProblemStyle(
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: SpacingTokens.xl),
+
+                    // 判定反馈
+                    if (_judgement != null) ...[
+                      _buildJudgementFeedback(context),
+                      const SizedBox(height: SpacingTokens.md),
+                      if (_judgement!.correctSteps.isNotEmpty)
+                        _buildStepsSection(context),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // 答案输入区
+            const SizedBox(height: SpacingTokens.md),
+            _buildAnswerInput(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildJudgementFeedback(BuildContext context) {
+    final judgement = _judgement!;
+    final problem = ref.read(currentProblemProvider)!;
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(SpacingTokens.md),
+      decoration: BoxDecoration(
+        color: judgement.isCorrect
+            ? ColorTokens.mathMint.withValues(alpha: 0.15)
+            : ColorTokens.mathCoral.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+        border: Border.all(
+          color: judgement.isCorrect
+              ? ColorTokens.mathMint
+              : ColorTokens.mathCoral,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                judgement.isCorrect
+                    ? Icons.check_circle_rounded
+                    : Icons.cancel_rounded,
+                color: judgement.isCorrect
+                    ? ColorTokens.success
+                    : ColorTokens.error,
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              Text(
+                judgement.isCorrect ? '回答正确！' : '答错了',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: judgement.isCorrect
+                      ? ColorTokens.success
+                      : ColorTokens.error,
+                ),
+              ),
+            ],
+          ),
+          if (!judgement.isCorrect) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '正确答案：${problem.answerText}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (judgement.diagnosis != null) ...[
+              const SizedBox(height: SpacingTokens.xs),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  judgement.diagnosis!.message,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepsSection(BuildContext context) {
+    final judgement = _judgement!;
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        TextButton.icon(
+          onPressed: () => setState(() => _showSteps = !_showSteps),
+          icon: Icon(_showSteps ? Icons.expand_less : Icons.expand_more),
+          label: Text(_showSteps ? '收起解题步骤' : '查看解题步骤'),
+        ),
+        if (_showSteps)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            decoration: BoxDecoration(
+              color: ColorTokens.mathBlue.withValues(alpha: 0.08),
+              borderRadius:
+                  BorderRadius.circular(SpacingTokens.radiusMedium),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < judgement.correctSteps.length; i++) ...[
+                  if (i > 0) const SizedBox(height: SpacingTokens.sm),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: const BoxDecoration(
+                          color: ColorTokens.mathPurple,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${i + 1}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: SpacingTokens.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              judgement.correctSteps[i].description,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            if (judgement
+                                .correctSteps[i].resultHint.isNotEmpty)
+                              Text(
+                                judgement.correctSteps[i].resultHint,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: ColorTokens.mathPurple,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAnswerInput(BuildContext context) {
+    if (_judgement != null) {
+      // 已作答，显示"下一题"按钮
+      return SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: _nextProblem,
+          icon: const Icon(Icons.arrow_forward_rounded),
+          label: Text(
+            ref.read(mathCurrentIndexProvider) + 1 >=
+                    ref.read(mathProblemsProvider).length
+                ? '查看成绩'
+                : '下一题',
+          ),
+        ),
+      );
+    }
+
+    // 未作答，显示输入框
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _answerController,
+            focusNode: _focusNode,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+              signed: true,
+            ),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: TypographyTokens.fsTitle,
+              fontWeight: FontWeight.bold,
+            ),
+            decoration: InputDecoration(
+              hintText: '输入答案',
+              border: OutlineInputBorder(
+                borderRadius:
+                    BorderRadius.circular(SpacingTokens.radiusMedium),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: SpacingTokens.md,
+                vertical: SpacingTokens.md,
+              ),
+            ),
+            onSubmitted: (_) => _submitAnswer(),
+          ),
+        ),
+        const SizedBox(width: SpacingTokens.md),
+        SizedBox(
+          height: 56,
+          child: FilledButton(
+            onPressed: _submitAnswer,
+            child: const Text('确定'),
+          ),
+        ),
+      ],
+    );
+  }
+}

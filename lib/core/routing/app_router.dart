@@ -11,6 +11,8 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
+import 'package:poemath/features/math/math_mistake_page.dart';
+import 'package:poemath/features/math/math_practice_page.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
 import 'package:poemath/features/poem/poem_detail_page.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
@@ -67,6 +69,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id']!;
           return PoemRecitePage(poemId: id);
         },
+      ),
+      // ============ 口算练习（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.mathPractice,
+        builder: (context, state) => const MathPracticePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.mathMistake,
+        builder: (context, state) => const MathMistakePage(),
       ),
     ],
   );
