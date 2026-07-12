@@ -129,10 +129,12 @@ git push origin v1.0.0
 
 | Secret | 说明 |
 |--------|------|
-| `KEYSTORE_BASE64` | base64 编码的 JKS 签名文件 |
+| `KEYSTORE_BASE64` | base64 编码的签名文件 |
 | `KEYSTORE_PASSWORD` | keystore 密码 |
 | `KEY_ALIAS` | key 别名 |
-| `KEY_PASSWORD` | key 密码 |
+| `KEY_PASSWORD` | key 密码（**必须与 `KEYSTORE_PASSWORD` 相同**） |
+
+> ⚠️ **重要**：Java 9+ 的 keytool 默认生成 PKCS12 格式的 keystore，PKCS12 **不支持 storePassword 和 keyPassword 不同**。即使创建时指定了不同的 `-keypass`，也会被静默忽略。因此 `KEY_PASSWORD` 和 `KEYSTORE_PASSWORD` 必须设置为相同的值。
 
 生成签名密钥：
 
@@ -141,10 +143,14 @@ keytool -genkey -v \
   -keystore poemath-release.jks \
   -alias poemath \
   -keyalg RSA -keysize 2048 \
-  -validity 10000
+  -validity 10000 \
+  -storepass YOUR_PASSWORD \
+  -keypass YOUR_PASSWORD \
+  -dname "CN=PoeMath, O=PoeMath, L=Beijing, C=CN"
 
-# 转 base64 后填入 KEYSTORE_BASE64
-base64 -i poemath-release.jks | pbcopy
+# 转 base64 后填入 KEYSTORE_BASE64（从文件复制，避免终端截断）
+base64 -i poemath-release.jks -o keystore.b64
+cat keystore.b64 | pbcopy
 ```
 
 ## 数据来源
