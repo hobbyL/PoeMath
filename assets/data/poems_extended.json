@@ -337,5 +337,2055 @@
       "名篇"
     ],
     "difficulty": 3
+  },
+  {
+    "id": "poem_ext_011",
+    "title": "行宫",
+    "author": "元稹",
+    "dynasty": "唐",
+    "content": "寥落古行宫，宫花寂寞红。\n白头宫女在，闲坐说玄宗。",
+    "pinyin": "liáo luò gǔ xíng gōng ， gōng huā jì mò hóng 。\nbái tóu gōng nǚ zài ， xián zuò shuō xuán zōng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "寥落",
+        "meaning": "寂寞冷落"
+      },
+      {
+        "word": "行宫",
+        "meaning": "皇帝在京城之外的宫殿"
+      },
+      {
+        "word": "宫花",
+        "meaning": "行宫里的花"
+      },
+      {
+        "word": "白头宫女",
+        "meaning": "据白居易《上阳白发人》，一些宫女天宝末年被“潜配”到上阳宫，在这冷宫里一闭四十多年，成了白发宫人"
+      },
+      {
+        "word": "说",
+        "meaning": "谈论"
+      }
+    ],
+    "translation": "空旷冷落的古旧行宫，只有宫花寂寞地艳红。 几个满头白发的宫女，闲坐无事谈论唐玄宗。",
+    "appreciation": "元稹的这首《行宫》是一首抒发盛衰之感的诗，这首短小精悍的五绝具有深邃的意境，富有隽永的诗味，倾诉了宫女无穷的哀怨之情，寄托了诗人深沉的盛衰之感。 从诗的内容上看，理解这首诗的关键在末尾一句“闲坐说玄宗”。说者前句已经点明是“白头宫女”，时间地点则是在荒凉冷寞的古行宫，红花盛开，正是一年春好处之时。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "白头宫女在，闲坐说玄宗"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "怀古",
+      "宫怨",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_012",
+    "title": "新嫁娘词",
+    "author": "王建",
+    "dynasty": "唐",
+    "content": "三日入厨下，洗手作羹汤。\n未谙姑食性，先遣小姑尝。",
+    "pinyin": "sān rì rù chú xià ， xǐ shǒu zuò gēng tāng 。\nwèi ān gū shí xìng ， xiān qiǎn xiǎo gū cháng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "新婚三天来到厨房，洗手亲自来作羹汤。 不知婆婆什么口味，做好先让小姑品尝。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "未谙姑食性，先遣小姑尝"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "女子",
+      "新婚",
+      "生活",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_013",
+    "title": "杂诗三首·其二",
+    "author": "王维",
+    "dynasty": "唐",
+    "content": "君自故乡来，应知故乡事。\n来日绮窗前，寒梅著花未？",
+    "pinyin": "jūn zì gù xiāng lái ， yīng zhī gù xiāng shì 。\nlái rì qǐ chuāng qián ， hán méi zhuó huā wèi ？",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "来日",
+        "meaning": "来的时候"
+      },
+      {
+        "word": "绮窗",
+        "meaning": "雕画花纹的窗户"
+      },
+      {
+        "word": "著花未",
+        "meaning": "开花没有"
+      }
+    ],
+    "translation": "您是刚从我们家乡来的，一定了解家乡的人情世态。 请问您来的时候我家雕画花纹的窗户前，那一株腊梅花开了没有？",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "来日绮窗前，寒梅著花未"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "思乡",
+      "思亲",
+      "写景",
+      "梅花",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_014",
+    "title": "送别",
+    "author": "王维",
+    "dynasty": "唐",
+    "content": "山中相送罢，日暮掩柴扉。\n春草明年绿，王孙归不归？",
+    "pinyin": "shān zhōng xiāng sòng bà ， rì mù yǎn chái fēi 。\nchūn cǎo míng nián lǜ ， wáng sūn guī bù guī ？",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "掩",
+        "meaning": "关闭"
+      },
+      {
+        "word": "柴扉",
+        "meaning": "柴门"
+      },
+      {
+        "word": "王孙",
+        "meaning": "贵族的子孙，这里指送别的友人"
+      }
+    ],
+    "translation": "在深山中送走了好友，夕阳落下把柴门半掩。 春草到明年催生新绿，朋友啊你能不能回还？",
+    "appreciation": "这首《山中送别》诗，不写离亭饯别的情景，而是匠心别运，选取了与一般送别诗全然不同的下笔着墨之点。 诗的首句“山中相送罢”，在一开头就告诉读者相送已罢，把送行时的话别场面、惜别情怀，用一个看似毫无感情色彩的“罢”字一笔带过。这里，从相送到送罢，跳越了一段时间。而次句从白昼送走行人一下子写到“日暮掩柴扉”，则又跳越了一段更长的时间。诗人在把生活接入诗篇时，剪去了在这段时间内送行者的所感所想，都当作暗场处理了。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "春草明年绿，王孙归不归"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "送别",
+      "友情",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_015",
+    "title": "问刘十九",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "绿蚁新醅酒，红泥小火炉。\n晚来天欲雪，能饮一杯无？",
+    "pinyin": "lǜ yǐ xīn pēi jiǔ ， hóng ní xiǎo huǒ lú 。\nwǎn lái tiān yù xuě ， néng yǐn yī bēi wú ？",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "绿蚁",
+        "meaning": "指浮在新酿的没有过滤的米酒上的绿色泡沫"
+      },
+      {
+        "word": "醅",
+        "meaning": "酿造"
+      },
+      {
+        "word": "绿蚁新醅酒",
+        "meaning": "酒是新酿的酒"
+      },
+      {
+        "word": "雪",
+        "meaning": "下雪，这里作动词用"
+      },
+      {
+        "word": "无",
+        "meaning": "表示疑问的语气词，相当于“么”或“吗”"
+      }
+    ],
+    "translation": "新酿的米酒，色绿香浓；小小红泥炉，烧得殷红。 天快黑了，大雪将要来。能否共饮一杯？朋友！",
+    "appreciation": "刘十九是作者在江州时的朋友，作者另有《刘十九同宿》诗，说他是嵩阳处士。全诗寥寥二十字，没有深远寄托，没有华丽辞藻，字里行间却洋溢着热烈欢快的色调和温馨炽热的情谊，表现了温暖如春的诗情。 诗句的巧妙，首先是意象的精心选择和巧妙安排。全诗表情达意主要靠三个意象（新酒、火炉、暮雪）的组合来完成。“绿蚁新醅酒”，开门见山点出新酒，由于酒是新近酿好的，未经过滤，酒面泛起酒渣泡沫，颜色微绿，细小如蚁，故称“绿蚁”。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "晚来天欲雪，能饮一杯无"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "饮酒",
+      "生活",
+      "友情",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_016",
+    "title": "哥舒歌",
+    "author": "西鄙人",
+    "dynasty": "唐",
+    "content": "北斗七星高，哥舒夜带刀。\n至今窥牧马，不敢过临洮。",
+    "pinyin": "běi dòu qī xīng gāo ， gē shū yè dài dāo 。\nzhì jīn kuī mù mǎ ， bù gǎn guò lín táo 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "哥舒",
+        "meaning": "指哥舒翰，是唐玄宗的大将，突厥族哥舒部的后裔"
+      },
+      {
+        "word": "北斗七星",
+        "meaning": "大熊座的一部分"
+      },
+      {
+        "word": "窥",
+        "meaning": "窃伺"
+      },
+      {
+        "word": "牧马",
+        "meaning": "指吐蕃越境放牧，指侵扰活动"
+      },
+      {
+        "word": "临洮",
+        "meaning": "今甘肃省洮河边的岷县"
+      }
+    ],
+    "translation": "黑夜里北斗七星挂得高高，哥舒翰勇猛守边夜带宝刀。 吐蕃族至今牧马只敢远望，他们再不敢南来越过临洮。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "至今窥牧马，不敢过临洮"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "赞颂",
+      "民歌",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_017",
+    "title": "怨情",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "美人卷珠帘，深坐颦蛾眉。\n但见泪痕湿，不知心恨谁。",
+    "pinyin": "měi rén juǎn zhū lián ， shēn zuò pín é méi 。\ndàn jiàn lèi hén shī ， bù zhī xīn hèn shuí 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "卷珠帘",
+        "meaning": "意指其卷帘相望"
+      },
+      {
+        "word": "珠帘",
+        "meaning": "珠串的帷帘"
+      },
+      {
+        "word": "深坐",
+        "meaning": "长久的坐"
+      },
+      {
+        "word": "颦",
+        "meaning": "皱眉"
+      },
+      {
+        "word": "蛾眉",
+        "meaning": "蚕蛾触须弯而细长，故以称女子之眉"
+      }
+    ],
+    "translation": "美人卷起珠帘，深闺独坐还皱着蛾眉。 只见玉颜上泪痕斑斑，不知她心里究竟恨的是谁。",
+    "appreciation": "五言绝句：语言平浅简易，情态缠绵凄凉，含蓄蕴藉，言短意长。“含蓄有古意”、“直接国风之遗”，在理解李白诗歌的时候应该注意这些。古代的“美人”就不是一个普通的词，与现代口头时髦的“美女”很不一样。《离骚》里的“香草美人”指贤臣明君；《诗经》中的美人指容德俱美的年轻女子，“有美一人，清扬婉兮”。“美人卷珠帘”是指品性容貌都美好的闺中女子，李白诗歌的“含蓄蕴藉”是指诗歌中主人公情韵的婉转，而非指寄托兴寓，所以说它“直接国风之遗”。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "但见泪痕湿，不知心恨谁"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "女子",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_018",
+    "title": "乐游原",
+    "author": "李商隐",
+    "dynasty": "唐",
+    "content": "向晚意不适，驱车登古原。\n夕阳无限好，只是近黄昏。",
+    "pinyin": "xiàng wǎn yì bù shì ， qū chē dēng gǔ yuán 。\nxī yáng wú xiàn hǎo ， zhǐ shì jìn huáng hūn 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "向晚",
+        "meaning": "傍晚"
+      },
+      {
+        "word": "不适",
+        "meaning": "不悦， 不快"
+      },
+      {
+        "word": "古原",
+        "meaning": "指乐游原"
+      },
+      {
+        "word": "近",
+        "meaning": "快要"
+      }
+    ],
+    "translation": "傍晚时心情不快，驾着车登上古原。 夕阳啊无限美好，只不过接近黄昏。",
+    "appreciation": "这是一首久享盛名的佳作。 李商隐所处的时代是国运将尽的晚唐，尽管他有抱负，但是无法施展，很不得志。这首诗就反映了他的伤感情绪。 前两句“向晚意不适，驱车登古原”是说：傍晚时分我心情悒郁，驾着车登上古老的郊原。“向晚”指天色快黑了，“不适”指不悦。诗人心情忧郁，为了解闷，就驾着车子外出眺望风景。“古原”就是乐游原，在长安城南，地势较高，是唐代的游览胜地。这两句，点明登古原的时间和原因。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "夕阳无限好，只是近黄昏"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "哲理",
+      "惜时",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_019",
+    "title": "听筝",
+    "author": "李端",
+    "dynasty": "唐",
+    "content": "鸣筝金粟柱，素手玉房前。\n欲得周郎顾，时时误拂弦。",
+    "pinyin": "míng zhēng jīn sù zhù ， sù shǒu yù fáng qián 。\nyù dé zhōu láng gù ， shí shí wù fú xián 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "鸣筝",
+        "meaning": "弹奏筝曲"
+      },
+      {
+        "word": "金粟",
+        "meaning": "古也称桂为金粟，这里当是指弦轴之细而精美"
+      },
+      {
+        "word": "柱",
+        "meaning": "定弦调音的短轴"
+      },
+      {
+        "word": "素手",
+        "meaning": "指弹筝女子纤细洁白的手"
+      },
+      {
+        "word": "玉房",
+        "meaning": "指玉制的筝枕"
+      }
+    ],
+    "translation": "金粟轴的古筝发出优美的声音，那素手拨筝的美人坐在玉房前。 想尽了办法为博取周郎的青睐，你看她故意地时时拨错了琴弦。",
+    "appreciation": "这首小诗轻捷洒脱，寥寥数语，就在读者面前展示了一幅线条流畅，动态鲜明的舞台人物速写图。 “鸣筝金粟柱，素手玉房前。”诗的一二句写弹筝的女子纤手拨筝，正处于弹奏状态。筝是一种弦乐器。从唐诗中所描写的筝来看，筝是十三根弦，如：“花脸云鬟坐玉楼，十三弦里一时愁”（白居易《听崔七妓人筝》）。“大艑高船一百尺，清声促柱十三弦”（刘禹锡《夜闻商人船中筝》）。此诗是速写，当然必须抓住最能突出主题的部分。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "欲得周郎顾，时时误拂弦"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "音乐",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_020",
+    "title": "渡汉江",
+    "author": "宋之问",
+    "dynasty": "唐",
+    "content": "岭外音书断，经冬复历春。\n近乡情更怯，不敢问来人。",
+    "pinyin": "lǐng wài yīn shū duàn ， jīng dōng fù lì chūn 。\njìn xiāng qíng gèng qiè ， bù gǎn wèn lái rén 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "岭外",
+        "meaning": "五岭以南的广东省广大地区，通常称岭南"
+      },
+      {
+        "word": "书",
+        "meaning": "信"
+      },
+      {
+        "word": "来人",
+        "meaning": "渡汉江时遇到的从家乡来的人"
+      }
+    ],
+    "translation": "流放岭南与亲人断绝了音信，熬过了冬天又经历一个新春。 越走近故乡心里就越是胆怯，不敢打听从家那边过来的人。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "近乡情更怯，不敢问来人"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "渡江",
+      "思乡",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_021",
+    "title": "八阵图",
+    "author": "杜甫",
+    "dynasty": "唐",
+    "content": "功盖三分国，名成八阵图。\n江流石不转，遗恨失吞吴。",
+    "pinyin": "gōng gài sān fēn guó ， míng chéng bā zhèn tú 。\njiāng liú shí bù zhuǎn ， yí hèn shī tūn wú 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "盖",
+        "meaning": "超过"
+      },
+      {
+        "word": "三分国",
+        "meaning": "指三国时魏、蜀、吴三国"
+      },
+      {
+        "word": "八阵图",
+        "meaning": "由八种阵势组成的图形，用来操练军队或作战"
+      },
+      {
+        "word": "石不转",
+        "meaning": "指涨水时，八阵图的石块仍然不动"
+      },
+      {
+        "word": "失吞吴",
+        "meaning": "是吞吴失策的意思"
+      }
+    ],
+    "translation": "三国鼎立你建立了盖世功绩，创八阵图你成就了永久声名。 江水东流推不转你布阵石头，千古遗恨你灭吴失策功未就。",
+    "appreciation": "“功盖三分国，名成八阵图“两句赞颂诸葛亮的丰功伟绩。第一句是从总的方面写，说诸葛亮在确立魏蜀吴三分天下、鼎足而立局势的过程中，功绩最为卓绝。三国并存局面的形成，固然有许多因素，而诸葛亮辅助刘备从无到有地创建蜀国基业，应该说就是重要原因之一。杜甫这一高度概括的赞语，客观地反映了三国时代的历史真实。第二句是从具体的方面来写，说诸葛亮创制八阵图使他声名更加卓著。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "江流石不转，遗恨失吞吴"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "怀古",
+      "写人",
+      "哲理",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_022",
+    "title": "春怨",
+    "author": "金昌绪",
+    "dynasty": "唐",
+    "content": "打起黄莺儿，莫教枝上啼。\n啼时惊妾梦，不得到辽西。",
+    "pinyin": "dǎ qǐ huáng yīng ér ， mò jiào zhī shàng tí 。\ntí shí jīng qiè mèng ， bù dé dào liáo xī 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "莫",
+        "meaning": "不"
+      },
+      {
+        "word": "妾",
+        "meaning": "女子的自称"
+      }
+    ],
+    "translation": "我敲打树枝，赶走树上的黄莺，不让它在树上乱叫。 它清脆的叫声，惊醒了我的梦，害得我在梦中不能赶到辽西，与戍守边关的亲人相见。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "啼时惊妾梦，不得到辽西"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "闺怨",
+      "怀人",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_023",
+    "title": "秋夜寄邱员外",
+    "author": "韦应物",
+    "dynasty": "唐",
+    "content": "怀君属秋夜，散步咏凉天。\n空山松子落，幽人应未眠。",
+    "pinyin": "huái jūn shǔ qiū yè ， sàn bù yǒng liáng tiān 。\nkōng shān sōng zǐ luò ， yōu rén yīng wèi mián 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "属",
+        "meaning": "正值，适逢，恰好"
+      },
+      {
+        "word": "幽人",
+        "meaning": "幽居隐逸的人，悠闲的人，此处指丘员外"
+      }
+    ],
+    "translation": "怀念你竟在这深秋的夜晚，散步咏叹多么寒凉的霜天。 想此刻空山中正掉落松子，幽居的友人一定还未安眠。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "空山松子落，幽人应未眠"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "秋天",
+      "怀人",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_024",
+    "title": "终南望余雪",
+    "author": "祖咏",
+    "dynasty": "唐",
+    "content": "终南阴岭秀，积雪浮云端。\n林表明霁色，城中增暮寒。",
+    "pinyin": "zhōng nán yīn lǐng xiù ， jī xuě fú yún duān 。\nlín biǎo míng jì sè ， chéng zhōng zēng mù hán 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "终南",
+        "meaning": "山名，在唐京城长安（今陕西西安）南面六十里处"
+      },
+      {
+        "word": "余雪",
+        "meaning": "指未融化之雪"
+      },
+      {
+        "word": "阴岭",
+        "meaning": "北面的山岭，背向太阳，故曰阴"
+      },
+      {
+        "word": "林表",
+        "meaning": "林外，林梢"
+      },
+      {
+        "word": "霁",
+        "meaning": "雨、雪后天气转晴"
+      }
+    ],
+    "translation": "遥望终南，北山秀丽，皑皑白雪，若浮云间。 雪后初晴，林梢之间闪烁着夕阳余晖，晚时分，长安城内又添了几分积寒。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "林表明霁色，城中增暮寒"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "冬天",
+      "写景",
+      "写雪",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_025",
+    "title": "宫词·故国三千里",
+    "author": "张祜",
+    "dynasty": "唐",
+    "content": "故国三千里，深宫二十年。\n一声何满子，双泪落君前。",
+    "pinyin": "gù guó sān qiān lǐ ， shēn gōng èr shí nián 。\nyī shēng hé mǎn zǐ ， shuāng lèi luò jūn qián 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "故国",
+        "meaning": "故乡"
+      },
+      {
+        "word": "何满子",
+        "meaning": "唐玄宗时著名歌手，据说她因故得罪了皇帝，被推出就刑"
+      }
+    ],
+    "translation": "故乡和亲人远在千里之外，我已被幽闭在这深宫里二十年了。 听一声曲子《何满子》，忍不住掉下眼泪。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "一声何满子，双泪落君前"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "宫怨",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_026",
+    "title": "送灵澈上人",
+    "author": "刘长卿",
+    "dynasty": "唐",
+    "content": "苍苍竹林寺，杳杳钟声晚。\n荷笠带斜阳，青山独归远。",
+    "pinyin": "cāng cāng zhú lín sì ， yǎo yǎo zhōng shēng wǎn 。\nhé lì dài xié yáng ， qīng shān dú guī yuǎn 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "苍苍",
+        "meaning": "深青色"
+      },
+      {
+        "word": "竹林寺",
+        "meaning": "在现在江苏丹徒南"
+      },
+      {
+        "word": "杳杳",
+        "meaning": "深远的样子"
+      },
+      {
+        "word": "荷笠",
+        "meaning": "背着斗笠"
+      }
+    ],
+    "translation": "青苍的竹林寺，近晚时传来深远的钟声。 背着斗笠披着斜阳，独回青山渐行渐远。",
+    "appreciation": "这首小诗记叙诗人在傍晚送灵澈返竹林寺时的心情，它即景抒情，构思精致，语言精炼，素朴秀美，是唐代山水诗的名篇。 前二句想望苍苍山林中的灵澈归宿处，远远传来寺院报时的钟响，点明时已黄昏，仿佛催促灵澈归山。诗人出以想象之笔，创造了一个清远幽渺的境界。此二句重在写景，景中也寓之以情。后二句即写灵澈辞别归去情景。灵澈戴着斗笠，披带夕阳余晖，独自向青山走去，越来越远。“青山”即应首句“苍苍竹林寺”，点出寺在山林。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "荷笠带斜阳，青山独归远"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "初中古诗",
+      "送别",
+      "即景抒情",
+      "山水",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_027",
+    "title": "听弹琴",
+    "author": "刘长卿",
+    "dynasty": "唐",
+    "content": "泠泠七弦上，静听松风寒。\n古调虽自爱，今人多不弹。",
+    "pinyin": "líng líng qī xián shàng ， jìng tīng sōng fēng hán 。\ngǔ tiáo suī zì ài ， jīn rén duō bù tán 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "泠泠",
+        "meaning": "形容清凉、清淡，也形容声音清越"
+      },
+      {
+        "word": "松风",
+        "meaning": "以风入松林暗示琴声凄凉"
+      },
+      {
+        "word": "古调",
+        "meaning": "古时的曲调"
+      }
+    ],
+    "translation": "七弦琴奏出清凉的曲调悠扬起伏，细细倾听就像那滚滚的松涛声。 我虽然很喜爱这首古时的曲调，但在今天人们大多已不去弹奏了。",
+    "appreciation": "此诗题一作“弹琴”，《刘随州集》与《全唐诗》均为“听弹琴”。从诗中“静听”二字细味，题目以有“听”字为妥。 琴是中国古代传统民族乐器，由七条弦组成，所以首句以“七弦”作琴的代称，意象也更具体。“泠泠”形容琴声的清越，逗起“松风寒”三字。“松风寒”以风入松林暗示琴声的凄清，极为形象，引导读者进入音乐的境界。“静听”二字描摹出听琴者入神的情态，可见琴声的超妙。高雅平和的琴声，常能唤起听者水流石上、风来松下的幽清肃穆之感。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "古调虽自爱，今人多不弹"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "音乐",
+      "抒情",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_028",
+    "title": "送方外上人",
+    "author": "刘长卿",
+    "dynasty": "唐",
+    "content": "孤云将野鹤，岂向人间住。\n莫买沃洲山，时人已知处。",
+    "pinyin": "gū yún jiāng yě hè ， qǐ xiàng rén jiān zhù 。\nmò mǎi wò zhōu shān ， shí rén yǐ zhī chù 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "将",
+        "meaning": "与共"
+      },
+      {
+        "word": "沃洲山",
+        "meaning": "在浙江新昌县东，上有支遁岭，放鹤峰、养马坡，相传为晋代名僧支遁放鹤、养马之地"
+      },
+      {
+        "word": "时人",
+        "meaning": "指时俗之人"
+      }
+    ],
+    "translation": "你是行僧象孤云和野鹤，怎能在人世间栖居住宿？ 要归隐请别买沃洲名山，那里是世人早知的去处。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "莫买沃洲山，时人已知处"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "送别",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_029",
+    "title": "玉台体",
+    "author": "权德舆",
+    "dynasty": "唐",
+    "content": "昨夜裙带解，今朝蟢子飞。\n铅华不可弃，莫是藁砧归。",
+    "pinyin": "zuó yè qún dài jiě ， jīn zhāo xǐ zǐ fēi 。\nqiān huá bù kě qì ， mò shì gǎo zhēn guī 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "蟢子",
+        "meaning": "小蜘蛛脚长者，俗称蟢子"
+      },
+      {
+        "word": "铅华",
+        "meaning": "指脂粉"
+      },
+      {
+        "word": "藁砧",
+        "meaning": "丈夫的隐语"
+      }
+    ],
+    "translation": "昨晚我裙带忽然松弛解开，早晨又看见蟢子双双飞来。 要赶紧描眉擦粉梳妆打扮，莫非是我的丈夫快要回来。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "铅华不可弃，莫是藁砧归"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "女子",
+      "思念",
+      "五言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_030",
+    "title": "闺怨",
+    "author": "王昌龄",
+    "dynasty": "唐",
+    "content": "闺中少妇不知愁，春日凝妆上翠楼。\n忽见陌头杨柳色，悔教夫婿觅封侯。",
+    "pinyin": "guī zhōng shǎo fù bù zhī chóu ， chūn rì níng zhuāng shàng cuì lóu 。\nhū jiàn mò tóu yáng liǔ sè ， huǐ jiào fū xù mì fēng hóu 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "凝妆",
+        "meaning": "盛妆"
+      },
+      {
+        "word": "陌头",
+        "meaning": "路边"
+      },
+      {
+        "word": "觅封侯",
+        "meaning": "为求得封侯而从军"
+      },
+      {
+        "word": "悔教",
+        "meaning": "后悔让"
+      }
+    ],
+    "translation": "闺中少妇未曾有过相思离别之愁，在明媚的春日，她精心妆饰，登上高楼。 忽然看到路边的杨柳春色，惆怅之情涌上心头。她后悔当初不该让丈夫从军边塞，建功封侯。",
+    "appreciation": "王昌龄的一系列宫闺怨诗中《闺怨》尤为突出。诗题为《闺怨》，起笔却写道：“闺中少妇不知愁”，紧接着第二句又写出这位不知愁的少妇，如何在春光明媚的日子里“凝妆”登楼远眺的情景。于是，一个有些天真和娇憨之气的少妇形象跃然纸上。闺中少妇果真不知愁吗？当然不是。读过全诗之后我们知道，这是一位丈夫远征他乡，自己独守空房的少妇，即使在唐朝封建礼教尚不严格束缚妇女的时代，她平日里也是不能随便出门的。 第三句是全诗的关键，称为“诗眼”。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "忽见陌头杨柳色，悔教夫婿觅封侯"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "春天",
+      "妇女",
+      "闺怨",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_031",
+    "title": "春宫曲",
+    "author": "王昌龄",
+    "dynasty": "唐",
+    "content": "昨夜风开露井桃，未央前殿月轮高。\n平阳歌舞新承宠，帘外春寒赐锦袍。",
+    "pinyin": "zuó yè fēng kāi lòu jǐng táo ， wèi yāng qián diàn yuè lún gāo 。\npíng yáng gē wǔ xīn chéng chǒng ， lián wài chūn hán cì jǐn páo 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "露井",
+        "meaning": "指没有井亭覆盖的井"
+      },
+      {
+        "word": "未央",
+        "meaning": "即未央宫​，汉宫殿名，汉高祖刘邦​所建"
+      },
+      {
+        "word": "平阳歌舞",
+        "meaning": "平阳公主​家中的歌女"
+      }
+    ],
+    "translation": "昨夜的春风吹开了露井边的桃花，未央宫前的明月高高地挂在天上。 平阳公主家的歌女新受武帝宠幸，见帘外略有春寒皇上特把锦袍赐给她。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "平阳歌舞新承宠，帘外春寒赐锦袍"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "女子",
+      "宫怨",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_032",
+    "title": "凉州词二首·其一",
+    "author": "王翰",
+    "dynasty": "唐",
+    "content": "葡萄美酒夜光杯，欲饮琵琶马上催。\n醉卧沙场君莫笑，古来征战几人回？",
+    "pinyin": "pú táo měi jiǔ yè guāng bēi ， yù yǐn pí pá mǎ shàng cuī 。\nzuì wò shā chǎng jūn mò xiào ， gǔ lái zhēng zhàn jǐ rén huí ？",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "夜光杯",
+        "meaning": "用白玉制成的酒杯，光可照明，这里指华贵而精美的酒杯"
+      },
+      {
+        "word": "欲",
+        "meaning": "将要"
+      },
+      {
+        "word": "琵琶",
+        "meaning": "这里指作战时用来发出号角的声音时用的"
+      },
+      {
+        "word": "催",
+        "meaning": "催人出征"
+      },
+      {
+        "word": "沙场",
+        "meaning": "平坦空旷的沙地，古时多指战场"
+      }
+    ],
+    "translation": "酒筵上甘醇的葡萄美酒盛满在精美的夜光杯之中，歌伎们弹奏起急促欢快的琵琶声助兴催饮，想到即将跨马奔赴沙场杀敌报国，战士们个个豪情满怀。 今日一定要一醉方休，即使醉倒在战场上又何妨？此次出征为国效力，本来就打算马革裹尸，没有准备活着回来。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "醉卧沙场君莫笑，古来征战几人回"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "豪放",
+      "边塞",
+      "战争",
+      "宴饮",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_033",
+    "title": "后宫词",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "泪湿罗巾梦不成，夜深前殿按歌声。\n红颜未老恩先断，斜倚薰笼坐到明。",
+    "pinyin": "lèi shī luó jīn mèng bù chéng ， yè shēn qián diàn àn gē shēng 。\nhóng yán wèi lǎo ēn xiān duàn ， xié yǐ xūn lóng zuò dào míng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "泪水湿透了罗巾无法入睡好梦难成，深夜时分听到前殿传来按着节拍唱歌的声音。 红颜尚未老去已经失去了君王的恩宠，斜靠着熏笼一直坐到天明。",
+    "appreciation": "这首诗是代宫人所作的怨词。前人曾批评此诗过于浅露，这是不公正的。诗以自然浑成之语，传层层深入之情，语言明快而感情深沉，一气贯通而绝不平直。 诗的主人公是一位不幸的宫女。她一心盼望君王的临幸而终未盼得，时已深夜，只好上床，已是一层怨怅。宠幸不可得，退而求之好梦；辗转反侧，竟连梦也难成，见出两层怨怅。梦既不成，索性揽衣推枕，挣扎坐起。正当她愁苦难忍，泪湿罗巾之时，前殿又传来阵阵笙歌，原来君王正在那边寻欢作乐，这就有了三层怨怅。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "红颜未老恩先断，斜倚薰笼坐到明"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "宫怨",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_034",
+    "title": "宫词",
+    "author": "朱庆馀",
+    "dynasty": "唐",
+    "content": "寂寂花时闭院门，美人相并立琼轩。\n含情欲说宫中事，鹦鹉前头不敢言。",
+    "pinyin": "jì jì huā shí bì yuàn mén ， měi rén xiāng bìng lì qióng xuān 。\nhán qíng yù shuō gōng zhōng shì ， yīng wǔ qián tóu bù gǎn yán 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "百花盛开，宫院却寂寂地紧闭大门；俏丽宫女，相依相并伫立廊下赏春。 满怀幽情，都想谈谈宫中忧愁的事，鹦鹉面前，谁也不敢吐露自己苦闷。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "含情欲说宫中事，鹦鹉前头不敢言"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "写景",
+      "宫怨",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_035",
+    "title": "近试上张籍水部",
+    "author": "朱庆馀",
+    "dynasty": "唐",
+    "content": "洞房昨夜停红烛，待晓堂前拜舅姑。\n妆罢低声问夫婿，画眉深浅入时无。",
+    "pinyin": "dòng fáng zuó yè tíng hóng zhú ， dài xiǎo táng qián bài jiù gū 。\nzhuāng bà dī shēng wèn fū xù ， huà méi shēn qiǎn rù shí wú 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "洞房",
+        "meaning": "新婚卧室"
+      },
+      {
+        "word": "停红烛",
+        "meaning": "让红烛通宵点着"
+      },
+      {
+        "word": "停",
+        "meaning": "留置"
+      },
+      {
+        "word": "舅姑",
+        "meaning": "公婆"
+      },
+      {
+        "word": "深浅",
+        "meaning": "浓淡"
+      }
+    ],
+    "translation": "洞房里昨夜花烛彻夜通明，等待拂晓拜公婆讨个好评。 打扮好了轻轻问丈夫一声：我的眉画得浓淡可合时兴？",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "妆罢低声问夫婿，画眉深浅入时无"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "新婚",
+      "考试",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_036",
+    "title": "逢入京使",
+    "author": "岑参",
+    "dynasty": "唐",
+    "content": "故园东望路漫漫，双袖龙钟泪不干。\n马上相逢无纸笔，凭君传语报平安。",
+    "pinyin": "gù yuán dōng wàng lù màn màn ， shuāng xiù lóng zhōng lèi bù gān 。\nmǎ shàng xiāng féng wú zhǐ bǐ ， píng jūn chuán yǔ bào píng ān 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "东望家乡路程又远又长，热泪湿双袖还不断流淌。 在马上与你相遇无纸笔，请告家人说我平安无恙。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "马上相逢无纸笔，凭君传语报平安"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "初中古诗",
+      "思乡",
+      "边塞",
+      "生活",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_037",
+    "title": "夜上受降城闻笛",
+    "author": "李益",
+    "dynasty": "唐",
+    "content": "回乐峰前沙似雪，受降城外月如霜。\n不知何处吹芦管，一夜征人尽望乡。",
+    "pinyin": "huí lè fēng qián shā sì xuě ， shòu jiàng chéng wài yuè rú shuāng 。\nbù zhī hé chù chuī lú guǎn ， yī yè zhēng rén jìn wàng xiāng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "回乐峰前的沙地白得像雪，受降城外的月色有如秋霜。 不知何处吹起凄凉的芦管，一夜间征人个个眺望故乡。",
+    "appreciation": "这是一首抒写戍边将士乡情的诗作，从多角度描绘了戍边将士（包括吹笛人）浓烈的乡思和满心的哀愁之情。 诗歌的前两句描写了一幅边塞月夜的独特景色.举目远眺，蜿蜒数十里的丘陵上耸立着座座高大的烽火台，烽火台下是一片无垠的沙漠，在月光的映照下如同积雪的荒原。近看，高城之外月光皎洁，如同深秋的寒霜。沙漠并非雪原，诗人偏说它“似雪”，月光并非秋霜，诗人偏说它“如霜”。诗人如此运笔，是为了借这寒气袭人的景物来渲染心境的愁惨凄凉。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "不知何处吹芦管，一夜征人尽望乡"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "冬天",
+      "月亮",
+      "边塞",
+      "思念",
+      "战争"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_ext_038",
+    "title": "贾生",
+    "author": "李商隐",
+    "dynasty": "唐",
+    "content": "宣室求贤访逐臣，贾生才调更无伦。\n可怜夜半虚前席，不问苍生问鬼神。",
+    "pinyin": "xuān shì qiú xián fǎng zhú chén ， jiǎ shēng cái tiáo gèng wú lún 。\nkě lián yè bàn xū qián xí ， bù wèn cāng shēng wèn guǐ shén 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "汉文帝求贤，宣示召见被贬臣子。贾谊才能，确实高明无人能及。 只是空谈半夜，令人扼腕叹息。文帝尽问鬼神之事，只字不提国事民生。",
+    "appreciation": "这是一首托古讽时诗，意在借贾谊的遭遇，抒写诗人怀才不遇的感慨。诗选取汉文帝宣室召见贾谊，夜半倾谈的情节，写文帝不能识贤，任贤；“不问苍生问鬼神”却揭露了晚唐皇帝服药求仙，荒于政事，不能任贤，不顾民生的昏庸特性。诗寓慨于讽，讽刺效果颇好。 此诗是首咏叹贾生故事的短诗，其着眼点，不在个人的穷通得失，而在于指出封建统治者不能真正重视人才，使其在政治上发挥作用。 贾谊贬长沙，久已成为诗人们抒写不遇之感的熟滥题材。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "可怜夜半虚前席，不问苍生问鬼神"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "托古讽今",
+      "怀才不遇",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_039",
+    "title": "隋宫",
+    "author": "李商隐",
+    "dynasty": "唐",
+    "content": "乘兴南游不戒严，九重谁省谏书函。\n春风举国裁宫锦，半作障泥半作帆。",
+    "pinyin": "chéng xìng nán yóu bù jiè yán ， jiǔ chóng shuí shěng jiàn shū hán 。\nchūn fēng jǔ guó cái gōng jǐn ， bàn zuò zhàng ní bàn zuò fān 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "乘兴句",
+        "meaning": "此言不戒严，意谓炀帝骄横无忌，毫无戒备"
+      },
+      {
+        "word": "九重",
+        "meaning": "指皇帝居住的深宫"
+      },
+      {
+        "word": "省",
+        "meaning": "明察，懂得"
+      },
+      {
+        "word": "谏书函",
+        "meaning": "给皇帝的谏书"
+      },
+      {
+        "word": "宫锦",
+        "meaning": "供皇家使用的高级锦缎"
+      }
+    ],
+    "translation": "隋炀帝为南游江都不顾安全，九重宫中有谁理会劝谏书函。 春游中全国裁制的绫罗锦缎，一半作御马障泥一半作船帆。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "春风举国裁宫锦，半作障泥半作帆"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "咏史怀古",
+      "讽刺",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_040",
+    "title": "江南逢李龟年",
+    "author": "杜甫",
+    "dynasty": "唐",
+    "content": "岐王宅里寻常见，崔九堂前几度闻。\n正是江南好风景，落花时节又逢君。",
+    "pinyin": "qí wáng zhái lǐ xún cháng jiàn ， cuī jiǔ táng qián jǐ dù wén 。\nzhèng shì jiāng nán hǎo fēng jǐng ， luò huā shí jié yòu féng jūn 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "岐王",
+        "meaning": "唐玄宗李隆基的弟弟，名叫李范，以好学爱才著称，雅善音律"
+      },
+      {
+        "word": "寻常",
+        "meaning": "经常"
+      },
+      {
+        "word": "崔九",
+        "meaning": "崔涤，在兄弟中排行第九，中书令崔湜的弟弟"
+      },
+      {
+        "word": "江南",
+        "meaning": "这里指今湖南省一带"
+      },
+      {
+        "word": "落花时节",
+        "meaning": "暮春，通常指阴历三月"
+      }
+    ],
+    "translation": "当年在岐王宅里，常常见到你的演出；在崔九堂前，也曾多次欣赏你的艺术。 没有想到，在这风景一派大好的江南；正是落花时节，能巧遇你这位老相熟。",
+    "appreciation": "诗是感伤世态炎凉的。李龟年是唐玄宗初年的著名歌手，常在贵族豪门歌唱。杜甫少年时才华卓著，常出入于岐王李隆范和中书监崔涤的门庭，得以欣赏李龟年的歌唱艺术。诗的开首二句是追忆昔日与李龟年的接触，寄寓诗人对开元初年鼎盛的眷怀；后两句是对国事凋零，艺人颠沛流离的感慨。仅仅四句却概括了整个开元时期（注：开元时期为713年—741年）的时代沧桑，人生巨变。语极平淡，内涵却无限丰满。 李龟年是开元时期“特承顾遇”的著名歌唱家。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "正是江南好风景，落花时节又逢君"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "初中古诗",
+      "感伤",
+      "怀念",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_041",
+    "title": "赠别",
+    "author": "杜牧",
+    "dynasty": "唐",
+    "content": "多情却似总无情，唯觉樽前笑不成。\n蜡烛有心还惜别，替人垂泪到天明。",
+    "pinyin": "duō qíng què sì zǒng wú qíng ， wéi jué zūn qián xiào bù chéng 。\nlà zhú yǒu xīn huán xī bié ， tì rén chuí lèi dào tiān míng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "多情句",
+        "meaning": "意谓多情者满腔情绪，一时无法表达，只能无言相对，倒象彼此无情"
+      },
+      {
+        "word": "樽",
+        "meaning": "酒杯"
+      }
+    ],
+    "translation": "聚首如胶似漆作别却象无情；只觉得酒筵上要笑笑不出声。 案头蜡烛有心它还依依惜别；你看它替我们流泪流到天明。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "蜡烛有心还惜别，替人垂泪到天明"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "离别",
+      "惜别",
+      "最美",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_042",
+    "title": "金谷园",
+    "author": "杜牧",
+    "dynasty": "唐",
+    "content": "繁华事散逐香尘，流水无情草自春。\n日暮东风怨啼鸟，落花犹似坠楼人。",
+    "pinyin": "fán huá shì sàn zhú xiāng chén ， liú shuǐ wú qíng cǎo zì chūn 。\nrì mù dōng fēng yuàn tí niǎo ， luò huā yóu sì zhuì lóu rén 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "香尘",
+        "meaning": "石崇为教练家中舞妓步法，以沉香屑铺象牙床上，使她们践踏，无迹者赐以珍珠"
+      },
+      {
+        "word": "坠楼人",
+        "meaning": "指石崇爱妾绿珠，曾为石崇坠楼而死"
+      }
+    ],
+    "translation": "繁华往事，已跟香尘一样飘荡无存；流水无情，野草却年年以碧绿迎春。 啼鸟悲鸣，傍晚随着东风声声传来；落花纷纷，恰似那为石崇坠楼的绿珠美人。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "日暮东风怨啼鸟，落花犹似坠楼人"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "怀古",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_043",
+    "title": "寄扬州韩绰判官",
+    "author": "杜牧",
+    "dynasty": "唐",
+    "content": "青山隐隐水迢迢，秋尽江南草未凋。\n二十四桥明月夜，玉人何处教吹箫？",
+    "pinyin": "qīng shān yǐn yǐn shuǐ tiáo tiáo ， qiū jìn jiāng nán cǎo wèi diāo 。\nèr shí sì qiáo míng yuè yè ， yù rén hé chù jiào chuī xiāo ？",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "迢迢",
+        "meaning": "指江水悠长遥远"
+      },
+      {
+        "word": "凋",
+        "meaning": "凋谢"
+      },
+      {
+        "word": "二十四桥",
+        "meaning": "一说为二十四座桥"
+      },
+      {
+        "word": "玉人",
+        "meaning": "貌美之人"
+      },
+      {
+        "word": "教",
+        "meaning": "使，令"
+      }
+    ],
+    "translation": "青山隐隐约约绿水千里迢迢，秋时已尽江南草木还未枯凋。 二十四桥明月映照幽幽清夜，你这美人现在何处教人吹箫？",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "二十四桥明月夜，玉人何处教吹箫"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "调笑",
+      "写景",
+      "友情",
+      "怀念",
+      "优美"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_044",
+    "title": "遣怀",
+    "author": "杜牧",
+    "dynasty": "唐",
+    "content": "落魄江南载酒行，楚腰纤细掌中轻。\n十年一觉扬州梦，赢得青楼薄幸名。",
+    "pinyin": "luò pò jiāng nán zài jiǔ xíng ， chǔ yāo xiān xì zhǎng zhōng qīng 。\nshí nián yī jué yáng zhōu mèng ， yíng dé qīng lóu báo xìng míng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "落魄",
+        "meaning": "仕宦潦倒不得意，飘泊江湖"
+      },
+      {
+        "word": "楚腰",
+        "meaning": "指细腰美女"
+      },
+      {
+        "word": "掌中轻",
+        "meaning": "汉成帝皇后赵飞燕“体轻，能为掌上舞”（《飞燕外传》）"
+      },
+      {
+        "word": "青楼",
+        "meaning": "旧指精美华丽的楼房，也指妓院"
+      },
+      {
+        "word": "薄幸",
+        "meaning": "薄情"
+      }
+    ],
+    "translation": "失意潦倒，携酒漂泊江湖，沉湎于楚灵王喜好的细腰女子和赵飞燕的轻盈舞姿。 扬州十年的纵情声色，好像一场梦，醒悟回头，却在青楼女子这中落得一个薄情的名声。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "十年一觉扬州梦，赢得青楼薄幸名"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "抒怀",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_045",
+    "title": "金陵图",
+    "author": "韦庄",
+    "dynasty": "唐",
+    "content": "谁谓伤心画不成，画人心逐世人情。\n君看六幅南朝事，老木寒云满故城。",
+    "pinyin": "shuí wèi shāng xīn huà bù chéng ， huà rén xīn zhú shì rén qíng 。\njūn kàn liù fú nán zhāo shì ， lǎo mù hán yún mǎn gù chéng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "逐",
+        "meaning": "随，跟随"
+      },
+      {
+        "word": "《玉篇》",
+        "meaning": "“逐，从也"
+      },
+      {
+        "word": "老木",
+        "meaning": "枯老的树木"
+      }
+    ],
+    "translation": "谁说画不出六朝古都的伤心事，只不过是那些画家为了迎合当权者的心态而不画伤心图而已。 你看这六幅描摹南朝往事的画中，枯老的树木和寒凉的云朵充满了整个金陵城。",
+    "appreciation": "这是一首题画之作，诗人看了六幅描写南朝史事的彩绘，有感于心，挥笔题下了这首诗。 画家是什么人，已不可考。他画的是南朝六代（东吴、东晋、宋、齐、梁、陈）的故事，因为六代均建都于金陵。这位画家并没有为南朝统治者粉饰升平，而是写出它的凄凉衰败。他在画面绘出许多老木寒云，绘出危城破堞，使人看到三百年间的金陵，并非什么郁郁葱葱的帝王之州，倒是使人产生伤感的古城。这真是不同于一般的历史组画。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "君看六幅南朝事，老木寒云满故城"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "咏史怀古",
+      "题画",
+      "地名",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_046",
+    "title": "寄人",
+    "author": "张泌",
+    "dynasty": "唐",
+    "content": "别梦依依到谢家，小廊回合曲阑斜。\n多情只有春庭月，犹为离人照落花。",
+    "pinyin": "bié mèng yī yī dào xiè jiā ， xiǎo láng huí hé qǔ lán xié 。\nduō qíng zhǐ yǒu chūn tíng yuè ， yóu wèi lí rén zhào luò huā 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "谢家",
+        "meaning": "泛指闺中女子"
+      },
+      {
+        "word": "回合",
+        "meaning": "回环、回绕"
+      },
+      {
+        "word": "阑",
+        "meaning": "栏杆"
+      },
+      {
+        "word": "“多情”句",
+        "meaning": "指梦后所见"
+      },
+      {
+        "word": "离人",
+        "meaning": "这里指寻梦人"
+      }
+    ],
+    "translation": "别梦中隐约来到了谢家，徘徊在小回廊栏杆底下。 只有天上春月最是多情，还为离人照着庭院落花。",
+    "appreciation": "别梦依依到谢家，小廊回合曲阑斜。多情只有春庭月，犹为离人照落花。 以诗代柬，来表达自己心里要说的话，这是古代常有的事。这首题为《寄人》的诗，就是用来代替一封信的。 诗的首句写诗人与情人梦中重聚，难舍难离；第二句写依旧是当年环境，往日欢情，表明自己思念之深。第三句写明月有情；第四句写落花有恨。寄希望于对方，含蓄深厚，曲折委婉，情真意真。前两句写入梦的原因与梦中所见的景物，是向对方表明自己思忆之深；",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "多情只有春庭月，犹为离人照落花"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "月亮",
+      "爱情",
+      "思念",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_047",
+    "title": "赠内人",
+    "author": "张祜",
+    "dynasty": "唐",
+    "content": "禁门宫树月痕过，媚眼惟看宿鹭窠。\n斜拔玉钗灯影畔，剔开红焰救飞蛾。",
+    "pinyin": "jīn mén gōng shù yuè hén guò ， mèi yǎn wéi kàn sù lù kē 。\nxié bá yù chāi dēng yǐng pàn ， tī kāi hóng yàn jiù fēi é 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "禁门",
+        "meaning": "宫门"
+      },
+      {
+        "word": "宿鹭",
+        "meaning": "指双栖之鸳鸯"
+      },
+      {
+        "word": "红焰",
+        "meaning": "指灯芯"
+      }
+    ],
+    "translation": "月光由宫门移到宫树梢，媚眼只看那宿鹭的窝巢。 在灯影旁拔下头上玉钗，挑开灯焰救出扑火飞蛾。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "斜拔玉钗灯影畔，剔开红焰救飞蛾"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "女子",
+      "宫怨",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_048",
+    "title": "杂诗",
+    "author": "佚名",
+    "dynasty": "唐",
+    "content": "近寒食雨草萋萋，著麦苗风柳映堤。\n等是有家归未得，杜鹃休向耳边啼。",
+    "pinyin": "jìn hán shí yǔ cǎo qī qī ， zhuó mài miáo fēng liǔ yìng dī 。\nděng shì yǒu jiā guī wèi dé ， dù juān xiū xiàng ěr biān tí 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "时令将近寒食，春雨绵绵春草萋萋；春风过处苗麦摇摆，堤上杨柳依依。 这是为什么呵，我却有家归去不得？杜鹃呵，不要在我耳边不停地悲啼。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "等是有家归未得，杜鹃休向耳边啼"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "寒食节",
+      "思乡",
+      "感伤",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_049",
+    "title": "回乡偶书二首·其一",
+    "author": "贺知章",
+    "dynasty": "唐",
+    "content": "少小离家老大回，乡音无改鬓毛衰。\n儿童相见不相识，笑问客从何处来。",
+    "pinyin": "shǎo xiǎo lí jiā lǎo dà huí ， xiāng yīn wú gǎi bìn máo cuī 。\nér tóng xiāng jiàn bù xiāng shí ， xiào wèn kè cóng hé chù lái 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "我在年少时离开家乡，到了迟暮之年才回来。我的乡音虽未改变，但鬓角的毛发却已经疏落。 儿童们看见我，没有一个认识的。他们笑着询问：这客人是从哪里来的呀？",
+    "appreciation": "这是一首久客异乡、缅怀故里的感怀诗。写于初来乍到之时，抒写久客伤老之情。在第一、二句中，诗人置身于故乡熟悉而又陌生的环境之中，一路迤逦行来，心情颇不平静：当年离家，风华正茂；今日返归，鬓毛疏落，不禁感慨系之。首句用“少小离家”与“老大回”的句中自对，概括写出数十年久客他乡的事实，暗寓自伤“老大”之情。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "儿童相见不相识，笑问客从何处来"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "小学古诗",
+      "思乡",
+      "感慨",
+      "伤老",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_050",
+    "title": "瑶瑟怨",
+    "author": "温庭筠",
+    "dynasty": "唐",
+    "content": "冰簟银床梦不成，碧天如水夜云轻。\n雁声远过潇湘去，十二楼中月自明。",
+    "pinyin": "bīng diàn yín chuáng mèng bù chéng ， bì tiān rú shuǐ yè yún qīng 。\nyàn shēng yuǎn guò xiāo xiāng qù ， shí èr lóu zhōng yuè zì míng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "秋夜床席冰冷梦也难以做成，天空碧蓝如水夜云像沙样轻。 雁声凄厉远远地飞过潇湘去，十二楼中的明月空自放光明。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "雁声远过潇湘去，十二楼中月自明"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "离别",
+      "闺怨",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_051",
+    "title": "月夜",
+    "author": "刘方平",
+    "dynasty": "唐",
+    "content": "更深月色半人家，北斗阑干南斗斜。\n今夜偏知春气暖，虫声新透绿窗纱。",
+    "pinyin": "gèng shēn yuè sè bàn rén jiā ， běi dòu lán gān nán dòu xié 。\njīn yè piān zhī chūn qì nuǎn ， chóng shēng xīn tòu lǜ chuāng shā 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "更深",
+        "meaning": "古时计算时间，一夜分成五更"
+      },
+      {
+        "word": "月色半人家",
+        "meaning": "月光只照亮了人家房屋的一半，另一半隐藏在黑暗里"
+      },
+      {
+        "word": "北斗",
+        "meaning": "在北方天空排列成斗形的七颗亮星"
+      },
+      {
+        "word": "阑干",
+        "meaning": "这里指横斜的样子"
+      },
+      {
+        "word": "南斗",
+        "meaning": "有星六颗"
+      }
+    ],
+    "translation": "夜静更深，月光只照亮了人家房屋的一半，另一半隐藏在黑夜里。北斗星倾斜了，南斗星也倾斜了。 今夜才知春天的来临，因为你听那被树叶映绿的窗纱外，唧唧的虫鸣，头一遭儿传到了屋子里来了。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "今夜偏知春气暖，虫声新透绿窗纱"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "初中古诗",
+      "春天",
+      "月亮",
+      "田园",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_052",
+    "title": "春怨",
+    "author": "刘方平",
+    "dynasty": "唐",
+    "content": "纱窗日落渐黄昏，金屋无人见泪痕。\n寂寞空庭春欲晚，梨花满地不开门。",
+    "pinyin": "shā chuāng rì luò jiàn huáng hūn ， jīn wū wú rén jiàn lèi hén 。\njì mò kōng tíng chūn yù wǎn ， lí huā mǎn dì bù kāi mén 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "纱窗外的阳光淡去，黄昏渐渐降临；锁闭华屋，无人看见我悲哀的泪痕。 庭院空旷寂寞，春天景色行将逝尽；梨花飘落满地，无情无绪把门关紧。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "寂寞空庭春欲晚，梨花满地不开门"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "宫怨",
+      "孤独",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_053",
+    "title": "马嵬坡",
+    "author": "郑畋",
+    "dynasty": "唐",
+    "content": "玄宗回马杨妃死，云雨难忘日月新。\n终是圣明天子事，景阳宫井又何人。",
+    "pinyin": "xuán zōng huí mǎ yáng fēi sǐ ， yún yǔ nán wàng rì yuè xīn 。\nzhōng shì shèng míng tiān zǐ shì ， jǐng yáng gōng jǐng yòu hé rén 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "玄宗返回长安杨贵妃早已死，旧时恩爱难忘国家开始振兴。 处死杨妃也是玄宗英明决策，不然就会步陈后主亡国后尘。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "终是圣明天子事，景阳宫井又何人"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "地名",
+      "咏史",
+      "七言绝句"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_ext_054",
+    "title": "送杜少府之任蜀州",
+    "author": "王勃",
+    "dynasty": "唐",
+    "content": "城阙辅三秦，风烟望五津。\n与君离别意，同是宦游人。\n海内存知己，天涯若比邻。\n无为在歧路，儿女共沾巾。",
+    "pinyin": "chéng quē fǔ sān qín ， fēng yān wàng wǔ jīn 。\nyǔ jūn lí bié yì ， tóng shì huàn yóu rén 。\nhǎi nèi cún zhī jǐ ， tiān yá ruò bǐ lín 。\nwú wèi zài qí lù ， ér nǚ gòng zhān jīn 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "五津",
+        "meaning": "指岷江的五个渡口白华津、万里津、江首津、涉头津、江南津"
+      },
+      {
+        "word": "风烟望五津",
+        "meaning": "“风烟”两字名词用作状语，表示行为的处所"
+      },
+      {
+        "word": "君",
+        "meaning": "对人的尊称，相当于“您”"
+      },
+      {
+        "word": "宦游",
+        "meaning": "出外做官"
+      },
+      {
+        "word": "海内",
+        "meaning": "四海之内，即全国各地"
+      }
+    ],
+    "translation": "巍巍长安，雄踞三秦之地；渺渺四川，却在迢迢远方。 你我命运何等相仿，奔波仕途，远离家乡。 只要有知心朋友，四海之内不觉遥远。即便在天涯海角，感觉就像近邻一样。 岔道分手，实在不用儿女情长，泪洒衣裳。",
+    "appreciation": "此诗是送别诗的名作，诗意慰勉勿在离别之时悲哀。起句严整对仗，三、四句以散调相承，以实转虚，文情跌宕。第三联“海内存知己，天涯若比邻”，奇峰突起，高度地概括了“友情深厚，江山难阻”的情景，尾联点出“送”的主题。全诗开合顿挫，气脉流通，意境旷达。送别诗中的悲凉凄怆之气，音调明快爽朗，语言清新高远，内容独树碑石。此诗一洗往昔送别诗中悲苦缠绵之态，体现出诗人高远的志向、豁达的情趣和旷达的胸怀。 “城阙辅三秦，风烟望五津”。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "无为在歧路，儿女共沾巾"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "初中古诗",
+      "友情",
+      "送别",
+      "哲理",
+      "最美"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_ext_055",
+    "title": "汉江临泛",
+    "author": "王维",
+    "dynasty": "唐",
+    "content": "楚塞三湘接，荆门九派通。\n江流天地外，山色有无中。\n郡邑浮前浦，波澜动远空。\n襄阳好风日，留醉与山翁。",
+    "pinyin": "chǔ sāi sān xiāng jiē ， jīng mén jiǔ pài tōng 。\njiāng liú tiān dì wài ， shān sè yǒu wú zhōng 。\njùn yì fú qián pǔ ， bō lán dòng yuǎn kōng 。\nxiāng yáng hǎo fēng rì ， liú zuì yǔ shān wēng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "楚塞",
+        "meaning": "楚国边境地带，这里指汉水流域，此地古为楚国辖区"
+      },
+      {
+        "word": "三湘",
+        "meaning": "湖南有湘潭、湘阴、湘乡，合称三湘"
+      },
+      {
+        "word": "荆门",
+        "meaning": "山名，荆门山，在今湖北宜都县西北的长江南岸，战国时为楚之西塞"
+      },
+      {
+        "word": "九派",
+        "meaning": "九条支流，长江至浔阳分为九支"
+      },
+      {
+        "word": "郡邑",
+        "meaning": "指汉水两岸的城镇"
+      }
+    ],
+    "translation": "汉江流经楚塞又折入三湘，西起荆门往东与九江相通。 远望江水好像流到天地外，近看山色缥缈若有若无中。 岸边都城仿佛在水面浮动，水天相接波涛滚滚荡云空。 襄阳的风光的确令人陶醉，我愿在此地酣饮陪伴山翁。",
+    "appreciation": "此诗可谓王维融画法入诗的力作。 “楚塞三湘接，荆门九派通”，语工形肖，一笔勾勒出汉江雄浑壮阔的景色，作为画幅的背景。春秋战国时期，湖北、湖南等地都属于楚国，而襄阳位于楚之北境，所以这里称“楚塞”。“三湘”，一说湘水合漓水为漓湘，合蒸水为蒸湘，合潇水为潇湘，合称三湘；一说为湖南的湘潭、湘阴、湘乡。古诗文中，三湘一般泛称今洞庭湖南北、湘江一带。“荆门”，山名，在今湖北宜都县西北。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "襄阳好风日，留醉与山翁"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "山水",
+      "抒情",
+      "五言律诗"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_ext_056",
+    "title": "终南别业",
+    "author": "王维",
+    "dynasty": "唐",
+    "content": "中岁颇好道，晚家南山陲。\n兴来每独往，胜事空自知。\n行到水穷处，坐看云起时。\n偶然值林叟，谈笑无还期。",
+    "pinyin": "zhōng suì pō hǎo dào ， wǎn jiā nán shān chuí 。\nxìng lái měi dú wǎng ， shèng shì kōng zì zhī 。\nxíng dào shuǐ qióng chù ， zuò kàn yún qǐ shí 。\nǒu rán zhí lín sǒu ， tán xiào wú huán qī 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "中岁",
+        "meaning": "中年"
+      },
+      {
+        "word": "好",
+        "meaning": "喜好"
+      },
+      {
+        "word": "道",
+        "meaning": "这里指佛教"
+      },
+      {
+        "word": "家",
+        "meaning": "安家"
+      },
+      {
+        "word": "南山",
+        "meaning": "即终南山"
+      }
+    ],
+    "translation": "中年以后存有较浓的好道之心，直到晚年才安家于终南山边陲。 兴趣浓时常常独来独往去游玩，有快乐的事自我欣赏自我陶醉。 间或走到水的尽头去寻求源流，间或坐看上升的云雾千变万化。 偶然在林间遇见个把乡村父老，偶与他谈笑聊天每每忘了还家。",
+    "appreciation": "开头两句：“中岁颇好道，晚家南山陲。”叙述诗人中年以后即厌尘俗，而信奉佛教。“晚”是晚年；“南山陲”指辋川别墅所在地。此处原为宋之问别墅，王维得到这个地方后，完全被那里秀丽、寂静的田园山水陶醉了。他在《山中与裴秀才迪书》的信中说：“足下方温经，猥不敢相烦。辄便往山中，憩感兴寺，与山僧饭讫而去。北涉玄灞，清月映郭；夜登华子冈，辋水沦涟，与月上下。寒山远火，明灭林外；深巷寒犬，吠声如豹；村墟夜舂，复与疏钟相间。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "偶然值林叟，谈笑无还期"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "田园",
+      "写人",
+      "抒情",
+      "优美",
+      "五言律诗"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_ext_057",
+    "title": "酬张少府",
+    "author": "王维",
+    "dynasty": "唐",
+    "content": "晚年唯好静，万事不关心。自顾无长策，空知返旧林。\n松风吹解带，山月照弹琴。君问穷通理，渔歌入浦深。",
+    "pinyin": "wǎn nián wéi hǎo jìng ， wàn shì bù guān xīn 。 zì gù wú cháng cè ， kōng zhī fǎn jiù lín 。\nsōng fēng chuī jiě dài ， shān yuè zhào tán qín 。 jūn wèn qióng tōng lǐ ， yú gē rù pǔ shēn 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "晚年",
+        "meaning": "年老之时"
+      },
+      {
+        "word": "唯",
+        "meaning": "亦写作“惟”，只"
+      },
+      {
+        "word": "自顾",
+        "meaning": "自念"
+      },
+      {
+        "word": "长策",
+        "meaning": "犹良计"
+      },
+      {
+        "word": "空知",
+        "meaning": "徒然知道"
+      }
+    ],
+    "translation": "人到晚年特别喜好安静，对人间万事都漠不关心。自思没有高策可以报国，只要求归隐家乡的山林。 宽解衣带对着松风乘凉，山月高照正好弄弦弹琴。君若问穷困通达的道理，请听水浦深处渔歌声音。",
+    "appreciation": "这是一首赠友诗。全诗写情多于写景。三、四句隐含不满朝政之牢骚。 诗开头就说“晚年唯好静，万事不关心”，描述了晚年唯好清静、万事皆不关心的心态，看似达观，实则表露出诗人远大抱负无法实现的无奈情绪。说自己人到晚年，惟好清静，对什么事情都漠不关心了，乍一看，生活态度消极之至，但这是表面现象。仔细推求起来，这“唯好静”的“唯”字大有文章。一是确实“只”好静。二是“动”不了才“只得”好静。三是显示出极端消极的生活态度。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "松风吹解带，山月照弹琴。君问穷通理，渔歌入浦深"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "赠别",
+      "友情",
+      "规劝",
+      "五言律诗"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_ext_058",
+    "title": "过香积寺",
+    "author": "王维",
+    "dynasty": "唐",
+    "content": "不知香积寺，数里入云峰。\n古木无人径，深山何处钟。\n泉声咽危石，日色冷青松。\n薄暮空潭曲，安禅制毒龙。",
+    "pinyin": "bù zhī xiāng jī sì ， shǔ lǐ rù yún fēng 。\ngǔ mù wú rén jìng ， shēn shān hé chù zhōng 。\nquán shēng yàn wēi shí ， rì sè lěng qīng sōng 。\nbáo mù kōng tán qǔ ， ān chán zhì dú lóng 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "入云峰",
+        "meaning": "登上入云的高峰"
+      },
+      {
+        "word": "钟",
+        "meaning": "寺庙的钟鸣声"
+      },
+      {
+        "word": "咽",
+        "meaning": "呜咽"
+      },
+      {
+        "word": "危",
+        "meaning": "高的，陡的"
+      },
+      {
+        "word": "冷青松",
+        "meaning": "为青松所冷"
+      }
+    ],
+    "translation": "不知道香积寺在什么地方，攀登好几里误入云拥群峰。 古木参天却没有人行路径，深山里何处传来古寺鸣钟。 山中泉水撞危石响声幽咽，松林里日光照射也显寒冷。 黄昏时来到空潭隐蔽之地，安然地修禅抑制心中毒龙。",
+    "appreciation": "入选《唐诗三百首》的经典作品。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "薄暮空潭曲，安禅制毒龙"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "写景",
+      "五言律诗"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_ext_059",
+    "title": "辋川闲居赠裴秀才迪",
+    "author": "王维",
+    "dynasty": "唐",
+    "content": "寒山转苍翠，秋水日潺湲。\n倚杖柴门外，临风听暮蝉。\n渡头馀落日，墟里上孤烟。\n复值接舆醉，狂歌五柳前。",
+    "pinyin": "hán shān zhuǎn cāng cuì ， qiū shuǐ rì chán yuán 。\nyǐ zhàng chái mén wài ， lín fēng tīng mù chán 。\ndù tóu yú luò rì ， xū lǐ shàng gū yān 。\nfù zhí jiē yú zuì ， kuáng gē wǔ liǔ qián 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "转",
+        "meaning": "转为，变为"
+      },
+      {
+        "word": "苍翠",
+        "meaning": "青绿色，苍为灰白色，翠为墨绿色"
+      },
+      {
+        "word": "潺湲",
+        "meaning": "水流声"
+      },
+      {
+        "word": "听暮蝉",
+        "meaning": "聆听秋后的蝉儿的鸣叫"
+      },
+      {
+        "word": "暮蝉",
+        "meaning": "秋后的蝉，这里是指蝉的叫声"
+      }
+    ],
+    "translation": "寒山转变得格外郁郁苍苍，秋水日日舒缓地流向远方。 我柱杖伫立在茅舍的门外，迎风细听着那暮蝉的吟唱。 渡头那边太阳快要落山了，村子里的炊烟一缕缕飘散。 又碰到裴迪这个接舆酒醉，在恰如陶潜的我面前讴狂。",
+    "appreciation": "寒山转苍翠，秋水日潺湲。倚杖柴门外，临风听暮蝉。渡头馀落日，墟里上孤烟。复值接舆醉，狂歌五柳前。 此诗所要极力表现的是辋川的秋景。一联和三联写山水原野的深秋晚景，诗人选择富有季节和时间特征的景物：苍翠的寒山、缓缓的秋水、渡口的夕阳，墟里的炊烟，有声有色，动静结合，勾勒出一幅和谐幽静而又富有生机的田园山水画。诗的二联和四联写诗人与裴迪的闲居之乐。倚杖柴门，临风听蝉，把诗人安逸的神态，超然物外的情致，写得栩栩如生；",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "复值接舆醉，狂歌五柳前"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "秋天",
+      "写景",
+      "抒情",
+      "五言律诗"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_ext_060",
+    "title": "归嵩山作",
+    "author": "王维",
+    "dynasty": "唐",
+    "content": "清川带长薄，车马去闲闲。\n流水如有意，暮禽相与还。\n荒城临古渡，落日满秋山。\n迢递嵩高下，归来且闭关。",
+    "pinyin": "qīng chuān dài cháng báo ， chē mǎ qù xián xián 。\nliú shuǐ rú yǒu yì ， mù qín xiāng yǔ huán 。\nhuāng chéng lín gǔ dù ， luò rì mǎn qiū shān 。\ntiáo dì sōng gāo xià ， guī lái qiě bì guān 。",
+    "layer": "extended",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "清川",
+        "meaning": "清清的流水，当指伊水及其支流"
+      },
+      {
+        "word": "川",
+        "meaning": "河川"
+      },
+      {
+        "word": "带",
+        "meaning": "围绕，映带"
+      },
+      {
+        "word": "薄",
+        "meaning": "草木丛生之地，草木交错曰薄"
+      },
+      {
+        "word": "去",
+        "meaning": "行走"
+      }
+    ],
+    "translation": "清澈的川水环绕一片草木，驾车马徐徐而去从容悠闲。 流水好像对我充满了情意，傍晚的鸟儿随我一同回还。 荒凉的城池靠着古老渡口，落日的余晖洒满金色秋山。 在遥远又高峻的嵩山脚下，闭上门谢绝世俗度过晚年。",
+    "appreciation": "这首诗写作者辞官归隐途中所见的景色和心情。嵩山，古称“中岳”，在今河南登封县北。 “清川带长薄，车马去闲闲。”首联描写归隐出发时的情景，扣题目中的“归”字。清澈的河川环绕着一片长长的草木丛生的草泽地，离归的车马缓缓前进，显得那样从容不迫。这里所写望中景色和车马动态，都反映出诗人归山出发时一种安详闲适的心境。 中间四句进一步描摹归隐路途中的景色。",
+    "background": "入选《唐诗三百首》，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "迢递嵩高下，归来且闭关"
+    ],
+    "tags": [
+      "唐诗三百首",
+      "山水",
+      "写景",
+      "抒情",
+      "五言律诗"
+    ],
+    "difficulty": 3
   }
 ]
