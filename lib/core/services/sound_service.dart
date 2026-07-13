@@ -10,10 +10,10 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 
 /// 音效类型枚举。
 enum SoundEffect {
-  correct('sounds/correct.mp3'),
-  wrong('sounds/wrong.mp3'),
-  checkIn('sounds/checkin.mp3'),
-  achievement('sounds/achievement.mp3');
+  correct('sounds/correct.wav'),
+  wrong('sounds/wrong.wav'),
+  checkIn('sounds/checkin.wav'),
+  achievement('sounds/achievement.wav');
 
   const SoundEffect(this.assetPath);
   final String assetPath;
