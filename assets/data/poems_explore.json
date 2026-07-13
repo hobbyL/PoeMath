@@ -16714,5 +16714,1393 @@
       "古诗词"
     ],
     "difficulty": 3
+  },
+  {
+    "id": "poem_exp_601",
+    "title": "送范山人归泰山",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "鲁客抱白鹤，别余往泰山。\n初行若片云，杳在青崖间。\n高高至天门，日观近可攀。\n云山望不及，此去何时还。",
+    "pinyin": "lǔ kè bào bái hè ， bié yú wǎng tài shān 。\nchū xíng ruò piàn yún ， yǎo zài qīng yá jiān 。\ngāo gāo zhì tiān mén ， rì guān jìn kě pān 。\nyún shān wàng bù jí ， cǐ qù hé shí huán 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "云山望不及，此去何时还。"
+    ],
+    "tags": [
+      "写景",
+      "向往",
+      "抒情",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_602",
+    "title": "送裴十八图南归嵩山二首",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "何处可为别，长安青绮门。\n胡姬招素手，延客醉金樽。\n临当上马时，我独与君言。\n风吹芳兰折，日没鸟雀喧。\n举手指飞鸿，此情难具论。\n同归无早晚，颍水有清源。\n君思颍水绿，忽复归嵩岑。\n归时莫洗耳，为我洗其心。\n洗心得真情，洗耳徒买名。\n谢公终一起，相与济苍生。",
+    "pinyin": "hé chù kě wèi bié ， cháng ān qīng qǐ mén 。\nhú jī zhāo sù shǒu ， yán kè zuì jīn zūn 。\nlín dāng shàng mǎ shí ， wǒ dú yǔ jūn yán 。\nfēng chuī fāng lán zhé ， rì méi niǎo què xuān 。\njǔ shǒu zhǐ fēi hóng ， cǐ qíng nán jù lùn 。\ntóng guī wú zǎo wǎn ， yǐng shuǐ yǒu qīng yuán 。\njūn sī yǐng shuǐ lǜ ， hū fù guī sōng cén 。\nguī shí mò xǐ ěr ， wèi wǒ xǐ qí xīn 。\nxǐ xīn dé zhēn qíng ， xǐ ěr tú mǎi míng 。\nxiè gōng zhōng yī qǐ ， xiāng yǔ jì cāng shēng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "谢公终一起，相与济苍生。"
+    ],
+    "tags": [
+      "送别",
+      "归隐",
+      "古诗词"
+    ],
+    "difficulty": 4
+  },
+  {
+    "id": "poem_exp_603",
+    "title": "送友人寻越中山水",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "闻道稽山去，偏宜谢客才。\n千岩泉洒落，万壑树萦回。\n东海横秦望，西陵绕越台。\n湖清霜镜晓，涛白雪山来。\n八月枚乘笔，三吴张翰杯。\n此中多逸兴，早晚向天台。",
+    "pinyin": "wén dào jī shān qù ， piān yí xiè kè cái 。\nqiān yán quán sǎ luò ， wàn hè shù yíng huí 。\ndōng hǎi héng qín wàng ， xī líng rào yuè tái 。\nhú qīng shuāng jìng xiǎo ， tāo bái xuě shān lái 。\nbā yuè méi chéng bǐ ， sān wú zhāng hàn bēi 。\ncǐ zhōng duō yì xìng ， zǎo wǎn xiàng tiān tái 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "此中多逸兴，早晚向天台。"
+    ],
+    "tags": [
+      "送别",
+      "山水",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_604",
+    "title": "送韩侍御之广德",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "昔日绣衣何足荣，今宵贳酒与君倾。\n暂就东山赊月色，酣歌一夜送泉明。",
+    "pinyin": "xī rì xiù yī hé zú róng ， jīn xiāo shì jiǔ yǔ jūn qīng 。\nzàn jiù dōng shān shē yuè sè ， hān gē yī yè sòng quán míng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "暂就东山赊月色，酣歌一夜送泉明。"
+    ],
+    "tags": [
+      "送别",
+      "友人",
+      "友谊",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_605",
+    "title": "宫中行乐词·其四",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "玉树春归日，金宫乐事多。\n后庭朝未入，轻辇夜相过。\n笑出花间语，娇来竹下歌。\n莫教明月去，留著醉嫦娥。",
+    "pinyin": "yù shù chūn guī rì ， jīn gōng lè shì duō 。\nhòu tíng zhāo wèi rù ， qīng niǎn yè xiāng guò 。\nxiào chū huā jiān yǔ ， jiāo lái zhú xià gē 。\nmò jiào míng yuè qù ， liú zhuó zuì cháng é 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "莫教明月去，留著醉嫦娥。"
+    ],
+    "tags": [
+      "写景",
+      "游玩",
+      "抒情",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_606",
+    "title": "凤吹笙曲",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "仙人十五爱吹笙，学得昆丘彩凤鸣。\n始闻炼气餐金液，复道朝天赴玉京。\n玉京迢迢几千里，凤笙去去无穷已。\n欲叹离声发绛唇，更嗟别调流纤指。\n此时惜别讵堪闻，此地相看未忍分。\n重吟真曲和清吹，却奏仙歌响绿云。\n绿云紫气向函关，访道应寻缑氏山。\n莫学吹笙王子晋，一遇浮丘断不还。",
+    "pinyin": "xiān rén shí wǔ ài chuī shēng ， xué dé kūn qiū cǎi fèng míng 。\nshǐ wén liàn qì cān jīn yè ， fù dào zhāo tiān fù yù jīng 。\nyù jīng tiáo tiáo jǐ qiān lǐ ， fèng shēng qù qù wú qióng yǐ 。\nyù tàn lí shēng fā jiàng chún ， gèng jiē bié tiáo liú xiān zhǐ 。\ncǐ shí xī bié jù kān wén ， cǐ dì xiāng kàn wèi rěn fēn 。\nchóng yín zhēn qǔ hé qīng chuī ， què zòu xiān gē xiǎng lǜ yún 。\nlǜ yún zǐ qì xiàng hán guān ， fǎng dào yīng xún gōu shì shān 。\nmò xué chuī shēng wáng zǐ jìn ， yī yù fú qiū duàn bù huán 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "莫学吹笙王子晋，一遇浮丘断不还。"
+    ],
+    "tags": [
+      "送别",
+      "不舍",
+      "离别",
+      "古诗词"
+    ],
+    "difficulty": 4
+  },
+  {
+    "id": "poem_exp_607",
+    "title": "与诸公送陈郎将归衡阳",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "衡山苍苍入紫冥，下看南极老人星。\n回飙吹散五峰雪，往往飞花落洞庭。\n气清岳秀有如此，郎将一家拖金紫。\n门前食客乱浮云，世人皆比孟尝君。\n江上送行无白璧，临歧惆怅若为分。",
+    "pinyin": "héng shān cāng cāng rù zǐ míng ， xià kàn nán jí lǎo rén xīng 。\nhuí biāo chuī sàn wǔ fēng xuě ， wǎng wǎng fēi huā luò dòng tíng 。\nqì qīng yuè xiù yǒu rú cǐ ， láng jiāng yī jiā tuō jīn zǐ 。\nmén qián shí kè luàn fú yún ， shì rén jiē bǐ mèng cháng jūn 。\njiāng shàng sòng xíng wú bái bì ， lín qí chóu chàng ruò wèi fēn 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "江上送行无白璧，临歧惆怅若为分。"
+    ],
+    "tags": [
+      "写景",
+      "送别",
+      "不舍",
+      "古诗词"
+    ],
+    "difficulty": 4
+  },
+  {
+    "id": "poem_exp_608",
+    "title": "把酒问月·故人贾淳令予问之",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "青天有月来几时？\n我今停杯一问之。\n人攀明月不可得，月行却与人相随。\n皎如飞镜临丹阙，绿烟灭尽清辉发。\n但见宵从海上来，宁知晓向云间没。\n白兔捣药秋复春，嫦娥孤栖与谁邻？\n今人不见古时月，今月曾经照古人。\n古人今人若流水，共看明月皆如此。\n唯愿当歌对酒时，月光长照金樽里。",
+    "pinyin": "qīng tiān yǒu yuè lái jǐ shí ？\nwǒ jīn tíng bēi yī wèn zhī 。\nrén pān míng yuè bù kě dé ， yuè xíng què yǔ rén xiāng suí 。\njiǎo rú fēi jìng lín dān quē ， lǜ yān miè jìn qīng huī fā 。\ndàn jiàn xiāo cóng hǎi shàng lái ， níng zhī xiǎo xiàng yún jiān méi 。\nbái tù dǎo yào qiū fù chūn ， cháng é gū qī yǔ shuí lín ？\njīn rén bù jiàn gǔ shí yuè ， jīn yuè céng jīng zhào gǔ rén 。\ngǔ rén jīn rén ruò liú shuǐ ， gòng kàn míng yuè jiē rú cǐ 。\nwéi yuàn dāng gē duì jiǔ shí ， yuè guāng cháng zhào jīn zūn lǐ 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "阙",
+        "meaning": "朱红色的宫殿"
+      },
+      {
+        "word": "绿烟",
+        "meaning": "指遮蔽月光的浓重的云雾"
+      },
+      {
+        "word": "但见",
+        "meaning": "只看到"
+      },
+      {
+        "word": "宁知",
+        "meaning": "怎知"
+      },
+      {
+        "word": "没",
+        "meaning": "隐没"
+      }
+    ],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "唯愿当歌对酒时，月光长照金樽里。"
+    ],
+    "tags": [
+      "哲理",
+      "咏物",
+      "月亮",
+      "抒怀",
+      "优美",
+      "古诗词"
+    ],
+    "difficulty": 4
+  },
+  {
+    "id": "poem_exp_609",
+    "title": "鲁中送二从弟赴举之西京",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "鲁客向西笑，君门若梦中。\n霜凋逐臣发，日忆明光宫。\n复羡二龙去，才华冠世雄。\n平衢骋高足，逸翰凌长风。\n舞袖拂秋月，歌筵闻早鸿。\n送君日千里，良会何由同。",
+    "pinyin": "lǔ kè xiàng xī xiào ， jūn mén ruò mèng zhōng 。\nshuāng diāo zhú chén fā ， rì yì míng guāng gōng 。\nfù xiàn èr lóng qù ， cái huá guàn shì xióng 。\npíng qú chěng gāo zú ， yì hàn líng cháng fēng 。\nwǔ xiù fú qiū yuè ， gē yán wén zǎo hóng 。\nsòng jūn rì qiān lǐ ， liáng huì hé yóu tóng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "送君日千里，良会何由同。"
+    ],
+    "tags": [
+      "送别",
+      "赞美",
+      "爱国",
+      "述志",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_610",
+    "title": "江上寄元六林宗",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "霜落江始寒，枫叶绿未脱。\n客行悲清秋，永路苦不达。\n沧波眇川汜，白日隐天末。\n停棹依林峦，惊猿相叫聒。\n夜分河汉转，起视溟涨阔。\n凉风何萧萧，流水鸣活活。\n浦沙净如洗，海月明可掇。\n兰交空怀思，琼树讵解渴。\n勖哉沧洲心，岁晚庶不夺。\n幽赏颇自得，兴远与谁豁。",
+    "pinyin": "shuāng luò jiāng shǐ hán ， fēng yè lǜ wèi tuō 。\nkè xíng bēi qīng qiū ， yǒng lù kǔ bù dá 。\ncāng bō miǎo chuān sì ， bái rì yǐn tiān mò 。\ntíng zhào yī lín luán ， jīng yuán xiāng jiào guō 。\nyè fēn hé hàn zhuǎn ， qǐ shì míng zhǎng kuò 。\nliáng fēng hé xiāo xiāo ， liú shuǐ míng huó huó 。\npǔ shā jìng rú xǐ ， hǎi yuè míng kě duō 。\nlán jiāo kōng huái sī ， qióng shù jù jiě kě 。\nxù zāi cāng zhōu xīn ， suì wǎn shù bù duó 。\nyōu shǎng pō zì dé ， xìng yuǎn yǔ shuí huō 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "幽赏颇自得，兴远与谁豁。"
+    ],
+    "tags": [
+      "写景",
+      "秋天",
+      "抒怀",
+      "人生",
+      "怀才不遇",
+      "古诗词"
+    ],
+    "difficulty": 4
+  },
+  {
+    "id": "poem_exp_611",
+    "title": "宴陶家亭子",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "曲巷幽人宅，高门大士家。\n池开照胆镜，林吐破颜花。\n绿水藏春日，青轩秘晚霞。\n若闻弦管妙，金谷不能夸。",
+    "pinyin": "qǔ xiàng yōu rén zhái ， gāo mén dà shì jiā 。\nchí kāi zhào dǎn jìng ， lín tǔ pò yán huā 。\nlǜ shuǐ cáng chūn rì ， qīng xuān mì wǎn xiá 。\nruò wén xián guǎn miào ， jīn gǔ bù néng kuā 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "若闻弦管妙，金谷不能夸。"
+    ],
+    "tags": [
+      "写景",
+      "叙事",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_612",
+    "title": "白鼻騧",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "银鞍白鼻騧，绿地障泥锦。\n细雨春风花落时，挥鞭直就胡姬饮。",
+    "pinyin": "yín ān bái bí guā ， lǜ dì zhàng ní jǐn 。\nxì yǔ chūn fēng huā luò shí ， huī biān zhí jiù hú jī yǐn 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "细雨春风花落时，挥鞭直就胡姬饮。"
+    ],
+    "tags": [
+      "写景",
+      "抒情",
+      "豪迈",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_613",
+    "title": "永王东巡歌·其六",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "丹阳北固是吴关，画出楼台云水间。\n千岩烽火连沧海，两岸旌旗绕碧山。",
+    "pinyin": "dān yáng běi gù shì wú guān ， huà chū lóu tái yún shuǐ jiān 。\nqiān yán fēng huǒ lián cāng hǎi ， liǎng àn jīng qí rào bì shān 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "千岩烽火连沧海，两岸旌旗绕碧山。"
+    ],
+    "tags": [
+      "边塞",
+      "战争",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_614",
+    "title": "送族弟绾从军安西",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "汉家兵马乘北风，鼓行而西破犬戎。\n尔随汉将出门去，剪虏若草收奇功。\n君王按剑望边色，旄头已落胡天空。\n匈奴系颈数应尽，明年应入蒲萄宫。",
+    "pinyin": "hàn jiā bīng mǎ chéng běi fēng ， gǔ xíng ér xī pò quǎn róng 。\něr suí hàn jiāng chū mén qù ， jiǎn lǔ ruò cǎo shōu qí gōng 。\njūn wáng àn jiàn wàng biān sè ， máo tóu yǐ luò hú tiān kōng 。\nxiōng nú xì jǐng shǔ yīng jìn ， míng nián yīng rù pú táo gōng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "匈奴系颈数应尽，明年应入蒲萄宫。"
+    ],
+    "tags": [
+      "送别",
+      "抒情",
+      "爱国",
+      "志向",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_615",
+    "title": "秋浦寄内",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "我今寻阳去，辞家千里馀。\n结荷倦水宿，却寄大雷书。\n虽不同辛苦，怆离各自居。\n我自入秋浦，三年北信疏。\n红颜愁落尽，白发不能除。\n有客自梁苑，手携五色鱼。\n开鱼得锦字，归问我何如。\n江山虽道阻，意合不为殊。",
+    "pinyin": "wǒ jīn xún yáng qù ， cí jiā qiān lǐ yú 。\njié hé juàn shuǐ sù ， què jì dà léi shū 。\nsuī bù tóng xīn kǔ ， chuàng lí gè zì jū 。\nwǒ zì rù qiū pǔ ， sān nián běi xìn shū 。\nhóng yán chóu luò jìn ， bái fā bù néng chú 。\nyǒu kè zì liáng yuàn ， shǒu xié wǔ sè yú 。\nkāi yú dé jǐn zì ， guī wèn wǒ hé rú 。\njiāng shān suī dào zǔ ， yì hé bù wèi shū 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "江山虽道阻，意合不为殊。"
+    ],
+    "tags": [
+      "思乡",
+      "抒情",
+      "怀人",
+      "愁苦",
+      "古诗词"
+    ],
+    "difficulty": 4
+  },
+  {
+    "id": "poem_exp_616",
+    "title": "春日归山寄孟浩然",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "朱绂遗尘境，青山谒梵筵。\n金绳开觉路，宝筏度迷川。\n岭树攒飞栱，岩花覆谷泉。\n塔形标海月，楼势出江烟。\n香气三天下，钟声万壑连。\n荷秋珠已满，松密盖初圆。\n鸟聚疑闻法，龙参若护禅。\n愧非流水韵，叨入伯牙弦。",
+    "pinyin": "zhū fú yí chén jìng ， qīng shān yè fàn yán 。\njīn shéng kāi jué lù ， bǎo fá dù mí chuān 。\nlǐng shù zǎn fēi gǒng ， yán huā fù gǔ quán 。\ntǎ xíng biāo hǎi yuè ， lóu shì chū jiāng yān 。\nxiāng qì sān tiān xià ， zhōng shēng wàn hè lián 。\nhé qiū zhū yǐ mǎn ， sōng mì gài chū yuán 。\nniǎo jù yí wén fǎ ， lóng cān ruò hù chán 。\nkuì fēi liú shuǐ yùn ， dāo rù bó yá xián 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "朝服绶带遗弃在尘世之境，赶赴青山拜谒佛教道场。 黄金为绳显示觉悟之路，乘上宝筏渡过惑人迷川。 岭上高树拢聚构成飞栱一般，岩上红花盛开掩盖山谷的泉水。 佛塔高耸是海上日出的标志，佛楼雄伟依傍大江烟云缭绕。 佛烟香气传遍欲界色界无色界，佛钟敲响声连万壑千川。 手中念珠如秋日莲子成熟满把满串，繁茂的松树团团圆圆如月。 鸟儿相聚疑是为听法而来，龙王亦来参加原为护法而来。 惭愧我无洋洋兮若江河般的流水声韵，可以混为伯牙的琴上之声。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "愧非流水韵，叨入伯牙弦。"
+    ],
+    "tags": [
+      "写景",
+      "春天",
+      "赞美",
+      "友人",
+      "古诗词"
+    ],
+    "difficulty": 4
+  },
+  {
+    "id": "poem_exp_617",
+    "title": "菩萨蛮·平林漠漠烟如织",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "平林漠漠烟如织，寒山一带伤心碧。\n暝色入高楼，有人楼上愁。\n玉阶空伫立，宿鸟归飞急。\n何处是归程？\n长亭连短亭。",
+    "pinyin": "píng lín mò mò yān rú zhī ， hán shān yī dài shāng xīn bì 。\nmíng sè rù gāo lóu ， yǒu rén lóu shàng chóu 。\nyù jiē kōng zhù lì ， sù niǎo guī fēi jí 。\nhé chù shì guī chéng ？\ncháng tíng lián duǎn tíng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "平林",
+        "meaning": "平原上的林木"
+      },
+      {
+        "word": "漠漠",
+        "meaning": "迷蒙貌"
+      },
+      {
+        "word": "烟如织",
+        "meaning": "暮烟浓密"
+      },
+      {
+        "word": "伤心",
+        "meaning": "极甚之辞"
+      },
+      {
+        "word": "暝色",
+        "meaning": "夜色"
+      }
+    ],
+    "translation": "远处舒展的树林烟雾漾潆，好像纺织物一般，秋寒的山色宛如衣带，触目伤心的碧绿。暮色进了高高的闺楼，有人正在楼上独自忧愁。 玉石的台阶上，徒然侍立盼望。那回巢的鸟儿，在归心催促下急急飞翔。哪里是我返回的路程？过了长亭接着短亭。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "长亭连短亭。"
+    ],
+    "tags": [
+      "写景",
+      "宋词三百首",
+      "豪放",
+      "秋天",
+      "怀人",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_618",
+    "title": "峨眉山月歌",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "峨眉山月半轮秋，影入平羌江水流。\n夜发清溪向三峡，思君不见下渝州。",
+    "pinyin": "é méi shān yuè bàn lún qiū ， yǐng rù píng qiāng jiāng shuǐ liú 。\nyè fā qīng xī xiàng sān xiá ， sī jūn bù jiàn xià yú zhōu 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "夜发清溪向三峡，思君不见下渝州。"
+    ],
+    "tags": [
+      "写景",
+      "初中古诗",
+      "秋天",
+      "游历",
+      "地名",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_619",
+    "title": "咏槿",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "园花笑芳年，池草艳春色。\n犹不如槿花，婵娟玉阶侧。\n芬荣何夭促，零落在瞬息。\n岂若琼树枝，终岁长翕赩。",
+    "pinyin": "yuán huā xiào fāng nián ， chí cǎo yàn chūn sè 。\nyóu bù rú jǐn huā ， chán juān yù jiē cè 。\nfēn róng hé yāo cù ， líng luò zài shùn xī 。\nqǐ ruò qióng shù zhī ， zhōng suì cháng xī xì 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "园花笑在美好的年岁，春光里池草更觉鲜艳。 还不如篱边的木槿花，在玉阶旁姿态如婵娟。 花香草茂生命太短促，花草凋落只在霎那间。 哪里像美丽的玉树枝，一年到头都光彩灿烂。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "岂若琼树枝，终岁长翕赩。"
+    ],
+    "tags": [
+      "咏物",
+      "写花",
+      "赞美",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_620",
+    "title": "夜下征虏亭",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "船下广陵去，月明征虏亭。\n山花如绣颊，江火似流萤。",
+    "pinyin": "chuán xià guǎng líng qù ， yuè míng zhēng lǔ tíng 。\nshān huā rú xiù jiá ， jiāng huǒ sì liú yíng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "山花如绣颊，江火似流萤。"
+    ],
+    "tags": [
+      "写景",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_621",
+    "title": "白田马上闻莺",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "黄鹂啄紫椹，五月鸣桑枝。\n我行不记日，误作阳春时。\n蚕老客未归，白田已缫丝。\n驱马又前去，扪心空自悲。",
+    "pinyin": "huáng lí zhuó zǐ zhēn ， wǔ yuè míng sāng zhī 。\nwǒ xíng bù jì rì ， wù zuò yáng chūn shí 。\ncán lǎo kè wèi guī ， bái tián yǐ sāo sī 。\nqū mǎ yòu qián qù ， mén xīn kōng zì bēi 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "驱马又前去，扪心空自悲。"
+    ],
+    "tags": [
+      "写景",
+      "夏天",
+      "怀才不遇",
+      "羁旅",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_622",
+    "title": "宣城青溪",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "青溪胜桐庐，水木有佳色。\n山貌日高古，石容天倾侧。\n彩鸟昔未名，白猿初相识。\n不见同怀人，对之空叹息。",
+    "pinyin": "qīng xī shèng tóng lú ， shuǐ mù yǒu jiā sè 。\nshān mào rì gāo gǔ ， shí róng tiān qīng cè 。\ncǎi niǎo xī wèi míng ， bái yuán chū xiāng shí 。\nbù jiàn tóng huái rén ， duì zhī kōng tàn xī 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "不见同怀人，对之空叹息。"
+    ],
+    "tags": [
+      "写景",
+      "自然",
+      "喜爱",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_623",
+    "title": "大堤曲",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "汉水临襄阳，花开大堤暖。\n佳期大堤下，泪向南云满。\n春风无复情，吹我梦魂散。\n不见眼中人，天长音信断。",
+    "pinyin": "hàn shuǐ lín xiāng yáng ， huā kāi dà dī nuǎn 。\njiā qī dà dī xià ， lèi xiàng nán yún mǎn 。\nchūn fēng wú fù qíng ， chuī wǒ mèng hún sàn 。\nbù jiàn yǎn zhōng rén ， tiān cháng yīn xìn duàn 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "不见眼中人，天长音信断。"
+    ],
+    "tags": [
+      "思乡",
+      "乐府",
+      "触景伤情",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_624",
+    "title": "别东林寺僧",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "东林送客处，月出白猿啼。\n笑别庐山远，何烦过虎溪。",
+    "pinyin": "dōng lín sòng kè chù ， yuè chū bái yuán tí 。\nxiào bié lú shān yuǎn ， hé fán guò hǔ xī 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "笑别庐山远，何烦过虎溪。"
+    ],
+    "tags": [
+      "送别",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_625",
+    "title": "宫中行乐词八首·其二",
+    "author": "李白",
+    "dynasty": "唐",
+    "content": "柳色黄金嫩，梨花白雪香。\n玉楼巢翡翠，金殿锁鸳鸯。\n选妓随雕辇，征歌出洞房。\n宫中谁第一，飞燕在昭阳。",
+    "pinyin": "liǔ sè huáng jīn nèn ， lí huā bái xuě xiāng 。\nyù lóu cháo fěi cuì ， jīn diàn suǒ yuān yāng 。\nxuǎn jì suí diāo niǎn ， zhēng gē chū dòng fáng 。\ngōng zhōng shuí dì yī ， fēi yàn zài zhāo yáng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "宫中谁第一，飞燕在昭阳。"
+    ],
+    "tags": [
+      "写景",
+      "同情",
+      "宫廷",
+      "生活",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_626",
+    "title": "南浦别",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "南浦凄凄别，西风袅袅秋。\n一看肠一断，好去莫回头。",
+    "pinyin": "nán pǔ qī qī bié ， xī fēng niǎo niǎo qiū 。\nyī kàn cháng yī duàn ， hǎo qù mò huí tóu 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "一看肠一断，好去莫回头。"
+    ],
+    "tags": [
+      "写景",
+      "送别",
+      "惜别",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_627",
+    "title": "放言五首·其三",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "赠君一法决狐疑，不用钻龟与祝蓍。\n试玉要烧三日满，辨材须待七年期。\n周公恐惧流言日，王莽谦恭未篡时。\n向使当初身便死，一生真伪复谁知？",
+    "pinyin": "zèng jūn yī fǎ jué hú yí ， bù yòng zuān guī yǔ zhù shī 。\nshì yù yào shāo sān rì mǎn ， biàn cái xū dài qī nián qī 。\nzhōu gōng kǒng jù liú yán rì ， wáng mǎng qiān gōng wèi cuàn shí 。\nxiàng shǐ dāng chū shēn biàn sǐ ， yī shēng zhēn wěi fù shuí zhī ？",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "向使当初身便死，一生真伪复谁知？"
+    ],
+    "tags": [
+      "哲理",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_628",
+    "title": "南湖早春",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "风回云断雨初晴，返照湖边暖复明。\n乱点碎红山杏发，平铺新绿水蘋生。\n翅低白雁飞仍重，舌涩黄鹂语未成。\n不道江南春不好，年年衰病减心情。",
+    "pinyin": "fēng huí yún duàn yǔ chū qíng ， fǎn zhào hú biān nuǎn fù míng 。\nluàn diǎn suì hóng shān xìng fā ， píng pū xīn lǜ shuǐ píng shēng 。\nchì dī bái yàn fēi réng chóng ， shé sè huáng lí yǔ wèi chéng 。\nbù dào jiāng nán chūn bù hǎo ， nián nián shuāi bìng jiǎn xīn qíng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "不道江南春不好，年年衰病减心情。"
+    ],
+    "tags": [
+      "写景",
+      "春天",
+      "写水",
+      "抒情",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_629",
+    "title": "遗爱寺",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "弄石临溪坐，寻花绕寺行。\n时时闻鸟语，处处是泉声。",
+    "pinyin": "nòng shí lín xī zuò ， xún huā rào sì xíng 。\nshí shí wén niǎo yǔ ， chù chù shì quán shēng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "时时闻鸟语，处处是泉声。"
+    ],
+    "tags": [
+      "写景",
+      "抒情",
+      "早教古诗100首",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_630",
+    "title": "阴雨",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "岚雾今朝重，江山此地深。\n滩声秋更急，峡气晓多阴。\n望阙云遮眼，思乡雨滴心。\n将何慰幽独，赖此北窗琴。",
+    "pinyin": "lán wù jīn zhāo chóng ， jiāng shān cǐ dì shēn 。\ntān shēng qiū gèng jí ， xiá qì xiǎo duō yīn 。\nwàng quē yún zhē yǎn ， sī xiāng yǔ dī xīn 。\njiāng hé wèi yōu dú ， lài cǐ běi chuāng qín 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "将何慰幽独，赖此北窗琴。"
+    ],
+    "tags": [
+      "思乡",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_631",
+    "title": "放言五首·其五",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "泰山不要欺毫末，颜子无心羡老彭。\n松树千年终是朽，槿花一日自为荣。\n何须恋世常忧死，亦莫嫌身漫厌生。\n生去死来都是幻，幻人哀乐系何情。",
+    "pinyin": "tài shān bù yào qī háo mò ， yán zǐ wú xīn xiàn lǎo péng 。\nsōng shù qiān nián zhōng shì xiǔ ， jǐn huā yī rì zì wèi róng 。\nhé xū liàn shì cháng yōu sǐ ， yì mò xián shēn màn yàn shēng 。\nshēng qù sǐ lái dōu shì huàn ， huàn rén āi lè xì hé qíng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "生去死来都是幻，幻人哀乐系何情。"
+    ],
+    "tags": [
+      "哲理",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_632",
+    "title": "放言五首·其四",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "谁家宅第成还破，何处亲宾哭复歌？\n昨日屋头堪炙手，今朝门外好张罗。\n北邙未省留闲地，东海何曾有顶波。\n莫笑贱贫夸富贵，共成枯骨两何如？",
+    "pinyin": "shuí jiā zhái dì chéng huán pò ， hé chù qīn bīn kū fù gē ？\nzuó rì wū tóu kān zhì shǒu ， jīn zhāo mén wài hǎo zhāng luó 。\nběi máng wèi shěng liú xián dì ， dōng hǎi hé céng yǒu dǐng bō 。\nmò xiào jiàn pín kuā fù guì ， gòng chéng kū gǔ liǎng hé rú ？",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "莫笑贱贫夸富贵，共成枯骨两何如？"
+    ],
+    "tags": [
+      "哲理",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_633",
+    "title": "琴茶",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "兀兀寄形群动内，陶陶任性一生间。\n自抛官后春多梦，不读书来老更闲。\n琴里知闻唯渌水，茶中故旧是蒙山。\n穷通行止常相伴，难道吾今无往还？",
+    "pinyin": "wù wù jì xíng qún dòng nèi ， táo táo rèn xìng yī shēng jiān 。\nzì pāo guān hòu chūn duō mèng ， bù dú shū lái lǎo gèng xián 。\nqín lǐ zhī wén wéi lù shuǐ ， chá zhōng gù jiù shì mēng shān 。\nqióng tōng xíng zhǐ cháng xiāng bàn ， nán dào wú jīn wú wǎng huán ？",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "穷通行止常相伴，难道吾今无往还？"
+    ],
+    "tags": [
+      "爱国",
+      "生活",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_634",
+    "title": "浪淘沙·白浪茫茫与海连",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "白浪茫茫与海连，平沙浩浩四无边。\n暮去朝来淘不住，遂令东海变桑田。",
+    "pinyin": "bái làng máng máng yǔ hǎi lián ， píng shā hào hào sì wú biān 。\nmù qù zhāo lái táo bù zhù ， suì lìng dōng hǎi biàn sāng tián 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "暮去朝来淘不住，遂令东海变桑田。"
+    ],
+    "tags": [
+      "写景",
+      "抒情",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_635",
+    "title": "湖亭望水",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "久雨南湖涨，新晴北客过。\n日沉红有影，风定绿无波。\n岸没闾阎少，滩平船舫多。\n可怜心赏处，其奈独游何。",
+    "pinyin": "jiǔ yǔ nán hú zhǎng ， xīn qíng běi kè guò 。\nrì chén hóng yǒu yǐng ， fēng dìng lǜ wú bō 。\nàn méi lǘ yán shǎo ， tān píng chuán fǎng duō 。\nkě lián xīn shǎng chù ， qí nài dú yóu hé 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "可怜心赏处，其奈独游何。"
+    ],
+    "tags": [
+      "写景",
+      "遗憾",
+      "感叹",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_636",
+    "title": "京兆府栽莲",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "污沟贮浊水，水上叶田田。\n我来一长叹，知是东溪莲。\n下有青污泥，馨香无复全。\n上有红尘扑，颜色不得鲜。\n物性犹如此，人事亦宜然。\n托根非其所，不如遭弃捐。\n昔在溪中日，花叶媚清涟。\n今年不得地，憔悴府门前。",
+    "pinyin": "wū gōu zhù zhuó shuǐ ， shuǐ shàng yè tián tián 。\nwǒ lái yī cháng tàn ， zhī shì dōng xī lián 。\nxià yǒu qīng wū ní ， xīn xiāng wú fù quán 。\nshàng yǒu hóng chén pū ， yán sè bù dé xiān 。\nwù xìng yóu rú cǐ ， rén shì yì yí rán 。\ntuō gēn fēi qí suǒ ， bù rú zāo qì juān 。\nxī zài xī zhōng rì ， huā yè mèi qīng lián 。\njīn nián bù dé dì ， qiáo cuì fǔ mén qián 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "今年不得地，憔悴府门前。"
+    ],
+    "tags": [
+      "咏物",
+      "荷花",
+      "感伤",
+      "命运",
+      "古诗词"
+    ],
+    "difficulty": 4
+  },
+  {
+    "id": "poem_exp_637",
+    "title": "庾楼晓望",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "独凭朱槛立凌晨，山色初明水色新。\n竹雾晓笼衔岭月，频风暖送过江春。\n子城阴处犹残雪，衙鼓声前未有尘。\n三百年来庾楼上，曾经多少望乡人。",
+    "pinyin": "dú píng zhū jiàn lì líng chén ， shān sè chū míng shuǐ sè xīn 。\nzhú wù xiǎo lóng xián lǐng yuè ， pín fēng nuǎn sòng guò jiāng chūn 。\nzǐ chéng yīn chù yóu cán xuě ， yá gǔ shēng qián wèi yǒu chén 。\nsān bǎi nián lái yǔ lóu shàng ， céng jīng duō shǎo wàng xiāng rén 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "三百年来庾楼上，曾经多少望乡人。"
+    ],
+    "tags": [
+      "写景",
+      "登高",
+      "思乡",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_638",
+    "title": "邯郸冬至夜思家",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "邯郸驿里逢冬至，抱膝灯前影伴身。\n想得家中夜深坐，还应说着远行人。",
+    "pinyin": "hán dān yì lǐ féng dōng zhì ， bào xī dēng qián yǐng bàn shēn 。\nxiǎng dé jiā zhōng yè shēn zuò ， huán yīng shuō zhuó yuǎn xíng rén 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "我居住在邯郸客栈的时候正好是冬至佳节。晚上，我抱着双膝坐在灯前，只有影子与我相伴。 我相信，家中的亲人今天会相聚到深夜，还应该谈论着我这个远行人。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "想得家中夜深坐，还应说着远行人。"
+    ],
+    "tags": [
+      "思乡",
+      "冬天",
+      "地名",
+      "冬至",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_639",
+    "title": "白云泉",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "天平山上白云泉，云自无心水自闲。\n何必奔冲山下去，更添波浪向人间。",
+    "pinyin": "tiān píng shān shàng bái yún quán ， yún zì wú xīn shuǐ zì xián 。\nhé bì bēn chōng shān xià qù ， gèng tiān bō làng xiàng rén jiān 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "何必奔冲山下去，更添波浪向人间。"
+    ],
+    "tags": [
+      "写景",
+      "山水",
+      "寓志",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_640",
+    "title": "早兴",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "晨光出照屋梁明，初打开门鼓一声。\n犬上阶眠知地湿，鸟临窗语报天晴。\n半销宿酒头仍重，新脱冬衣体乍轻。\n睡觉心空思想尽，近来乡梦不多成。",
+    "pinyin": "chén guāng chū zhào wū liáng míng ， chū dǎ kāi mén gǔ yī shēng 。\nquǎn shàng jiē mián zhī dì shī ， niǎo lín chuāng yǔ bào tiān qíng 。\nbàn xiāo sù jiǔ tóu réng chóng ， xīn tuō dōng yī tǐ zhà qīng 。\nshuì jué xīn kōng sī xiǎng jìn ， jìn lái xiāng mèng bù duō chéng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "睡觉心空思想尽，近来乡梦不多成。"
+    ],
+    "tags": [
+      "写景",
+      "春天",
+      "生活",
+      "愉悦",
+      "写狗古诗18首",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_641",
+    "title": "别州民",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "耆老遮归路，壶浆满别筵。\n甘棠无一树，那得泪潸然。\n税重多贫户，农饥足旱田。\n唯留一湖水，与汝救凶年。",
+    "pinyin": "qí lǎo zhē guī lù ， hú jiāng mǎn bié yán 。\ngān táng wú yī shù ， nà dé lèi shān rán 。\nshuì chóng duō pín hù ， nóng jī zú hàn tián 。\nwéi liú yī hú shuǐ ， yǔ rǔ jiù xiōng nián 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "唯留一湖水，与汝救凶年。"
+    ],
+    "tags": [
+      "送别",
+      "农民",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_642",
+    "title": "放言五首·其二",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "世途倚伏都无定，尘网牵缠卒未休。\n祸福回还车轮毂，荣枯反覆手藏钩。\n龟灵未免刳肠患，马失应无折足忧。\n不信请看弈棋者，输赢须待局终头。",
+    "pinyin": "shì tú yǐ fú dōu wú dìng ， chén wǎng qiān chán zú wèi xiū 。\nhuò fú huí huán chē lún gǔ ， róng kū fǎn fù shǒu cáng gōu 。\nguī líng wèi miǎn kū cháng huàn ， mǎ shī yīng wú zhé zú yōu 。\nbù xìn qǐng kàn yì qí zhě ， shū yíng xū dài jú zhōng tóu 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "不信请看弈棋者，输赢须待局终头。"
+    ],
+    "tags": [
+      "哲理",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_643",
+    "title": "欲与元八卜邻先有是赠",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "平生心迹最相亲，欲隐墙东不为身。\n明月好同三径夜，绿杨宜作两家春。\n每因暂出犹思伴，岂得安居不择邻。\n可独终身数相见，子孙长作隔墙人。",
+    "pinyin": "píng shēng xīn jì zuì xiāng qīn ， yù yǐn qiáng dōng bù wèi shēn 。\nmíng yuè hǎo tóng sān jìng yè ， lǜ yáng yí zuò liǎng jiā chūn 。\nměi yīn zàn chū yóu sī bàn ， qǐ dé ān jū bù zé lín 。\nkě dú zhōng shēn shǔ xiāng jiàn ， zǐ sūn cháng zuò gé qiáng rén 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "可独终身数相见，子孙长作隔墙人。"
+    ],
+    "tags": [
+      "写景",
+      "想象",
+      "友人",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_644",
+    "title": "晚秋夜",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "碧空溶溶月华静，月里愁人吊孤影。\n花开残菊傍疏篱，叶下衰桐落寒井。\n塞鸿飞急觉秋尽，邻鸡鸣迟知夜永。\n凝情不语空所思，风吹白露衣裳冷。",
+    "pinyin": "bì kōng róng róng yuè huá jìng ， yuè lǐ chóu rén diào gū yǐng 。\nhuā kāi cán jú bàng shū lí ， yè xià shuāi tóng luò hán jǐng 。\nsāi hóng fēi jí jué qiū jìn ， lín jī míng chí zhī yè yǒng 。\nníng qíng bù yǔ kōng suǒ sī ， fēng chuī bái lòu yī cháng lěng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "凝情不语空所思，风吹白露衣裳冷。"
+    ],
+    "tags": [
+      "写景",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_645",
+    "title": "塞下曲·其六",
+    "author": "戎昱",
+    "dynasty": "唐",
+    "content": "北风凋白草，胡马日骎骎。\n夜后戍楼月，秋来边将心。\n铁衣霜露重，战马岁年深。\n自有卢龙塞，烟尘飞至今。",
+    "pinyin": "běi fēng diāo bái cǎo ， hú mǎ rì qīn qīn 。\nyè hòu shù lóu yuè ， qiū lái biān jiāng xīn 。\ntiě yī shuāng lòu chóng ， zhàn mǎ suì nián shēn 。\nzì yǒu lú lóng sāi ， yān chén fēi zhì jīn 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "自有卢龙塞，烟尘飞至今。"
+    ],
+    "tags": [
+      "边塞",
+      "将士",
+      "渴望",
+      "和平",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_646",
+    "title": "忆江南词三首",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "江南好，风景旧曾谙。\n日出江花红胜火，春来江水绿如蓝。\n能不忆江南？\n江南忆，最忆是杭州。\n山寺月中寻桂子，郡亭枕上看潮头。\n何日更重游！\n江南忆，其次忆吴宫。\n吴酒一杯春竹叶，吴娃双舞醉芙蓉。\n早晚复相逢！",
+    "pinyin": "jiāng nán hǎo ， fēng jǐng jiù céng ān 。\nrì chū jiāng huā hóng shèng huǒ ， chūn lái jiāng shuǐ lǜ rú lán 。\nnéng bù yì jiāng nán ？\njiāng nán yì ， zuì yì shì háng zhōu 。\nshān sì yuè zhōng xún guì zǐ ， jùn tíng zhěn shàng kàn cháo tóu 。\nhé rì gèng chóng yóu ！\njiāng nán yì ， qí cì yì wú gōng 。\nwú jiǔ yī bēi chūn zhú yè ， wú wá shuāng wǔ zuì fú róng 。\nzǎo wǎn fù xiāng féng ！",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "江南的风景多么美好，如画的风景久已熟悉。春天到来时，太阳从江面升起，把江边的鲜花照得比火红，碧绿的江水绿得胜过蓝草。怎能叫人不怀念江南？ 江南的回忆，最能唤起追思的是像天堂一样的杭州：游玩灵隐寺寻找皎洁月亮中的桂子，登上郡亭，枕卧其上，欣赏那起落的钱塘江大潮。什么时候能够再次去游玩？ 江南的回忆，再来就是回忆苏州的吴宫，喝一喝吴宫的美酒春竹叶，看一看吴宫的歌女双双起舞像朵朵迷人的芙蓉。不知何时会再次相逢。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "早晚复相逢！"
+    ],
+    "tags": [
+      "写景",
+      "乐府",
+      "地名",
+      "春天",
+      "古诗词"
+    ],
+    "difficulty": 4
+  },
+  {
+    "id": "poem_exp_647",
+    "title": "送客归京",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "水陆四千里，何时归到秦？\n舟辞三峡雨，马入九衢尘。\n有酒留行客，无书寄贵人。\n唯凭远传语，好在曲江春。",
+    "pinyin": "shuǐ lù sì qiān lǐ ， hé shí guī dào qín ？\nzhōu cí sān xiá yǔ ， mǎ rù jiǔ qú chén 。\nyǒu jiǔ liú xíng kè ， wú shū jì guì rén 。\nwéi píng yuǎn chuán yǔ ， hǎo zài qǔ jiāng chūn 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "唯凭远传语，好在曲江春。"
+    ],
+    "tags": [
+      "送别",
+      "友人",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_648",
+    "title": "寒闺怨",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "寒月沉沉洞房静，真珠帘外梧桐影。\n秋霜欲下手先知，灯底裁缝剪刀冷。",
+    "pinyin": "hán yuè chén chén dòng fáng jìng ， zhēn zhū lián wài wú tóng yǐng 。\nqiū shuāng yù xià shǒu xiān zhī ， dēng dǐ cái féng jiǎn dāo lěng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "秋霜欲下手先知，灯底裁缝剪刀冷。"
+    ],
+    "tags": [
+      "写景",
+      "抒情",
+      "闺怨",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_649",
+    "title": "魏王堤",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "花寒懒发鸟慵啼，信马闲行到日西。\n何处未春先有思，柳条无力魏王堤。",
+    "pinyin": "huā hán lǎn fā niǎo yōng tí ， xìn mǎ xián xíng dào rì xī 。\nhé chù wèi chūn xiān yǒu sī ， liǔ tiáo wú lì wèi wáng dī 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "何处未春先有思，柳条无力魏王堤。"
+    ],
+    "tags": [
+      "写景",
+      "春天",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_650",
+    "title": "除夜寄弟妹",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "感时思弟妹，不寐百忧生。\n万里经年别，孤灯此夜情。\n病容非旧日，归思逼新正。\n早晚重欢会，羁离各长成。",
+    "pinyin": "gǎn shí sī dì mèi ， bù mèi bǎi yōu shēng 。\nwàn lǐ jīng nián bié ， gū dēng cǐ yè qíng 。\nbìng róng fēi jiù rì ， guī sī bī xīn zhèng 。\nzǎo wǎn chóng huān huì ， jī lí gè cháng chéng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "早晚重欢会，羁离各长成。"
+    ],
+    "tags": [
+      "节日",
+      "思念",
+      "亲人",
+      "古诗词"
+    ],
+    "difficulty": 3
   }
 ]

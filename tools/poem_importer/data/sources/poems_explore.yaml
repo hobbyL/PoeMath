@@ -13320,3 +13320,1081 @@ poems:
     background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
     famous_lines: ["王公何慷慨，千载仰雄名。"]
     tags: ["爱国", "咏史怀古", "赞美", "志士", "古诗词"]
+
+  - id: poem_exp_601
+    title: 送范山人归泰山
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      鲁客抱白鹤，别余往泰山。
+      初行若片云，杳在青崖间。
+      高高至天门，日观近可攀。
+      云山望不及，此去何时还。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["云山望不及，此去何时还。"]
+    tags: ["写景", "向往", "抒情", "古诗词"]
+
+  - id: poem_exp_602
+    title: 送裴十八图南归嵩山二首
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      何处可为别，长安青绮门。
+      胡姬招素手，延客醉金樽。
+      临当上马时，我独与君言。
+      风吹芳兰折，日没鸟雀喧。
+      举手指飞鸿，此情难具论。
+      同归无早晚，颍水有清源。
+      君思颍水绿，忽复归嵩岑。
+      归时莫洗耳，为我洗其心。
+      洗心得真情，洗耳徒买名。
+      谢公终一起，相与济苍生。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["谢公终一起，相与济苍生。"]
+    tags: ["送别", "归隐", "古诗词"]
+
+  - id: poem_exp_603
+    title: 送友人寻越中山水
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      闻道稽山去，偏宜谢客才。
+      千岩泉洒落，万壑树萦回。
+      东海横秦望，西陵绕越台。
+      湖清霜镜晓，涛白雪山来。
+      八月枚乘笔，三吴张翰杯。
+      此中多逸兴，早晚向天台。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["此中多逸兴，早晚向天台。"]
+    tags: ["送别", "山水", "古诗词"]
+
+  - id: poem_exp_604
+    title: 送韩侍御之广德
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      昔日绣衣何足荣，今宵贳酒与君倾。
+      暂就东山赊月色，酣歌一夜送泉明。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["暂就东山赊月色，酣歌一夜送泉明。"]
+    tags: ["送别", "友人", "友谊", "古诗词"]
+
+  - id: poem_exp_605
+    title: 宫中行乐词·其四
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      玉树春归日，金宫乐事多。
+      后庭朝未入，轻辇夜相过。
+      笑出花间语，娇来竹下歌。
+      莫教明月去，留著醉嫦娥。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["莫教明月去，留著醉嫦娥。"]
+    tags: ["写景", "游玩", "抒情", "古诗词"]
+
+  - id: poem_exp_606
+    title: 凤吹笙曲
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      仙人十五爱吹笙，学得昆丘彩凤鸣。
+      始闻炼气餐金液，复道朝天赴玉京。
+      玉京迢迢几千里，凤笙去去无穷已。
+      欲叹离声发绛唇，更嗟别调流纤指。
+      此时惜别讵堪闻，此地相看未忍分。
+      重吟真曲和清吹，却奏仙歌响绿云。
+      绿云紫气向函关，访道应寻缑氏山。
+      莫学吹笙王子晋，一遇浮丘断不还。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["莫学吹笙王子晋，一遇浮丘断不还。"]
+    tags: ["送别", "不舍", "离别", "古诗词"]
+
+  - id: poem_exp_607
+    title: 与诸公送陈郎将归衡阳
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      衡山苍苍入紫冥，下看南极老人星。
+      回飙吹散五峰雪，往往飞花落洞庭。
+      气清岳秀有如此，郎将一家拖金紫。
+      门前食客乱浮云，世人皆比孟尝君。
+      江上送行无白璧，临歧惆怅若为分。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["江上送行无白璧，临歧惆怅若为分。"]
+    tags: ["写景", "送别", "不舍", "古诗词"]
+
+  - id: poem_exp_608
+    title: 把酒问月·故人贾淳令予问之
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      青天有月来几时？
+      我今停杯一问之。
+      人攀明月不可得，月行却与人相随。
+      皎如飞镜临丹阙，绿烟灭尽清辉发。
+      但见宵从海上来，宁知晓向云间没。
+      白兔捣药秋复春，嫦娥孤栖与谁邻？
+      今人不见古时月，今月曾经照古人。
+      古人今人若流水，共看明月皆如此。
+      唯愿当歌对酒时，月光长照金樽里。
+    annotations:
+      - {word: "阙", meaning: "朱红色的宫殿"}
+      - {word: "绿烟", meaning: "指遮蔽月光的浓重的云雾"}
+      - {word: "但见", meaning: "只看到"}
+      - {word: "宁知", meaning: "怎知"}
+      - {word: "没", meaning: "隐没"}
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["唯愿当歌对酒时，月光长照金樽里。"]
+    tags: ["哲理", "咏物", "月亮", "抒怀", "优美", "古诗词"]
+
+  - id: poem_exp_609
+    title: 鲁中送二从弟赴举之西京
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      鲁客向西笑，君门若梦中。
+      霜凋逐臣发，日忆明光宫。
+      复羡二龙去，才华冠世雄。
+      平衢骋高足，逸翰凌长风。
+      舞袖拂秋月，歌筵闻早鸿。
+      送君日千里，良会何由同。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["送君日千里，良会何由同。"]
+    tags: ["送别", "赞美", "爱国", "述志", "古诗词"]
+
+  - id: poem_exp_610
+    title: 江上寄元六林宗
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      霜落江始寒，枫叶绿未脱。
+      客行悲清秋，永路苦不达。
+      沧波眇川汜，白日隐天末。
+      停棹依林峦，惊猿相叫聒。
+      夜分河汉转，起视溟涨阔。
+      凉风何萧萧，流水鸣活活。
+      浦沙净如洗，海月明可掇。
+      兰交空怀思，琼树讵解渴。
+      勖哉沧洲心，岁晚庶不夺。
+      幽赏颇自得，兴远与谁豁。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["幽赏颇自得，兴远与谁豁。"]
+    tags: ["写景", "秋天", "抒怀", "人生", "怀才不遇", "古诗词"]
+
+  - id: poem_exp_611
+    title: 宴陶家亭子
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      曲巷幽人宅，高门大士家。
+      池开照胆镜，林吐破颜花。
+      绿水藏春日，青轩秘晚霞。
+      若闻弦管妙，金谷不能夸。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["若闻弦管妙，金谷不能夸。"]
+    tags: ["写景", "叙事", "古诗词"]
+
+  - id: poem_exp_612
+    title: 白鼻騧
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      银鞍白鼻騧，绿地障泥锦。
+      细雨春风花落时，挥鞭直就胡姬饮。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["细雨春风花落时，挥鞭直就胡姬饮。"]
+    tags: ["写景", "抒情", "豪迈", "古诗词"]
+
+  - id: poem_exp_613
+    title: 永王东巡歌·其六
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      丹阳北固是吴关，画出楼台云水间。
+      千岩烽火连沧海，两岸旌旗绕碧山。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["千岩烽火连沧海，两岸旌旗绕碧山。"]
+    tags: ["边塞", "战争", "古诗词"]
+
+  - id: poem_exp_614
+    title: 送族弟绾从军安西
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      汉家兵马乘北风，鼓行而西破犬戎。
+      尔随汉将出门去，剪虏若草收奇功。
+      君王按剑望边色，旄头已落胡天空。
+      匈奴系颈数应尽，明年应入蒲萄宫。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["匈奴系颈数应尽，明年应入蒲萄宫。"]
+    tags: ["送别", "抒情", "爱国", "志向", "古诗词"]
+
+  - id: poem_exp_615
+    title: 秋浦寄内
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      我今寻阳去，辞家千里馀。
+      结荷倦水宿，却寄大雷书。
+      虽不同辛苦，怆离各自居。
+      我自入秋浦，三年北信疏。
+      红颜愁落尽，白发不能除。
+      有客自梁苑，手携五色鱼。
+      开鱼得锦字，归问我何如。
+      江山虽道阻，意合不为殊。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["江山虽道阻，意合不为殊。"]
+    tags: ["思乡", "抒情", "怀人", "愁苦", "古诗词"]
+
+  - id: poem_exp_616
+    title: 春日归山寄孟浩然
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      朱绂遗尘境，青山谒梵筵。
+      金绳开觉路，宝筏度迷川。
+      岭树攒飞栱，岩花覆谷泉。
+      塔形标海月，楼势出江烟。
+      香气三天下，钟声万壑连。
+      荷秋珠已满，松密盖初圆。
+      鸟聚疑闻法，龙参若护禅。
+      愧非流水韵，叨入伯牙弦。
+    annotations: []
+    translation: >-
+      朝服绶带遗弃在尘世之境，赶赴青山拜谒佛教道场。 黄金为绳显示觉悟之路，乘上宝筏渡过惑人迷川。 岭上高树拢聚构成飞栱一般，岩上红花盛开掩盖山谷的泉水。 佛塔高耸是海上日出的标志，佛楼雄伟依傍大江烟云缭绕。 佛烟香气传遍欲界色界无色界，佛钟敲响声连万壑千川。 手中念珠如秋日莲子成熟满把满串，繁茂的松树团团圆圆如月。 鸟儿相聚疑是为听法而来，龙王亦来参加原为护法而来。 惭愧我无洋洋兮若江河般的流水声韵，可以混为伯牙的琴上之声。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["愧非流水韵，叨入伯牙弦。"]
+    tags: ["写景", "春天", "赞美", "友人", "古诗词"]
+
+  - id: poem_exp_617
+    title: 菩萨蛮·平林漠漠烟如织
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      平林漠漠烟如织，寒山一带伤心碧。
+      暝色入高楼，有人楼上愁。
+      玉阶空伫立，宿鸟归飞急。
+      何处是归程？
+      长亭连短亭。
+    annotations:
+      - {word: "平林", meaning: "平原上的林木"}
+      - {word: "漠漠", meaning: "迷蒙貌"}
+      - {word: "烟如织", meaning: "暮烟浓密"}
+      - {word: "伤心", meaning: "极甚之辞"}
+      - {word: "暝色", meaning: "夜色"}
+    translation: >-
+      远处舒展的树林烟雾漾潆，好像纺织物一般，秋寒的山色宛如衣带，触目伤心的碧绿。暮色进了高高的闺楼，有人正在楼上独自忧愁。 玉石的台阶上，徒然侍立盼望。那回巢的鸟儿，在归心催促下急急飞翔。哪里是我返回的路程？过了长亭接着短亭。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["长亭连短亭。"]
+    tags: ["写景", "宋词三百首", "豪放", "秋天", "怀人", "古诗词"]
+
+  - id: poem_exp_618
+    title: 峨眉山月歌
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      峨眉山月半轮秋，影入平羌江水流。
+      夜发清溪向三峡，思君不见下渝州。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["夜发清溪向三峡，思君不见下渝州。"]
+    tags: ["写景", "初中古诗", "秋天", "游历", "地名", "古诗词"]
+
+  - id: poem_exp_619
+    title: 咏槿
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      园花笑芳年，池草艳春色。
+      犹不如槿花，婵娟玉阶侧。
+      芬荣何夭促，零落在瞬息。
+      岂若琼树枝，终岁长翕赩。
+    annotations: []
+    translation: >-
+      园花笑在美好的年岁，春光里池草更觉鲜艳。 还不如篱边的木槿花，在玉阶旁姿态如婵娟。 花香草茂生命太短促，花草凋落只在霎那间。 哪里像美丽的玉树枝，一年到头都光彩灿烂。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["岂若琼树枝，终岁长翕赩。"]
+    tags: ["咏物", "写花", "赞美", "古诗词"]
+
+  - id: poem_exp_620
+    title: 夜下征虏亭
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      船下广陵去，月明征虏亭。
+      山花如绣颊，江火似流萤。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["山花如绣颊，江火似流萤。"]
+    tags: ["写景", "古诗词"]
+
+  - id: poem_exp_621
+    title: 白田马上闻莺
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      黄鹂啄紫椹，五月鸣桑枝。
+      我行不记日，误作阳春时。
+      蚕老客未归，白田已缫丝。
+      驱马又前去，扪心空自悲。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["驱马又前去，扪心空自悲。"]
+    tags: ["写景", "夏天", "怀才不遇", "羁旅", "古诗词"]
+
+  - id: poem_exp_622
+    title: 宣城青溪
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      青溪胜桐庐，水木有佳色。
+      山貌日高古，石容天倾侧。
+      彩鸟昔未名，白猿初相识。
+      不见同怀人，对之空叹息。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["不见同怀人，对之空叹息。"]
+    tags: ["写景", "自然", "喜爱", "古诗词"]
+
+  - id: poem_exp_623
+    title: 大堤曲
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      汉水临襄阳，花开大堤暖。
+      佳期大堤下，泪向南云满。
+      春风无复情，吹我梦魂散。
+      不见眼中人，天长音信断。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["不见眼中人，天长音信断。"]
+    tags: ["思乡", "乐府", "触景伤情", "古诗词"]
+
+  - id: poem_exp_624
+    title: 别东林寺僧
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      东林送客处，月出白猿啼。
+      笑别庐山远，何烦过虎溪。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["笑别庐山远，何烦过虎溪。"]
+    tags: ["送别", "古诗词"]
+
+  - id: poem_exp_625
+    title: 宫中行乐词八首·其二
+    author: 李白
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      柳色黄金嫩，梨花白雪香。
+      玉楼巢翡翠，金殿锁鸳鸯。
+      选妓随雕辇，征歌出洞房。
+      宫中谁第一，飞燕在昭阳。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["宫中谁第一，飞燕在昭阳。"]
+    tags: ["写景", "同情", "宫廷", "生活", "古诗词"]
+
+  - id: poem_exp_626
+    title: 南浦别
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      南浦凄凄别，西风袅袅秋。
+      一看肠一断，好去莫回头。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["一看肠一断，好去莫回头。"]
+    tags: ["写景", "送别", "惜别", "古诗词"]
+
+  - id: poem_exp_627
+    title: 放言五首·其三
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      赠君一法决狐疑，不用钻龟与祝蓍。
+      试玉要烧三日满，辨材须待七年期。
+      周公恐惧流言日，王莽谦恭未篡时。
+      向使当初身便死，一生真伪复谁知？
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["向使当初身便死，一生真伪复谁知？"]
+    tags: ["哲理", "古诗词"]
+
+  - id: poem_exp_628
+    title: 南湖早春
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      风回云断雨初晴，返照湖边暖复明。
+      乱点碎红山杏发，平铺新绿水蘋生。
+      翅低白雁飞仍重，舌涩黄鹂语未成。
+      不道江南春不好，年年衰病减心情。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["不道江南春不好，年年衰病减心情。"]
+    tags: ["写景", "春天", "写水", "抒情", "古诗词"]
+
+  - id: poem_exp_629
+    title: 遗爱寺
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      弄石临溪坐，寻花绕寺行。
+      时时闻鸟语，处处是泉声。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["时时闻鸟语，处处是泉声。"]
+    tags: ["写景", "抒情", "早教古诗100首", "古诗词"]
+
+  - id: poem_exp_630
+    title: 阴雨
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      岚雾今朝重，江山此地深。
+      滩声秋更急，峡气晓多阴。
+      望阙云遮眼，思乡雨滴心。
+      将何慰幽独，赖此北窗琴。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["将何慰幽独，赖此北窗琴。"]
+    tags: ["思乡", "古诗词"]
+
+  - id: poem_exp_631
+    title: 放言五首·其五
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      泰山不要欺毫末，颜子无心羡老彭。
+      松树千年终是朽，槿花一日自为荣。
+      何须恋世常忧死，亦莫嫌身漫厌生。
+      生去死来都是幻，幻人哀乐系何情。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["生去死来都是幻，幻人哀乐系何情。"]
+    tags: ["哲理", "古诗词"]
+
+  - id: poem_exp_632
+    title: 放言五首·其四
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      谁家宅第成还破，何处亲宾哭复歌？
+      昨日屋头堪炙手，今朝门外好张罗。
+      北邙未省留闲地，东海何曾有顶波。
+      莫笑贱贫夸富贵，共成枯骨两何如？
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["莫笑贱贫夸富贵，共成枯骨两何如？"]
+    tags: ["哲理", "古诗词"]
+
+  - id: poem_exp_633
+    title: 琴茶
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      兀兀寄形群动内，陶陶任性一生间。
+      自抛官后春多梦，不读书来老更闲。
+      琴里知闻唯渌水，茶中故旧是蒙山。
+      穷通行止常相伴，难道吾今无往还？
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["穷通行止常相伴，难道吾今无往还？"]
+    tags: ["爱国", "生活", "古诗词"]
+
+  - id: poem_exp_634
+    title: 浪淘沙·白浪茫茫与海连
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      白浪茫茫与海连，平沙浩浩四无边。
+      暮去朝来淘不住，遂令东海变桑田。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["暮去朝来淘不住，遂令东海变桑田。"]
+    tags: ["写景", "抒情", "古诗词"]
+
+  - id: poem_exp_635
+    title: 湖亭望水
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      久雨南湖涨，新晴北客过。
+      日沉红有影，风定绿无波。
+      岸没闾阎少，滩平船舫多。
+      可怜心赏处，其奈独游何。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["可怜心赏处，其奈独游何。"]
+    tags: ["写景", "遗憾", "感叹", "古诗词"]
+
+  - id: poem_exp_636
+    title: 京兆府栽莲
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      污沟贮浊水，水上叶田田。
+      我来一长叹，知是东溪莲。
+      下有青污泥，馨香无复全。
+      上有红尘扑，颜色不得鲜。
+      物性犹如此，人事亦宜然。
+      托根非其所，不如遭弃捐。
+      昔在溪中日，花叶媚清涟。
+      今年不得地，憔悴府门前。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["今年不得地，憔悴府门前。"]
+    tags: ["咏物", "荷花", "感伤", "命运", "古诗词"]
+
+  - id: poem_exp_637
+    title: 庾楼晓望
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      独凭朱槛立凌晨，山色初明水色新。
+      竹雾晓笼衔岭月，频风暖送过江春。
+      子城阴处犹残雪，衙鼓声前未有尘。
+      三百年来庾楼上，曾经多少望乡人。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["三百年来庾楼上，曾经多少望乡人。"]
+    tags: ["写景", "登高", "思乡", "古诗词"]
+
+  - id: poem_exp_638
+    title: 邯郸冬至夜思家
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      邯郸驿里逢冬至，抱膝灯前影伴身。
+      想得家中夜深坐，还应说着远行人。
+    annotations: []
+    translation: >-
+      我居住在邯郸客栈的时候正好是冬至佳节。晚上，我抱着双膝坐在灯前，只有影子与我相伴。 我相信，家中的亲人今天会相聚到深夜，还应该谈论着我这个远行人。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["想得家中夜深坐，还应说着远行人。"]
+    tags: ["思乡", "冬天", "地名", "冬至", "古诗词"]
+
+  - id: poem_exp_639
+    title: 白云泉
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      天平山上白云泉，云自无心水自闲。
+      何必奔冲山下去，更添波浪向人间。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["何必奔冲山下去，更添波浪向人间。"]
+    tags: ["写景", "山水", "寓志", "古诗词"]
+
+  - id: poem_exp_640
+    title: 早兴
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      晨光出照屋梁明，初打开门鼓一声。
+      犬上阶眠知地湿，鸟临窗语报天晴。
+      半销宿酒头仍重，新脱冬衣体乍轻。
+      睡觉心空思想尽，近来乡梦不多成。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["睡觉心空思想尽，近来乡梦不多成。"]
+    tags: ["写景", "春天", "生活", "愉悦", "写狗古诗18首", "古诗词"]
+
+  - id: poem_exp_641
+    title: 别州民
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      耆老遮归路，壶浆满别筵。
+      甘棠无一树，那得泪潸然。
+      税重多贫户，农饥足旱田。
+      唯留一湖水，与汝救凶年。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["唯留一湖水，与汝救凶年。"]
+    tags: ["送别", "农民", "古诗词"]
+
+  - id: poem_exp_642
+    title: 放言五首·其二
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      世途倚伏都无定，尘网牵缠卒未休。
+      祸福回还车轮毂，荣枯反覆手藏钩。
+      龟灵未免刳肠患，马失应无折足忧。
+      不信请看弈棋者，输赢须待局终头。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["不信请看弈棋者，输赢须待局终头。"]
+    tags: ["哲理", "古诗词"]
+
+  - id: poem_exp_643
+    title: 欲与元八卜邻先有是赠
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      平生心迹最相亲，欲隐墙东不为身。
+      明月好同三径夜，绿杨宜作两家春。
+      每因暂出犹思伴，岂得安居不择邻。
+      可独终身数相见，子孙长作隔墙人。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["可独终身数相见，子孙长作隔墙人。"]
+    tags: ["写景", "想象", "友人", "古诗词"]
+
+  - id: poem_exp_644
+    title: 晚秋夜
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      碧空溶溶月华静，月里愁人吊孤影。
+      花开残菊傍疏篱，叶下衰桐落寒井。
+      塞鸿飞急觉秋尽，邻鸡鸣迟知夜永。
+      凝情不语空所思，风吹白露衣裳冷。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["凝情不语空所思，风吹白露衣裳冷。"]
+    tags: ["写景", "古诗词"]
+
+  - id: poem_exp_645
+    title: 塞下曲·其六
+    author: 戎昱
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      北风凋白草，胡马日骎骎。
+      夜后戍楼月，秋来边将心。
+      铁衣霜露重，战马岁年深。
+      自有卢龙塞，烟尘飞至今。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["自有卢龙塞，烟尘飞至今。"]
+    tags: ["边塞", "将士", "渴望", "和平", "古诗词"]
+
+  - id: poem_exp_646
+    title: 忆江南词三首
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      江南好，风景旧曾谙。
+      日出江花红胜火，春来江水绿如蓝。
+      能不忆江南？
+      江南忆，最忆是杭州。
+      山寺月中寻桂子，郡亭枕上看潮头。
+      何日更重游！
+      江南忆，其次忆吴宫。
+      吴酒一杯春竹叶，吴娃双舞醉芙蓉。
+      早晚复相逢！
+    annotations: []
+    translation: >-
+      江南的风景多么美好，如画的风景久已熟悉。春天到来时，太阳从江面升起，把江边的鲜花照得比火红，碧绿的江水绿得胜过蓝草。怎能叫人不怀念江南？ 江南的回忆，最能唤起追思的是像天堂一样的杭州：游玩灵隐寺寻找皎洁月亮中的桂子，登上郡亭，枕卧其上，欣赏那起落的钱塘江大潮。什么时候能够再次去游玩？ 江南的回忆，再来就是回忆苏州的吴宫，喝一喝吴宫的美酒春竹叶，看一看吴宫的歌女双双起舞像朵朵迷人的芙蓉。不知何时会再次相逢。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["早晚复相逢！"]
+    tags: ["写景", "乐府", "地名", "春天", "古诗词"]
+
+  - id: poem_exp_647
+    title: 送客归京
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      水陆四千里，何时归到秦？
+      舟辞三峡雨，马入九衢尘。
+      有酒留行客，无书寄贵人。
+      唯凭远传语，好在曲江春。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["唯凭远传语，好在曲江春。"]
+    tags: ["送别", "友人", "古诗词"]
+
+  - id: poem_exp_648
+    title: 寒闺怨
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      寒月沉沉洞房静，真珠帘外梧桐影。
+      秋霜欲下手先知，灯底裁缝剪刀冷。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["秋霜欲下手先知，灯底裁缝剪刀冷。"]
+    tags: ["写景", "抒情", "闺怨", "古诗词"]
+
+  - id: poem_exp_649
+    title: 魏王堤
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      花寒懒发鸟慵啼，信马闲行到日西。
+      何处未春先有思，柳条无力魏王堤。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["何处未春先有思，柳条无力魏王堤。"]
+    tags: ["写景", "春天", "古诗词"]
+
+  - id: poem_exp_650
+    title: 除夜寄弟妹
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      感时思弟妹，不寐百忧生。
+      万里经年别，孤灯此夜情。
+      病容非旧日，归思逼新正。
+      早晚重欢会，羁离各长成。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["早晚重欢会，羁离各长成。"]
+    tags: ["节日", "思念", "亲人", "古诗词"]
