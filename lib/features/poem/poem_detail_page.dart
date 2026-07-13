@@ -39,6 +39,9 @@ class PoemDetailPage extends ConsumerStatefulWidget {
 class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   bool _isSpeaking = false;
 
+  /// 当前正在朗读的行索引，-1 表示未朗读。
+  int _currentLineIndex = -1;
+
   @override
   void dispose() {
     // 退出页面时停止朗读
@@ -46,15 +49,44 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     super.dispose();
   }
 
+  /// 将诗词内容按换行拆分成行（去空行）。
+  List<String> _splitLines(String content) {
+    return content
+        .split('\n')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
   Future<void> _toggleTts(Poem poem) async {
     final tts = ref.read(_ttsServiceProvider);
     if (_isSpeaking) {
       await tts.stop();
-      setState(() => _isSpeaking = false);
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+          _currentLineIndex = -1;
+        });
+      }
     } else {
+      final lines = _splitLines(poem.content);
       setState(() => _isSpeaking = true);
-      await tts.speak(poem.content);
-      if (mounted) setState(() => _isSpeaking = false);
+      await tts.speakLines(
+        lines,
+        onLineStart: (index) {
+          if (mounted) {
+            setState(() => _currentLineIndex = index);
+          }
+        },
+        onComplete: () {
+          if (mounted) {
+            setState(() {
+              _isSpeaking = false;
+              _currentLineIndex = -1;
+            });
+          }
+        },
+      );
     }
   }
 
@@ -145,18 +177,11 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
             ),
             const SizedBox(height: SpacingTokens.lg),
 
-            // 正文
+            // 正文（逐行显示，朗读时当前行高亮）
             _buildSection(
               context,
               child: Center(
-                child: Text(
-                  poem.content,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    height: 2,
-                    letterSpacing: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                child: _buildContentLines(poem, theme),
               ),
             ),
 
@@ -233,6 +258,44 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           ),
         ),
       ),
+    );
+  }
+
+  /// 逐行构建诗词正文，朗读时高亮当前行。
+  Widget _buildContentLines(Poem poem, ThemeData theme) {
+    final lines = _splitLines(poem.content);
+    final baseStyle = theme.textTheme.bodyLarge?.copyWith(
+      height: 2,
+      letterSpacing: 1.5,
+    );
+
+    return Column(
+      children: List.generate(lines.length, (i) {
+        final isActive = _isSpeaking && i == _currentLineIndex;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.sm,
+            vertical: 2,
+          ),
+          decoration: BoxDecoration(
+            color: isActive
+                ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+          ),
+          child: Text(
+            lines[i],
+            style: isActive
+                ? baseStyle?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  )
+                : baseStyle,
+            textAlign: TextAlign.center,
+          ),
+        );
+      }),
     );
   }
 

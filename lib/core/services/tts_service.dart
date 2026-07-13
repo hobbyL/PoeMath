@@ -85,6 +85,30 @@ class TtsService {
     onComplete?.call();
   }
 
+  /// 逐行朗读：调用方提供已拆分的行列表，确保索引与视觉行一一对应。
+  ///
+  /// [onLineStart] 回调：传入当前朗读的行索引。
+  /// [onComplete] 在全部朗读完毕时调用。
+  Future<void> speakLines(
+    List<String> lines, {
+    void Function(int index)? onLineStart,
+    void Function()? onComplete,
+  }) async {
+    await _ensureInitialized();
+    await _tts.setSpeechRate(_settings.ttsSpeed);
+
+    for (var i = 0; i < lines.length; i++) {
+      if (!_isSpeaking && i > 0) break; // 被 stop() 中断
+      onLineStart?.call(i);
+      _isSpeaking = true;
+      await _tts.speak(lines[i]);
+      await _tts.awaitSpeakCompletion(true);
+    }
+
+    _isSpeaking = false;
+    onComplete?.call();
+  }
+
   /// 停止朗读。
   Future<void> stop() async {
     _isSpeaking = false;
