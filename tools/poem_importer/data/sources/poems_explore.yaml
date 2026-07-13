@@ -14398,3 +14398,115 @@ poems:
     background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
     famous_lines: ["早晚重欢会，羁离各长成。"]
     tags: ["节日", "思念", "亲人", "古诗词"]
+
+  - id: poem_exp_651
+    title: 村夜
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      霜草苍苍虫切切，村南村北行人绝。
+      独出门前望野田，月明荞麦花如雪。
+    annotations:
+      - {word: "霜草", meaning: "被秋霜打过的草"}
+      - {word: "苍苍", meaning: "灰白色"}
+      - {word: "切切", meaning: "虫叫声"}
+      - {word: "绝", meaning: "绝迹"}
+      - {word: "独", meaning: "单独，一个人"}
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["独出门前望野田，月明荞麦花如雪。"]
+    tags: ["写景", "乡村", "古诗词"]
+
+  - id: poem_exp_652
+    title: 杨柳枝词
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      一树春风千万枝，嫩于金色软于丝。
+      永丰西角荒园里，尽日无人属阿谁？
+    annotations: []
+    translation: >-
+      春风吹拂柳枝随风起舞，绽出嫩芽一片嫩黄比丝柔软。 永丰坊西角的荒园里，整日都没有人，这柳枝属于谁？
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["永丰西角荒园里，尽日无人属阿谁？"]
+    tags: ["咏物", "乐府", "柳树", "古诗词"]
+
+  - id: poem_exp_653
+    title: 代迎春花招刘郎中
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 2
+    content: |
+      幸与松筠相近栽，不随桃李一时开。
+      杏园岂敢妨君去，未有花时且看来。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["杏园岂敢妨君去，未有花时且看来。"]
+    tags: ["咏物", "写花", "喻人", "古诗词"]
+
+  - id: poem_exp_654
+    title: 江楼晚眺景物鲜奇吟玩成篇寄水部张员外
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 3
+    content: |
+      澹烟疏雨间斜阳，江色鲜明海气凉。
+      蜃散云收破楼阁，虹残水照断桥粱。
+      风翻白浪花千片，雁点青天字一行。
+      好著丹青图画取，题诗寄与水曹郎。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["好著丹青图画取，题诗寄与水曹郎。"]
+    tags: ["写景", "友情", "思念", "古诗词"]
+
+  - id: poem_exp_655
+    title: 杏园中枣树
+    author: 白居易
+    dynasty: 唐
+    layer: explore
+    is_required: false
+    difficulty: 4
+    content: |
+      人言百果中，唯枣凡且鄙。
+      皮皴似龟手，叶小如鼠耳。
+      胡为不自知，生花此园里。
+      岂宜遇攀玩，幸免遭伤毁。
+      二月曲江头，杂英红旖旎。
+      枣亦在其间，如嫫对西子。
+      东风不择木，吹喣长未已。
+      眼看欲合抱，得尽生生理。
+      寄言游春客，乞君一回视。
+      君爱绕指柔，从君怜柳杞。
+      君求悦目艳，不敢争桃李。
+      君若作大车，轮轴材须此。
+    annotations: []
+    translation: >-
+      暂无译文，后续可继续补充。
+    appreciation: >-
+      入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
+    famous_lines: ["君若作大车，轮轴材须此。"]
+    tags: ["哲理", "古诗词"]

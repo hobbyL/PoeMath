@@ -18102,5 +18102,158 @@
       "古诗词"
     ],
     "difficulty": 3
+  },
+  {
+    "id": "poem_exp_651",
+    "title": "村夜",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "霜草苍苍虫切切，村南村北行人绝。\n独出门前望野田，月明荞麦花如雪。",
+    "pinyin": "shuāng cǎo cāng cāng chóng qiē qiē ， cūn nán cūn běi xíng rén jué 。\ndú chū mén qián wàng yě tián ， yuè míng qiáo mài huā rú xuě 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [
+      {
+        "word": "霜草",
+        "meaning": "被秋霜打过的草"
+      },
+      {
+        "word": "苍苍",
+        "meaning": "灰白色"
+      },
+      {
+        "word": "切切",
+        "meaning": "虫叫声"
+      },
+      {
+        "word": "绝",
+        "meaning": "绝迹"
+      },
+      {
+        "word": "独",
+        "meaning": "单独，一个人"
+      }
+    ],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "独出门前望野田，月明荞麦花如雪。"
+    ],
+    "tags": [
+      "写景",
+      "乡村",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_652",
+    "title": "杨柳枝词",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "一树春风千万枝，嫩于金色软于丝。\n永丰西角荒园里，尽日无人属阿谁？",
+    "pinyin": "yī shù chūn fēng qiān wàn zhī ， nèn yú jīn sè ruǎn yú sī 。\nyǒng fēng xī jiǎo huāng yuán lǐ ， jìn rì wú rén shǔ ā shuí ？",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "春风吹拂柳枝随风起舞，绽出嫩芽一片嫩黄比丝柔软。 永丰坊西角的荒园里，整日都没有人，这柳枝属于谁？",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "永丰西角荒园里，尽日无人属阿谁？"
+    ],
+    "tags": [
+      "咏物",
+      "乐府",
+      "柳树",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_653",
+    "title": "代迎春花招刘郎中",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "幸与松筠相近栽，不随桃李一时开。\n杏园岂敢妨君去，未有花时且看来。",
+    "pinyin": "xìng yǔ sōng yún xiāng jìn zāi ， bù suí táo lǐ yī shí kāi 。\nxìng yuán qǐ gǎn fáng jūn qù ， wèi yǒu huā shí qiě kàn lái 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "杏园岂敢妨君去，未有花时且看来。"
+    ],
+    "tags": [
+      "咏物",
+      "写花",
+      "喻人",
+      "古诗词"
+    ],
+    "difficulty": 2
+  },
+  {
+    "id": "poem_exp_654",
+    "title": "江楼晚眺景物鲜奇吟玩成篇寄水部张员外",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "澹烟疏雨间斜阳，江色鲜明海气凉。\n蜃散云收破楼阁，虹残水照断桥粱。\n风翻白浪花千片，雁点青天字一行。\n好著丹青图画取，题诗寄与水曹郎。",
+    "pinyin": "dàn yān shū yǔ jiān xié yáng ， jiāng sè xiān míng hǎi qì liáng 。\nshèn sàn yún shōu pò lóu gé ， hóng cán shuǐ zhào duàn qiáo liáng 。\nfēng fān bái làng huā qiān piàn ， yàn diǎn qīng tiān zì yī xíng 。\nhǎo zhuó dān qīng tú huà qǔ ， tí shī jì yǔ shuǐ cáo láng 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "好著丹青图画取，题诗寄与水曹郎。"
+    ],
+    "tags": [
+      "写景",
+      "友情",
+      "思念",
+      "古诗词"
+    ],
+    "difficulty": 3
+  },
+  {
+    "id": "poem_exp_655",
+    "title": "杏园中枣树",
+    "author": "白居易",
+    "dynasty": "唐",
+    "content": "人言百果中，唯枣凡且鄙。\n皮皴似龟手，叶小如鼠耳。\n胡为不自知，生花此园里。\n岂宜遇攀玩，幸免遭伤毁。\n二月曲江头，杂英红旖旎。\n枣亦在其间，如嫫对西子。\n东风不择木，吹喣长未已。\n眼看欲合抱，得尽生生理。\n寄言游春客，乞君一回视。\n君爱绕指柔，从君怜柳杞。\n君求悦目艳，不敢争桃李。\n君若作大车，轮轴材须此。",
+    "pinyin": "rén yán bǎi guǒ zhōng ， wéi zǎo fán qiě bǐ 。\npí cūn sì guī shǒu ， yè xiǎo rú shǔ ěr 。\nhú wèi bù zì zhī ， shēng huā cǐ yuán lǐ 。\nqǐ yí yù pān wán ， xìng miǎn zāo shāng huǐ 。\nèr yuè qǔ jiāng tóu ， zá yīng hóng yǐ nǐ 。\nzǎo yì zài qí jiān ， rú mó duì xī zǐ 。\ndōng fēng bù zé mù ， chuī xǔ cháng wèi yǐ 。\nyǎn kàn yù hé bào ， dé jìn shēng shēng lǐ 。\njì yán yóu chūn kè ， qǐ jūn yī huí shì 。\njūn ài rào zhǐ róu ， cóng jūn lián liǔ qǐ 。\njūn qiú yuè mù yàn ， bù gǎn zhēng táo lǐ 。\njūn ruò zuò dà chē ， lún zhóu cái xū cǐ 。",
+    "layer": "explore",
+    "grade": null,
+    "semester": null,
+    "textbook_unit": null,
+    "is_required": false,
+    "annotations": [],
+    "translation": "暂无译文，后续可继续补充。",
+    "appreciation": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "background": "入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。",
+    "famous_lines": [
+      "君若作大车，轮轴材须此。"
+    ],
+    "tags": [
+      "哲理",
+      "古诗词"
+    ],
+    "difficulty": 4
   }
 ]
