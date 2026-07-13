@@ -18,6 +18,7 @@ import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/profile/daily_goal_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -143,7 +144,7 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: SpacingTokens.md),
 
             // 每日目标设置
-            _buildDailyGoalSettings(context, ref, settingsRepo),
+            _buildDailyGoalSettings(context, ref),
             const SizedBox(height: SpacingTokens.md),
 
             // 数据备份
@@ -389,13 +390,13 @@ class SettingsPage extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
+        var speed = settingsRepo.ttsSpeed as double;
         return ConstrainedBox(
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
           ),
           child: StatefulBuilder(
           builder: (context, setState) {
-            var speed = settingsRepo.ttsSpeed as double;
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -459,153 +460,20 @@ class SettingsPage extends ConsumerWidget {
   Widget _buildDailyGoalSettings(
     BuildContext context,
     WidgetRef ref,
-    dynamic settingsRepo,
   ) {
-    final theme = Theme.of(context);
     final poemGoal = ref.watch(dailyPoemGoalProvider);
     final mathGoal = ref.watch(dailyMathGoalProvider);
 
-    return Column(
-      children: [
-        AppTile(
-          icon: Icons.flag_outlined,
-          iconColor: ColorTokens.poemGold,
-          title: '每日诗词目标',
-          subtitle: '$poemGoal 首',
-          onTap: () => _showGoalPicker(
-            context,
-            ref,
-            title: '每日诗词背诵目标',
-            current: poemGoal,
-            min: 1,
-            max: 10,
-            unit: '首',
-            onSave: (v) async {
-              await settingsRepo.setDailyPoemGoal(v);
-              ref.invalidate(settingsRepositoryProvider);
-              ref.invalidate(dailyPoemGoalProvider);
-            },
-          ),
-        ),
-        const SizedBox(height: SpacingTokens.sm),
-        AppTile(
-          icon: Icons.flag_outlined,
-          iconColor: theme.colorScheme.secondary,
-          title: '每日口算目标',
-          subtitle: '$mathGoal 题',
-          onTap: () => _showGoalPicker(
-            context,
-            ref,
-            title: '每日口算做题目标',
-            current: mathGoal,
-            min: 5,
-            max: 100,
-            step: 5,
-            unit: '题',
-            onSave: (v) async {
-              await settingsRepo.setDailyMathGoal(v);
-              ref.invalidate(settingsRepositoryProvider);
-              ref.invalidate(dailyMathGoalProvider);
-            },
-          ),
-        ),
-      ],
+    return AppTile(
+      icon: Icons.flag_outlined,
+      iconColor: ColorTokens.poemGold,
+      title: '每日目标',
+      subtitle: '诗词 $poemGoal 首 · 口算 $mathGoal 题',
+      onTap: () => Navigator.push<void>(
+        context,
+        MaterialPageRoute(builder: (_) => const DailyGoalPage()),
+      ),
     );
   }
 
-  void _showGoalPicker(
-    BuildContext context,
-    WidgetRef ref, {
-    required String title,
-    required int current,
-    required int min,
-    required int max,
-    int step = 1,
-    required String unit,
-    required Future<void> Function(int) onSave,
-  }) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
-          ),
-          child: StatefulBuilder(
-            builder: (context, setState) {
-              var value = current;
-              return SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(SpacingTokens.lg),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        style:
-                            Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                      ),
-                      const SizedBox(height: SpacingTokens.lg),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton.filled(
-                            onPressed: value > min
-                                ? () => setState(
-                                    () => value =
-                                        (value - step).clamp(min, max),
-                                  )
-                                : null,
-                            icon: const Icon(Icons.remove),
-                          ),
-                          const SizedBox(width: SpacingTokens.lg),
-                          Text(
-                            '$value',
-                            style: Theme.of(ctx)
-                                .textTheme
-                                .displaySmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(width: SpacingTokens.xs),
-                          Text(
-                            unit,
-                            style: Theme.of(ctx).textTheme.titleMedium,
-                          ),
-                          const SizedBox(width: SpacingTokens.lg),
-                          IconButton.filled(
-                            onPressed: value < max
-                                ? () => setState(
-                                    () => value =
-                                        (value + step).clamp(min, max),
-                                  )
-                                : null,
-                            icon: const Icon(Icons.add),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: SpacingTokens.lg),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: () async {
-                            await onSave(value);
-                            if (ctx.mounted) Navigator.pop(ctx);
-                          },
-                          child: const Text('确定'),
-                        ),
-                      ),
-                      const SizedBox(height: SpacingTokens.sm),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
 }
