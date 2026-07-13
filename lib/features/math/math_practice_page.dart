@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_checker.dart';
 import 'package:poemath/domain/level_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
@@ -102,6 +104,17 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       _judgement = judgement;
       _showSteps = false;
     });
+
+    // 音效和触觉反馈
+    final sound = ref.read(soundServiceProvider);
+    final haptic = ref.read(hapticServiceProvider);
+    if (judgement.isCorrect) {
+      sound.play(SoundEffect.correct);
+      haptic.medium();
+    } else {
+      sound.play(SoundEffect.wrong);
+      haptic.heavy();
+    }
 
     ref.read(mathAnsweredCountProvider.notifier).update((s) => s + 1);
     if (judgement.isCorrect) {

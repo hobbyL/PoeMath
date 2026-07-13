@@ -8,7 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/quiz/quiz_engine.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
@@ -95,12 +97,28 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     if (text.isEmpty || _answered) return;
     _session!.submitAnswer(text);
     setState(() => _answered = true);
+    _playAnswerFeedback();
   }
 
   void _submitChoiceAnswer(String choice) {
     if (_answered) return;
     _session!.submitAnswer(choice);
     setState(() => _answered = true);
+    _playAnswerFeedback();
+  }
+
+  /// 答题后播放音效和触觉反馈。
+  void _playAnswerFeedback() {
+    final isCorrect = _session!.isCurrentCorrect();
+    final sound = ref.read(soundServiceProvider);
+    final haptic = ref.read(hapticServiceProvider);
+    if (isCorrect) {
+      sound.play(SoundEffect.correct);
+      haptic.medium();
+    } else {
+      sound.play(SoundEffect.wrong);
+      haptic.heavy();
+    }
   }
 
   void _nextQuestion() {

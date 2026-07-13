@@ -9,9 +9,11 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -174,6 +176,8 @@ class HomePage extends ConsumerWidget {
               onPressed: () async {
                 final checkInRepo = ref.read(checkInRepoProvider);
                 await checkInRepo.checkInToday();
+                ref.read(soundServiceProvider).play(SoundEffect.checkIn);
+                ref.read(hapticServiceProvider).medium();
                 ref.invalidate(isCheckedInProvider);
                 ref.invalidate(streakProvider);
               },
