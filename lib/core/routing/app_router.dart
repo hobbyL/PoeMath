@@ -19,6 +19,7 @@ import 'package:poemath/features/poem/poem_detail_page.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/poem_tab_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
+import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 import 'package:poemath/features/shell/splash_page.dart';
 
@@ -87,6 +88,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id']!;
           return FormulaDetailPage(formulaId: id);
         },
+      ),
+      // ============ 设置（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.settings,
+        builder: (context, state) => const SettingsPage(),
       ),
     ],
   );

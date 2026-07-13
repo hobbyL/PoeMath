@@ -1,15 +1,15 @@
 // lib/features/profile/profile_page.dart
 //
 // 层级：features/profile
-// 职责：个人中心 — 主题切换 + 统计面板 + 成就展示。
+// 职责：个人中心 — 统计面板 + 成就展示 + 设置入口。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
-import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 
@@ -24,14 +24,22 @@ class ProfilePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final subject = ref.watch(activeSubjectProvider);
-    final mode = ref.watch(themeModeProvider);
     final stats = ref.watch(userStatsProvider);
     final streak = ref.watch(streakProvider);
     final unlockedCount = ref.watch(unlockedAchievementsCountProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('我的')),
+      appBar: AppBar(
+        title: const Text('我的'),
+        actions: <Widget>[
+          IconButton(
+            tooltip: '设置',
+            onPressed: () => context.push(AppRoutes.settings),
+            icon: const Icon(Icons.settings_rounded),
+          ),
+          const SizedBox(width: SpacingTokens.sm),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -93,50 +101,6 @@ class ProfilePage extends ConsumerWidget {
 
             // 成就展示
             _buildAchievementSection(context, unlockedCount),
-            const SizedBox(height: SpacingTokens.xl),
-
-            // 主题切换
-            Text('主题风格', style: theme.textTheme.titleLarge),
-            const SizedBox(height: SpacingTokens.sm),
-            SegmentedButton<AppSubject>(
-              segments: const <ButtonSegment<AppSubject>>[
-                ButtonSegment<AppSubject>(
-                  value: AppSubject.poem,
-                  label: Text('诗词 · 国风'),
-                  icon: Icon(Icons.brush_rounded),
-                ),
-                ButtonSegment<AppSubject>(
-                  value: AppSubject.math,
-                  label: Text('口算 · 童趣'),
-                  icon: Icon(Icons.emoji_emotions_rounded),
-                ),
-              ],
-              selected: <AppSubject>{subject},
-              onSelectionChanged: (Set<AppSubject> next) {
-                ref.read(activeSubjectProvider.notifier).state = next.first;
-              },
-            ),
-
-            const SizedBox(height: SpacingTokens.xl),
-
-            // 外观切换
-            Text('外观', style: theme.textTheme.titleLarge),
-            const SizedBox(height: SpacingTokens.sm),
-            SwitchListTile(
-              title: const Text('深色模式'),
-              subtitle: Text(_modeLabel(mode)),
-              value: mode == ThemeMode.dark,
-              onChanged: (bool on) {
-                ref.read(themeModeProvider.notifier).state =
-                    on ? ThemeMode.dark : ThemeMode.light;
-              },
-            ),
-            TextButton(
-              onPressed: () {
-                ref.read(themeModeProvider.notifier).state = ThemeMode.system;
-              },
-              child: const Text('跟随系统'),
-            ),
 
             // 版本号
             const SizedBox(height: SpacingTokens.xl),
@@ -323,16 +287,5 @@ class ProfilePage extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _modeLabel(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.light:
-        return '亮色';
-      case ThemeMode.dark:
-        return '深色';
-      case ThemeMode.system:
-        return '跟随系统';
-    }
   }
 }

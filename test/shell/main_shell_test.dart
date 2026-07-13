@@ -1,7 +1,7 @@
 // test/shell/main_shell_test.dart
 //
 // MainShell 5-Tab 点击测试：点击 tab 后应正确切换页面；
-// 主题由用户在"我的"页手动切换，tab 切换不改变主题。
+// 主题由用户在设置页手动切换，tab 切换不改变主题。
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -83,5 +83,25 @@ void main() {
     await tester.pump();
 
     expect(container.read(activeSubjectProvider), AppSubject.poem);
+  });
+
+  testWidgets('我的页设置按钮应打开设置页', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: App()));
+
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tester.tap(find.text('我的'));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('设置'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('设置'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('设置'), findsOneWidget);
+    expect(find.text('主题风格'), findsOneWidget);
+    expect(find.text('外观'), findsOneWidget);
   });
 }

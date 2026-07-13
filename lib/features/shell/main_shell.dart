@@ -3,7 +3,7 @@
 // 层级：features/shell
 // 职责：应用主体的 5-Tab Shell（首页 / 诗词 / 学习 / 口算 / 我的）。
 //       - 5 个 tab 中，第 3 个是中央凸起"学习"入口，其余 4 个用 NotchedBottomBar 展示。
-//       - 主题由用户在"我的"页面统一切换，不随 tab 自动变化。
+//       - 主题由用户在设置页面统一切换，不随 tab 自动变化。
 // 依赖：go_router / Riverpod / NotchedBottomBar / AppRoutes。
 
 import 'package:flutter/material.dart';
