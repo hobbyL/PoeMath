@@ -53,4 +53,16 @@ class MathSessionRepository {
     final total = totalProblems;
     return total > 0 ? totalCorrect / total : 0.0;
   }
+
+  /// 今日做题总数
+  int get todayProblems {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    return getAll()
+        .where(
+          (s) =>
+              s.finishedAt != null && s.finishedAt!.isAfter(todayStart),
+        )
+        .fold<int>(0, (sum, s) => sum + s.totalProblems);
+  }
 }

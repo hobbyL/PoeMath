@@ -45,6 +45,19 @@ class PoemProgressRepository {
         .length;
   }
 
+  /// 今日学习的诗词数（按 lastStudiedAt 日期判断）
+  int get todayStudiedCount {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    return getAll()
+        .where(
+          (p) =>
+              p.lastStudiedAt != null &&
+              p.lastStudiedAt!.isAfter(todayStart),
+        )
+        .length;
+  }
+
   /// 记录一次学习
   Future<PoemProgress> recordStudy(String poemId) async {
     var progress = get(poemId);

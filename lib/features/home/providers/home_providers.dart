@@ -8,6 +8,9 @@ import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
+import 'package:poemath/data/repositories/math_session_repository.dart';
+import 'package:poemath/data/repositories/poem_progress_repository.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 
 // ============ Repositories ============
@@ -50,6 +53,34 @@ final streakProvider = Provider<int>((ref) {
 final userStatsProvider = Provider<UserStats>((ref) {
   final repo = ref.watch(userStatsRepoProvider);
   return repo.get();
+});
+
+// ============ 今日活动统计 ============
+
+/// 今日诗词学习数
+final todayPoemCountProvider = Provider<int>((ref) {
+  final repo = PoemProgressRepository();
+  return repo.todayStudiedCount;
+});
+
+/// 今日口算做题数
+final todayMathCountProvider = Provider<int>((ref) {
+  final repo = MathSessionRepository();
+  return repo.todayProblems;
+});
+
+// ============ 每日目标 ============
+
+/// 每日诗词目标
+final dailyPoemGoalProvider = Provider<int>((ref) {
+  final settings = SettingsRepository();
+  return settings.dailyPoemGoal;
+});
+
+/// 每日口算目标
+final dailyMathGoalProvider = Provider<int>((ref) {
+  final settings = SettingsRepository();
+  return settings.dailyMathGoal;
 });
 
 // ============ 成就 ============
