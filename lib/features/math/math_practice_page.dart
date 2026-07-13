@@ -84,6 +84,18 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final userAnswer = _answerController.text.trim();
     if (userAnswer.isEmpty) return;
 
+    _processAnswer(problem, userAnswer);
+  }
+
+  /// 处理比大小模式的作答。
+  void _submitCompareAnswer(String symbol) {
+    final problem = ref.read(currentProblemProvider);
+    if (problem == null || _judgement != null) return;
+
+    _processAnswer(problem, symbol);
+  }
+
+  void _processAnswer(MathProblem problem, String userAnswer) {
     final judgement = MathEngine.judge(problem, userAnswer);
     setState(() {
       _judgement = judgement;
@@ -94,7 +106,6 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     if (judgement.isCorrect) {
       ref.read(mathCorrectCountProvider.notifier).update((s) => s + 1);
     } else {
-      // 记录错题
       _recordMistake(problem, userAnswer, judgement);
     }
   }
@@ -493,7 +504,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       );
     }
 
-    // 未作答，显示输入框
+    // 比大小模式：显示 > < = 三个按钮
+    final problem = ref.watch(currentProblemProvider);
+    if (problem?.mode == ProblemMode.compare) {
+      return _buildCompareButtons(context);
+    }
+
+    // 普通模式：显示输入框
     return Row(
       children: [
         Expanded(
@@ -532,6 +549,44 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
             child: const Text('确定'),
           ),
         ),
+      ],
+    );
+  }
+
+  /// 比大小模式的三个按钮：> < =
+  Widget _buildCompareButtons(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        for (final symbol in const ['<', '=', '>']) ...[
+          if (symbol != '<') const SizedBox(width: SpacingTokens.md),
+          Expanded(
+            child: SizedBox(
+              height: 64,
+              child: OutlinedButton(
+                onPressed: () => _submitCompareAnswer(symbol),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: theme.colorScheme.primary,
+                    width: 2,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(SpacingTokens.radiusMedium),
+                  ),
+                ),
+                child: Text(
+                  symbol,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
