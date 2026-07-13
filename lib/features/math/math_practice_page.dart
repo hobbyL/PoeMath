@@ -2,6 +2,7 @@
 //
 // 口算练习页：题目展示 → 用户输入 → 判定反馈 → 分步讲解。
 
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
@@ -31,6 +33,7 @@ class MathPracticePage extends ConsumerStatefulWidget {
 class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   final _answerController = TextEditingController();
   final _focusNode = FocusNode();
+  late final ConfettiController _confettiController;
 
   /// 当前判定结果（null = 尚未作答）
   AnswerJudgement? _judgement;
@@ -49,6 +52,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     super.initState();
     _startTime = DateTime.now();
     _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    _confettiController = ConfettiController(
+      duration: const Duration(milliseconds: 500),
+    );
 
     // 延迟到 build 之后初始化题目
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -77,6 +83,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   void dispose() {
     _answerController.dispose();
     _focusNode.dispose();
+    _confettiController.dispose();
     super.dispose();
   }
 
@@ -111,6 +118,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     if (judgement.isCorrect) {
       sound.play(SoundEffect.correct);
       haptic.medium();
+      _confettiController.play();
     } else {
       sound.play(SoundEffect.wrong);
       haptic.heavy();
@@ -300,10 +308,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(SpacingTokens.lg),
-        child: Column(
-          children: [
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(SpacingTokens.lg),
+            child: Column(
+              children: [
             // 进度条
             LinearProgressIndicator(
               value: (currentIndex + 1) / problems.length,
@@ -353,6 +363,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
             _buildAnswerInput(context),
           ],
         ),
+      ),
+      ConfettiOverlay(controller: _confettiController),
+        ],
       ),
     );
   }

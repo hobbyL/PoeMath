@@ -4,12 +4,14 @@
 
 import 'dart:math';
 
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/quiz/quiz_engine.dart';
@@ -34,10 +36,14 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   bool _answered = false;
   final _fillController = TextEditingController();
   final _fillFocusNode = FocusNode();
+  late final ConfettiController _confettiController;
 
   @override
   void initState() {
     super.initState();
+    _confettiController = ConfettiController(
+      duration: const Duration(milliseconds: 500),
+    );
     // 延迟初始化，等 ref 可用
     WidgetsBinding.instance.addPostFrameCallback((_) => _initQuiz());
   }
@@ -46,6 +52,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   void dispose() {
     _fillController.dispose();
     _fillFocusNode.dispose();
+    _confettiController.dispose();
     super.dispose();
   }
 
@@ -115,6 +122,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     if (isCorrect) {
       sound.play(SoundEffect.correct);
       haptic.medium();
+      _confettiController.play();
     } else {
       sound.play(SoundEffect.wrong);
       haptic.heavy();
@@ -180,9 +188,14 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       appBar: AppBar(
         title: Text('${widget.quizType.label} · ${poem.title}'),
       ),
-      body: session.isFinished
-          ? _buildResult(context, session)
-          : _buildQuestion(context, session, theme),
+      body: Stack(
+        children: [
+          session.isFinished
+              ? _buildResult(context, session)
+              : _buildQuestion(context, session, theme),
+          ConfettiOverlay(controller: _confettiController),
+        ],
+      ),
     );
   }
 
