@@ -17,13 +17,22 @@ class StudyHubPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final formulas = ref.watch(filteredFormulasProvider);
-    final categories = ref.watch(availableCategoriesProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final theme = Theme.of(context);
+
+    final filterLabel = selectedCategory ?? '全部';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('公式知识库'),
+        actions: [
+          TextButton.icon(
+            onPressed: () =>
+                _showCategoryPicker(context, ref, selectedCategory),
+            icon: const Icon(Icons.filter_list, size: 18),
+            label: Text(filterLabel),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -53,162 +62,165 @@ class StudyHubPage extends ConsumerWidget {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          // 分类筛选
-          if (categories.isNotEmpty) ...[
-            const SizedBox(height: SpacingTokens.sm),
-            SizedBox(
-              height: 40,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
+      body: formulas.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: SpacingTokens.xs),
-                    child: ChoiceChip(
-                      label: const Text('全部'),
-                      selected: selectedCategory == null,
-                      onSelected: (_) {
-                        ref.read(selectedCategoryProvider.notifier).state =
-                            null;
-                      },
+                  Icon(
+                    Icons.functions_rounded,
+                    size: 64,
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.3),
+                  ),
+                  const SizedBox(height: SpacingTokens.md),
+                  Text(
+                    '暂无公式',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  ...categories.map((cat) {
-                    return Padding(
-                      padding:
-                          const EdgeInsets.only(right: SpacingTokens.xs),
-                      child: ChoiceChip(
-                        label: Text(cat),
-                        selected: selectedCategory == cat,
-                        onSelected: (_) {
-                          ref.read(selectedCategoryProvider.notifier).state =
-                              selectedCategory == cat ? null : cat;
-                        },
-                      ),
-                    );
-                  }),
                 ],
               ),
-            ),
-            const SizedBox(height: SpacingTokens.xs),
-          ],
+            )
+          : ListView.builder(
+              itemCount: formulas.length,
+              padding: const EdgeInsets.only(
+                bottom: 100, // 为 NotchedBottomBar 预留空间
+              ),
+              itemBuilder: (context, index) {
+                final formula = formulas[index];
+                final isFav = ref.watch(
+                  isFormulaFavoriteProvider(formula.id),
+                );
 
-          // 公式列表
-          Expanded(
-            child: formulas.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.functions_rounded,
-                          size: 64,
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: SpacingTokens.md),
-                        Text(
-                          '暂无公式',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: formulas.length,
-                    padding: const EdgeInsets.only(
-                      bottom: 100, // 为 NotchedBottomBar 预留空间
-                    ),
-                    itemBuilder: (context, index) {
-                      final formula = formulas[index];
-                      final isFav = ref.watch(
-                        isFormulaFavoriteProvider(formula.id),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpacingTokens.md,
+                    vertical: SpacingTokens.xs,
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      context.push(
+                        AppRoutes.formulaDetailOf(formula.id),
                       );
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: SpacingTokens.md,
-                          vertical: SpacingTokens.xs,
+                    },
+                    borderRadius: BorderRadius.circular(
+                      SpacingTokens.radiusMedium,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.all(SpacingTokens.md),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary
+                            .withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(
+                          SpacingTokens.radiusMedium,
                         ),
-                        child: InkWell(
-                          onTap: () {
-                            context.push(
-                              AppRoutes.formulaDetailOf(formula.id),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(
-                            SpacingTokens.radiusMedium,
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(SpacingTokens.md),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary
-                                  .withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(
-                                SpacingTokens.radiusMedium,
-                              ),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: theme.colorScheme.primary
+                                .withValues(alpha: 0.15),
+                            child: Icon(
+                              Icons.functions,
+                              color: theme.colorScheme.primary,
                             ),
-                            child: Row(
+                          ),
+                          const SizedBox(width: SpacingTokens.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
                               children: [
-                                CircleAvatar(
-                                  backgroundColor: theme.colorScheme.primary
-                                      .withValues(alpha: 0.15),
-                                  child: Icon(
-                                    Icons.functions,
-                                    color: theme.colorScheme.primary,
+                                Text(
+                                  formula.name,
+                                  style: theme.textTheme.titleSmall
+                                      ?.copyWith(
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const SizedBox(width: SpacingTokens.md),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        formula.name,
-                                        style: theme.textTheme.titleSmall
-                                            ?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        formula.formulaText,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                          color: theme
-                                              .colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
+                                const SizedBox(height: 2),
+                                Text(
+                                  formula.formulaText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall
+                                      ?.copyWith(
+                                    color: theme
+                                        .colorScheme.onSurfaceVariant,
                                   ),
-                                ),
-                                Icon(
-                                  isFav
-                                      ? Icons.bookmark
-                                      : Icons.bookmark_border,
-                                  color: isFav
-                                      ? theme.colorScheme.secondary
-                                      : theme.colorScheme.onSurfaceVariant,
-                                  size: 20,
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      );
-                    },
+                          Icon(
+                            isFav
+                                ? Icons.bookmark
+                                : Icons.bookmark_border,
+                            color: isFav
+                                ? theme.colorScheme.secondary
+                                : theme.colorScheme.onSurfaceVariant,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
+                );
+              },
+            ),
+    );
+  }
+
+  void _showCategoryPicker(
+    BuildContext context,
+    WidgetRef ref,
+    String? current,
+  ) {
+    final categories = ref.read(availableCategoriesProvider);
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: SpacingTokens.md),
+              Text(
+                '选择分类',
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              RadioGroup<String?>(
+                groupValue: current,
+                onChanged: (v) {
+                  ref.read(selectedCategoryProvider.notifier).state = v;
+                  Navigator.pop(ctx);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const RadioListTile<String?>(
+                      title: Text('全部'),
+                      value: null,
+                    ),
+                    ...categories.map((cat) {
+                      return RadioListTile<String?>(
+                        title: Text(cat),
+                        value: cat,
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

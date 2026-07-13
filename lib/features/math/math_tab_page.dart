@@ -31,6 +31,14 @@ class MathTabPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('口算练习'),
         actions: [
+          TextButton.icon(
+            onPressed: () =>
+                _showSemesterPicker(context, ref, selectedSemester),
+            icon: const Icon(Icons.filter_list, size: 18),
+            label: Text(
+              _semesterLabels[selectedSemester] ?? selectedSemester,
+            ),
+          ),
           if (mistakeCount > 0)
             TextButton.icon(
               onPressed: () => context.push(AppRoutes.mathMistake),
@@ -81,28 +89,6 @@ class MathTabPage extends ConsumerWidget {
                 ],
               ),
             ),
-
-          // 学期筛选 Chips
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
-            child: Row(
-              children: _semesterLabels.entries.map((entry) {
-                final isSelected = selectedSemester == entry.key;
-                return Padding(
-                  padding: const EdgeInsets.only(right: SpacingTokens.sm),
-                  child: ChoiceChip(
-                    label: Text(entry.value),
-                    selected: isSelected,
-                    onSelected: (_) {
-                      ref.read(mathSemesterProvider.notifier).state =
-                          entry.key;
-                    },
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
 
           // 年级列表（一行两个）
           Expanded(
@@ -191,5 +177,50 @@ class MathTabPage extends ConsumerWidget {
     if (config.allowNegative) parts.add('正负数');
     if (config.allowRemainder) parts.add('有余数');
     return parts.join(' · ');
+  }
+
+  void _showSemesterPicker(
+    BuildContext context,
+    WidgetRef ref,
+    String current,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: SpacingTokens.md),
+              Text(
+                '选择学期',
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              RadioGroup<String>(
+                groupValue: current,
+                onChanged: (v) {
+                  if (v == null) return;
+                  ref.read(mathSemesterProvider.notifier).state = v;
+                  Navigator.pop(ctx);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _semesterLabels.entries.map((entry) {
+                    return RadioListTile<String>(
+                      title: Text(entry.value),
+                      value: entry.key,
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
