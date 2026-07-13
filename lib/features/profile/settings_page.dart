@@ -4,20 +4,16 @@
 // 职责：应用设置页 — 主题、音频、显示等设置项逐行展示。
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/config/app_config.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
-
-/// 应用版本信息 Provider。
-final _packageInfoProvider = FutureProvider<PackageInfo>((ref) {
-  return PackageInfo.fromPlatform();
-});
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -145,24 +141,12 @@ class SettingsPage extends ConsumerWidget {
               icon: Icons.system_update_outlined,
               iconColor: theme.colorScheme.onSurfaceVariant,
               title: '检查更新',
-              subtitle: '查看新版本并下载 APK',
-              onTap: () => _showUpdateDialog(context),
-            ),
-
-            // 版本号
-            const SizedBox(height: SpacingTokens.xl),
-            Center(
-              child: ref.watch(_packageInfoProvider).when(
-                    data: (info) => Text(
-                      '韵算 v${info.version} (${info.buildNumber})',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.5),
-                      ),
-                    ),
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
-                  ),
+              subtitle: AppConfig.hasUpdateCheckUrl
+                  ? '查看新版本并下载安装'
+                  : '更新检查未配置',
+              onTap: AppConfig.hasUpdateCheckUrl
+                  ? () => context.push(AppRoutes.update)
+                  : null,
             ),
             const SizedBox(height: SpacingTokens.md),
           ],
@@ -350,30 +334,4 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  void _showUpdateDialog(BuildContext context) {
-    const releaseUrl = 'https://github.com/wangjun/PoeMath/releases';
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('检查更新'),
-        content: const Text('请前往 GitHub Releases 页面下载最新版本：\n\n$releaseUrl'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Clipboard.setData(const ClipboardData(text: releaseUrl));
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('链接已复制到剪贴板')),
-              );
-            },
-            child: const Text('复制链接'),
-          ),
-        ],
-      ),
-    );
-  }
 }

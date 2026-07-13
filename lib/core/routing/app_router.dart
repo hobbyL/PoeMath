@@ -8,7 +8,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/update/android_update_installer.dart';
+import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
@@ -20,6 +23,7 @@ import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/poem_tab_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
+import 'package:poemath/features/profile/update_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 import 'package:poemath/features/shell/splash_page.dart';
 
@@ -93,6 +97,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.settings,
         builder: (context, state) => const SettingsPage(),
+      ),
+      // ============ 检查更新（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.update,
+        builder: (context, state) => UpdatePage(
+          updateClient: UpdateClient(updateUrl: AppConfig.updateCheckUrl),
+          updateInstaller: AndroidUpdateInstaller(),
+        ),
       ),
     ],
   );

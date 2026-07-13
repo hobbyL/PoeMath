@@ -6,17 +6,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
-
-/// 应用版本信息 Provider（异步加载一次）。
-final _packageInfoProvider = FutureProvider<PackageInfo>((ref) {
-  return PackageInfo.fromPlatform();
-});
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -101,22 +95,6 @@ class ProfilePage extends ConsumerWidget {
 
             // 成就展示
             _buildAchievementSection(context, unlockedCount),
-
-            // 版本号
-            const SizedBox(height: SpacingTokens.xl),
-            Center(
-              child: ref.watch(_packageInfoProvider).when(
-                    data: (info) => Text(
-                      '韵算 v${info.version} (${info.buildNumber})',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.5),
-                      ),
-                    ),
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
-                  ),
-            ),
             const SizedBox(height: SpacingTokens.md),
           ],
         ),

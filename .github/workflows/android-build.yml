@@ -12,6 +12,14 @@ jobs:
     permissions:
       contents: write # 创建 Release 需要写权限
 
+    env:
+      ALIYUN_OSS_ENDPOINT: ${{ secrets.ALIYUN_OSS_ENDPOINT || vars.ALIYUN_OSS_ENDPOINT }}
+      ALIYUN_OSS_BUCKET: ${{ secrets.ALIYUN_OSS_BUCKET || vars.ALIYUN_OSS_BUCKET }}
+      ALIYUN_OSS_ACCESS_KEY_ID: ${{ secrets.ALIYUN_OSS_ACCESS_KEY_ID }}
+      ALIYUN_OSS_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_OSS_ACCESS_KEY_SECRET }}
+      ALIYUN_OSS_APP_UPDATE_DOWNLOAD_BASE_URL: ${{ secrets.ALIYUN_OSS_APP_UPDATE_DOWNLOAD_BASE_URL || vars.ALIYUN_OSS_APP_UPDATE_DOWNLOAD_BASE_URL }}
+      ALIYUN_OSS_APP_UPDATE_OSS_PREFIX: ${{ secrets.ALIYUN_OSS_APP_UPDATE_OSS_PREFIX || vars.ALIYUN_OSS_APP_UPDATE_OSS_PREFIX || 'poemath/android/stable' }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +74,18 @@ jobs:
           }
 
       # -------- 构建 --------
+      - name: Resolve UPDATE_CHECK_URL
+        run: |
+          oss_prefix="${ALIYUN_OSS_APP_UPDATE_OSS_PREFIX#/}"
+          oss_prefix="${oss_prefix%/}"
+          download_base="${ALIYUN_OSS_APP_UPDATE_DOWNLOAD_BASE_URL%/}"
+          if [ -n "${download_base}" ] && [ -n "${oss_prefix}" ]; then
+            echo "UPDATE_CHECK_URL=${download_base}/${oss_prefix}/latest.json" >> "${GITHUB_ENV}"
+            echo "→ UPDATE_CHECK_URL=${download_base}/${oss_prefix}/latest.json"
+          else
+            echo "→ UPDATE_CHECK_URL not configured, in-app update will be disabled"
+          fi
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -79,33 +99,137 @@ jobs:
         run: |
           flutter build apk --release \
             --build-name=${{ steps.version.outputs.version_name }} \
-            --build-number=${{ steps.version.outputs.version_code }}
+            --build-number=${{ steps.version.outputs.version_code }} \
+            --dart-define=UPDATE_CHECK_URL="${UPDATE_CHECK_URL:-}"
 
-      - name: Rename APK with version
+      # -------- 准备发布资产 --------
+      - name: Prepare release assets
         run: |
-          mv build/app/outputs/flutter-apk/app-release.apk \
-             build/app/outputs/flutter-apk/PoeMath-${{ steps.version.outputs.tag }}.apk
+          mkdir -p release
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             "release/poemath.apk"
 
-      # -------- 发布 Release --------
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      # -------- OSS 上传 --------
+      - name: Set up Go for ossutil
+        uses: actions/setup-go@v5
         with:
-          name: 韵算 ${{ steps.version.outputs.tag }}
-          body: |
-            ## 韵算 ${{ steps.version.outputs.tag }}
+          go-version: '1.22.x'
 
-            版本号: `${{ steps.version.outputs.version_name }}`
-            构建号: `${{ steps.version.outputs.version_code }}`
+      - name: Install ossutil
+        run: |
+          go install github.com/aliyun/ossutil@v1.7.19
+          echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
 
-            ### 安装说明
-            1. 下载下方 APK 文件
-            2. 在 Android 设备上打开安装
-            3. 首次安装可能需要允许「安装未知来源应用」
-
-            ---
-            > ⚠️ 请务必从此 Release 页面下载，确保签名一致可覆盖安装。
-          files: build/app/outputs/flutter-apk/PoeMath-${{ steps.version.outputs.tag }}.apk
-          draft: false
-          prerelease: false
+      - name: Publish app update to Aliyun OSS
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          BUILD_NAME: ${{ steps.version.outputs.version_name }}
+          BUILD_NUMBER: ${{ steps.version.outputs.version_code }}
+        run: |
+          set -euo pipefail
+
+          # 检查必要的 OSS 配置
+          missing=()
+          for name in \
+            ALIYUN_OSS_ENDPOINT \
+            ALIYUN_OSS_BUCKET \
+            ALIYUN_OSS_ACCESS_KEY_ID \
+            ALIYUN_OSS_ACCESS_KEY_SECRET \
+            ALIYUN_OSS_APP_UPDATE_DOWNLOAD_BASE_URL \
+            ALIYUN_OSS_APP_UPDATE_OSS_PREFIX
+          do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required Aliyun OSS configuration: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+          # 获取 Release notes
+          default_release_notes="韵算 ${GITHUB_REF_NAME}"
+          gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --title "韵算 ${GITHUB_REF_NAME}" --notes "${default_release_notes}"
+          release_notes="$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json body --jq '.body')"
+          if [ -z "${release_notes}" ]; then
+            release_notes="${default_release_notes}"
+          fi
+
+          # 计算 SHA256 和文件大小
+          apk_path="release/poemath.apk"
+          version_key="${BUILD_NAME}+${BUILD_NUMBER}"
+          oss_prefix="${ALIYUN_OSS_APP_UPDATE_OSS_PREFIX#/}"
+          oss_prefix="${oss_prefix%/}"
+          download_base="${ALIYUN_OSS_APP_UPDATE_DOWNLOAD_BASE_URL%/}"
+          version_prefix="${oss_prefix}/versions/${version_key}"
+          url_version_key="${version_key//+/%2B}"
+          apk_url="${download_base}/${oss_prefix}/versions/${url_version_key}/poemath.apk"
+          apk_sha256="$(sha256sum "${apk_path}" | awk '{print $1}')"
+          apk_size="$(wc -c < "${apk_path}" | tr -d ' ')"
+          export apk_url apk_sha256 apk_size release_notes
+
+          # 生成 release.json / latest.json
+          mkdir -p release/update
+          printf '%s  poemath.apk\n' "${apk_sha256}" > release/update/poemath.apk.sha256
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "packageName": "com.poemath.app",
+              "versionName": os.environ["BUILD_NAME"],
+              "versionCode": int(os.environ["BUILD_NUMBER"]),
+              "tagName": os.environ["GITHUB_REF_NAME"],
+              "channel": "stable",
+              "apkUrl": os.environ["apk_url"],
+              "apkSha256": os.environ["apk_sha256"],
+              "apkSize": int(os.environ["apk_size"]),
+              "mandatory": False,
+              "notes": os.environ["release_notes"],
+          }
+
+          update_dir = Path("release/update")
+          update_dir.mkdir(parents=True, exist_ok=True)
+          content = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+          (update_dir / "release.json").write_text(content, encoding="utf-8")
+          (update_dir / "latest.json").write_text(content, encoding="utf-8")
+          PY
+
+          # 配置 ossutil
+          oss_config="${RUNNER_TEMP}/ossutilconfig"
+          ossutil config \
+            -e "${ALIYUN_OSS_ENDPOINT}" \
+            -i "${ALIYUN_OSS_ACCESS_KEY_ID}" \
+            -k "${ALIYUN_OSS_ACCESS_KEY_SECRET}" \
+            -c "${oss_config}"
+
+          bucket_uri="oss://${ALIYUN_OSS_BUCKET}"
+
+          # 上传版本目录（不可变资源）
+          ossutil cp "${apk_path}" "${bucket_uri}/${version_prefix}/poemath.apk" -c "${oss_config}" -f --retry-times 5
+          ossutil cp release/update/poemath.apk.sha256 "${bucket_uri}/${version_prefix}/poemath.apk.sha256" -c "${oss_config}" -f --retry-times 5
+          ossutil cp release/update/release.json "${bucket_uri}/${version_prefix}/release.json" -c "${oss_config}" -f --retry-times 5
+
+          ossutil set-meta "${bucket_uri}/${version_prefix}/poemath.apk" "Cache-Control:public,max-age=31536000,immutable#Content-Type:application/vnd.android.package-archive" -c "${oss_config}" -f
+          ossutil set-meta "${bucket_uri}/${version_prefix}/poemath.apk.sha256" "Cache-Control:public,max-age=31536000,immutable#Content-Type:text/plain;charset=utf-8" -c "${oss_config}" -f
+          ossutil set-meta "${bucket_uri}/${version_prefix}/release.json" "Cache-Control:public,max-age=31536000,immutable#Content-Type:application/json;charset=utf-8" -c "${oss_config}" -f
+
+          # 更新 latest.json（短缓存）
+          ossutil cp release/update/latest.json "${bucket_uri}/${oss_prefix}/latest.json" -c "${oss_config}" -f --retry-times 5
+          ossutil set-meta "${bucket_uri}/${oss_prefix}/latest.json" "Cache-Control:no-cache,max-age=60#Content-Type:application/json;charset=utf-8" -c "${oss_config}" -f
+
+          echo "✅ Published app update: ${download_base}/${oss_prefix}/latest.json"
+          echo "✅ APK download URL: ${apk_url}"
+
+      # -------- GitHub Release --------
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.version.outputs.tag }}" \
+            "release/poemath.apk#PoeMath-${{ steps.version.outputs.tag }}.apk" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
