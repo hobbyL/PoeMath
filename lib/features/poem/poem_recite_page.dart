@@ -142,6 +142,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                       );
                       ref.invalidate(learnedCountProvider);
                       ref.invalidate(userStatsProvider);
+                      ref.invalidate(todayPoemCountProvider);
 
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(

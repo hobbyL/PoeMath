@@ -152,6 +152,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     await statsRepo.updatePoemStats(learned: learnedCount);
     ref.invalidate(learnedCountProvider);
     ref.invalidate(userStatsProvider);
+    ref.invalidate(todayPoemCountProvider);
 
     // 通过时更新掌握等级和复习计划
     if (session.isPassed) {
