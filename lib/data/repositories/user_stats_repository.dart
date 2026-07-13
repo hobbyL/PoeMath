@@ -37,14 +37,14 @@ class UserStatsRepository {
 
   /// 增加星星
   Future<void> addStars(int count) async {
-    final stats = get();
+    final stats = await getOrCreate();
     stats.totalStars += count;
     await stats.save();
   }
 
   /// 更新连续打卡
   Future<void> updateStreak(int currentStreak) async {
-    final stats = get();
+    final stats = await getOrCreate();
     stats.currentStreak = currentStreak;
     if (currentStreak > stats.longestStreak) {
       stats.longestStreak = currentStreak;
@@ -54,7 +54,7 @@ class UserStatsRepository {
 
   /// 更新诗词学习统计
   Future<void> updatePoemStats({int? learned, int? mastered}) async {
-    final stats = get();
+    final stats = await getOrCreate();
     if (learned != null) stats.poemsLearned = learned;
     if (mastered != null) stats.poemsMastered = mastered;
     await stats.save();
@@ -65,7 +65,7 @@ class UserStatsRepository {
     required int problems,
     required int correct,
   }) async {
-    final stats = get();
+    final stats = await getOrCreate();
     stats.mathTotalProblems += problems;
     stats.mathTotalCorrect += correct;
     await stats.save();
@@ -73,7 +73,7 @@ class UserStatsRepository {
 
   /// 更新等级
   Future<void> updateLevel(int level) async {
-    final stats = get();
+    final stats = await getOrCreate();
     stats.level = level;
     await stats.save();
   }

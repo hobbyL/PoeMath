@@ -13,6 +13,7 @@ import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/quiz/quiz_engine.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
@@ -144,6 +145,13 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     // 记录学习
     final progressRepo = ref.read(poemProgressRepoProvider);
     final progress = await progressRepo.recordStudy(widget.poemId);
+
+    // 更新全局统计
+    final statsRepo = ref.read(userStatsRepoProvider);
+    final learnedCount = progressRepo.learnedCount;
+    await statsRepo.updatePoemStats(learned: learnedCount);
+    ref.invalidate(learnedCountProvider);
+    ref.invalidate(userStatsProvider);
 
     // 通过时更新掌握等级和复习计划
     if (session.isPassed) {

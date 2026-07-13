@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 /// 背诵难度级别。
@@ -132,6 +133,16 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                       final progressRepo =
                           ref.read(poemProgressRepoProvider);
                       await progressRepo.recordStudy(widget.poemId);
+
+                      // 更新全局统计
+                      final statsRepo = ref.read(userStatsRepoProvider);
+                      final learnedCount = progressRepo.learnedCount;
+                      await statsRepo.updatePoemStats(
+                        learned: learnedCount,
+                      );
+                      ref.invalidate(learnedCountProvider);
+                      ref.invalidate(userStatsProvider);
+
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
