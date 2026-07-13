@@ -105,6 +105,8 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: SpacingTokens.sm),
 
             // 音效
+            // TODO(backlog): soundEnabled 开关已预留，但音效播放服务尚未实现。
+            //   需新建 SoundService，在口算答题/打卡/成就等场景播放短音效。
             AppTile(
               icon: Icons.music_note_outlined,
               iconColor: theme.colorScheme.tertiary,
@@ -121,6 +123,8 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: SpacingTokens.sm),
 
             // 触觉反馈
+            // TODO(backlog): hapticEnabled 开关已预留，但触觉反馈服务尚未实现。
+            //   需新建 HapticService，在按钮点击/答题提交等场景调用 HapticFeedback。
             AppTile(
               icon: Icons.vibration_outlined,
               iconColor: theme.colorScheme.error,
