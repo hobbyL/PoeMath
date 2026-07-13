@@ -23,13 +23,14 @@ class UserStatsAdapter extends TypeAdapter<UserStats> {
       mathTotalCorrect: fields[7] as int,
       level: fields[8] as int,
       createdAt: fields[9] as DateTime,
+      mathBestStreak: (fields[10] as int?) ?? 0,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserStats obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.profileId)
       ..writeByte(1)
@@ -49,7 +50,9 @@ class UserStatsAdapter extends TypeAdapter<UserStats> {
       ..writeByte(8)
       ..write(obj.level)
       ..writeByte(9)
-      ..write(obj.createdAt);
+      ..write(obj.createdAt)
+      ..writeByte(10)
+      ..write(obj.mathBestStreak);
   }
 
   @override

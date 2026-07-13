@@ -166,8 +166,8 @@ class ProfilePage extends ConsumerWidget {
               Expanded(
                 child: _buildStatItem(
                   context,
-                  '${stats.longestStreak}',
-                  '最长连续',
+                  '${stats.mathBestStreak}',
+                  '最佳连对',
                   ColorTokens.poemGold,
                 ),
               ),

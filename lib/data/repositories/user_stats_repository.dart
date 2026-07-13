@@ -71,6 +71,15 @@ class UserStatsRepository {
     await stats.save();
   }
 
+  /// 更新口算最佳连续答对数（仅在新纪录超过旧纪录时更新）
+  Future<void> updateMathBestStreak(int streak) async {
+    final stats = await getOrCreate();
+    if (streak > stats.mathBestStreak) {
+      stats.mathBestStreak = streak;
+      await stats.save();
+    }
+  }
+
   /// 更新等级
   Future<void> updateLevel(int level) async {
     final stats = await getOrCreate();

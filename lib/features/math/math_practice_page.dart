@@ -10,9 +10,10 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
-import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
@@ -48,6 +49,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   /// 当前 session ID
   late final String _sessionId;
+
+  /// 当前连续答对数（答错时清零）
+  int _consecutiveCorrect = 0;
+
+  /// 本次练习最佳连续答对数
+  int _bestConsecutive = 0;
 
   @override
   void initState() {
@@ -85,26 +92,26 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   @override
   void dispose() {
-    _savePartialSession();
+    // 数据已在 _persistProgress() 中逐题保存，无需额外处理
     _answerController.dispose();
     _focusNode.dispose();
     _confettiController.dispose();
     super.dispose();
   }
 
-  /// 中途退出时保存已完成的部分会话。
-  void _savePartialSession() {
+  /// 每答一题后同步更新 Hive，确保数据立即持久化。
+  ///
+  /// Hive put() 的内存写入是同步的，后续 provider 读取立刻可见。
+  void _persistProgress({required bool isCorrect}) {
     final answered = ref.read(mathAnsweredCountProvider);
-    if (answered == 0 || _isFinishing) return; // 没做题或已结算过
-
-    final grade = ref.read(mathGradeProvider);
     final correctCount = ref.read(mathCorrectCountProvider);
     final duration = DateTime.now().difference(_startTime).inSeconds;
 
+    // 更新运行中的 session（同一 ID 覆盖写入）
     final session = MathSession(
-      id: '${_sessionId}_partial',
+      id: _sessionId,
       profileId: ProfileScope.currentId,
-      grade: grade,
+      grade: ref.read(mathGradeProvider),
       problemType: 'mixed',
       totalProblems: answered,
       correctCount: correctCount,
@@ -112,16 +119,20 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       starsEarned: 0,
       finishedAt: DateTime.now(),
     );
+    HiveBoxes.mathSessions.put(ProfileScope.key(_sessionId), session);
 
-    final repo = ref.read(mathSessionRepoProvider);
-    // Hive put() 内存写入是同步的，dispose 中可安全调用
-    repo.save(session);
+    // 增量更新用户统计（每题 +1）
+    final statsKey = ProfileScope.key('stats');
+    var stats = HiveBoxes.userStats.get(statsKey);
+    stats ??= UserStats(profileId: ProfileScope.currentId);
+    stats.mathTotalProblems += 1;
+    if (isCorrect) stats.mathTotalCorrect += 1;
+    if (_bestConsecutive > stats.mathBestStreak) {
+      stats.mathBestStreak = _bestConsecutive;
+    }
+    HiveBoxes.userStats.put(statsKey, stats);
 
-    // 更新用户统计
-    final statsRepo = ref.read(userStatsRepoProvider);
-    statsRepo.addMathResults(problems: answered, correct: correctCount);
-
-    // 刷新首页 providers
+    // 刷新 providers
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayMathCountProvider);
   }
@@ -166,9 +177,17 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     ref.read(mathAnsweredCountProvider.notifier).update((s) => s + 1);
     if (judgement.isCorrect) {
       ref.read(mathCorrectCountProvider.notifier).update((s) => s + 1);
+      _consecutiveCorrect++;
+      if (_consecutiveCorrect > _bestConsecutive) {
+        _bestConsecutive = _consecutiveCorrect;
+      }
     } else {
+      _consecutiveCorrect = 0;
       _recordMistake(problem, userAnswer, judgement);
     }
+
+    // 每答一题就同步保存到 Hive
+    _persistProgress(isCorrect: judgement.isCorrect);
   }
 
   void _recordMistake(
@@ -231,7 +250,6 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       if (!_isFinishing) {
         _isFinishing = true;
         await _finishSession();
-        _isFinishing = false;
       }
       return;
     }
@@ -277,12 +295,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final repo = ref.read(mathSessionRepoProvider);
     await repo.save(session);
 
-    // 更新用户统计：口算做题数 + 星星
+    // 做题数和连对数已在 _persistProgress() 中逐题更新，只需添加星星
     final statsRepo = ref.read(userStatsRepoProvider);
-    await statsRepo.addMathResults(
-      problems: problems.length,
-      correct: correctCount,
-    );
     if (stars > 0) {
       await statsRepo.addStars(stars);
     }
