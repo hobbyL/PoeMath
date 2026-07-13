@@ -104,7 +104,7 @@ class HomePage extends ConsumerWidget {
             ],
 
             // 今日目标
-            _buildDailyGoal(context, dueReviews),
+            _buildDailyGoal(context, dueReviews, ref),
             // 底部留白：为 NotchedBottomBar 预留空间 (barHeight + fabTopReserve)
             const SizedBox(height: 100),
           ],
@@ -175,19 +175,33 @@ class HomePage extends ConsumerWidget {
           if (!isCheckedIn)
             FilledButton.tonal(
               onPressed: () async {
-                // 检查是否完成了今日目标（至少一项）
-                final stats = ref.read(userStatsProvider);
-                final todayPoems = ref.read(learnedCountProvider);
-                final todayMath = stats.mathTotalProblems;
+                // 读取今日实际完成量
+                final todayPoems = ref.read(todayPoemCountProvider);
+                final todayMath = ref.read(todayMathCountProvider);
 
-                // 简单检查：只要有学习记录就允许打卡
-                // (首次使用时 stats 未初始化也算 0)
-                if (todayPoems == 0 && todayMath == 0) {
+                // 读取每日目标
+                final poemGoal = ref.read(dailyPoemGoalProvider);
+                final mathGoal = ref.read(dailyMathGoalProvider);
+
+                // 检查是否所有目标都已完成
+                final poemDone = todayPoems >= poemGoal;
+                final mathDone = todayMath >= mathGoal;
+
+                if (!poemDone || !mathDone) {
                   if (context.mounted) {
+                    final missing = <String>[];
+                    if (!poemDone) {
+                      missing.add('诗词 $todayPoems/$poemGoal 首');
+                    }
+                    if (!mathDone) {
+                      missing.add('口算 $todayMath/$mathGoal 题');
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('请先完成至少一项学习任务再打卡 📚'),
-                        duration: Duration(seconds: 2),
+                      SnackBar(
+                        content: Text(
+                          '每日目标未完成：${missing.join("、")} 📚',
+                        ),
+                        duration: const Duration(seconds: 3),
                       ),
                     );
                   }
@@ -196,15 +210,28 @@ class HomePage extends ConsumerWidget {
 
                 final checkInRepo = ref.read(checkInRepoProvider);
                 await checkInRepo.checkInToday();
+
+                // 更新打卡的实际数据
+                await checkInRepo.updateToday(
+                  addPoems: todayPoems,
+                  addMathCorrect: todayMath,
+                );
+
+                // 更新连续打卡天数到 UserStats
+                final newStreak = checkInRepo.calculateStreak();
+                final statsRepo = ref.read(userStatsRepoProvider);
+                await statsRepo.updateStreak(newStreak);
+
                 ref.read(soundServiceProvider).play(SoundEffect.checkIn);
                 await ref.read(hapticServiceProvider).medium();
                 ref.invalidate(isCheckedInProvider);
                 ref.invalidate(streakProvider);
+                ref.invalidate(userStatsProvider);
                 if (context.mounted) {
                   showCelebration(
                     context,
                     type: CelebrationType.checkIn,
-                    subtitle: '继续保持！',
+                    subtitle: '连续打卡 $newStreak 天！继续保持！',
                   );
                 }
               },
@@ -417,8 +444,16 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildDailyGoal(BuildContext context, int dueReviews) {
+  Widget _buildDailyGoal(
+    BuildContext context,
+    int dueReviews,
+    WidgetRef ref,
+  ) {
     final theme = Theme.of(context);
+    final poemGoal = ref.watch(dailyPoemGoalProvider);
+    final mathGoal = ref.watch(dailyMathGoalProvider);
+    final todayPoems = ref.watch(todayPoemCountProvider);
+    final todayMath = ref.watch(todayMathCountProvider);
 
     return ColoredCard(
       color: theme.colorScheme.primary,
@@ -446,13 +481,17 @@ class HomePage extends ConsumerWidget {
           const SizedBox(height: SpacingTokens.sm),
           _buildGoalItem(
             context,
-            '背诵 1 首诗词',
+            '背诵 $poemGoal 首诗词',
             Icons.menu_book_outlined,
+            current: todayPoems,
+            target: poemGoal,
           ),
           _buildGoalItem(
             context,
-            '完成 1 组口算 (10 题)',
+            '完成 $mathGoal 题口算',
             Icons.calculate_outlined,
+            current: todayMath,
+            target: mathGoal,
           ),
           if (dueReviews > 0)
             _buildGoalItem(
@@ -471,21 +510,44 @@ class HomePage extends ConsumerWidget {
     String text,
     IconData icon, {
     VoidCallback? onTap,
+    int? current,
+    int? target,
   }) {
     final theme = Theme.of(context);
+    final done = current != null && target != null && current >= target;
     final content = Padding(
       padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
       child: Row(
         children: [
           Icon(
-            icon,
+            done ? Icons.check_circle : icon,
             size: 16,
-            color: theme.colorScheme.onSurfaceVariant,
+            color: done
+                ? ColorTokens.success
+                : theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: SpacingTokens.sm),
           Expanded(
-            child: Text(text, style: theme.textTheme.bodyMedium),
+            child: Text(
+              text,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                decoration: done ? TextDecoration.lineThrough : null,
+                color: done
+                    ? theme.colorScheme.onSurfaceVariant
+                    : null,
+              ),
+            ),
           ),
+          if (current != null && target != null)
+            Text(
+              '$current/$target',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: done
+                    ? ColorTokens.success
+                    : theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           if (onTap != null)
             Icon(
               Icons.chevron_right,
