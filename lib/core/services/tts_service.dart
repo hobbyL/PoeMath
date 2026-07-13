@@ -17,6 +17,10 @@ class TtsService {
   bool _initialized = false;
   bool _isSpeaking = false;
 
+  /// 用户主动停止标志，仅 [stop] 方法设置，
+  /// 避免 completionHandler 干扰 [speakLines] 循环。
+  bool _stopRequested = false;
+
   TtsService(this._settings);
 
   /// 当前是否正在朗读。
@@ -31,16 +35,18 @@ class TtsService {
     await _tts.setVolume(1.0);
     await _tts.setPitch(1.0);
 
-    _tts.setCompletionHandler(() {
-      _isSpeaking = false;
-    });
+    // 注意：completionHandler 在每次 speak() 完成后触发，
+    // 但在 speakLines/speakSentences 场景下不应中断循环，
+    // 所以这里不再设置 _isSpeaking = false，改由各方法自行管理。
 
     _tts.setCancelHandler(() {
       _isSpeaking = false;
+      _stopRequested = true;
     });
 
     _tts.setErrorHandler((msg) {
       _isSpeaking = false;
+      _stopRequested = true;
     });
 
     _initialized = true;
@@ -51,7 +57,10 @@ class TtsService {
     await _ensureInitialized();
     await _tts.setSpeechRate(_settings.ttsSpeed);
     _isSpeaking = true;
+    _stopRequested = false;
     await _tts.speak(text);
+    await _tts.awaitSpeakCompletion(true);
+    _isSpeaking = false;
   }
 
   /// 逐句朗读：按句号、问号、感叹号、逗号、换行分割，依次朗读。
@@ -65,6 +74,7 @@ class TtsService {
   }) async {
     await _ensureInitialized();
     await _tts.setSpeechRate(_settings.ttsSpeed);
+    _stopRequested = false;
 
     // 分割句子（按中文标点和换行）
     final sentences = text
@@ -73,11 +83,11 @@ class TtsService {
         .where((s) => s.isNotEmpty)
         .toList();
 
+    _isSpeaking = true;
     for (var i = 0; i < sentences.length; i++) {
+      if (_stopRequested) break;
       onSentenceStart?.call(i);
-      _isSpeaking = true;
       await _tts.speak(sentences[i]);
-      // 等待当前句子朗读完毕
       await _tts.awaitSpeakCompletion(true);
     }
 
@@ -96,11 +106,12 @@ class TtsService {
   }) async {
     await _ensureInitialized();
     await _tts.setSpeechRate(_settings.ttsSpeed);
+    _stopRequested = false;
 
+    _isSpeaking = true;
     for (var i = 0; i < lines.length; i++) {
-      if (!_isSpeaking && i > 0) break; // 被 stop() 中断
+      if (_stopRequested) break;
       onLineStart?.call(i);
-      _isSpeaking = true;
       await _tts.speak(lines[i]);
       await _tts.awaitSpeakCompletion(true);
     }
@@ -111,13 +122,15 @@ class TtsService {
 
   /// 停止朗读。
   Future<void> stop() async {
+    _stopRequested = true;
     _isSpeaking = false;
     await _tts.stop();
   }
 
   /// 释放资源。
   void dispose() {
-    _tts.stop();
+    _stopRequested = true;
     _isSpeaking = false;
+    _tts.stop();
   }
 }
