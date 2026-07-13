@@ -20,6 +20,7 @@ class AppRoutes {
   static const String poemDetail = '/poem/detail/:id';
   static const String poemRecite = '/poem/recite/:id';
   static const String poemQuiz = '/poem/quiz/:id';
+  static const String poemReview = '/poem/review';
 
   // ============ 口算模块（Phase 5） ============
   static const String mathHub = '/math/hub';

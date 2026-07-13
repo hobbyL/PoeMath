@@ -26,6 +26,7 @@ class HomePage extends ConsumerWidget {
     final isCheckedIn = ref.watch(isCheckedInProvider);
     final learnedPoems = ref.watch(learnedCountProvider);
     final mistakeCount = ref.watch(mistakeCountProvider);
+    final dueReviews = ref.watch(dueReviewCountProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -93,8 +94,14 @@ class HomePage extends ConsumerWidget {
             _buildQuickActions(context, mistakeCount),
             const SizedBox(height: SpacingTokens.lg),
 
+            // 复习提醒（有待复习时显示）
+            if (dueReviews > 0) ...[
+              _buildReviewReminder(context, dueReviews),
+              const SizedBox(height: SpacingTokens.lg),
+            ],
+
             // 今日目标
-            _buildDailyGoal(context, ref),
+            _buildDailyGoal(context, dueReviews),
             // 底部留白：为 NotchedBottomBar 预留空间 (barHeight + fabTopReserve)
             const SizedBox(height: 100),
           ],
@@ -337,9 +344,50 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildDailyGoal(BuildContext context, WidgetRef ref) {
+  Widget _buildReviewReminder(BuildContext context, int count) {
     final theme = Theme.of(context);
-    final dueReviews = ref.watch(dueReviewCountProvider);
+    return ColoredCard(
+      color: theme.colorScheme.error,
+      onTap: () => context.push(AppRoutes.poemReview),
+      child: Row(
+        children: [
+          Icon(
+            Icons.notifications_active,
+            color: theme.colorScheme.error,
+            size: 28,
+          ),
+          const SizedBox(width: SpacingTokens.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$count 首诗词待复习',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '按艾宾浩斯记忆曲线，现在是最佳复习时间',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyGoal(BuildContext context, int dueReviews) {
+    final theme = Theme.of(context);
 
     return ColoredCard(
       color: theme.colorScheme.primary,
@@ -380,15 +428,21 @@ class HomePage extends ConsumerWidget {
               context,
               '复习 $dueReviews 首待复习诗词',
               Icons.replay_rounded,
+              onTap: () => context.push(AppRoutes.poemReview),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildGoalItem(BuildContext context, String text, IconData icon) {
+  Widget _buildGoalItem(
+    BuildContext context,
+    String text,
+    IconData icon, {
+    VoidCallback? onTap,
+  }) {
     final theme = Theme.of(context);
-    return Padding(
+    final content = Padding(
       padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
       child: Row(
         children: [
@@ -398,10 +452,27 @@ class HomePage extends ConsumerWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: SpacingTokens.sm),
-          Text(text, style: theme.textTheme.bodyMedium),
+          Expanded(
+            child: Text(text, style: theme.textTheme.bodyMedium),
+          ),
+          if (onTap != null)
+            Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+        child: content,
+      );
+    }
+    return content;
   }
 }
 
