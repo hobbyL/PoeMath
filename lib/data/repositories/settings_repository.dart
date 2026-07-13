@@ -4,6 +4,7 @@
 // 职责：应用设置仓储。使用 settingsBox 作为 KV 存储。
 
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/webdav_config.dart';
 
 class SettingsRepository {
   // ============ KV 键名 ============
@@ -15,6 +16,7 @@ class SettingsRepository {
   static const String _keyPinyinVisible = 'pinyin_visible';
   static const String _keyDailyPoemGoal = 'daily_poem_goal';
   static const String _keyDailyMathGoal = 'daily_math_goal';
+  static const String _keyWebDavConfigs = 'webdav_configs';
 
   // ============ 主题 ============
 
@@ -86,5 +88,37 @@ class SettingsRepository {
 
   Future<void> setDailyMathGoal(int count) async {
     await HiveBoxes.settings.put(_keyDailyMathGoal, count);
+  }
+
+  // ============ WebDAV 配置 ============
+
+  /// 所有 WebDAV 同步配置。
+  List<WebDavConfig> get webDavConfigs {
+    final json = HiveBoxes.settings.get(_keyWebDavConfigs) as String?;
+    return WebDavConfig.decodeList(json);
+  }
+
+  /// 保存（新增或更新）一条 WebDAV 配置。
+  Future<void> saveWebDavConfig(WebDavConfig config) async {
+    final list = webDavConfigs;
+    final index = list.indexWhere((c) => c.id == config.id);
+    if (index >= 0) {
+      list[index] = config;
+    } else {
+      list.add(config);
+    }
+    await HiveBoxes.settings.put(
+      _keyWebDavConfigs,
+      WebDavConfig.encodeList(list),
+    );
+  }
+
+  /// 删除一条 WebDAV 配置。
+  Future<void> deleteWebDavConfig(String id) async {
+    final list = webDavConfigs..removeWhere((c) => c.id == id);
+    await HiveBoxes.settings.put(
+      _keyWebDavConfigs,
+      WebDavConfig.encodeList(list),
+    );
   }
 }
