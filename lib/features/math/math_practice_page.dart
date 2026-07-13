@@ -85,10 +85,40 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   @override
   void dispose() {
+    _savePartialSession();
     _answerController.dispose();
     _focusNode.dispose();
     _confettiController.dispose();
     super.dispose();
+  }
+
+  /// 中途退出时保存已完成的部分会话。
+  void _savePartialSession() {
+    final answered = ref.read(mathAnsweredCountProvider);
+    if (answered == 0 || _isFinishing) return; // 没做题或已结算过
+
+    final grade = ref.read(mathGradeProvider);
+    final correctCount = ref.read(mathCorrectCountProvider);
+    final duration = DateTime.now().difference(_startTime).inSeconds;
+
+    final session = MathSession(
+      id: '${_sessionId}_partial',
+      profileId: ProfileScope.currentId,
+      grade: grade,
+      problemType: 'mixed',
+      totalProblems: answered,
+      correctCount: correctCount,
+      durationSeconds: duration,
+      starsEarned: 0,
+      finishedAt: DateTime.now(),
+    );
+
+    final repo = ref.read(mathSessionRepoProvider);
+    repo.save(session);
+
+    // 更新用户统计
+    final statsRepo = ref.read(userStatsRepoProvider);
+    statsRepo.addMathResults(problems: answered, correct: correctCount);
   }
 
   void _submitAnswer() {
