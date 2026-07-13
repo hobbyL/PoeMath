@@ -166,13 +166,16 @@ class MathEngine {
       generators.add(RemainderDivisionGen(config, random: random));
     }
 
-    // 多位数乘除（3年级）
-    if (config.grade == 3) {
+    // 多位数乘除法（3年级及以上）
+    if (config.grade >= 3 &&
+        (config.allowedOperators.contains(Operator.multiply) ||
+            config.allowedOperators.contains(Operator.divide))) {
       generators.add(MultiDigitMulDivGen(config, random: random));
     }
 
-    // 混合运算（3-4年级）
-    if (config.grade >= 3 && config.maxOperands > 2) {
+    // 混合运算（3年级及以上，允许乘除法时即可生成两步混合）
+    if (config.grade >= 3 &&
+        config.allowedOperators.length >= 3) {
       generators.add(MixedOperationGen(config, random: random));
     }
 
