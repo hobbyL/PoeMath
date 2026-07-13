@@ -5,10 +5,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
@@ -18,6 +16,8 @@ import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/profile/backup_restore_page.dart';
+import 'package:poemath/features/profile/cloud_sync_page.dart';
 import 'package:poemath/features/profile/daily_goal_page.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -147,23 +147,33 @@ class SettingsPage extends ConsumerWidget {
             _buildDailyGoalSettings(context, ref),
             const SizedBox(height: SpacingTokens.md),
 
-            // 数据备份
+            // 备份与恢复
             AppTile(
-              icon: Icons.cloud_upload_outlined,
+              icon: Icons.folder_outlined,
               iconColor: theme.colorScheme.primary,
-              title: '数据备份',
-              subtitle: '导出学习数据',
-              onTap: () => _exportBackup(context, ref),
+              title: '备份与恢复',
+              subtitle: '导出或恢复学习数据',
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const BackupRestorePage(),
+                ),
+              ),
             ),
             const SizedBox(height: SpacingTokens.sm),
 
-            // 数据恢复
+            // 云端同步
             AppTile(
-              icon: Icons.cloud_download_outlined,
-              iconColor: theme.colorScheme.secondary,
-              title: '数据恢复',
-              subtitle: '从备份文件恢复',
-              onTap: () => _importBackup(context, ref),
+              icon: Icons.cloud_sync_outlined,
+              iconColor: theme.colorScheme.tertiary,
+              title: '云端同步',
+              subtitle: '通过 WebDAV 同步数据',
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CloudSyncPage(),
+                ),
+              ),
             ),
             const SizedBox(height: SpacingTokens.md),
 
@@ -184,72 +194,6 @@ class SettingsPage extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _exportBackup(BuildContext context, WidgetRef ref) async {
-    final scaffold = ScaffoldMessenger.of(context);
-    try {
-      final backup = ref.read(backupServiceProvider);
-      final filePath = await backup.exportToFile();
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(filePath)]),
-      );
-    } on Exception catch (e) {
-      scaffold.showSnackBar(
-        SnackBar(content: Text('备份失败: $e')),
-      );
-    }
-  }
-
-  Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
-    final scaffold = ScaffoldMessenger.of(context);
-
-    // 确认对话框
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('数据恢复'),
-        content: const Text('恢复将覆盖当前所有学习数据，此操作不可撤销。\n\n确定要继续吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确认恢复'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-      if (result == null || result.files.isEmpty) return;
-
-      final filePath = result.files.single.path;
-      if (filePath == null) return;
-
-      final backup = ref.read(backupServiceProvider);
-      final count = await backup.restoreFromFile(filePath);
-
-      scaffold.showSnackBar(
-        SnackBar(content: Text('恢复成功，共恢复 $count 条记录')),
-      );
-    } on FormatException catch (e) {
-      scaffold.showSnackBar(
-        SnackBar(content: Text('恢复失败: ${e.message}')),
-      );
-    } on Exception catch (e) {
-      scaffold.showSnackBar(
-        SnackBar(content: Text('恢复失败: $e')),
-      );
-    }
   }
 
   void _showSubjectPicker(

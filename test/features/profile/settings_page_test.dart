@@ -43,16 +43,16 @@ void main() {
     expect(find.text('每日目标'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('数据备份'),
+      find.text('备份与恢复'),
       50,
     );
-    expect(find.text('数据备份'), findsOneWidget);
+    expect(find.text('备份与恢复'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('数据恢复'),
+      find.text('云端同步'),
       50,
     );
-    expect(find.text('数据恢复'), findsOneWidget);
+    expect(find.text('云端同步'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('检查更新'),
