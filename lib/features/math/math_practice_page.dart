@@ -114,11 +114,16 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     );
 
     final repo = ref.read(mathSessionRepoProvider);
+    // Hive put() 内存写入是同步的，dispose 中可安全调用
     repo.save(session);
 
     // 更新用户统计
     final statsRepo = ref.read(userStatsRepoProvider);
     statsRepo.addMathResults(problems: answered, correct: correctCount);
+
+    // 刷新首页 providers
+    ref.invalidate(userStatsProvider);
+    ref.invalidate(todayMathCountProvider);
   }
 
   void _submitAnswer() {
@@ -305,6 +310,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     // 刷新首页统计 providers
     ref.invalidate(userStatsProvider);
+    ref.invalidate(todayMathCountProvider);
 
     if (!mounted) return;
 
