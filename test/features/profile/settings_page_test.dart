@@ -35,12 +35,24 @@ void main() {
     expect(find.text('音效'), findsOneWidget);
     expect(find.text('触觉反馈'), findsOneWidget);
 
-    // 滚动以显示下方的备份/恢复/更新选项
+    // 滚动以显示下方的每日目标/备份/恢复/更新选项
+    await tester.scrollUntilVisible(
+      find.text('每日诗词目标'),
+      50,
+    );
+    expect(find.text('每日诗词目标'), findsOneWidget);
+    expect(find.text('每日口算目标'), findsOneWidget);
+
     await tester.scrollUntilVisible(
       find.text('数据备份'),
       50,
     );
     expect(find.text('数据备份'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('数据恢复'),
+      50,
+    );
     expect(find.text('数据恢复'), findsOneWidget);
 
     await tester.scrollUntilVisible(

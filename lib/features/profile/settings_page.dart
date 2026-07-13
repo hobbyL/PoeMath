@@ -4,6 +4,7 @@
 // 职责：应用设置页 — 主题、音频、显示等设置项逐行展示。
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +17,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -123,15 +125,25 @@ class SettingsPage extends ConsumerWidget {
               icon: Icons.vibration_outlined,
               iconColor: theme.colorScheme.error,
               title: '触觉反馈',
-              subtitle: settingsRepo.hapticEnabled ? '已开启' : '已关闭',
+              subtitle: settingsRepo.hapticEnabled
+                  ? '已开启（需真机体验）'
+                  : '已关闭',
               trailing: Switch(
                 value: settingsRepo.hapticEnabled,
                 onChanged: (v) async {
                   await settingsRepo.setHapticEnabled(v);
                   ref.invalidate(settingsRepositoryProvider);
+                  // 开启时触发一次测试震动
+                  if (v) {
+                    await HapticFeedback.mediumImpact();
+                  }
                 },
               ),
             ),
+            const SizedBox(height: SpacingTokens.md),
+
+            // 每日目标设置
+            _buildDailyGoalSettings(context, ref, settingsRepo),
             const SizedBox(height: SpacingTokens.md),
 
             // 数据备份
@@ -444,4 +456,156 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
+  Widget _buildDailyGoalSettings(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic settingsRepo,
+  ) {
+    final theme = Theme.of(context);
+    final poemGoal = ref.watch(dailyPoemGoalProvider);
+    final mathGoal = ref.watch(dailyMathGoalProvider);
+
+    return Column(
+      children: [
+        AppTile(
+          icon: Icons.flag_outlined,
+          iconColor: ColorTokens.poemGold,
+          title: '每日诗词目标',
+          subtitle: '$poemGoal 首',
+          onTap: () => _showGoalPicker(
+            context,
+            ref,
+            title: '每日诗词背诵目标',
+            current: poemGoal,
+            min: 1,
+            max: 10,
+            unit: '首',
+            onSave: (v) async {
+              await settingsRepo.setDailyPoemGoal(v);
+              ref.invalidate(settingsRepositoryProvider);
+              ref.invalidate(dailyPoemGoalProvider);
+            },
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        AppTile(
+          icon: Icons.flag_outlined,
+          iconColor: theme.colorScheme.secondary,
+          title: '每日口算目标',
+          subtitle: '$mathGoal 题',
+          onTap: () => _showGoalPicker(
+            context,
+            ref,
+            title: '每日口算做题目标',
+            current: mathGoal,
+            min: 5,
+            max: 100,
+            step: 5,
+            unit: '题',
+            onSave: (v) async {
+              await settingsRepo.setDailyMathGoal(v);
+              ref.invalidate(settingsRepositoryProvider);
+              ref.invalidate(dailyMathGoalProvider);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showGoalPicker(
+    BuildContext context,
+    WidgetRef ref, {
+    required String title,
+    required int current,
+    required int min,
+    required int max,
+    int step = 1,
+    required String unit,
+    required Future<void> Function(int) onSave,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              var value = current;
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(SpacingTokens.lg),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style:
+                            Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                      ),
+                      const SizedBox(height: SpacingTokens.lg),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton.filled(
+                            onPressed: value > min
+                                ? () => setState(
+                                    () => value =
+                                        (value - step).clamp(min, max),
+                                  )
+                                : null,
+                            icon: const Icon(Icons.remove),
+                          ),
+                          const SizedBox(width: SpacingTokens.lg),
+                          Text(
+                            '$value',
+                            style: Theme.of(ctx)
+                                .textTheme
+                                .displaySmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: SpacingTokens.xs),
+                          Text(
+                            unit,
+                            style: Theme.of(ctx).textTheme.titleMedium,
+                          ),
+                          const SizedBox(width: SpacingTokens.lg),
+                          IconButton.filled(
+                            onPressed: value < max
+                                ? () => setState(
+                                    () => value =
+                                        (value + step).clamp(min, max),
+                                  )
+                                : null,
+                            icon: const Icon(Icons.add),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: SpacingTokens.lg),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () async {
+                            await onSave(value);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          },
+                          child: const Text('确定'),
+                        ),
+                      ),
+                      const SizedBox(height: SpacingTokens.sm),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
 }

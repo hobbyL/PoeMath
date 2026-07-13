@@ -13,6 +13,8 @@ class SettingsRepository {
   static const String _keySelectedGrade = 'selected_grade';
   static const String _keyTtsSpeed = 'tts_speed';
   static const String _keyPinyinVisible = 'pinyin_visible';
+  static const String _keyDailyPoemGoal = 'daily_poem_goal';
+  static const String _keyDailyMathGoal = 'daily_math_goal';
 
   // ============ 主题 ============
 
@@ -66,5 +68,23 @@ class SettingsRepository {
 
   Future<void> setPinyinVisible(bool visible) async {
     await HiveBoxes.settings.put(_keyPinyinVisible, visible);
+  }
+
+  // ============ 每日目标 ============
+
+  /// 每日诗词背诵目标（默认 1 首）
+  int get dailyPoemGoal =>
+      HiveBoxes.settings.get(_keyDailyPoemGoal, defaultValue: 1) as int;
+
+  Future<void> setDailyPoemGoal(int count) async {
+    await HiveBoxes.settings.put(_keyDailyPoemGoal, count);
+  }
+
+  /// 每日口算做题目标（默认 10 题）
+  int get dailyMathGoal =>
+      HiveBoxes.settings.get(_keyDailyMathGoal, defaultValue: 10) as int;
+
+  Future<void> setDailyMathGoal(int count) async {
+    await HiveBoxes.settings.put(_keyDailyMathGoal, count);
   }
 }
