@@ -48,12 +48,47 @@ class MathEngine {
     // 约束检查，不通过则重新生成（最多 100 次）
     for (var i = 0; i < 100; i++) {
       final problem = generator.generate();
-      final violation = ConstraintChecker.check(problem, config);
-      if (violation == null) return problem;
+
+      // 若指定了模式，强制转换
+      final converted = _applyMode(problem, mode, config, generator);
+      if (converted == null) continue; // 模式不兼容，重试
+
+      final violation = ConstraintChecker.check(converted, config);
+      if (violation == null) return converted;
     }
 
     // 兜底：返回最后一次生成的题目
-    return generator.generate();
+    final fallback = generator.generate();
+    return _applyMode(fallback, mode, config, generator) ?? fallback;
+  }
+
+  /// 将题目转换为指定模式。返回 null 表示不兼容需重试。
+  static MathProblem? _applyMode(
+    MathProblem problem,
+    ProblemMode? mode,
+    GradeConfig config,
+    BaseGenerator generator,
+  ) {
+    if (mode == null) return problem;
+
+    // 已经是目标模式
+    if (problem.mode == mode) return problem;
+
+    switch (mode) {
+      case ProblemMode.compare:
+        if (!config.allowedModes.contains(ProblemMode.compare)) return null;
+        return generator.toCompare(problem);
+      case ProblemMode.vertical:
+        if (!config.allowedModes.contains(ProblemMode.vertical)) return null;
+        // 竖式只支持 findResult 模式的加减乘法
+        if (problem.mode != ProblemMode.findResult) return null;
+        return generator.toVertical(problem);
+      case ProblemMode.findMissing:
+        if (!config.allowedModes.contains(ProblemMode.findMissing)) return null;
+        return generator.toFindMissing(problem);
+      default:
+        return problem;
+    }
   }
 
   /// 批量生成题目。

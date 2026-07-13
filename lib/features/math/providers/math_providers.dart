@@ -31,6 +31,9 @@ final mathSemesterProvider = StateProvider<String>((ref) => '上');
 /// 每组题目数量
 final mathBatchSizeProvider = StateProvider<int>((ref) => 10);
 
+/// 练习模式（null = 综合随机，compare = 比大小，vertical = 竖式）
+final mathPracticeModeProvider = StateProvider<ProblemMode?>((ref) => null);
+
 // ============ 练习进行中 ============
 
 /// 当前练习的题目列表

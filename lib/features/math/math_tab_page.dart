@@ -100,7 +100,7 @@ class MathTabPage extends ConsumerWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: SpacingTokens.sm,
                 mainAxisSpacing: SpacingTokens.sm,
-                childAspectRatio: 2.2,
+                childAspectRatio: 1.8,
               ),
               itemCount: 6,
               itemBuilder: (context, index) {
@@ -121,6 +121,9 @@ class MathTabPage extends ConsumerWidget {
               },
             ),
           ),
+
+          // 练习模式选择（比大小 / 竖式）
+          _buildModeSelector(context, ref),
 
           // 开始练习按钮
           SafeArea(
@@ -177,6 +180,61 @@ class MathTabPage extends ConsumerWidget {
     if (config.allowNegative) parts.add('正负数');
     if (config.allowRemainder) parts.add('有余数');
     return parts.join(' · ');
+  }
+
+  Widget _buildModeSelector(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final selectedMode = ref.watch(mathPracticeModeProvider);
+    final gradeConfig = ref.watch(gradeConfigProvider);
+
+    // 只有当前年级配置支持 compare/vertical 时才显示对应选项
+    final hasCompare =
+        gradeConfig.allowedModes.contains(ProblemMode.compare);
+    final hasVertical =
+        gradeConfig.allowedModes.contains(ProblemMode.vertical);
+
+    if (!hasCompare && !hasVertical) return const SizedBox.shrink();
+
+    final modes = <(ProblemMode?, String, IconData)>[
+      (null, '综合', Icons.shuffle_rounded),
+      if (hasCompare)
+        (ProblemMode.compare, '比大小', Icons.compare_arrows_rounded),
+      if (hasVertical)
+        (ProblemMode.vertical, '竖式', Icons.view_column_rounded),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
+      child: Row(
+        children: [
+          Text(
+            '模式',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: SpacingTokens.sm),
+          Expanded(
+            child: Wrap(
+              spacing: SpacingTokens.xs,
+              children: modes.map((m) {
+                final (mode, label, icon) = m;
+                final isActive = selectedMode == mode;
+                return ChoiceChip(
+                  avatar: Icon(icon, size: 16),
+                  label: Text(label),
+                  selected: isActive,
+                  onSelected: (_) {
+                    ref.read(mathPracticeModeProvider.notifier).state = mode;
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSemesterPicker(

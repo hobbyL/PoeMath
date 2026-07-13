@@ -68,11 +68,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final grade = ref.read(mathGradeProvider);
     final semester = ref.read(mathSemesterProvider);
     final batchSize = ref.read(mathBatchSizeProvider);
+    final practiceMode = ref.read(mathPracticeModeProvider);
 
     final problems = MathEngine.generateBatch(
       grade: grade,
       semester: semester,
       count: batchSize,
+      mode: practiceMode,
     );
 
     ref.read(mathProblemsProvider.notifier).state = problems;
@@ -107,7 +109,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     _processAnswer(problem, symbol);
   }
 
-  void _processAnswer(MathProblem problem, String userAnswer) {
+  Future<void> _processAnswer(MathProblem problem, String userAnswer) async {
     final judgement = MathEngine.judge(problem, userAnswer);
     setState(() {
       _judgement = judgement;
@@ -119,11 +121,11 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final haptic = ref.read(hapticServiceProvider);
     if (judgement.isCorrect) {
       sound.play(SoundEffect.correct);
-      haptic.medium();
+      await haptic.medium();
       _confettiController.play();
     } else {
       sound.play(SoundEffect.wrong);
-      haptic.heavy();
+      await haptic.heavy();
     }
 
     ref.read(mathAnsweredCountProvider.notifier).update((s) => s + 1);
@@ -183,12 +185,19 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         .join('\n');
   }
 
-  void _nextProblem() {
+  /// 是否正在结算中，防止多次调用。
+  bool _isFinishing = false;
+
+  Future<void> _nextProblem() async {
     final problems = ref.read(mathProblemsProvider);
     final currentIndex = ref.read(mathCurrentIndexProvider);
 
     if (currentIndex + 1 >= problems.length) {
-      _finishSession();
+      if (!_isFinishing) {
+        _isFinishing = true;
+        await _finishSession();
+        _isFinishing = false;
+      }
       return;
     }
 
@@ -263,6 +272,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final achievementRepo = ref.read(achievementRepoProvider);
     final checker = AchievementChecker(achievementRepo);
     await checker.check(statsRepo.get());
+
+    // 刷新首页统计 providers
+    ref.invalidate(userStatsProvider);
 
     if (!mounted) return;
 
