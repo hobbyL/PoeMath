@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 
@@ -109,23 +110,10 @@ class ProfilePage extends ConsumerWidget {
   ) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
+    return ColoredCard(
+      color: theme.colorScheme.primary,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '学习统计',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.md),
           Row(
             children: [
               Expanded(
@@ -220,15 +208,8 @@ class ProfilePage extends ConsumerWidget {
   Widget _buildAchievementSection(BuildContext context, int unlockedCount) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      decoration: BoxDecoration(
-        color: ColorTokens.poemGold.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        border: Border.all(
-          color: ColorTokens.poemGold.withValues(alpha: 0.2),
-        ),
-      ),
+    return ColoredCard(
+      color: ColorTokens.poemGold,
       child: Row(
         children: [
           const Icon(
