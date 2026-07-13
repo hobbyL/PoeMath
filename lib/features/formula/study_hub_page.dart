@@ -183,8 +183,12 @@ class StudyHubPage extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
-        return SafeArea(
-          child: SingleChildScrollView(
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -222,6 +226,7 @@ class StudyHubPage extends ConsumerWidget {
               ],
             ),
           ),
+        ),
         );
       },
     );
