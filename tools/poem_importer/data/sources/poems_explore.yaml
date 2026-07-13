@@ -9248,7 +9248,13 @@ poems:
     更催飞将追骄虏，莫遣沙场匹马还。
 
     '
-  annotations: []
+  annotations:
+  - word: 军城
+    meaning: 军事重镇
+  - word: 早秋
+    meaning: 初秋
+  - word: 昨夜
+    meaning: 昨天夜里
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9270,7 +9276,13 @@ poems:
     他乡共酌金花酒，万里同悲鸿雁天。
 
     '
-  annotations: []
+  annotations:
+  - word: 九月九日
+    meaning: 重阳节
+  - word: 玄武山
+    meaning: 山名
+  - word: 他乡
+    meaning: 外地
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9297,7 +9309,13 @@ poems:
     叹息老来交旧尽，睡来谁共午瓯茶。
 
     '
-  annotations: []
+  annotations:
+  - word: 幽居
+    meaning: 幽静的住所
+  - word: 初夏
+    meaning: 夏天开始
+  - word: 湖光
+    meaning: 湖面的光泽
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9333,7 +9351,13 @@ poems:
     叹流年、又成虚度。
 
     '
-  annotations: []
+  annotations:
+  - word: 谢池春
+    meaning: 词牌名
+  - word: 壮岁
+    meaning: 壮年
+  - word: 从戎
+    meaning: 从军
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9362,7 +9386,13 @@ poems:
     归来报明主，恢复旧神州。
 
     '
-  annotations: []
+  annotations:
+  - word: 紫岩
+    meaning: 张浚的号
+  - word: 北伐
+    meaning: 向北方进军
+  - word: 中原
+    meaning: 中国北方中部地区
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9389,7 +9419,13 @@ poems:
     当年志气俱消尽，白发新添四五茎。
 
     '
-  annotations: []
+  annotations:
+  - word: 长安
+    meaning: 唐都城
+  - word: 夜雨
+    meaning: 夜间的雨
+  - word: 残灯
+    meaning: 将灭的灯
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9416,7 +9452,15 @@ poems:
     从头越，苍山如海，残阳如血。
 
     '
-  annotations: []
+  annotations:
+  - word: 忆秦娥
+    meaning: 词牌名
+  - word: 娄山关
+    meaning: 贵州遵义北的关口
+  - word: 雄关
+    meaning: 雄伟的关隘
+  - word: 如铁
+    meaning: 坚如钢铁
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9443,7 +9487,13 @@ poems:
     酒盈杯，书满架，名利不将心挂。
 
     '
-  annotations: []
+  annotations:
+  - word: 渔歌子
+    meaning: 词牌名
+  - word: 荻花
+    meaning: 芦荻的花
+  - word: 秋
+    meaning: 秋天
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9470,7 +9520,11 @@ poems:
     一月不读书，耳目失精爽。
 
     '
-  annotations: []
+  annotations:
+  - word: 读书
+    meaning: 读书学习
+  - word: 有所见
+    meaning: 有所领悟
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9493,7 +9547,13 @@ poems:
     沧浪之水浊兮，可以濯我足。
 
     '
-  annotations: []
+  annotations:
+  - word: 沧浪
+    meaning: 水名
+  - word: 水清
+    meaning: 水清澈
+  - word: 缨
+    meaning: 帽带
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9515,7 +9575,11 @@ poems:
     自是相思抽不尽，却教风雨怨秋声。
 
     '
-  annotations: []
+  annotations:
+  - word: 芭蕉
+    meaning: 芭蕉树
+  - word: 绿叶
+    meaning: 翠绿的叶子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9538,7 +9602,11 @@ poems:
     最爱芦花经雨后，一蓬烟火饭鱼船。
 
     '
-  annotations: []
+  annotations:
+  - word: 秋江
+    meaning: 秋天的江水
+  - word: 苍茫
+    meaning: 苍苍茫茫
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9565,7 +9633,13 @@ poems:
     同来不得同归去，故国逢春一寂寥！
 
     '
-  annotations: []
+  annotations:
+  - word: 宣州
+    meaning: 今安徽宣城
+  - word: 舒州
+    meaning: 今安徽安庆
+  - word: 判官
+    meaning: 唐代官职
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9592,7 +9666,11 @@ poems:
     不可久留豺虎乱，南方实有未招魂。
 
     '
-  annotations: []
+  annotations:
+  - word: 返照
+    meaning: 夕阳返照
+  - word: 楚天
+    meaning: 南方的天空
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9642,7 +9720,13 @@ poems:
     静言思之，不能奋飞。
 
     '
-  annotations: []
+  annotations:
+  - word: 国风
+    meaning: 《诗经》的一部分
+  - word: 鄘风
+    meaning: 鄘国的民歌
+  - word: 柏舟
+    meaning: 柏木做的船
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9684,7 +9768,13 @@ poems:
     先君之思，以勖寡人。
 
     '
-  annotations: []
+  annotations:
+  - word: 燕燕
+    meaning: 飞翔的燕子
+  - word: 邶风
+    meaning: 邶国的民歌
+  - word: 于飞
+    meaning: 飞翔
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9725,7 +9815,13 @@ poems:
     驾言出游，以写我忧。
 
     '
-  annotations: []
+  annotations:
+  - word: 泉水
+    meaning: 泉水流淌
+  - word: 邶风
+    meaning: 邶国的民歌
+  - word: 淇水
+    meaning: 河名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9771,7 +9867,11 @@ poems:
     百尔所思，不如我所之。
 
     '
-  annotations: []
+  annotations:
+  - word: 载驰
+    meaning: 驱车疾行
+  - word: 归唁
+    meaning: 回去吊唁
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9807,7 +9907,11 @@ poems:
     驾言出游，以写我忧。
 
     '
-  annotations: []
+  annotations:
+  - word: 竹竿
+    meaning: 竹做的鱼竿
+  - word: 淇水
+    meaning: 河名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9837,7 +9941,11 @@ poems:
     椒聊且，远条且。
 
     '
-  annotations: []
+  annotations:
+  - word: 椒聊
+    meaning: 花椒树
+  - word: 蕃衍
+    meaning: 繁殖茂盛
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9880,7 +9988,13 @@ poems:
     人之为言，胡得焉？
 
     '
-  annotations: []
+  annotations:
+  - word: 苓
+    meaning: 甘草
+  - word: 采
+    meaning: 采摘
+  - word: 首阳
+    meaning: 山名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9922,7 +10036,15 @@ poems:
     与子偕行！
 
     '
-  annotations: []
+  annotations:
+  - word: 秦风
+    meaning: 秦国的民歌
+  - word: 无衣
+    meaning: 没有衣服
+  - word: 同袍
+    meaning: 共穿战袍
+  - word: 同仇
+    meaning: 共同对敌
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9953,7 +10075,11 @@ poems:
     琼瑰玉佩。
 
     '
-  annotations: []
+  annotations:
+  - word: 渭阳
+    meaning: 渭水北岸
+  - word: 舅
+    meaning: 舅舅
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -9984,7 +10110,11 @@ poems:
     岂其取妻，必宋之子？
 
     '
-  annotations: []
+  annotations:
+  - word: 衡门
+    meaning: 横木为门，简陋的门
+  - word: 可以
+    meaning: 可以在此
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10019,7 +10149,11 @@ poems:
     怀之好音。
 
     '
-  annotations: []
+  annotations:
+  - word: 匪风
+    meaning: 那风
+  - word: 飘
+    meaning: 飘荡
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10050,7 +10184,13 @@ poems:
     心之忧矣，於我归说。
 
     '
-  annotations: []
+  annotations:
+  - word: 蜉蝣
+    meaning: 一种短命昆虫
+  - word: 羽
+    meaning: 翅膀
+  - word: 朝生暮死
+    meaning: 早上出生晚上死去
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10084,7 +10224,11 @@ poems:
     四国有王，郇伯劳之。
 
     '
-  annotations: []
+  annotations:
+  - word: 下泉
+    meaning: 地下泉水
+  - word: 郇伯
+    meaning: 周代贤臣
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10119,7 +10263,13 @@ poems:
     风雨所漂摇，予维音哓哓！
 
     '
-  annotations: []
+  annotations:
+  - word: 鸱鸮
+    meaning: 猫头鹰
+  - word: 既取
+    meaning: 已经夺取
+  - word: 子
+    meaning: 孩子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10165,7 +10315,13 @@ poems:
     是用作歌，将母来谂。
 
     '
-  annotations: []
+  annotations:
+  - word: 四牡
+    meaning: 四匹公马
+  - word: 周道
+    meaning: 大路
+  - word: 靡盬
+    meaning: 没有止息
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10200,7 +10356,11 @@ poems:
     既见君子，我心则休。
 
     '
-  annotations: []
+  annotations:
+  - word: 菁菁
+    meaning: 茂盛的样子
+  - word: 莪
+    meaning: 一种植物
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10235,7 +10395,13 @@ poems:
     以雅以南，以籥不僭。
 
     '
-  annotations: []
+  annotations:
+  - word: 鼓钟
+    meaning: 敲钟
+  - word: 将将
+    meaning: 铿锵作响
+  - word: 淮水
+    meaning: 淮河
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10266,7 +10432,13 @@ poems:
     王在在镐，有那其居。
 
     '
-  annotations: []
+  annotations:
+  - word: 鱼
+    meaning: 鱼
+  - word: 藻
+    meaning: 水草
+  - word: 在藻
+    meaning: 在水草间
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10301,7 +10473,11 @@ poems:
     君子有酒，酌言酬之。
 
     '
-  annotations: []
+  annotations:
+  - word: 瓠叶
+    meaning: 葫芦叶
+  - word: 幡幡
+    meaning: 翻转的样子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10342,7 +10518,11 @@ poems:
     蒙瞍奏公。
 
     '
-  annotations: []
+  annotations:
+  - word: 灵台
+    meaning: 周文王建造的高台
+  - word: 经始
+    meaning: 开始营建
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10374,7 +10554,11 @@ poems:
     命我众人：庤乃钱镈，奄观铚艾。
 
     '
-  annotations: []
+  annotations:
+  - word: 周颂
+    meaning: 周代祭祀用的乐歌
+  - word: 臣工
+    meaning: 臣子和百官
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10400,7 +10584,11 @@ poems:
     亦服尔耕，十千维耦。
 
     '
-  annotations: []
+  annotations:
+  - word: 噫嘻
+    meaning: 感叹词
+  - word: 成王
+    meaning: 周成王
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10438,7 +10626,11 @@ poems:
     以似以续，续古之人。
 
     '
-  annotations: []
+  annotations:
+  - word: 良耜
+    meaning: 好的耒耜（农具）
+  - word: 穫
+    meaning: 收获
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10464,7 +10656,17 @@ poems:
     报君黄金台上意，提携玉龙为君死！
 
     '
-  annotations: []
+  annotations:
+  - word: 雁门
+    meaning: 雁门关
+  - word: 太守
+    meaning: 地方长官
+  - word: 黑云压城
+    meaning: 敌军兵临城下
+  - word: 甲光
+    meaning: 铠甲的光泽
+  - word: 金鳞
+    meaning: 金色的鳞片般闪光
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10502,7 +10704,17 @@ poems:
     曾记否，到中流击水，浪遏飞舟？
 
     '
-  annotations: []
+  annotations:
+  - word: 沁园春
+    meaning: 词牌名
+  - word: 湘江
+    meaning: 湖南的大江
+  - word: 橘子洲
+    meaning: 湘江中的洲
+  - word: 万类
+    meaning: 万物
+  - word: 霜天
+    meaning: 深秋
   translation: 在深秋一个秋高气爽的日子里，我独自伫立在橘子洲头，眺望着湘江碧水缓缓北流。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10526,7 +10738,13 @@ poems:
     落花水香茅舍晚，断桥头卖鱼人散。
 
     '
-  annotations: []
+  annotations:
+  - word: 寿阳曲
+    meaning: 曲牌名
+  - word: 远浦
+    meaning: 远处的水边
+  - word: 帆归
+    meaning: 帆船归来
   translation: 暂无译文，后续可继续补充。
   appreciation: 有文场“曲状元”之称的马致远，其散曲描绘的景物，意境优美，语言凝炼，流畅自然。这首曲是他所作的《潇湘八景》组曲中的一首。湘水从广西发源，流经湖南零陵，与从九嶷山北流的潇水会合，称为潇湘（今称湘江），流入洞庭。宋人曾画潇湘风景山水画八幅，称为“潇湘八景”。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10565,7 +10783,15 @@ poems:
     ”肃遂拜蒙母，结友而别。
 
     '
-  annotations: []
+  annotations:
+  - word: 孙权
+    meaning: 三国时吴国君主
+  - word: 劝学
+    meaning: 劝人学习
+  - word: 吕蒙
+    meaning: 东吴大将
+  - word: 刮目相看
+    meaning: 用新眼光看待
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10606,7 +10832,13 @@ poems:
     ”
 
     '
-  annotations: []
+  annotations:
+  - word: 辩日
+    meaning: 争论太阳
+  - word: 日初出
+    meaning: 太阳刚升起
+  - word: 车盖
+    meaning: 车上的圆形篷盖
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10635,7 +10867,13 @@ poems:
     是故谋闭而不兴，盗窃乱贼而不作，故外户而不闭，是谓大同。
 
     '
-  annotations: []
+  annotations:
+  - word: 大道
+    meaning: 理想的政治制度
+  - word: 天下为公
+    meaning: 天下是大家的
+  - word: 选贤与能
+    meaning: 选择贤能的人
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10671,7 +10909,13 @@ poems:
     ”
 
     '
-  annotations: []
+  annotations:
+  - word: 惠子
+    meaning: 惠施
+  - word: 相梁
+    meaning: 做梁国的国相
+  - word: 鹓鶵
+    meaning: 传说中的凤凰一类的鸟
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10705,7 +10949,11 @@ poems:
     无为守穷贱，坎坷长苦辛。
 
     '
-  annotations: []
+  annotations:
+  - word: 良宴会
+    meaning: 美好的宴会
+  - word: 齐声歌
+    meaning: 一齐唱歌
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10741,7 +10989,11 @@ poems:
     愿为双鸿鹄，奋翅起高飞。
 
     '
-  annotations: []
+  annotations:
+  - word: 高楼
+    meaning: 高高的楼阁
+  - word: 清商
+    meaning: 清商曲，悲凉的曲调
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10777,7 +11029,13 @@ poems:
     良无盘石固，虚名复何益？
 
     '
-  annotations: []
+  annotations:
+  - word: 明月
+    meaning: 明亮的月亮
+  - word: 皎
+    meaning: 洁白明亮
+  - word: 夜光
+    meaning: 夜间发光
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10810,7 +11068,13 @@ poems:
     不如子之衣，安且燠兮。
 
     '
-  annotations: []
+  annotations:
+  - word: 无衣
+    meaning: 没有衣服
+  - word: 同袍
+    meaning: 共穿战袍
+  - word: 同泽
+    meaning: 共穿内衣
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10846,7 +11110,13 @@ poems:
     曾不崇朝。
 
     '
-  annotations: []
+  annotations:
+  - word: 河广
+    meaning: 河水宽广
+  - word: 卫风
+    meaning: 卫国的民歌
+  - word: 宋
+    meaning: 宋国
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10870,7 +11140,15 @@ poems:
     探虎穴兮入蛟宫，仰天呼气兮成白虹。
 
     '
-  annotations: []
+  annotations:
+  - word: 荆轲
+    meaning: 战国时期刺客
+  - word: 易水
+    meaning: 河名
+  - word: 壮士
+    meaning: 勇士
+  - word: 一去不复还
+    meaning: 一去不再回来
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10912,7 +11190,11 @@ poems:
     思为双飞燕，衔泥巢君屋。
 
     '
-  annotations: []
+  annotations:
+  - word: 东城
+    meaning: 城东
+  - word: 高且长
+    meaning: 又高又长
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10945,7 +11227,11 @@ poems:
     奄忽随物化，荣名以为宝。
 
     '
-  annotations: []
+  annotations:
+  - word: 回车
+    meaning: 掉转车头
+  - word: 驾言迈
+    meaning: 驱车远行
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -10978,7 +11264,17 @@ poems:
     此中有真意，欲辨已忘言。
 
     '
-  annotations: []
+  annotations:
+  - word: 结庐
+    meaning: 建造房屋
+  - word: 人境
+    meaning: 人间
+  - word: 东篱
+    meaning: 东边的篱笆
+  - word: 南山
+    meaning: 庐山
+  - word: 悠然
+    meaning: 闲适的样子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11004,7 +11300,11 @@ poems:
     无论君不归，君归芳已歇。
 
     '
-  annotations: []
+  annotations:
+  - word: 王孙
+    meaning: 贵族公子
+  - word: 芳草
+    meaning: 芬芳的草
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11029,7 +11329,11 @@ poems:
     关山四面绝，故乡几千里。
 
     '
-  annotations: []
+  annotations:
+  - word: 断句
+    meaning: 截取的诗句
+  - word: 微雨
+    meaning: 细雨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11051,7 +11355,15 @@ poems:
     故乡篱下菊，今日几花开。
 
     '
-  annotations: []
+  annotations:
+  - word: 长安
+    meaning: 唐都城
+  - word: 扬州
+    meaning: 今江苏扬州
+  - word: 九月九日
+    meaning: 重阳节
+  - word: 薇山亭
+    meaning: 亭名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11075,7 +11387,11 @@ poems:
     只为来时晚，花开不及春。
 
     '
-  annotations: []
+  annotations:
+  - word: 侍宴
+    meaning: 陪侍宴会
+  - word: 石榴
+    meaning: 石榴果实
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11097,7 +11413,13 @@ poems:
     萧萧远树疏林外，一半秋山带夕阳。
 
     '
-  annotations: []
+  annotations:
+  - word: 河上亭
+    meaning: 河边的亭子
+  - word: 壁
+    meaning: 墙壁
+  - word: 书
+    meaning: 题写
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11121,7 +11443,11 @@ poems:
     若教鲍老当筵舞，转更郎当舞袖长。
 
     '
-  annotations: []
+  annotations:
+  - word: 傀儡
+    meaning: 木偶
+  - word: 线
+    meaning: 操纵木偶的线
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11156,7 +11482,15 @@ poems:
     忆着江南旧行路，酒旗斜拂堕吟鞍。
 
     '
-  annotations: []
+  annotations:
+  - word: 山园
+    meaning: 山中的园子
+  - word: 小梅
+    meaning: 梅花
+  - word: 疏影
+    meaning: 稀疏的影子
+  - word: 暗香
+    meaning: 隐约的清香
   translation: 百花凋零，独有梅花迎着寒风昂然盛开，那明媚艳丽的景色把小园的风光占尽。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11185,7 +11519,11 @@ poems:
     曾是洛阳花下客，野芳虽晚不须嗟。
 
     '
-  annotations: []
+  annotations:
+  - word: 戏答
+    meaning: 开玩笑式地回答
+  - word: 元珍
+    meaning: 丁宝臣，字元珍
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11208,7 +11546,13 @@ poems:
     一番桃李花开尽，惟有青青草色齐。
 
     '
-  annotations: []
+  annotations:
+  - word: 城南
+    meaning: 城的南边
+  - word: 花
+    meaning: 花朵
+  - word: 春风
+    meaning: 春天的风
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11236,7 +11580,15 @@ poems:
     茅茨烟暝客衣湿，破梦午鸡啼一声。
 
     '
-  annotations: []
+  annotations:
+  - word: 春日
+    meaning: 春天
+  - word: 泗水
+    meaning: 山东泗水
+  - word: 万紫千红
+    meaning: 形容百花盛开
+  - word: 东风
+    meaning: 春风
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11260,7 +11612,13 @@ poems:
     好水好山看不足，马蹄催趁月明归。
 
     '
-  annotations: []
+  annotations:
+  - word: 池州
+    meaning: 今安徽池州
+  - word: 翠微亭
+    meaning: 亭名
+  - word: 好水好山
+    meaning: 美好的山水
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11284,7 +11642,11 @@ poems:
     何方可化身千亿，一树梅花一放翁。
 
     '
-  annotations: []
+  annotations:
+  - word: 梅花
+    meaning: 梅树开的花
+  - word: 绝句
+    meaning: 四句诗
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11308,7 +11670,13 @@ poems:
     向来枉费推移力，此日中流自在行。
 
     '
-  annotations: []
+  annotations:
+  - word: 活水亭
+    meaning: 亭名
+  - word: 方塘
+    meaning: 方形的水塘
+  - word: 渠
+    meaning: 它，指水塘
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11335,7 +11703,11 @@ poems:
     不知天外雁，何事乐长征？
 
     '
-  annotations: []
+  annotations:
+  - word: 武昌
+    meaning: 今湖北武汉
+  - word: 秋风
+    meaning: 秋天的风
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11358,7 +11730,11 @@ poems:
     休把客衣轻浣濯，此中犹有帝京尘。
 
     '
-  annotations: []
+  annotations:
+  - word: 重赠
+    meaning: 再次赠诗
+  - word: 吴国宾
+    meaning: 友人名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11381,7 +11757,13 @@ poems:
     城头一片西山月，多少征人马上看。
 
     '
-  annotations: []
+  annotations:
+  - word: 塞上
+    meaning: 边塞
+  - word: 元美
+    meaning: 王世贞的字
+  - word: 送
+    meaning: 送别
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11403,7 +11785,11 @@ poems:
     波光水鸟惊犹宿，露冷流萤湿不飞。
 
     '
-  annotations: []
+  annotations:
+  - word: 江宿
+    meaning: 在江上住宿
+  - word: 渔灯
+    meaning: 渔船上的灯
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11426,7 +11812,11 @@ poems:
     行人便觉须眉绿，一路蝉声过许州。
 
     '
-  annotations: []
+  annotations:
+  - word: 许州
+    meaning: 今河南许昌
+  - word: 过
+    meaning: 经过
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11450,7 +11840,13 @@ poems:
     檐流未滴梅花冻，一种清孤不等闲。
 
     '
-  annotations: []
+  annotations:
+  - word: 山中
+    meaning: 山里
+  - word: 雪后
+    meaning: 下雪之后
+  - word: 梅花
+    meaning: 梅树开的花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11476,7 +11872,11 @@ poems:
     四百万人同一哭，去年今日割台湾。
 
     '
-  annotations: []
+  annotations:
+  - word: 春愁
+    meaning: 春天的忧愁
+  - word: 落花
+    meaning: 飘落的花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11502,7 +11902,13 @@ poems:
     人语驿边桥。
 
     '
-  annotations: []
+  annotations:
+  - word: 梦江南
+    meaning: 词牌名
+  - word: 兰烬
+    meaning: 兰膏蜡烛的残烬
+  - word: 落
+    meaning: 落下
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11525,7 +11931,11 @@ poems:
     占得杏梁安稳处，体轻唯有主人怜，堪羡好因缘。
 
     '
-  annotations: []
+  annotations:
+  - word: 忆江南
+    meaning: 词牌名
+  - word: 衔泥
+    meaning: 燕子衔泥筑巢
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11556,7 +11966,17 @@ poems:
     若到江南赶上春，千万和春住。
 
     '
-  annotations: []
+  annotations:
+  - word: 卜算子
+    meaning: 词牌名
+  - word: 鲍浩然
+    meaning: 友人名
+  - word: 浙东
+    meaning: 浙江东部
+  - word: 水是眼波横
+    meaning: 水像美人的眼波
+  - word: 山是眉峰聚
+    meaning: 山像美人皱的眉
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11586,7 +12006,13 @@ poems:
     相思只在，丁香枝上，豆蔻梢头。
 
     '
-  annotations: []
+  annotations:
+  - word: 眼儿媚
+    meaning: 词牌名
+  - word: 杨柳
+    meaning: 柳树
+  - word: 轻柔
+    meaning: 柔软轻盈
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11626,7 +12052,13 @@ poems:
     伤情处，高城望断，灯火已黄昏。
 
     '
-  annotations: []
+  annotations:
+  - word: 满庭芳
+    meaning: 词牌名
+  - word: 山抹微云
+    meaning: 山上轻抹着微云
+  - word: 天粘衰草
+    meaning: 天际与枯草相接
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11665,7 +12097,13 @@ poems:
     歌筵畔，先安簟枕，容我醉时眠。
 
     '
-  annotations: []
+  annotations:
+  - word: 满庭芳
+    meaning: 词牌名
+  - word: 溧水
+    meaning: 今江苏溧水
+  - word: 无想山
+    meaning: 山名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11693,7 +12131,13 @@ poems:
     一尊心事百年期。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 岚光
+    meaning: 山间雾气的光
+  - word: 水拍堤
+    meaning: 水拍打堤岸
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11721,7 +12165,13 @@ poems:
     仔细看山山不动，是船行。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 五两
+    meaning: 测风旗
+  - word: 竿头
+    meaning: 旗杆顶端
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11749,7 +12199,13 @@ poems:
     信回刚道别多时。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 杨柳
+    meaning: 柳树
+  - word: 送马蹄
+    meaning: 送别行人
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11772,7 +12228,13 @@ poems:
     腻粉半沾金靥子，残香犹暖绣熏笼，蕙心无处与人同。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 凋疏
+    meaning: 凋谢稀疏
+  - word: 不耐风
+    meaning: 经不住风吹
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11802,7 +12264,13 @@ poems:
     兰红波碧忆潇湘。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 蓼岸
+    meaning: 长满蓼草的岸边
+  - word: 橘柚
+    meaning: 橘子和柚子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11827,7 +12295,13 @@ poems:
     罗袜况兼金菡萏，雪肌仍是玉琅玕，骨香腰细更沈檀。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 宿醉
+    meaning: 隔夜的醉意
+  - word: 髻鬟
+    meaning: 发髻
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11856,7 +12330,13 @@ poems:
     西风梧井叶先愁。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 铜花
+    meaning: 水面的光泽
+  - word: 冷不收
+    meaning: 冷寂无人
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11886,7 +12366,13 @@ poems:
     而今堪诵北山移。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 泉湖
+    meaning: 地名
+  - word: 闽宪
+    meaning: 福建提刑
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11910,7 +12396,11 @@ poems:
     遥指平山山外路，断鸿无数水迢迢，新愁分付广陵潮。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 红桥
+    meaning: 扬州红桥
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11938,7 +12428,11 @@ poems:
     不知来岁与谁看。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 菊节
+    meaning: 重阳节
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11968,7 +12462,11 @@ poems:
     几时归去不销魂。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 春情
+    meaning: 春天的情思
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -11997,7 +12495,13 @@ poems:
     卖瓜声过竹边村。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 常山
+    meaning: 地名
+  - word: 即事
+    meaning: 就眼前事写诗
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12027,7 +12531,11 @@ poems:
     雨条烟叶系人情。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 彩旌
+    meaning: 彩色的旗帜
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12054,7 +12562,13 @@ poems:
     闺中红日奈何长。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 青门
+    meaning: 长安城东门
+  - word: 柳色黄
+    meaning: 柳树初发芽
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12081,7 +12595,13 @@ poems:
     夕阳山影自萧森。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 兵备
+    meaning: 官职名
+  - word: 画马
+    meaning: 画的马
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12106,7 +12626,13 @@ poems:
     粉黛暗愁金带枕，鸳鸯空绕画罗衣，那堪辜负不思归！
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 云淡
+    meaning: 云很淡
+  - word: 风高
+    meaning: 风很大
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12135,7 +12661,13 @@ poems:
     岳云抛翠上吟鞭。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 都运
+    meaning: 转运使
+  - word: 关中
+    meaning: 陕西一带
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12171,7 +12703,11 @@ poems:
     回首望霄汉，双泪堕清波。
 
     '
-  annotations: []
+  annotations:
+  - word: 水调歌头
+    meaning: 词牌名
+  - word: 太湖
+    meaning: 江苏太湖
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12206,7 +12742,11 @@ poems:
     此意仗江月，分付与沙鸥。
 
     '
-  annotations: []
+  annotations:
+  - word: 水调歌头
+    meaning: 词牌名
+  - word: 多景楼
+    meaning: 镇江北固山上
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12240,7 +12780,11 @@ poems:
     烽火平安夜，归梦绕家山。
 
     '
-  annotations: []
+  annotations:
+  - word: 水调歌头
+    meaning: 词牌名
+  - word: 剑阁
+    meaning: 四川剑门关
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12275,7 +12819,13 @@ poems:
     对此貌无恐，心亦畏风波。
 
     '
-  annotations: []
+  annotations:
+  - word: 水调歌头
+    meaning: 词牌名
+  - word: 大风
+    meaning: 猛烈的风
+  - word: 沙子
+    meaning: 地名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12301,7 +12851,15 @@ poems:
     江晚正愁余，山深闻鹧鸪。
 
     '
-  annotations: []
+  annotations:
+  - word: 菩萨蛮
+    meaning: 词牌名
+  - word: 造口
+    meaning: 地名，在今江西
+  - word: 郁孤台
+    meaning: 赣州城上的台
+  - word: 清江
+    meaning: 赣江
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12331,7 +12889,13 @@ poems:
     沉水卧时烧，香消酒未消。
 
     '
-  annotations: []
+  annotations:
+  - word: 菩萨蛮
+    meaning: 词牌名
+  - word: 风柔
+    meaning: 风轻柔
+  - word: 日薄
+    meaning: 阳光淡薄
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12365,7 +12929,11 @@ poems:
     月明生夜寒。
 
     '
-  annotations: []
+  annotations:
+  - word: 菩萨蛮
+    meaning: 词牌名
+  - word: 芭蕉
+    meaning: 芭蕉树
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12392,7 +12960,13 @@ poems:
     皎皎绮罗光，青青云粉状。
 
     '
-  annotations: []
+  annotations:
+  - word: 菩萨蛮
+    meaning: 词牌名
+  - word: 霏霏
+    meaning: 雨雪纷纷
+  - word: 回塘
+    meaning: 迂回的池塘
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12420,7 +12994,11 @@ poems:
     又是月黄昏，寒灯人闭门。
 
     '
-  annotations: []
+  annotations:
+  - word: 菩萨蛮
+    meaning: 词牌名
+  - word: 水口
+    meaning: 地名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12447,7 +13025,13 @@ poems:
     今日此樽空，知君何日同！
 
     '
-  annotations: []
+  annotations:
+  - word: 菩萨蛮
+    meaning: 词牌名
+  - word: 画船
+    meaning: 装饰的船
+  - word: 捶鼓
+    meaning: 敲鼓
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12476,7 +13060,11 @@ poems:
     漫道玉为堂，玉堂今夜长。
 
     '
-  annotations: []
+  annotations:
+  - word: 菩萨蛮
+    meaning: 词牌名
+  - word: 三通鼓
+    meaning: 三次鼓声
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12503,7 +13091,13 @@ poems:
     时节欲黄昏，无憀独倚门。
 
     '
-  annotations: []
+  annotations:
+  - word: 菩萨蛮
+    meaning: 词牌名
+  - word: 南园
+    meaning: 南边的园子
+  - word: 轻絮
+    meaning: 柳絮
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12531,7 +13125,11 @@ poems:
     骚人可煞无情思，何事当年不见收。
 
     '
-  annotations: []
+  annotations:
+  - word: 鹧鸪天
+    meaning: 词牌名
+  - word: 桂花
+    meaning: 桂树的花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12562,7 +13160,13 @@ poems:
     归家恐被翁姑责，窃取金杯作照凭。
 
     '
-  annotations: []
+  annotations:
+  - word: 鹧鸪天
+    meaning: 词牌名
+  - word: 蓬壶
+    meaning: 蓬莱仙岛
+  - word: 灿烂灯
+    meaning: 明亮的灯
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12594,7 +13198,13 @@ poems:
     谁家寒食归宁女，笑语柔桑陌上来。
 
     '
-  annotations: []
+  annotations:
+  - word: 鹧鸪天
+    meaning: 词牌名
+  - word: 鹅湖
+    meaning: 江西铅山
+  - word: 病起
+    meaning: 大病初愈
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12630,7 +13240,13 @@ poems:
     倩双成、一曲紫云回，红莲折。
 
     '
-  annotations: []
+  annotations:
+  - word: 满江红
+    meaning: 词牌名
+  - word: 翠幕
+    meaning: 翠绿的帷幕
+  - word: 深庭
+    meaning: 深深的庭院
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12666,7 +13282,13 @@ poems:
     算遗踪、犹有枕囊留，相思物。
 
     '
-  annotations: []
+  annotations:
+  - word: 满江红
+    meaning: 词牌名
+  - word: 菊
+    meaning: 菊花
+  - word: 和韵
+    meaning: 依韵唱和
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12706,7 +13328,13 @@ poems:
     到如今、修竹满山阴，空陈迹。
 
     '
-  annotations: []
+  annotations:
+  - word: 满江红
+    meaning: 词牌名
+  - word: 东武
+    meaning: 今山东诸城
+  - word: 流杯亭
+    meaning: 亭名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12738,7 +13366,17 @@ poems:
     古今多少事，都付笑谈中。
 
     '
-  annotations: []
+  annotations:
+  - word: 临江仙
+    meaning: 词牌名
+  - word: 滚滚
+    meaning: 奔腾的样子
+  - word: 东逝水
+    meaning: 向东流去的水
+  - word: 浪花
+    meaning: 波浪的泡沫
+  - word: 英雄
+    meaning: 杰出人物
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12770,7 +13408,11 @@ poems:
     欲知肠断处，梁上暗尘飞。
 
     '
-  annotations: []
+  annotations:
+  - word: 临江仙
+    meaning: 词牌名
+  - word: 冰合井
+    meaning: 井水结冰
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12802,7 +13444,11 @@ poems:
     马当山下路，空见野云还。
 
     '
-  annotations: []
+  annotations:
+  - word: 临江仙
+    meaning: 词牌名
+  - word: 马当山
+    meaning: 在今安徽
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12833,7 +13479,13 @@ poems:
     恨无千日酒，空断九回肠。
 
     '
-  annotations: []
+  annotations:
+  - word: 临江仙
+    meaning: 词牌名
+  - word: 长安
+    meaning: 代指京城
+  - word: 名利客
+    meaning: 追逐名利的人
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12865,7 +13517,11 @@ poems:
     不知潮欲落，渔梦悄然生。
 
     '
-  annotations: []
+  annotations:
+  - word: 临江仙
+    meaning: 词牌名
+  - word: 瓜洲
+    meaning: 今江苏扬州南
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12900,7 +13556,13 @@ poems:
     问花花又娇无语。
 
     '
-  annotations: []
+  annotations:
+  - word: 蝶恋花
+    meaning: 词牌名
+  - word: 月桥
+    meaning: 拱桥似月
+  - word: 花半吐
+    meaning: 花开了一半
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12934,7 +13596,11 @@ poems:
     人闲倚遍阑干曲。
 
     '
-  annotations: []
+  annotations:
+  - word: 蝶恋花
+    meaning: 词牌名
+  - word: 庭院深深
+    meaning: 庭院很深
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -12969,7 +13635,11 @@ poems:
     栏干捶碎，酒狂忠愤俱发。
 
     '
-  annotations: []
+  annotations:
+  - word: 念奴娇
+    meaning: 词牌名
+  - word: 牛渚
+    meaning: 在今安徽当涂
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13005,7 +13675,13 @@ poems:
     回首乡关归路难。
 
     '
-  annotations: []
+  annotations:
+  - word: 减字木兰花
+    meaning: 词牌名
+  - word: 雄州
+    meaning: 地名
+  - word: 驿
+    meaning: 驿站
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13039,7 +13715,11 @@ poems:
     翠飐红轻，时下凌霄百尺英。
 
     '
-  annotations: []
+  annotations:
+  - word: 减字木兰花
+    meaning: 词牌名
+  - word: 双龙
+    meaning: 两条龙
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13119,7 +13799,13 @@ poems:
     麒麟阁，岂中兴人物，不画儒冠。
 
     '
-  annotations: []
+  annotations:
+  - word: 沁园春
+    meaning: 词牌名
+  - word: 丁酉
+    meaning: 干支纪年
+  - word: 感事
+    meaning: 有感而发
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13151,7 +13837,11 @@ poems:
     谁会凭栏意。
 
     '
-  annotations: []
+  annotations:
+  - word: 点绛唇
+    meaning: 词牌名
+  - word: 感兴
+    meaning: 有感而兴
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13187,7 +13877,11 @@ poems:
     只有归时好。
 
     '
-  annotations: []
+  annotations:
+  - word: 点绛唇
+    meaning: 词牌名
+  - word: 东风
+    meaning: 春风
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13218,7 +13912,13 @@ poems:
     砌下落花风起，罗衣特地春寒。
 
     '
-  annotations: []
+  annotations:
+  - word: 清平乐
+    meaning: 词牌名
+  - word: 雨晴
+    meaning: 雨后放晴
+  - word: 烟晚
+    meaning: 傍晚的烟雾
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13248,7 +13948,13 @@ poems:
     正是销魂时节，东风满树花飞。
 
     '
-  annotations: []
+  annotations:
+  - word: 清平乐
+    meaning: 词牌名
+  - word: 春光
+    meaning: 春天的景色
+  - word: 欲暮
+    meaning: 将要结束
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13276,7 +13982,13 @@ poems:
     诗句欲成时，没入苍烟丛里。
 
     '
-  annotations: []
+  annotations:
+  - word: 清平乐令
+    meaning: 词牌名
+  - word: 曲阑
+    meaning: 弯曲的栏杆
+  - word: 独倚
+    meaning: 独自倚靠
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13304,7 +14016,13 @@ poems:
     留得东风数点，只缘娇嫩春迟。
 
     '
-  annotations: []
+  annotations:
+  - word: 清平乐
+    meaning: 词牌名
+  - word: 检校
+    meaning: 巡视
+  - word: 山园
+    meaning: 山中的园子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13332,7 +14050,13 @@ poems:
     烛明香暗画堂深，满鬓青霜残雪思难任。
 
     '
-  annotations: []
+  annotations:
+  - word: 虞美人
+    meaning: 词牌名
+  - word: 庭芜
+    meaning: 庭院杂草
+  - word: 柳眼
+    meaning: 柳芽
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13360,7 +14084,11 @@ poems:
     故人早晚上高台，赠我江南春色、一枝梅。
 
     '
-  annotations: []
+  annotations:
+  - word: 虞美人
+    meaning: 词牌名
+  - word: 公度
+    meaning: 友人名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13396,7 +14124,11 @@ poems:
     起看檐蛛结网、又寻思。
 
     '
-  annotations: []
+  annotations:
+  - word: 虞美人
+    meaning: 词牌名
+  - word: 秋感
+    meaning: 秋天的感怀
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13425,7 +14157,13 @@ poems:
     功名事了，不待老僧招。
 
     '
-  annotations: []
+  annotations:
+  - word: 满庭芳
+    meaning: 词牌名
+  - word: 天风
+    meaning: 天上的风
+  - word: 海涛
+    meaning: 海上的波涛
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13460,7 +14198,11 @@ poems:
     纵樽前痛饮，狂歌似旧，情难依旧。
 
     '
-  annotations: []
+  annotations:
+  - word: 水龙吟
+    meaning: 词牌名
+  - word: 惜春
+    meaning: 惋惜春天
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13496,7 +14238,11 @@ poems:
     抱素琴，独向银蟾影里，此怀难寄。
 
     '
-  annotations: []
+  annotations:
+  - word: 水龙吟
+    meaning: 词牌名
+  - word: 长江
+    meaning: 中国第一长河
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13533,7 +14279,13 @@ poems:
     正凄凉望极，中原路杳，月来南浦。
 
     '
-  annotations: []
+  annotations:
+  - word: 水龙吟
+    meaning: 词牌名
+  - word: 翠鳌
+    meaning: 绿色巨龟
+  - word: 沧溟
+    meaning: 大海
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13561,7 +14313,13 @@ poems:
     惟有御沟声断，似知人呜咽。
 
     '
-  annotations: []
+  annotations:
+  - word: 好事近
+    meaning: 词牌名
+  - word: 汴京
+    meaning: 今河南开封
+  - word: 教坊
+    meaning: 宫廷音乐机构
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13589,7 +14347,11 @@ poems:
     恰好乌篷小小，载一肩秋色。
 
     '
-  annotations: []
+  annotations:
+  - word: 好事近
+    meaning: 词牌名
+  - word: 杭苇
+    meaning: 杭州的芦苇
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13617,7 +14379,11 @@ poems:
     却向春风亭畔，数梧桐叶下。
 
     '
-  annotations: []
+  annotations:
+  - word: 好事近
+    meaning: 词牌名
+  - word: 危楼
+    meaning: 高楼
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13689,7 +14455,13 @@ poems:
     风萧瑟，荻花满地秋江白。
 
     '
-  annotations: []
+  annotations:
+  - word: 渔家傲
+    meaning: 词牌名
+  - word: 东昌
+    meaning: 地名
+  - word: 道中
+    meaning: 路途中
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13719,7 +14491,15 @@ poems:
     待到山花烂漫时，她在丛中笑。
 
     '
-  annotations: []
+  annotations:
+  - word: 卜算子
+    meaning: 词牌名
+  - word: 咏梅
+    meaning: 歌咏梅花
+  - word: 俏
+    meaning: 美好
+  - word: 百丈冰
+    meaning: 极厚的冰
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13744,7 +14524,11 @@ poems:
     弹泪别东风，把酒浇飞絮：化了浮萍也是愁，莫向天涯去！
 
     '
-  annotations: []
+  annotations:
+  - word: 卜算子
+    meaning: 词牌名
+  - word: 燕子
+    meaning: 飞来飞去的小鸟
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13771,7 +14555,13 @@ poems:
     冷艳孤光照眼明，只欠些儿雪。
 
     '
-  annotations: []
+  annotations:
+  - word: 卜算子
+    meaning: 词牌名
+  - word: 雪月
+    meaning: 雪和月
+  - word: 相宜
+    meaning: 相配
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13801,7 +14591,13 @@ poems:
     终日望君君不至，举头闻鹊喜。
 
     '
-  annotations: []
+  annotations:
+  - word: 谒金门
+    meaning: 词牌名
+  - word: 风乍起
+    meaning: 风突然吹起
+  - word: 吹皱一池春水
+    meaning: 吹皱了一池春水
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13830,7 +14626,11 @@ poems:
     历历危樯沙外泊，东风晚来恶。
 
     '
-  annotations: []
+  annotations:
+  - word: 谒金门
+    meaning: 词牌名
+  - word: 杨花
+    meaning: 柳絮
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13865,7 +14665,13 @@ poems:
     画檐残雨滴。
 
     '
-  annotations: []
+  annotations:
+  - word: 谒金门
+    meaning: 词牌名
+  - word: 柳丝
+    meaning: 柳条
+  - word: 碧
+    meaning: 翠绿
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13889,7 +14695,11 @@ poems:
     两岸人家微雨后，收红豆，树底纤纤抬素手。
 
     '
-  annotations: []
+  annotations:
+  - word: 南乡子
+    meaning: 词牌名
+  - word: 南中
+    meaning: 南方
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13916,7 +14726,11 @@ poems:
     借问夏城屯戍客，是否思乡？
 
     '
-  annotations: []
+  annotations:
+  - word: 浪淘沙
+    meaning: 词牌名
+  - word: 秋
+    meaning: 秋天
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13945,7 +14759,13 @@ poems:
     掷与巴江流到海，切莫回头。
 
     '
-  annotations: []
+  annotations:
+  - word: 浪淘沙
+    meaning: 词牌名
+  - word: 曹溪驿
+    meaning: 驿站名
+  - word: 涪江
+    meaning: 四川的河流
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13968,7 +14788,11 @@ poems:
     愁见滩头夜泊处，风翻暗浪打船声。
 
     '
-  annotations: []
+  annotations:
+  - word: 浪淘沙
+    meaning: 词牌名
+  - word: 青草湖
+    meaning: 洞庭湖南部
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -13991,7 +14815,9 @@ poems:
     女郎剪下鸳鸯锦，将向中流匹晚霞。
 
     '
-  annotations: []
+  annotations:
+  - word: 浪淘沙
+    meaning: 词牌名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14013,7 +14839,9 @@ poems:
     须臾却入海门去，卷起沙堆似雪堆。
 
     '
-  annotations: []
+  annotations:
+  - word: 浪淘沙
+    meaning: 词牌名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14050,7 +14878,13 @@ poems:
     念故人，千里至此共明月。
 
     '
-  annotations: []
+  annotations:
+  - word: 踏莎行
+    meaning: 词牌名
+  - word: 寒草
+    meaning: 冬天枯草
+  - word: 烟光
+    meaning: 烟雾般的光
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14082,7 +14916,13 @@ poems:
     唤取玉人来共、一帘风。
 
     '
-  annotations: []
+  annotations:
+  - word: 南歌子
+    meaning: 词牌名
+  - word: 荷盖
+    meaning: 荷叶
+  - word: 新绿
+    meaning: 新长出的绿色
   translation: 荷叶倾倒展现出新绿之色，陈旧的红色榴巾满是褶皱。水中的亭子，朦胧的水榭都在傍晚的凉风中。天上又是一弯新月，静静地照着窗栊。 莲藕洁白如雪，橱柜的纱窗细薄得犹如不存在。这样美好的夜晚和谁一起维持呢，最好是唤来美子一同沐浴在一帘春风里。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14109,7 +14949,11 @@ poems:
     流年回首付东流，凭仗挽回潘鬓，莫教秋。
 
     '
-  annotations: []
+  annotations:
+  - word: 南歌子
+    meaning: 词牌名
+  - word: 东园
+    meaning: 东边的园子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14135,7 +14979,13 @@ poems:
     语已多，情未了，回首犹重道：记得绿罗裙，处处怜芳草。
 
     '
-  annotations: []
+  annotations:
+  - word: 生查子
+    meaning: 词牌名
+  - word: 春山
+    meaning: 春天的山
+  - word: 烟欲收
+    meaning: 雾气将散
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14161,7 +15011,11 @@ poems:
     先望立功勋，后见君王面。
 
     '
-  annotations: []
+  annotations:
+  - word: 生查子
+    meaning: 词牌名
+  - word: 龙泉剑
+    meaning: 名剑
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14189,7 +15043,13 @@ poems:
     不是望金山，我自思量禹。
 
     '
-  annotations: []
+  annotations:
+  - word: 生查子
+    meaning: 词牌名
+  - word: 京口
+    meaning: 今江苏镇江
+  - word: 尘表亭
+    meaning: 亭名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14216,7 +15076,11 @@ poems:
     借得洞庭春，飞上桃花面。
 
     '
-  annotations: []
+  annotations:
+  - word: 生查子
+    meaning: 词牌名
+  - word: 软金杯
+    meaning: 金色的酒杯
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14244,7 +15108,11 @@ poems:
     却笑灯蛾，学他蝴蝶，照影频飞。
 
     '
-  annotations: []
+  annotations:
+  - word: 柳梢青
+    meaning: 词牌名
+  - word: 灯花
+    meaning: 灯芯的结花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14275,7 +15143,13 @@ poems:
     何日是归年。
 
     '
-  annotations: []
+  annotations:
+  - word: 望江南
+    meaning: 词牌名
+  - word: 燕塞
+    meaning: 北方边塞
+  - word: 雪
+    meaning: 大雪
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14303,7 +15177,11 @@ poems:
     曾记，曾记，人在武陵微醉。
 
     '
-  annotations: []
+  annotations:
+  - word: 如梦令
+    meaning: 词牌名
+  - word: 梨花
+    meaning: 梨树的花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14332,7 +15210,11 @@ poems:
     帘外五更风雨。
 
     '
-  annotations: []
+  annotations:
+  - word: 如梦令
+    meaning: 词牌名
+  - word: 春归
+    meaning: 春天离去
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14358,7 +15240,11 @@ poems:
     但洗，但洗，俯为人间一切。
 
     '
-  annotations: []
+  annotations:
+  - word: 如梦令
+    meaning: 词牌名
+  - word: 自净
+    meaning: 自我清净
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14388,7 +15274,11 @@ poems:
     半窗灯晕，几叶芭蕉，客梦床头。
 
     '
-  annotations: []
+  annotations:
+  - word: 诉衷情
+    meaning: 词牌名
+  - word: 秋情
+    meaning: 秋天的情思
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14419,7 +15309,11 @@ poems:
     三千粉黛，十二阑干，一片云头。
 
     '
-  annotations: []
+  annotations:
+  - word: 诉衷情
+    meaning: 词牌名
+  - word: 寒食
+    meaning: 寒食节
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14446,7 +15340,11 @@ poems:
     登临无限意，何处望京华。
 
     '
-  annotations: []
+  annotations:
+  - word: 九日
+    meaning: 重阳节
+  - word: 茱萸
+    meaning: 重阳节佩戴的植物
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14473,7 +15371,13 @@ poems:
     云外好呼南去雁，系书先为报江乡。
 
     '
-  annotations: []
+  annotations:
+  - word: 九日
+    meaning: 重阳节
+  - word: 清水营
+    meaning: 军营名
+  - word: 登城
+    meaning: 登上城楼
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14499,7 +15403,13 @@ poems:
     山阁若逢阎伯屿，方君诗思敌王郎。
 
     '
-  annotations: []
+  annotations:
+  - word: 九日
+    meaning: 重阳节
+  - word: 吴山
+    meaning: 杭州吴山
+  - word: 值雨
+    meaning: 恰好遇上下雨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14529,7 +15439,11 @@ poems:
     翻身整顿着残棋，沉吟应劫迟。
 
     '
-  annotations: []
+  annotations:
+  - word: 阮郎归
+    meaning: 词牌名
+  - word: 残枝
+    meaning: 凋残的枝条
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14554,7 +15468,13 @@ poems:
     空有姑苏台上月，如西子镜照江城。
 
     '
-  annotations: []
+  annotations:
+  - word: 江城子
+    meaning: 词牌名
+  - word: 金陵
+    meaning: 今南京
+  - word: 岸草平
+    meaning: 岸边的草很平
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14597,7 +15517,13 @@ poems:
     便似得班超，封侯万里，归计恐迟暮。
 
     '
-  annotations: []
+  annotations:
+  - word: 摸鱼儿
+    meaning: 词牌名
+  - word: 东皋
+    meaning: 地名
+  - word: 寓居
+    meaning: 寄居
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14641,7 +15567,11 @@ poems:
     悔不早荆钗，暮天修竹，头白倚寒翠。
 
     '
-  annotations: []
+  annotations:
+  - word: 摸鱼儿
+    meaning: 词牌名
+  - word: 西风
+    meaning: 秋风
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14681,7 +15611,11 @@ poems:
     怎知人、一点新愁，寸心万里。
 
     '
-  annotations: []
+  annotations:
+  - word: 瑞鹤仙
+    meaning: 词牌名
+  - word: 卷帘
+    meaning: 卷起帘子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14716,7 +15650,13 @@ poems:
     无寻处，惟有少年心。
 
     '
-  annotations: []
+  annotations:
+  - word: 小重山
+    meaning: 词牌名
+  - word: 柳暗
+    meaning: 柳树成荫
+  - word: 花明
+    meaning: 花朵明艳
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14751,7 +15691,13 @@ poems:
     青溪水，流得到红桥。
 
     '
-  annotations: []
+  annotations:
+  - word: 小重山
+    meaning: 词牌名
+  - word: 疏雅
+    meaning: 稀疏的
+  - word: 柳条
+    meaning: 柳树枝条
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14786,7 +15732,13 @@ poems:
     船儿住，且醉浪花中。
 
     '
-  annotations: []
+  annotations:
+  - word: 小重山
+    meaning: 词牌名
+  - word: 三山
+    meaning: 地名
+  - word: 西湖
+    meaning: 杭州西湖
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14814,7 +15766,13 @@ poems:
     片红休埽尽从伊，留待舞人归。
 
     '
-  annotations: []
+  annotations:
+  - word: 喜迁莺
+    meaning: 词牌名
+  - word: 晓月
+    meaning: 黎明的月亮
+  - word: 坠
+    meaning: 落下
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14849,7 +15807,11 @@ poems:
     孤负几韶华。
 
     '
-  annotations: []
+  annotations:
+  - word: 喜迁莺
+    meaning: 词牌名
+  - word: 鸠雨
+    meaning: 布谷鸟叫时的雨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14874,7 +15836,13 @@ poems:
     行云却在行舟下，空水澄鲜，俯仰留连，疑是湖中别有天。
 
     '
-  annotations: []
+  annotations:
+  - word: 采桑子
+    meaning: 词牌名
+  - word: 画船
+    meaning: 装饰的船
+  - word: 西湖
+    meaning: 杭州西湖
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14901,7 +15869,15 @@ poems:
     胜似春光，廖廓江天万里霜。
 
     '
-  annotations: []
+  annotations:
+  - word: 采桑子
+    meaning: 词牌名
+  - word: 重阳
+    meaning: 重阳节
+  - word: 人生易老
+    meaning: 人容易衰老
+  - word: 战地黄花
+    meaning: 战场上的菊花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14931,7 +15907,13 @@ poems:
     何处疏钟，一穗灯花似梦中。
 
     '
-  annotations: []
+  annotations:
+  - word: 采桑子
+    meaning: 词牌名
+  - word: 严宵
+    meaning: 严寒的夜
+  - word: 拥絮
+    meaning: 裹着棉被
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -14971,7 +15953,13 @@ poems:
     听著鸣蛩，一声声是怨。
 
     '
-  annotations: []
+  annotations:
+  - word: 齐天乐
+    meaning: 词牌名
+  - word: 疏雨
+    meaning: 稀疏的雨
+  - word: 金井
+    meaning: 有金属栏杆的水井
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15000,7 +15988,13 @@ poems:
     狎兴生疏，酒徒萧索，不似少年时。
 
     '
-  annotations: []
+  annotations:
+  - word: 少年游
+    meaning: 词牌名
+  - word: 长安
+    meaning: 代指京城
+  - word: 古道
+    meaning: 古老的道路
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15030,7 +16024,13 @@ poems:
     更特地、忆王孙。
 
     '
-  annotations: []
+  annotations:
+  - word: 少年游
+    meaning: 词牌名
+  - word: 栏干
+    meaning: 栏杆
+  - word: 独凭
+    meaning: 独自倚靠
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15060,7 +16060,13 @@ poems:
     也应似旧，盈盈秋水，淡淡春山。
 
     '
-  annotations: []
+  annotations:
+  - word: 眼儿媚
+    meaning: 词牌名
+  - word: 黄昏
+    meaning: 傍晚
+  - word: 杏花寒
+    meaning: 杏花时节的寒意
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15090,7 +16096,11 @@ poems:
     明日重扶残醉，来寻陌上花钿。
 
     '
-  annotations: []
+  annotations:
+  - word: 风入松
+    meaning: 词牌名
+  - word: 买花钱
+    meaning: 买花的费用
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15130,7 +16140,13 @@ poems:
     一夜看承应未别，秋好处，雁来时。
 
     '
-  annotations: []
+  annotations:
+  - word: 江神子
+    meaning: 词牌名，同江城子
+  - word: 荷塘
+    meaning: 荷花池
+  - word: 赏桂
+    meaning: 赏桂花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15167,7 +16183,11 @@ poems:
     不教蓬径通。
 
     '
-  annotations: []
+  annotations:
+  - word: 更漏子
+    meaning: 词牌名
+  - word: 秋
+    meaning: 秋天
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15202,7 +16222,11 @@ poems:
     任他红日长。
 
     '
-  annotations: []
+  annotations:
+  - word: 更漏子
+    meaning: 词牌名
+  - word: 雪藏梅
+    meaning: 雪中藏着梅花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15237,7 +16261,13 @@ poems:
     望长桥上，灯火乱，使君还。
 
     '
-  annotations: []
+  annotations:
+  - word: 行香子
+    meaning: 词牌名
+  - word: 泗守
+    meaning: 泗州太守
+  - word: 南山
+    meaning: 山名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15277,7 +16307,13 @@ poems:
     数峰江上，芳草天涯，参差烟树。
 
     '
-  annotations: []
+  annotations:
+  - word: 烛影摇红
+    meaning: 词牌名
+  - word: 安陆
+    meaning: 地名
+  - word: 浮云楼
+    meaning: 楼名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15304,7 +16340,11 @@ poems:
     八行书，千里梦，雁南飞。
 
     '
-  annotations: []
+  annotations:
+  - word: 酒泉子
+    meaning: 词牌名
+  - word: 楚女
+    meaning: 楚地的女子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15340,7 +16380,15 @@ poems:
     至今商女，时时犹唱，后庭遗曲。
 
     '
-  annotations: []
+  annotations:
+  - word: 桂枝香
+    meaning: 词牌名
+  - word: 金陵
+    meaning: 今南京
+  - word: 怀古
+    meaning: 怀念古事
+  - word: 千里澄江
+    meaning: 千里清澈的江水
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15377,7 +16425,13 @@ poems:
     人在江南，心在江南。
 
     '
-  annotations: []
+  annotations:
+  - word: 一剪梅
+    meaning: 词牌名
+  - word: 漠漠
+    meaning: 迷蒙
+  - word: 春阴
+    meaning: 春天的阴天
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15406,7 +16460,19 @@ poems:
     别是一般滋味在心头。
 
     '
-  annotations: []
+  annotations:
+  - word: 相见欢
+    meaning: 词牌名
+  - word: 无言
+    meaning: 默默无语
+  - word: 西楼
+    meaning: 西边的楼阁
+  - word: 如钩
+    meaning: 像钩子一样弯曲
+  - word: 剪不断
+    meaning: 无法剪断
+  - word: 离愁
+    meaning: 离别的愁绪
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15444,7 +16510,13 @@ poems:
     绀云欹，玉搔斜，酒初醒。
 
     '
-  annotations: []
+  annotations:
+  - word: 夜游宫
+    meaning: 词牌名
+  - word: 竹窗
+    meaning: 竹制的窗
+  - word: 听雨
+    meaning: 听雨声
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15474,7 +16546,11 @@ poems:
     归来沈醉月朦胧，觉花气、满襟犹润。
 
     '
-  annotations: []
+  annotations:
+  - word: 步蟾宫
+    meaning: 词牌名
+  - word: 酴釄
+    meaning: 一种花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15512,7 +16588,13 @@ poems:
     欲买桂花同载酒，终不似，少年游。
 
     '
-  annotations: []
+  annotations:
+  - word: 唐多令
+    meaning: 词牌名
+  - word: 芦叶
+    meaning: 芦苇的叶子
+  - word: 汀洲
+    meaning: 水边的沙洲
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15543,7 +16625,13 @@ poems:
     明月小楼间，第一夜相思泪弹。
 
     '
-  annotations: []
+  annotations:
+  - word: 太常引
+    meaning: 词牌名
+  - word: 参议
+    meaning: 官职名
+  - word: 山东
+    meaning: 太行山以东
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15573,7 +16661,13 @@ poems:
     回首绿波三楚暮，接天流。
 
     '
-  annotations: []
+  annotations:
+  - word: 摊破浣溪沙
+    meaning: 词牌名
+  - word: 真珠
+    meaning: 珍珠
+  - word: 玉钩
+    meaning: 玉制的帘钩
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15611,7 +16705,11 @@ poems:
     花易老、烟水无穷。
 
     '
-  annotations: []
+  annotations:
+  - word: 婆罗门引
+    meaning: 词牌名
+  - word: 暮霞
+    meaning: 傍晚的彩霞
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15647,7 +16745,11 @@ poems:
     莫问调羹心事，且论笛里平生。
 
     '
-  annotations: []
+  annotations:
+  - word: 一萼红
+    meaning: 词牌名
+  - word: 盆梅
+    meaning: 盆栽的梅花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15683,7 +16785,11 @@ poems:
     记当日、门掩梨花，剪灯深夜语。
 
     '
-  annotations: []
+  annotations:
+  - word: 绮罗香
+    meaning: 词牌名
+  - word: 春雨
+    meaning: 春天的雨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15712,7 +16818,13 @@ poems:
     浓睡觉来莺乱语，惊残好梦无寻处。
 
     '
-  annotations: []
+  annotations:
+  - word: 鹊踏枝
+    meaning: 词牌名，即蝶恋花
+  - word: 六曲
+    meaning: 六折
+  - word: 阑干
+    meaning: 栏杆
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15736,7 +16848,13 @@ poems:
     楚客欲听瑶瑟怨，潇湘深夜月明时。
 
     '
-  annotations: []
+  annotations:
+  - word: 潇湘神
+    meaning: 词牌名
+  - word: 斑竹
+    meaning: 有泪痕的竹子
+  - word: 湘妃
+    meaning: 传说中舜的妃子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15769,7 +16887,11 @@ poems:
     惆怅旧欢如梦，觉来无处追寻。
 
     '
-  annotations: []
+  annotations:
+  - word: 河满子
+    meaning: 词牌名
+  - word: 秋怨
+    meaning: 秋天的怨恨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15795,7 +16917,11 @@ poems:
     笙歌方一歇，莺啭柳洲亭。
 
     '
-  annotations: []
+  annotations:
+  - word: 西湖
+    meaning: 杭州西湖
+  - word: 春晓
+    meaning: 春天的清晨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15834,7 +16960,13 @@ poems:
     但梦想、一枝潇洒，黄昏斜照水。
 
     '
-  annotations: []
+  annotations:
+  - word: 花犯
+    meaning: 词牌名
+  - word: 小石
+    meaning: 曲调名
+  - word: 梅花
+    meaning: 梅树的花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15864,7 +16996,11 @@ poems:
     闻说东风亦多情，被竹外、香留住。
 
     '
-  annotations: []
+  annotations:
+  - word: 留春令
+    meaning: 词牌名
+  - word: 咏梅花
+    meaning: 歌咏梅花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15899,7 +17035,13 @@ poems:
     怪来调苦缘词苦，多是通州司马诗。
 
     '
-  annotations: []
+  annotations:
+  - word: 竹枝词
+    meaning: 一种民歌体裁
+  - word: 瞿塘峡
+    meaning: 长江三峡之一
+  - word: 水烟
+    meaning: 水面的雾气
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15928,7 +17070,13 @@ poems:
     小楼今夜月重圆。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 清润
+    meaning: 清爽润泽
+  - word: 雨后天
+    meaning: 雨后的天空
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15963,7 +17111,11 @@ poems:
     凭栏干，但有盈盈泪眼，罗襟揾。
 
     '
-  annotations: []
+  annotations:
+  - word: 水龙吟
+    meaning: 词牌名
+  - word: 咏月
+    meaning: 歌咏月亮
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -15987,7 +17139,11 @@ poems:
     惊起暮天沙上雁，海门斜去两三行。
 
     '
-  annotations: []
+  annotations:
+  - word: 润州
+    meaning: 今江苏镇江
+  - word: 暮角
+    meaning: 傍晚的号角声
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16019,7 +17175,11 @@ poems:
     ”
 
     '
-  annotations: []
+  annotations:
+  - word: 杨布
+    meaning: 人名
+  - word: 衣
+    meaning: 衣服
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16043,7 +17203,11 @@ poems:
     黄芦掩映清江下，斜缆着钓鱼艖。
 
     '
-  annotations: []
+  annotations:
+  - word: 大德歌
+    meaning: 曲牌名
+  - word: 冬景
+    meaning: 冬天的景色
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16076,7 +17240,11 @@ poems:
     松醪常与野人期，忘形共说清闲话。
 
     '
-  annotations: []
+  annotations:
+  - word: 踏莎行
+    meaning: 词牌名
+  - word: 云山
+    meaning: 云雾中的山
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16117,7 +17285,11 @@ poems:
     隔邮亭，故人望断，舞腰瘦怯。
 
     '
-  annotations: []
+  annotations:
+  - word: 解连环
+    meaning: 词牌名
+  - word: 柳
+    meaning: 柳树
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16141,7 +17313,13 @@ poems:
     动枝生乱影，吹花送远香。
 
     '
-  annotations: []
+  annotations:
+  - word: 奉和
+    meaning: 奉命和诗
+  - word: 咏风
+    meaning: 歌咏风
+  - word: 魏王
+    meaning: 唐太宗之子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16162,7 +17340,11 @@ poems:
     一双俱应节，还似镜中看。
 
     '
-  annotations: []
+  annotations:
+  - word: 咏舞
+    meaning: 歌咏舞蹈
+  - word: 裙
+    meaning: 舞裙
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16183,7 +17365,11 @@ poems:
     恐畏无人识，独自暗中明。
 
     '
-  annotations: []
+  annotations:
+  - word: 萤
+    meaning: 萤火虫
+  - word: 微光
+    meaning: 微弱的光
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16217,7 +17403,11 @@ poems:
     翰林物色分留少，诗到巴陵还未工。
 
     '
-  annotations: []
+  annotations:
+  - word: 岳阳楼
+    meaning: 湖南岳阳名楼
+  - word: 洞庭
+    meaning: 洞庭湖
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16241,7 +17431,11 @@ poems:
     青墩溪畔龙钟客，独立东风看牡丹。
 
     '
-  annotations: []
+  annotations:
+  - word: 牡丹
+    meaning: 花中之王
+  - word: 国色
+    meaning: 倾国的美色
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16266,7 +17460,11 @@ poems:
     海棠不惜胭脂色，独立蒙蒙细雨中。
 
     '
-  annotations: []
+  annotations:
+  - word: 春寒
+    meaning: 春天的寒意
+  - word: 料峭
+    meaning: 微寒
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16306,7 +17504,13 @@ poems:
     今年何以报君恩，一路繁花相送过青墩。
 
     '
-  annotations: []
+  annotations:
+  - word: 虞美人
+    meaning: 词牌名
+  - word: 扁舟
+    meaning: 小船
+  - word: 秋塘
+    meaning: 秋天的池塘
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16338,7 +17542,13 @@ poems:
     试浇桥下水，今夕到湘中。
 
     '
-  annotations: []
+  annotations:
+  - word: 临江仙
+    meaning: 词牌名
+  - word: 楚词
+    meaning: 楚辞
+  - word: 午日
+    meaning: 端午节
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16362,7 +17572,11 @@ poems:
     东风也作清明节，开遍来禽一树花。
 
     '
-  annotations: []
+  annotations:
+  - word: 清明
+    meaning: 清明节
+  - word: 二绝
+    meaning: 两首绝句
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16390,7 +17604,11 @@ poems:
     故验家山赏，惟有风入松。
 
     '
-  annotations: []
+  annotations:
+  - word: 九龙潭
+    meaning: 潭名
+  - word: 游
+    meaning: 游览
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16422,7 +17640,13 @@ poems:
     长别几多情，含春任攀搴。
 
     '
-  annotations: []
+  annotations:
+  - word: 五月
+    meaning: 农历五月
+  - word: 水边
+    meaning: 水旁
+  - word: 柳
+    meaning: 柳树
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16444,7 +17668,13 @@ poems:
     君泪盈，妾泪盈，罗带同心结未成，江边潮已平。
 
     '
-  annotations: []
+  annotations:
+  - word: 相思令
+    meaning: 词牌名
+  - word: 吴山
+    meaning: 杭州吴山
+  - word: 越山
+    meaning: 浙东的山
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16472,7 +17702,11 @@ poems:
     取酒须勤醉，乡关不可思。
 
     '
-  annotations: []
+  annotations:
+  - word: 寺丞
+    meaning: 官职名
+  - word: 富顺监
+    meaning: 四川富顺的盐监
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16499,7 +17733,13 @@ poems:
     淇园春竹美，军宴日椎牛。
 
     '
-  annotations: []
+  annotations:
+  - word: 判官
+    meaning: 唐代官职
+  - word: 卫州
+    meaning: 地名
+  - word: 新及第
+    meaning: 刚考中科举
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16523,7 +17763,13 @@ poems:
     更无柳絮因风起，惟有葵花向日倾。
 
     '
-  annotations: []
+  annotations:
+  - word: 客中
+    meaning: 旅居在外
+  - word: 初夏
+    meaning: 夏天开始
+  - word: 梅子
+    meaning: 梅树的果实
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16560,7 +17806,11 @@ poems:
     东风巧，尽收翠绿，吹在眉山。
 
     '
-  annotations: []
+  annotations:
+  - word: 庆清朝慢
+    meaning: 词牌名
+  - word: 踏青
+    meaning: 春游
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16605,7 +17855,13 @@ poems:
     念沈沈、小阁幽窗，有时梦去。
 
     '
-  annotations: []
+  annotations:
+  - word: 瑞鹤仙
+    meaning: 词牌名
+  - word: 郊原
+    meaning: 郊外原野
+  - word: 初过雨
+    meaning: 刚下过雨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16655,7 +17911,11 @@ poems:
     断肠落日千山暮。
 
     '
-  annotations: []
+  annotations:
+  - word: 剑器近
+    meaning: 词牌名
+  - word: 夜来雨
+    meaning: 夜间的雨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16698,7 +17958,13 @@ poems:
     唤觉来厌厌，残照依然花坞。
 
     '
-  annotations: []
+  annotations:
+  - word: 安公子
+    meaning: 词牌名
+  - word: 弱柳
+    meaning: 柔弱的柳条
+  - word: 千缕
+    meaning: 千条丝线
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16733,7 +17999,13 @@ poems:
     为说相思、目断西楼燕。
 
     '
-  annotations: []
+  annotations:
+  - word: 一斛珠
+    meaning: 词牌名
+  - word: 洛城
+    meaning: 洛阳
+  - word: 春晚
+    meaning: 晚春
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16763,7 +18035,11 @@ poems:
     往事已成空，还如一梦中。
 
     '
-  annotations: []
+  annotations:
+  - word: 子夜歌
+    meaning: 词牌名
+  - word: 愁恨
+    meaning: 忧愁和遗恨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16789,7 +18065,13 @@ poems:
     天，湖外影；湖，天上景。
 
     '
-  annotations: []
+  annotations:
+  - word: 山坡羊
+    meaning: 曲牌名
+  - word: 西湖
+    meaning: 杭州西湖
+  - word: 夜饮
+    meaning: 夜间饮酒
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16825,7 +18107,11 @@ poems:
     但凭阑无语，烟花三月春愁。
 
     '
-  annotations: []
+  annotations:
+  - word: 扬州慢
+    meaning: 词牌名
+  - word: 琼花
+    meaning: 扬州名花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16851,7 +18137,11 @@ poems:
     曾见正开时。
 
     '
-  annotations: []
+  annotations:
+  - word: 阳春曲
+    meaning: 曲牌名
+  - word: 海棠
+    meaning: 海棠花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16873,7 +18163,11 @@ poems:
     山月不知心里事，水风空落眼前花，摇曳碧云斜。
 
     '
-  annotations: []
+  annotations:
+  - word: 梦江南
+    meaning: 词牌名
+  - word: 千万恨
+    meaning: 无尽的遗恨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16903,7 +18197,11 @@ poems:
     回首天涯，一抹斜阳，数点寒鸦。
 
     '
-  annotations: []
+  annotations:
+  - word: 折桂令
+    meaning: 曲牌名
+  - word: 九日
+    meaning: 重阳节
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16932,7 +18230,13 @@ poems:
     醉眼睁开，遥望蓬莱，一半儿云遮，一半儿烟霾。
 
     '
-  annotations: []
+  annotations:
+  - word: 折桂令
+    meaning: 曲牌名
+  - word: 长江
+    meaning: 中国第一长河
+  - word: 浩浩
+    meaning: 浩荡的样子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16961,7 +18265,11 @@ poems:
     浪卷胥魂，山锁吴愁。
 
     '
-  annotations: []
+  annotations:
+  - word: 折桂令
+    meaning: 曲牌名
+  - word: 虎丘
+    meaning: 苏州虎丘
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -16986,7 +18294,13 @@ poems:
     羡他一对，鸳鸯飞去，残梦蓼花深。
 
     '
-  annotations: []
+  annotations:
+  - word: 小桃红
+    meaning: 曲牌名
+  - word: 碧湖
+    meaning: 碧绿的湖水
+  - word: 柳阴阴
+    meaning: 柳树成荫
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17011,7 +18325,13 @@ poems:
     辞柯霜叶，飞来就我题红。
 
     '
-  annotations: []
+  annotations:
+  - word: 天净沙
+    meaning: 曲牌名
+  - word: 秋
+    meaning: 秋天
+  - word: 孤村
+    meaning: 孤零零的村庄
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17038,7 +18358,11 @@ poems:
     客衣尘土终须换，好与湖边长芰荷。
 
     '
-  annotations: []
+  annotations:
+  - word: 春晴
+    meaning: 春天的晴天
+  - word: 花开
+    meaning: 花朵盛开
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17073,7 +18397,13 @@ poems:
     百年前事，欲问东风，酒醒长笛。
 
     '
-  annotations: []
+  annotations:
+  - word: 庆宫春
+    meaning: 词牌名
+  - word: 峨眉亭
+    meaning: 亭名
+  - word: 感旧
+    meaning: 感怀旧事
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17100,7 +18430,13 @@ poems:
     小殿沈沈清夜，银灯飘落香灺。
 
     '
-  annotations: []
+  annotations:
+  - word: 河渎神
+    meaning: 词牌名
+  - word: 汾水
+    meaning: 山西的汾河
+  - word: 碧依依
+    meaning: 碧绿依依
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17126,7 +18462,13 @@ poems:
     乱云愁，满头风雨，戴荷叶归去休。
 
     '
-  annotations: []
+  annotations:
+  - word: 后庭花
+    meaning: 词牌名
+  - word: 清溪
+    meaning: 清澈的溪水
+  - word: 一叶舟
+    meaning: 一只小船
   translation: 暂无译文，后续可继续补充。
   appreciation: 网页发生错误，请联系网站管理员：service@gushiwen.org
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17153,7 +18495,11 @@ poems:
     偏忆戍楼人，久绝边庭信。
 
     '
-  annotations: []
+  annotations:
+  - word: 醉花间
+    meaning: 词牌名
+  - word: 休相问
+    meaning: 不要再问
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17178,7 +18524,9 @@ poems:
     为是襄王故宫地，至今犹自细腰多。
 
     '
-  annotations: []
+  annotations:
+  - word: 踏歌
+    meaning: 踩着节拍唱歌
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17218,7 +18566,13 @@ poems:
     唯有池塘自碧。
 
     '
-  annotations: []
+  annotations:
+  - word: 淡黄柳
+    meaning: 词牌名
+  - word: 空城
+    meaning: 空荡的城
+  - word: 晓角
+    meaning: 黎明的号角
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17257,7 +18611,13 @@ poems:
     倚瑶台，十二金钱晕半掐。
 
     '
-  annotations: []
+  annotations:
+  - word: 凄凉犯
+    meaning: 词牌名
+  - word: 重台
+    meaning: 双层花瓣
+  - word: 水仙
+    meaning: 水仙花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17287,7 +18647,11 @@ poems:
     乱红飞絮，相逐东风去。
 
     '
-  annotations: []
+  annotations:
+  - word: 茶瓶儿
+    meaning: 词牌名
+  - word: 深院宇
+    meaning: 深深的庭院
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17317,7 +18681,13 @@ poems:
     眼见的吹翻了这家，吹伤了那家，只吹的水尽鹅飞罢！
 
     '
-  annotations: []
+  annotations:
+  - word: 朝天子
+    meaning: 曲牌名
+  - word: 喇叭
+    meaning: 乐器
+  - word: 官船
+    meaning: 官方的船只
   translation: 喇叭锁呐呜呜哇哇，曲儿小来腔儿大。官船来往乱如麻，全凭你来抬声价。 军人听了军人愁，百姓听了百姓怕。能到哪里去分真和假？ 眼睁睁吹翻了这家，吹伤了那家，只吹得江水枯竭鹅飞罢！
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17344,7 +18714,13 @@ poems:
     良田数顷，黄牛二只，归去来兮。
 
     '
-  annotations: []
+  annotations:
+  - word: 普天乐
+    meaning: 曲牌名
+  - word: 翠荷
+    meaning: 翠绿的荷叶
+  - word: 残
+    meaning: 凋残
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17378,7 +18754,13 @@ poems:
     黄尘意外，青山眼里，归去来兮。
 
     '
-  annotations: []
+  annotations:
+  - word: 普天乐
+    meaning: 曲牌名
+  - word: 柳丝
+    meaning: 柳条
+  - word: 柔
+    meaning: 柔软
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17403,7 +18785,13 @@ poems:
     无端隔水抛莲子，遥被人知半日羞。
 
     '
-  annotations: []
+  annotations:
+  - word: 采莲子
+    meaning: 词牌名
+  - word: 滟滟
+    meaning: 水光闪烁
+  - word: 采莲
+    meaning: 采摘莲子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17430,7 +18818,13 @@ poems:
     回别，帆影灭，江浪如雪。
 
     '
-  annotations: []
+  annotations:
+  - word: 上行杯
+    meaning: 词牌名
+  - word: 离亭
+    meaning: 送别的亭子
+  - word: 鞍马
+    meaning: 马匹
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17473,7 +18867,11 @@ poems:
     愁损翠黛双蛾，日日画阑独凭。
 
     '
-  annotations: []
+  annotations:
+  - word: 双双燕
+    meaning: 词牌名
+  - word: 咏燕
+    meaning: 歌咏燕子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17511,7 +18909,11 @@ poems:
     输于池上鸳鸯，日日阑前双暝。
 
     '
-  annotations: []
+  annotations:
+  - word: 双双燕
+    meaning: 词牌名
+  - word: 社雨
+    meaning: 社日的雨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17551,7 +18953,13 @@ poems:
     还过短墙，谁会万千言语。
 
     '
-  annotations: []
+  annotations:
+  - word: 双双燕
+    meaning: 词牌名
+  - word: 小桃
+    meaning: 小桃花
+  - word: 谢后
+    meaning: 凋谢之后
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17585,7 +18993,13 @@ poems:
     相思血，都沁绿筠枝。
 
     '
-  annotations: []
+  annotations:
+  - word: 小重山令
+    meaning: 词牌名
+  - word: 潭州
+    meaning: 今湖南长沙
+  - word: 红梅
+    meaning: 红色梅花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17618,7 +19032,11 @@ poems:
     凤皇诏下，步步蹑丹梯。
 
     '
-  annotations: []
+  annotations:
+  - word: 甘州遍
+    meaning: 词牌名
+  - word: 秋风紧
+    meaning: 秋风强劲
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17646,7 +19064,13 @@ poems:
     不似酴醾开独步，能着意留春住。
 
     '
-  annotations: []
+  annotations:
+  - word: 四犯令
+    meaning: 词牌名
+  - word: 轻云
+    meaning: 淡淡的云
+  - word: 天淡注
+    meaning: 天色淡淡
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17673,7 +19097,11 @@ poems:
     秋光谈薄人情似，迢迢野水，茫茫衰草，隐隐青山。
 
     '
-  annotations: []
+  annotations:
+  - word: 青杏儿
+    meaning: 词牌名
+  - word: 秋
+    meaning: 秋天
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17704,7 +19132,11 @@ poems:
     悔不剪、春雨蘼芜，牵惹愁怀多少！
 
     '
-  annotations: []
+  annotations:
+  - word: 望湘人
+    meaning: 词牌名
+  - word: 归程
+    meaning: 回家的路
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17730,7 +19162,11 @@ poems:
     世间好处，休没寻思，典卖了西湖。
 
     '
-  annotations: []
+  annotations:
+  - word: 醉中天
+    meaning: 曲牌名
+  - word: 相思树
+    meaning: 连理树
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17758,7 +19194,13 @@ poems:
     不多时暮霭风吹散，西山看我，我看西山。
 
     '
-  annotations: []
+  annotations:
+  - word: 殿前欢
+    meaning: 曲牌名
+  - word: 大都
+    meaning: 元代首都，今北京
+  - word: 西山
+    meaning: 北京西山
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17785,7 +19227,11 @@ poems:
     云心无我，云我无心。
 
     '
-  annotations: []
+  annotations:
+  - word: 殿前欢
+    meaning: 曲牌名
+  - word: 碧云
+    meaning: 碧绿的云
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17825,7 +19271,13 @@ poems:
     思归诚独乐，薇蕨渐春荣。
 
     '
-  annotations: []
+  annotations:
+  - word: 次韵
+    meaning: 依照他人诗韵和诗
+  - word: 伯氏
+    meaning: 兄长
+  - word: 长芦寺
+    meaning: 寺名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17852,7 +19304,13 @@ poems:
     今宵眼底，明朝心上，后日眉头。
 
     '
-  annotations: []
+  annotations:
+  - word: 眼儿媚
+    meaning: 词牌名
+  - word: 萧萧
+    meaning: 风声
+  - word: 荻花
+    meaning: 芦荻的花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17879,7 +19337,11 @@ poems:
     今日狂歌客，谁知入楚来。
 
     '
-  annotations: []
+  annotations:
+  - word: 荆门
+    meaning: 湖北荆门
+  - word: 望楚
+    meaning: 眺望楚地
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17902,7 +19364,13 @@ poems:
     非无脚下浮云闹，来不相知去不留。
 
     '
-  annotations: []
+  annotations:
+  - word: 题画
+    meaning: 在画上题诗
+  - word: 兰
+    meaning: 兰花
+  - word: 幽香
+    meaning: 清幽的香气
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17937,7 +19405,11 @@ poems:
     将白头供作折腰人，将毋左。
 
     '
-  annotations: []
+  annotations:
+  - word: 满江红
+    meaning: 词牌名
+  - word: 思家
+    meaning: 思念家乡
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -17967,7 +19439,13 @@ poems:
     江南春好与谁看。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 清明
+    meaning: 清明节
+  - word: 香火残
+    meaning: 香烛残留
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18006,7 +19484,11 @@ poems:
     喜静看、匹练秋光，倒泻半湖明月。
 
     '
-  annotations: []
+  annotations:
+  - word: 疏影
+    meaning: 词牌名
+  - word: 荷叶
+    meaning: 莲的叶子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18041,7 +19523,11 @@ poems:
     前度刘郎归去后，溪上碧桃多少。
 
     '
-  annotations: []
+  annotations:
+  - word: 南浦
+    meaning: 词牌名
+  - word: 春水
+    meaning: 春天的水
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18076,7 +19562,11 @@ poems:
     待繁红乱处，留云借月，也须拚醉。
 
     '
-  annotations: []
+  annotations:
+  - word: 水龙吟
+    meaning: 词牌名
+  - word: 风雨匆匆
+    meaning: 风雨急促
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18100,7 +19590,13 @@ poems:
     啼莺舞燕，小桥流水飞红。
 
     '
-  annotations: []
+  annotations:
+  - word: 天净沙
+    meaning: 曲牌名
+  - word: 春
+    meaning: 春天
+  - word: 春山
+    meaning: 春天的山
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18123,7 +19619,11 @@ poems:
     近来攀折苦，应为别离多。
 
     '
-  annotations: []
+  annotations:
+  - word: 送别
+    meaning: 送人离开
+  - word: 杨柳
+    meaning: 柳树
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18146,7 +19646,11 @@ poems:
     莫听声声催去棹，桃溪浅处不胜舟。
 
     '
-  annotations: []
+  annotations:
+  - word: 宴词
+    meaning: 宴席上的诗
+  - word: 花落
+    meaning: 花谢了
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18172,7 +19676,13 @@ poems:
     "
 
     '
-  annotations: []
+  annotations:
+  - word: 州桥
+    meaning: 汴京桥名
+  - word: 南望
+    meaning: 向南眺望
+  - word: 王师
+    meaning: 朝廷的军队
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18194,7 +19704,11 @@ poems:
     十万汉军零落尽，独吹边曲向残阳。
 
     '
-  annotations: []
+  annotations:
+  - word: 河湟
+    meaning: 黄河和湟水流域
+  - word: 旧卒
+    meaning: 老兵
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18232,7 +19746,13 @@ poems:
     且芳尊随分趁芳时，休虚掷。
 
     '
-  annotations: []
+  annotations:
+  - word: 满江红
+    meaning: 词牌名
+  - word: 金陵
+    meaning: 今南京
+  - word: 乌衣园
+    meaning: 乌衣巷旧址
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18261,7 +19781,11 @@ poems:
     孤怀激烈难消遣，漫把金盘簇五辛。
 
     '
-  annotations: []
+  annotations:
+  - word: 立春
+    meaning: 二十四节气之一
+  - word: 感怀
+    meaning: 有所感慨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18283,7 +19807,15 @@ poems:
     落红不是无情物，化作春泥更护花。
 
     '
-  annotations: []
+  annotations:
+  - word: 己亥
+    meaning: 干支纪年
+  - word: 杂诗
+    meaning: 即兴而作的诗
+  - word: 落红
+    meaning: 落花
+  - word: 化作春泥
+    meaning: 变成滋养花朵的泥土
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18313,7 +19845,11 @@ poems:
     事事令人幽，停桡向余景。
 
     '
-  annotations: []
+  annotations:
+  - word: 若耶溪
+    meaning: 在今浙江绍兴
+  - word: 入
+    meaning: 进入
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18340,7 +19876,13 @@ poems:
     何用慰相思，裁书寄关右。
 
     '
-  annotations: []
+  annotations:
+  - word: 诸暨
+    meaning: 今浙江诸暨
+  - word: 主簿
+    meaning: 唐代官职
+  - word: 之任
+    meaning: 赴任
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18362,7 +19904,11 @@ poems:
     燕歌未断塞鸿飞，牧马群嘶边草绿。
 
     '
-  annotations: []
+  annotations:
+  - word: 塞下曲
+    meaning: 边塞题材乐府
+  - word: 将军
+    meaning: 统兵军官
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18400,7 +19946,13 @@ poems:
     ”友人惭，下车引之，元方入门不顾。
 
     '
-  annotations: []
+  annotations:
+  - word: 陈太丘
+    meaning: 陈寔，曾任太丘长
+  - word: 期
+    meaning: 约定
+  - word: 友
+    meaning: 朋友
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18432,7 +19984,15 @@ poems:
     即公大兄无奕女，左将军王凝之妻也。
 
     '
-  annotations: []
+  annotations:
+  - word: 咏雪
+    meaning: 歌咏下雪
+  - word: 谢安
+    meaning: 东晋名臣
+  - word: 撒盐空中
+    meaning: 像撒盐一样
+  - word: 柳絮因风起
+    meaning: 像柳絮随风飞舞
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18466,7 +20026,13 @@ poems:
     ”遂班军而还，一郡并获全。
 
     '
-  annotations: []
+  annotations:
+  - word: 荀巨伯
+    meaning: 东汉人名
+  - word: 病友
+    meaning: 生病的朋友
+  - word: 探
+    meaning: 探望
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18510,7 +20076,11 @@ poems:
     烟未敛，楚山杳。
 
     '
-  annotations: []
+  annotations:
+  - word: 贺新郎
+    meaning: 词牌名
+  - word: 秋晓
+    meaning: 秋天的清晨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18537,7 +20107,11 @@ poems:
     暮而果大亡其财，其家甚智其子，而疑邻人之父。
 
     '
-  annotations: []
+  annotations:
+  - word: 智子
+    meaning: 认为儿子聪明
+  - word: 疑邻
+    meaning: 怀疑邻居
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18560,7 +20134,11 @@ poems:
     纵然一夜风吹去，只在芦花浅水边。
 
     '
-  annotations: []
+  annotations:
+  - word: 江村
+    meaning: 江边的村庄
+  - word: 即事
+    meaning: 就眼前事物写诗
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18587,7 +20165,13 @@ poems:
     可怜身是眼中人。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 山寺
+    meaning: 山中寺庙
+  - word: 夕曛
+    meaning: 夕阳的光芒
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18614,7 +20198,13 @@ poems:
     今宵欢宴胜平时。
 
     '
-  annotations: []
+  annotations:
+  - word: 浣溪沙
+    meaning: 词牌名
+  - word: 天末
+    meaning: 天边
+  - word: 同云
+    meaning: 密布的乌云
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18653,7 +20243,13 @@ poems:
     荒裔一戎衣，灵台凯歌入。
 
     '
-  annotations: []
+  annotations:
+  - word: 饮马
+    meaning: 让马喝水
+  - word: 长城窟
+    meaning: 长城边的泉水
+  - word: 行
+    meaning: 乐府诗体
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18688,7 +20284,11 @@ poems:
     见荷花、被风吹。
 
     '
-  annotations: []
+  annotations:
+  - word: 燕归梁
+    meaning: 词牌名
+  - word: 凤莲
+    meaning: 一种莲花品种
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18739,7 +20339,13 @@ poems:
     春风知别苦，不遣柳条青。
 
     '
-  annotations: []
+  annotations:
+  - word: 劳劳亭
+    meaning: 在今南京，古代送别之地
+  - word: 送客
+    meaning: 送别客人
+  - word: 柳条
+    meaning: 柳树枝条
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18784,7 +20390,11 @@ poems:
     为君一击，鹏抟九天。
 
     '
-  annotations: []
+  annotations:
+  - word: 独漉
+    meaning: 乐府旧题
+  - word: 漉
+    meaning: 过滤
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18805,7 +20415,11 @@ poems:
     疑是老僧休念诵，腕前推下水晶珠。
 
     '
-  annotations: []
+  annotations:
+  - word: 白胡桃
+    meaning: 白色的核桃
+  - word: 玉
+    meaning: 洁白如玉
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18836,7 +20450,13 @@ poems:
     相失各万里，茫然空尔思。
 
     '
-  annotations: []
+  annotations:
+  - word: 鲁郡
+    meaning: 今山东兖州
+  - word: 尧祠
+    meaning: 祭祀尧帝的祠堂
+  - word: 杜补阙
+    meaning: 姓杜的补阙
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18867,7 +20487,11 @@ poems:
     君更弹射何为乎？
 
     '
-  annotations: []
+  annotations:
+  - word: 鸣雁
+    meaning: 鸣叫的大雁
+  - word: 行
+    meaning: 乐府诗体
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18895,7 +20519,11 @@ poems:
     闲随白鸥去，沙上自为群。
 
     '
-  annotations: []
+  annotations:
+  - word: 崔八丈
+    meaning: 排行第八的崔姓长者
+  - word: 水亭
+    meaning: 水边的亭子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18919,7 +20547,11 @@ poems:
     客心自酸楚，况对木瓜山。
 
     '
-  annotations: []
+  annotations:
+  - word: 木瓜山
+    meaning: 山名
+  - word: 望
+    meaning: 眺望
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18944,7 +20576,11 @@ poems:
     空歌望云月，曲尽长松声。
 
     '
-  annotations: []
+  annotations:
+  - word: 南阳
+    meaning: 今河南南阳
+  - word: 清泠泉
+    meaning: 清凉的泉水
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -18979,7 +20615,11 @@ poems:
     空持钓鳌心，从此谢魏阙。
 
     '
-  annotations: []
+  annotations:
+  - word: 友人
+    meaning: 朋友
+  - word: 台越
+    meaning: 天台山和越地
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19002,7 +20642,11 @@ poems:
     但用东山谢安石，为君谈笑净胡沙。
 
     '
-  annotations: []
+  annotations:
+  - word: 永王
+    meaning: 唐肃宗之弟
+  - word: 东巡
+    meaning: 向东巡视
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19028,7 +20672,11 @@ poems:
     尽日扶犁叟，往来江树前。
 
     '
-  annotations: []
+  annotations:
+  - word: 对雨
+    meaning: 面对下雨
+  - word: 愁
+    meaning: 忧愁
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19060,7 +20708,11 @@ poems:
     明日别离去，连峰郁嵯峨。
 
     '
-  annotations: []
+  annotations:
+  - word: 五松山
+    meaning: 山名
+  - word: 殷淑
+    meaning: 友人名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19083,7 +20735,11 @@ poems:
     秋毫不犯三吴悦，春日遥看五色光。
 
     '
-  annotations: []
+  annotations:
+  - word: 永王
+    meaning: 唐肃宗之弟
+  - word: 东巡
+    meaning: 向东巡视
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19106,7 +20762,11 @@ poems:
     横江欲渡风波恶，一水牵愁万里长。
 
     '
-  annotations: []
+  annotations:
+  - word: 横江
+    meaning: 横渡长江
+  - word: 大风
+    meaning: 猛烈的风
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19132,7 +20792,11 @@ poems:
     思归若汾水，无日不悠悠。
 
     '
-  annotations: []
+  annotations:
+  - word: 太原
+    meaning: 今山西太原
+  - word: 早秋
+    meaning: 初秋
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19159,7 +20823,13 @@ poems:
     王公何慷慨，千载仰雄名。
 
     '
-  annotations: []
+  annotations:
+  - word: 金陵
+    meaning: 今南京
+  - word: 新亭
+    meaning: 亭名
+  - word: 对泣
+    meaning: 相对哭泣
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19187,7 +20857,11 @@ poems:
     云山望不及，此去何时还。
 
     '
-  annotations: []
+  annotations:
+  - word: 范山人
+    meaning: 隐士
+  - word: 泰山
+    meaning: 五岳之首
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19226,7 +20900,11 @@ poems:
     谢公终一起，相与济苍生。
 
     '
-  annotations: []
+  annotations:
+  - word: 裴十八
+    meaning: 排行十八的裴姓友人
+  - word: 嵩山
+    meaning: 五岳之一
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19256,7 +20934,11 @@ poems:
     此中多逸兴，早晚向天台。
 
     '
-  annotations: []
+  annotations:
+  - word: 越中
+    meaning: 浙江一带
+  - word: 山水
+    meaning: 自然风景
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19278,7 +20960,11 @@ poems:
     暂就东山赊月色，酣歌一夜送泉明。
 
     '
-  annotations: []
+  annotations:
+  - word: 侍御
+    meaning: 侍御史
+  - word: 广德
+    meaning: 地名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19305,7 +20991,11 @@ poems:
     莫教明月去，留著醉嫦娥。
 
     '
-  annotations: []
+  annotations:
+  - word: 宫中
+    meaning: 皇宫内
+  - word: 行乐
+    meaning: 游乐
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19340,7 +21030,11 @@ poems:
     莫学吹笙王子晋，一遇浮丘断不还。
 
     '
-  annotations: []
+  annotations:
+  - word: 凤吹笙
+    meaning: 像凤凰一样吹笙
+  - word: 笙
+    meaning: 一种管乐器
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19369,7 +21063,11 @@ poems:
     江上送行无白璧，临歧惆怅若为分。
 
     '
-  annotations: []
+  annotations:
+  - word: 郎将
+    meaning: 军官名
+  - word: 衡阳
+    meaning: 今湖南衡阳
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19449,7 +21147,13 @@ poems:
     送君日千里，良会何由同。
 
     '
-  annotations: []
+  annotations:
+  - word: 鲁中
+    meaning: 山东中部
+  - word: 从弟
+    meaning: 堂弟
+  - word: 赴举
+    meaning: 参加科举考试
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19489,7 +21193,11 @@ poems:
     幽赏颇自得，兴远与谁豁。
 
     '
-  annotations: []
+  annotations:
+  - word: 元六
+    meaning: 排行第六的元姓友人
+  - word: 江上
+    meaning: 江水之上
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19518,7 +21226,11 @@ poems:
     若闻弦管妙，金谷不能夸。
 
     '
-  annotations: []
+  annotations:
+  - word: 陶家
+    meaning: 陶姓人家
+  - word: 亭子
+    meaning: 园中亭子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19540,7 +21252,11 @@ poems:
     细雨春风花落时，挥鞭直就胡姬饮。
 
     '
-  annotations: []
+  annotations:
+  - word: 白鼻騧
+    meaning: 白鼻子的黄马
+  - word: 骑
+    meaning: 骑马
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19563,7 +21279,11 @@ poems:
     千岩烽火连沧海，两岸旌旗绕碧山。
 
     '
-  annotations: []
+  annotations:
+  - word: 永王
+    meaning: 唐肃宗之弟
+  - word: 东巡
+    meaning: 向东巡视
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19589,7 +21309,11 @@ poems:
     匈奴系颈数应尽，明年应入蒲萄宫。
 
     '
-  annotations: []
+  annotations:
+  - word: 族弟
+    meaning: 同族的弟弟
+  - word: 安西
+    meaning: 安西都护府
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19625,7 +21349,11 @@ poems:
     江山虽道阻，意合不为殊。
 
     '
-  annotations: []
+  annotations:
+  - word: 秋浦
+    meaning: 今安徽池州
+  - word: 寄内
+    meaning: 寄给妻子
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19661,7 +21389,13 @@ poems:
     愧非流水韵，叨入伯牙弦。
 
     '
-  annotations: []
+  annotations:
+  - word: 春日
+    meaning: 春天
+  - word: 归山
+    meaning: 回到山中
+  - word: 孟浩然
+    meaning: 唐代诗人
   translation: 朝服绶带遗弃在尘世之境，赶赴青山拜谒佛教道场。 黄金为绳显示觉悟之路，乘上宝筏渡过惑人迷川。 岭上高树拢聚构成飞栱一般，岩上红花盛开掩盖山谷的泉水。 佛塔高耸是海上日出的标志，佛楼雄伟依傍大江烟云缭绕。 佛烟香气传遍欲界色界无色界，佛钟敲响声连万壑千川。 手中念珠如秋日莲子成熟满把满串，繁茂的松树团团圆圆如月。 鸟儿相聚疑是为听法而来，龙王亦来参加原为护法而来。 惭愧我无洋洋兮若江河般的流水声韵，可以混为伯牙的琴上之声。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19726,7 +21460,15 @@ poems:
     夜发清溪向三峡，思君不见下渝州。
 
     '
-  annotations: []
+  annotations:
+  - word: 峨眉山
+    meaning: 四川峨眉山
+  - word: 月
+    meaning: 月亮
+  - word: 半轮秋
+    meaning: 半圆形的秋月
+  - word: 平羌
+    meaning: 平羌江
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19755,7 +21497,13 @@ poems:
     岂若琼树枝，终岁长翕赩。
 
     '
-  annotations: []
+  annotations:
+  - word: 槿
+    meaning: 木槿花
+  - word: 朝开
+    meaning: 早上开放
+  - word: 暮落
+    meaning: 傍晚凋落
   translation: 园花笑在美好的年岁，春光里池草更觉鲜艳。 还不如篱边的木槿花，在玉阶旁姿态如婵娟。 花香草茂生命太短促，花草凋落只在霎那间。 哪里像美丽的玉树枝，一年到头都光彩灿烂。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19778,7 +21526,11 @@ poems:
     山花如绣颊，江火似流萤。
 
     '
-  annotations: []
+  annotations:
+  - word: 征虏亭
+    meaning: 亭名，在南京
+  - word: 夜下
+    meaning: 夜晚下行
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19803,7 +21555,13 @@ poems:
     驱马又前去，扪心空自悲。
 
     '
-  annotations: []
+  annotations:
+  - word: 白田
+    meaning: 地名
+  - word: 马上
+    meaning: 骑在马上
+  - word: 闻莺
+    meaning: 听到黄莺叫
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19831,7 +21589,11 @@ poems:
     不见同怀人，对之空叹息。
 
     '
-  annotations: []
+  annotations:
+  - word: 宣城
+    meaning: 今安徽宣城
+  - word: 青溪
+    meaning: 碧绿的溪流
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19858,7 +21620,11 @@ poems:
     不见眼中人，天长音信断。
 
     '
-  annotations: []
+  annotations:
+  - word: 大堤
+    meaning: 在今湖北襄阳
+  - word: 曲
+    meaning: 乐府曲
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19881,7 +21647,13 @@ poems:
     笑别庐山远，何烦过虎溪。
 
     '
-  annotations: []
+  annotations:
+  - word: 东林寺
+    meaning: 庐山东林寺
+  - word: 僧
+    meaning: 僧人
+  - word: 别
+    meaning: 离别
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19906,7 +21678,11 @@ poems:
     宫中谁第一，飞燕在昭阳。
 
     '
-  annotations: []
+  annotations:
+  - word: 宫中
+    meaning: 皇宫
+  - word: 行乐
+    meaning: 游乐
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19930,7 +21706,13 @@ poems:
     一看肠一断，好去莫回头。
 
     '
-  annotations: []
+  annotations:
+  - word: 南浦
+    meaning: 南面的水边
+  - word: 别
+    meaning: 离别
+  - word: 南浦凄凄
+    meaning: 南浦一片凄凉
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19957,7 +21739,13 @@ poems:
     向使当初身便死，一生真伪复谁知？
 
     '
-  annotations: []
+  annotations:
+  - word: 放言
+    meaning: 放言高论
+  - word: 周公
+    meaning: 西周摄政王
+  - word: 王莽
+    meaning: 篡汉建新朝的人
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -19982,7 +21770,11 @@ poems:
     不道江南春不好，年年衰病减心情。
 
     '
-  annotations: []
+  annotations:
+  - word: 南湖
+    meaning: 湖名
+  - word: 早春
+    meaning: 初春
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20006,7 +21798,11 @@ poems:
     时时闻鸟语，处处是泉声。
 
     '
-  annotations: []
+  annotations:
+  - word: 遗爱寺
+    meaning: 庐山的寺庙
+  - word: 泉声
+    meaning: 泉水的声音
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20033,7 +21829,11 @@ poems:
     将何慰幽独，赖此北窗琴。
 
     '
-  annotations: []
+  annotations:
+  - word: 阴雨
+    meaning: 阴天下雨
+  - word: 岚
+    meaning: 山间的雾气
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20058,7 +21858,13 @@ poems:
     生去死来都是幻，幻人哀乐系何情。
 
     '
-  annotations: []
+  annotations:
+  - word: 放言
+    meaning: 放言高论
+  - word: 泰
+    meaning: 安泰
+  - word: 否
+    meaning: 困厄
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20083,7 +21889,11 @@ poems:
     莫笑贱贫夸富贵，共成枯骨两何如？
 
     '
-  annotations: []
+  annotations:
+  - word: 放言
+    meaning: 放言高论
+  - word: 谁
+    meaning: 谁人
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20108,7 +21918,13 @@ poems:
     穷通行止常相伴，难道吾今无往还？
 
     '
-  annotations: []
+  annotations:
+  - word: 琴
+    meaning: 古琴
+  - word: 茶
+    meaning: 茶水
+  - word: 闲
+    meaning: 悠闲
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20130,7 +21946,13 @@ poems:
     暮去朝来淘不住，遂令东海变桑田。
 
     '
-  annotations: []
+  annotations:
+  - word: 浪淘沙
+    meaning: 词牌名
+  - word: 白浪
+    meaning: 白色的浪花
+  - word: 茫茫
+    meaning: 广阔无边
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20156,7 +21978,11 @@ poems:
     可怜心赏处，其奈独游何。
 
     '
-  annotations: []
+  annotations:
+  - word: 湖亭
+    meaning: 湖边的亭子
+  - word: 望水
+    meaning: 观看湖水
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20191,7 +22017,11 @@ poems:
     今年不得地，憔悴府门前。
 
     '
-  annotations: []
+  annotations:
+  - word: 京兆府
+    meaning: 长安京兆尹官署
+  - word: 栽莲
+    meaning: 种植莲花
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20219,7 +22049,11 @@ poems:
     三百年来庾楼上，曾经多少望乡人。
 
     '
-  annotations: []
+  annotations:
+  - word: 庾楼
+    meaning: 在今江西九江
+  - word: 晓望
+    meaning: 清晨远眺
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20242,7 +22076,13 @@ poems:
     想得家中夜深坐，还应说着远行人。
 
     '
-  annotations: []
+  annotations:
+  - word: 邯郸
+    meaning: 今河北邯郸
+  - word: 冬至
+    meaning: 二十四节气之一
+  - word: 思家
+    meaning: 思念家乡
   translation: 我居住在邯郸客栈的时候正好是冬至佳节。晚上，我抱着双膝坐在灯前，只有影子与我相伴。 我相信，家中的亲人今天会相聚到深夜，还应该谈论着我这个远行人。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20266,7 +22106,11 @@ poems:
     何必奔冲山下去，更添波浪向人间。
 
     '
-  annotations: []
+  annotations:
+  - word: 白云泉
+    meaning: 苏州虎丘的泉水
+  - word: 白云
+    meaning: 白色的云
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20293,7 +22137,9 @@ poems:
     睡觉心空思想尽，近来乡梦不多成。
 
     '
-  annotations: []
+  annotations:
+  - word: 早兴
+    meaning: 早起的兴致
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20322,7 +22168,11 @@ poems:
     唯留一湖水，与汝救凶年。
 
     '
-  annotations: []
+  annotations:
+  - word: 别
+    meaning: 离别
+  - word: 州民
+    meaning: 所治州的百姓
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20348,7 +22198,11 @@ poems:
     不信请看弈棋者，输赢须待局终头。
 
     '
-  annotations: []
+  annotations:
+  - word: 放言
+    meaning: 放言高论
+  - word: 赠君
+    meaning: 送给你
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20373,7 +22227,13 @@ poems:
     可独终身数相见，子孙长作隔墙人。
 
     '
-  annotations: []
+  annotations:
+  - word: 元八
+    meaning: 排行第八的元姓友人
+  - word: 卜邻
+    meaning: 选择邻居
+  - word: 赠
+    meaning: 赠诗
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20400,7 +22260,11 @@ poems:
     凝情不语空所思，风吹白露衣裳冷。
 
     '
-  annotations: []
+  annotations:
+  - word: 晚秋
+    meaning: 深秋
+  - word: 夜
+    meaning: 夜晚
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20425,7 +22289,9 @@ poems:
     自有卢龙塞，烟尘飞至今。
 
     '
-  annotations: []
+  annotations:
+  - word: 塞下曲
+    meaning: 边塞题材乐府
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20463,7 +22329,15 @@ poems:
     早晚复相逢！
 
     '
-  annotations: []
+  annotations:
+  - word: 忆江南
+    meaning: 词牌名
+  - word: 江南好
+    meaning: 江南风景好
+  - word: 日出江花红胜火
+    meaning: 太阳出来江边的花红似火
+  - word: 春来江水绿如蓝
+    meaning: 春天江水绿得像蓝草
   translation: 江南的风景多么美好，如画的风景久已熟悉。春天到来时，太阳从江面升起，把江边的鲜花照得比火红，碧绿的江水绿得胜过蓝草。怎能叫人不怀念江南？ 江南的回忆，最能唤起追思的是像天堂一样的杭州：游玩灵隐寺寻找皎洁月亮中的桂子，登上郡亭，枕卧其上，欣赏那起落的钱塘江大潮。什么时候能够再次去游玩？ 江南的回忆，再来就是回忆苏州的吴宫，喝一喝吴宫的美酒春竹叶，看一看吴宫的歌女双双起舞像朵朵迷人的芙蓉。不知何时会再次相逢。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20491,7 +22365,11 @@ poems:
     唯凭远传语，好在曲江春。
 
     '
-  annotations: []
+  annotations:
+  - word: 送客
+    meaning: 送别客人
+  - word: 归京
+    meaning: 回京城
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20513,7 +22391,11 @@ poems:
     秋霜欲下手先知，灯底裁缝剪刀冷。
 
     '
-  annotations: []
+  annotations:
+  - word: 寒闺
+    meaning: 寒冷的闺房
+  - word: 怨
+    meaning: 怨恨
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20536,7 +22418,11 @@ poems:
     何处未春先有思，柳条无力魏王堤。
 
     '
-  annotations: []
+  annotations:
+  - word: 魏王堤
+    meaning: 洛阳名胜
+  - word: 花
+    meaning: 花朵
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20562,7 +22448,11 @@ poems:
     早晚重欢会，羁离各长成。
 
     '
-  annotations: []
+  annotations:
+  - word: 除夜
+    meaning: 除夕夜
+  - word: 弟妹
+    meaning: 弟弟和妹妹
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20617,7 +22507,11 @@ poems:
     永丰西角荒园里，尽日无人属阿谁？
 
     '
-  annotations: []
+  annotations:
+  - word: 杨柳枝
+    meaning: 词调名
+  - word: 柳
+    meaning: 柳树
   translation: 春风吹拂柳枝随风起舞，绽出嫩芽一片嫩黄比丝柔软。 永丰坊西角的荒园里，整日都没有人，这柳枝属于谁？
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20640,7 +22534,11 @@ poems:
     杏园岂敢妨君去，未有花时且看来。
 
     '
-  annotations: []
+  annotations:
+  - word: 迎春花
+    meaning: 一种早春开花的植物
+  - word: 郎中
+    meaning: 官职名
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20667,7 +22565,13 @@ poems:
     好著丹青图画取，题诗寄与水曹郎。
 
     '
-  annotations: []
+  annotations:
+  - word: 江楼
+    meaning: 江边的楼
+  - word: 晚眺
+    meaning: 傍晚远眺
+  - word: 水部张员外
+    meaning: 张籍
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
@@ -20710,7 +22614,11 @@ poems:
     君若作大车，轮轴材须此。
 
     '
-  annotations: []
+  annotations:
+  - word: 杏园
+    meaning: 唐代新进士宴会之地
+  - word: 枣树
+    meaning: 枣树
   translation: 暂无译文，后续可继续补充。
   appreciation: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
   background: 入选拓展层主题精选，由 yxcs/poems-db 原始数据整理。
