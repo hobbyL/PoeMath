@@ -175,10 +175,29 @@ class HomePage extends ConsumerWidget {
           if (!isCheckedIn)
             FilledButton.tonal(
               onPressed: () async {
+                // 检查是否完成了今日目标（至少一项）
+                final stats = ref.read(userStatsProvider);
+                final todayPoems = ref.read(learnedCountProvider);
+                final todayMath = stats.mathTotalProblems;
+
+                // 简单检查：只要有学习记录就允许打卡
+                // (首次使用时 stats 未初始化也算 0)
+                if (todayPoems == 0 && todayMath == 0) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('请先完成至少一项学习任务再打卡 📚'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                  return;
+                }
+
                 final checkInRepo = ref.read(checkInRepoProvider);
                 await checkInRepo.checkInToday();
                 ref.read(soundServiceProvider).play(SoundEffect.checkIn);
-                ref.read(hapticServiceProvider).medium();
+                await ref.read(hapticServiceProvider).medium();
                 ref.invalidate(isCheckedInProvider);
                 ref.invalidate(streakProvider);
                 if (context.mounted) {
