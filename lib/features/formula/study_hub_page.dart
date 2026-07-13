@@ -181,43 +181,46 @@ class StudyHubPage extends ConsumerWidget {
     final categories = ref.read(availableCategoriesProvider);
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: SpacingTokens.md),
-              Text(
-                '选择分类',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              RadioGroup<String?>(
-                groupValue: current,
-                onChanged: (v) {
-                  ref.read(selectedCategoryProvider.notifier).state = v;
-                  Navigator.pop(ctx);
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const RadioListTile<String?>(
-                      title: Text('全部'),
-                      value: null,
-                    ),
-                    ...categories.map((cat) {
-                      return RadioListTile<String?>(
-                        title: Text(cat),
-                        value: cat,
-                      );
-                    }),
-                  ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '选择分类',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
+                const SizedBox(height: SpacingTokens.sm),
+                RadioGroup<String?>(
+                  groupValue: current,
+                  onChanged: (v) {
+                    ref.read(selectedCategoryProvider.notifier).state = v;
+                    Navigator.pop(ctx);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const RadioListTile<String?>(
+                        title: Text('全部'),
+                        value: null,
+                      ),
+                      ...categories.map((cat) {
+                        return RadioListTile<String?>(
+                          title: Text(cat),
+                          value: cat,
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
           ),
         );
       },

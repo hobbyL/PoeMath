@@ -122,36 +122,38 @@ class PoemTabPage extends ConsumerWidget {
     final grades = ref.read(availableGradesProvider);
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: SpacingTokens.md),
-              Text(
-                '选择年级',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              RadioGroup<int?>(
-                groupValue: current,
-                onChanged: (v) {
-                  ref.read(selectedGradeProvider.notifier).state = v;
-                  Navigator.pop(ctx);
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const RadioListTile<int?>(
-                      title: Text('全部'),
-                      value: null,
-                    ),
-                    ...grades.map((g) {
-                      return RadioListTile<int?>(
-                        title: Text(_gradeLabels[g] ?? '$g 年级'),
-                        value: g,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '选择年级',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                RadioGroup<int?>(
+                  groupValue: current,
+                  onChanged: (v) {
+                    ref.read(selectedGradeProvider.notifier).state = v;
+                    Navigator.pop(ctx);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const RadioListTile<int?>(
+                        title: Text('全部'),
+                        value: null,
+                      ),
+                      ...grades.map((g) {
+                        return RadioListTile<int?>(
+                          title: Text(_gradeLabels[g] ?? '$g 年级'),
+                          value: g,
                       );
                     }),
                   ],
@@ -159,6 +161,7 @@ class PoemTabPage extends ConsumerWidget {
               ),
               const SizedBox(height: SpacingTokens.md),
             ],
+          ),
           ),
         );
       },
