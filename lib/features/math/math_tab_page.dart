@@ -186,38 +186,48 @@ class MathTabPage extends ConsumerWidget {
   ) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: SpacingTokens.md),
-              Text(
-                '选择学期',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              RadioGroup<String>(
-                groupValue: current,
-                onChanged: (v) {
-                  if (v == null) return;
-                  ref.read(mathSemesterProvider.notifier).state = v;
-                  Navigator.pop(ctx);
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _semesterLabels.entries.map((entry) {
-                    return RadioListTile<String>(
-                      title: Text(entry.value),
-                      value: entry.key,
-                    );
-                  }).toList(),
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '选择学期',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<String>(
+                      groupValue: current,
+                      onChanged: (v) {
+                        if (v == null) return;
+                        ref.read(mathSemesterProvider.notifier).state = v;
+                        Navigator.pop(ctx);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _semesterLabels.entries.map((entry) {
+                          return RadioListTile<String>(
+                            title: Text(entry.value),
+                            value: entry.key,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
           ),
         );
       },

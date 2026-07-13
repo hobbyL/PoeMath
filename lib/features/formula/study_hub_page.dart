@@ -188,7 +188,6 @@ class StudyHubPage extends ConsumerWidget {
             maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
           ),
           child: SafeArea(
-            child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -200,33 +199,36 @@ class StudyHubPage extends ConsumerWidget {
                       ),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
-                RadioGroup<String?>(
-                  groupValue: current,
-                  onChanged: (v) {
-                    ref.read(selectedCategoryProvider.notifier).state = v;
-                    Navigator.pop(ctx);
-                  },
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const RadioListTile<String?>(
-                        title: Text('全部'),
-                        value: null,
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<String?>(
+                      groupValue: current,
+                      onChanged: (v) {
+                        ref.read(selectedCategoryProvider.notifier).state = v;
+                        Navigator.pop(ctx);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const RadioListTile<String?>(
+                            title: Text('全部'),
+                            value: null,
+                          ),
+                          ...categories.map((cat) {
+                            return RadioListTile<String?>(
+                              title: Text(cat),
+                              value: cat,
+                            );
+                          }),
+                        ],
                       ),
-                      ...categories.map((cat) {
-                        return RadioListTile<String?>(
-                          title: Text(cat),
-                          value: cat,
-                        );
-                      }),
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: SpacingTokens.md),
               ],
             ),
           ),
-        ),
         );
       },
     );

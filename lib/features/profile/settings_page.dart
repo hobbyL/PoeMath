@@ -162,46 +162,56 @@ class SettingsPage extends ConsumerWidget {
   ) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              const SizedBox(height: SpacingTokens.md),
-              Text(
-                '主题风格',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              RadioGroup<AppSubject>(
-                groupValue: current,
-                onChanged: (v) {
-                  if (v == null) return;
-                  ref.read(activeSubjectProvider.notifier).state = v;
-                  Navigator.pop(ctx);
-                },
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    RadioListTile<AppSubject>(
-                      title: Text('诗词'),
-                      subtitle: Text('国风水墨主题'),
-                      secondary: Icon(Icons.brush_rounded),
-                      value: AppSubject.poem,
-                    ),
-                    RadioListTile<AppSubject>(
-                      title: Text('口算'),
-                      subtitle: Text('童趣马卡龙主题'),
-                      secondary: Icon(Icons.calculate_rounded),
-                      value: AppSubject.math,
-                    ),
-                  ],
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '主题风格',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<AppSubject>(
+                      groupValue: current,
+                      onChanged: (v) {
+                        if (v == null) return;
+                        ref.read(activeSubjectProvider.notifier).state = v;
+                        Navigator.pop(ctx);
+                      },
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          RadioListTile<AppSubject>(
+                            title: Text('诗词'),
+                            subtitle: Text('国风水墨主题'),
+                            secondary: Icon(Icons.brush_rounded),
+                            value: AppSubject.poem,
+                          ),
+                          RadioListTile<AppSubject>(
+                            title: Text('口算'),
+                            subtitle: Text('童趣马卡龙主题'),
+                            secondary: Icon(Icons.calculate_rounded),
+                            value: AppSubject.math,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
           ),
         );
       },
@@ -215,49 +225,59 @@ class SettingsPage extends ConsumerWidget {
   ) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              const SizedBox(height: SpacingTokens.md),
-              Text(
-                '外观模式',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              RadioGroup<ThemeMode>(
-                groupValue: current,
-                onChanged: (v) {
-                  if (v == null) return;
-                  ref.read(themeModeProvider.notifier).state = v;
-                  Navigator.pop(ctx);
-                },
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    RadioListTile<ThemeMode>(
-                      title: Text('跟随系统'),
-                      secondary: Icon(Icons.settings_suggest_outlined),
-                      value: ThemeMode.system,
-                    ),
-                    RadioListTile<ThemeMode>(
-                      title: Text('浅色'),
-                      secondary: Icon(Icons.light_mode_outlined),
-                      value: ThemeMode.light,
-                    ),
-                    RadioListTile<ThemeMode>(
-                      title: Text('深色'),
-                      secondary: Icon(Icons.dark_mode_outlined),
-                      value: ThemeMode.dark,
-                    ),
-                  ],
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '外观模式',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<ThemeMode>(
+                      groupValue: current,
+                      onChanged: (v) {
+                        if (v == null) return;
+                        ref.read(themeModeProvider.notifier).state = v;
+                        Navigator.pop(ctx);
+                      },
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          RadioListTile<ThemeMode>(
+                            title: Text('跟随系统'),
+                            secondary: Icon(Icons.settings_suggest_outlined),
+                            value: ThemeMode.system,
+                          ),
+                          RadioListTile<ThemeMode>(
+                            title: Text('浅色'),
+                            secondary: Icon(Icons.light_mode_outlined),
+                            value: ThemeMode.light,
+                          ),
+                          RadioListTile<ThemeMode>(
+                            title: Text('深色'),
+                            secondary: Icon(Icons.dark_mode_outlined),
+                            value: ThemeMode.dark,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
           ),
         );
       },
@@ -271,8 +291,13 @@ class SettingsPage extends ConsumerWidget {
   ) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) {
-        return StatefulBuilder(
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: StatefulBuilder(
           builder: (context, setState) {
             var speed = settingsRepo.ttsSpeed as double;
             return SafeArea(
@@ -329,6 +354,7 @@ class SettingsPage extends ConsumerWidget {
               ),
             );
           },
+        ),
         );
       },
     );

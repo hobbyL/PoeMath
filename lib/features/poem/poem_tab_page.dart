@@ -124,8 +124,11 @@ class PoemTabPage extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
-        return SafeArea(
-          child: SingleChildScrollView(
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -137,31 +140,35 @@ class PoemTabPage extends ConsumerWidget {
                       ),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
-                RadioGroup<int?>(
-                  groupValue: current,
-                  onChanged: (v) {
-                    ref.read(selectedGradeProvider.notifier).state = v;
-                    Navigator.pop(ctx);
-                  },
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const RadioListTile<int?>(
-                        title: Text('全部'),
-                        value: null,
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<int?>(
+                      groupValue: current,
+                      onChanged: (v) {
+                        ref.read(selectedGradeProvider.notifier).state = v;
+                        Navigator.pop(ctx);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const RadioListTile<int?>(
+                            title: Text('全部'),
+                            value: null,
+                          ),
+                          ...grades.map((g) {
+                            return RadioListTile<int?>(
+                              title: Text(_gradeLabels[g] ?? '$g 年级'),
+                              value: g,
+                            );
+                          }),
+                        ],
                       ),
-                      ...grades.map((g) {
-                        return RadioListTile<int?>(
-                          title: Text(_gradeLabels[g] ?? '$g 年级'),
-                          value: g,
-                      );
-                    }),
-                  ],
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
-          ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
           ),
         );
       },
