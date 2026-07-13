@@ -14,11 +14,13 @@ class GradePresets {
     ProblemMode.findResult,
     ProblemMode.findMissing,
     ProblemMode.compare,
+    ProblemMode.vertical,
   };
   static const _fullModes = {
     ProblemMode.findResult,
     ProblemMode.findMissing,
     ProblemMode.compare,
+    ProblemMode.vertical,
     ProblemMode.chain,
   };
 

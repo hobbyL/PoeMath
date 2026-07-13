@@ -61,6 +61,10 @@ class AdditionSubtractionGen extends BaseGenerator {
         randomInt(0, 3) == 0) {
       return toCompare(problem);
     }
+    if (config.allowedModes.contains(ProblemMode.vertical) &&
+        randomInt(0, 3) == 0) {
+      return toVertical(problem);
+    }
 
     return problem;
   }

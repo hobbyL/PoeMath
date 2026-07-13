@@ -94,6 +94,23 @@ abstract class BaseGenerator {
     );
   }
 
+  /// 生成竖式计算模式题目（仅适用于两操作数的加减乘法）。
+  MathProblem toVertical(MathProblem problem) {
+    if (problem.operands.length != 2) return problem;
+    final op = problem.operators.first;
+    // 竖式只支持加减乘
+    if (op == Operator.divide) return problem;
+    return MathProblem(
+      operands: problem.operands,
+      operators: problem.operators,
+      result: problem.result,
+      mode: ProblemMode.vertical,
+      grade: problem.grade,
+      difficulty: problem.difficulty,
+      resultForm: problem.resultForm,
+    );
+  }
+
   /// 评估难度分。
   int scoreDifficulty(List<NumberValue> operands, List<Operator> operators) {
     var score = 1;

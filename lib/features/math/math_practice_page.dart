@@ -16,6 +16,7 @@ import 'package:poemath/domain/level_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/session_result_dialog.dart';
+import 'package:poemath/features/math/widgets/vertical_calc_widget.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 class MathPracticePage extends ConsumerStatefulWidget {
@@ -306,14 +307,20 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // 题目文本
-                    Text(
-                      problem.problemText,
-                      style: TypographyTokens.mathProblemStyle(
-                        color: theme.colorScheme.onSurface,
+                    // 题目文本（竖式模式特殊展示）
+                    if (problem.mode == ProblemMode.vertical)
+                      VerticalCalcWidget(
+                        problem: problem,
+                        showAnswer: _judgement != null,
+                      )
+                    else
+                      Text(
+                        problem.problemText,
+                        style: TypographyTokens.mathProblemStyle(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
                     const SizedBox(height: SpacingTokens.xl),
 
                     // 判定反馈
