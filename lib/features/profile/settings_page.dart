@@ -1,14 +1,23 @@
 // lib/features/profile/settings_page.dart
 //
 // 层级：features/profile
-// 职责：集中管理应用主题风格与亮暗外观。
+// 职责：应用设置页 — 主题、音频、显示等设置项逐行展示。
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
+
+/// 应用版本信息 Provider。
+final _packageInfoProvider = FutureProvider<PackageInfo>((ref) {
+  return PackageInfo.fromPlatform();
+});
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -18,6 +27,8 @@ class SettingsPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final subject = ref.watch(activeSubjectProvider);
     final mode = ref.watch(themeModeProvider);
+    final settingsRepo = ref.watch(settingsRepositoryProvider);
+
     final isDark = switch (mode) {
       ThemeMode.light => false,
       ThemeMode.dark => true,
@@ -25,136 +36,340 @@ class SettingsPage extends ConsumerWidget {
         MediaQuery.platformBrightnessOf(context) == Brightness.dark,
     };
 
+    final subjectLabel = switch (subject) {
+      AppSubject.poem => '诗词',
+      AppSubject.math => '口算',
+    };
+
+    final modeLabel = switch (mode) {
+      ThemeMode.system => '跟随系统',
+      ThemeMode.light => '浅色',
+      ThemeMode.dark => '深色',
+    };
+
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(SpacingTokens.lg),
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.md,
+            vertical: SpacingTokens.sm,
+          ),
           children: <Widget>[
-            Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(
-                  SpacingTokens.radiusMedium,
-                ),
-                border: Border.all(color: theme.colorScheme.outlineVariant),
-              ),
-              child: Column(
-                children: <Widget>[
-                  _SettingsRow(
-                    title: '主题风格',
-                    trailing: SegmentedButton<AppSubject>(
-                      expandedInsets: EdgeInsets.zero,
-                      segments: const <ButtonSegment<AppSubject>>[
-                        ButtonSegment<AppSubject>(
-                          value: AppSubject.poem,
-                          label: Text('诗词'),
-                          icon: Icon(Icons.brush_rounded),
-                        ),
-                        ButtonSegment<AppSubject>(
-                          value: AppSubject.math,
-                          label: Text('口算'),
-                          icon: Icon(Icons.calculate_rounded),
-                        ),
-                      ],
-                      selected: <AppSubject>{subject},
-                      showSelectedIcon: false,
-                      onSelectionChanged: (Set<AppSubject> next) {
-                        ref.read(activeSubjectProvider.notifier).state =
-                            next.first;
-                      },
-                    ),
-                  ),
-                  Divider(
-                    height: 1,
-                    indent: SpacingTokens.md,
-                    endIndent: SpacingTokens.md,
-                    color: theme.colorScheme.outlineVariant,
-                  ),
-                  _SettingsRow(
-                    title: '外观',
-                    trailing: Semantics(
-                      label: '深色模式',
-                      toggled: isDark,
-                      child: Switch(
-                        value: isDark,
-                        onChanged: (bool enabled) {
-                          ref.read(themeModeProvider.notifier).state =
-                              enabled ? ThemeMode.dark : ThemeMode.light;
-                        },
-                      ),
-                    ),
-                  ),
-                ],
+            // 主题设置
+            AppTile(
+              icon: Icons.palette_outlined,
+              iconColor: theme.colorScheme.primary,
+              title: '主题设置',
+              subtitle: subjectLabel,
+              onTap: () => _showSubjectPicker(context, ref, subject),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+
+            // 外观模式
+            AppTile(
+              icon: isDark
+                  ? Icons.dark_mode_outlined
+                  : Icons.light_mode_outlined,
+              iconColor: theme.colorScheme.secondary,
+              title: '外观模式',
+              subtitle: modeLabel,
+              onTap: () => _showThemeModePicker(context, ref, mode),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+
+            // 音频设置
+            AppTile(
+              icon: Icons.volume_up_outlined,
+              iconColor: ColorTokens.poemGold,
+              title: '音频设置',
+              subtitle: '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)}',
+              onTap: () => _showTtsSpeedPicker(context, ref, settingsRepo),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+
+            // 拼音显示
+            AppTile(
+              icon: Icons.text_fields_outlined,
+              iconColor: ColorTokens.success,
+              title: '拼音显示',
+              subtitle: settingsRepo.pinyinVisible ? '已开启' : '已关闭',
+              trailing: Switch(
+                value: settingsRepo.pinyinVisible,
+                onChanged: (v) async {
+                  await settingsRepo.setPinyinVisible(v);
+                  ref.invalidate(settingsRepositoryProvider);
+                },
               ),
             ),
+            const SizedBox(height: SpacingTokens.sm),
+
+            // 音效
+            AppTile(
+              icon: Icons.music_note_outlined,
+              iconColor: theme.colorScheme.tertiary,
+              title: '音效',
+              subtitle: settingsRepo.soundEnabled ? '已开启' : '已关闭',
+              trailing: Switch(
+                value: settingsRepo.soundEnabled,
+                onChanged: (v) async {
+                  await settingsRepo.setSoundEnabled(v);
+                  ref.invalidate(settingsRepositoryProvider);
+                },
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+
+            // 触觉反馈
+            AppTile(
+              icon: Icons.vibration_outlined,
+              iconColor: theme.colorScheme.error,
+              title: '触觉反馈',
+              subtitle: settingsRepo.hapticEnabled ? '已开启' : '已关闭',
+              trailing: Switch(
+                value: settingsRepo.hapticEnabled,
+                onChanged: (v) async {
+                  await settingsRepo.setHapticEnabled(v);
+                  ref.invalidate(settingsRepositoryProvider);
+                },
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.md),
+
+            // 检查更新
+            AppTile(
+              icon: Icons.system_update_outlined,
+              iconColor: theme.colorScheme.onSurfaceVariant,
+              title: '检查更新',
+              subtitle: '查看新版本并下载 APK',
+              onTap: () => _showUpdateDialog(context),
+            ),
+
+            // 版本号
+            const SizedBox(height: SpacingTokens.xl),
+            Center(
+              child: ref.watch(_packageInfoProvider).when(
+                    data: (info) => Text(
+                      '韵算 v${info.version} (${info.buildNumber})',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.5),
+                      ),
+                    ),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+            ),
+            const SizedBox(height: SpacingTokens.md),
           ],
         ),
       ),
     );
   }
-}
 
-class _SettingsRow extends StatelessWidget {
-  const _SettingsRow({required this.title, required this.trailing});
-
-  final String title;
-  final Widget trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final shouldStack = constraints.maxWidth < 320 || textScale > 1.2;
-        final titleWidget = Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        );
-
-        return ConstrainedBox(
-          constraints: const BoxConstraints(
-            minHeight: SpacingTokens.minTapTarget + SpacingTokens.md,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: SpacingTokens.md,
-              vertical: SpacingTokens.sm,
-            ),
-            child: shouldStack
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      titleWidget,
-                      const SizedBox(height: SpacingTokens.sm),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: trailing,
-                        ),
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: <Widget>[
-                      titleWidget,
-                      const SizedBox(width: SpacingTokens.md),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: trailing,
-                        ),
-                      ),
-                    ],
-                  ),
+  void _showSubjectPicker(
+    BuildContext context,
+    WidgetRef ref,
+    AppSubject current,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const SizedBox(height: SpacingTokens.md),
+              Text(
+                '主题风格',
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              RadioGroup<AppSubject>(
+                groupValue: current,
+                onChanged: (v) {
+                  if (v == null) return;
+                  ref.read(activeSubjectProvider.notifier).state = v;
+                  Navigator.pop(ctx);
+                },
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    RadioListTile<AppSubject>(
+                      title: Text('诗词'),
+                      subtitle: Text('国风水墨主题'),
+                      secondary: Icon(Icons.brush_rounded),
+                      value: AppSubject.poem,
+                    ),
+                    RadioListTile<AppSubject>(
+                      title: Text('口算'),
+                      subtitle: Text('童趣马卡龙主题'),
+                      secondary: Icon(Icons.calculate_rounded),
+                      value: AppSubject.math,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+            ],
           ),
         );
       },
+    );
+  }
+
+  void _showThemeModePicker(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeMode current,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const SizedBox(height: SpacingTokens.md),
+              Text(
+                '外观模式',
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              RadioGroup<ThemeMode>(
+                groupValue: current,
+                onChanged: (v) {
+                  if (v == null) return;
+                  ref.read(themeModeProvider.notifier).state = v;
+                  Navigator.pop(ctx);
+                },
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    RadioListTile<ThemeMode>(
+                      title: Text('跟随系统'),
+                      secondary: Icon(Icons.settings_suggest_outlined),
+                      value: ThemeMode.system,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: Text('浅色'),
+                      secondary: Icon(Icons.light_mode_outlined),
+                      value: ThemeMode.light,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: Text('深色'),
+                      secondary: Icon(Icons.dark_mode_outlined),
+                      value: ThemeMode.dark,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showTtsSpeedPicker(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic settingsRepo,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            var speed = settingsRepo.ttsSpeed as double;
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(SpacingTokens.lg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      '语速调节',
+                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: SpacingTokens.md),
+                    Row(
+                      children: [
+                        const Text('慢'),
+                        Expanded(
+                          child: Slider(
+                            value: speed,
+                            min: 0.1,
+                            max: 1.0,
+                            divisions: 9,
+                            label: speed.toStringAsFixed(1),
+                            onChanged: (v) {
+                              setState(() => speed = v);
+                            },
+                          ),
+                        ),
+                        const Text('快'),
+                      ],
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    Text(
+                      '当前语速: ${speed.toStringAsFixed(1)}',
+                      style: Theme.of(ctx).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: SpacingTokens.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () async {
+                          await settingsRepo.setTtsSpeed(speed);
+                          ref.invalidate(settingsRepositoryProvider);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                        child: const Text('确定'),
+                      ),
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showUpdateDialog(BuildContext context) {
+    const releaseUrl = 'https://github.com/wangjun/PoeMath/releases';
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('检查更新'),
+        content: const Text('请前往 GitHub Releases 页面下载最新版本：\n\n$releaseUrl'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Clipboard.setData(const ClipboardData(text: releaseUrl));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('链接已复制到剪贴板')),
+              );
+            },
+            child: const Text('复制链接'),
+          ),
+        ],
+      ),
     );
   }
 }

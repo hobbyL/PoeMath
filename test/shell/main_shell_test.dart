@@ -101,7 +101,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('设置'), findsOneWidget);
-    expect(find.text('主题风格'), findsOneWidget);
-    expect(find.text('外观'), findsOneWidget);
+    expect(find.text('主题设置'), findsOneWidget);
+    expect(find.text('外观模式'), findsOneWidget);
   });
 }
