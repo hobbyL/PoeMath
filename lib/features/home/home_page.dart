@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
@@ -238,12 +239,8 @@ class HomePage extends ConsumerWidget {
     required Color color,
   }) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      ),
+    return ColoredCard(
+      color: color,
       child: Column(
         children: [
           Icon(icon, color: color, size: 24),
@@ -344,13 +341,10 @@ class HomePage extends ConsumerWidget {
     final theme = Theme.of(context);
     final dueReviews = ref.watch(dueReviewCountProvider);
 
-    return Container(
+    return ColoredCard(
+      color: theme.colorScheme.primary,
       width: double.infinity,
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      ),
+      backgroundOpacity: 0.06,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -427,29 +421,23 @@ class _QuickActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
+    return ColoredCard(
+      color: color,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: SpacingTokens.md),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
+      padding: const EdgeInsets.symmetric(vertical: SpacingTokens.md),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
