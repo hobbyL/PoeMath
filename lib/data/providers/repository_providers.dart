@@ -19,6 +19,7 @@ import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
+import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/services/haptic_service.dart';
 
@@ -96,4 +97,8 @@ final soundServiceProvider = Provider<SoundService>((ref) {
 final hapticServiceProvider = Provider<HapticService>((ref) {
   final settings = ref.watch(settingsRepositoryProvider);
   return HapticService(settings);
+});
+
+final backupServiceProvider = Provider<BackupService>((ref) {
+  return BackupService();
 });

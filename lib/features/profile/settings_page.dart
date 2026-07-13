@@ -4,8 +4,10 @@
 // 职责：应用设置页 — 主题、音频、显示等设置项逐行展示。
 
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
@@ -101,8 +103,6 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: SpacingTokens.sm),
 
             // 音效
-            // TODO(backlog): soundEnabled 开关已预留，但音效播放服务尚未实现。
-            //   需新建 SoundService，在口算答题/打卡/成就等场景播放短音效。
             AppTile(
               icon: Icons.music_note_outlined,
               iconColor: theme.colorScheme.tertiary,
@@ -119,8 +119,6 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: SpacingTokens.sm),
 
             // 触觉反馈
-            // TODO(backlog): hapticEnabled 开关已预留，但触觉反馈服务尚未实现。
-            //   需新建 HapticService，在按钮点击/答题提交等场景调用 HapticFeedback。
             AppTile(
               icon: Icons.vibration_outlined,
               iconColor: theme.colorScheme.error,
@@ -133,6 +131,26 @@ class SettingsPage extends ConsumerWidget {
                   ref.invalidate(settingsRepositoryProvider);
                 },
               ),
+            ),
+            const SizedBox(height: SpacingTokens.md),
+
+            // 数据备份
+            AppTile(
+              icon: Icons.cloud_upload_outlined,
+              iconColor: theme.colorScheme.primary,
+              title: '数据备份',
+              subtitle: '导出学习数据',
+              onTap: () => _exportBackup(context, ref),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+
+            // 数据恢复
+            AppTile(
+              icon: Icons.cloud_download_outlined,
+              iconColor: theme.colorScheme.secondary,
+              title: '数据恢复',
+              subtitle: '从备份文件恢复',
+              onTap: () => _importBackup(context, ref),
             ),
             const SizedBox(height: SpacingTokens.md),
 
@@ -153,6 +171,72 @@ class SettingsPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _exportBackup(BuildContext context, WidgetRef ref) async {
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      final backup = ref.read(backupServiceProvider);
+      final filePath = await backup.exportToFile();
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(filePath)]),
+      );
+    } on Exception catch (e) {
+      scaffold.showSnackBar(
+        SnackBar(content: Text('备份失败: $e')),
+      );
+    }
+  }
+
+  Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
+    final scaffold = ScaffoldMessenger.of(context);
+
+    // 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('数据恢复'),
+        content: const Text('恢复将覆盖当前所有学习数据，此操作不可撤销。\n\n确定要继续吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确认恢复'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final filePath = result.files.single.path;
+      if (filePath == null) return;
+
+      final backup = ref.read(backupServiceProvider);
+      final count = await backup.restoreFromFile(filePath);
+
+      scaffold.showSnackBar(
+        SnackBar(content: Text('恢复成功，共恢复 $count 条记录')),
+      );
+    } on FormatException catch (e) {
+      scaffold.showSnackBar(
+        SnackBar(content: Text('恢复失败: ${e.message}')),
+      );
+    } on Exception catch (e) {
+      scaffold.showSnackBar(
+        SnackBar(content: Text('恢复失败: $e')),
+      );
+    }
   }
 
   void _showSubjectPicker(

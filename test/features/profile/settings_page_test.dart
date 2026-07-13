@@ -34,6 +34,19 @@ void main() {
     expect(find.text('拼音显示'), findsOneWidget);
     expect(find.text('音效'), findsOneWidget);
     expect(find.text('触觉反馈'), findsOneWidget);
+
+    // 滚动以显示下方的备份/恢复/更新选项
+    await tester.scrollUntilVisible(
+      find.text('数据备份'),
+      50,
+    );
+    expect(find.text('数据备份'), findsOneWidget);
+    expect(find.text('数据恢复'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('检查更新'),
+      50,
+    );
     expect(find.text('检查更新'), findsOneWidget);
   });
 
