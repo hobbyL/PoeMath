@@ -90,9 +90,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: 诗算宝 ${{ steps.version.outputs.tag }}
+          name: 韵算 ${{ steps.version.outputs.tag }}
           body: |
-            ## 诗算宝 ${{ steps.version.outputs.tag }}
+            ## 韵算 ${{ steps.version.outputs.tag }}
 
             版本号: `${{ steps.version.outputs.version_name }}`
             构建号: `${{ steps.version.outputs.version_code }}`
