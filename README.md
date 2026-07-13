@@ -16,8 +16,11 @@
 - 🧮 **12 类口算题型**：紧贴人教版数学课标，1-6 年级 12 个学期精准配置
 - 📐 **60+ 数学公式库**：分类浏览、参数说明、记忆技巧、例题
 - 🎯 **智能错题分析**：6 类错因规则（进位遗漏/退位遗漏/口诀错误/运算顺序/余数/小数点）
-- 📖 **艾宾浩斯复习**：间隔 [1, 3, 7, 14, 30] 天的科学复习调度
+- 📝 **诗词测试**：填空测试（补全诗句）+ 选择题（上句选下句），自动生成题目、即时反馈
+- 📖 **渐进式背诵**：首字提示 → 半隐模式 → 全隐模式 → 默写，四级递进
+- 🧠 **艾宾浩斯复习**：间隔 [1, 3, 7, 14, 30] 天的科学复习调度，首页提醒 + 复习列表
 - ⭐ **游戏化激励**：每日打卡 → 星星累积 → 等级晋升（童生→状元→诗仙）→ 成就勋章
+- 🔄 **应用内更新**：检查新版本、下载 APK、校验安装（阿里云 OSS）
 - 🔒 **完全离线**：不收集任何个人信息，无广告，无内购，无第三方 SDK
 
 ## 功能截图
@@ -39,16 +42,23 @@
 
 ```
 lib/
-├── core/              # 常量、路由、主题、工具
+├── core/              # 常量、路由、主题、工具、服务
+│   ├── routing/       # GoRouter 路由定义
+│   ├── theme/         # 双主题系统 (诗词/口算)
+│   ├── widgets/       # 共享组件 (ColoredCard, AppTile)
+│   └── services/      # TTS、应用更新服务
 ├── data/              # Hive 模型、仓储、Provider
+│   ├── models/        # 14 个 Hive 模型
+│   └── repositories/  # 13 个仓储类
 ├── features/          # 功能模块
-│   ├── home/          # 首页仪表盘
-│   ├── poem/          # 诗词模块
-│   ├── math/          # 口算模块
+│   ├── home/          # 首页仪表盘 (打卡/统计/复习提醒)
+│   ├── poem/          # 诗词模块 (列表/详情/背诵/测试/复习)
+│   │   └── quiz/      # 测试引擎 + 题目模型
+│   ├── math/          # 口算模块 (练习/错题本)
 │   ├── formula/       # 公式知识库
-│   ├── profile/       # 个人中心
+│   ├── profile/       # 个人中心 (设置/更新)
 │   └── shell/         # Shell + 导航 + 启动页
-├── math_engine/       # 口算引擎 (纯 Dart)
+├── math_engine/       # 口算引擎 (纯 Dart, 12 类生成器)
 └── app.dart           # 应用根 Widget
 ```
 
@@ -152,6 +162,53 @@ keytool -genkey -v \
 base64 -i poemath-release.jks -o keystore.b64
 cat keystore.b64 | pbcopy
 ```
+
+### 应用内更新（阿里云 OSS）
+
+应用支持检查新版本、下载 APK 并安装。更新文件托管在阿里云 OSS，CI 构建时自动上传。
+
+#### 工作流程
+
+```
+打 tag → CI 构建 APK → 上传到 OSS → 生成 latest.json
+→ 用户在设置页点击"检查更新" → 对比版本 → 下载 → MD5 校验 → 安装
+```
+
+#### GitHub Secrets 配置
+
+| Secret / Variable | 说明 | 示例值 |
+|-------------------|------|--------|
+| `ALIYUN_OSS_ACCESS_KEY_ID` | 阿里云 AccessKey ID | `LTAI5t...` |
+| `ALIYUN_OSS_ACCESS_KEY_SECRET` | 阿里云 AccessKey Secret | `***` |
+| `ALIYUN_OSS_ENDPOINT` | OSS Endpoint | `oss-cn-hangzhou.aliyuncs.com` |
+| `ALIYUN_OSS_BUCKET` | Bucket 名称 | `cloudm` |
+| `ALIYUN_OSS_APP_UPDATE_OSS_PREFIX` | OSS 目录前缀 | `poemath/android/stable` |
+| `ALIYUN_OSS_APP_UPDATE_DOWNLOAD_BASE_URL` | 下载 Base URL | `https://cloudm.oss-cn-hangzhou.aliyuncs.com` |
+
+> `UPDATE_CHECK_URL` 由 CI 自动拼接并通过 `--dart-define` 注入，无需单独配置。未配置时，设置页的"检查更新"入口自动降级为不可用状态。
+
+## 功能模块
+
+### 诗词模块
+
+| 功能 | 说明 | 页面 |
+|------|------|------|
+| 诗词列表 | 按年级筛选、搜索 | `poem_tab_page` |
+| 诗词详情 | 全文、拼音、译文、注释、赏析、名句 | `poem_detail_page` |
+| 渐进式背诵 | 首字提示 → 半隐 → 全隐 → 默写 | `poem_recite_page` |
+| 填空测试 | 自动挖空诗句后半，输入答案 | `poem_quiz_page` |
+| 选择题 | 上句出题，4 选 1 选下句 | `poem_quiz_page` |
+| 复习计划 | 艾宾浩斯 5 轮复习，首页提醒 | `poem_review_page` |
+| TTS 朗读 | 全文语音朗读，可调语速 | `poem_detail_page` |
+
+### 口算模块
+
+| 功能 | 说明 |
+|------|------|
+| 12 类题型 | 加减法 / 乘法口诀 / 有余除法 / 多位数乘除 / 混合运算 / 运算律 / 小数 / 分数 / 百分数 / 简易方程 / 比例 / 正负数 |
+| 年级适配 | 1-6 年级 12 个学期独立配置，难度递进 |
+| 错题诊断 | 6 类错因规则 + 分步解题过程 |
+| 错题本 | 记录错题、重做、标记已掌握 |
 
 ## 数据来源
 
