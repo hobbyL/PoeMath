@@ -12,6 +12,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
@@ -180,6 +181,13 @@ class HomePage extends ConsumerWidget {
                 ref.read(hapticServiceProvider).medium();
                 ref.invalidate(isCheckedInProvider);
                 ref.invalidate(streakProvider);
+                if (context.mounted) {
+                  showCelebration(
+                    context,
+                    type: CelebrationType.checkIn,
+                    subtitle: '继续保持！',
+                  );
+                }
               },
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.white.withValues(alpha: 0.2),

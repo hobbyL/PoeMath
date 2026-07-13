@@ -10,10 +10,12 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_checker.dart';
 import 'package:poemath/domain/level_calculator.dart';
@@ -246,6 +248,15 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final newLevel = LevelCalculator.calculate(updatedStats.totalStars);
     if (newLevel != updatedStats.level) {
       await statsRepo.updateLevel(newLevel);
+      if (mounted) {
+        showCelebration(
+          context,
+          type: CelebrationType.levelUp,
+          subtitle: newLevel < UserStats.levelNames.length
+              ? UserStats.levelNames[newLevel]
+              : '诗仙',
+        );
+      }
     }
 
     // 成就自动检查
