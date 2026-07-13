@@ -196,6 +196,8 @@ class HomePage extends ConsumerWidget {
                     if (!mathDone) {
                       missing.add('口算 $todayMath/$mathGoal 题');
                     }
+                    // 先清除已有提示，避免叠加
+                    ScaffoldMessenger.of(context).clearSnackBars();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
