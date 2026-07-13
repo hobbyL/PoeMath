@@ -3,7 +3,7 @@
   "name": "phase-2-data-layer",
   "title": "Phase 2 Hive 数据层与 Riverpod 状态骨架",
   "description": "Hive 11 个 Box 定义 + TypeAdapter + Repository 层 + Riverpod Provider 骨架 + Bootstrap 首次导入流程",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "mhp",
   "assignee": "mhp",
   "createdAt": "2026-07-12",
-  "completedAt": null,
+  "completedAt": "2026-07-13",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -21,6 +21,6 @@
   "children": [],
   "parent": "07-12-poemath-mvp",
   "relatedFiles": [],
-  "notes": "2026-07-13 状态核查：大部分已实现。R2.1 模型15个✅, R2.2 Box定义+初始化✅(hive_boxes.dart+hive_registrar.dart), R2.3 Bootstrap导入✅(bootstrap.dart 120行), R2.4 索引内联在PoemRepository中✅(byGrade/byAuthor/byDynasty/byTag/byLayer), R2.5 Repository层13个✅, R2.6 ProfileScope在core/utils/✅, R2.7 Provider骨架✅(repository_providers.dart+data_providers.dart). 缺失：R2.8 Repository层单元测试未覆盖。可考虑标记completed或补测试后完成。",
+  "notes": "2026-07-13 已完成。R2.1-R2.7 全部实现，R2.8 Repository 层 13 个单元测试文件已补齐（136 个测试），全部通过。363 tests passing, 0 analyze issues.",
   "meta": {}
 }

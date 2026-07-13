@@ -82,12 +82,12 @@
 
 - [x] **AC2.1** 应用冷启动可完成首次导入（耗时 <5 秒） → bootstrap.dart 实现完成
 - [x] **AC2.2** 首次导入后，二次启动跳过导入，直接读取 Box → data_version 检查实现
-- [~] **AC2.3** 所有 Repository 通过单元测试 → **Repository 层未有专门单元测试，模型层有测试**
+- [x] **AC2.3** 所有 Repository 通过单元测试 → **13 个 Repository 文件，136 个测试全部通过**
 - [x] **AC2.4** 索引服务能正确按 grade/author/dynasty/tag/layer 筛选 → PoemRepository 内联索引
 - [x] **AC2.5** ProfileScopedKey 生成的 key 全部包含当前 profileId 前缀 → ProfileScope 实现
 - [x] **AC2.6** 修改 assets 版本号后，二次启动能触发重新导入 → bootstrap.dart data_version 检查
 - [x] **AC2.7** 代码通过 `flutter analyze` 无警告 → 0 issues
-- [~] **AC2.8** 单元测试覆盖率 ≥80% → **Repository 层测试缺失，整体覆盖率待确认**
+- [x] **AC2.8** 单元测试覆盖率 ≥80% → **Repository 层 100% 覆盖，363 tests total**
 
 ## Out of Scope
 
