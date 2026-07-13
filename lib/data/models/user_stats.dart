@@ -49,6 +49,10 @@ class UserStats extends HiveObject {
   @HiveField(9)
   final DateTime createdAt;
 
+  /// 口算单次练习最佳连续答对数
+  @HiveField(10)
+  int mathBestStreak;
+
   UserStats({
     required this.profileId,
     this.totalStars = 0,
@@ -59,6 +63,7 @@ class UserStats extends HiveObject {
     this.mathTotalProblems = 0,
     this.mathTotalCorrect = 0,
     this.level = 0,
+    this.mathBestStreak = 0,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 

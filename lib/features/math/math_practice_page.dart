@@ -10,9 +10,10 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
-import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
@@ -48,6 +49,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   /// 当前 session ID
   late final String _sessionId;
+
+  /// 当前连续答对数（答错时清零）
+  int _consecutiveCorrect = 0;
+
+  /// 本次练习最佳连续答对数
+  int _bestConsecutive = 0;
 
   @override
   void initState() {
@@ -93,6 +100,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   }
 
   /// 中途退出时保存已完成的部分会话。
+  ///
+  /// 必须全同步操作 —— dispose() 中调用 async 方法时，
+  /// 微任务可能在 ref 失效后才执行，导致数据丢失。
+  /// Hive put() 的内存写入是同步的，磁盘写入异步但不影响后续读取。
   void _savePartialSession() {
     final answered = ref.read(mathAnsweredCountProvider);
     if (answered == 0 || _isFinishing) return; // 没做题或已结算过
@@ -113,13 +124,20 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       finishedAt: DateTime.now(),
     );
 
-    final repo = ref.read(mathSessionRepoProvider);
-    // Hive put() 内存写入是同步的，dispose 中可安全调用
-    repo.save(session);
+    // 直接同步写入 Hive（绕过 async 仓储方法）
+    final sessionKey = ProfileScope.key(session.id);
+    HiveBoxes.mathSessions.put(sessionKey, session);
 
-    // 更新用户统计
-    final statsRepo = ref.read(userStatsRepoProvider);
-    statsRepo.addMathResults(problems: answered, correct: correctCount);
+    // 同步更新用户统计
+    final statsKey = ProfileScope.key('stats');
+    var stats = HiveBoxes.userStats.get(statsKey);
+    stats ??= UserStats(profileId: ProfileScope.currentId);
+    stats.mathTotalProblems += answered;
+    stats.mathTotalCorrect += correctCount;
+    if (_bestConsecutive > stats.mathBestStreak) {
+      stats.mathBestStreak = _bestConsecutive;
+    }
+    HiveBoxes.userStats.put(statsKey, stats);
 
     // 刷新首页 providers
     ref.invalidate(userStatsProvider);
@@ -166,7 +184,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     ref.read(mathAnsweredCountProvider.notifier).update((s) => s + 1);
     if (judgement.isCorrect) {
       ref.read(mathCorrectCountProvider.notifier).update((s) => s + 1);
+      _consecutiveCorrect++;
+      if (_consecutiveCorrect > _bestConsecutive) {
+        _bestConsecutive = _consecutiveCorrect;
+      }
     } else {
+      _consecutiveCorrect = 0;
       _recordMistake(problem, userAnswer, judgement);
     }
   }
@@ -286,6 +309,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     if (stars > 0) {
       await statsRepo.addStars(stars);
     }
+    // 更新口算最佳连续答对数
+    await statsRepo.updateMathBestStreak(_bestConsecutive);
 
     // 等级自动计算
     final updatedStats = statsRepo.get();
