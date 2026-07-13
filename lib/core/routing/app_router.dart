@@ -19,7 +19,9 @@ import 'package:poemath/features/math/math_mistake_page.dart';
 import 'package:poemath/features/math/math_practice_page.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
 import 'package:poemath/features/poem/poem_detail_page.dart';
+import 'package:poemath/features/poem/poem_quiz_page.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
+import 'package:poemath/features/poem/quiz/quiz_models.dart';
 import 'package:poemath/features/poem/poem_tab_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
@@ -74,6 +76,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return PoemRecitePage(poemId: id);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.poemQuiz,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final typeStr = state.uri.queryParameters['type'] ?? 'fill';
+          final quizType = typeStr == 'choice'
+              ? QuizType.multipleChoice
+              : QuizType.fillBlank;
+          return PoemQuizPage(poemId: id, quizType: quizType);
         },
       ),
       // ============ 口算练习（非 Shell 子路由，全屏） ============

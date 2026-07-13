@@ -19,6 +19,7 @@ class AppRoutes {
   static const String poemList = '/poem/list';
   static const String poemDetail = '/poem/detail/:id';
   static const String poemRecite = '/poem/recite/:id';
+  static const String poemQuiz = '/poem/quiz/:id';
 
   // ============ 口算模块（Phase 5） ============
   static const String mathHub = '/math/hub';
@@ -37,5 +38,6 @@ class AppRoutes {
   // ============ 路径构造器 ============
   static String poemDetailOf(String id) => '/poem/detail/$id';
   static String poemReciteOf(String id) => '/poem/recite/$id';
+  static String poemQuizOf(String id) => '/poem/quiz/$id';
   static String formulaDetailOf(String id) => '/formula/detail/$id';
 }
