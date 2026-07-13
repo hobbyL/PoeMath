@@ -80,10 +80,14 @@ void main() {
             grade: grade, semester: sem, count: 30, random: rng,
           );
           for (final p in problems) {
-            expect(p.problemText.isNotEmpty, isTrue,
-                reason: '${config.label}: 题目文本为空');
-            expect(p.answerText.isNotEmpty, isTrue,
-                reason: '${config.label}: 答案文本为空，题目: ${p.problemText}');
+            expect(
+                p.problemText.isNotEmpty, isTrue,
+                reason: '${config.label}: 题目文本为空',
+            );
+            expect(
+                p.answerText.isNotEmpty, isTrue,
+                reason: '${config.label}: 答案文本为空，题目: ${p.problemText}',
+            );
           }
         });
       }
@@ -97,8 +101,10 @@ void main() {
     );
     for (final p in problems) {
       if (p.mode == ProblemMode.findResult) {
-        expect(p.result.asDouble <= 10, isTrue,
-            reason: '一年级上结果 ${p.result} > 10，题目: ${p.problemText}');
+        expect(
+            p.result.asDouble <= 10, isTrue,
+            reason: '一年级上结果 ${p.result} > 10，题目: ${p.problemText}',
+        );
       }
     }
   });
