@@ -246,6 +246,7 @@ class BackupService {
         'mathTotalCorrect': s.mathTotalCorrect,
         'level': s.level,
         'createdAt': s.createdAt.toIso8601String(),
+        'mathBestStreak': s.mathBestStreak,
       };
     }).toList();
   }
@@ -430,6 +431,7 @@ class BackupService {
         mathTotalCorrect: m['mathTotalCorrect'] as int? ?? 0,
         level: m['level'] as int? ?? 0,
         createdAt: _parseDateTime(m['createdAt']),
+        mathBestStreak: m['mathBestStreak'] as int? ?? 0,
       );
       await box.put(obj.profileId, obj);
     }
