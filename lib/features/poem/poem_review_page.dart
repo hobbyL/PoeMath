@@ -11,6 +11,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 class PoemReviewPage extends ConsumerWidget {
@@ -339,12 +340,19 @@ class PoemReviewPage extends ConsumerWidget {
             progress.status != LearningStatus.mastered) {
           progress.status = LearningStatus.mastered;
           await progressRepo.save(progress);
+
+          // 同步更新 UserStats 的已掌握数
+          final statsRepo = ref.read(userStatsRepoProvider);
+          final masteredCount = progressRepo.masteredCount;
+          await statsRepo.updatePoemStats(mastered: masteredCount);
         }
       }
 
       // 刷新 providers
       ref.invalidate(reviewRepoProvider);
       ref.invalidate(dueReviewCountProvider);
+      ref.invalidate(poemProgressProvider(schedule.poemId));
+      ref.invalidate(userStatsProvider);
 
       if (context.mounted) {
         final message = nextSchedule != null && nextSchedule.isCompleted

@@ -326,6 +326,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     // 刷新首页统计 providers
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayMathCountProvider);
+    ref.invalidate(unlockedAchievementsCountProvider);
+    ref.invalidate(recentSessionsProvider);
+    ref.invalidate(totalProblemsCountProvider);
+    ref.invalidate(overallAccuracyProvider);
 
     if (!mounted) return;
 

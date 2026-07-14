@@ -133,6 +133,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                       final progressRepo =
                           ref.read(poemProgressRepoProvider);
                       await progressRepo.recordStudy(widget.poemId);
+                      ref.invalidate(
+                        poemProgressProvider(widget.poemId),
+                      );
 
                       // 更新全局统计
                       final statsRepo = ref.read(userStatsRepoProvider);

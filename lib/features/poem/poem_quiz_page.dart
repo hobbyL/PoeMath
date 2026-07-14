@@ -146,6 +146,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     // 记录学习
     final progressRepo = ref.read(poemProgressRepoProvider);
     final progress = await progressRepo.recordStudy(widget.poemId);
+    ref.invalidate(poemProgressProvider(widget.poemId));
 
     // 更新全局统计
     final statsRepo = ref.read(userStatsRepoProvider);
@@ -172,6 +173,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
       if (needSave) {
         await progressRepo.save(progress);
+        ref.invalidate(poemProgressProvider(widget.poemId));
       }
 
       // 首次通过 → 创建艾宾浩斯复习计划
