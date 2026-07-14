@@ -5,6 +5,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -42,9 +43,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   @override
   void initState() {
     super.initState();
-    _confettiController = CelebrationController(
-      duration: const Duration(milliseconds: 500),
-    );
+    _confettiController = CelebrationController();
     // 延迟初始化，等 ref 可用
     WidgetsBinding.instance.addPostFrameCallback((_) => _initQuiz());
   }
@@ -296,7 +295,23 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                     // 反馈区域
                     if (_answered) ...[
                       const SizedBox(height: SpacingTokens.md),
-                      _buildFeedback(context, session, q, theme),
+                      _buildFeedback(context, session, q, theme)
+                          .animate()
+                          .fadeIn(duration: 300.ms)
+                          .scale(
+                            begin: const Offset(0.9, 0.9),
+                            end: const Offset(1, 1),
+                            duration: 300.ms,
+                            curve: Curves.easeOutBack,
+                          )
+                          .then()
+                          .shimmer(
+                            delay: 200.ms,
+                            duration: 600.ms,
+                            color: session.isCurrentCorrect()
+                                ? ColorTokens.success.withValues(alpha: 0.3)
+                                : Colors.transparent,
+                          ),
                     ],
                   ],
                 ),
@@ -379,24 +394,30 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     ThemeData theme,
   ) {
     return Column(
-      children: q.options!.map((option) {
+      children: q.options!.asMap().entries.map((entry) {
+        final i = entry.key;
+        final option = entry.value;
         Color? bgColor;
         Color? borderColor;
         Color? textColor;
+        final isCorrectOption = option == q.correctAnswer;
+        final isUserWrong = _answered &&
+            !isCorrectOption &&
+            option == _session!.userAnswers[_session!.currentIndex];
 
         if (_answered) {
-          if (option == q.correctAnswer) {
+          if (isCorrectOption) {
             bgColor = ColorTokens.success.withValues(alpha: 0.12);
             borderColor = ColorTokens.success;
             textColor = ColorTokens.success;
-          } else if (option == _session!.userAnswers[_session!.currentIndex]) {
+          } else if (isUserWrong) {
             bgColor = theme.colorScheme.error.withValues(alpha: 0.12);
             borderColor = theme.colorScheme.error;
             textColor = theme.colorScheme.error;
           }
         }
 
-        return Padding(
+        Widget optionWidget = Padding(
           padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
           child: SizedBox(
             width: double.infinity,
@@ -421,6 +442,50 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
             ),
           ),
         );
+
+        // 交错入场
+        optionWidget = optionWidget
+            .animate()
+            .fadeIn(delay: (100 * i).ms, duration: 300.ms)
+            .slideX(
+              begin: 0.15,
+              end: 0,
+              delay: (100 * i).ms,
+              duration: 300.ms,
+              curve: Curves.easeOutCubic,
+            );
+
+        // 答对选项：额外弹跳 + 光泽
+        if (_answered && isCorrectOption) {
+          optionWidget = optionWidget
+              .animate(delay: 100.ms)
+              .scale(
+                begin: const Offset(1, 1),
+                end: const Offset(1.03, 1.03),
+                duration: 200.ms,
+                curve: Curves.easeOut,
+              )
+              .then()
+              .scale(
+                begin: const Offset(1.03, 1.03),
+                end: const Offset(1, 1),
+                duration: 200.ms,
+              )
+              .shimmer(
+                delay: 100.ms,
+                duration: 600.ms,
+                color: ColorTokens.success.withValues(alpha: 0.4),
+              );
+        }
+
+        // 答错选项：抖动
+        if (isUserWrong) {
+          optionWidget = optionWidget
+              .animate(delay: 100.ms)
+              .shakeX(duration: 400.ms, hz: 4, amount: 4);
+        }
+
+        return optionWidget;
       }).toList(),
     );
   }
@@ -511,7 +576,19 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
           const Spacer(),
 
           // 评级图标
-          Icon(ratingIcon, size: 80, color: ratingColor),
+          Icon(ratingIcon, size: 80, color: ratingColor)
+              .animate()
+              .scale(
+                begin: const Offset(0, 0),
+                end: const Offset(1, 1),
+                duration: 500.ms,
+                curve: Curves.elasticOut,
+              )
+              .shimmer(
+                delay: 400.ms,
+                duration: 800.ms,
+                color: ratingColor.withValues(alpha: 0.3),
+              ),
           const SizedBox(height: SpacingTokens.md),
 
           // 评语
@@ -521,10 +598,10 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
-          ),
+          ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
           const SizedBox(height: SpacingTokens.xl),
 
-          // 统计卡片
+          // 统计卡片（滑入）
           ColoredCard(
             color: theme.colorScheme.primary,
             child: Column(
@@ -586,7 +663,16 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                 ],
               ],
             ),
-          ),
+          )
+              .animate()
+              .fadeIn(delay: 600.ms, duration: 400.ms)
+              .slideY(
+                begin: 0.15,
+                end: 0,
+                delay: 600.ms,
+                duration: 400.ms,
+                curve: Curves.easeOutCubic,
+              ),
 
           const Spacer(),
 
@@ -617,7 +703,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                 ),
               ),
             ],
-          ),
+          ).animate().fadeIn(delay: 800.ms, duration: 400.ms),
         ],
       ),
     );

@@ -61,9 +61,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     super.initState();
     _startTime = DateTime.now();
     _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-    _confettiController = CelebrationController(
-      duration: const Duration(milliseconds: 500),
-    );
+    _confettiController = CelebrationController();
 
     // 延迟到 build 之后初始化题目
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -411,17 +409,35 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                     // 题目文本（竖式模式特殊展示）
                     if (problem.mode == ProblemMode.vertical)
                       VerticalCalcWidget(
+                        key: ValueKey('vert_$currentIndex'),
                         problem: problem,
                         showAnswer: _judgement != null,
                       )
+                          .animate()
+                          .fadeIn(duration: 300.ms)
+                          .slideX(
+                            begin: 0.1,
+                            end: 0,
+                            duration: 300.ms,
+                            curve: Curves.easeOutCubic,
+                          )
                     else
                       Text(
                         problem.problemText,
+                        key: ValueKey('prob_$currentIndex'),
                         style: TypographyTokens.mathProblemStyle(
                           color: theme.colorScheme.onSurface,
                         ),
                         textAlign: TextAlign.center,
-                      ),
+                      )
+                          .animate()
+                          .fadeIn(duration: 300.ms)
+                          .slideX(
+                            begin: 0.1,
+                            end: 0,
+                            duration: 300.ms,
+                            curve: Curves.easeOutCubic,
+                          ),
                     const SizedBox(height: SpacingTokens.xl),
 
                     // 判定反馈
@@ -628,7 +644,15 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                 : '下一题',
           ),
         ),
-      );
+      )
+          .animate()
+          .fadeIn(duration: 250.ms)
+          .slideY(
+            begin: 0.2,
+            end: 0,
+            duration: 250.ms,
+            curve: Curves.easeOutCubic,
+          );
     }
 
     // 比大小模式：显示 > < = 三个按钮

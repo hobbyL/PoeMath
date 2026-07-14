@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 ///
 /// 创建后调用 [play] 触发一次撒花，动画结束后自动停止。
 class CelebrationController extends ChangeNotifier {
-  CelebrationController({this.duration = const Duration(seconds: 2)});
+  CelebrationController({this.duration = const Duration(milliseconds: 2500)});
 
   final Duration duration;
   bool _isPlaying = false;
@@ -51,12 +51,13 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
 
   static const _colors = [
     Color(0xFFFFC107), // 金色
-    Color(0xFFFF5722), // 橙色
+    Color(0xFFFF9800), // 橙色
+    Color(0xFFE91E63), // 粉色
     Color(0xFF4CAF50), // 绿色
     Color(0xFF2196F3), // 蓝色
-    Color(0xFFE91E63), // 粉色
     Color(0xFF9C27B0), // 紫色
-    Color(0xFFFFEB3B), // 黄色
+    Color(0xFFFF5252), // 红色
+    Color(0xFF00BCD4), // 青色
   ];
 
   @override
@@ -91,22 +92,44 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
   }
 
   void _spawnParticles() {
-    _particles = List.generate(60, (_) {
-      final angle = _random.nextDouble() * 2 * pi;
-      final speed = 200 + _random.nextDouble() * 400;
-      final size = 4.0 + _random.nextDouble() * 8;
-      final rotationSpeed = (_random.nextDouble() - 0.5) * 10;
+    final durationSec = widget.controller.duration.inMilliseconds / 1000.0;
+
+    _particles = List.generate(80, (_) {
+      // 从屏幕中下方两个发射点喷出（左右各一个，模拟烟花）
+      final isLeft = _random.nextBool();
+      final startX = isLeft
+          ? 0.15 + _random.nextDouble() * 0.15 // 左侧 15%-30%
+          : 0.55 + _random.nextDouble() * 0.15; // 右侧 55%-70%
+
+      // 向上喷射的速度
+      final upSpeed = 300 + _random.nextDouble() * 350;
+      // 水平散开的速度（左侧偏右、右侧偏左，形成交叉）
+      final spreadAngle = isLeft
+          ? 0.3 + _random.nextDouble() * 1.0 // 向右偏
+          : -0.3 - _random.nextDouble() * 1.0; // 向左偏
+      final hSpeed = spreadAngle * (80 + _random.nextDouble() * 120);
+
+      // 延迟出发：0 ~ 25% 的动画时长内交错发射
+      final delay = _random.nextDouble() * 0.25;
+
+      // 左右飘摆的频率和幅度
+      final swayFreq = 1.5 + _random.nextDouble() * 2.5;
+      final swayAmp = 15 + _random.nextDouble() * 30;
+
       return _Particle(
-        // 从顶部中央区域发射
-        startX: 0.3 + _random.nextDouble() * 0.4,
-        startY: -0.05,
-        vx: cos(angle) * speed * 0.5,
-        vy: sin(angle).abs() * speed, // 向下
-        size: size,
+        startX: startX,
+        startY: 0.65 + _random.nextDouble() * 0.1, // 从 65%-75% 高度发射
+        vx: hSpeed,
+        vy: -upSpeed, // 向上（负值）
+        size: 4.0 + _random.nextDouble() * 7,
         color: _colors[_random.nextInt(_colors.length)],
         rotation: _random.nextDouble() * 2 * pi,
-        rotationSpeed: rotationSpeed,
-        shape: _random.nextInt(3), // 0=圆, 1=方, 2=星
+        rotationSpeed: (_random.nextDouble() - 0.5) * 8,
+        shape: _random.nextInt(3),
+        delay: delay,
+        swayFreq: swayFreq,
+        swayAmp: swayAmp,
+        durationSec: durationSec,
       );
     });
   }
@@ -144,17 +167,25 @@ class _Particle {
     required this.rotation,
     required this.rotationSpeed,
     required this.shape,
+    required this.delay,
+    required this.swayFreq,
+    required this.swayAmp,
+    required this.durationSec,
   });
 
   final double startX; // 0~1 比例
   final double startY;
   final double vx; // 像素/秒
-  final double vy;
+  final double vy; // 负值 = 向上
   final double size;
   final Color color;
   final double rotation;
   final double rotationSpeed;
   final int shape; // 0=圆, 1=方, 2=星
+  final double delay; // 0~1 延迟发射比例
+  final double swayFreq; // 左右摇摆频率 (Hz)
+  final double swayAmp; // 左右摇摆幅度 (px)
+  final double durationSec;
 }
 
 class _ConfettiPainter extends CustomPainter {
@@ -163,23 +194,39 @@ class _ConfettiPainter extends CustomPainter {
   final List<_Particle> particles;
   final double progress;
 
-  static const _gravity = 800.0; // 像素/秒²
+  // 较轻的重力，让粒子飘得更久
+  static const _gravity = 280.0; // 像素/秒²
 
   @override
   void paint(Canvas canvas, Size size) {
-    final duration = 2.0; // 秒
-    final t = progress * duration;
-
     for (final p in particles) {
-      final x = p.startX * size.width + p.vx * t;
+      // 尚未发射
+      if (progress < p.delay) continue;
+
+      // 粒子自身时间（减去延迟）
+      final localProgress = (progress - p.delay) / (1.0 - p.delay);
+      final t = localProgress * p.durationSec;
+
+      // 抛物线运动 + 正弦摇摆
+      final x = p.startX * size.width + p.vx * t + p.swayAmp * sin(p.swayFreq * t * 2 * pi);
       final y = p.startY * size.height + p.vy * t + 0.5 * _gravity * t * t;
 
       // 超出画布则跳过
       if (y > size.height + 20 || x < -20 || x > size.width + 20) continue;
 
-      // 淡出：最后 30% 时间逐渐消失
-      final opacity = progress > 0.7
-          ? ((1.0 - progress) / 0.3).clamp(0.0, 1.0)
+      // 淡入（前 10%）+ 淡出（后 35%）
+      double opacity;
+      if (localProgress < 0.1) {
+        opacity = localProgress / 0.1;
+      } else if (localProgress > 0.65) {
+        opacity = ((1.0 - localProgress) / 0.35).clamp(0.0, 1.0);
+      } else {
+        opacity = 1.0;
+      }
+
+      // 尺寸缩小：后 40% 逐渐缩小
+      final scale = localProgress > 0.6
+          ? 1.0 - (localProgress - 0.6) / 0.4 * 0.5
           : 1.0;
 
       final paint = Paint()
@@ -189,17 +236,21 @@ class _ConfettiPainter extends CustomPainter {
       canvas.save();
       canvas.translate(x, y);
       canvas.rotate(p.rotation + p.rotationSpeed * t);
+      canvas.scale(scale);
 
       switch (p.shape) {
         case 0: // 圆形
           canvas.drawCircle(Offset.zero, p.size / 2, paint);
-        case 1: // 方形（菱形旋转）
+        case 1: // 长条纸片（旋转的矩形）
           final rect = Rect.fromCenter(
             center: Offset.zero,
             width: p.size,
-            height: p.size * 0.6,
+            height: p.size * 0.4,
           );
-          canvas.drawRect(rect, paint);
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(rect, Radius.circular(p.size * 0.1)),
+            paint,
+          );
         default: // 星形
           _drawStar(canvas, p.size / 2, paint);
       }
