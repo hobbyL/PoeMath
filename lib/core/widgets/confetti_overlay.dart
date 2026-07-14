@@ -113,20 +113,22 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (context, _) {
-        if (!_anim.isAnimating && _anim.value == 0) {
-          return const SizedBox.shrink();
-        }
-        return CustomPaint(
-          painter: _ConfettiPainter(
-            particles: _particles,
-            progress: _anim.value,
-          ),
-          size: Size.infinite,
-        );
-      },
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _anim,
+        builder: (context, _) {
+          if (!_anim.isAnimating && _anim.value == 0) {
+            return const SizedBox.shrink();
+          }
+          return CustomPaint(
+            painter: _ConfettiPainter(
+              particles: _particles,
+              progress: _anim.value,
+            ),
+            size: Size.infinite,
+          );
+        },
+      ),
     );
   }
 }
