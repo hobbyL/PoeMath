@@ -296,6 +296,12 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
     final statsRepo = ref.read(userStatsRepoProvider);
     await statsRepo.updatePoemStats(learned: progressRepo.learnedCount);
+
+    // 记录星星到全局统计
+    if (_totalStars > 0) {
+      await statsRepo.addStars(_totalStars);
+    }
+
     ref.invalidate(learnedCountProvider);
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayPoemCountProvider);
@@ -326,6 +332,70 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _dictController.clear();
       _setupLine(0);
     });
+  }
+
+  void _showLevelSheet(BuildContext context) {
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '选择难度',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final l in ReciteLevel.values)
+                        ListTile(
+                          leading: Icon(
+                            _levelIcon(l),
+                            color: _level == l
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                          title: Text(l.label),
+                          subtitle: Text(l.desc),
+                          selected: _level == l,
+                          selectedColor: theme.colorScheme.primary,
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _changeLevel(l);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  IconData _levelIcon(ReciteLevel l) {
+    return switch (l) {
+      ReciteLevel.easy => Icons.sentiment_satisfied,
+      ReciteLevel.medium => Icons.sentiment_neutral,
+      ReciteLevel.hard => Icons.sentiment_dissatisfied,
+      ReciteLevel.dictation => Icons.edit_note,
+    };
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -378,29 +448,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       appBar: AppBar(
         title: Text(poem.title),
         actions: [
-          PopupMenuButton<ReciteLevel>(
-            initialValue: _level,
-            onSelected: _changeLevel,
-            itemBuilder: (context) => ReciteLevel.values
-                .map(
-                  (l) => PopupMenuItem(
-                    value: l,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(l.label),
-                        Text(
-                          l.desc,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                .toList(),
+          InkWell(
+            onTap: () => _showLevelSheet(context),
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
             child: Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
