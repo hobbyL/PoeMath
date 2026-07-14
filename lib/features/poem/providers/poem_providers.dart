@@ -36,6 +36,10 @@ final reviewRepoProvider = Provider<ReviewRepository>((ref) {
 /// 当前选中年级（null = 全部）
 final selectedGradeProvider = StateProvider<int?>((ref) => null);
 
+/// 当前选中学习状态筛选（null = 全部）
+final selectedStatusFilterProvider =
+    StateProvider<LearningStatus?>((ref) => null);
+
 /// 搜索关键词
 final poemSearchQueryProvider = StateProvider<String>((ref) => '');
 
@@ -44,6 +48,7 @@ final filteredPoemsProvider = Provider<List<Poem>>((ref) {
   final repo = ref.watch(poemRepoProvider);
   final grade = ref.watch(selectedGradeProvider);
   final query = ref.watch(poemSearchQueryProvider);
+  final statusFilter = ref.watch(selectedStatusFilterProvider);
 
   List<Poem> poems;
   if (grade != null) {
@@ -62,6 +67,16 @@ final filteredPoemsProvider = Provider<List<Poem>>((ref) {
               p.author.toLowerCase().contains(lower),
         )
         .toList();
+  }
+
+  // 按学习状态筛选
+  if (statusFilter != null) {
+    final progressRepo = ref.watch(poemProgressRepoProvider);
+    poems = poems.where((p) {
+      final progress = progressRepo.get(p.id);
+      final status = progress?.status ?? LearningStatus.notStarted;
+      return status == statusFilter;
+    }).toList();
   }
 
   return poems;

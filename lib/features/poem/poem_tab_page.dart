@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/poem_card.dart';
 
@@ -24,15 +25,26 @@ class PoemTabPage extends ConsumerWidget {
     6: '六年级',
   };
 
+  static const _statusLabels = {
+    null: '全部状态',
+    LearningStatus.notStarted: '未开始',
+    LearningStatus.learning: '学习中',
+    LearningStatus.reviewing: '复习中',
+    LearningStatus.mastered: '已掌握',
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final poems = ref.watch(filteredPoemsProvider);
     final selected = ref.watch(selectedGradeProvider);
+    final statusFilter = ref.watch(selectedStatusFilterProvider);
     final theme = Theme.of(context);
 
     final filterLabel = selected == null
         ? '全部'
         : _gradeLabels[selected] ?? '$selected 年级';
+
+    final hasStatusFilter = statusFilter != null;
 
     return Scaffold(
       body: LayoutBuilder(
@@ -43,6 +55,22 @@ class PoemTabPage extends ConsumerWidget {
               SliverAppBar(
                 floating: true,
                 snap: true,
+                leading: Padding(
+                  padding: const EdgeInsets.only(left: SpacingTokens.xs),
+                  child: IconButton(
+                    onPressed: () =>
+                        _showStatusPicker(context, ref, statusFilter),
+                    icon: Icon(
+                      hasStatusFilter
+                          ? Icons.filter_alt
+                          : Icons.filter_alt_outlined,
+                      color: hasStatusFilter
+                          ? theme.colorScheme.primary
+                          : null,
+                    ),
+                    tooltip: _statusLabels[statusFilter] ?? '筛选状态',
+                  ),
+                ),
                 title: const Text('诗词'),
                 actions: [
                   TextButton.icon(
@@ -211,6 +239,52 @@ class PoemTabPage extends ConsumerWidget {
                 const SizedBox(height: SpacingTokens.md),
               ],
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showStatusPicker(
+    BuildContext context,
+    WidgetRef ref,
+    LearningStatus? current,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: SpacingTokens.md),
+              Text(
+                '筛选学习状态',
+                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              RadioGroup<LearningStatus?>(
+                groupValue: current,
+                onChanged: (v) {
+                  ref
+                      .read(selectedStatusFilterProvider.notifier)
+                      .state = v;
+                  Navigator.pop(ctx);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: _statusLabels.entries.map((e) {
+                    return RadioListTile<LearningStatus?>(
+                      title: Text(e.value),
+                      value: e.key,
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+            ],
           ),
         );
       },
