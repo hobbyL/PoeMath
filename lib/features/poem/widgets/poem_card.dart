@@ -46,8 +46,8 @@ class PoemCard extends StatelessWidget {
       _ => '',
     };
     final ribbonColor = switch (learningStatus) {
-      LearningStatus.mastered => ColorTokens.success,
-      LearningStatus.reviewing => ColorTokens.poemGold,
+      LearningStatus.mastered => theme.colorScheme.primary,
+      LearningStatus.reviewing => theme.colorScheme.secondary,
       _ => theme.colorScheme.tertiary,
     };
 

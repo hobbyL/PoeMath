@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/services/sound_service.dart';
+import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -154,10 +155,22 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayPoemCountProvider);
 
-    // 通过时更新掌握等级和复习计划
+    // 通过时更新掌握等级、状态和复习计划
     if (session.isPassed) {
+      var needSave = false;
+
       if (progress.masteryLevel < 5) {
         progress.masteryLevel = 5; // 测试通过 = 等级 5
+        needSave = true;
+      }
+
+      // 测试通过 → 进入复习阶段
+      if (progress.status == LearningStatus.learning) {
+        progress.status = LearningStatus.reviewing;
+        needSave = true;
+      }
+
+      if (needSave) {
         await progressRepo.save(progress);
       }
 

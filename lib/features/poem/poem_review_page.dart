@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
@@ -329,12 +330,23 @@ class PoemReviewPage extends ConsumerWidget {
       final reviewRepo = ref.read(reviewRepoProvider);
       await reviewRepo.completeReview(schedule.poemId);
 
+      // 如果复习全部完成，将状态更新为「已掌握」
+      final nextSchedule = reviewRepo.get(schedule.poemId);
+      if (nextSchedule != null && nextSchedule.isCompleted) {
+        final progressRepo = ref.read(poemProgressRepoProvider);
+        final progress = progressRepo.get(schedule.poemId);
+        if (progress != null &&
+            progress.status != LearningStatus.mastered) {
+          progress.status = LearningStatus.mastered;
+          await progressRepo.save(progress);
+        }
+      }
+
       // 刷新 providers
       ref.invalidate(reviewRepoProvider);
       ref.invalidate(dueReviewCountProvider);
 
       if (context.mounted) {
-        final nextSchedule = reviewRepo.get(schedule.poemId);
         final message = nextSchedule != null && nextSchedule.isCompleted
             ? '🎉 恭喜！该诗词复习全部完成！'
             : '复习已记录 ✓ 下次复习在 '
