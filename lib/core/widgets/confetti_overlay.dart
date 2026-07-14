@@ -210,8 +210,15 @@ class _ConfettiPainter extends CustomPainter {
       final localProgress = (progress - p.delay) / (1.0 - p.delay);
       final t = localProgress * p.durationSec;
 
-      // 抛物线运动 + 正弦摇摆
-      final x = p.startX * size.width + p.vx * t + p.swayAmp * sin(p.swayFreq * t * 2 * pi);
+      // 抛物线顶点时间：vy + gravity * tApex = 0
+      final tApex = -p.vy / _gravity;
+
+      // 上升阶段：纯抛物线，无摇摆
+      // 下降阶段：加入正弦摇摆模拟飘落
+      final tFall = (t - tApex).clamp(0.0, double.infinity);
+      final sway = p.swayAmp * sin(p.swayFreq * tFall * 2 * pi);
+
+      final x = p.startX * size.width + p.vx * t + sway;
       final y = p.startY * size.height + p.vy * t + 0.5 * _gravity * t * t;
 
       // 超出画布则跳过
