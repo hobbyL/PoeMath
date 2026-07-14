@@ -35,94 +35,114 @@ class PoemTabPage extends ConsumerWidget {
         : _gradeLabels[selected] ?? '$selected 年级';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('诗词'),
-        actions: [
-          TextButton.icon(
-            onPressed: () => _showGradePicker(context, ref, selected),
-            icon: const Icon(Icons.filter_list, size: 18),
-            label: Text(filterLabel),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: SpacingTokens.md,
-              vertical: SpacingTokens.xs,
-            ),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: '搜索诗词、作者…',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest,
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: SpacingTokens.sm,
-                ),
-                isDense: true,
-              ),
-              onChanged: (value) {
-                ref.read(poemSearchQueryProvider.notifier).state = value;
-              },
-            ),
-          ),
-        ),
-      ),
-      body: poems.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.menu_book_rounded,
-                    size: 64,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.3),
-                  ),
-                  const SizedBox(height: SpacingTokens.md),
-                  Text(
-                    '暂无诗词',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = _responsiveColumns(constraints.maxWidth);
+          return CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                floating: true,
+                snap: true,
+                title: const Text('诗词'),
+                actions: [
+                  TextButton.icon(
+                    onPressed: () =>
+                        _showGradePicker(context, ref, selected),
+                    icon: const Icon(Icons.filter_list, size: 18),
+                    label: Text(filterLabel),
                   ),
                 ],
-              ),
-            )
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = _responsiveColumns(constraints.maxWidth);
-                return GridView.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: columns,
-                    crossAxisSpacing: SpacingTokens.sm,
-                    mainAxisSpacing: SpacingTokens.sm,
-                    mainAxisExtent: 140,
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(56),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.md,
+                      vertical: SpacingTokens.xs,
+                    ),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: '搜索诗词、作者…',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor:
+                            theme.colorScheme.surfaceContainerHighest,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: SpacingTokens.sm,
+                        ),
+                        isDense: true,
+                      ),
+                      onChanged: (value) {
+                        ref.read(poemSearchQueryProvider.notifier).state =
+                            value;
+                      },
+                    ),
                   ),
-                  itemCount: poems.length,
+                ),
+              ),
+              if (poems.isEmpty)
+                SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.menu_book_rounded,
+                          size: 64,
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.3),
+                        ),
+                        const SizedBox(height: SpacingTokens.md),
+                        Text(
+                          '暂无诗词',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: SpacingTokens.md,
                     vertical: SpacingTokens.sm,
                   ).copyWith(bottom: 100),
-                  itemBuilder: (context, index) {
-                    final poem = poems[index];
-                    final isFav = ref.watch(isFavoriteProvider(poem.id));
-                    return PoemCard(
-                      poem: poem,
-                      isFavorite: isFav,
-                      onTap: () {
-                        context.push(AppRoutes.poemDetailOf(poem.id));
+                  sliver: SliverGrid(
+                    gridDelegate:
+                        SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      crossAxisSpacing: SpacingTokens.sm,
+                      mainAxisSpacing: SpacingTokens.sm,
+                      mainAxisExtent: 140,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final poem = poems[index];
+                        final isFav =
+                            ref.watch(isFavoriteProvider(poem.id));
+                        return PoemCard(
+                          poem: poem,
+                          isFavorite: isFav,
+                          onTap: () {
+                            context.push(
+                              AppRoutes.poemDetailOf(poem.id),
+                            );
+                          },
+                        );
                       },
-                    );
-                  },
-                );
-              },
-            ),
+                      childCount: poems.length,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
 
