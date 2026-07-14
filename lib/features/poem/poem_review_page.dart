@@ -3,6 +3,7 @@
 // 艾宾浩斯复习列表页：展示今日待复习和所有进行中的复习计划。
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -64,7 +65,10 @@ class PoemReviewPage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 艾宾浩斯说明卡片
-                  _buildInfoCard(context),
+                  _buildInfoCard(context)
+                      .animate()
+                      .fadeIn(duration: 400.ms)
+                      .slideY(begin: 0.1, end: 0, duration: 400.ms),
                   const SizedBox(height: SpacingTokens.lg),
 
                   // 今日待复习
@@ -74,11 +78,31 @@ class PoemReviewPage extends ConsumerWidget {
                       '今日待复习',
                       '${dueToday.length} 首',
                       theme.colorScheme.error,
-                    ),
+                    ).animate().fadeIn(duration: 300.ms).slideX(
+                          begin: -0.1,
+                          end: 0,
+                          duration: 300.ms,
+                        ),
                     const SizedBox(height: SpacingTokens.sm),
-                    ...dueToday.map(
-                      (s) => _buildReviewItem(context, ref, s, isDue: true),
-                    ),
+                    ...dueToday.asMap().entries.map(
+                          (e) => _buildReviewItem(
+                            context,
+                            ref,
+                            e.value,
+                            isDue: true,
+                          )
+                              .animate()
+                              .fadeIn(
+                                delay: (80 * e.key).ms,
+                                duration: 300.ms,
+                              )
+                              .slideX(
+                                begin: 0.1,
+                                end: 0,
+                                delay: (80 * e.key).ms,
+                                duration: 300.ms,
+                              ),
+                        ),
                     const SizedBox(height: SpacingTokens.lg),
                   ],
 
@@ -89,11 +113,31 @@ class PoemReviewPage extends ConsumerWidget {
                       '即将复习',
                       '${upcoming.length} 首',
                       theme.colorScheme.secondary,
-                    ),
+                    ).animate().fadeIn(duration: 300.ms).slideX(
+                          begin: -0.1,
+                          end: 0,
+                          duration: 300.ms,
+                        ),
                     const SizedBox(height: SpacingTokens.sm),
-                    ...upcoming.map(
-                      (s) => _buildReviewItem(context, ref, s, isDue: false),
-                    ),
+                    ...upcoming.asMap().entries.map(
+                          (e) => _buildReviewItem(
+                            context,
+                            ref,
+                            e.value,
+                            isDue: false,
+                          )
+                              .animate()
+                              .fadeIn(
+                                delay: (80 * e.key).ms,
+                                duration: 300.ms,
+                              )
+                              .slideX(
+                                begin: 0.1,
+                                end: 0,
+                                delay: (80 * e.key).ms,
+                                duration: 300.ms,
+                              ),
+                        ),
                   ],
                 ],
               ),

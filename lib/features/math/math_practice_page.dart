@@ -3,6 +3,7 @@
 // 口算练习页：题目展示 → 用户输入 → 判定反馈 → 分步讲解。
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -425,7 +426,23 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
                     // 判定反馈
                     if (_judgement != null) ...[
-                      _buildJudgementFeedback(context),
+                      _buildJudgementFeedback(context)
+                          .animate()
+                          .fadeIn(duration: 300.ms)
+                          .scale(
+                            begin: const Offset(0.9, 0.9),
+                            end: const Offset(1, 1),
+                            duration: 300.ms,
+                            curve: Curves.easeOutBack,
+                          )
+                          .then()
+                          .shimmer(
+                            delay: 200.ms,
+                            duration: 600.ms,
+                            color: _judgement!.isCorrect
+                                ? ColorTokens.success.withValues(alpha: 0.3)
+                                : Colors.transparent,
+                          ),
                       const SizedBox(height: SpacingTokens.md),
                       if (_judgement!.correctSteps.isNotEmpty)
                         _buildStepsSection(context),
