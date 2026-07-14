@@ -30,6 +30,14 @@ class MathTabPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('口算练习'),
+        leadingWidth: mistakeCount > 0 ? 100 : null,
+        leading: mistakeCount > 0
+            ? TextButton.icon(
+                onPressed: () => context.push(AppRoutes.mathMistake),
+                icon: const Icon(Icons.error_outline, size: 18),
+                label: Text('错题 $mistakeCount'),
+              )
+            : null,
         actions: [
           TextButton.icon(
             onPressed: () =>
@@ -39,12 +47,6 @@ class MathTabPage extends ConsumerWidget {
               _semesterLabels[selectedSemester] ?? selectedSemester,
             ),
           ),
-          if (mistakeCount > 0)
-            TextButton.icon(
-              onPressed: () => context.push(AppRoutes.mathMistake),
-              icon: const Icon(Icons.error_outline, size: 18),
-              label: Text('错题 $mistakeCount'),
-            ),
         ],
       ),
       body: Column(
