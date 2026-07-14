@@ -24,41 +24,35 @@ class PoemCard extends StatelessWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: SpacingTokens.md,
-        vertical: SpacingTokens.xs,
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        child: Container(
-          padding: const EdgeInsets.all(SpacingTokens.md),
-          decoration: BoxDecoration(
-            color: primary.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题 + 标签行
-              _buildTitleRow(theme),
-              const SizedBox(height: SpacingTokens.xs),
-              Text(
-                '${poem.dynasty} · ${poem.author}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+      child: Container(
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        decoration: BoxDecoration(
+          color: primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 标题 + 标签行
+            _buildTitleRow(theme),
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              '${poem.dynasty} · ${poem.author}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: SpacingTokens.sm),
-              Text(
-                _firstLine(poem.content),
-                style: theme.textTheme.bodyMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            Text(
+              _firstLine(poem.content),
+              style: theme.textTheme.bodyMedium,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );

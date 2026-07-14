@@ -83,94 +83,109 @@ class StudyHubPage extends ConsumerWidget {
                 ],
               ),
             )
-          : ListView.builder(
-              itemCount: formulas.length,
-              padding: const EdgeInsets.only(
-                bottom: 100, // 为 NotchedBottomBar 预留空间
-              ),
-              itemBuilder: (context, index) {
-                final formula = formulas[index];
-                final isFav = ref.watch(
-                  isFormulaFavoriteProvider(formula.id),
-                );
-
-                return Padding(
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = _responsiveColumns(constraints.maxWidth);
+                return GridView.builder(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: SpacingTokens.sm,
+                    mainAxisSpacing: SpacingTokens.sm,
+                    mainAxisExtent: 80,
+                  ),
+                  itemCount: formulas.length,
                   padding: const EdgeInsets.symmetric(
                     horizontal: SpacingTokens.md,
-                    vertical: SpacingTokens.xs,
-                  ),
-                  child: InkWell(
-                    onTap: () {
-                      context.push(
-                        AppRoutes.formulaDetailOf(formula.id),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(
-                      SpacingTokens.radiusMedium,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(SpacingTokens.md),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary
-                            .withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(
-                          SpacingTokens.radiusMedium,
+                    vertical: SpacingTokens.sm,
+                  ).copyWith(bottom: 100),
+                  itemBuilder: (context, index) {
+                    final formula = formulas[index];
+                    final isFav = ref.watch(
+                      isFormulaFavoriteProvider(formula.id),
+                    );
+
+                    return InkWell(
+                      onTap: () {
+                        context.push(
+                          AppRoutes.formulaDetailOf(formula.id),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(
+                        SpacingTokens.radiusMedium,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(SpacingTokens.md),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary
+                              .withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(
+                            SpacingTokens.radiusMedium,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: theme.colorScheme.primary
+                                  .withValues(alpha: 0.15),
+                              child: Icon(
+                                Icons.functions,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: SpacingTokens.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    formula.name,
+                                    style: theme.textTheme.titleSmall
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    formula.formulaText,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall
+                                        ?.copyWith(
+                                      color: theme
+                                          .colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              isFav
+                                  ? Icons.bookmark
+                                  : Icons.bookmark_border,
+                              color: isFav
+                                  ? theme.colorScheme.secondary
+                                  : theme.colorScheme.onSurfaceVariant,
+                              size: 20,
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: theme.colorScheme.primary
-                                .withValues(alpha: 0.15),
-                            child: Icon(
-                              Icons.functions,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: SpacingTokens.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  formula.name,
-                                  style: theme.textTheme.titleSmall
-                                      ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  formula.formulaText,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall
-                                      ?.copyWith(
-                                    color: theme
-                                        .colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            isFav
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
-                            color: isFav
-                                ? theme.colorScheme.secondary
-                                : theme.colorScheme.onSurfaceVariant,
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                    );
+                  },
                 );
               },
             ),
     );
+  }
+
+  /// 根据可用宽度计算列数。
+  static int _responsiveColumns(double width) {
+    if (width >= 900) return 3;
+    if (width >= 600) return 2;
+    return 1;
   }
 
   void _showCategoryPicker(
