@@ -13,8 +13,8 @@ import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
-import 'package:poemath/features/home/providers/home_providers.dart';
 
 class BackupRestorePage extends ConsumerWidget {
   const BackupRestorePage({super.key});
@@ -207,7 +207,6 @@ class BackupRestorePage extends ConsumerWidget {
 
       // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
       invalidateAllHiveProviders(ref.invalidate);
-      ref.invalidate(settingsRepositoryProvider);
 
       scaffold.showSnackBar(
         SnackBar(content: Text('恢复成功，共恢复 $count 条记录')),

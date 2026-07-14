@@ -90,20 +90,3 @@ final unlockedAchievementsCountProvider = Provider<int>((ref) {
   final repo = ref.watch(achievementRepoProvider);
   return repo.unlockedCount;
 });
-
-// ============ 恢复辅助 ============
-
-/// 恢复数据后，刷新所有从 Hive 读取的缓存 Provider。
-///
-/// 用于备份恢复 / 云端下载后，确保 UI 立即反映最新数据。
-void invalidateAllHiveProviders(void Function(ProviderOrFamily) invalidate) {
-  invalidate(todayCheckInProvider);
-  invalidate(isCheckedInProvider);
-  invalidate(streakProvider);
-  invalidate(userStatsProvider);
-  invalidate(todayPoemCountProvider);
-  invalidate(todayMathCountProvider);
-  invalidate(dailyPoemGoalProvider);
-  invalidate(dailyMathGoalProvider);
-  invalidate(unlockedAchievementsCountProvider);
-}
