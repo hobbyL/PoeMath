@@ -211,6 +211,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     );
 
     repo.add(mistake);
+    ref.invalidate(mathMistakeRepoProvider);
   }
 
   String _problemTypeLabel(MathProblem problem) {

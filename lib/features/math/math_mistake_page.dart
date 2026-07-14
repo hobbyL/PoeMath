@@ -215,7 +215,7 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
                         onTap: () async {
                           final repo = ref.read(mathMistakeRepoProvider);
                           await repo.resolve(mistake.id);
-                          ref.invalidate(mathMistakesProvider);
+                          ref.invalidate(mathMistakeRepoProvider);
                         },
                         color: theme.colorScheme.primary,
                       ),
@@ -225,7 +225,7 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
                       onTap: () async {
                         final repo = ref.read(mathMistakeRepoProvider);
                         await repo.delete(mistake.id);
-                        ref.invalidate(mathMistakesProvider);
+                        ref.invalidate(mathMistakeRepoProvider);
                       },
                       color: theme.colorScheme.error,
                     ),
@@ -324,7 +324,7 @@ class _MistakeCardState extends ConsumerState<_MistakeCard> {
       await repo.resolve(mistake.id);
     }
 
-    ref.invalidate(mathMistakesProvider);
+    ref.invalidate(mathMistakeRepoProvider);
   }
 
   /// 生成同类新题：设置年级和学期，导航到练习页。
