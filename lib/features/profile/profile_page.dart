@@ -94,30 +94,30 @@ class ProfilePage extends ConsumerWidget {
             _buildStatsPanel(context, stats, streak),
             const SizedBox(height: SpacingTokens.md),
 
-            // 学习报告入口
-            ColoredCard(
-              color: theme.colorScheme.primary,
-              onTap: () => context.push(AppRoutes.learningStats),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.bar_chart_rounded,
-                    size: 32,
+            // 学习报告 + 成就勋章（一行两个卡片）
+            Row(
+              children: [
+                Expanded(
+                  child: ColoredCard(
                     color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: SpacingTokens.md),
-                  Expanded(
+                    onTap: () => context.push(AppRoutes.learningStats),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Icon(
+                          Icons.bar_chart_rounded,
+                          size: 32,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(height: SpacingTokens.sm),
                         Text(
                           '学习报告',
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                        const SizedBox(height: SpacingTokens.xs),
                         Text(
-                          '查看每日练习、正确率、星星等趋势',
+                          '查看学习趋势',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -125,17 +125,13 @@ class ProfilePage extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: theme.colorScheme.primary,
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: SpacingTokens.sm),
+                Expanded(
+                  child: _buildAchievementCard(context, theme, unlockedCount),
+                ),
+              ],
             ),
-            const SizedBox(height: SpacingTokens.md),
-
-            // 成就展示
-            _buildAchievementSection(context, unlockedCount),
             const SizedBox(height: SpacingTokens.md),
           ],
         ),
@@ -245,43 +241,33 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildAchievementSection(BuildContext context, int unlockedCount) {
-    final theme = Theme.of(context);
-
+  Widget _buildAchievementCard(
+    BuildContext context,
+    ThemeData theme,
+    int unlockedCount,
+  ) {
     return ColoredCard(
       color: ColorTokens.poemGold,
-      child: Row(
+      child: Column(
         children: [
           const Icon(
             Icons.emoji_events_rounded,
             size: 32,
             color: ColorTokens.poemGold,
           ),
-          const SizedBox(width: SpacingTokens.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '成就勋章',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  unlockedCount > 0
-                      ? '已解锁 $unlockedCount 个成就'
-                      : '开始学习，解锁你的第一个成就吧！',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+          const SizedBox(height: SpacingTokens.sm),
+          Text(
+            '成就勋章',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const Icon(
-            Icons.chevron_right,
-            color: ColorTokens.poemGold,
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            unlockedCount > 0 ? '已解锁 $unlockedCount 个' : '开始解锁吧',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),

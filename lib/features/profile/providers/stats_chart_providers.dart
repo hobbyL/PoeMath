@@ -1,7 +1,7 @@
 // lib/features/profile/providers/stats_chart_providers.dart
 //
 // 层级：features/profile/providers
-// 职责：将 checkIns / mathSessions / mathMistakes 按日聚合，
+// 职责：将 mathSessions / mathMistakes / checkIns 按日聚合，
 //       为学习报告图表提供数据。
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,32 +33,36 @@ class DailyStat {
   int get durationMinutes => (durationSeconds / 60).ceil();
 }
 
-/// 最近 N 天的每日统计（默认 30 天）。
+/// 最近 N 天的每日统计。
+/// 使用 autoDispose 确保每次进入页面都重新读取最新数据。
 final dailyStatsProvider =
-    Provider.family<List<DailyStat>, int>((ref, days) {
+    Provider.autoDispose.family<List<DailyStat>, int>((ref, days) {
   final now = DateTime.now();
   final startDate = DateTime(now.year, now.month, now.day)
       .subtract(Duration(days: days - 1));
 
-  // 从 checkIns 按日期聚合
+  // 从 checkIns 取 poemCount
   final checkInMap = <String, CheckIn>{};
   for (final ci in HiveBoxes.checkIns.values) {
     checkInMap[ci.date] = ci;
   }
 
-  // 从 mathSessions 按日期聚合题数
-  final sessionMap = <String, ({int total, int correct})>{};
+  // 从 mathSessions 按日聚合：题数、正确数、星星、耗时
+  final sessionMap = <String, ({int total, int correct, int stars, int duration})>{};
   for (final s in HiveBoxes.mathSessions.values) {
     if (s.finishedAt == null) continue;
     final key = _dateKey(s.startedAt);
-    final prev = sessionMap[key] ?? (total: 0, correct: 0);
+    final prev = sessionMap[key] ??
+        (total: 0, correct: 0, stars: 0, duration: 0);
     sessionMap[key] = (
       total: prev.total + s.totalProblems,
       correct: prev.correct + s.correctCount,
+      stars: prev.stars + s.starsEarned,
+      duration: prev.duration + s.durationSeconds,
     );
   }
 
-  // 从 mathMistakes 按日期统计新增错题
+  // 从 mathMistakes 按日统计新增错题
   final mistakeMap = <String, int>{};
   for (final m in HiveBoxes.mathMistakes.values) {
     final key = _dateKey(m.createdAt);
@@ -80,8 +84,8 @@ final dailyStatsProvider =
       poemCount: ci?.poemCount ?? 0,
       mathTotal: session?.total ?? 0,
       mathCorrect: session?.correct ?? 0,
-      starsEarned: ci?.starsEarned ?? 0,
-      durationSeconds: ci?.durationSeconds ?? 0,
+      starsEarned: session?.stars ?? 0,
+      durationSeconds: session?.duration ?? 0,
       mistakeCount: mistakes,
     ),);
   }
