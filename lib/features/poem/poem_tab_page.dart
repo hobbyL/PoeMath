@@ -125,9 +125,12 @@ class PoemTabPage extends ConsumerWidget {
                         final poem = poems[index];
                         final isFav =
                             ref.watch(isFavoriteProvider(poem.id));
+                        final progress =
+                            ref.watch(poemProgressProvider(poem.id));
                         return PoemCard(
                           poem: poem,
                           isFavorite: isFav,
+                          learningStatus: progress?.status,
                           onTap: () {
                             context.push(
                               AppRoutes.poemDetailOf(poem.id),

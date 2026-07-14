@@ -2,10 +2,13 @@
 //
 // 诗词列表卡片：无边框、纯色背景、圆角，与首页卡片风格一致。
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/data/models/poem.dart';
+import 'package:poemath/data/models/poem_progress.dart';
 
 class PoemCard extends StatelessWidget {
   const PoemCard({
@@ -13,11 +16,13 @@ class PoemCard extends StatelessWidget {
     required this.poem,
     this.onTap,
     this.isFavorite = false,
+    this.learningStatus,
   });
 
   final Poem poem;
   final VoidCallback? onTap;
   final bool isFavorite;
+  final LearningStatus? learningStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -31,16 +36,35 @@ class PoemCard extends StatelessWidget {
       if (poem.isRequired) _buildTag('必背', secondary),
     ];
 
+    // 判断是否显示已背诵丝带
+    final showRibbon = learningStatus != null &&
+        learningStatus != LearningStatus.notStarted;
+    final ribbonLabel = switch (learningStatus) {
+      LearningStatus.mastered => '已掌握',
+      LearningStatus.reviewing => '复习中',
+      LearningStatus.learning => '学习中',
+      _ => '',
+    };
+    final ribbonColor = switch (learningStatus) {
+      LearningStatus.mastered => ColorTokens.success,
+      LearningStatus.reviewing => ColorTokens.poemGold,
+      _ => theme.colorScheme.tertiary,
+    };
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      child: Container(
-        padding: const EdgeInsets.all(SpacingTokens.md),
-        decoration: BoxDecoration(
-          color: primary.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        ),
-        child: Column(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+        child: Stack(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: 0.06),
+              ),
+              child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // 第一行：标题 + 朝代·作者（baseline 对齐）
@@ -95,6 +119,20 @@ class PoemCard extends StatelessWidget {
           ],
         ),
       ),
+
+      // 右上角斜向丝带
+      if (showRibbon)
+        Positioned(
+          top: 0,
+          right: 0,
+          child: _RibbonBadge(
+            label: ribbonLabel,
+            color: ribbonColor,
+          ),
+        ),
+    ],
+  ),
+),
     );
   }
 
@@ -125,4 +163,61 @@ class PoemCard extends StatelessWidget {
     if (lines.length >= 2) return '${lines[0]}\n${lines[1]}';
     return lines.first;
   }
+}
+
+/// 右上角斜向丝带标签。
+class _RibbonBadge extends StatelessWidget {
+  const _RibbonBadge({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _RibbonPainter(color: color),
+      child: SizedBox(
+        width: 64,
+        height: 64,
+        child: Transform.rotate(
+          angle: math.pi / 4, // 45°
+          child: Align(
+            alignment: const Alignment(0, -0.3),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 绘制右上角三角丝带背景。
+class _RibbonPainter extends CustomPainter {
+  _RibbonPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final path = Path()
+      ..moveTo(size.width * 0.2, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width, size.height * 0.8)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_RibbonPainter oldDelegate) => color != oldDelegate.color;
 }
