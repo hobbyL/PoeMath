@@ -77,7 +77,7 @@ void main() {
       mathTotalCorrect: 180,
       level: 3,
     );
-    await HiveBoxes.userStats.put('default', stats);
+    await HiveBoxes.userStats.put('default_stats', stats);
 
     final json = backupService.exportToJson();
 
@@ -86,7 +86,7 @@ void main() {
 
     await backupService.restoreFromJson(json);
 
-    final restored = HiveBoxes.userStats.get('default');
+    final restored = HiveBoxes.userStats.get('default_stats');
     expect(restored, isNotNull);
     expect(restored!.totalStars, equals(42));
     expect(restored.currentStreak, equals(7));
@@ -113,7 +113,7 @@ void main() {
       ),
     );
     await HiveBoxes.userStats.put(
-      'default',
+      'default_stats',
       UserStats(profileId: 'default', totalStars: 15),
     );
 

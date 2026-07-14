@@ -335,7 +335,7 @@ class BackupService {
         isResolved: m['isResolved'] as bool? ?? false,
         retryCount: m['retryCount'] as int? ?? 0,
       );
-      await box.put(obj.id, obj);
+      await box.put('${obj.profileId}_${obj.id}', obj);
     }
     return items.length;
   }
@@ -357,7 +357,7 @@ class BackupService {
         startedAt: _parseDateTime(m['startedAt']),
         finishedAt: _parseDateTime(m['finishedAt']),
       );
-      await box.put(obj.id, obj);
+      await box.put('${obj.profileId}_${obj.id}', obj);
     }
     return items.length;
   }
@@ -433,7 +433,7 @@ class BackupService {
         createdAt: _parseDateTime(m['createdAt']),
         mathBestStreak: m['mathBestStreak'] as int? ?? 0,
       );
-      await box.put(obj.profileId, obj);
+      await box.put('${obj.profileId}_stats', obj);
     }
     return items.length;
   }
