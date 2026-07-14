@@ -1,13 +1,12 @@
 // lib/features/profile/providers/stats_chart_providers.dart
 //
 // 层级：features/profile/providers
-// 职责：将 mathSessions / mathMistakes / checkIns 按日聚合，
+// 职责：将 poemProgress / mathSessions / mathMistakes 按日聚合，
 //       为学习报告图表提供数据。
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/hive/hive_boxes.dart';
-import 'package:poemath/data/models/check_in.dart';
 
 /// 单日聚合数据。
 class DailyStat {
@@ -41,10 +40,12 @@ final dailyStatsProvider =
   final startDate = DateTime(now.year, now.month, now.day)
       .subtract(Duration(days: days - 1));
 
-  // 从 checkIns 取 poemCount
-  final checkInMap = <String, CheckIn>{};
-  for (final ci in HiveBoxes.checkIns.values) {
-    checkInMap[ci.date] = ci;
+  // 从 poemProgress 按 lastStudiedAt 日期统计每日学习诗词数
+  final poemMap = <String, int>{};
+  for (final p in HiveBoxes.poemProgress.values) {
+    if (p.lastStudiedAt == null) continue;
+    final key = _dateKey(p.lastStudiedAt!);
+    poemMap[key] = (poemMap[key] ?? 0) + 1;
   }
 
   // 从 mathSessions 按日聚合：题数、正确数、星星、耗时
@@ -75,13 +76,13 @@ final dailyStatsProvider =
     final date = startDate.add(Duration(days: i));
     final key = _dateKey(date);
 
-    final ci = checkInMap[key];
+    final poems = poemMap[key] ?? 0;
     final session = sessionMap[key];
     final mistakes = mistakeMap[key] ?? 0;
 
     result.add(DailyStat(
       date: date,
-      poemCount: ci?.poemCount ?? 0,
+      poemCount: poems,
       mathTotal: session?.total ?? 0,
       mathCorrect: session?.correct ?? 0,
       starsEarned: session?.stars ?? 0,
