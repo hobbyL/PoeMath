@@ -23,6 +23,13 @@ class PoemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final secondary = theme.colorScheme.secondary;
+
+    // 收集标签
+    final tags = <Widget>[
+      ...poem.tags.take(3).map((tag) => _buildTag(tag, primary)),
+      if (poem.isRequired) _buildTag('必背', secondary),
+    ];
 
     return InkWell(
       onTap: onTap,
@@ -34,55 +41,60 @@ class PoemCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // 标题 + 标签行
-            _buildTitleRow(theme),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              '${poem.dynasty} · ${poem.author}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+            // 第一行：标题 + 朝代·作者（baseline 对齐）
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.ideographic,
+              children: [
+                if (isFavorite) ...[
+                  Icon(Icons.favorite, color: secondary, size: 16),
+                  const SizedBox(width: SpacingTokens.xs),
+                ],
+                Flexible(
+                  child: Text(
+                    poem.title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: SpacingTokens.sm),
+                Text(
+                  '${poem.dynasty} · ${poem.author}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
+
+            // 第二行：标签
+            if (tags.isNotEmpty) ...[
+              const SizedBox(height: SpacingTokens.xs),
+              Wrap(
+                spacing: SpacingTokens.xs,
+                runSpacing: SpacingTokens.xs,
+                alignment: WrapAlignment.center,
+                children: tags,
+              ),
+            ],
+
+            // 第三行：诗词内容
             const SizedBox(height: SpacingTokens.sm),
             Text(
               _firstLine(poem.content),
               style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
       ),
-    );
-  }
-
-  /// 标题 + 收藏 + 必背 + 标签（baseline 对齐）。
-  Widget _buildTitleRow(ThemeData theme) {
-    final secondary = theme.colorScheme.secondary;
-    final primary = theme.colorScheme.primary;
-
-    return Wrap(
-      spacing: SpacingTokens.xs,
-      runSpacing: SpacingTokens.xs,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text(
-          poem.title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        if (isFavorite)
-          Icon(
-            Icons.favorite,
-            color: secondary,
-            size: 16,
-          ),
-        ...poem.tags.take(3).map((tag) => _buildTag(tag, primary)),
-        if (poem.isRequired) _buildTag('必背', secondary),
-      ],
     );
   }
 
