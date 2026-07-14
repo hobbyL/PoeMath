@@ -92,7 +92,47 @@ class ProfilePage extends ConsumerWidget {
 
             // 统计面板
             _buildStatsPanel(context, stats, streak),
-            const SizedBox(height: SpacingTokens.lg),
+            const SizedBox(height: SpacingTokens.md),
+
+            // 学习报告入口
+            ColoredCard(
+              color: theme.colorScheme.primary,
+              onTap: () => context.push(AppRoutes.learningStats),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.bar_chart_rounded,
+                    size: 32,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: SpacingTokens.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '学习报告',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '查看每日练习、正确率、星星等趋势',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.primary,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.md),
 
             // 成就展示
             _buildAchievementSection(context, unlockedCount),

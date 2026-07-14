@@ -34,6 +34,7 @@ class AppRoutes {
   // ============ 启动 & 设置 ============
   static const String splash = '/splash';
   static const String settings = '/profile/settings';
+  static const String learningStats = '/profile/stats';
   static const String update = '/profile/update';
 
   // ============ 路径构造器 ============
