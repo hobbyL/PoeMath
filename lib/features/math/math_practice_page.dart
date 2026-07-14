@@ -2,7 +2,6 @@
 //
 // 口算练习页：题目展示 → 用户输入 → 判定反馈 → 分步讲解。
 
-import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -36,7 +35,7 @@ class MathPracticePage extends ConsumerStatefulWidget {
 class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   final _answerController = TextEditingController();
   final _focusNode = FocusNode();
-  late final ConfettiController _confettiController;
+  late final CelebrationController _confettiController;
 
   /// 当前判定结果（null = 尚未作答）
   AnswerJudgement? _judgement;
@@ -61,7 +60,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     super.initState();
     _startTime = DateTime.now();
     _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-    _confettiController = ConfettiController(
+    _confettiController = CelebrationController(
       duration: const Duration(milliseconds: 500),
     );
 

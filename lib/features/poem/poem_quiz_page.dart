@@ -4,7 +4,6 @@
 
 import 'dart:math';
 
-import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,12 +37,12 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   bool _answered = false;
   final _fillController = TextEditingController();
   final _fillFocusNode = FocusNode();
-  late final ConfettiController _confettiController;
+  late final CelebrationController _confettiController;
 
   @override
   void initState() {
     super.initState();
-    _confettiController = ConfettiController(
+    _confettiController = CelebrationController(
       duration: const Duration(milliseconds: 500),
     );
     // 延迟初始化，等 ref 可用

@@ -2,16 +2,16 @@
 //
 // 层级：features/shell
 // 职责：应用启动页。
-//       1. 展示品牌"韵算" + slogan + 占位 Lottie。
+//       1. 展示品牌"韵算" + slogan + 品牌动画。
 //       2. 执行首次数据导入（DataBootstrap），显示进度条。
 //       3. 导入完成后构建诗词索引，然后进入首页。
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lottie/lottie.dart';
 
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
@@ -27,8 +27,6 @@ class SplashPage extends ConsumerStatefulWidget {
 }
 
 class _SplashPageState extends ConsumerState<SplashPage> {
-  static const String _lottiePath = 'assets/lottie/splash_placeholder.json';
-
   double _progress = 0.0;
   String _statusText = '正在启动…';
   bool _isImporting = false;
@@ -92,30 +90,37 @@ class _SplashPageState extends ConsumerState<SplashPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              SizedBox(
-                width: 160,
-                height: 160,
-                child: Lottie.asset(
-                  _lottiePath,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const _LoadingFallback(),
-                ),
-              ),
+              // 品牌图标动画
+              Icon(
+                Icons.auto_stories_rounded,
+                size: 80,
+                color: theme.colorScheme.primary,
+              )
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .scaleXY(begin: 0.9, end: 1.1, duration: 1200.ms)
+                  .shimmer(
+                    duration: 1800.ms,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                  ),
               const SizedBox(height: SpacingTokens.lg),
               Text(
                 AppConstants.appName,
                 style: theme.textTheme.displayLarge?.copyWith(
                   color: theme.colorScheme.primary,
                 ),
-              ),
+              ).animate().fadeIn(duration: 600.ms).slideY(
+                    begin: 0.3,
+                    end: 0,
+                    duration: 600.ms,
+                    curve: Curves.easeOut,
+                  ),
               const SizedBox(height: SpacingTokens.sm),
               Text(
                 AppConstants.slogan,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
-              ),
+              ).animate().fadeIn(delay: 300.ms, duration: 600.ms),
               if (_isImporting) ...[
                 const SizedBox(height: SpacingTokens.xl),
                 Padding(
@@ -149,22 +154,6 @@ class _SplashPageState extends ConsumerState<SplashPage> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Lottie 资源缺失时的降级：常规 loading 圈。
-class _LoadingFallback extends StatelessWidget {
-  const _LoadingFallback();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: CircularProgressIndicator(strokeWidth: 3),
       ),
     );
   }

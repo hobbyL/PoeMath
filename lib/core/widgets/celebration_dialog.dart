@@ -1,10 +1,10 @@
 // lib/core/widgets/celebration_dialog.dart
 //
 // 庆祝弹窗：打卡成功、成就解锁、等级提升时显示。
-// 支持 Lottie 动画文件（assets/lottie/），未找到时自动降级为内置动画。
+// 使用 flutter_animate 实现弹入 + 光泽动画。
 
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 
@@ -12,32 +12,27 @@ import 'package:poemath/core/theme/design_tokens.dart';
 enum CelebrationType {
   checkIn(
     title: '打卡成功！',
-    lottieAsset: 'assets/lottie/checkin.json',
     icon: Icons.check_circle_rounded,
     color: Color(0xFF4CAF50),
   ),
   achievement(
     title: '成就解锁！',
-    lottieAsset: 'assets/lottie/achievement.json',
     icon: Icons.emoji_events_rounded,
     color: Color(0xFFFFC107),
   ),
   levelUp(
     title: '等级提升！',
-    lottieAsset: 'assets/lottie/levelup.json',
     icon: Icons.arrow_upward_rounded,
     color: Color(0xFF2196F3),
   );
 
   const CelebrationType({
     required this.title,
-    required this.lottieAsset,
     required this.icon,
     required this.color,
   });
 
   final String title;
-  final String lottieAsset;
   final IconData icon;
   final Color color;
 }
@@ -76,35 +71,14 @@ class _CelebrationDialogContent extends StatefulWidget {
       _CelebrationDialogContentState();
 }
 
-class _CelebrationDialogContentState extends State<_CelebrationDialogContent>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _animController;
-  late final Animation<double> _scaleAnimation;
-  bool _hasLottie = false;
-
+class _CelebrationDialogContentState extends State<_CelebrationDialogContent> {
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _scaleAnimation = CurvedAnimation(
-      parent: _animController,
-      curve: Curves.elasticOut,
-    );
-    _animController.forward();
-
     // 自动关闭
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) Navigator.of(context).pop();
     });
-  }
-
-  @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
   }
 
   @override
@@ -113,102 +87,76 @@ class _CelebrationDialogContentState extends State<_CelebrationDialogContent>
     final type = widget.type;
 
     return Center(
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            width: 220,
-            padding: const EdgeInsets.all(SpacingTokens.lg),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius:
-                  BorderRadius.circular(SpacingTokens.radiusLarge),
-              boxShadow: [
-                BoxShadow(
-                  color: type.color.withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  spreadRadius: 4,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 220,
+          padding: const EdgeInsets.all(SpacingTokens.lg),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
+            boxShadow: [
+              BoxShadow(
+                color: type.color.withValues(alpha: 0.3),
+                blurRadius: 20,
+                spreadRadius: 4,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 动画图标
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: type.color.withValues(alpha: 0.15),
                 ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Lottie 动画或降级图标
-                SizedBox(
-                  height: 100,
-                  width: 100,
-                  child: _buildAnimation(type),
+                padding: const EdgeInsets.all(SpacingTokens.md),
+                child: Icon(type.icon, size: 60, color: type.color),
+              )
+                  .animate()
+                  .scale(
+                    begin: const Offset(0, 0),
+                    end: const Offset(1, 1),
+                    duration: 600.ms,
+                    curve: Curves.elasticOut,
+                  )
+                  .shimmer(
+                    delay: 400.ms,
+                    duration: 800.ms,
+                    color: type.color.withValues(alpha: 0.3),
+                  ),
+              const SizedBox(height: SpacingTokens.md),
+              Text(
+                type.title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: type.color,
                 ),
-                const SizedBox(height: SpacingTokens.md),
+              ).animate().fadeIn(delay: 200.ms, duration: 300.ms),
+              if (widget.subtitle != null) ...[
+                const SizedBox(height: SpacingTokens.xs),
                 Text(
-                  type.title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: type.color,
+                  widget.subtitle!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                ),
-                if (widget.subtitle != null) ...[
-                  const SizedBox(height: SpacingTokens.xs),
-                  Text(
-                    widget.subtitle!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 400.ms, duration: 300.ms),
               ],
-            ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildAnimation(CelebrationType type) {
-    if (_hasLottie) {
-      return Lottie.asset(
-        type.lottieAsset,
-        repeat: false,
-        errorBuilder: (_, __, ___) => _buildFallbackIcon(type),
-      );
-    }
-
-    // 尝试加载 Lottie，失败则用降级图标
-    return Lottie.asset(
-      type.lottieAsset,
-      repeat: false,
-      errorBuilder: (_, __, ___) => _buildFallbackIcon(type),
-      onLoaded: (_) {
-        if (mounted) setState(() => _hasLottie = true);
-      },
-    );
-  }
-
-  Widget _buildFallbackIcon(CelebrationType type) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.elasticOut,
-      builder: (context, value, child) {
-        return Transform.scale(
-          scale: value,
-          child: child,
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: type.color.withValues(alpha: 0.15),
-        ),
-        child: Icon(
-          type.icon,
-          size: 60,
-          color: type.color,
-        ),
-      ),
+      )
+          .animate()
+          .scale(
+            begin: const Offset(0.5, 0.5),
+            end: const Offset(1, 1),
+            duration: 400.ms,
+            curve: Curves.easeOutBack,
+          )
+          .fadeIn(duration: 300.ms),
     );
   }
 }
