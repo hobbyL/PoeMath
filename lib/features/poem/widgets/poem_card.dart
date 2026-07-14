@@ -185,7 +185,7 @@ class _RibbonBadge extends StatelessWidget {
         child: Transform.rotate(
           angle: math.pi / 4, // 45°
           child: Align(
-            alignment: const Alignment(0.4, -0.65),
+            alignment: const Alignment(0.1, -0.82),
             child: Text(
               label,
               style: const TextStyle(
