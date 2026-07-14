@@ -269,13 +269,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final correctCount = ref.read(mathCorrectCountProvider);
     final duration = DateTime.now().difference(_startTime).inSeconds;
 
-    // 计算星星：90%+ → 3星, 70%+ → 2星, 50%+ → 1星
+    // 计算星星：全对 → 3星, 90%+ → 2星, 70%+ → 1星
     final accuracy = problems.isNotEmpty ? correctCount / problems.length : 0.0;
-    final stars = accuracy >= 0.9
+    final stars = accuracy >= 1.0
         ? 3
-        : accuracy >= 0.7
+        : accuracy >= 0.9
             ? 2
-            : accuracy >= 0.5
+            : accuracy >= 0.7
                 ? 1
                 : 0;
 

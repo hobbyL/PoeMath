@@ -31,9 +31,9 @@ class SessionResultDialog extends StatelessWidget {
   }
 
   String get _gradeText {
-    if (accuracy >= 0.9) return '太棒了！🌟';
-    if (accuracy >= 0.7) return '不错哦！👍';
-    if (accuracy >= 0.5) return '继续加油！💪';
+    if (accuracy >= 1.0) return '太棒了！🌟';
+    if (accuracy >= 0.9) return '不错哦！👍';
+    if (accuracy >= 0.7) return '继续加油！💪';
     return '多多练习！📚';
   }
 
