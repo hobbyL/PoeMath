@@ -3,6 +3,9 @@
 // 层级：features/profile
 // 职责：备份与恢复子页面 — 导出备份文件或从备份恢复数据。
 
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +14,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 
 class BackupRestorePage extends ConsumerWidget {
   const BackupRestorePage({super.key});
@@ -50,7 +54,7 @@ class BackupRestorePage extends ConsumerWidget {
                     child: _ActionCard(
                       icon: Icons.upload_file_rounded,
                       title: '导出备份',
-                      subtitle: '分享备份文件',
+                      subtitle: '保存或分享备份',
                       color: theme.colorScheme.primary,
                       onTap: () => _exportBackup(context, ref),
                     ),
@@ -101,12 +105,60 @@ class BackupRestorePage extends ConsumerWidget {
 
   Future<void> _exportBackup(BuildContext context, WidgetRef ref) async {
     final scaffold = ScaffoldMessenger.of(context);
+
+    // 弹出底部选择：保存到设备 or 分享
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.save_alt_rounded),
+              title: const Text('保存到设备'),
+              subtitle: const Text('选择本地目录保存备份文件'),
+              onTap: () => Navigator.pop(ctx, 'save'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_rounded),
+              title: const Text('分享'),
+              subtitle: const Text('通过其他应用发送备份文件'),
+              onTap: () => Navigator.pop(ctx, 'share'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (action == null) return;
+
     try {
       final backup = ref.read(backupServiceProvider);
-      final filePath = await backup.exportToFile();
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(filePath)]),
-      );
+
+      if (action == 'save') {
+        final json = backup.exportToJson();
+        final timestamp = DateTime.now()
+            .toIso8601String()
+            .replaceAll(':', '-')
+            .split('.')
+            .first;
+        final path = await FilePicker.saveFile(
+          dialogTitle: '保存备份文件',
+          fileName: 'poemath_backup_$timestamp.json',
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          bytes: Uint8List.fromList(utf8.encode(json)),
+        );
+        if (path == null) return; // 用户取消
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('备份已保存 ✓')),
+        );
+      } else {
+        final filePath = await backup.exportToFile();
+        await SharePlus.instance.share(
+          ShareParams(files: [XFile(filePath)]),
+        );
+      }
     } on Exception catch (e) {
       scaffold.showSnackBar(
         SnackBar(content: Text('备份失败: $e')),
@@ -152,6 +204,10 @@ class BackupRestorePage extends ConsumerWidget {
 
       final backup = ref.read(backupServiceProvider);
       final count = await backup.restoreFromFile(filePath);
+
+      // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
+      invalidateAllHiveProviders(ref.invalidate);
+      ref.invalidate(settingsRepositoryProvider);
 
       scaffold.showSnackBar(
         SnackBar(content: Text('恢复成功，共恢复 $count 条记录')),

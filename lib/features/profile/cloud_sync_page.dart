@@ -11,6 +11,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/profile/webdav_config_page.dart';
 
 class CloudSyncPage extends ConsumerStatefulWidget {
@@ -151,6 +152,10 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       final backup = ref.read(backupServiceProvider);
       final json = await webdav.download(config);
       final count = await backup.restoreFromJson(json);
+
+      // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
+      invalidateAllHiveProviders(ref.invalidate);
+      ref.invalidate(settingsRepositoryProvider);
 
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
