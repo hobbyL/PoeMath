@@ -252,39 +252,49 @@ class PoemTabPage extends ConsumerWidget {
   ) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: SpacingTokens.md),
-              Text(
-                '筛选学习状态',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              RadioGroup<LearningStatus?>(
-                groupValue: current,
-                onChanged: (v) {
-                  ref
-                      .read(selectedStatusFilterProvider.notifier)
-                      .state = v;
-                  Navigator.pop(ctx);
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _statusLabels.entries.map((e) {
-                    return RadioListTile<LearningStatus?>(
-                      title: Text(e.value),
-                      value: e.key,
-                    );
-                  }).toList(),
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '筛选学习状态',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<LearningStatus?>(
+                      groupValue: current,
+                      onChanged: (v) {
+                        ref
+                            .read(selectedStatusFilterProvider.notifier)
+                            .state = v;
+                        Navigator.pop(ctx);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _statusLabels.entries.map((e) {
+                          return RadioListTile<LearningStatus?>(
+                            title: Text(e.value),
+                            value: e.key,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
           ),
         );
       },
