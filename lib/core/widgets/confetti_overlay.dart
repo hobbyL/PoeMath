@@ -95,32 +95,35 @@ class _ConfettiOverlayState extends State<ConfettiOverlay>
     final durationSec = widget.controller.duration.inMilliseconds / 1000.0;
 
     _particles = List.generate(80, (_) {
-      // 从屏幕中下方两个发射点喷出（左右各一个，模拟烟花）
+      // 从左下角或右下角发射，以抛物线向上方中间喷射
       final isLeft = _random.nextBool();
+
+      // 发射点：左下角 (0.02~0.08, 0.92~0.98) / 右下角 (0.92~0.98, 0.92~0.98)
       final startX = isLeft
-          ? 0.15 + _random.nextDouble() * 0.15 // 左侧 15%-30%
-          : 0.55 + _random.nextDouble() * 0.15; // 右侧 55%-70%
+          ? 0.02 + _random.nextDouble() * 0.06
+          : 0.92 + _random.nextDouble() * 0.06;
 
-      // 向上喷射的速度
-      final upSpeed = 300 + _random.nextDouble() * 350;
-      // 水平散开的速度（左侧偏右、右侧偏左，形成交叉）
-      final spreadAngle = isLeft
-          ? 0.3 + _random.nextDouble() * 1.0 // 向右偏
-          : -0.3 - _random.nextDouble() * 1.0; // 向左偏
-      final hSpeed = spreadAngle * (80 + _random.nextDouble() * 120);
+      // 向上喷射 + 向中间偏移
+      final upSpeed = 350 + _random.nextDouble() * 300;
+      // 左侧向右飞、右侧向左飞（抛物线向中间）
+      final towardCenter = isLeft
+          ? 120 + _random.nextDouble() * 160 // 正值 = 向右
+          : -(120 + _random.nextDouble() * 160); // 负值 = 向左
+      // 加一些随机散开
+      final spread = (_random.nextDouble() - 0.5) * 80;
 
-      // 延迟出发：0 ~ 25% 的动画时长内交错发射
-      final delay = _random.nextDouble() * 0.25;
+      // 延迟出发：0 ~ 20% 的动画时长内交错发射
+      final delay = _random.nextDouble() * 0.20;
 
-      // 左右飘摆的频率和幅度
-      final swayFreq = 1.5 + _random.nextDouble() * 2.5;
-      final swayAmp = 15 + _random.nextDouble() * 30;
+      // 飘落时的左右摇摆
+      final swayFreq = 1.5 + _random.nextDouble() * 2.0;
+      final swayAmp = 10 + _random.nextDouble() * 25;
 
       return _Particle(
         startX: startX,
-        startY: 0.65 + _random.nextDouble() * 0.1, // 从 65%-75% 高度发射
-        vx: hSpeed,
-        vy: -upSpeed, // 向上（负值）
+        startY: 0.95 + _random.nextDouble() * 0.05, // 底部 95%-100%
+        vx: towardCenter + spread,
+        vy: -upSpeed, // 向上
         size: 4.0 + _random.nextDouble() * 7,
         color: _colors[_random.nextInt(_colors.length)],
         rotation: _random.nextDouble() * 2 * pi,

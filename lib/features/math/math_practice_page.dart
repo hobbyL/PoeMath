@@ -407,37 +407,29 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // 题目文本（竖式模式特殊展示）
-                    if (problem.mode == ProblemMode.vertical)
-                      VerticalCalcWidget(
-                        key: ValueKey('vert_$currentIndex'),
-                        problem: problem,
-                        showAnswer: _judgement != null,
-                      )
+                    KeyedSubtree(
+                      key: ValueKey('q_$currentIndex'),
+                      child: (problem.mode == ProblemMode.vertical
+                              ? VerticalCalcWidget(
+                                  problem: problem,
+                                  showAnswer: _judgement != null,
+                                ) as Widget
+                              : Text(
+                                  problem.problemText,
+                                  style: TypographyTokens.mathProblemStyle(
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ))
                           .animate()
-                          .fadeIn(duration: 300.ms)
+                          .fadeIn(duration: 350.ms)
                           .slideX(
-                            begin: 0.1,
+                            begin: 0.12,
                             end: 0,
-                            duration: 300.ms,
-                            curve: Curves.easeOutCubic,
-                          )
-                    else
-                      Text(
-                        problem.problemText,
-                        key: ValueKey('prob_$currentIndex'),
-                        style: TypographyTokens.mathProblemStyle(
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        textAlign: TextAlign.center,
-                      )
-                          .animate()
-                          .fadeIn(duration: 300.ms)
-                          .slideX(
-                            begin: 0.1,
-                            end: 0,
-                            duration: 300.ms,
+                            duration: 350.ms,
                             curve: Curves.easeOutCubic,
                           ),
+                    ),
                     const SizedBox(height: SpacingTokens.xl),
 
                     // 判定反馈
