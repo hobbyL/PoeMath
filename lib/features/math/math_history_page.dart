@@ -81,38 +81,62 @@ class MathHistoryPage extends ConsumerWidget {
                         horizontal: SpacingTokens.md,
                         vertical: SpacingTokens.sm,
                       ),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          crossAxisSpacing: SpacingTokens.sm,
-                          mainAxisSpacing: SpacingTokens.sm,
-                          mainAxisExtent: 120,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final session = sessions[index];
-                            return GestureDetector(
-                              onTap: () => context.push(
-                                AppRoutes.mathSessionDetail,
-                                extra: session,
+                      sliver: SliverList.builder(
+                        itemCount:
+                            (sessions.length + columns - 1) ~/ columns,
+                        itemBuilder: (context, rowIndex) {
+                          final start = rowIndex * columns;
+                          final rowWidgets = <Widget>[];
+                          for (int col = 0; col < columns; col++) {
+                            if (col > 0) {
+                              rowWidgets.add(
+                                const SizedBox(width: SpacingTokens.sm),
+                              );
+                            }
+                            final idx = start + col;
+                            if (idx < sessions.length) {
+                              final session = sessions[idx];
+                              rowWidgets.add(
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => context.push(
+                                      AppRoutes.mathSessionDetail,
+                                      extra: session,
+                                    ),
+                                    child:
+                                        _SessionCard(session: session),
+                                  )
+                                      .animate()
+                                      .fadeIn(
+                                        delay: (80 * idx).ms,
+                                        duration: 300.ms,
+                                      )
+                                      .slideX(
+                                        begin: 0.1,
+                                        end: 0,
+                                        delay: (80 * idx).ms,
+                                        duration: 300.ms,
+                                      ),
+                                ),
+                              );
+                            } else {
+                              rowWidgets
+                                  .add(const Expanded(child: SizedBox()));
+                            }
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: SpacingTokens.sm,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: rowWidgets,
                               ),
-                              child: _SessionCard(session: session),
-                            )
-                                .animate()
-                                .fadeIn(
-                                  delay: (80 * index).ms,
-                                  duration: 300.ms,
-                                )
-                                .slideX(
-                                  begin: 0.1,
-                                  end: 0,
-                                  delay: (80 * index).ms,
-                                  duration: 300.ms,
-                                );
-                          },
-                          childCount: sessions.length,
-                        ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],

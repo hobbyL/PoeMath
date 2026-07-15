@@ -72,38 +72,60 @@ class MathMistakePage extends ConsumerWidget {
                         horizontal: SpacingTokens.md,
                         vertical: SpacingTokens.sm,
                       ),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          crossAxisSpacing: SpacingTokens.sm,
-                          mainAxisSpacing: SpacingTokens.sm,
-                          mainAxisExtent: 110,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final mistake = mistakes[index];
-                            return GestureDetector(
-                              onTap: () => context.push(
-                                AppRoutes.mathMistakeDetail,
-                                extra: mistake.id,
+                      sliver: SliverList.builder(
+                        itemCount:
+                            (mistakes.length + columns - 1) ~/ columns,
+                        itemBuilder: (context, rowIndex) {
+                          final start = rowIndex * columns;
+                          final rowWidgets = <Widget>[];
+                          for (int col = 0; col < columns; col++) {
+                            if (col > 0) {
+                              rowWidgets.add(
+                                const SizedBox(width: SpacingTokens.sm),
+                              );
+                            }
+                            final idx = start + col;
+                            if (idx < mistakes.length) {
+                              final mistake = mistakes[idx];
+                              rowWidgets.add(
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => context.push(
+                                      AppRoutes.mathMistakeDetail,
+                                      extra: mistake.id,
+                                    ),
+                                    child: _MistakeCard(mistake: mistake),
+                                  )
+                                      .animate()
+                                      .fadeIn(
+                                        delay: (80 * idx).ms,
+                                        duration: 300.ms,
+                                      )
+                                      .slideX(
+                                        begin: 0.1,
+                                        end: 0,
+                                        delay: (80 * idx).ms,
+                                        duration: 300.ms,
+                                      ),
+                                ),
+                              );
+                            } else {
+                              rowWidgets.add(const Expanded(child: SizedBox()));
+                            }
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: SpacingTokens.sm,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: rowWidgets,
                               ),
-                              child: _MistakeCard(mistake: mistake),
-                            )
-                                .animate()
-                                .fadeIn(
-                                  delay: (80 * index).ms,
-                                  duration: 300.ms,
-                                )
-                                .slideX(
-                                  begin: 0.1,
-                                  end: 0,
-                                  delay: (80 * index).ms,
-                                  duration: 300.ms,
-                                );
-                          },
-                          childCount: mistakes.length,
-                        ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],

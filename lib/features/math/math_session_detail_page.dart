@@ -120,36 +120,59 @@ class MathSessionDetailPage extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(
                     horizontal: SpacingTokens.md,
                   ),
-                  sliver: SliverGrid(
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      crossAxisSpacing: SpacingTokens.sm,
-                      mainAxisSpacing: SpacingTokens.sm,
-                      mainAxisExtent: 80,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final record = records[index];
-                        return _ProblemRow(
-                          index: index,
-                          record: record,
-                          sessionId: session.id,
-                        )
-                            .animate()
-                            .fadeIn(
-                              delay: (80 * index).ms,
-                              duration: 300.ms,
-                            )
-                            .slideX(
-                              begin: 0.1,
-                              end: 0,
-                              delay: (80 * index).ms,
-                              duration: 300.ms,
-                            );
-                      },
-                      childCount: records.length,
-                    ),
+                  sliver: SliverList.builder(
+                    itemCount:
+                        (records.length + columns - 1) ~/ columns,
+                    itemBuilder: (context, rowIndex) {
+                      final start = rowIndex * columns;
+                      final rowWidgets = <Widget>[];
+                      for (int col = 0; col < columns; col++) {
+                        if (col > 0) {
+                          rowWidgets.add(
+                            const SizedBox(width: SpacingTokens.sm),
+                          );
+                        }
+                        final idx = start + col;
+                        if (idx < records.length) {
+                          final record = records[idx];
+                          rowWidgets.add(
+                            Expanded(
+                              child: _ProblemRow(
+                                index: idx,
+                                record: record,
+                                sessionId: session.id,
+                              )
+                                  .animate()
+                                  .fadeIn(
+                                    delay: (80 * idx).ms,
+                                    duration: 300.ms,
+                                  )
+                                  .slideX(
+                                    begin: 0.1,
+                                    end: 0,
+                                    delay: (80 * idx).ms,
+                                    duration: 300.ms,
+                                  ),
+                            ),
+                          );
+                        } else {
+                          rowWidgets
+                              .add(const Expanded(child: SizedBox()));
+                        }
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: SpacingTokens.sm,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.stretch,
+                            children: rowWidgets,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
             ],

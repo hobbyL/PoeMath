@@ -5,6 +5,7 @@
 //       同时服务于错题本列表和练习记录详情的导航入口。
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -129,12 +130,15 @@ class MathMistakeDetailPage extends ConsumerWidget {
                   ],
                 ],
               ),
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 400.ms)
+                .slideY(begin: 0.1, end: 0, duration: 400.ms),
 
             const SizedBox(height: SpacingTokens.md),
 
             // 错因标签
-            if (mistake.errorType != null)
+            if (mistake.errorType != null) ...[
               ColoredCard(
                 color: theme.colorScheme.error,
                 child: Row(
@@ -154,10 +158,12 @@ class MathMistakeDetailPage extends ConsumerWidget {
                     ),
                   ],
                 ),
-              ),
-
-            if (mistake.errorType != null)
+              )
+                  .animate()
+                  .fadeIn(delay: 100.ms, duration: 300.ms)
+                  .slideX(begin: 0.1, end: 0, delay: 100.ms, duration: 300.ms),
               const SizedBox(height: SpacingTokens.md),
+            ],
 
             // 解题步骤
             if (mistake.solutionStepsJson != null &&
@@ -165,7 +171,15 @@ class MathMistakeDetailPage extends ConsumerWidget {
               ColoredCard(
                 color: theme.colorScheme.secondary,
                 child: _buildSteps(context, mistake.solutionStepsJson!),
-              ),
+              )
+                  .animate()
+                  .fadeIn(delay: 200.ms, duration: 300.ms)
+                  .slideX(
+                    begin: 0.1,
+                    end: 0,
+                    delay: 200.ms,
+                    duration: 300.ms,
+                  ),
 
             const SizedBox(height: SpacingTokens.lg),
 
@@ -173,7 +187,9 @@ class MathMistakeDetailPage extends ConsumerWidget {
             _ActionButtons(
               mistake: mistake,
               onDeleted: () => context.pop(),
-            ),
+            )
+                .animate()
+                .fadeIn(delay: 300.ms, duration: 300.ms),
           ],
         ),
       ),
@@ -269,7 +285,7 @@ class _AnswerChip extends StatelessWidget {
   }
 }
 
-/// 操作按钮区。
+/// 操作按钮区 — 一行展示所有按钮。
 class _ActionButtons extends ConsumerWidget {
   const _ActionButtons({
     required this.mistake,
@@ -283,39 +299,35 @@ class _ActionButtons extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    return Wrap(
-      spacing: SpacingTokens.sm,
-      runSpacing: SpacingTokens.sm,
+    return Row(
       children: [
-        // 再练一次
-        FilledButton.tonalIcon(
-          onPressed: () => _repractice(context, ref),
-          icon: const Icon(Icons.replay, size: 18),
-          label: const Text('再练一次'),
+        _buildActionButton(
+          icon: Icons.replay,
+          label: '再练一次',
+          onTap: () => _repractice(context, ref),
+          color: theme.colorScheme.primary,
         ),
-
-        // 同类新题
-        FilledButton.tonalIcon(
-          onPressed: () => _generateSimilar(context, ref),
-          icon: const Icon(Icons.auto_awesome, size: 18),
-          label: const Text('同类新题'),
+        _buildActionButton(
+          icon: Icons.auto_awesome,
+          label: '同类新题',
+          onTap: () => _generateSimilar(context, ref),
+          color: theme.colorScheme.primary,
         ),
-
-        // 已掌握
         if (!mistake.isResolved)
-          FilledButton.tonalIcon(
-            onPressed: () async {
+          _buildActionButton(
+            icon: Icons.check,
+            label: '已掌握',
+            onTap: () async {
               final repo = ref.read(mathMistakeRepoProvider);
               await repo.resolve(mistake.id);
               ref.invalidate(mathMistakeRepoProvider);
             },
-            icon: const Icon(Icons.check, size: 18),
-            label: const Text('已掌握'),
+            color: theme.colorScheme.primary,
           ),
-
-        // 删除
-        OutlinedButton.icon(
-          onPressed: () async {
+        _buildActionButton(
+          icon: Icons.delete_outline,
+          label: '删除',
+          onTap: () async {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -342,13 +354,35 @@ class _ActionButtons extends ConsumerWidget {
             ref.invalidate(mathMistakeRepoProvider);
             if (context.mounted) onDeleted();
           },
-          icon: Icon(Icons.delete_outline, size: 18, color: theme.colorScheme.error),
-          label: Text(
-            '删除',
-            style: TextStyle(color: theme.colorScheme.error),
-          ),
+          color: theme.colorScheme.error,
         ),
       ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required Color color,
+  }) {
+    return Expanded(
+      child: TextButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 14, color: color),
+        label: Text(
+          label,
+          style: TextStyle(fontSize: 11, color: color),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.xs,
+            vertical: SpacingTokens.xs,
+          ),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
     );
   }
 
