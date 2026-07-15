@@ -14,6 +14,7 @@ import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/quiz/quiz_engine.dart';
@@ -181,6 +182,10 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
         await reviewRepo.createSchedule(widget.poemId);
       }
     }
+
+    // 成就自动检查
+    await checkAchievements(ref);
+    ref.invalidate(unlockedAchievementsCountProvider);
 
     if (mounted) setState(() {});
   }

@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
+import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
@@ -305,6 +306,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     ref.invalidate(learnedCountProvider);
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayPoemCountProvider);
+
+    // 成就自动检查
+    await checkAchievements(ref);
+    ref.invalidate(unlockedAchievementsCountProvider);
 
     if (!mounted) return;
     _celebrationCtrl.play();

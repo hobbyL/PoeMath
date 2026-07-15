@@ -15,6 +15,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -225,6 +226,11 @@ class HomePage extends ConsumerWidget {
                 ref.invalidate(isCheckedInProvider);
                 ref.invalidate(streakProvider);
                 ref.invalidate(userStatsProvider);
+
+                // 成就自动检查
+                await checkAchievements(ref);
+                ref.invalidate(unlockedAchievementsCountProvider);
+
                 if (context.mounted) {
                   showCelebration(
                     context,

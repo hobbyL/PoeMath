@@ -20,7 +20,7 @@ import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
-import 'package:poemath/domain/achievement_checker.dart';
+import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/level_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
@@ -347,31 +347,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       }
     }
 
-    // 成就自动检查 — 构建完整上下文
-    final achievementRepo = ref.read(achievementRepoProvider);
-    final mistakeRepo = ref.read(mathMistakeRepoProvider);
-    final sessionRepo = ref.read(mathSessionRepoProvider);
-    final formulaFavRepo = ref.read(formulaFavoriteRepositoryProvider);
-
-    final resolvedMistakes =
-        mistakeRepo.getAll().where((m) => m.isResolved).length;
-    final completedReviewRounds = HiveBoxes.reviewSchedules.values
-        .where((s) => s.profileId == ProfileScope.currentId)
-        .fold<int>(0, (sum, s) => sum + s.currentRound);
-    final hardModeTotal = sessionRepo
-        .getAll()
-        .where((s) => s.difficulty == 'hard')
-        .fold<int>(0, (sum, s) => sum + s.totalProblems);
-
-    final checker = AchievementChecker(achievementRepo);
-    await checker.check(AchievementCheckContext(
-      stats: statsRepo.get(),
-      latestSession: session,
-      resolvedMistakes: resolvedMistakes,
-      completedReviewRounds: completedReviewRounds,
-      formulaFavorites: formulaFavRepo.count,
-      hardModeTotalProblems: hardModeTotal,
-    ),);
+    // 成就自动检查
+    await checkAchievements(ref, latestSession: session);
 
     // 刷新首页统计 providers
     ref.invalidate(userStatsProvider);
