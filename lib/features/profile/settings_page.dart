@@ -25,6 +25,18 @@ import 'package:poemath/features/profile/tts_settings_page.dart';
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
+  /// 将原始 voice name 映射为友好名称（用于 subtitle 显示）。
+  static String _friendlyVoiceName(String name) {
+    final lower = name.toLowerCase().replaceAll(RegExp(r'[-_]'), '');
+    const localeMap = {
+      'zh': '中文语音',
+      'zhcn': '普通话',
+      'zhtw': '台湾语音',
+      'zhhk': '粤语',
+    };
+    return localeMap[lower] ?? name;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -51,9 +63,13 @@ class SettingsPage extends ConsumerWidget {
     };
 
     // 音频设置 subtitle
-    final voiceName = settingsRepo.ttsVoice?['name'];
-    final audioSubtitle = voiceName != null
-        ? '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)} · $voiceName'
+    final rawVoiceName = settingsRepo.ttsVoice?['name'];
+    // 如果 voiceName 是纯 locale code（如 "zh"），映射为友好名称
+    final voiceLabel = rawVoiceName != null
+        ? _friendlyVoiceName(rawVoiceName)
+        : null;
+    final audioSubtitle = voiceLabel != null
+        ? '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)} · $voiceLabel'
         : '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)}';
 
     return Scaffold(

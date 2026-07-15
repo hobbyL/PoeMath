@@ -85,6 +85,27 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     return locale;
   }
 
+  /// 将原始 voice name 转为友好显示名。
+  ///
+  /// Android 上 name 可能只是 "zh"，需要映射为可读名称。
+  /// 去重后如果只有一个音色，显示为「中文语音」即可。
+  static String _voiceDisplayName(String name, String locale, int index) {
+    // 如果 name 是有意义的（不是纯 locale code），直接用
+    final lower = name.toLowerCase().replaceAll(RegExp(r'[-_]'), '');
+    final isLocaleCode = lower == 'zh' ||
+        lower == 'zhcn' ||
+        lower == 'zhtw' ||
+        lower == 'zhhk' ||
+        lower.isEmpty;
+
+    if (!isLocaleCode) return name;
+
+    // name 只是 locale code，生成友好名称
+    final label = _localeLabel(locale);
+    if (index == 0) return '$label语音';
+    return '$label语音 ${index + 1}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -213,14 +234,18 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
                   ),
                 )
               else
-                ..._voices!.map((voice) {
+                ..._voices!.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final voice = entry.value;
                   final isSelected = _selectedVoice != null &&
                       _selectedVoice!['name'] == voice['name'] &&
                       _selectedVoice!['locale'] == voice['locale'];
+                  final name = voice['name'] ?? '';
+                  final locale = voice['locale'] ?? '';
                   return _buildVoiceTile(
                     theme: theme,
-                    title: voice['name'] ?? '',
-                    subtitle: _localeLabel(voice['locale'] ?? ''),
+                    title: _voiceDisplayName(name, locale, index),
+                    subtitle: _localeLabel(locale),
                     icon: Icons.record_voice_over,
                     isSelected: isSelected,
                     onTap: () => _selectVoice(voice),

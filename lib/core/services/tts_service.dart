@@ -58,24 +58,31 @@ class TtsService {
     _initialized = true;
   }
 
-  /// 获取可用的中文音色列表。
+  /// 获取可用的中文音色列表（已去重）。
   ///
   /// 返回 `List<Map<String, String>>`，每个 Map 至少包含 name 和 locale。
   /// 仅返回 locale 以 "zh" 开头的音色（zh-CN, zh-TW, zh-HK 等）。
+  /// 按 name+locale 去重，避免 Android 上返回多个完全相同的条目。
   Future<List<Map<String, String>>> getChineseVoices() async {
     await _ensureInitialized();
     final voices = await _tts.getVoices as List<dynamic>;
+    final seen = <String>{};
     final chineseVoices = <Map<String, String>>[];
 
     for (final v in voices) {
       final map = Map<String, dynamic>.from(v as Map);
       final locale = (map['locale'] ?? '').toString();
-      if (locale.startsWith('zh')) {
-        chineseVoices.add({
-          'name': (map['name'] ?? '').toString(),
-          'locale': locale,
-        });
-      }
+      if (!locale.startsWith('zh')) continue;
+
+      final name = (map['name'] ?? '').toString();
+      final key = '$name|$locale';
+      if (seen.contains(key)) continue;
+      seen.add(key);
+
+      chineseVoices.add({
+        'name': name,
+        'locale': locale,
+      });
     }
 
     // 按 locale → name 排序，zh-CN 优先
