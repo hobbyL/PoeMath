@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/color_tokens.dart';
+import 'package:poemath/core/theme/semantic_colors_ext.dart';
 import 'package:poemath/core/theme/typography_tokens.dart';
 
 /// 口算马卡龙童趣主题构建器。
@@ -44,7 +45,13 @@ class MathTheme {
         centerTitle: true,
       ),
       chipTheme: _chipTheme(primary),
-      extensions: const <ThemeExtension<dynamic>>[MathThemeExt()],
+      extensions: const <ThemeExtension<dynamic>>[
+        MathThemeExt(),
+        SemanticColorsExt(
+          success: ColorTokens.mathMint,
+          caution: ColorTokens.mathYellow,
+        ),
+      ],
     );
   }
 
@@ -77,7 +84,13 @@ class MathTheme {
         centerTitle: true,
       ),
       chipTheme: _chipTheme(primary),
-      extensions: const <ThemeExtension<dynamic>>[MathThemeExt()],
+      extensions: const <ThemeExtension<dynamic>>[
+        MathThemeExt(),
+        SemanticColorsExt(
+          success: ColorTokens.mathMint,
+          caution: ColorTokens.mathYellow,
+        ),
+      ],
     );
   }
 

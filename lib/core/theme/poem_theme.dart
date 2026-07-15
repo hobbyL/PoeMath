@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/color_tokens.dart';
+import 'package:poemath/core/theme/semantic_colors_ext.dart';
 import 'package:poemath/core/theme/typography_tokens.dart';
 
 /// 诗词国风主题构建器。
@@ -44,7 +45,13 @@ class PoemTheme {
         centerTitle: true,
       ),
       chipTheme: _chipTheme(primary),
-      extensions: const <ThemeExtension<dynamic>>[PoemThemeExt()],
+      extensions: const <ThemeExtension<dynamic>>[
+        PoemThemeExt(),
+        SemanticColorsExt(
+          success: ColorTokens.success,
+          caution: ColorTokens.poemGold,
+        ),
+      ],
     );
   }
 
@@ -77,7 +84,13 @@ class PoemTheme {
         centerTitle: true,
       ),
       chipTheme: _chipTheme(primary),
-      extensions: const <ThemeExtension<dynamic>>[PoemThemeExt()],
+      extensions: const <ThemeExtension<dynamic>>[
+        PoemThemeExt(),
+        SemanticColorsExt(
+          success: ColorTokens.success,
+          caution: ColorTokens.poemGold,
+        ),
+      ],
     );
   }
 

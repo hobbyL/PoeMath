@@ -10,5 +10,6 @@
 //   final f = TypographyTokens.fsTitle;
 
 export 'package:poemath/core/theme/color_tokens.dart';
+export 'package:poemath/core/theme/semantic_colors_ext.dart';
 export 'package:poemath/core/theme/spacing_tokens.dart';
 export 'package:poemath/core/theme/typography_tokens.dart';
