@@ -225,7 +225,6 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                       itemBuilder: (context, index) {
                         final config = configs[index];
                         final selected = _selectedId == config.id;
-                        final delay = (60 * index).clamp(0, 480);
 
                         return ColoredCard(
                           color: selected
@@ -301,16 +300,14 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                         )
                             .animate()
                             .fadeIn(
-                              delay: delay.ms,
-                              duration: 400.ms,
-                              curve: Curves.easeOut,
+                              delay: (80 * index).ms,
+                              duration: 300.ms,
                             )
-                            .slideY(
-                              begin: 0.08,
+                            .slideX(
+                              begin: 0.1,
                               end: 0,
-                              delay: delay.ms,
-                              duration: 400.ms,
-                              curve: Curves.easeOutCubic,
+                              delay: (80 * index).ms,
+                              duration: 300.ms,
                             );
                       },
                     ),

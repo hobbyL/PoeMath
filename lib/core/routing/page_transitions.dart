@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 
 /// GoRouter 路由使用的自定义转场页面。
 ///
-/// 效果：淡入 + 从底部上滑（0.08 高度偏移），与复习计划页的
+/// 效果：淡入 + 从底部上滑（0.1 高度偏移），与复习计划页的
 /// `flutter_animate` 内容动画（fadeIn + slideY 0.1）风格统一。
 CustomTransitionPage<T> fadeSlideTransitionPage<T>({
   required Widget child,
@@ -39,8 +39,8 @@ PageRouteBuilder<T> fadeSlideRoute<T>({
 
 /// 共用的转场动画构建器：fadeIn + slideUp。
 ///
-/// 进入效果：从下方 0.08 偏移淡入上滑（与 poem_review_page 的
-/// `.animate().fadeIn(400.ms).slideY(begin: 0.1)` 视觉一致）。
+/// 进入效果：从下方 0.1 偏移淡入上滑（与 poem_review_page 的
+/// `.animate().fadeIn(400.ms).slideY(begin: 0.1)` 完全一致）。
 /// 退出效果：轻微下沉 + 淡出。
 Widget _fadeSlideUpTransition(
   BuildContext context,
@@ -50,7 +50,7 @@ Widget _fadeSlideUpTransition(
 ) {
   final fadeIn = CurveTween(curve: Curves.easeOut).animate(animation);
   final slideIn = Tween<Offset>(
-    begin: const Offset(0, 0.08),
+    begin: const Offset(0, 0.1),
     end: Offset.zero,
   ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(animation);
 

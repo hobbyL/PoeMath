@@ -67,13 +67,8 @@ class PoemReviewPage extends ConsumerWidget {
                   // 艾宾浩斯说明卡片
                   _buildInfoCard(context)
                       .animate()
-                      .fadeIn(duration: 400.ms, curve: Curves.easeOut)
-                      .slideY(
-                        begin: 0.08,
-                        end: 0,
-                        duration: 400.ms,
-                        curve: Curves.easeOutCubic,
-                      ),
+                      .fadeIn(duration: 400.ms)
+                      .slideY(begin: 0.1, end: 0, duration: 400.ms),
                   const SizedBox(height: SpacingTokens.lg),
 
                   // 今日待复习
@@ -83,14 +78,10 @@ class PoemReviewPage extends ConsumerWidget {
                       '今日待复习',
                       '${dueToday.length} 首',
                       theme.colorScheme.error,
-                    )
-                        .animate()
-                        .fadeIn(duration: 400.ms, curve: Curves.easeOut)
-                        .slideY(
-                          begin: 0.08,
+                    ).animate().fadeIn(duration: 300.ms).slideX(
+                          begin: -0.1,
                           end: 0,
-                          duration: 400.ms,
-                          curve: Curves.easeOutCubic,
+                          duration: 300.ms,
                         ),
                     const SizedBox(height: SpacingTokens.sm),
                     ...dueToday.asMap().entries.map(
@@ -102,16 +93,14 @@ class PoemReviewPage extends ConsumerWidget {
                           )
                               .animate()
                               .fadeIn(
-                                delay: (60 * e.key).ms,
-                                duration: 400.ms,
-                                curve: Curves.easeOut,
+                                delay: (80 * e.key).ms,
+                                duration: 300.ms,
                               )
-                              .slideY(
-                                begin: 0.08,
+                              .slideX(
+                                begin: 0.1,
                                 end: 0,
-                                delay: (60 * e.key).ms,
-                                duration: 400.ms,
-                                curve: Curves.easeOutCubic,
+                                delay: (80 * e.key).ms,
+                                duration: 300.ms,
                               ),
                         ),
                     const SizedBox(height: SpacingTokens.lg),
@@ -124,14 +113,10 @@ class PoemReviewPage extends ConsumerWidget {
                       '即将复习',
                       '${upcoming.length} 首',
                       theme.colorScheme.secondary,
-                    )
-                        .animate()
-                        .fadeIn(duration: 400.ms, curve: Curves.easeOut)
-                        .slideY(
-                          begin: 0.08,
+                    ).animate().fadeIn(duration: 300.ms).slideX(
+                          begin: -0.1,
                           end: 0,
-                          duration: 400.ms,
-                          curve: Curves.easeOutCubic,
+                          duration: 300.ms,
                         ),
                     const SizedBox(height: SpacingTokens.sm),
                     ...upcoming.asMap().entries.map(
@@ -143,16 +128,14 @@ class PoemReviewPage extends ConsumerWidget {
                           )
                               .animate()
                               .fadeIn(
-                                delay: (60 * e.key).ms,
-                                duration: 400.ms,
-                                curve: Curves.easeOut,
+                                delay: (80 * e.key).ms,
+                                duration: 300.ms,
                               )
-                              .slideY(
-                                begin: 0.08,
+                              .slideX(
+                                begin: 0.1,
                                 end: 0,
-                                delay: (60 * e.key).ms,
-                                duration: 400.ms,
-                                curve: Curves.easeOutCubic,
+                                delay: (80 * e.key).ms,
+                                duration: 300.ms,
                               ),
                         ),
                   ],

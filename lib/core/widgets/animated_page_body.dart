@@ -3,9 +3,11 @@
 // 层级：core/widgets
 // 职责：带交错入场动画的页面内容容器，统一全局子页面内容动画。
 //
-// 效果与复习计划页的 flutter_animate 动画一致：
-// 每个子组件依次 fadeIn + slideY(0.08) 浮现，间隔 60ms，时长 400ms。
-// SizedBox 等间距组件自动跳过，不计入动画序列。
+// 动画效果完全复制自 poem_review_page 的 flutter_animate 风格：
+// - 卡片/大组件：fadeIn 400ms + slideY(0.1) 400ms
+// - 列表项/行：fadeIn 300ms + slideX(0.1) 300ms
+// - 交错间隔：80ms
+// - SizedBox 等间距组件自动跳过，不计入动画序列。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -13,6 +15,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 
 /// 带交错入场动画的可滚动页面内容。
+///
+/// 动画效果与复习计划页一致：fadeIn + slideX(0.1)，80ms 交错间隔。
 ///
 /// 用法：
 /// ```dart
@@ -29,8 +33,6 @@ class AnimatedPageBody extends StatelessWidget {
     super.key,
     required this.children,
     this.padding = const EdgeInsets.all(SpacingTokens.md),
-    this.interval = const Duration(milliseconds: 60),
-    this.duration = const Duration(milliseconds: 400),
     this.controller,
   }) {
     // 确保 SizedBox 间距组件不计入动画序列（仅首次生效）
@@ -43,12 +45,6 @@ class AnimatedPageBody extends StatelessWidget {
   /// 外边距，默认 `SpacingTokens.md`。
   final EdgeInsetsGeometry padding;
 
-  /// 相邻子组件的动画间隔，默认 60ms。
-  final Duration interval;
-
-  /// 单个子组件的动画时长，默认 400ms。
-  final Duration duration;
-
   /// 可选的滚动控制器。
   final ScrollController? controller;
 
@@ -58,14 +54,9 @@ class AnimatedPageBody extends StatelessWidget {
       controller: controller,
       padding: padding,
       children: children
-          .animate(interval: interval)
-          .fadeIn(duration: duration, curve: Curves.easeOut)
-          .slideY(
-            begin: 0.08,
-            end: 0,
-            duration: duration,
-            curve: Curves.easeOutCubic,
-          ),
+          .animate(interval: 80.ms)
+          .fadeIn(duration: 300.ms)
+          .slideX(begin: 0.1, end: 0, duration: 300.ms),
     );
   }
 }

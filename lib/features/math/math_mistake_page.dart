@@ -50,21 +50,17 @@ class MathMistakePage extends ConsumerWidget {
               padding: const EdgeInsets.all(SpacingTokens.md),
               itemBuilder: (context, index) {
                 final mistake = mistakes[index];
-                // 前 8 项有交错动画，之后立即显示
-                final delay = (60 * index).clamp(0, 480);
                 return _MistakeCard(mistake: mistake)
                     .animate()
                     .fadeIn(
-                      delay: delay.ms,
-                      duration: 400.ms,
-                      curve: Curves.easeOut,
+                      delay: (80 * index).ms,
+                      duration: 300.ms,
                     )
-                    .slideY(
-                      begin: 0.08,
+                    .slideX(
+                      begin: 0.1,
                       end: 0,
-                      delay: delay.ms,
-                      duration: 400.ms,
-                      curve: Curves.easeOutCubic,
+                      delay: (80 * index).ms,
+                      duration: 300.ms,
                     );
               },
             ),
