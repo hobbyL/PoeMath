@@ -22,6 +22,9 @@ class MathMistakePage extends ConsumerWidget {
     final mistakes = ref.watch(mathMistakesProvider);
     final theme = Theme.of(context);
 
+    final resolvedCount = mistakes.where((m) => m.isResolved).length;
+    final unresolvedCount = mistakes.length - resolvedCount;
+
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -67,6 +70,45 @@ class MathMistakePage extends ConsumerWidget {
                       snap: true,
                       title: Text('错题本（${mistakes.length}）'),
                     ),
+
+                    // 统计概览 — 使用 primary 色突出主题差异
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          SpacingTokens.md,
+                          SpacingTokens.sm,
+                          SpacingTokens.md,
+                          0,
+                        ),
+                        child: ColoredCard(
+                          color: theme.colorScheme.primary,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _StatBadge(
+                                label: '总错题',
+                                value: '${mistakes.length}',
+                                color: theme.colorScheme.primary,
+                              ),
+                              _StatBadge(
+                                label: '待复练',
+                                value: '$unresolvedCount',
+                                color: theme.colorScheme.error,
+                              ),
+                              _StatBadge(
+                                label: '已掌握',
+                                value: '$resolvedCount',
+                                color: theme.semantic.success,
+                              ),
+                            ],
+                          ),
+                        )
+                            .animate()
+                            .fadeIn(duration: 400.ms)
+                            .slideY(begin: 0.1, end: 0, duration: 400.ms),
+                      ),
+                    ),
+
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: SpacingTokens.md,
@@ -140,6 +182,43 @@ class MathMistakePage extends ConsumerWidget {
     if (width >= 900) return 3;
     if (width >= 600) return 2;
     return 1;
+  }
+}
+
+/// 统计徽章。
+class _StatBadge extends StatelessWidget {
+  const _StatBadge({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.xs),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
   }
 }
 

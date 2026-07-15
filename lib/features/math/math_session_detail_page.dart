@@ -265,7 +265,7 @@ class _ProblemRow extends ConsumerWidget {
               )
           : null,
       child: ColoredCard(
-        color: isCorrect ? theme.semantic.success : theme.colorScheme.error,
+        color: theme.colorScheme.primary,
         padding: const EdgeInsets.symmetric(
           horizontal: SpacingTokens.md,
           vertical: SpacingTokens.sm,

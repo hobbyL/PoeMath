@@ -77,7 +77,7 @@ class PoemReviewPage extends ConsumerWidget {
                       context,
                       '今日待复习',
                       '${dueToday.length} 首',
-                      theme.colorScheme.error,
+                      theme.colorScheme.primary,
                     ).animate().fadeIn(duration: 300.ms).slideX(
                           begin: -0.1,
                           end: 0,
@@ -148,13 +148,13 @@ class PoemReviewPage extends ConsumerWidget {
   Widget _buildInfoCard(BuildContext context) {
     final theme = Theme.of(context);
     return ColoredCard(
-      color: theme.colorScheme.tertiary,
+      color: theme.colorScheme.primary,
       child: Row(
         children: [
           Icon(
             Icons.psychology,
             size: 32,
-            color: theme.colorScheme.tertiary,
+            color: theme.colorScheme.primary,
           ),
           const SizedBox(width: SpacingTokens.md),
           Expanded(
@@ -165,6 +165,7 @@ class PoemReviewPage extends ConsumerWidget {
                   '艾宾浩斯记忆曲线',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
                 const SizedBox(height: SpacingTokens.xs),
@@ -259,7 +260,7 @@ class PoemReviewPage extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
       child: AppTile(
         icon: isDue ? Icons.notifications_active : Icons.schedule,
-        iconColor: isDue ? theme.colorScheme.error : theme.colorScheme.secondary,
+        iconColor: isDue ? theme.colorScheme.primary : theme.colorScheme.secondary,
         title: poem.title,
         subtitle: '$roundLabel · 间隔 $intervalLabel · $timeLabel',
         trailing: isDue
