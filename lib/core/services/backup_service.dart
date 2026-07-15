@@ -191,6 +191,8 @@ class BackupService {
         'starsEarned': s.starsEarned,
         'startedAt': s.startedAt.toIso8601String(),
         'finishedAt': s.finishedAt?.toIso8601String(),
+        'semester': s.semester,
+        'difficulty': s.difficulty,
       };
     }).toList();
   }
@@ -356,6 +358,8 @@ class BackupService {
         starsEarned: m['starsEarned'] as int? ?? 0,
         startedAt: _parseDateTime(m['startedAt']),
         finishedAt: _parseDateTime(m['finishedAt']),
+        semester: m['semester'] as String?,
+        difficulty: m['difficulty'] as String?,
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
