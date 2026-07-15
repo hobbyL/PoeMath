@@ -48,9 +48,7 @@ class NotchedBottomBar extends StatelessWidget {
     final theme = Theme.of(context);
     final surface = theme.colorScheme.surface;
     final primary = theme.colorScheme.primary;
-    final inactive = theme.brightness == Brightness.dark
-        ? Colors.grey.shade400
-        : Colors.grey.shade600;
+    final inactive = theme.colorScheme.onSurfaceVariant;
 
     return SizedBox(
       height: _barHeight + _fabTopReserve,
@@ -68,6 +66,7 @@ class NotchedBottomBar extends StatelessWidget {
               painter: _NotchedBarPainter(
                 color: surface,
                 notchRadius: _notchRadius,
+                shadowColor: theme.shadowColor,
               ),
               child: SafeArea(
                 top: false,
@@ -138,10 +137,15 @@ class NotchedBottomBar extends StatelessWidget {
 
 /// 底部条自绘：顶部中央挖一个半圆凹槽。
 class _NotchedBarPainter extends CustomPainter {
-  _NotchedBarPainter({required this.color, required this.notchRadius});
+  _NotchedBarPainter({
+    required this.color,
+    required this.notchRadius,
+    required this.shadowColor,
+  });
 
   final Color color;
   final double notchRadius;
+  final Color shadowColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -172,13 +176,15 @@ class _NotchedBarPainter extends CustomPainter {
     path.close();
 
     // 阴影：上探效果
-    canvas.drawShadow(path, const Color(0x33000000), 8, false);
+    canvas.drawShadow(path, shadowColor, 8, false);
     canvas.drawPath(path, Paint()..color = color);
   }
 
   @override
   bool shouldRepaint(covariant _NotchedBarPainter old) =>
-      old.color != color || old.notchRadius != notchRadius;
+      old.color != color ||
+      old.notchRadius != notchRadius ||
+      old.shadowColor != shadowColor;
 }
 
 /// 中央凸起圆形按钮。
