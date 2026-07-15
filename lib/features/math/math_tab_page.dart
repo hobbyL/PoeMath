@@ -4,6 +4,7 @@
 // 职责：口算 Tab 主页 — 年级学期选择 + 最近练习 + 错题入口。
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -95,7 +96,10 @@ class MathTabPage extends ConsumerWidget {
                   _buildStat(context, '$mistakeCount', '错题'),
                 ],
               ),
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 400.ms)
+                .slideY(begin: 0.1, end: 0, duration: 400.ms),
 
           // 年级列表（一行两个）
           Expanded(
@@ -124,7 +128,18 @@ class MathTabPage extends ConsumerWidget {
                   onTap: () {
                     ref.read(mathGradeProvider.notifier).state = grade;
                   },
-                );
+                )
+                    .animate()
+                    .fadeIn(
+                      delay: (80 * index).ms,
+                      duration: 300.ms,
+                    )
+                    .slideX(
+                      begin: 0.1,
+                      end: 0,
+                      delay: (80 * index).ms,
+                      duration: 300.ms,
+                    );
               },
             ),
           ),

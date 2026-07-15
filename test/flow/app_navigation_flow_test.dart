@@ -32,6 +32,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pump(const Duration(milliseconds: 200));
+    // 消耗 MainShell IndexedStack 中所有 tab 的 flutter_animate 入场动画
+    await tester.pump(const Duration(seconds: 3));
 
     expect(find.byType(MainShell), findsOneWidget);
     expect(find.byType(NotchedBottomBar), findsOneWidget);
@@ -42,6 +44,8 @@ void main() {
     }
 
     expect(tester.takeException(), isNull);
+    // 消耗剩余 flutter_animate 计时器
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('首页显示快捷入口和今日目标', (tester) async {
@@ -49,6 +53,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pump(const Duration(milliseconds: 200));
+    // 消耗 MainShell IndexedStack 中所有 tab 的 flutter_animate 入场动画
+    await tester.pump(const Duration(seconds: 3));
 
     // 快捷入口
     expect(find.text('背诗词'), findsOneWidget);

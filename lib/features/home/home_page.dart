@@ -73,11 +73,8 @@ class HomePage extends ConsumerWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(SpacingTokens.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: AnimatedPageBody(
+        children: [
             // 打卡 + 连续天数
             _buildStreakCard(context, streak, isCheckedIn, ref),
             const SizedBox(height: SpacingTokens.md),
@@ -108,7 +105,6 @@ class HomePage extends ConsumerWidget {
             // 底部留白：为 NotchedBottomBar 预留空间 (barHeight + fabTopReserve)
             const SizedBox(height: 100),
           ],
-        ),
       ),
     );
   }

@@ -4,6 +4,7 @@
 // 职责：诗词 Tab 主页 — 搜索栏 + 年级筛选 + 诗词列表。
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -164,7 +165,18 @@ class PoemTabPage extends ConsumerWidget {
                               AppRoutes.poemDetailOf(poem.id),
                             );
                           },
-                        );
+                        )
+                            .animate()
+                            .fadeIn(
+                              delay: (80 * index).ms,
+                              duration: 300.ms,
+                            )
+                            .slideX(
+                              begin: 0.1,
+                              end: 0,
+                              delay: (80 * index).ms,
+                              duration: 300.ms,
+                            );
                       },
                       childCount: poems.length,
                     ),

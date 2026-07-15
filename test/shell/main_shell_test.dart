@@ -13,6 +13,18 @@ import 'package:poemath/features/shell/widgets/notched_bottom_bar.dart';
 
 import '../helpers/hive_test_helper.dart';
 
+/// 等待 splash 结束并消耗所有 flutter_animate 入场动画计时器。
+///
+/// MainShell 的 IndexedStack 同时构建所有 tab 页面，
+/// 各页面的 AnimatedPageBody / per-item .animate() 会创建 delay timers，
+/// 需要足够的 pump 时间来清除。
+Future<void> _pumpPastSplashAndAnimations(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 500));
+  await tester.pump(const Duration(milliseconds: 200));
+  await tester.pump(const Duration(milliseconds: 200));
+  await tester.pump(const Duration(seconds: 3));
+}
+
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
@@ -33,10 +45,7 @@ void main() {
       ),
     );
 
-    // splash → shell
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pump(const Duration(milliseconds: 200));
+    await _pumpPastSplashAndAnimations(tester);
 
     expect(find.byType(NotchedBottomBar), findsOneWidget);
 
@@ -46,14 +55,14 @@ void main() {
     // 点击"口算" — 切换到口算页，但主题不变
     await tester.tap(find.text('口算'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(seconds: 2));
 
     expect(container.read(activeSubjectProvider), initialSubject);
 
     // 点击"诗词" — 切换到诗词页，主题仍不变
     await tester.tap(find.text('诗词'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(seconds: 2));
 
     expect(container.read(activeSubjectProvider), initialSubject);
   });
@@ -69,18 +78,19 @@ void main() {
       ),
     );
 
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(milliseconds: 200));
+    await _pumpPastSplashAndAnimations(tester);
 
     // 手动切换到 math 主题
     container.read(activeSubjectProvider.notifier).state = AppSubject.math;
     await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
 
     expect(container.read(activeSubjectProvider), AppSubject.math);
 
     // 切回 poem
     container.read(activeSubjectProvider.notifier).state = AppSubject.poem;
     await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
 
     expect(container.read(activeSubjectProvider), AppSubject.poem);
   });
@@ -88,9 +98,7 @@ void main() {
   testWidgets('我的页设置按钮应打开设置页', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: App()));
 
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pump(const Duration(milliseconds: 200));
+    await _pumpPastSplashAndAnimations(tester);
 
     await tester.tap(find.text('我的'));
     await tester.pumpAndSettle();
@@ -103,5 +111,8 @@ void main() {
     expect(find.text('设置'), findsOneWidget);
     expect(find.text('主题设置'), findsOneWidget);
     expect(find.text('外观模式'), findsOneWidget);
+
+    // 消耗剩余 flutter_animate 计时器
+    await tester.pump(const Duration(seconds: 2));
   });
 }

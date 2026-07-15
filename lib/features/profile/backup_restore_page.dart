@@ -26,11 +26,9 @@ class BackupRestorePage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('备份与恢复')),
       body: SafeArea(
-        child: Padding(
+        child: AnimatedPageBody(
           padding: const EdgeInsets.all(SpacingTokens.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          children: [
               Text(
                 '数据安全',
                 style: theme.textTheme.titleSmall?.copyWith(
@@ -97,7 +95,6 @@ class BackupRestorePage extends ConsumerWidget {
                 ),
               ),
             ],
-          ),
         ),
       ),
     );

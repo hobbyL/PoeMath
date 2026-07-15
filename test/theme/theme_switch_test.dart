@@ -48,6 +48,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pump(const Duration(milliseconds: 200));
+      // 消耗 MainShell IndexedStack 中所有 tab 的 flutter_animate 入场动画
+      await tester.pump(const Duration(seconds: 3));
 
       // 初始 poem 主题
       final ThemeData light1 = container.read(lightThemeProvider);
@@ -56,6 +58,7 @@ void main() {
       // 切到 math
       container.read(activeSubjectProvider.notifier).state = AppSubject.math;
       await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
 
       final ThemeData light2 = container.read(lightThemeProvider);
       expect(light2.colorScheme.primary, ColorTokens.mathPurple);

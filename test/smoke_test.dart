@@ -36,5 +36,9 @@ void main() {
 
     expect(find.byType(MainShell), findsOneWidget);
     expect(find.byType(NotchedBottomBar), findsOneWidget);
+
+    // 消耗 MainShell IndexedStack 中所有 tab 页面的
+    // flutter_animate 入场动画计时器
+    await tester.pump(const Duration(seconds: 3));
   });
 }
