@@ -22,47 +22,67 @@ class MathMistakePage extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('错题本（${mistakes.length}）'),
-      ),
       body: mistakes.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    size: 64,
-                    color: ColorTokens.success.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(height: SpacingTokens.md),
-                  Text(
-                    '暂无错题，继续保持！',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+          ? CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  floating: true,
+                  snap: true,
+                  title: Text('错题本（${mistakes.length}）'),
+                ),
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 64,
+                          color: ColorTokens.success.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: SpacingTokens.md),
+                        Text(
+                          '暂无错题，继续保持！',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             )
-          : ListView.builder(
-              itemCount: mistakes.length,
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              itemBuilder: (context, index) {
-                final mistake = mistakes[index];
-                return _MistakeCard(mistake: mistake)
-                    .animate()
-                    .fadeIn(
-                      delay: (80 * index).ms,
-                      duration: 300.ms,
-                    )
-                    .slideX(
-                      begin: 0.1,
-                      end: 0,
-                      delay: (80 * index).ms,
-                      duration: 300.ms,
-                    );
-              },
+          : CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  floating: true,
+                  snap: true,
+                  title: Text('错题本（${mistakes.length}）'),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  sliver: SliverList.builder(
+                    itemCount: mistakes.length,
+                    itemBuilder: (context, index) {
+                      final mistake = mistakes[index];
+                      return _MistakeCard(mistake: mistake)
+                          .animate()
+                          .fadeIn(
+                            delay: (80 * index).ms,
+                            duration: 300.ms,
+                          )
+                          .slideX(
+                            begin: 0.1,
+                            end: 0,
+                            delay: (80 * index).ms,
+                            duration: 300.ms,
+                          );
+                    },
+                  ),
+                ),
+              ],
             ),
     );
   }
