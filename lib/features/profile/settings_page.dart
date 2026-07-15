@@ -19,6 +19,7 @@ import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/profile/backup_restore_page.dart';
 import 'package:poemath/features/profile/cloud_sync_page.dart';
 import 'package:poemath/features/profile/daily_goal_page.dart';
+import 'package:poemath/features/profile/tts_settings_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -47,6 +48,12 @@ class SettingsPage extends ConsumerWidget {
       ThemeMode.light => '浅色',
       ThemeMode.dark => '深色',
     };
+
+    // 音频设置 subtitle
+    final voiceName = settingsRepo.ttsVoice?['name'];
+    final audioSubtitle = voiceName != null
+        ? '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)} · $voiceName'
+        : '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)}';
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -79,13 +86,18 @@ class SettingsPage extends ConsumerWidget {
             ),
             const SizedBox(height: SpacingTokens.sm),
 
-            // 音频设置
+            // 音频设置（语速 + 音色 → 子页面）
             AppTile(
               icon: Icons.volume_up_outlined,
               iconColor: ColorTokens.poemGold,
               title: '音频设置',
-              subtitle: '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)}',
-              onTap: () => _showTtsSpeedPicker(context, ref, settingsRepo),
+              subtitle: audioSubtitle,
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const TtsSettingsPage(),
+                ),
+              ),
             ),
             const SizedBox(height: SpacingTokens.sm),
 
@@ -325,82 +337,6 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  void _showTtsSpeedPicker(
-    BuildContext context,
-    WidgetRef ref,
-    dynamic settingsRepo,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        var speed = settingsRepo.ttsSpeed as double;
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
-          ),
-          child: StatefulBuilder(
-          builder: (context, setState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(SpacingTokens.lg),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(
-                      '语速调节',
-                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    const SizedBox(height: SpacingTokens.md),
-                    Row(
-                      children: [
-                        const Text('慢'),
-                        Expanded(
-                          child: Slider(
-                            value: speed,
-                            min: 0.1,
-                            max: 1.0,
-                            divisions: 9,
-                            label: speed.toStringAsFixed(1),
-                            onChanged: (v) {
-                              setState(() => speed = v);
-                            },
-                          ),
-                        ),
-                        const Text('快'),
-                      ],
-                    ),
-                    const SizedBox(height: SpacingTokens.sm),
-                    Text(
-                      '当前语速: ${speed.toStringAsFixed(1)}',
-                      style: Theme.of(ctx).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: SpacingTokens.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: () async {
-                          await settingsRepo.setTtsSpeed(speed);
-                          ref.invalidate(settingsRepositoryProvider);
-                          if (ctx.mounted) Navigator.pop(ctx);
-                        },
-                        child: const Text('确定'),
-                      ),
-                    ),
-                    const SizedBox(height: SpacingTokens.sm),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-        );
-      },
-    );
-  }
-
   Widget _buildDailyGoalSettings(
     BuildContext context,
     WidgetRef ref,
@@ -419,5 +355,4 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
   }
-
 }
