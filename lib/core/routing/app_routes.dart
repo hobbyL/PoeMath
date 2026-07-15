@@ -32,9 +32,11 @@ class AppRoutes {
 
   // ============ 启动 & 设置 ============
   static const String splash = '/splash';
+  static const String onboarding = '/onboarding';
   static const String settings = '/profile/settings';
   static const String learningStats = '/profile/stats';
   static const String achievements = '/profile/achievements';
+  static const String about = '/profile/about';
   static const String update = '/profile/update';
 
   // ============ 路径构造器 ============

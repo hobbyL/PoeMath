@@ -60,6 +60,16 @@ void main() {
       50,
     );
     expect(find.text('检查更新'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('关于韵算'),
+      50,
+    );
+    expect(find.text('关于韵算'), findsOneWidget);
+
+    // 消耗 flutter_animate 入场动画剩余计时器（滚动创建新动画）
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('点击主题设置打开底部弹窗并可选择', (tester) async {
@@ -88,6 +98,9 @@ void main() {
     await tester.pump(const Duration(seconds: 1)); // 完成动画
 
     expect(container.read(activeSubjectProvider), AppSubject.math);
+
+    // 消耗 flutter_animate 入场动画剩余计时器
+    await tester.pump(const Duration(seconds: 2));
   });
 
   testWidgets('Switch 控件可点击', (tester) async {
@@ -104,7 +117,7 @@ void main() {
 
     // 验证有 Switch 控件
     final switches = find.byType(Switch);
-    expect(switches, findsNWidgets(3)); // 拼音、音效、触觉反馈
+    expect(switches, findsNWidgets(4)); // 拼音、音效、触觉反馈、学习提醒
 
     // 不抛异常即可
     expect(tester.takeException(), isNull);

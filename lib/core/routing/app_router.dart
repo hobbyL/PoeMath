@@ -29,12 +29,14 @@ import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/poem_review_page.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
 import 'package:poemath/features/poem/poem_tab_page.dart';
+import 'package:poemath/features/profile/about_page.dart';
 import 'package:poemath/features/profile/achievement_page.dart';
 import 'package:poemath/features/profile/learning_stats_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/update_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
+import 'package:poemath/features/shell/onboarding_page.dart';
 import 'package:poemath/features/shell/splash_page.dart';
 
 /// `Provider<GoRouter>`：整个应用共享一份 GoRouter 实例。
@@ -45,6 +47,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.splash,
         builder: (context, state) => const SplashPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.onboarding,
+        builder: (context, state) => const OnboardingPage(),
       ),
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
@@ -181,6 +187,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const AchievementPage(),
+        ),
+      ),
+      // ============ 关于页面（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.about,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const AboutPage(),
         ),
       ),
       // ============ 检查更新（非 Shell 子路由，全屏） ============
