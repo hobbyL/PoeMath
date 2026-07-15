@@ -33,12 +33,11 @@ class FormulaDetailPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(formula.name),
         actions: [
-          IconButton(
-            icon: Icon(
-              isFav ? Icons.bookmark : Icons.bookmark_border,
-              color: isFav ? theme.colorScheme.secondary : null,
-            ),
-            onPressed: () async {
+          AnimatedFavoriteButton(
+            isFavorite: isFav,
+            activeIcon: Icons.bookmark,
+            inactiveIcon: Icons.bookmark_border,
+            onToggle: () async {
               final repo = ref.read(formulaFavoriteRepoProvider);
               await repo.toggle(formulaId);
               ref.invalidate(isFormulaFavoriteProvider(formulaId));

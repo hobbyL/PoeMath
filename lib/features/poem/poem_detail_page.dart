@@ -128,13 +128,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               tooltip: pinyinVisible ? '隐藏拼音' : '显示拼音',
               onPressed: _togglePinyin,
             ),
-          // 收藏按钮
-          IconButton(
-            icon: Icon(
-              isFav ? Icons.favorite : Icons.favorite_border,
-              color: isFav ? theme.colorScheme.secondary : null,
-            ),
-            onPressed: () async {
+          // 收藏按钮（带弹跳动画）
+          AnimatedFavoriteButton(
+            isFavorite: isFav,
+            onToggle: () async {
               final repo = ref.read(poemFavoriteRepoProvider);
               await repo.toggle(widget.poemId);
               ref.invalidate(isFavoriteProvider(widget.poemId));
