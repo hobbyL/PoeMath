@@ -42,6 +42,10 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
       body: SafeArea(
         child: AnimatedPageBody(
           children: [
+            // 周期汇总卡片
+            _buildSummaryCard(theme, stats),
+            const SizedBox(height: SpacingTokens.md),
+
             // 做题数 & 学诗数
             _buildChartCard(
               theme: theme,
@@ -85,6 +89,142 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
           ],
         ),
       ),
+    );
+  }
+
+  // ============ 周期汇总 ============
+
+  Widget _buildSummaryCard(ThemeData theme, List<DailyStat> stats) {
+    final totalPoems = stats.fold<int>(0, (sum, s) => sum + s.poemCount);
+    final totalMath = stats.fold<int>(0, (sum, s) => sum + s.mathTotal);
+    final totalCorrect = stats.fold<int>(0, (sum, s) => sum + s.mathCorrect);
+    final totalStars = stats.fold<int>(0, (sum, s) => sum + s.starsEarned);
+    final totalMinutes = stats.fold<int>(
+      0,
+      (sum, s) => sum + s.durationMinutes,
+    );
+    final avgAccuracy =
+        totalMath > 0 ? (totalCorrect / totalMath * 100).round() : 0;
+    final activeDays = stats.where(
+      (s) => s.poemCount > 0 || s.mathTotal > 0,
+    ).length;
+
+    return ColoredCard(
+      color: theme.colorScheme.primary,
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.insights_rounded,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: SpacingTokens.xs),
+              Text(
+                '${_dayOptions[_days] ?? "$_days 天"}汇总',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryItem(
+                  theme,
+                  Icons.menu_book_rounded,
+                  '$totalPoems',
+                  '诗词',
+                  theme.colorScheme.primary,
+                ),
+              ),
+              Expanded(
+                child: _buildSummaryItem(
+                  theme,
+                  Icons.calculate_rounded,
+                  '$totalMath',
+                  '口算题',
+                  theme.colorScheme.secondary,
+                ),
+              ),
+              Expanded(
+                child: _buildSummaryItem(
+                  theme,
+                  Icons.check_circle_outline,
+                  '$avgAccuracy%',
+                  '正确率',
+                  theme.semantic.success,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryItem(
+                  theme,
+                  Icons.star_rounded,
+                  '$totalStars',
+                  '星星',
+                  theme.semantic.caution,
+                ),
+              ),
+              Expanded(
+                child: _buildSummaryItem(
+                  theme,
+                  Icons.timer_outlined,
+                  '$totalMinutes',
+                  '分钟',
+                  theme.colorScheme.tertiary,
+                ),
+              ),
+              Expanded(
+                child: _buildSummaryItem(
+                  theme,
+                  Icons.calendar_today,
+                  '$activeDays',
+                  '活跃天',
+                  theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(
+    ThemeData theme,
+    IconData icon,
+    String value,
+    String label,
+    Color color,
+  ) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: SpacingTokens.xs),
+        Text(
+          value,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 
