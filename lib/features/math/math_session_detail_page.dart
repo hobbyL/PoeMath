@@ -257,6 +257,11 @@ class _ProblemRow extends ConsumerWidget {
 
     final canNavigate = mistakeId != null;
 
+    // 参考 _SessionCard 配色：用 primary/tertiary 做主视觉
+    final statusColor = isCorrect
+        ? theme.colorScheme.tertiary
+        : theme.colorScheme.primary;
+
     return GestureDetector(
       onTap: canNavigate
           ? () => context.push(
@@ -272,15 +277,12 @@ class _ProblemRow extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            // 序号
+            // 序号圆圈 — 用 primary/tertiary 区分对错
             Container(
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: (isCorrect
-                        ? theme.semantic.success
-                        : theme.colorScheme.error)
-                    .withValues(alpha: 0.15),
+                color: statusColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
@@ -288,9 +290,7 @@ class _ProblemRow extends ConsumerWidget {
                 '${index + 1}',
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: isCorrect
-                      ? theme.semantic.success
-                      : theme.colorScheme.error,
+                  color: statusColor,
                 ),
               ),
             ),
@@ -321,18 +321,14 @@ class _ProblemRow extends ConsumerWidget {
                           ? Icons.check_circle_rounded
                           : Icons.cancel_rounded,
                       size: 16,
-                      color: isCorrect
-                          ? theme.semantic.success
-                          : theme.colorScheme.error,
+                      color: statusColor,
                     ),
                     const SizedBox(width: SpacingTokens.xs),
                     Text(
                       record.userAnswer,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: isCorrect
-                            ? theme.semantic.success
-                            : theme.colorScheme.error,
+                        color: statusColor,
                       ),
                     ),
                   ],
@@ -341,7 +337,7 @@ class _ProblemRow extends ConsumerWidget {
                   Text(
                     '正确: ${record.answerText}',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.semantic.success,
+                      color: theme.colorScheme.tertiary,
                     ),
                   ),
               ],

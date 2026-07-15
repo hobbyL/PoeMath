@@ -242,9 +242,7 @@ class _MistakeCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return ColoredCard(
-      color: mistake.isResolved
-          ? theme.semantic.success
-          : theme.colorScheme.error,
+      color: theme.colorScheme.primary,
       padding: const EdgeInsets.symmetric(
         horizontal: SpacingTokens.md,
         vertical: SpacingTokens.sm,
@@ -252,35 +250,74 @@ class _MistakeCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 题目行
+          // 状态标签行 — 参考 _SessionCard 的标签样式
           Row(
             children: [
-              Expanded(
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.sm,
+                  vertical: SpacingTokens.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: (mistake.isResolved
+                          ? theme.colorScheme.tertiary
+                          : theme.colorScheme.primary)
+                      .withValues(alpha: 0.12),
+                  borderRadius:
+                      BorderRadius.circular(SpacingTokens.radiusSmall),
+                ),
                 child: Text(
-                  mistake.problemText,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    decoration: mistake.isResolved
-                        ? TextDecoration.lineThrough
-                        : null,
+                  mistake.isResolved ? '已掌握' : '待复练',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: mistake.isResolved
+                        ? theme.colorScheme.tertiary
+                        : theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (mistake.isResolved)
-                Icon(
-                  Icons.check_circle,
-                  size: 20,
-                  color: theme.semantic.success,
+              if (mistake.errorType != null) ...[
+                const SizedBox(width: SpacingTokens.xs),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpacingTokens.sm,
+                    vertical: SpacingTokens.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondary
+                        .withValues(alpha: 0.12),
+                    borderRadius:
+                        BorderRadius.circular(SpacingTokens.radiusSmall),
+                  ),
+                  child: Text(
+                    _errorTypeLabels[mistake.errorType] ??
+                        mistake.errorType!,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-              const SizedBox(width: SpacingTokens.xs),
+              ],
+              const Spacer(),
               Icon(
                 Icons.chevron_right,
                 size: 20,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
+          ),
+
+          const SizedBox(height: SpacingTokens.sm),
+
+          // 题目行
+          Text(
+            mistake.problemText,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
 
           const SizedBox(height: SpacingTokens.xs),
@@ -311,34 +348,12 @@ class _MistakeCard extends StatelessWidget {
               Text(
                 mistake.correctAnswer,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.semantic.success,
+                  color: theme.colorScheme.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-
-          // 错因标签
-          if (mistake.errorType != null) ...[
-            const SizedBox(height: SpacingTokens.xs),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: SpacingTokens.sm,
-                vertical: 2,
-              ),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.error.withValues(alpha: 0.1),
-                borderRadius:
-                    BorderRadius.circular(SpacingTokens.radiusSmall),
-              ),
-              child: Text(
-                _errorTypeLabels[mistake.errorType] ?? mistake.errorType!,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
