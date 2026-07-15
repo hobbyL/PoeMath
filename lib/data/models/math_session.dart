@@ -3,6 +3,8 @@
 // 层级：data/models
 // 职责：口算练习会话模型。Profile-scoped。
 
+import 'dart:convert';
+
 import 'package:hive/hive.dart';
 
 part 'math_session.g.dart';
@@ -55,6 +57,11 @@ class MathSession extends HiveObject {
   @HiveField(11)
   String? difficulty;
 
+  /// 每道题的详细记录（JSON 序列化）
+  /// 格式：[{"q":"1+2=?","a":"3","u":"3","c":true}, ...]
+  @HiveField(12)
+  String? problemsJson;
+
   MathSession({
     required this.id,
     required this.profileId,
@@ -68,8 +75,60 @@ class MathSession extends HiveObject {
     this.finishedAt,
     this.semester,
     this.difficulty,
+    this.problemsJson,
   }) : startedAt = startedAt ?? DateTime.now();
 
   double get accuracy =>
       totalProblems > 0 ? correctCount / totalProblems : 0.0;
+
+  /// 解析每道题的详细记录。
+  List<ProblemRecord> get problemRecords {
+    if (problemsJson == null || problemsJson!.isEmpty) return [];
+    try {
+      final list = jsonDecode(problemsJson!) as List<dynamic>;
+      return list
+          .map((e) => ProblemRecord.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+}
+
+/// 单道题的作答记录。
+class ProblemRecord {
+  /// 题目文本
+  final String problemText;
+
+  /// 正确答案
+  final String answerText;
+
+  /// 用户作答
+  final String userAnswer;
+
+  /// 是否正确
+  final bool isCorrect;
+
+  const ProblemRecord({
+    required this.problemText,
+    required this.answerText,
+    required this.userAnswer,
+    required this.isCorrect,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'q': problemText,
+        'a': answerText,
+        'u': userAnswer,
+        'c': isCorrect,
+      };
+
+  factory ProblemRecord.fromJson(Map<String, dynamic> json) {
+    return ProblemRecord(
+      problemText: json['q'] as String? ?? '',
+      answerText: json['a'] as String? ?? '',
+      userAnswer: json['u'] as String? ?? '',
+      isCorrect: json['c'] as bool? ?? false,
+    );
+  }
 }

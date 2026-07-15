@@ -193,6 +193,7 @@ class BackupService {
         'finishedAt': s.finishedAt?.toIso8601String(),
         'semester': s.semester,
         'difficulty': s.difficulty,
+        'problemsJson': s.problemsJson,
       };
     }).toList();
   }
@@ -360,6 +361,7 @@ class BackupService {
         finishedAt: _parseDateTime(m['finishedAt']),
         semester: m['semester'] as String?,
         difficulty: m['difficulty'] as String?,
+        problemsJson: m['problemsJson'] as String?,
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }

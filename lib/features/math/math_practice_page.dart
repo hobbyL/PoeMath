@@ -2,6 +2,8 @@
 //
 // 口算练习页：题目展示 → 用户输入 → 判定反馈 → 分步讲解。
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,6 +46,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   /// 是否展示分步解答
   bool _showSteps = false;
 
+  /// 每题作答记录
+  final List<ProblemRecord> _problemRecords = [];
+
   /// 练习开始时间
   late final DateTime _startTime;
 
@@ -75,7 +80,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final settingsRepo = ref.read(settingsRepositoryProvider);
     final batchSize = settingsRepo.mathBatchSize;
     final practiceMode = ref.read(mathPracticeModeProvider);
-    final difficulty = ref.read(mathDifficultyProvider);
+    final difficulty = DifficultyLevel.values.firstWhere(
+      (d) => d.name == settingsRepo.mathDifficulty,
+      orElse: () => DifficultyLevel.medium,
+    );
 
     final problems = MathEngine.generateBatch(
       grade: grade,
@@ -120,7 +128,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       starsEarned: 0,
       finishedAt: DateTime.now(),
       semester: ref.read(mathSemesterProvider),
-      difficulty: ref.read(mathDifficultyProvider).name,
+      difficulty: ref.read(settingsRepositoryProvider).mathDifficulty,
+      problemsJson: jsonEncode(
+        _problemRecords.map((r) => r.toJson()).toList(),
+      ),
     );
     HiveBoxes.mathSessions.put(ProfileScope.key(_sessionId), session);
 
@@ -188,6 +199,16 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       _consecutiveCorrect = 0;
       _recordMistake(problem, userAnswer, judgement);
     }
+
+    // 记录本题详情
+    _problemRecords.add(
+      ProblemRecord(
+        problemText: problem.problemText,
+        answerText: problem.answerText,
+        userAnswer: userAnswer,
+        isCorrect: judgement.isCorrect,
+      ),
+    );
 
     // 每答一题就同步保存到 Hive
     _persistProgress(isCorrect: judgement.isCorrect);
@@ -295,7 +316,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       starsEarned: stars,
       finishedAt: DateTime.now(),
       semester: ref.read(mathSemesterProvider),
-      difficulty: ref.read(mathDifficultyProvider).name,
+      difficulty: ref.read(settingsRepositoryProvider).mathDifficulty,
+      problemsJson: jsonEncode(
+        _problemRecords.map((r) => r.toJson()).toList(),
+      ),
     );
 
     final repo = ref.read(mathSessionRepoProvider);

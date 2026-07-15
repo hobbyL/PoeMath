@@ -29,13 +29,14 @@ class MathSessionAdapter extends TypeAdapter<MathSession> {
       finishedAt: fields[9] as DateTime?,
       semester: fields[10] as String?,
       difficulty: fields[11] as String?,
+      problemsJson: fields[12] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, MathSession obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +60,9 @@ class MathSessionAdapter extends TypeAdapter<MathSession> {
       ..writeByte(10)
       ..write(obj.semester)
       ..writeByte(11)
-      ..write(obj.difficulty);
+      ..write(obj.difficulty)
+      ..writeByte(12)
+      ..write(obj.problemsJson);
   }
 
   @override

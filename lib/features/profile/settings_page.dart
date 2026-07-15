@@ -19,7 +19,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/profile/backup_restore_page.dart';
 import 'package:poemath/features/profile/cloud_sync_page.dart';
-import 'package:poemath/features/profile/daily_goal_page.dart';
+import 'package:poemath/features/profile/practice_settings_page.dart';
 import 'package:poemath/features/profile/tts_settings_page.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -172,18 +172,8 @@ class SettingsPage extends ConsumerWidget {
             ),
             const SizedBox(height: SpacingTokens.md),
 
-            // 每日目标设置
-            _buildDailyGoalSettings(context, ref),
-            const SizedBox(height: SpacingTokens.sm),
-
-            // 练习设置
-            AppTile(
-              icon: Icons.tune_outlined,
-              iconColor: theme.colorScheme.secondary,
-              title: '练习设置',
-              subtitle: '每组 ${settingsRepo.mathBatchSize} 题',
-              onTap: () => _showBatchSizePicker(context, ref),
-            ),
+            // 练习设置（每组题数 + 难度 + 每日目标）
+            _buildPracticeSettings(context, ref),
             const SizedBox(height: SpacingTokens.md),
 
             // 备份与恢复
@@ -364,78 +354,24 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildDailyGoalSettings(
+  Widget _buildPracticeSettings(
     BuildContext context,
     WidgetRef ref,
   ) {
+    final settingsRepo = ref.watch(settingsRepositoryProvider);
     final poemGoal = ref.watch(dailyPoemGoalProvider);
     final mathGoal = ref.watch(dailyMathGoalProvider);
+    final batchSize = settingsRepo.mathBatchSize;
 
     return AppTile(
-      icon: Icons.flag_outlined,
+      icon: Icons.tune_outlined,
       iconColor: ColorTokens.poemGold,
-      title: '每日目标',
-      subtitle: '诗词 $poemGoal 首 · 口算 $mathGoal 题',
+      title: '练习设置',
+      subtitle: '每组 $batchSize 题 · 诗词 $poemGoal 首 · 口算 $mathGoal 题',
       onTap: () => Navigator.push<void>(
         context,
-        fadeSlideRoute(builder: (_) => const DailyGoalPage()),
+        fadeSlideRoute(builder: (_) => const PracticeSettingsPage()),
       ),
-    );
-  }
-
-  void _showBatchSizePicker(BuildContext context, WidgetRef ref) {
-    final settingsRepo = ref.read(settingsRepositoryProvider);
-    final current = settingsRepo.mathBatchSize;
-    const options = [5, 10, 15, 20, 30];
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const SizedBox(height: SpacingTokens.md),
-                Text(
-                  '每组题目数量',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: RadioGroup<int>(
-                      groupValue: current,
-                      onChanged: (v) async {
-                        if (v == null) return;
-                        await settingsRepo.setMathBatchSize(v);
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        ref.invalidate(settingsRepositoryProvider);
-                      },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: options.map((n) {
-                          return RadioListTile<int>(
-                            title: Text('$n 题'),
-                            value: n,
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

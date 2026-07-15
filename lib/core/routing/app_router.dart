@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
+import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
@@ -19,6 +20,7 @@ import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/math/math_history_page.dart';
 import 'package:poemath/features/math/math_mistake_page.dart';
 import 'package:poemath/features/math/math_practice_page.dart';
+import 'package:poemath/features/math/math_session_detail_page.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
 import 'package:poemath/features/poem/poem_detail_page.dart';
 import 'package:poemath/features/poem/poem_quiz_page.dart';
@@ -124,6 +126,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           state: state,
           child: const MathHistoryPage(),
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathSessionDetail,
+        pageBuilder: (context, state) {
+          final session = state.extra! as MathSession;
+          return fadeSlideTransitionPage(
+            state: state,
+            child: MathSessionDetailPage(session: session),
+          );
+        },
       ),
       // ============ 公式详情（非 Shell 子路由，全屏） ============
       GoRoute(

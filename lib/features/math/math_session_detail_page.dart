@@ -1,0 +1,275 @@
+// lib/features/math/math_session_detail_page.dart
+//
+// 层级：features/math
+// 职责：练习组详情 — 展示某次练习的所有题目及作答情况。
+
+import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
+import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/models/math_session.dart';
+
+class MathSessionDetailPage extends StatelessWidget {
+  const MathSessionDetailPage({super.key, required this.session});
+
+  final MathSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final records = session.problemRecords;
+    final accuracy = session.accuracy;
+    final accuracyPct = (accuracy * 100).toStringAsFixed(0);
+
+    // 难度标签
+    final difficultyLabel = switch (session.difficulty) {
+      'easy' => '简单',
+      'hard' => '困难',
+      _ => '中等',
+    };
+
+    // 学期标签
+    final semesterLabel = session.semester == '下' ? '下学期' : '上学期';
+
+    // 时间格式化
+    final time = session.startedAt;
+    final timeStr =
+        '${time.year}/${time.month}/${time.day} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+    // 用时格式化
+    final dur = session.durationSeconds;
+    final durStr =
+        dur >= 60 ? '${dur ~/ 60}分${dur % 60}秒' : '$dur秒';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${session.grade}年级$semesterLabel · $difficultyLabel'),
+      ),
+      body: Column(
+        children: [
+          // 概要卡片
+          Padding(
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            child: ColoredCard(
+              color: theme.colorScheme.primary,
+              child: Padding(
+                padding: const EdgeInsets.all(SpacingTokens.md),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _SummaryItem(
+                      label: '正确率',
+                      value: '$accuracyPct%',
+                      color: accuracy >= 0.9
+                          ? ColorTokens.success
+                          : accuracy >= 0.7
+                              ? ColorTokens.poemGold
+                              : theme.colorScheme.error,
+                    ),
+                    _SummaryItem(
+                      label: '题数',
+                      value:
+                          '${session.correctCount}/${session.totalProblems}',
+                      color: theme.colorScheme.primary,
+                    ),
+                    _SummaryItem(
+                      label: '用时',
+                      value: durStr,
+                      color: theme.colorScheme.secondary,
+                    ),
+                    _SummaryItem(
+                      label: '时间',
+                      value: timeStr,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ).animate().fadeIn(duration: 300.ms),
+
+          // 题目列表
+          if (records.isEmpty)
+            Expanded(
+              child: Center(
+                child: Text(
+                  '该练习无题目详情记录',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: records.length,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.md,
+                ),
+                itemBuilder: (context, index) {
+                  final record = records[index];
+                  return _ProblemRow(
+                    index: index + 1,
+                    record: record,
+                  )
+                      .animate()
+                      .fadeIn(
+                        delay: (80 * index).ms,
+                        duration: 300.ms,
+                      )
+                      .slideX(
+                        begin: 0.1,
+                        end: 0,
+                        delay: (80 * index).ms,
+                        duration: 300.ms,
+                      );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryItem extends StatelessWidget {
+  const _SummaryItem({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.xs),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProblemRow extends StatelessWidget {
+  const _ProblemRow({required this.index, required this.record});
+
+  final int index;
+  final ProblemRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isCorrect = record.isCorrect;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+      child: ColoredCard(
+        color: isCorrect
+            ? ColorTokens.success
+            : theme.colorScheme.error,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.md,
+            vertical: SpacingTokens.sm,
+          ),
+          child: Row(
+            children: [
+              // 序号
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: (isCorrect
+                          ? ColorTokens.success
+                          : theme.colorScheme.error)
+                      .withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$index',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: isCorrect
+                        ? ColorTokens.success
+                        : theme.colorScheme.error,
+                  ),
+                ),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+
+              // 题目
+              Expanded(
+                child: Text(
+                  record.problemText,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+
+              // 用户答案
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isCorrect
+                            ? Icons.check_circle_rounded
+                            : Icons.cancel_rounded,
+                        size: 16,
+                        color: isCorrect
+                            ? ColorTokens.success
+                            : theme.colorScheme.error,
+                      ),
+                      const SizedBox(width: SpacingTokens.xs),
+                      Text(
+                        record.userAnswer,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isCorrect
+                              ? ColorTokens.success
+                              : theme.colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!isCorrect)
+                    Text(
+                      '正确: ${record.answerText}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: ColorTokens.success,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

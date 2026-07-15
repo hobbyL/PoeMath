@@ -6,7 +6,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_session.dart';
@@ -60,7 +62,13 @@ class MathHistoryPage extends ConsumerWidget {
                 return Padding(
                   padding:
                       const EdgeInsets.only(bottom: SpacingTokens.sm),
-                  child: _SessionCard(session: session),
+                  child: GestureDetector(
+                    onTap: () => context.push(
+                      AppRoutes.mathSessionDetail,
+                      extra: session,
+                    ),
+                    child: _SessionCard(session: session),
+                  ),
                 )
                     .animate()
                     .fadeIn(
