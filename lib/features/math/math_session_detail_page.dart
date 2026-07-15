@@ -99,7 +99,9 @@ class MathSessionDetailPage extends ConsumerWidget {
                       ],
                     ),
                   ),
-                ).animate().fadeIn(duration: 300.ms),
+                ).animate()
+                    .fadeIn(duration: 400.ms)
+                    .slideY(begin: 0.1, end: 0, duration: 400.ms),
               ),
 
               // 题目列表
