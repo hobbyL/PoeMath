@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
@@ -94,7 +95,7 @@ class SettingsPage extends ConsumerWidget {
               subtitle: audioSubtitle,
               onTap: () => Navigator.push<void>(
                 context,
-                MaterialPageRoute(
+                fadeSlideRoute(
                   builder: (_) => const TtsSettingsPage(),
                 ),
               ),
@@ -167,7 +168,7 @@ class SettingsPage extends ConsumerWidget {
               subtitle: '导出或恢复学习数据',
               onTap: () => Navigator.push<void>(
                 context,
-                MaterialPageRoute(
+                fadeSlideRoute(
                   builder: (_) => const BackupRestorePage(),
                 ),
               ),
@@ -182,7 +183,7 @@ class SettingsPage extends ConsumerWidget {
               subtitle: '通过 WebDAV 同步数据',
               onTap: () => Navigator.push<void>(
                 context,
-                MaterialPageRoute(
+                fadeSlideRoute(
                   builder: (_) => const CloudSyncPage(),
                 ),
               ),
@@ -351,7 +352,7 @@ class SettingsPage extends ConsumerWidget {
       subtitle: '诗词 $poemGoal 首 · 口算 $mathGoal 题',
       onTap: () => Navigator.push<void>(
         context,
-        MaterialPageRoute(builder: (_) => const DailyGoalPage()),
+        fadeSlideRoute(builder: (_) => const DailyGoalPage()),
       ),
     );
   }

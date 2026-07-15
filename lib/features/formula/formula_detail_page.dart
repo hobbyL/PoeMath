@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/features/formula/providers/formula_providers.dart';
 
@@ -177,7 +178,7 @@ class FormulaDetailPage extends ConsumerWidget {
                           ? () {
                               // 导航到关联公式
                               Navigator.of(context).push(
-                                MaterialPageRoute<void>(
+                                fadeSlideRoute<void>(
                                   builder: (_) =>
                                       FormulaDetailPage(formulaId: id),
                                 ),

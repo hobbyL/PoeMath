@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
@@ -68,66 +69,89 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // ============ 诗词详情（非 Shell 子路由，全屏） ============
       GoRoute(
         path: AppRoutes.poemDetail,
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return PoemDetailPage(poemId: id);
-        },
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: PoemDetailPage(poemId: state.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: AppRoutes.poemRecite,
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return PoemRecitePage(poemId: id);
-        },
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: PoemRecitePage(poemId: state.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: AppRoutes.poemQuiz,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id']!;
           final typeStr = state.uri.queryParameters['type'] ?? 'fill';
           final quizType = typeStr == 'choice'
               ? QuizType.multipleChoice
               : QuizType.fillBlank;
-          return PoemQuizPage(poemId: id, quizType: quizType);
+          return fadeSlideTransitionPage(
+            state: state,
+            child: PoemQuizPage(poemId: id, quizType: quizType),
+          );
         },
       ),
       GoRoute(
         path: AppRoutes.poemReview,
-        builder: (context, state) => const PoemReviewPage(),
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const PoemReviewPage(),
+        ),
       ),
       // ============ 口算练习（非 Shell 子路由，全屏） ============
       GoRoute(
         path: AppRoutes.mathPractice,
-        builder: (context, state) => const MathPracticePage(),
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const MathPracticePage(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.mathMistake,
-        builder: (context, state) => const MathMistakePage(),
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const MathMistakePage(),
+        ),
       ),
       // ============ 公式详情（非 Shell 子路由，全屏） ============
       GoRoute(
         path: AppRoutes.formulaDetail,
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return FormulaDetailPage(formulaId: id);
-        },
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: FormulaDetailPage(
+            formulaId: state.pathParameters['id']!,
+          ),
+        ),
       ),
       // ============ 设置（非 Shell 子路由，全屏） ============
       GoRoute(
         path: AppRoutes.settings,
-        builder: (context, state) => const SettingsPage(),
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const SettingsPage(),
+        ),
       ),
       // ============ 学习报告（非 Shell 子路由，全屏） ============
       GoRoute(
         path: AppRoutes.learningStats,
-        builder: (context, state) => const LearningStatsPage(),
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const LearningStatsPage(),
+        ),
       ),
       // ============ 检查更新（非 Shell 子路由，全屏） ============
       GoRoute(
         path: AppRoutes.update,
-        builder: (context, state) => UpdatePage(
-          updateClient: UpdateClient(updateUrl: AppConfig.updateCheckUrl),
-          updateInstaller: AndroidUpdateInstaller(),
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: UpdatePage(
+            updateClient: UpdateClient(updateUrl: AppConfig.updateCheckUrl),
+            updateInstaller: AndroidUpdateInstaller(),
+          ),
         ),
       ),
     ],

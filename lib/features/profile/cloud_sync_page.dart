@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/services/webdav_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -29,7 +30,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   Future<void> _addConfig() async {
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const WebDavConfigPage()),
+      fadeSlideRoute(builder: (_) => const WebDavConfigPage()),
     );
     if (result == true) {
       ref.invalidate(settingsRepositoryProvider);
@@ -40,7 +41,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   Future<void> _editConfig(WebDavConfig config) async {
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
+      fadeSlideRoute(
         builder: (_) => WebDavConfigPage(existing: config),
       ),
     );
