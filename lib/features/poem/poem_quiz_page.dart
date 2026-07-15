@@ -12,6 +12,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
@@ -184,8 +185,17 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     }
 
     // 成就自动检查
-    await checkAchievements(ref);
+    final newlyUnlocked = await checkAchievements(ref);
     ref.invalidate(unlockedAchievementsCountProvider);
+
+    if (mounted && newlyUnlocked.isNotEmpty) {
+      final names = newlyUnlocked.map((a) => a.title).join('、');
+      showCelebration(
+        context,
+        type: CelebrationType.achievement,
+        subtitle: names,
+      );
+    }
 
     if (mounted) setState(() {});
   }

@@ -228,7 +228,7 @@ class HomePage extends ConsumerWidget {
                 ref.invalidate(userStatsProvider);
 
                 // 成就自动检查
-                await checkAchievements(ref);
+                final newlyUnlocked = await checkAchievements(ref);
                 ref.invalidate(unlockedAchievementsCountProvider);
 
                 if (context.mounted) {
@@ -237,6 +237,23 @@ class HomePage extends ConsumerWidget {
                     type: CelebrationType.checkIn,
                     subtitle: '连续打卡 $newStreak 天！继续保持！',
                   );
+                  // 若同时解锁了成就，等打卡庆祝关闭后再弹
+                  if (newlyUnlocked.isNotEmpty) {
+                    Future.delayed(
+                      const Duration(milliseconds: 1800),
+                      () {
+                        if (context.mounted) {
+                          final names =
+                              newlyUnlocked.map((a) => a.title).join('、');
+                          showCelebration(
+                            context,
+                            type: CelebrationType.achievement,
+                            subtitle: names,
+                          );
+                        }
+                      },
+                    );
+                  }
                 }
               },
               style: FilledButton.styleFrom(

@@ -348,7 +348,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     }
 
     // 成就自动检查
-    await checkAchievements(ref, latestSession: session);
+    final newlyUnlocked = await checkAchievements(ref, latestSession: session);
 
     // 刷新首页统计 providers
     ref.invalidate(userStatsProvider);
@@ -359,6 +359,19 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     ref.invalidate(overallAccuracyProvider);
 
     if (!mounted) return;
+
+    // 成就解锁庆祝
+    if (newlyUnlocked.isNotEmpty) {
+      final names = newlyUnlocked.map((a) => a.title).join('、');
+      showCelebration(
+        context,
+        type: CelebrationType.achievement,
+        subtitle: names,
+      );
+      // 等庆祝弹窗自动关闭后再弹结果
+      await Future<void>.delayed(const Duration(milliseconds: 1800));
+      if (!mounted) return;
+    }
 
     final action = await showDialog<String>(
       context: context,

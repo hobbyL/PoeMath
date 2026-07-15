@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
+import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -308,10 +309,23 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     ref.invalidate(todayPoemCountProvider);
 
     // 成就自动检查
-    await checkAchievements(ref);
+    final newlyUnlocked = await checkAchievements(ref);
     ref.invalidate(unlockedAchievementsCountProvider);
 
     if (!mounted) return;
+
+    // 成就解锁庆祝（在撒花之前短暂展示）
+    if (newlyUnlocked.isNotEmpty) {
+      final names = newlyUnlocked.map((a) => a.title).join('、');
+      showCelebration(
+        context,
+        type: CelebrationType.achievement,
+        subtitle: names,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 1800));
+      if (!mounted) return;
+    }
+
     _celebrationCtrl.play();
     setState(() => _isComplete = true);
   }

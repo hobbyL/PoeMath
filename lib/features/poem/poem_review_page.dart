@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
@@ -401,8 +402,17 @@ class PoemReviewPage extends ConsumerWidget {
       ref.invalidate(userStatsProvider);
 
       // 成就自动检查
-      await checkAchievements(ref);
+      final newlyUnlocked = await checkAchievements(ref);
       ref.invalidate(unlockedAchievementsCountProvider);
+
+      if (context.mounted && newlyUnlocked.isNotEmpty) {
+        final names = newlyUnlocked.map((a) => a.title).join('、');
+        showCelebration(
+          context,
+          type: CelebrationType.achievement,
+          subtitle: names,
+        );
+      }
 
       if (context.mounted) {
         final message = nextSchedule != null && nextSchedule.isCompleted
