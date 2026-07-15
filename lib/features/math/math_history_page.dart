@@ -130,7 +130,7 @@ class _SessionCard extends StatelessWidget {
         : '$dur秒';
 
     return ColoredCard(
-      color: theme.colorScheme.surfaceContainerLow,
+      color: theme.colorScheme.primary,
       child: Padding(
         padding: const EdgeInsets.all(SpacingTokens.md),
         child: Column(
