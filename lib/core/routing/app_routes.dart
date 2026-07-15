@@ -28,6 +28,7 @@ class AppRoutes {
   static const String mathMistake = '/math/mistake';
   static const String mathHistory = '/math/history';
   static const String mathSessionDetail = '/math/session';
+  static const String mathMistakeDetail = '/math/mistake/detail';
 
   // ============ 公式（Phase 6） ============
   static const String formulaList = '/formula/list';

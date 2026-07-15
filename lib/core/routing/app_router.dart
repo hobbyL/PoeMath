@@ -20,6 +20,7 @@ import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/math/math_history_page.dart';
 import 'package:poemath/features/math/math_mistake_page.dart';
 import 'package:poemath/features/math/math_practice_page.dart';
+import 'package:poemath/features/math/math_mistake_detail_page.dart';
 import 'package:poemath/features/math/math_session_detail_page.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
 import 'package:poemath/features/poem/poem_detail_page.dart';
@@ -134,6 +135,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return fadeSlideTransitionPage(
             state: state,
             child: MathSessionDetailPage(session: session),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.mathMistakeDetail,
+        pageBuilder: (context, state) {
+          final mistakeId = state.extra! as String;
+          return fadeSlideTransitionPage(
+            state: state,
+            child: MathMistakeDetailPage(mistakeId: mistakeId),
           );
         },
       ),
