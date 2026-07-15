@@ -281,10 +281,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     });
   }
 
-  void _useHint() {
+  void _toggleHint() {
     setState(() {
-      _showHint = true;
-      _hintUsedThisLine = true;
+      _showHint = !_showHint;
+      if (_showHint) _hintUsedThisLine = true;
     });
   }
 
@@ -515,10 +515,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
           const Spacer(),
 
-          // ── 拼音提示 ──
-          if (_showHint) _buildPinyinHint(context),
-
-          // ── 当前句 ──
+          // ── 当前句（含拼音提示） ──
           _buildCurrentLine(context, lineChars, allFilled),
 
           const Spacer(),
@@ -530,8 +527,13 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
             // ── 提示按钮 ──
             TextButton.icon(
-              onPressed: _showHint ? null : _useHint,
-              icon: const Icon(Icons.lightbulb_outline, size: 18),
+              onPressed: _toggleHint,
+              icon: Icon(
+                _showHint
+                    ? Icons.lightbulb
+                    : Icons.lightbulb_outline,
+                size: 18,
+              ),
               label: Text(_showHint ? '已显示提示' : '显示拼音提示'),
             ),
           ],
@@ -620,39 +622,18 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     );
   }
 
-  Widget _buildPinyinHint(BuildContext context) {
-    if (_currentLineIndex >= _pinyinLines.length) return const SizedBox();
-    if (_currentBlankIdx >= _blankPositions.length) return const SizedBox();
-
-    final pinyinLine = _pinyinLines[_currentLineIndex];
-    final pinyinParts = pinyinLine.split(' ');
-    final blankPos = _blankPositions[_currentBlankIdx];
-
-    final hint = blankPos < pinyinParts.length ? pinyinParts[blankPos] : '';
-    if (hint.isEmpty) return const SizedBox();
-
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
-      child: Text(
-        hint,
-        style: theme.textTheme.titleMedium?.copyWith(
-          color: theme.colorScheme.tertiary,
-          fontWeight: FontWeight.w600,
-        ),
-      )
-          .animate()
-          .fadeIn(duration: 300.ms)
-          .slideY(begin: 0.3, end: 0, duration: 300.ms),
-    );
-  }
-
   Widget _buildCurrentLine(
     BuildContext context,
     List<String> lineChars,
     bool allFilled,
   ) {
     final theme = Theme.of(context);
+
+    // 预加载拼音数据用于定位
+    List<String> pinyinParts = [];
+    if (_showHint && _currentLineIndex < _pinyinLines.length) {
+      pinyinParts = _pinyinLines[_currentLineIndex].split(' ');
+    }
 
     Widget lineWidget = Wrap(
       alignment: WrapAlignment.center,
@@ -667,10 +648,40 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
         if (isBlank && !isFilled) {
           // 空白槽位
-          return _BlankSlot(
+          Widget slot = _BlankSlot(
             isActive: isActiveBlank,
             shake: isActiveBlank && _shakeActive,
           );
+
+          // 在活跃空白槽位上方显示拼音提示
+          if (isActiveBlank && _showHint) {
+            final pinyin =
+                i < pinyinParts.length ? pinyinParts[i] : '';
+            if (pinyin.isNotEmpty && !_isPunctuation(pinyin)) {
+              slot = Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    pinyin,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.tertiary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                      .animate()
+                      .fadeIn(duration: 300.ms)
+                      .slideY(
+                        begin: 0.3,
+                        end: 0,
+                        duration: 300.ms,
+                      ),
+                  slot,
+                ],
+              );
+            }
+          }
+
+          return slot;
         }
 
         final displayChar = isFilled ? _filledChars[i]! : char;
