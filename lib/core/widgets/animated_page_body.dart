@@ -4,7 +4,7 @@
 // 职责：带交错入场动画的页面内容容器，统一全局子页面内容动画。
 //
 // 效果与复习计划页的 flutter_animate 动画一致：
-// 每个子组件依次 fadeIn + slideY 浮现，间隔 60ms。
+// 每个子组件依次 fadeIn + slideY(0.08) 浮现，间隔 60ms，时长 400ms。
 // SizedBox 等间距组件自动跳过，不计入动画序列。
 
 import 'package:flutter/material.dart';
@@ -30,7 +30,7 @@ class AnimatedPageBody extends StatelessWidget {
     required this.children,
     this.padding = const EdgeInsets.all(SpacingTokens.md),
     this.interval = const Duration(milliseconds: 60),
-    this.duration = const Duration(milliseconds: 350),
+    this.duration = const Duration(milliseconds: 400),
     this.controller,
   }) {
     // 确保 SizedBox 间距组件不计入动画序列（仅首次生效）
@@ -46,7 +46,7 @@ class AnimatedPageBody extends StatelessWidget {
   /// 相邻子组件的动画间隔，默认 60ms。
   final Duration interval;
 
-  /// 单个子组件的动画时长，默认 350ms。
+  /// 单个子组件的动画时长，默认 400ms。
   final Duration duration;
 
   /// 可选的滚动控制器。
@@ -61,7 +61,7 @@ class AnimatedPageBody extends StatelessWidget {
           .animate(interval: interval)
           .fadeIn(duration: duration, curve: Curves.easeOut)
           .slideY(
-            begin: 0.06,
+            begin: 0.08,
             end: 0,
             duration: duration,
             curve: Curves.easeOutCubic,

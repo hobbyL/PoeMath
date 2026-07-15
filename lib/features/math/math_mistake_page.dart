@@ -56,14 +56,14 @@ class MathMistakePage extends ConsumerWidget {
                     .animate()
                     .fadeIn(
                       delay: delay.ms,
-                      duration: 350.ms,
+                      duration: 400.ms,
                       curve: Curves.easeOut,
                     )
                     .slideY(
-                      begin: 0.06,
+                      begin: 0.08,
                       end: 0,
                       delay: delay.ms,
-                      duration: 350.ms,
+                      duration: 400.ms,
                       curve: Curves.easeOutCubic,
                     );
               },
