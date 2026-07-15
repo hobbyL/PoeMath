@@ -13,6 +13,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 
 class MathMistakePage extends ConsumerWidget {
   const MathMistakePage({super.key});
@@ -109,6 +110,34 @@ class MathMistakePage extends ConsumerWidget {
                       ),
                     ),
 
+                    // 错题重练按钮（有未掌握错题时显示）
+                    if (unresolvedCount > 0)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            SpacingTokens.md,
+                            SpacingTokens.sm,
+                            SpacingTokens.md,
+                            0,
+                          ),
+                          child: FilledButton.icon(
+                            onPressed: () => _startBatchRepractice(
+                              context,
+                              ref,
+                              mistakes
+                                  .where((m) => !m.isResolved)
+                                  .toList(),
+                            ),
+                            icon: const Icon(Icons.replay_rounded),
+                            label: Text('重练全部未掌握（$unresolvedCount 题）'),
+                            style: FilledButton.styleFrom(
+                              minimumSize:
+                                  const Size(double.infinity, 48),
+                            ),
+                          ),
+                        ),
+                      ),
+
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: SpacingTokens.md,
@@ -182,6 +211,54 @@ class MathMistakePage extends ConsumerWidget {
     if (width >= 900) return 3;
     if (width >= 600) return 2;
     return 1;
+  }
+
+  /// 批量重练所有未掌握错题。
+  Future<void> _startBatchRepractice(
+    BuildContext context,
+    WidgetRef ref,
+    List<MathMistake> unresolved,
+  ) async {
+    var correctCount = 0;
+    var totalDone = 0;
+
+    for (final mistake in unresolved) {
+      if (!context.mounted) break;
+
+      final result = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => MistakeRepracticeDialog(
+          problemText:
+              '(${totalDone + 1}/${unresolved.length}) ${mistake.problemText}',
+          correctAnswer: mistake.correctAnswer,
+        ),
+      );
+
+      // 用户取消 → 退出重练
+      if (result == null) break;
+
+      totalDone++;
+      if (result) {
+        correctCount++;
+        // 更新重练次数
+        mistake.retryCount++;
+        await mistake.save();
+      }
+    }
+
+    if (totalDone > 0 && context.mounted) {
+      ref.invalidate(mathMistakesProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '重练完成：$totalDone 题中答对 $correctCount 题'
+            '（正确率 ${(correctCount / totalDone * 100).round()}%）',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 }
 
