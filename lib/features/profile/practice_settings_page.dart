@@ -33,7 +33,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
   static const int _mathMin = 5;
   static const int _mathMax = 100;
   static const int _mathStep = 5;
-  static const _batchOptions = [5, 10, 15, 20, 30];
+  static const _batchOptions = [5, 10, 15, 20, 30, 50, 100];
 
   @override
   void didChangeDependencies() {

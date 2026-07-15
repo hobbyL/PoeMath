@@ -347,10 +347,31 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       }
     }
 
-    // 成就自动检查
+    // 成就自动检查 — 构建完整上下文
     final achievementRepo = ref.read(achievementRepoProvider);
+    final mistakeRepo = ref.read(mathMistakeRepoProvider);
+    final sessionRepo = ref.read(mathSessionRepoProvider);
+    final formulaFavRepo = ref.read(formulaFavoriteRepositoryProvider);
+
+    final resolvedMistakes =
+        mistakeRepo.getAll().where((m) => m.isResolved).length;
+    final completedReviewRounds = HiveBoxes.reviewSchedules.values
+        .where((s) => s.profileId == ProfileScope.currentId)
+        .fold<int>(0, (sum, s) => sum + s.currentRound);
+    final hardModeTotal = sessionRepo
+        .getAll()
+        .where((s) => s.difficulty == 'hard')
+        .fold<int>(0, (sum, s) => sum + s.totalProblems);
+
     final checker = AchievementChecker(achievementRepo);
-    await checker.check(statsRepo.get());
+    await checker.check(AchievementCheckContext(
+      stats: statsRepo.get(),
+      latestSession: session,
+      resolvedMistakes: resolvedMistakes,
+      completedReviewRounds: completedReviewRounds,
+      formulaFavorites: formulaFavRepo.count,
+      hardModeTotalProblems: hardModeTotal,
+    ),);
 
     // 刷新首页统计 providers
     ref.invalidate(userStatsProvider);
