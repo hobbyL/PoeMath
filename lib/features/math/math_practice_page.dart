@@ -407,7 +407,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
               child: Text(
                 '✓ $correctCount',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: ColorTokens.success,
+                  color: theme.semantic.success,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -479,7 +479,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                             delay: 200.ms,
                             duration: 600.ms,
                             color: _judgement!.isCorrect
-                                ? ColorTokens.success.withValues(alpha: 0.3)
+                                ? theme.semantic.success.withValues(alpha: 0.3)
                                 : Colors.transparent,
                           ),
                       const SizedBox(height: SpacingTokens.md),
@@ -513,13 +513,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       padding: const EdgeInsets.all(SpacingTokens.md),
       decoration: BoxDecoration(
         color: judgement.isCorrect
-            ? ColorTokens.success.withValues(alpha: 0.15)
-            : ColorTokens.error.withValues(alpha: 0.15),
+            ? theme.semantic.success.withValues(alpha: 0.15)
+            : theme.colorScheme.error.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
         border: Border.all(
           color: judgement.isCorrect
-              ? ColorTokens.success
-              : ColorTokens.error,
+              ? theme.semantic.success
+              : theme.colorScheme.error,
         ),
       ),
       child: Column(
@@ -531,8 +531,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                     ? Icons.check_circle_rounded
                     : Icons.cancel_rounded,
                 color: judgement.isCorrect
-                    ? ColorTokens.success
-                    : ColorTokens.error,
+                    ? theme.semantic.success
+                    : theme.colorScheme.error,
               ),
               const SizedBox(width: SpacingTokens.sm),
               Text(
@@ -540,8 +540,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: judgement.isCorrect
-                      ? ColorTokens.success
-                      : ColorTokens.error,
+                      ? theme.semantic.success
+                      : theme.colorScheme.error,
                 ),
               ),
             ],

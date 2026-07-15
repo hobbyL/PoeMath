@@ -196,7 +196,7 @@ class ProfilePage extends ConsumerWidget {
                       ? '${(stats.mathAccuracy * 100).toStringAsFixed(0)}%'
                       : '-',
                   '正确率',
-                  ColorTokens.success,
+                  theme.semantic.success,
                 ),
               ),
               Expanded(

@@ -315,21 +315,21 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
               spots: spots,
               isCurved: true,
               curveSmoothness: 0.3,
-              color: ColorTokens.success,
+              color: theme.semantic.success,
               barWidth: 2.5,
               isStrokeCapRound: true,
               dotData: FlDotData(
                 show: true,
                 getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
                   radius: 3,
-                  color: ColorTokens.success,
+                  color: theme.semantic.success,
                   strokeWidth: 1.5,
                   strokeColor: theme.colorScheme.surface,
                 ),
               ),
               belowBarData: BarAreaData(
                 show: true,
-                color: ColorTokens.success.withValues(alpha: 0.1),
+                color: theme.semantic.success.withValues(alpha: 0.1),
               ),
             ),
           ],
@@ -429,7 +429,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
               barRods: [
                 BarChartRodData(
                   toY: stats[i].mistakeCount.toDouble(),
-                  color: ColorTokens.error,
+                  color: theme.colorScheme.error,
                   width: _barWidth,
                   borderRadius: _barRadius,
                 ),

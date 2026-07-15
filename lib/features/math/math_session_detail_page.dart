@@ -75,9 +75,9 @@ class MathSessionDetailPage extends ConsumerWidget {
                           label: '正确率',
                           value: '$accuracyPct%',
                           color: accuracy >= 0.9
-                              ? ColorTokens.success
+                              ? theme.semantic.success
                               : accuracy >= 0.7
-                                  ? ColorTokens.poemGold
+                                  ? theme.semantic.caution
                                   : theme.colorScheme.error,
                         ),
                         _SummaryItem(
@@ -265,7 +265,7 @@ class _ProblemRow extends ConsumerWidget {
               )
           : null,
       child: ColoredCard(
-        color: isCorrect ? ColorTokens.success : theme.colorScheme.error,
+        color: isCorrect ? theme.semantic.success : theme.colorScheme.error,
         padding: const EdgeInsets.symmetric(
           horizontal: SpacingTokens.md,
           vertical: SpacingTokens.sm,
@@ -278,7 +278,7 @@ class _ProblemRow extends ConsumerWidget {
               height: 28,
               decoration: BoxDecoration(
                 color: (isCorrect
-                        ? ColorTokens.success
+                        ? theme.semantic.success
                         : theme.colorScheme.error)
                     .withValues(alpha: 0.15),
                 shape: BoxShape.circle,
@@ -289,7 +289,7 @@ class _ProblemRow extends ConsumerWidget {
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: isCorrect
-                      ? ColorTokens.success
+                      ? theme.semantic.success
                       : theme.colorScheme.error,
                 ),
               ),
@@ -322,7 +322,7 @@ class _ProblemRow extends ConsumerWidget {
                           : Icons.cancel_rounded,
                       size: 16,
                       color: isCorrect
-                          ? ColorTokens.success
+                          ? theme.semantic.success
                           : theme.colorScheme.error,
                     ),
                     const SizedBox(width: SpacingTokens.xs),
@@ -331,7 +331,7 @@ class _ProblemRow extends ConsumerWidget {
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: isCorrect
-                            ? ColorTokens.success
+                            ? theme.semantic.success
                             : theme.colorScheme.error,
                       ),
                     ),
@@ -341,7 +341,7 @@ class _ProblemRow extends ConsumerWidget {
                   Text(
                     '正确: ${record.answerText}',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: ColorTokens.success,
+                      color: theme.semantic.success,
                     ),
                   ),
               ],

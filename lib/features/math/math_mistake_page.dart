@@ -45,7 +45,7 @@ class MathMistakePage extends ConsumerWidget {
                               Icons.check_circle_outline,
                               size: 64,
                               color:
-                                  ColorTokens.success.withValues(alpha: 0.5),
+                                  theme.semantic.success.withValues(alpha: 0.5),
                             ),
                             const SizedBox(height: SpacingTokens.md),
                             Text(
@@ -164,7 +164,7 @@ class _MistakeCard extends StatelessWidget {
 
     return ColoredCard(
       color: mistake.isResolved
-          ? ColorTokens.success
+          ? theme.semantic.success
           : theme.colorScheme.error,
       padding: const EdgeInsets.symmetric(
         horizontal: SpacingTokens.md,
@@ -190,10 +190,10 @@ class _MistakeCard extends StatelessWidget {
                 ),
               ),
               if (mistake.isResolved)
-                const Icon(
+                Icon(
                   Icons.check_circle,
                   size: 20,
-                  color: ColorTokens.success,
+                  color: theme.semantic.success,
                 ),
               const SizedBox(width: SpacingTokens.xs),
               Icon(
@@ -218,7 +218,7 @@ class _MistakeCard extends StatelessWidget {
               Text(
                 mistake.userAnswer,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: ColorTokens.error,
+                  color: theme.colorScheme.error,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -232,7 +232,7 @@ class _MistakeCard extends StatelessWidget {
               Text(
                 mistake.correctAnswer,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: ColorTokens.success,
+                  color: theme.semantic.success,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -248,14 +248,14 @@ class _MistakeCard extends StatelessWidget {
                 vertical: 2,
               ),
               decoration: BoxDecoration(
-                color: ColorTokens.error.withValues(alpha: 0.1),
+                color: theme.colorScheme.error.withValues(alpha: 0.1),
                 borderRadius:
                     BorderRadius.circular(SpacingTokens.radiusSmall),
               ),
               child: Text(
                 _errorTypeLabels[mistake.errorType] ?? mistake.errorType!,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: ColorTokens.error,
+                  color: theme.colorScheme.error,
                 ),
               ),
             ),

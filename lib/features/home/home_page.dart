@@ -379,8 +379,8 @@ class HomePage extends ConsumerWidget {
                   top: -2,
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: ColorTokens.error,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error,
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -521,7 +521,7 @@ class HomePage extends ConsumerWidget {
             done ? Icons.check_circle : icon,
             size: 16,
             color: done
-                ? ColorTokens.success
+                ? theme.semantic.success
                 : theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: SpacingTokens.sm),
@@ -541,7 +541,7 @@ class HomePage extends ConsumerWidget {
               '$current/$target',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: done
-                    ? ColorTokens.success
+                    ? theme.semantic.success
                     : theme.colorScheme.primary,
                 fontWeight: FontWeight.w600,
               ),

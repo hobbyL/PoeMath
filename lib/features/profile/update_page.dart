@@ -523,7 +523,7 @@ class _UpdatePageState extends State<UpdatePage> {
 
   Color _phaseColor(ThemeData theme) => switch (_phase) {
         _UpdatePhase.error => theme.colorScheme.error,
-        _UpdatePhase.noUpdate || _UpdatePhase.ready => ColorTokens.success,
+        _UpdatePhase.noUpdate || _UpdatePhase.ready => theme.semantic.success,
         _ => theme.colorScheme.primary,
       };
 

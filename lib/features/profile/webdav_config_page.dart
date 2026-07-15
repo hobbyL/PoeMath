@@ -69,7 +69,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(ok ? '连接成功 ✓' : '连接失败，请检查配置'),
-        backgroundColor: ok ? ColorTokens.success : null,
+        backgroundColor: ok ? Theme.of(context).semantic.success : null,
       ),
     );
   }

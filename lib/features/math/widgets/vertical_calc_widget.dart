@@ -109,7 +109,7 @@ class VerticalCalcWidget extends StatelessWidget {
                 ? resultStr.padLeft(maxDigits)
                 : '?'.padLeft(maxDigits),
             style: digitStyle.copyWith(
-              color: showAnswer ? ColorTokens.success : primaryColor,
+              color: showAnswer ? theme.semantic.success : primaryColor,
             ),
           ),
         ],

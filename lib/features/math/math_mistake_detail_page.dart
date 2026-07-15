@@ -79,7 +79,7 @@ class MathMistakeDetailPage extends ConsumerWidget {
                       _AnswerChip(
                         label: '正确答案',
                         value: mistake.correctAnswer,
-                        color: ColorTokens.success,
+                        color: theme.semantic.success,
                         icon: Icons.check_circle_rounded,
                       ),
                     ],
@@ -94,7 +94,7 @@ class MathMistakeDetailPage extends ConsumerWidget {
                         vertical: SpacingTokens.xs,
                       ),
                       decoration: BoxDecoration(
-                        color: ColorTokens.success.withValues(alpha: 0.12),
+                        color: theme.semantic.success.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(
                           SpacingTokens.radiusSmall,
                         ),
@@ -102,16 +102,16 @@ class MathMistakeDetailPage extends ConsumerWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.check_circle,
                             size: 16,
-                            color: ColorTokens.success,
+                            color: theme.semantic.success,
                           ),
                           const SizedBox(width: SpacingTokens.xs),
                           Text(
                             '已掌握',
                             style: theme.textTheme.labelMedium?.copyWith(
-                              color: ColorTokens.success,
+                              color: theme.semantic.success,
                               fontWeight: FontWeight.w600,
                             ),
                           ),

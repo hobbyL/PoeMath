@@ -64,7 +64,7 @@ class SessionResultDialog extends StatelessWidget {
                 i < starsEarned ? Icons.star_rounded : Icons.star_outline_rounded,
                 size: 40,
                 color: i < starsEarned
-                    ? ColorTokens.poemGold
+                    ? theme.semantic.caution
                     : theme.colorScheme.onSurfaceVariant,
               );
             }),

@@ -121,7 +121,7 @@ class SettingsPage extends ConsumerWidget {
             // 拼音显示
             AppTile(
               icon: Icons.text_fields_outlined,
-              iconColor: ColorTokens.success,
+              iconColor: theme.semantic.success,
               title: '拼音显示',
               subtitle: settingsRepo.pinyinVisible ? '已开启' : '已关闭',
               trailing: Switch(

@@ -167,9 +167,9 @@ class _SessionCard extends StatelessWidget {
 
     // 颜色映射
     final accuracyColor = accuracy >= 0.9
-        ? ColorTokens.success
+        ? theme.semantic.success
         : accuracy >= 0.7
-            ? ColorTokens.poemGold
+            ? theme.semantic.caution
             : theme.colorScheme.error;
 
     // 星星
@@ -296,7 +296,7 @@ class _SessionCard extends StatelessWidget {
                             : Icons.star_outline_rounded,
                         size: 20,
                         color: i < stars
-                            ? ColorTokens.poemGold
+                            ? theme.semantic.caution
                             : theme.colorScheme.onSurfaceVariant
                                 .withValues(alpha: 0.3),
                       );

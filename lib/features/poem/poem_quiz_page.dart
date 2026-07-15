@@ -309,7 +309,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                             delay: 200.ms,
                             duration: 600.ms,
                             color: session.isCurrentCorrect()
-                                ? ColorTokens.success.withValues(alpha: 0.3)
+                                ? theme.semantic.success.withValues(alpha: 0.3)
                                 : Colors.transparent,
                           ),
                     ],
@@ -407,9 +407,9 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
         if (_answered) {
           if (isCorrectOption) {
-            bgColor = ColorTokens.success.withValues(alpha: 0.12);
-            borderColor = ColorTokens.success;
-            textColor = ColorTokens.success;
+            bgColor = theme.semantic.success.withValues(alpha: 0.12);
+            borderColor = theme.semantic.success;
+            textColor = theme.semantic.success;
           } else if (isUserWrong) {
             bgColor = theme.colorScheme.error.withValues(alpha: 0.12);
             borderColor = theme.colorScheme.error;
@@ -474,7 +474,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
               .shimmer(
                 delay: 100.ms,
                 duration: 600.ms,
-                color: ColorTokens.success.withValues(alpha: 0.4),
+                color: theme.semantic.success.withValues(alpha: 0.4),
               );
         }
 
@@ -502,7 +502,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       padding: const EdgeInsets.all(SpacingTokens.md),
       decoration: BoxDecoration(
         color: isCorrect
-            ? ColorTokens.success.withValues(alpha: 0.1)
+            ? theme.semantic.success.withValues(alpha: 0.1)
             : theme.colorScheme.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
       ),
@@ -510,7 +510,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
         children: [
           Icon(
             isCorrect ? Icons.check_circle : Icons.cancel,
-            color: isCorrect ? ColorTokens.success : theme.colorScheme.error,
+            color: isCorrect ? theme.semantic.success : theme.colorScheme.error,
           ),
           const SizedBox(width: SpacingTokens.sm),
           Expanded(
@@ -521,7 +521,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                   isCorrect ? '回答正确！' : '回答错误',
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: isCorrect
-                        ? ColorTokens.success
+                        ? theme.semantic.success
                         : theme.colorScheme.error,
                     fontWeight: FontWeight.w600,
                   ),
@@ -554,11 +554,11 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     if (session.accuracy >= 1.0) {
       ratingText = '满分！完美！🎉';
       ratingIcon = Icons.emoji_events;
-      ratingColor = ColorTokens.poemGold;
+      ratingColor = theme.semantic.caution;
     } else if (session.isPassed) {
       ratingText = '表现不错，继续加油！👍';
       ratingIcon = Icons.thumb_up;
-      ratingColor = ColorTokens.success;
+      ratingColor = theme.semantic.success;
     } else {
       ratingText = '还需努力，多多复习哦 📖';
       ratingIcon = Icons.auto_stories;

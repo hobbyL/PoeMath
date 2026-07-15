@@ -68,8 +68,8 @@ class _MistakeRepracticeDialogState extends State<MistakeRepracticeDialog> {
               padding: const EdgeInsets.all(SpacingTokens.md),
               decoration: BoxDecoration(
                 color: _isCorrect!
-                    ? ColorTokens.success.withValues(alpha: 0.15)
-                    : ColorTokens.error.withValues(alpha: 0.15),
+                    ? theme.semantic.success.withValues(alpha: 0.15)
+                    : theme.colorScheme.error.withValues(alpha: 0.15),
                 borderRadius:
                     BorderRadius.circular(SpacingTokens.radiusMedium),
               ),
@@ -80,8 +80,8 @@ class _MistakeRepracticeDialogState extends State<MistakeRepracticeDialog> {
                         ? Icons.check_circle_rounded
                         : Icons.cancel_rounded,
                     color: _isCorrect!
-                        ? ColorTokens.success
-                        : ColorTokens.error,
+                        ? theme.semantic.success
+                        : theme.colorScheme.error,
                     size: 32,
                   ),
                   const SizedBox(height: SpacingTokens.xs),
@@ -90,8 +90,8 @@ class _MistakeRepracticeDialogState extends State<MistakeRepracticeDialog> {
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: _isCorrect!
-                          ? ColorTokens.success
-                          : ColorTokens.error,
+                          ? theme.semantic.success
+                          : theme.colorScheme.error,
                     ),
                   ),
                   if (!_isCorrect!) ...[
