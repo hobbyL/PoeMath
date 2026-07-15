@@ -43,16 +43,14 @@ class VerticalCalcWidget extends StatelessWidget {
       );
     }
 
-    final a = operands[0].asInteger.abs();
-    final b = operands[1].asInteger.abs();
-    final result = problem.result.asInteger.abs();
+    // 使用 toString() 保留小数和符号，显示实际数值
+    final aStr = operands[0].toString();
+    final bStr = operands[1].toString();
+    final resultStr = problem.result.toString();
 
-    // 确定最大位数，用于右对齐
-    final maxDigits = [
-      a.toString().length,
-      b.toString().length,
-      result.toString().length,
-    ].reduce((a, b) => a > b ? a : b);
+    // 确定最大字符宽度，用于右对齐
+    final maxDigits = [aStr.length, bStr.length, resultStr.length]
+        .reduce((a, b) => a > b ? a : b);
 
     // 字符宽度（等宽字体）
     const digitStyle = TextStyle(
@@ -72,7 +70,7 @@ class VerticalCalcWidget extends StatelessWidget {
         children: [
           // 第一行：第一个操作数（右对齐）
           Text(
-            a.toString().padLeft(maxDigits),
+            aStr.padLeft(maxDigits),
             style: digitStyle.copyWith(
               color: theme.colorScheme.onSurface,
             ),
@@ -88,7 +86,7 @@ class VerticalCalcWidget extends StatelessWidget {
               ),
               const SizedBox(width: SpacingTokens.sm),
               Text(
-                b.toString().padLeft(maxDigits),
+                bStr.padLeft(maxDigits),
                 style: digitStyle.copyWith(
                   color: theme.colorScheme.onSurface,
                 ),
@@ -108,7 +106,7 @@ class VerticalCalcWidget extends StatelessWidget {
           // 结果行
           Text(
             showAnswer
-                ? result.toString().padLeft(maxDigits)
+                ? resultStr.padLeft(maxDigits)
                 : '?'.padLeft(maxDigits),
             style: digitStyle.copyWith(
               color: showAnswer ? ColorTokens.success : primaryColor,
