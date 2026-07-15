@@ -113,8 +113,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('音频设置')),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(SpacingTokens.md),
+        child: AnimatedPageBody(
           children: [
             // ====== 语速调节 ======
             ColoredCard(

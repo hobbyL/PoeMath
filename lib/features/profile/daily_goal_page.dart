@@ -56,10 +56,9 @@ class _DailyGoalPageState extends ConsumerState<DailyGoalPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('每日目标')),
       body: SafeArea(
-        child: Padding(
+        child: AnimatedPageBody(
           padding: const EdgeInsets.all(SpacingTokens.lg),
-          child: Column(
-            children: [
+          children: [
               // 诗词目标
               ColoredCard(
                 color: theme.colorScheme.primary,
@@ -133,7 +132,7 @@ class _DailyGoalPageState extends ConsumerState<DailyGoalPage> {
                 ),
               ),
 
-              const Spacer(),
+              const SizedBox(height: SpacingTokens.xl),
 
               // 保存按钮
               SizedBox(
@@ -146,7 +145,6 @@ class _DailyGoalPageState extends ConsumerState<DailyGoalPage> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

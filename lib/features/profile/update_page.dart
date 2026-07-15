@@ -56,7 +56,7 @@ class _UpdatePageState extends State<UpdatePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('检查更新')),
       body: SafeArea(
-        child: ListView(
+        child: AnimatedPageBody(
           padding: const EdgeInsets.symmetric(
             horizontal: SpacingTokens.md,
             vertical: SpacingTokens.sm,

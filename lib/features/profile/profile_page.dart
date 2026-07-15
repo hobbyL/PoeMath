@@ -36,7 +36,7 @@ class ProfilePage extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: ListView(
+        child: AnimatedPageBody(
           padding: const EdgeInsets.all(SpacingTokens.lg),
           children: <Widget>[
             // 用户头像 + 等级

@@ -38,7 +38,7 @@ void main() {
 
     for (final label in ['诗词', '口算', '我的', '首页']) {
       await tester.tap(_bottomBarItem(label));
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
     }
 
     expect(tester.takeException(), isNull);

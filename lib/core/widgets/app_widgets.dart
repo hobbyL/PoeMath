@@ -6,5 +6,6 @@
 // 用法：
 //   import 'package:poemath/core/widgets/app_widgets.dart';
 
+export 'package:poemath/core/widgets/animated_page_body.dart';
 export 'package:poemath/core/widgets/app_tile.dart';
 export 'package:poemath/core/widgets/colored_card.dart';

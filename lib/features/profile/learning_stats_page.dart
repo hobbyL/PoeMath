@@ -40,8 +40,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(SpacingTokens.md),
+        child: AnimatedPageBody(
           children: [
             // 做题数 & 学诗数
             _buildChartCard(

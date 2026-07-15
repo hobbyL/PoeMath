@@ -27,6 +27,7 @@ void main() {
         child: const MaterialApp(home: SettingsPage()),
       ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('主题设置'), findsOneWidget);
     expect(find.text('外观模式'), findsOneWidget);
@@ -71,6 +72,7 @@ void main() {
         child: const MaterialApp(home: SettingsPage()),
       ),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('主题设置'));
     await tester.pumpAndSettle();
@@ -96,6 +98,7 @@ void main() {
         child: const MaterialApp(home: SettingsPage()),
       ),
     );
+    await tester.pumpAndSettle();
 
     // 验证有 Switch 控件
     final switches = find.byType(Switch);
@@ -122,7 +125,7 @@ void main() {
         child: const MaterialApp(home: SettingsPage()),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('主题设置'), findsOneWidget);
     expect(tester.takeException(), isNull);

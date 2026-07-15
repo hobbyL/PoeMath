@@ -75,7 +75,7 @@ class SettingsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: SafeArea(
-        child: ListView(
+        child: AnimatedPageBody(
           padding: const EdgeInsets.symmetric(
             horizontal: SpacingTokens.md,
             vertical: SpacingTokens.sm,

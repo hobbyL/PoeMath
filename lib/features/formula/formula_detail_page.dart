@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/formula/providers/formula_providers.dart';
 
 class FormulaDetailPage extends ConsumerWidget {
@@ -45,11 +46,9 @@ class FormulaDetailPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: AnimatedPageBody(
         padding: const EdgeInsets.all(SpacingTokens.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        children: [
             // 分类 + 年级标签
             Row(
               children: [
@@ -194,7 +193,6 @@ class FormulaDetailPage extends ConsumerWidget {
             const SizedBox(height: SpacingTokens.xl),
           ],
         ),
-      ),
     );
   }
 
