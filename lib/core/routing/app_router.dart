@@ -29,6 +29,7 @@ import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/poem_review_page.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
 import 'package:poemath/features/poem/poem_tab_page.dart';
+import 'package:poemath/features/profile/achievement_page.dart';
 import 'package:poemath/features/profile/learning_stats_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
@@ -172,6 +173,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const LearningStatsPage(),
+        ),
+      ),
+      // ============ 成就勋章（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.achievements,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const AchievementPage(),
         ),
       ),
       // ============ 检查更新（非 Shell 子路由，全屏） ============

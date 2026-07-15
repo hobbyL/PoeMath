@@ -38,6 +38,7 @@ class AppRoutes {
   static const String splash = '/splash';
   static const String settings = '/profile/settings';
   static const String learningStats = '/profile/stats';
+  static const String achievements = '/profile/achievements';
   static const String update = '/profile/update';
 
   // ============ 路径构造器 ============

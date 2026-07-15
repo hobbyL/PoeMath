@@ -248,6 +248,7 @@ class ProfilePage extends ConsumerWidget {
   ) {
     return ColoredCard(
       color: theme.semantic.caution,
+      onTap: () => context.push(AppRoutes.achievements),
       child: Column(
         children: [
           Icon(
