@@ -106,7 +106,7 @@ class SettingsPage extends ConsumerWidget {
             // 音频设置（语速 + 音色 → 子页面）
             AppTile(
               icon: Icons.volume_up_outlined,
-              iconColor: ColorTokens.poemGold,
+              iconColor: theme.semantic.caution,
               title: '音频设置',
               subtitle: audioSubtitle,
               onTap: () => Navigator.push<void>(
@@ -256,7 +256,7 @@ class SettingsPage extends ConsumerWidget {
                       groupValue: current,
                       onChanged: (v) {
                         if (v == null) return;
-                        ref.read(activeSubjectProvider.notifier).state = v;
+                        ref.read(activeSubjectProvider.notifier).setSubject(v);
                         Navigator.pop(ctx);
                       },
                       child: const Column(
@@ -362,10 +362,11 @@ class SettingsPage extends ConsumerWidget {
     final poemGoal = ref.watch(dailyPoemGoalProvider);
     final mathGoal = ref.watch(dailyMathGoalProvider);
     final batchSize = settingsRepo.mathBatchSize;
+    final theme = Theme.of(context);
 
     return AppTile(
       icon: Icons.tune_outlined,
-      iconColor: ColorTokens.poemGold,
+      iconColor: theme.semantic.caution,
       title: '练习设置',
       subtitle: '每组 $batchSize 题 · 诗词 $poemGoal 首 · 口算 $mathGoal 题',
       onTap: () => Navigator.push<void>(

@@ -6,14 +6,51 @@
 //       - themeModeProvider: 亮色/暗色/跟随系统。
 //       - lightThemeProvider / darkThemeProvider: 派生 ThemeData。
 
+import 'dart:async' show Zone;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
 
-/// 当前活跃学科（决定加载哪套主题）。默认诗词国风。
-final activeSubjectProvider = StateProvider<AppSubject>(
-  (ref) => AppSubject.poem,
+/// 当前活跃学科 Notifier — 初始值从 Hive 读取，变更时自动写回。
+///
+/// 使用 [Zone.root] 调度 Hive 写入，避免 Flutter 测试中
+/// FakeAsync zone 无法完成 I/O Future 导致测试超时。
+class ActiveSubjectNotifier extends Notifier<AppSubject> {
+  @override
+  AppSubject build() {
+    final stored =
+        HiveBoxes.settings.get('active_subject', defaultValue: 'poem')
+            as String;
+
+    // 监听后续变更，自动持久化到 Hive
+    listenSelf((prev, next) {
+      if (prev != null && prev != next) {
+        // 在根 Zone 中执行 I/O，避免 FakeAsync 追踪导致测试卡死
+        Zone.root.run(() {
+          HiveBoxes.settings.put(
+            'active_subject',
+            next == AppSubject.math ? 'math' : 'poem',
+          );
+        });
+      }
+    });
+
+    return stored == 'math' ? AppSubject.math : AppSubject.poem;
+  }
+
+  /// 切换当前学科。
+  void setSubject(AppSubject subject) {
+    state = subject;
+  }
+}
+
+/// 当前活跃学科（决定加载哪套主题）。
+final activeSubjectProvider =
+    NotifierProvider<ActiveSubjectNotifier, AppSubject>(
+  ActiveSubjectNotifier.new,
 );
 
 /// 亮色 / 暗色 / 跟随系统。默认跟随系统。

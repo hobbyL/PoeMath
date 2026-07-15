@@ -56,7 +56,7 @@ void main() {
       expect(light1.colorScheme.primary, ColorTokens.poemGreen);
 
       // 切到 math
-      container.read(activeSubjectProvider.notifier).state = AppSubject.math;
+      container.read(activeSubjectProvider.notifier).setSubject(AppSubject.math);
       await tester.pump();
       await tester.pump(const Duration(seconds: 2));
 

@@ -81,14 +81,14 @@ void main() {
     await _pumpPastSplashAndAnimations(tester);
 
     // 手动切换到 math 主题
-    container.read(activeSubjectProvider.notifier).state = AppSubject.math;
+    container.read(activeSubjectProvider.notifier).setSubject(AppSubject.math);
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
     expect(container.read(activeSubjectProvider), AppSubject.math);
 
     // 切回 poem
-    container.read(activeSubjectProvider.notifier).state = AppSubject.poem;
+    container.read(activeSubjectProvider.notifier).setSubject(AppSubject.poem);
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 

@@ -72,18 +72,20 @@ void main() {
         child: const MaterialApp(home: SettingsPage()),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     await tester.tap(find.text('主题设置'));
-    await tester.pumpAndSettle();
+    await tester.pump(); // 触发 showModalBottomSheet
+    await tester.pump(const Duration(milliseconds: 500)); // 完成底部弹窗动画
 
     expect(find.text('主题风格'), findsOneWidget);
     expect(find.text('诗词'), findsWidgets);
     expect(find.text('口算'), findsWidgets);
 
-    // 选择口算
+    // 选择口算 — 触发 activeSubjectProvider 变更 + Hive 持久化
     await tester.tap(find.text('童趣马卡龙主题'));
-    await tester.pumpAndSettle();
+    await tester.pump(); // 触发回调
+    await tester.pump(const Duration(seconds: 1)); // 完成动画
 
     expect(container.read(activeSubjectProvider), AppSubject.math);
   });

@@ -11,6 +11,7 @@ import 'package:poemath/data/models/webdav_config.dart';
 class SettingsRepository {
   // ============ KV 键名 ============
   static const String _keyThemeMode = 'theme_mode'; // 'system' | 'light' | 'dark'
+  static const String _keyActiveSubject = 'active_subject'; // 'poem' | 'math'
   static const String _keySoundEnabled = 'sound_enabled';
   static const String _keyHapticEnabled = 'haptic_enabled';
   static const String _keySelectedGrade = 'selected_grade';
@@ -24,6 +25,14 @@ class SettingsRepository {
   static const String _keyMathDifficulty = 'math_difficulty';
 
   // ============ 主题 ============
+
+  /// 当前活跃学科主题（'poem' 或 'math'），默认 'poem'。
+  String get activeSubject =>
+      HiveBoxes.settings.get(_keyActiveSubject, defaultValue: 'poem') as String;
+
+  Future<void> setActiveSubject(String subject) async {
+    await HiveBoxes.settings.put(_keyActiveSubject, subject);
+  }
 
   String get themeMode =>
       HiveBoxes.settings.get(_keyThemeMode, defaultValue: 'system') as String;
