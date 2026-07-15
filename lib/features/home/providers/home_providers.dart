@@ -5,11 +5,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/models/check_in.dart';
+import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/math_session_repository.dart';
 import 'package:poemath/data/repositories/poem_progress_repository.dart';
+import 'package:poemath/data/repositories/poem_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 
@@ -89,4 +91,31 @@ final dailyMathGoalProvider = Provider<int>((ref) {
 final unlockedAchievementsCountProvider = Provider<int>((ref) {
   final repo = ref.watch(achievementRepoProvider);
   return repo.unlockedCount;
+});
+
+// ============ 今日推荐 ============
+
+/// 今日推荐诗词 — 优先推荐未学习的诗词，基于日期做伪随机选择。
+final dailyRecommendedPoemProvider = Provider<Poem?>((ref) {
+  final poemRepo = PoemRepository();
+  final progressRepo = PoemProgressRepository();
+  final allPoems = poemRepo.getAll();
+  if (allPoems.isEmpty) return null;
+
+  // 筛选未学习的诗词
+  final unlearned = allPoems.where((p) {
+    final progress = progressRepo.get(p.id);
+    return progress == null;
+  }).toList();
+
+  // 基于日期做伪随机，确保同一天推荐同一首
+  final daysSinceEpoch = DateTime.now().difference(
+    DateTime(2024),
+  ).inDays;
+
+  if (unlearned.isNotEmpty) {
+    return unlearned[daysSinceEpoch % unlearned.length];
+  }
+  // 全部学过 → 从全部诗词中推荐
+  return allPoems[daysSinceEpoch % allPoems.length];
 });

@@ -13,6 +13,7 @@ import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
+import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
@@ -31,6 +32,7 @@ class HomePage extends ConsumerWidget {
     final learnedPoems = ref.watch(learnedCountProvider);
     final mistakeCount = ref.watch(mistakeCountProvider);
     final dueReviews = ref.watch(dueReviewCountProvider);
+    final recommendedPoem = ref.watch(dailyRecommendedPoemProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -94,6 +96,19 @@ class HomePage extends ConsumerWidget {
             const SizedBox(height: SpacingTokens.sm),
             _buildQuickActions(context, mistakeCount),
             const SizedBox(height: SpacingTokens.lg),
+
+            // 今日推荐
+            if (recommendedPoem != null) ...[
+              Text(
+                '今日推荐',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              _buildDailyRecommendation(context, recommendedPoem),
+              const SizedBox(height: SpacingTokens.lg),
+            ],
 
             // 复习提醒（有待复习时显示）
             if (dueReviews > 0) ...[
@@ -420,6 +435,60 @@ class HomePage extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDailyRecommendation(BuildContext context, Poem poem) {
+    final theme = Theme.of(context);
+    // 取首句（第一个换行前的文本）
+    final firstLine = poem.content.split('\n').first.trim();
+
+    return ColoredCard(
+      color: theme.colorScheme.primary,
+      onTap: () => context.push(AppRoutes.poemDetailOf(poem.id)),
+      child: Row(
+        children: [
+          // 诗词信息
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  poem.title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.xs),
+                Text(
+                  '${poem.dynasty} · ${poem.author}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Text(
+                  firstLine,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color:
+                        theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: SpacingTokens.sm),
+          // 右侧图标
+          Icon(
+            Icons.auto_stories_outlined,
+            size: 36,
+            color: theme.colorScheme.primary.withValues(alpha: 0.5),
+          ),
+        ],
+      ),
     );
   }
 
