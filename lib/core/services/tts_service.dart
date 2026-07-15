@@ -9,7 +9,7 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 /// TTS 朗读服务。
 ///
 /// 使用 flutter_tts 实现中文语音合成。
-/// 支持全文朗读和逐句朗读。
+/// 支持全文朗读和逐句朗读，以及音色选择。
 class TtsService {
   final FlutterTts _tts = FlutterTts();
   final SettingsRepository _settings;
@@ -35,6 +35,12 @@ class TtsService {
     await _tts.setVolume(1.0);
     await _tts.setPitch(1.0);
 
+    // 应用用户已保存的音色
+    final savedVoice = _settings.ttsVoice;
+    if (savedVoice != null) {
+      await _tts.setVoice(savedVoice);
+    }
+
     // 注意：completionHandler 在每次 speak() 完成后触发，
     // 但在 speakLines/speakSentences 场景下不应中断循环，
     // 所以这里不再设置 _isSpeaking = false，改由各方法自行管理。
@@ -50,6 +56,55 @@ class TtsService {
     });
 
     _initialized = true;
+  }
+
+  /// 获取可用的中文音色列表。
+  ///
+  /// 返回 `List<Map<String, String>>`，每个 Map 至少包含 name 和 locale。
+  /// 仅返回 locale 以 "zh" 开头的音色（zh-CN, zh-TW, zh-HK 等）。
+  Future<List<Map<String, String>>> getChineseVoices() async {
+    await _ensureInitialized();
+    final voices = await _tts.getVoices as List<dynamic>;
+    final chineseVoices = <Map<String, String>>[];
+
+    for (final v in voices) {
+      final map = Map<String, dynamic>.from(v as Map);
+      final locale = (map['locale'] ?? '').toString();
+      if (locale.startsWith('zh')) {
+        chineseVoices.add({
+          'name': (map['name'] ?? '').toString(),
+          'locale': locale,
+        });
+      }
+    }
+
+    // 按 locale → name 排序，zh-CN 优先
+    chineseVoices.sort((a, b) {
+      final localeCompare = a['locale']!.compareTo(b['locale']!);
+      if (localeCompare != 0) return localeCompare;
+      return a['name']!.compareTo(b['name']!);
+    });
+
+    return chineseVoices;
+  }
+
+  /// 设置音色并保存到设置。传 null 恢复系统默认。
+  Future<void> setVoice(Map<String, String>? voice) async {
+    await _ensureInitialized();
+    if (voice != null) {
+      await _tts.setVoice(voice);
+    } else {
+      // 恢复默认：重设语言让系统选择默认音色
+      await _tts.setLanguage('zh-CN');
+    }
+    await _settings.setTtsVoice(voice);
+  }
+
+  /// 试听当前音色：朗读一段示例文本。
+  Future<void> preview(String text) async {
+    await _ensureInitialized();
+    await _tts.setSpeechRate(_settings.ttsSpeed);
+    await _tts.speak(text);
   }
 
   /// 朗读文本（全文一次性读完）。

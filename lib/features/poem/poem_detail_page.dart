@@ -7,19 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
-
-/// TTS 服务 Provider。
-final _ttsServiceProvider = Provider<TtsService>((ref) {
-  final settings = ref.watch(settingsRepositoryProvider);
-  final service = TtsService(settings);
-  ref.onDispose(service.dispose);
-  return service;
-});
 
 /// 拼音显隐状态 Provider（读取 SettingsRepository 的持久化值）。
 final _pinyinVisibleProvider = StateProvider<bool>((ref) {
@@ -45,7 +36,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   @override
   void dispose() {
     // 退出页面时停止朗读
-    ref.read(_ttsServiceProvider).stop();
+    ref.read(ttsServiceProvider).stop();
     super.dispose();
   }
 
@@ -59,7 +50,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   }
 
   Future<void> _toggleTts(Poem poem) async {
-    final tts = ref.read(_ttsServiceProvider);
+    final tts = ref.read(ttsServiceProvider);
     if (_isSpeaking) {
       await tts.stop();
       if (mounted) {

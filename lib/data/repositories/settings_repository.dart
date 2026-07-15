@@ -3,6 +3,8 @@
 // 层级：data/repositories
 // 职责：应用设置仓储。使用 settingsBox 作为 KV 存储。
 
+import 'dart:convert';
+
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 
@@ -13,6 +15,7 @@ class SettingsRepository {
   static const String _keyHapticEnabled = 'haptic_enabled';
   static const String _keySelectedGrade = 'selected_grade';
   static const String _keyTtsSpeed = 'tts_speed';
+  static const String _keyTtsVoice = 'tts_voice'; // JSON: {"name":"...", "locale":"..."}
   static const String _keyPinyinVisible = 'pinyin_visible';
   static const String _keyDailyPoemGoal = 'daily_poem_goal';
   static const String _keyDailyMathGoal = 'daily_math_goal';
@@ -61,6 +64,29 @@ class SettingsRepository {
 
   Future<void> setTtsSpeed(double speed) async {
     await HiveBoxes.settings.put(_keyTtsSpeed, speed);
+  }
+
+  // ============ TTS 音色 ============
+
+  /// 用户选择的 TTS 音色，返回 {"name": "...", "locale": "..."} 或 null（使用系统默认）。
+  Map<String, String>? get ttsVoice {
+    final json = HiveBoxes.settings.get(_keyTtsVoice) as String?;
+    if (json == null || json.isEmpty) return null;
+    try {
+      final map = jsonDecode(json) as Map<String, dynamic>;
+      return map.map((k, v) => MapEntry(k, v.toString()));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 保存用户选择的 TTS 音色。传 null 恢复系统默认。
+  Future<void> setTtsVoice(Map<String, String>? voice) async {
+    if (voice == null) {
+      await HiveBoxes.settings.delete(_keyTtsVoice);
+    } else {
+      await HiveBoxes.settings.put(_keyTtsVoice, jsonEncode(voice));
+    }
   }
 
   // ============ 拼音显示 ============

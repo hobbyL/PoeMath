@@ -22,6 +22,7 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/services/haptic_service.dart';
+import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/services/webdav_service.dart';
 
 // ============ 静态数据 Repository ============
@@ -106,4 +107,11 @@ final backupServiceProvider = Provider<BackupService>((ref) {
 
 final webDavServiceProvider = Provider<WebDavService>((ref) {
   return WebDavService();
+});
+
+final ttsServiceProvider = Provider<TtsService>((ref) {
+  final settings = ref.watch(settingsRepositoryProvider);
+  final service = TtsService(settings);
+  ref.onDispose(service.dispose);
+  return service;
 });
