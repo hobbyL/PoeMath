@@ -24,64 +24,87 @@ class MathHistoryPage extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('练习记录')),
       body: sessions.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.history_outlined,
-                    size: 64,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.3),
-                  ),
-                  const SizedBox(height: SpacingTokens.md),
-                  Text(
-                    '暂无练习记录',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+          ? CustomScrollView(
+              slivers: [
+                const SliverAppBar(
+                  floating: true,
+                  snap: true,
+                  title: Text('练习记录'),
+                ),
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.history_outlined,
+                          size: 64,
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.3),
+                        ),
+                        const SizedBox(height: SpacingTokens.md),
+                        Text(
+                          '暂无练习记录',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: SpacingTokens.xs),
+                        Text(
+                          '完成一次口算练习后即可查看记录',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: SpacingTokens.xs),
-                  Text(
-                    '完成一次口算练习后即可查看记录',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             )
-          : ListView.builder(
-              itemCount: sessions.length,
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              itemBuilder: (context, index) {
-                final session = sessions[index];
-                return Padding(
-                  padding:
-                      const EdgeInsets.only(bottom: SpacingTokens.sm),
-                  child: GestureDetector(
-                    onTap: () => context.push(
-                      AppRoutes.mathSessionDetail,
-                      extra: session,
-                    ),
-                    child: _SessionCard(session: session),
+          : CustomScrollView(
+              slivers: [
+                const SliverAppBar(
+                  floating: true,
+                  snap: true,
+                  title: Text('练习记录'),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  sliver: SliverList.builder(
+                    itemCount: sessions.length,
+                    itemBuilder: (context, index) {
+                      final session = sessions[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: SpacingTokens.sm,
+                        ),
+                        child: GestureDetector(
+                          onTap: () => context.push(
+                            AppRoutes.mathSessionDetail,
+                            extra: session,
+                          ),
+                          child: _SessionCard(session: session),
+                        ),
+                      )
+                          .animate()
+                          .fadeIn(
+                            delay: (80 * index).ms,
+                            duration: 300.ms,
+                          )
+                          .slideX(
+                            begin: 0.1,
+                            end: 0,
+                            delay: (80 * index).ms,
+                            duration: 300.ms,
+                          );
+                    },
                   ),
-                )
-                    .animate()
-                    .fadeIn(
-                      delay: (80 * index).ms,
-                      duration: 300.ms,
-                    )
-                    .slideX(
-                      begin: 0.1,
-                      end: 0,
-                      delay: (80 * index).ms,
-                      duration: 300.ms,
-                    );
-              },
+                ),
+              ],
             ),
     );
   }
@@ -131,9 +154,7 @@ class _SessionCard extends StatelessWidget {
 
     return ColoredCard(
       color: theme.colorScheme.primary,
-      child: Padding(
-        padding: const EdgeInsets.all(SpacingTokens.md),
-        child: Column(
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 标题行：年级 + 时间
@@ -241,7 +262,6 @@ class _SessionCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

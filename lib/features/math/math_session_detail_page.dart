@@ -47,18 +47,22 @@ class MathSessionDetailPage extends ConsumerWidget {
         dur >= 60 ? '${dur ~/ 60}分${dur % 60}秒' : '$dur秒';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${session.grade}年级$semesterLabel · $difficultyLabel'),
-      ),
-      body: Column(
-        children: [
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            snap: true,
+            title: Text(
+              '${session.grade}年级$semesterLabel · $difficultyLabel',
+            ),
+          ),
+
           // 概要卡片
-          Padding(
-            padding: const EdgeInsets.all(SpacingTokens.md),
-            child: ColoredCard(
-              color: theme.colorScheme.primary,
-              child: Padding(
-                padding: const EdgeInsets.all(SpacingTokens.md),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              child: ColoredCard(
+                color: theme.colorScheme.primary,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -90,12 +94,13 @@ class MathSessionDetailPage extends ConsumerWidget {
                   ],
                 ),
               ),
-            ),
-          ).animate().fadeIn(duration: 300.ms),
+            ).animate().fadeIn(duration: 300.ms),
+          ),
 
           // 题目列表
           if (records.isEmpty)
-            Expanded(
+            SliverFillRemaining(
+              hasScrollBody: false,
               child: Center(
                 child: Text(
                   '该练习无题目详情记录',
@@ -106,12 +111,12 @@ class MathSessionDetailPage extends ConsumerWidget {
               ),
             )
           else
-            Expanded(
-              child: ListView.builder(
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: SpacingTokens.md,
+              ),
+              sliver: SliverList.builder(
                 itemCount: records.length,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.md,
-                ),
                 itemBuilder: (context, index) {
                   final record = records[index];
                   return _ProblemRow(
@@ -230,12 +235,11 @@ class _ProblemRowState extends ConsumerState<_ProblemRow> {
           color: isCorrect
               ? ColorTokens.success
               : theme.colorScheme.error,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: SpacingTokens.md,
-              vertical: SpacingTokens.sm,
-            ),
-            child: Column(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.md,
+            vertical: SpacingTokens.sm,
+          ),
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 主行：序号 + 题目 + 答案
@@ -404,7 +408,6 @@ class _ProblemRowState extends ConsumerState<_ProblemRow> {
                 ],
               ],
             ),
-          ),
         ),
       ),
     );
