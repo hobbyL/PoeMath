@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 
@@ -110,7 +111,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
       body: SafeArea(
         child: Form(
           key: _formKey,
-          child: ListView(
+          child: AnimatedPageBody(
             padding: const EdgeInsets.all(SpacingTokens.lg),
             children: [
               // 名称

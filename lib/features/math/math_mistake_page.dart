@@ -3,6 +3,7 @@
 // 错题本页面：展示错题列表、支持重练和删除。
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -49,7 +50,22 @@ class MathMistakePage extends ConsumerWidget {
               padding: const EdgeInsets.all(SpacingTokens.md),
               itemBuilder: (context, index) {
                 final mistake = mistakes[index];
-                return _MistakeCard(mistake: mistake);
+                // 前 8 项有交错动画，之后立即显示
+                final delay = (60 * index).clamp(0, 480);
+                return _MistakeCard(mistake: mistake)
+                    .animate()
+                    .fadeIn(
+                      delay: delay.ms,
+                      duration: 350.ms,
+                      curve: Curves.easeOut,
+                    )
+                    .slideY(
+                      begin: 0.06,
+                      end: 0,
+                      delay: delay.ms,
+                      duration: 350.ms,
+                      curve: Curves.easeOutCubic,
+                    );
               },
             ),
     );

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -141,11 +142,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: AnimatedPageBody(
         padding: const EdgeInsets.all(SpacingTokens.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        children: [
             // 标题区
             Center(
               child: Column(
@@ -221,7 +220,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
             const SizedBox(height: SpacingTokens.xl),
           ],
         ),
-      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(SpacingTokens.md),

@@ -4,6 +4,7 @@
 // 职责：云端同步子页面 — 管理 WebDAV 配置，上传/下载备份数据。
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/routing/page_transitions.dart';
@@ -224,6 +225,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                       itemBuilder: (context, index) {
                         final config = configs[index];
                         final selected = _selectedId == config.id;
+                        final delay = (60 * index).clamp(0, 480);
 
                         return ColoredCard(
                           color: selected
@@ -296,7 +298,20 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                               ),
                             ],
                           ),
-                        );
+                        )
+                            .animate()
+                            .fadeIn(
+                              delay: delay.ms,
+                              duration: 350.ms,
+                              curve: Curves.easeOut,
+                            )
+                            .slideY(
+                              begin: 0.06,
+                              end: 0,
+                              delay: delay.ms,
+                              duration: 350.ms,
+                              curve: Curves.easeOutCubic,
+                            );
                       },
                     ),
                   ),
