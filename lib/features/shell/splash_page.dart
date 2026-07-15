@@ -77,7 +77,14 @@ class _SplashPageState extends ConsumerState<SplashPage> {
 
   void _goHome() {
     if (!mounted) return;
-    context.go(AppRoutes.home);
+    // 首次启动 → 引导页，否则直接进首页
+    final hasOnboarded =
+        ref.read(settingsRepositoryProvider).hasOnboarded;
+    if (hasOnboarded) {
+      context.go(AppRoutes.home);
+    } else {
+      context.go(AppRoutes.onboarding);
+    }
   }
 
   @override

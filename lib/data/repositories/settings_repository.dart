@@ -23,6 +23,7 @@ class SettingsRepository {
   static const String _keyWebDavConfigs = 'webdav_configs';
   static const String _keyMathBatchSize = 'math_batch_size';
   static const String _keyMathDifficulty = 'math_difficulty';
+  static const String _keyHasOnboarded = 'has_onboarded';
 
   // ============ 主题 ============
 
@@ -147,6 +148,18 @@ class SettingsRepository {
   }
 
   // ============ WebDAV 配置 ============
+
+  // ============ 新手引导 ============
+
+  /// 用户是否已完成新手引导。
+  bool get hasOnboarded =>
+      HiveBoxes.settings.get(_keyHasOnboarded, defaultValue: false) as bool;
+
+  Future<void> setHasOnboarded(bool value) async {
+    await HiveBoxes.settings.put(_keyHasOnboarded, value);
+  }
+
+  // ============ WebDAV 配置（移至底部） ============
 
   /// 所有 WebDAV 同步配置。
   List<WebDavConfig> get webDavConfigs {

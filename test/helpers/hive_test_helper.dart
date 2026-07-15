@@ -26,6 +26,9 @@ Future<void> setUpHiveForTesting() async {
     HiveKeys.metaDataVersion,
     AppConstants.dataVersion,
   );
+
+  // 标记已完成引导，跳过 Onboarding 页面
+  await HiveBoxes.settings.put('has_onboarded', true);
 }
 
 /// 在测试 tearDown 中调用。关闭 Hive 并清理临时目录。
