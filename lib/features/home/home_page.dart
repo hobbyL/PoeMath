@@ -46,23 +46,23 @@ class HomePage extends ConsumerWidget {
                   vertical: SpacingTokens.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: ColorTokens.poemGold.withValues(alpha: 0.15),
+                  color: theme.semantic.caution.withValues(alpha: 0.15),
                   borderRadius:
                       BorderRadius.circular(SpacingTokens.radiusPill),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.stars_rounded,
                       size: 16,
-                      color: ColorTokens.poemGold,
+                      color: theme.semantic.caution,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       stats.levelName,
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: ColorTokens.poemGold,
+                        color: theme.semantic.caution,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -287,7 +287,7 @@ class HomePage extends ConsumerWidget {
             icon: Icons.star_rounded,
             value: '${stats.totalStars}',
             label: '总星星',
-            color: ColorTokens.poemGold,
+            color: theme.semantic.caution,
           ),
         ),
       ],

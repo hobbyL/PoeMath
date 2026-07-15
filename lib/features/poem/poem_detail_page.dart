@@ -377,7 +377,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           Text(
             '名句',
             style: theme.textTheme.titleSmall?.copyWith(
-              color: ColorTokens.poemGold,
+              color: theme.semantic.caution,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -387,10 +387,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.format_quote,
                     size: 16,
-                    color: ColorTokens.poemGold,
+                    color: theme.semantic.caution,
                   ),
                   const SizedBox(width: SpacingTokens.xs),
                   Expanded(

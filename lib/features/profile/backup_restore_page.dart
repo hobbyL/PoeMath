@@ -73,12 +73,12 @@ class BackupRestorePage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.lg),
               // 提示信息
               ColoredCard(
-                color: ColorTokens.poemGold,
+                color: theme.semantic.caution,
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.info_outline_rounded,
-                      color: ColorTokens.poemGold,
+                      color: theme.semantic.caution,
                       size: 20,
                     ),
                     const SizedBox(width: SpacingTokens.sm),

@@ -62,23 +62,23 @@ class ProfilePage extends ConsumerWidget {
                       vertical: SpacingTokens.xs,
                     ),
                     decoration: BoxDecoration(
-                      color: ColorTokens.poemGold.withValues(alpha: 0.12),
+                      color: theme.semantic.caution.withValues(alpha: 0.12),
                       borderRadius:
                           BorderRadius.circular(SpacingTokens.radiusPill),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.stars_rounded,
                           size: 16,
-                          color: ColorTokens.poemGold,
+                          color: theme.semantic.caution,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '${stats.totalStars} 颗星星',
                           style: theme.textTheme.labelMedium?.copyWith(
-                            color: ColorTokens.poemGold,
+                            color: theme.semantic.caution,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -204,7 +204,7 @@ class ProfilePage extends ConsumerWidget {
                   context,
                   '${stats.mathBestStreak}',
                   '最佳连对',
-                  ColorTokens.poemGold,
+                  theme.semantic.caution,
                 ),
               ),
             ],
@@ -247,13 +247,13 @@ class ProfilePage extends ConsumerWidget {
     int unlockedCount,
   ) {
     return ColoredCard(
-      color: ColorTokens.poemGold,
+      color: theme.semantic.caution,
       child: Column(
         children: [
-          const Icon(
+          Icon(
             Icons.emoji_events_rounded,
             size: 32,
-            color: ColorTokens.poemGold,
+            color: theme.semantic.caution,
           ),
           const SizedBox(height: SpacingTokens.sm),
           Text(

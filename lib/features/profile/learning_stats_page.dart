@@ -360,7 +360,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
               barRods: [
                 BarChartRodData(
                   toY: stats[i].starsEarned.toDouble(),
-                  color: ColorTokens.poemGold,
+                  color: theme.semantic.caution,
                   width: _barWidth,
                   borderRadius: _barRadius,
                 ),
