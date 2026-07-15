@@ -314,8 +314,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
     if (!mounted) return;
 
-    // 成就解锁庆祝（在撒花之前短暂展示）
+    // 成就解锁庆祝（撒花 + 弹窗，在背诵完成撒花之前展示）
     if (newlyUnlocked.isNotEmpty) {
+      _celebrationCtrl.play();
       final names = newlyUnlocked.map((a) => a.title).join('、');
       showCelebration(
         context,

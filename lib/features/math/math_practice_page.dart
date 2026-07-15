@@ -362,6 +362,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     // 成就解锁庆祝
     if (newlyUnlocked.isNotEmpty) {
+      _confettiController.play();
       final names = newlyUnlocked.map((a) => a.title).join('、');
       showCelebration(
         context,

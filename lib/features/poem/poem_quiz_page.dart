@@ -189,6 +189,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     ref.invalidate(unlockedAchievementsCountProvider);
 
     if (mounted && newlyUnlocked.isNotEmpty) {
+      _confettiController.play();
       final names = newlyUnlocked.map((a) => a.title).join('、');
       showCelebration(
         context,
