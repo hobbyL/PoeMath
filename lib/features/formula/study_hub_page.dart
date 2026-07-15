@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/formula/providers/formula_providers.dart';
 
 class StudyHubPage extends ConsumerWidget {
@@ -129,16 +130,9 @@ class StudyHubPage extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(
                             SpacingTokens.radiusMedium,
                           ),
-                          child: Container(
-                            padding:
-                                const EdgeInsets.all(SpacingTokens.md),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary
-                                  .withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(
-                                SpacingTokens.radiusMedium,
-                              ),
-                            ),
+                          child: ColoredCard(
+                            color: theme.colorScheme.primary,
+                            backgroundOpacity: 0.06,
                             child: Row(
                               children: [
                                 CircleAvatar(

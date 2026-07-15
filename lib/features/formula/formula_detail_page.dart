@@ -217,13 +217,11 @@ class FormulaDetailPage extends ConsumerWidget {
   }
 
   Widget _buildSection(BuildContext context, {required Widget child}) {
-    return Container(
-      width: double.infinity,
+    return ColoredCard(
+      color: Theme.of(context).colorScheme.primary,
+      backgroundOpacity: 0.06,
       padding: const EdgeInsets.all(SpacingTokens.lg),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      ),
+      width: double.infinity,
       child: child,
     );
   }

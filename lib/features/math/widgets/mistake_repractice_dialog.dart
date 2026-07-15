@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 
 /// 错题重练对话框。
 ///
@@ -63,16 +64,12 @@ class _MistakeRepracticeDialogState extends State<MistakeRepracticeDialog> {
 
           // 判定结果
           if (_isCorrect != null) ...[
-            Container(
+            ColoredCard(
+              color: _isCorrect!
+                  ? theme.semantic.success
+                  : theme.colorScheme.error,
+              backgroundOpacity: 0.15,
               width: double.infinity,
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              decoration: BoxDecoration(
-                color: _isCorrect!
-                    ? theme.semantic.success.withValues(alpha: 0.15)
-                    : theme.colorScheme.error.withValues(alpha: 0.15),
-                borderRadius:
-                    BorderRadius.circular(SpacingTokens.radiusMedium),
-              ),
               child: Column(
                 children: [
                   Icon(

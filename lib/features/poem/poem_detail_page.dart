@@ -286,13 +286,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   }
 
   Widget _buildSection(BuildContext context, {required Widget child}) {
-    return Container(
+    return ColoredCard(
+      color: Theme.of(context).colorScheme.primary,
+      backgroundOpacity: 0.06,
       width: double.infinity,
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      ),
       child: child,
     );
   }

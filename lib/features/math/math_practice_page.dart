@@ -13,6 +13,7 @@ import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -599,14 +600,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           label: Text(_showSteps ? '收起解题步骤' : '查看解题步骤'),
         ),
         if (_showSteps)
-          Container(
+          ColoredCard(
+            color: theme.colorScheme.primary,
             width: double.infinity,
-            padding: const EdgeInsets.all(SpacingTokens.md),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.08),
-              borderRadius:
-                  BorderRadius.circular(SpacingTokens.radiusMedium),
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

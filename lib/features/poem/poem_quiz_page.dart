@@ -513,15 +513,10 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     ThemeData theme,
   ) {
     final isCorrect = session.isCurrentCorrect();
-    return Container(
+    return ColoredCard(
+      color: isCorrect ? theme.semantic.success : theme.colorScheme.error,
+      backgroundOpacity: 0.1,
       width: double.infinity,
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      decoration: BoxDecoration(
-        color: isCorrect
-            ? theme.semantic.success.withValues(alpha: 0.1)
-            : theme.colorScheme.error.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      ),
       child: Row(
         children: [
           Icon(
