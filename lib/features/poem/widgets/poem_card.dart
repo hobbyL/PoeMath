@@ -73,15 +73,31 @@ class PoemCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.ideographic,
               children: [
-                if (isFavorite) ...[
-                  Icon(Icons.favorite, color: secondary, size: 16),
-                  const SizedBox(width: SpacingTokens.xs),
-                ],
                 Flexible(
-                  child: Text(
-                    poem.title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        if (isFavorite)
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                right: SpacingTokens.xs,
+                              ),
+                              child: Icon(
+                                Icons.favorite,
+                                color: secondary,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        TextSpan(
+                          text: poem.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
