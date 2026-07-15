@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:poemath/app.dart';
+import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/data/hive/hive_registrar.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 
@@ -25,6 +26,9 @@ Future<void> main() async {
   // 3. 打开所有 Box
   await HiveBoxes.init();
 
-  // 4. 启动 App
+  // 4. 初始化通知服务
+  await NotificationService.instance.initialize();
+
+  // 5. 启动 App
   runApp(const ProviderScope(child: App()));
 }
