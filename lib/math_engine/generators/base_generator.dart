@@ -100,6 +100,8 @@ abstract class BaseGenerator {
     final op = problem.operators.first;
     // 竖式只支持加减乘
     if (op == Operator.divide) return problem;
+    // 负数操作数不适合竖式（"- -20" 视觉混乱），回退横式
+    if (problem.operands.any((o) => o.isNegative)) return problem;
     return MathProblem(
       operands: problem.operands,
       operators: problem.operators,
