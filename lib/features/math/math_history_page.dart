@@ -24,89 +24,109 @@ class MathHistoryPage extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: sessions.isEmpty
-          ? CustomScrollView(
-              slivers: [
-                const SliverAppBar(
-                  floating: true,
-                  snap: true,
-                  title: Text('练习记录'),
-                ),
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.history_outlined,
-                          size: 64,
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: SpacingTokens.md),
-                        Text(
-                          '暂无练习记录',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: SpacingTokens.xs),
-                        Text(
-                          '完成一次口算练习后即可查看记录',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = _responsiveColumns(constraints.maxWidth);
+
+          return sessions.isEmpty
+              ? CustomScrollView(
+                  slivers: [
+                    const SliverAppBar(
+                      floating: true,
+                      snap: true,
+                      title: Text('练习记录'),
                     ),
-                  ),
-                ),
-              ],
-            )
-          : CustomScrollView(
-              slivers: [
-                const SliverAppBar(
-                  floating: true,
-                  snap: true,
-                  title: Text('练习记录'),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.all(SpacingTokens.md),
-                  sliver: SliverList.builder(
-                    itemCount: sessions.length,
-                    itemBuilder: (context, index) {
-                      final session = sessions[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: SpacingTokens.sm,
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.history_outlined,
+                              size: 64,
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.3),
+                            ),
+                            const SizedBox(height: SpacingTokens.md),
+                            Text(
+                              '暂无练习记录',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: SpacingTokens.xs),
+                            Text(
+                              '完成一次口算练习后即可查看记录',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ],
                         ),
-                        child: GestureDetector(
-                          onTap: () => context.push(
-                            AppRoutes.mathSessionDetail,
-                            extra: session,
-                          ),
-                          child: _SessionCard(session: session),
+                      ),
+                    ),
+                  ],
+                )
+              : CustomScrollView(
+                  slivers: [
+                    const SliverAppBar(
+                      floating: true,
+                      snap: true,
+                      title: Text('练习记录'),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SpacingTokens.md,
+                        vertical: SpacingTokens.sm,
+                      ),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          crossAxisSpacing: SpacingTokens.sm,
+                          mainAxisSpacing: SpacingTokens.sm,
+                          mainAxisExtent: 120,
                         ),
-                      )
-                          .animate()
-                          .fadeIn(
-                            delay: (80 * index).ms,
-                            duration: 300.ms,
-                          )
-                          .slideX(
-                            begin: 0.1,
-                            end: 0,
-                            delay: (80 * index).ms,
-                            duration: 300.ms,
-                          );
-                    },
-                  ),
-                ),
-              ],
-            ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final session = sessions[index];
+                            return GestureDetector(
+                              onTap: () => context.push(
+                                AppRoutes.mathSessionDetail,
+                                extra: session,
+                              ),
+                              child: _SessionCard(session: session),
+                            )
+                                .animate()
+                                .fadeIn(
+                                  delay: (80 * index).ms,
+                                  duration: 300.ms,
+                                )
+                                .slideX(
+                                  begin: 0.1,
+                                  end: 0,
+                                  delay: (80 * index).ms,
+                                  duration: 300.ms,
+                                );
+                          },
+                          childCount: sessions.length,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+        },
+      ),
     );
+  }
+
+  /// 根据可用宽度计算列数。
+  static int _responsiveColumns(double width) {
+    if (width >= 900) return 3;
+    if (width >= 600) return 2;
+    return 1;
   }
 }
 
