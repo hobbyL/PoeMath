@@ -2,6 +2,10 @@
 
 part of 'poem_favorite.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class PoemFavoriteAdapter extends TypeAdapter<PoemFavorite> {
   @override
   final int typeId = 6;
@@ -15,7 +19,7 @@ class PoemFavoriteAdapter extends TypeAdapter<PoemFavorite> {
     return PoemFavorite(
       poemId: fields[0] as String,
       profileId: fields[1] as String,
-      createdAt: fields[2] as DateTime,
+      createdAt: fields[2] as DateTime?,
     );
   }
 

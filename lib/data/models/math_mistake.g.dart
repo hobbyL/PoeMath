@@ -2,6 +2,10 @@
 
 part of 'math_mistake.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class MathMistakeAdapter extends TypeAdapter<MathMistake> {
   @override
   final int typeId = 8;
@@ -22,7 +26,7 @@ class MathMistakeAdapter extends TypeAdapter<MathMistake> {
       grade: fields[6] as int,
       errorType: fields[7] as String?,
       solutionStepsJson: fields[8] as String?,
-      createdAt: fields[9] as DateTime,
+      createdAt: fields[9] as DateTime?,
       isResolved: fields[10] as bool,
       retryCount: fields[11] as int,
     );

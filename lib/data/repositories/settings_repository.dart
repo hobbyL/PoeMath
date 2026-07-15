@@ -20,6 +20,8 @@ class SettingsRepository {
   static const String _keyDailyPoemGoal = 'daily_poem_goal';
   static const String _keyDailyMathGoal = 'daily_math_goal';
   static const String _keyWebDavConfigs = 'webdav_configs';
+  static const String _keyMathBatchSize = 'math_batch_size';
+  static const String _keyMathDifficulty = 'math_difficulty';
 
   // ============ 主题 ============
 
@@ -114,6 +116,25 @@ class SettingsRepository {
 
   Future<void> setDailyMathGoal(int count) async {
     await HiveBoxes.settings.put(_keyDailyMathGoal, count);
+  }
+
+  // ============ 口算练习设置 ============
+
+  /// 每组题目数量（默认 10 题）
+  int get mathBatchSize =>
+      HiveBoxes.settings.get(_keyMathBatchSize, defaultValue: 10) as int;
+
+  Future<void> setMathBatchSize(int count) async {
+    await HiveBoxes.settings.put(_keyMathBatchSize, count);
+  }
+
+  /// 口算难度（默认 'medium'）
+  String get mathDifficulty =>
+      HiveBoxes.settings.get(_keyMathDifficulty, defaultValue: 'medium')
+          as String;
+
+  Future<void> setMathDifficulty(String difficulty) async {
+    await HiveBoxes.settings.put(_keyMathDifficulty, difficulty);
   }
 
   // ============ WebDAV 配置 ============

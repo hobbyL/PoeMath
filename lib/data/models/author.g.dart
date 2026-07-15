@@ -2,6 +2,10 @@
 
 part of 'author.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class AuthorAdapter extends TypeAdapter<Author> {
   @override
   final int typeId = 1;

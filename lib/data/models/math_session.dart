@@ -47,6 +47,14 @@ class MathSession extends HiveObject {
   @HiveField(9)
   DateTime? finishedAt;
 
+  /// 学期（'上' 或 '下'）
+  @HiveField(10)
+  String? semester;
+
+  /// 难度（'easy' / 'medium' / 'hard'）
+  @HiveField(11)
+  String? difficulty;
+
   MathSession({
     required this.id,
     required this.profileId,
@@ -58,6 +66,8 @@ class MathSession extends HiveObject {
     this.starsEarned = 0,
     DateTime? startedAt,
     this.finishedAt,
+    this.semester,
+    this.difficulty,
   }) : startedAt = startedAt ?? DateTime.now();
 
   double get accuracy =>

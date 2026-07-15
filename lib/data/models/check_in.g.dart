@@ -2,6 +2,10 @@
 
 part of 'check_in.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class CheckInAdapter extends TypeAdapter<CheckIn> {
   @override
   final int typeId = 12;

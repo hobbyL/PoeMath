@@ -2,6 +2,10 @@
 
 part of 'poem_annotation.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class PoemAnnotationAdapter extends TypeAdapter<PoemAnnotation> {
   @override
   final int typeId = 3;

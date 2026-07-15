@@ -2,6 +2,10 @@
 
 part of 'user_stats.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class UserStatsAdapter extends TypeAdapter<UserStats> {
   @override
   final int typeId = 13;
@@ -22,8 +26,8 @@ class UserStatsAdapter extends TypeAdapter<UserStats> {
       mathTotalProblems: fields[6] as int,
       mathTotalCorrect: fields[7] as int,
       level: fields[8] as int,
-      createdAt: fields[9] as DateTime,
-      mathBestStreak: (fields[10] as int?) ?? 0,
+      mathBestStreak: fields[10] as int,
+      createdAt: fields[9] as DateTime?,
     );
   }
 

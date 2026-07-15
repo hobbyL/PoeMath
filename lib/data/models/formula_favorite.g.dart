@@ -2,6 +2,10 @@
 
 part of 'formula_favorite.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class FormulaFavoriteAdapter extends TypeAdapter<FormulaFavorite> {
   @override
   final int typeId = 10;
@@ -15,7 +19,7 @@ class FormulaFavoriteAdapter extends TypeAdapter<FormulaFavorite> {
     return FormulaFavorite(
       formulaId: fields[0] as String,
       profileId: fields[1] as String,
-      createdAt: fields[2] as DateTime,
+      createdAt: fields[2] as DateTime?,
     );
   }
 

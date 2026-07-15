@@ -2,6 +2,10 @@
 
 part of 'formula_param.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class FormulaParamAdapter extends TypeAdapter<FormulaParam> {
   @override
   final int typeId = 4;

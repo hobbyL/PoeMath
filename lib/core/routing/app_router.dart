@@ -16,6 +16,7 @@ import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
+import 'package:poemath/features/math/math_history_page.dart';
 import 'package:poemath/features/math/math_mistake_page.dart';
 import 'package:poemath/features/math/math_practice_page.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
@@ -115,6 +116,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const MathMistakePage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathHistory,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const MathHistoryPage(),
         ),
       ),
       // ============ 公式详情（非 Shell 子路由，全屏） ============

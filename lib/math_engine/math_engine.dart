@@ -6,6 +6,7 @@
 import 'dart:math';
 
 import 'models/answer_judgement.dart';
+import 'models/difficulty_level.dart';
 import 'models/grade_config.dart';
 import 'models/math_problem.dart';
 import 'models/number_value.dart';
@@ -25,6 +26,7 @@ import 'generators/negative_number_gen.dart';
 import 'diagnostics/mistake_rule.dart';
 import 'step_solver/step_solver.dart';
 import 'presets/grade_presets.dart';
+import 'presets/difficulty_adjuster.dart';
 import 'validators/constraint_checker.dart';
 
 /// 口算引擎：生成 → 判定 → 诊断 → 解释。
@@ -35,14 +37,19 @@ class MathEngine {
   ///
   /// [grade] 年级（1-6），[semester] 学期（'上' 或 '下'）。
   /// [mode] 可选的题目模式，默认随机。
+  /// [difficulty] 可选的难度级别，默认使用年级原始配置。
   /// [random] 可选的随机数生成器（用于测试）。
   static MathProblem generate({
     required int grade,
     required String semester,
     ProblemMode? mode,
+    DifficultyLevel? difficulty,
     Random? random,
   }) {
-    final config = GradePresets.get(grade, semester);
+    var config = GradePresets.get(grade, semester);
+    if (difficulty != null) {
+      config = DifficultyAdjuster.adjust(config, difficulty);
+    }
     final generator = _selectGenerator(config, random: random);
 
     // 约束检查，不通过则重新生成（最多 100 次）
@@ -97,6 +104,7 @@ class MathEngine {
     required String semester,
     int count = 10,
     ProblemMode? mode,
+    DifficultyLevel? difficulty,
     Random? random,
   }) {
     return List.generate(
@@ -105,6 +113,7 @@ class MathEngine {
         grade: grade,
         semester: semester,
         mode: mode,
+        difficulty: difficulty,
         random: random,
       ),
     );

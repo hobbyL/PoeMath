@@ -2,6 +2,10 @@
 
 part of 'review_schedule.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class ReviewScheduleAdapter extends TypeAdapter<ReviewSchedule> {
   @override
   final int typeId = 7;

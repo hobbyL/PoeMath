@@ -2,41 +2,9 @@
 
 part of 'poem_progress.dart';
 
-class LearningStatusAdapter extends TypeAdapter<LearningStatus> {
-  @override
-  final int typeId = 20;
-
-  @override
-  LearningStatus read(BinaryReader reader) {
-    switch (reader.readByte()) {
-      case 0:
-        return LearningStatus.notStarted;
-      case 1:
-        return LearningStatus.learning;
-      case 2:
-        return LearningStatus.reviewing;
-      case 3:
-        return LearningStatus.mastered;
-      default:
-        return LearningStatus.notStarted;
-    }
-  }
-
-  @override
-  void write(BinaryWriter writer, LearningStatus obj) {
-    writer.writeByte(obj.index);
-  }
-
-  @override
-  int get hashCode => typeId.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is LearningStatusAdapter &&
-          runtimeType == other.runtimeType &&
-          typeId == other.typeId;
-}
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
 
 class PoemProgressAdapter extends TypeAdapter<PoemProgress> {
   @override
@@ -89,6 +57,55 @@ class PoemProgressAdapter extends TypeAdapter<PoemProgress> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is PoemProgressAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class LearningStatusAdapter extends TypeAdapter<LearningStatus> {
+  @override
+  final int typeId = 20;
+
+  @override
+  LearningStatus read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return LearningStatus.notStarted;
+      case 1:
+        return LearningStatus.learning;
+      case 2:
+        return LearningStatus.reviewing;
+      case 3:
+        return LearningStatus.mastered;
+      default:
+        return LearningStatus.notStarted;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, LearningStatus obj) {
+    switch (obj) {
+      case LearningStatus.notStarted:
+        writer.writeByte(0);
+        break;
+      case LearningStatus.learning:
+        writer.writeByte(1);
+        break;
+      case LearningStatus.reviewing:
+        writer.writeByte(2);
+        break;
+      case LearningStatus.mastered:
+        writer.writeByte(3);
+        break;
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LearningStatusAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

@@ -2,6 +2,10 @@
 
 part of 'achievement.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class AchievementAdapter extends TypeAdapter<Achievement> {
   @override
   final int typeId = 11;

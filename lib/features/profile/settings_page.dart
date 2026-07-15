@@ -174,6 +174,16 @@ class SettingsPage extends ConsumerWidget {
 
             // 每日目标设置
             _buildDailyGoalSettings(context, ref),
+            const SizedBox(height: SpacingTokens.sm),
+
+            // 练习设置
+            AppTile(
+              icon: Icons.tune_outlined,
+              iconColor: theme.colorScheme.secondary,
+              title: '练习设置',
+              subtitle: '每组 ${settingsRepo.mathBatchSize} 题',
+              onTap: () => _showBatchSizePicker(context, ref),
+            ),
             const SizedBox(height: SpacingTokens.md),
 
             // 备份与恢复
@@ -370,6 +380,62 @@ class SettingsPage extends ConsumerWidget {
         context,
         fadeSlideRoute(builder: (_) => const DailyGoalPage()),
       ),
+    );
+  }
+
+  void _showBatchSizePicker(BuildContext context, WidgetRef ref) {
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    final current = settingsRepo.mathBatchSize;
+    const options = [5, 10, 15, 20, 30];
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '每组题目数量',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<int>(
+                      groupValue: current,
+                      onChanged: (v) async {
+                        if (v == null) return;
+                        await settingsRepo.setMathBatchSize(v);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        ref.invalidate(settingsRepositoryProvider);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: options.map((n) {
+                          return RadioListTile<int>(
+                            title: Text('$n 题'),
+                            value: n,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -22,6 +22,7 @@ class MathTabPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedGrade = ref.watch(mathGradeProvider);
     final selectedSemester = ref.watch(mathSemesterProvider);
+    final selectedDifficulty = ref.watch(mathDifficultyProvider);
     final totalProblems = ref.watch(totalProblemsCountProvider);
     final accuracy = ref.watch(overallAccuracyProvider);
     final mistakeCount = ref.watch(mistakeCountProvider);
@@ -39,6 +40,11 @@ class MathTabPage extends ConsumerWidget {
               )
             : null,
         actions: [
+          IconButton(
+            onPressed: () => context.push(AppRoutes.mathHistory),
+            icon: const Icon(Icons.history_outlined),
+            tooltip: '练习记录',
+          ),
           TextButton.icon(
             onPressed: () =>
                 _showSemesterPicker(context, ref, selectedSemester),
@@ -127,6 +133,9 @@ class MathTabPage extends ConsumerWidget {
           // 练习模式选择（比大小 / 竖式）
           _buildModeSelector(context, ref),
 
+          // 难度选择
+          _buildDifficultySelector(context, ref),
+
           // 开始练习按钮
           SafeArea(
             child: Padding(
@@ -137,7 +146,7 @@ class MathTabPage extends ConsumerWidget {
                   onPressed: () => context.push(AppRoutes.mathPractice),
                   icon: const Icon(Icons.play_arrow_rounded),
                   label: Text(
-                    '开始练习 · ${GradePresets.get(selectedGrade, selectedSemester).label}',
+                    '开始练习 · ${GradePresets.get(selectedGrade, selectedSemester).label} · ${selectedDifficulty.label}',
                   ),
                 ),
               ),
@@ -237,6 +246,50 @@ class MathTabPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildDifficultySelector(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final selected = ref.watch(mathDifficultyProvider);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
+      child: Row(
+        children: [
+          Text(
+            '难度',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: SpacingTokens.sm),
+          Expanded(
+            child: Wrap(
+              spacing: SpacingTokens.xs,
+              children: DifficultyLevel.values.map((d) {
+                return ChoiceChip(
+                  avatar: Icon(_difficultyIcon(d), size: 16),
+                  label: Text(d.label),
+                  selected: selected == d,
+                  onSelected: (_) {
+                    ref.read(mathDifficultyProvider.notifier).state = d;
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _difficultyIcon(DifficultyLevel d) {
+    return switch (d) {
+      DifficultyLevel.easy => Icons.sentiment_satisfied_outlined,
+      DifficultyLevel.medium => Icons.sentiment_neutral_outlined,
+      DifficultyLevel.hard => Icons.local_fire_department_outlined,
+    };
   }
 
   void _showSemesterPicker(

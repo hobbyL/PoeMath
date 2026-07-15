@@ -2,6 +2,10 @@
 
 part of 'poem.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class PoemAdapter extends TypeAdapter<Poem> {
   @override
   final int typeId = 0;

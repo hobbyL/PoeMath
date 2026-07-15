@@ -28,8 +28,15 @@ final mathGradeProvider = StateProvider<int>((ref) => 1);
 /// 当前选中学期
 final mathSemesterProvider = StateProvider<String>((ref) => '上');
 
-/// 每组题目数量
-final mathBatchSizeProvider = StateProvider<int>((ref) => 10);
+/// 每组题目数量（从设置中读取）
+final mathBatchSizeProvider = StateProvider<int>((ref) {
+  // 启动时由 math_tab_page 从 settings 同步
+  return 10;
+});
+
+/// 难度级别
+final mathDifficultyProvider =
+    StateProvider<DifficultyLevel>((ref) => DifficultyLevel.medium);
 
 /// 练习模式（null = 综合随机，compare = 比大小，vertical = 竖式）
 final mathPracticeModeProvider = StateProvider<ProblemMode?>((ref) => null);

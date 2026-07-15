@@ -72,14 +72,17 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   void _generateProblems() {
     final grade = ref.read(mathGradeProvider);
     final semester = ref.read(mathSemesterProvider);
-    final batchSize = ref.read(mathBatchSizeProvider);
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    final batchSize = settingsRepo.mathBatchSize;
     final practiceMode = ref.read(mathPracticeModeProvider);
+    final difficulty = ref.read(mathDifficultyProvider);
 
     final problems = MathEngine.generateBatch(
       grade: grade,
       semester: semester,
       count: batchSize,
       mode: practiceMode,
+      difficulty: difficulty,
     );
 
     ref.read(mathProblemsProvider.notifier).state = problems;
@@ -116,6 +119,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       durationSeconds: duration,
       starsEarned: 0,
       finishedAt: DateTime.now(),
+      semester: ref.read(mathSemesterProvider),
+      difficulty: ref.read(mathDifficultyProvider).name,
     );
     HiveBoxes.mathSessions.put(ProfileScope.key(_sessionId), session);
 
@@ -289,6 +294,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       durationSeconds: duration,
       starsEarned: stars,
       finishedAt: DateTime.now(),
+      semester: ref.read(mathSemesterProvider),
+      difficulty: ref.read(mathDifficultyProvider).name,
     );
 
     final repo = ref.read(mathSessionRepoProvider);

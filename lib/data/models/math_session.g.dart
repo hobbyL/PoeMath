@@ -2,6 +2,10 @@
 
 part of 'math_session.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class MathSessionAdapter extends TypeAdapter<MathSession> {
   @override
   final int typeId = 9;
@@ -21,15 +25,17 @@ class MathSessionAdapter extends TypeAdapter<MathSession> {
       correctCount: fields[5] as int,
       durationSeconds: fields[6] as int,
       starsEarned: fields[7] as int,
-      startedAt: fields[8] as DateTime,
+      startedAt: fields[8] as DateTime?,
       finishedAt: fields[9] as DateTime?,
+      semester: fields[10] as String?,
+      difficulty: fields[11] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, MathSession obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -49,7 +55,11 @@ class MathSessionAdapter extends TypeAdapter<MathSession> {
       ..writeByte(8)
       ..write(obj.startedAt)
       ..writeByte(9)
-      ..write(obj.finishedAt);
+      ..write(obj.finishedAt)
+      ..writeByte(10)
+      ..write(obj.semester)
+      ..writeByte(11)
+      ..write(obj.difficulty);
   }
 
   @override
