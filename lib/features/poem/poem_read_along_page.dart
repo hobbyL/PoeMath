@@ -758,7 +758,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                   filled ? Icons.star_rounded : Icons.star_outline_rounded,
                   size: 48,
                   color: filled
-                      ? const Color(0xFFFFC107)
+                      ? theme.semantic.caution
                       : theme.colorScheme.onSurfaceVariant
                           .withValues(alpha: 0.3),
                 ),
