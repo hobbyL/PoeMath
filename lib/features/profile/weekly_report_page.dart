@@ -430,43 +430,79 @@ class WeeklyReportPage extends ConsumerWidget {
     _WeekAggregate lw,
   ) {
     final theme = Theme.of(context);
-    final messages = <String>[];
+    final items = <({String text, IconData icon, Color color})>[];
 
     // 与上周对比
     final poemDiff = tw.poems - lw.poems;
     final mathDiff = tw.math - lw.math;
 
     if (poemDiff > 0) {
-      messages.add('比上周多学了 $poemDiff 首诗词 📚');
+      items.add((
+        text: '比上周多学了 $poemDiff 首诗词',
+        icon: Icons.menu_book_rounded,
+        color: theme.colorScheme.primary,
+      ),);
     }
     if (mathDiff > 0) {
-      messages.add('比上周多做了 $mathDiff 道口算 🔢');
+      items.add((
+        text: '比上周多做了 $mathDiff 道口算',
+        icon: Icons.calculate_rounded,
+        color: theme.colorScheme.secondary,
+      ),);
     }
 
     // 活跃天数
     if (tw.activeDays >= 7) {
-      messages.add('连续 7 天坚持学习，太棒了！🌟');
+      items.add((
+        text: '连续 7 天坚持学习，太棒了！',
+        icon: Icons.star_rounded,
+        color: theme.semantic.caution,
+      ),);
     } else if (tw.activeDays >= 5) {
-      messages.add('本周学习了 ${tw.activeDays} 天，非常勤奋！💪');
+      items.add((
+        text: '本周学习了 ${tw.activeDays} 天，非常勤奋！',
+        icon: Icons.local_fire_department_rounded,
+        color: theme.colorScheme.error,
+      ),);
     } else if (tw.activeDays >= 3) {
-      messages.add('本周学习了 ${tw.activeDays} 天，继续加油 🎯');
+      items.add((
+        text: '本周学习了 ${tw.activeDays} 天，继续加油',
+        icon: Icons.flag_rounded,
+        color: theme.colorScheme.tertiary,
+      ),);
     }
 
     // 正确率
     if (tw.accuracy >= 95 && tw.math > 0) {
-      messages.add('口算正确率 ${tw.accuracy}%，准确率超高！✨');
+      items.add((
+        text: '口算正确率 ${tw.accuracy}%，准确率超高！',
+        icon: Icons.auto_awesome_rounded,
+        color: theme.semantic.caution,
+      ),);
     } else if (tw.accuracy >= 80 && tw.math > 0) {
-      messages.add('口算正确率 ${tw.accuracy}%，继续保持 👍');
+      items.add((
+        text: '口算正确率 ${tw.accuracy}%，继续保持',
+        icon: Icons.thumb_up_rounded,
+        color: theme.semantic.success,
+      ),);
     }
 
     // 没有数据
     if (tw.poems == 0 && tw.math == 0) {
-      messages.add('本周还没有学习记录，快来开始吧！📖');
+      items.add((
+        text: '本周还没有学习记录，快来开始吧！',
+        icon: Icons.book_outlined,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),);
     }
 
     // 默认鼓励
-    if (messages.isEmpty) {
-      messages.add('每天进步一点点，坚持就是胜利！🎉');
+    if (items.isEmpty) {
+      items.add((
+        text: '每天进步一点点，坚持就是胜利！',
+        icon: Icons.celebration_rounded,
+        color: theme.colorScheme.primary,
+      ),);
     }
 
     return ColoredCard(
@@ -491,12 +527,22 @@ class WeeklyReportPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: SpacingTokens.sm),
-          ...messages.map(
-            (msg) => Padding(
+          ...items.map(
+            (item) => Padding(
               padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-              child: Text(
-                msg,
-                style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+              child: Row(
+                children: [
+                  Icon(item.icon, size: 18, color: item.color),
+                  const SizedBox(width: SpacingTokens.sm),
+                  Expanded(
+                    child: Text(
+                      item.text,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        height: 1.6,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
