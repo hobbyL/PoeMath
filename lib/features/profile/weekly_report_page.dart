@@ -140,10 +140,10 @@ class WeeklyReportPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: SpacingTokens.md),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatItem(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final items = [
+                _buildStatItem(
                   theme,
                   Icons.menu_book_rounded,
                   '${tw.poems}',
@@ -151,9 +151,7 @@ class WeeklyReportPage extends ConsumerWidget {
                   theme.colorScheme.primary,
                   _diff(tw.poems, lw.poems),
                 ),
-              ),
-              Expanded(
-                child: _buildStatItem(
+                _buildStatItem(
                   theme,
                   Icons.calculate_rounded,
                   '${tw.math}',
@@ -161,9 +159,7 @@ class WeeklyReportPage extends ConsumerWidget {
                   theme.colorScheme.secondary,
                   _diff(tw.math, lw.math),
                 ),
-              ),
-              Expanded(
-                child: _buildStatItem(
+                _buildStatItem(
                   theme,
                   Icons.check_circle_outline,
                   '${tw.accuracy}%',
@@ -171,14 +167,7 @@ class WeeklyReportPage extends ConsumerWidget {
                   theme.semantic.success,
                   _diff(tw.accuracy, lw.accuracy),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatItem(
+                _buildStatItem(
                   theme,
                   Icons.star_rounded,
                   '${tw.stars}',
@@ -186,9 +175,7 @@ class WeeklyReportPage extends ConsumerWidget {
                   theme.semantic.caution,
                   _diff(tw.stars, lw.stars),
                 ),
-              ),
-              Expanded(
-                child: _buildStatItem(
+                _buildStatItem(
                   theme,
                   Icons.timer_outlined,
                   '${tw.minutes}',
@@ -196,9 +183,7 @@ class WeeklyReportPage extends ConsumerWidget {
                   theme.colorScheme.tertiary,
                   _diff(tw.minutes, lw.minutes),
                 ),
-              ),
-              Expanded(
-                child: _buildStatItem(
+                _buildStatItem(
                   theme,
                   Icons.calendar_today,
                   '${tw.activeDays}',
@@ -206,8 +191,35 @@ class WeeklyReportPage extends ConsumerWidget {
                   theme.colorScheme.primary,
                   _diff(tw.activeDays, lw.activeDays),
                 ),
-              ),
-            ],
+              ];
+
+              // 宽屏（≥480）一行 6 个，窄屏两行各 3 个
+              if (constraints.maxWidth >= 480) {
+                return Row(
+                  children: items
+                      .map((item) => Expanded(child: item))
+                      .toList(),
+                );
+              }
+
+              return Column(
+                children: [
+                  Row(
+                    children: items
+                        .sublist(0, 3)
+                        .map((item) => Expanded(child: item))
+                        .toList(),
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  Row(
+                    children: items
+                        .sublist(3)
+                        .map((item) => Expanded(child: item))
+                        .toList(),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

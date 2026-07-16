@@ -228,7 +228,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                     context.push(AppRoutes.poemReciteOf(widget.poemId));
                   },
                   icon: const Icon(Icons.record_voice_over),
-                  label: const Text('开始背诵'),
+                  label: const Text('背诵'),
                 ),
               ),
               const SizedBox(width: SpacingTokens.sm),
