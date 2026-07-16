@@ -207,26 +207,29 @@ class MathTabPage extends ConsumerWidget {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(SpacingTokens.md),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () =>
-                          context.push(AppRoutes.mathPractice),
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: Text(
-                        '开始练习 · ${GradePresets.get(selectedGrade, selectedSemester).label}',
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () =>
+                            context.push(AppRoutes.mathPractice),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: Text(
+                          '开始练习 · ${GradePresets.get(selectedGrade, selectedSemester).label}',
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: SpacingTokens.sm),
-                  FilledButton.tonalIcon(
-                    onPressed: () =>
-                        context.push(AppRoutes.mathChallenge),
-                    icon: const Icon(Icons.timer_rounded),
-                    label: const Text('挑战'),
-                  ),
-                ],
+                    const SizedBox(width: SpacingTokens.sm),
+                    FilledButton.tonalIcon(
+                      onPressed: () =>
+                          context.push(AppRoutes.mathChallenge),
+                      icon: const Icon(Icons.timer_rounded),
+                      label: const Text('挑战'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
