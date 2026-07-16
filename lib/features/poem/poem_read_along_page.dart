@@ -71,6 +71,9 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     _initSpeech();
   }
 
+  /// 语音识别初始化失败的原因描述。
+  String _speechUnavailableReason = '';
+
   Future<void> _initSpeech() async {
     try {
       _speechAvailable = await _speech.initialize(
@@ -90,8 +93,12 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
           }
         },
       );
+      if (!_speechAvailable) {
+        _speechUnavailableReason = '设备未安装语音识别服务';
+      }
     } catch (e) {
       debugPrint('语音识别初始化失败: $e');
+      _speechUnavailableReason = '语音识别初始化失败：$e';
     }
     if (mounted) setState(() {});
   }
@@ -138,12 +145,12 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
   Future<void> _startRecording() async {
     if (!_speechAvailable) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('语音识别不可用，请检查权限设置')),
-        );
+      // 尝试重新初始化（用户可能刚授权权限）
+      await _initSpeech();
+      if (!_speechAvailable && mounted) {
+        _showSpeechUnavailableDialog();
       }
-      return;
+      if (!_speechAvailable) return;
     }
 
     // 停止 TTS
@@ -162,6 +169,66 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         cancelOnError: true,
         listenFor: const Duration(seconds: 15),
         pauseFor: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showSpeechUnavailableDialog() {
+    final theme = Theme.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.mic_off_rounded,
+              color: theme.colorScheme.error,
+              size: 24,
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            const Text('语音识别不可用'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _speechUnavailableReason,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.md),
+            Text(
+              '请尝试以下操作：',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            Text(
+              '1. 确认已授予麦克风权限\n'
+              '2. 安装或更新「Google」应用\n'
+              '3. 在系统设置 → 语言与输入法 → 语音输入中，'
+              '启用 Google 语音识别\n'
+              '4. 重启应用后重试',
+              style: theme.textTheme.bodySmall?.copyWith(
+                height: 1.6,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('知道了'),
+          ),
+        ],
       ),
     );
   }
@@ -668,7 +735,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
             const SizedBox(width: SpacingTokens.sm),
             Expanded(
               child: FilledButton.icon(
-                onPressed: _speechAvailable ? _startRecording : null,
+                onPressed: _startRecording,
                 icon: const Icon(Icons.mic),
                 label: const Text('读一读'),
               ),
