@@ -20,6 +20,7 @@ import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/data/models/challenge_record.dart';
 
 /// 备份数据版本号，用于兼容性检查。
 const int _backupVersion = 1;
@@ -39,6 +40,7 @@ class BackupService {
       'achievements': _exportAchievements(),
       'checkIns': _exportCheckIns(),
       'userStats': _exportUserStats(),
+      'challengeRecords': _exportChallengeRecords(),
       'settings': _exportSettings(),
     };
     return const JsonEncoder.withIndent('  ').convert(data);
@@ -103,6 +105,9 @@ class BackupService {
     );
     count += await _restoreUserStats(
       data['userStats'] as List<dynamic>? ?? [],
+    );
+    count += await _restoreChallengeRecords(
+      data['challengeRecords'] as List<dynamic>? ?? [],
     );
     _restoreSettings(data['settings'] as Map<String, dynamic>? ?? {});
 
@@ -250,6 +255,25 @@ class BackupService {
         'level': s.level,
         'createdAt': s.createdAt.toIso8601String(),
         'mathBestStreak': s.mathBestStreak,
+      };
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _exportChallengeRecords() {
+    return HiveBoxes.challengeRecords.values.map((r) {
+      return <String, dynamic>{
+        'id': r.id,
+        'profileId': r.profileId,
+        'mode': r.mode,
+        'score': r.score,
+        'totalAnswered': r.totalAnswered,
+        'correctCount': r.correctCount,
+        'bestCombo': r.bestCombo,
+        'grade': r.grade,
+        'semester': r.semester,
+        'difficulty': r.difficulty,
+        'durationSeconds': r.durationSeconds,
+        'createdAt': r.createdAt.toIso8601String(),
       };
     }).toList();
   }
@@ -440,6 +464,30 @@ class BackupService {
         mathBestStreak: m['mathBestStreak'] as int? ?? 0,
       );
       await box.put('${obj.profileId}_stats', obj);
+    }
+    return items.length;
+  }
+
+  Future<int> _restoreChallengeRecords(List<dynamic> items) async {
+    final box = HiveBoxes.challengeRecords;
+    await box.clear();
+    for (final item in items) {
+      final m = item as Map<String, dynamic>;
+      final obj = ChallengeRecord(
+        id: m['id'] as String,
+        profileId: m['profileId'] as String,
+        mode: m['mode'] as String,
+        score: m['score'] as int,
+        totalAnswered: m['totalAnswered'] as int,
+        correctCount: m['correctCount'] as int,
+        bestCombo: m['bestCombo'] as int? ?? 0,
+        grade: m['grade'] as int,
+        semester: m['semester'] as String,
+        difficulty: m['difficulty'] as String,
+        durationSeconds: m['durationSeconds'] as int? ?? 0,
+        createdAt: _parseDateTime(m['createdAt']),
+      );
+      await box.put('${obj.profileId}_${obj.id}', obj);
     }
     return items.length;
   }
