@@ -27,9 +27,16 @@ class NotificationService {
   static const String _keyReminderMinute = 'reminder_minute';
 
   static const int _notificationId = 1001;
+  static const int _weeklyReportId = 1002;
   static const String _channelId = 'daily_reminder';
   static const String _channelName = '每日学习提醒';
   static const String _channelDescription = '每天定时提醒学习诗词和口算';
+
+  static const String _weeklyChannelId = 'weekly_report';
+  static const String _weeklyChannelName = '每周学习周报';
+  static const String _weeklyChannelDescription = '每周日推送本周学习数据汇总';
+
+  static const String _keyWeeklyEnabled = 'weekly_report_enabled';
 
   // ============ 鼓励文案池 ============
 
@@ -74,6 +81,11 @@ class NotificationService {
     // 如果之前已开启提醒，重新调度（应用重启后恢复）
     if (isReminderEnabled) {
       await scheduleDailyReminder(reminderHour, reminderMinute);
+    }
+
+    // 恢复周报通知
+    if (isWeeklyReportEnabled) {
+      await scheduleWeeklyReport();
     }
   }
 
@@ -186,5 +198,67 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
     return scheduled;
+  }
+
+  // ============ 周报推送 ============
+
+  /// 周报是否已开启。
+  bool get isWeeklyReportEnabled =>
+      HiveBoxes.settings.get(_keyWeeklyEnabled, defaultValue: false) as bool;
+
+  /// 开启周报推送（每周日 18:00）。
+  Future<void> scheduleWeeklyReport() async {
+    await HiveBoxes.settings.put(_keyWeeklyEnabled, true);
+    await _plugin.cancel(_weeklyReportId);
+
+    final scheduledDate = _nextSunday(18, 0);
+
+    try {
+      await _plugin.zonedSchedule(
+        _weeklyReportId,
+        '📊 本周学习周报',
+        '来看看这周学了多少诗词、做了多少口算吧！',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _weeklyChannelId,
+            _weeklyChannelName,
+            channelDescription: _weeklyChannelDescription,
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+    } catch (e) {
+      debugPrint('调度周报通知失败: $e');
+    }
+  }
+
+  /// 关闭周报推送。
+  Future<void> cancelWeeklyReport() async {
+    await HiveBoxes.settings.put(_keyWeeklyEnabled, false);
+    await _plugin.cancel(_weeklyReportId);
+  }
+
+  /// 计算下一个周日指定时间的 TZDateTime。
+  tz.TZDateTime _nextSunday(int hour, int minute) {
+    final now = tz.TZDateTime.now(tz.local);
+    var date = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      hour,
+      minute,
+    );
+    // 找到下一个周日
+    while (date.weekday != DateTime.sunday || date.isBefore(now)) {
+      date = date.add(const Duration(days: 1));
+    }
+    return date;
   }
 }

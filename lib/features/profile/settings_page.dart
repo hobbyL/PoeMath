@@ -179,6 +179,8 @@ class SettingsPage extends ConsumerWidget {
 
             // 学习提醒
             const _ReminderTile(),
+            // 周报推送
+            const _WeeklyReportTile(),
             const SizedBox(height: SpacingTokens.md),
 
             // 备份与恢复
@@ -515,6 +517,50 @@ class _ReminderTileState extends State<_ReminderTile> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// 周报推送开关。
+class _WeeklyReportTile extends StatefulWidget {
+  const _WeeklyReportTile();
+
+  @override
+  State<_WeeklyReportTile> createState() => _WeeklyReportTileState();
+}
+
+class _WeeklyReportTileState extends State<_WeeklyReportTile> {
+  late bool _enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _enabled = NotificationService.instance.isWeeklyReportEnabled;
+  }
+
+  Future<void> _toggle(bool value) async {
+    if (value) {
+      final granted = await NotificationService.instance.requestPermission();
+      if (!granted) return;
+      await NotificationService.instance.scheduleWeeklyReport();
+    } else {
+      await NotificationService.instance.cancelWeeklyReport();
+    }
+    setState(() => _enabled = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AppTile(
+      icon: Icons.insert_chart_outlined,
+      iconColor: theme.colorScheme.tertiary,
+      title: '学习周报',
+      subtitle: _enabled ? '每周日 18:00 推送' : '已关闭',
+      trailing: Switch(
+        value: _enabled,
+        onChanged: _toggle,
+      ),
     );
   }
 }
