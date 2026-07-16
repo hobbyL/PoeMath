@@ -116,12 +116,21 @@ class MathTabPage extends ConsumerWidget {
                   const totalItems = 6;
                   final rows = (totalItems / columns).ceil();
 
+                  // 每行最大高度 120px，不足则按可用空间等分
+                  const maxRowHeight = 120.0;
+                  final gaps = (rows - 1) * SpacingTokens.sm;
+                  final perRow =
+                      (constraints.maxHeight - gaps) / rows;
+                  final rowHeight = perRow.clamp(60.0, maxRowHeight);
+
                   return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       for (int row = 0; row < rows; row++) ...[
                         if (row > 0)
                           const SizedBox(height: SpacingTokens.sm),
-                        Expanded(
+                        SizedBox(
+                          height: rowHeight,
                           child: Row(
                             children: [
                               for (int col = 0; col < columns; col++) ...[
