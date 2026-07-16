@@ -213,7 +213,7 @@ class HomePage extends ConsumerWidget {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          '每日目标未完成：${missing.join("、")} 📚',
+                          '每日目标未完成：${missing.join("、")}',
                         ),
                         duration: const Duration(seconds: 3),
                       ),

@@ -83,7 +83,7 @@ class _MistakeRepracticeDialogState extends State<MistakeRepracticeDialog> {
                   ),
                   const SizedBox(height: SpacingTokens.xs),
                   Text(
-                    _isCorrect! ? '回答正确！🎉' : '还是答错了',
+                    _isCorrect! ? '回答正确！' : '还是答错了',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: _isCorrect!

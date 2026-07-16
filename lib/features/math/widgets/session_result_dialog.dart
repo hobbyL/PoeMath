@@ -30,11 +30,17 @@ class SessionResultDialog extends StatelessWidget {
     return '$seconds 秒';
   }
 
-  String get _gradeText {
-    if (accuracy >= 1.0) return '太棒了！🌟';
-    if (accuracy >= 0.9) return '不错哦！👍';
-    if (accuracy >= 0.7) return '继续加油！💪';
-    return '多多练习！📚';
+  ({String text, IconData icon}) get _grade {
+    if (accuracy >= 1.0) {
+      return (text: '太棒了！', icon: Icons.star_rounded);
+    }
+    if (accuracy >= 0.9) {
+      return (text: '不错哦！', icon: Icons.thumb_up_rounded);
+    }
+    if (accuracy >= 0.7) {
+      return (text: '继续加油！', icon: Icons.fitness_center_rounded);
+    }
+    return (text: '多多练习！', icon: Icons.menu_book_rounded);
   }
 
   @override
@@ -46,11 +52,18 @@ class SessionResultDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
       ),
       title: Center(
-        child: Text(
-          _gradeText,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(_grade.icon, color: theme.colorScheme.primary, size: 28),
+            const SizedBox(width: SpacingTokens.sm),
+            Text(
+              _grade.text,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
       content: Column(

@@ -58,7 +58,7 @@ class PoemFavoritesPage extends ConsumerWidget {
                         ),
                         const SizedBox(height: SpacingTokens.xs),
                         Text(
-                          '在诗词详情页点击 ❤️ 即可收藏',
+                          '在诗词详情页点击收藏按钮即可收藏',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),

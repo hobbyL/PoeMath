@@ -563,15 +563,15 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     Color ratingColor;
 
     if (session.accuracy >= 1.0) {
-      ratingText = '满分！完美！🎉';
+      ratingText = '满分！完美！';
       ratingIcon = Icons.emoji_events;
       ratingColor = theme.semantic.caution;
     } else if (session.isPassed) {
-      ratingText = '表现不错，继续加油！👍';
+      ratingText = '表现不错，继续加油！';
       ratingIcon = Icons.thumb_up;
       ratingColor = theme.semantic.success;
     } else {
-      ratingText = '还需努力，多多复习哦 📖';
+      ratingText = '还需努力，多多复习哦';
       ratingIcon = Icons.auto_stories;
       ratingColor = theme.colorScheme.secondary;
     }

@@ -494,12 +494,23 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                   borderRadius:
                       BorderRadius.circular(SpacingTokens.radiusPill),
                 ),
-                child: Text(
-                  '🔥 x$_currentCombo',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.semantic.caution,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.local_fire_department_rounded,
+                      size: 16,
+                      color: theme.semantic.caution,
+                    ),
+                    const SizedBox(width: SpacingTokens.xs),
+                    Text(
+                      'x$_currentCombo',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.semantic.caution,
+                      ),
+                    ),
+                  ],
                 ),
               )
             else

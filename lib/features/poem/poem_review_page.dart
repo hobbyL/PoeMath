@@ -416,7 +416,7 @@ class PoemReviewPage extends ConsumerWidget {
 
       if (context.mounted) {
         final message = nextSchedule != null && nextSchedule.isCompleted
-            ? '🎉 恭喜！该诗词复习全部完成！'
+            ? '恭喜！该诗词复习全部完成！'
             : '复习已记录 ✓ 下次复习在 '
                 '${nextSchedule != null ? _formatNextDate(nextSchedule) : ''}';
 

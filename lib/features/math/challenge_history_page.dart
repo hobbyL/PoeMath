@@ -401,12 +401,23 @@ class _RecordCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '🔥 ${record.bestCombo}',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.semantic.caution,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.local_fire_department_rounded,
+                          size: 18,
+                          color: theme.semantic.caution,
+                        ),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Text(
+                          '${record.bestCombo}',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.semantic.caution,
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       '最佳连击',

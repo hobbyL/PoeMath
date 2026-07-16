@@ -1029,9 +1029,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   }
 
   String _resultTitle(int stars) {
-    if (stars >= 3) return '🎉 太棒了！完美背诵！';
-    if (stars >= 2) return '👍 不错！继续加油！';
-    return '💪 再练练，会更好！';
+    if (stars >= 3) return '太棒了！完美背诵！';
+    if (stars >= 2) return '不错！继续加油！';
+    return '再练练，会更好！';
   }
 }
 

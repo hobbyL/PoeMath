@@ -337,7 +337,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
                   theme,
                   Icons.star_rounded,
                   '获得星星',
-                  '${checkIn.starsEarned} ⭐',
+                  '${checkIn.starsEarned}',
                   theme.semantic.caution,
                 ),
                 const SizedBox(height: SpacingTokens.sm),

@@ -340,11 +340,11 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     return _scores.reduce((a, b) => a + b) / _scores.length;
   }
 
-  String _scoreEmoji(double score) {
-    if (score >= 0.9) return '🌟';
-    if (score >= 0.7) return '👍';
-    if (score >= 0.5) return '💪';
-    return '🔄';
+  IconData _scoreIconData(double score) {
+    if (score >= 0.9) return Icons.star_rounded;
+    if (score >= 0.7) return Icons.thumb_up_rounded;
+    if (score >= 0.5) return Icons.fitness_center_rounded;
+    return Icons.refresh_rounded;
   }
 
   String _scoreLabel(double score) {
@@ -466,9 +466,10 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                 padding: const EdgeInsets.symmetric(
                   horizontal: SpacingTokens.xs / 2,
                 ),
-                child: Text(
-                  _scoreEmoji(s),
-                  style: const TextStyle(fontSize: 16),
+                child: Icon(
+                  _scoreIconData(s),
+                  size: 16,
+                  color: _scoreColor(s, Theme.of(context)),
                 ),
               );
             }).toList(),
@@ -593,9 +594,10 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              _scoreEmoji(score),
-              style: const TextStyle(fontSize: 32),
+            Icon(
+              _scoreIconData(score),
+              size: 32,
+              color: _scoreColor(score, theme),
             ),
             const SizedBox(width: SpacingTokens.sm),
             Text(
@@ -823,9 +825,10 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                     ),
                     child: Row(
                       children: [
-                        Text(
-                          _scoreEmoji(score),
-                          style: const TextStyle(fontSize: 18),
+                        Icon(
+                          _scoreIconData(score),
+                          size: 18,
+                          color: _scoreColor(score, theme),
                         ),
                         const SizedBox(width: SpacingTokens.sm),
                         Expanded(
