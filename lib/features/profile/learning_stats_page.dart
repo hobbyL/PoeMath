@@ -132,68 +132,80 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
             ],
           ),
           const SizedBox(height: SpacingTokens.md),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSummaryItem(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final items = [
+                _buildSummaryItem(
                   theme,
                   Icons.menu_book_rounded,
                   '$totalPoems',
                   '诗词',
                   theme.colorScheme.primary,
                 ),
-              ),
-              Expanded(
-                child: _buildSummaryItem(
+                _buildSummaryItem(
                   theme,
                   Icons.calculate_rounded,
                   '$totalMath',
                   '口算题',
                   theme.colorScheme.secondary,
                 ),
-              ),
-              Expanded(
-                child: _buildSummaryItem(
+                _buildSummaryItem(
                   theme,
                   Icons.check_circle_outline,
                   '$avgAccuracy%',
                   '正确率',
                   theme.semantic.success,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSummaryItem(
+                _buildSummaryItem(
                   theme,
                   Icons.star_rounded,
                   '$totalStars',
                   '星星',
                   theme.semantic.caution,
                 ),
-              ),
-              Expanded(
-                child: _buildSummaryItem(
+                _buildSummaryItem(
                   theme,
                   Icons.timer_outlined,
                   '$totalMinutes',
                   '分钟',
                   theme.colorScheme.tertiary,
                 ),
-              ),
-              Expanded(
-                child: _buildSummaryItem(
+                _buildSummaryItem(
                   theme,
                   Icons.calendar_today,
                   '$activeDays',
                   '活跃天',
                   theme.colorScheme.primary,
                 ),
-              ),
-            ],
+              ];
+
+              // 宽屏（≥480）一行 6 个，窄屏两行各 3 个
+              if (constraints.maxWidth >= 480) {
+                return Row(
+                  children: items
+                      .map((item) => Expanded(child: item))
+                      .toList(),
+                );
+              }
+
+              return Column(
+                children: [
+                  Row(
+                    children: items
+                        .sublist(0, 3)
+                        .map((item) => Expanded(child: item))
+                        .toList(),
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  Row(
+                    children: items
+                        .sublist(3)
+                        .map((item) => Expanded(child: item))
+                        .toList(),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
