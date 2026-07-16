@@ -30,6 +30,7 @@ class AppRoutes {
   static const String mathHistory = '/math/history';
   static const String mathSessionDetail = '/math/session';
   static const String mathMistakeDetail = '/math/mistake/detail';
+  static const String challengeHistory = '/math/challenge/history';
 
   // ============ 公式 ============
   static const String formulaDetail = '/formula/detail/:id';
