@@ -101,7 +101,7 @@ class MathTabPage extends ConsumerWidget {
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: 0.1, end: 0, duration: 400.ms),
 
-          // 年级列表（自适应列数，高度自动撑开）
+          // 年级列表（自适应列数，高度由内容决定）
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(
@@ -116,37 +116,36 @@ class MathTabPage extends ConsumerWidget {
                   const totalItems = 6;
                   final rows = (totalItems / columns).ceil();
 
-                  // 每行最大高度 120px，不足则按可用空间等分
-                  const maxRowHeight = 120.0;
-                  final gaps = (rows - 1) * SpacingTokens.sm;
-                  final perRow =
-                      (constraints.maxHeight - gaps) / rows;
-                  final rowHeight = perRow.clamp(60.0, maxRowHeight);
-
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       for (int row = 0; row < rows; row++) ...[
                         if (row > 0)
                           const SizedBox(height: SpacingTokens.sm),
-                        SizedBox(
-                          height: rowHeight,
+                        IntrinsicHeight(
                           child: Row(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.stretch,
                             children: [
-                              for (int col = 0; col < columns; col++) ...[
+                              for (int col = 0;
+                                  col < columns;
+                                  col++) ...[
                                 if (col > 0)
                                   const SizedBox(
                                     width: SpacingTokens.sm,
                                   ),
                                 Expanded(
-                                  child: row * columns + col < totalItems
+                                  child: row * columns + col <
+                                          totalItems
                                       ? _buildGradeCard(
                                           ref,
-                                          grade: row * columns + col + 1,
+                                          grade:
+                                              row * columns + col + 1,
                                           selectedGrade: selectedGrade,
                                           selectedSemester:
                                               selectedSemester,
-                                          animIndex: row * columns + col,
+                                          animIndex:
+                                              row * columns + col,
                                         )
                                       : const SizedBox.shrink(),
                                 ),
