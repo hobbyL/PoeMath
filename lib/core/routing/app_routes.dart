@@ -36,6 +36,7 @@ class AppRoutes {
   static const String onboarding = '/onboarding';
   static const String settings = '/profile/settings';
   static const String learningStats = '/profile/stats';
+  static const String learningCalendar = '/profile/calendar';
   static const String achievements = '/profile/achievements';
   static const String about = '/profile/about';
   static const String update = '/profile/update';

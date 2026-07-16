@@ -94,7 +94,7 @@ class ProfilePage extends ConsumerWidget {
             _buildStatsPanel(context, stats, streak),
             const SizedBox(height: SpacingTokens.md),
 
-            // 学习报告 + 成就勋章（一行两个卡片）
+            // 学习报告 + 学习日历 + 成就勋章（一行三个卡片）
             Row(
               children: [
                 Expanded(
@@ -115,11 +115,27 @@ class ProfilePage extends ConsumerWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: SpacingTokens.xs),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: SpacingTokens.sm),
+                Expanded(
+                  child: ColoredCard(
+                    color: theme.semantic.caution,
+                    onTap: () => context.push(AppRoutes.learningCalendar),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.calendar_month_rounded,
+                          size: 32,
+                          color: theme.semantic.caution,
+                        ),
+                        const SizedBox(height: SpacingTokens.sm),
                         Text(
-                          '查看学习趋势',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          '学习日历',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -261,13 +277,6 @@ class ProfilePage extends ConsumerWidget {
             '成就勋章',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            unlockedCount > 0 ? '已解锁 $unlockedCount 个' : '开始解锁吧',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],

@@ -17,6 +17,7 @@ import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
+import 'package:poemath/features/home/learning_calendar_page.dart';
 import 'package:poemath/features/math/math_history_page.dart';
 import 'package:poemath/features/math/math_mistake_page.dart';
 import 'package:poemath/features/math/math_practice_page.dart';
@@ -187,6 +188,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const LearningStatsPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.learningCalendar,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const LearningCalendarPage(),
         ),
       ),
       // ============ 成就勋章（非 Shell 子路由，全屏） ============
