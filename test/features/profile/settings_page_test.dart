@@ -56,12 +56,6 @@ void main() {
     expect(find.text('云端同步'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('检查更新'),
-      50,
-    );
-    expect(find.text('检查更新'), findsOneWidget);
-
-    await tester.scrollUntilVisible(
       find.text('关于韵算'),
       50,
     );

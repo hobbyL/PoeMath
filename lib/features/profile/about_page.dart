@@ -5,9 +5,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/constants/app_constants.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 
@@ -143,6 +146,7 @@ class _AboutPageState extends State<AboutPage> {
               iconColor: theme.colorScheme.primary,
               title: '诗词学习',
               subtitle: '小学必背古诗文，科学复习记忆法',
+              onTap: () => context.go(AppRoutes.poemTab),
             ),
             const SizedBox(height: SpacingTokens.sm),
             AppTile(
@@ -150,6 +154,7 @@ class _AboutPageState extends State<AboutPage> {
               iconColor: theme.colorScheme.secondary,
               title: '口算练习',
               subtitle: '多难度分级，错题本自动归纳',
+              onTap: () => context.go(AppRoutes.mathTab),
             ),
             const SizedBox(height: SpacingTokens.sm),
             AppTile(
@@ -157,8 +162,23 @@ class _AboutPageState extends State<AboutPage> {
               iconColor: theme.colorScheme.tertiary,
               title: '成就体系',
               subtitle: '44枚成就勋章，记录成长足迹',
+              onTap: () => context.push(AppRoutes.achievements),
             ),
             const SizedBox(height: SpacingTokens.md),
+
+            // 检查更新
+            AppTile(
+              icon: Icons.system_update_outlined,
+              iconColor: theme.colorScheme.onSurfaceVariant,
+              title: '检查更新',
+              subtitle: AppConfig.hasUpdateCheckUrl
+                  ? '查看新版本并下载安装'
+                  : '更新检查未配置',
+              onTap: AppConfig.hasUpdateCheckUrl
+                  ? () => context.push(AppRoutes.update)
+                  : null,
+            ),
+            const SizedBox(height: SpacingTokens.sm),
 
             // 隐私政策 & 开源许可
             AppTile(

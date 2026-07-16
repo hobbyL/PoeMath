@@ -8,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/services/notification_service.dart';
@@ -179,6 +178,7 @@ class SettingsPage extends ConsumerWidget {
 
             // 学习提醒
             const _ReminderTile(),
+            const SizedBox(height: SpacingTokens.sm),
             // 周报推送
             const _WeeklyReportTile(),
             const SizedBox(height: SpacingTokens.md),
@@ -212,20 +212,6 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: SpacingTokens.md),
-
-            // 检查更新
-            AppTile(
-              icon: Icons.system_update_outlined,
-              iconColor: theme.colorScheme.onSurfaceVariant,
-              title: '检查更新',
-              subtitle: AppConfig.hasUpdateCheckUrl
-                  ? '查看新版本并下载安装'
-                  : '更新检查未配置',
-              onTap: AppConfig.hasUpdateCheckUrl
-                  ? () => context.push(AppRoutes.update)
-                  : null,
-            ),
-            const SizedBox(height: SpacingTokens.sm),
 
             // 关于
             AppTile(
@@ -541,12 +527,19 @@ class _WeeklyReportTileState extends State<_WeeklyReportTile> {
   Future<void> _toggle(bool value) async {
     if (value) {
       final granted = await NotificationService.instance.requestPermission();
-      if (!granted) return;
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('需要通知权限才能开启周报推送')),
+          );
+        }
+        return;
+      }
       await NotificationService.instance.scheduleWeeklyReport();
     } else {
       await NotificationService.instance.cancelWeeklyReport();
     }
-    setState(() => _enabled = value);
+    if (mounted) setState(() => _enabled = value);
   }
 
   @override
