@@ -74,6 +74,12 @@ class PoemTabPage extends ConsumerWidget {
                 ),
                 title: const Text('诗词'),
                 actions: [
+                  IconButton(
+                    onPressed: () =>
+                        context.push(AppRoutes.poemFavorites),
+                    icon: const Icon(Icons.favorite_border),
+                    tooltip: '我的收藏',
+                  ),
                   TextButton.icon(
                     onPressed: () =>
                         _showGradePicker(context, ref, selected),

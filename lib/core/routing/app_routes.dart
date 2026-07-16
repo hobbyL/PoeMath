@@ -19,6 +19,7 @@ class AppRoutes {
   static const String poemRecite = '/poem/recite/:id';
   static const String poemQuiz = '/poem/quiz/:id';
   static const String poemReview = '/poem/review';
+  static const String poemFavorites = '/poem/favorites';
 
   // ============ 口算模块 ============
   static const String mathPractice = '/math/practice';
