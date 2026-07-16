@@ -101,46 +101,55 @@ class MathTabPage extends ConsumerWidget {
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: 0.1, end: 0, duration: 400.ms),
 
-          // 年级列表（一行两个）
+          // 年级列表（自适应列数，高度自动撑开）
           Expanded(
-            child: GridView.builder(
+            child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: SpacingTokens.md,
               ),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: SpacingTokens.sm,
-                mainAxisSpacing: SpacingTokens.sm,
-                childAspectRatio: 1.8,
-              ),
-              itemCount: 6,
-              itemBuilder: (context, index) {
-                final grade = index + 1;
-                final config = GradePresets.get(grade, selectedSemester);
-                final isSelected = selectedGrade == grade;
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // 按 ~180px 每列计算列数，最少 2 列，最多 6 列
+                  final columns = (constraints.maxWidth / 180)
+                      .floor()
+                      .clamp(2, 6);
+                  const totalItems = 6;
+                  final rows = (totalItems / columns).ceil();
 
-                return GradeSemesterCard(
-                  grade: grade,
-                  semester: selectedSemester,
-                  label: config.label,
-                  description: _configDescription(config),
-                  isSelected: isSelected,
-                  onTap: () {
-                    ref.read(mathGradeProvider.notifier).state = grade;
-                  },
-                )
-                    .animate()
-                    .fadeIn(
-                      delay: (80 * index).ms,
-                      duration: 300.ms,
-                    )
-                    .slideX(
-                      begin: 0.1,
-                      end: 0,
-                      delay: (80 * index).ms,
-                      duration: 300.ms,
-                    );
-              },
+                  return Column(
+                    children: [
+                      for (int row = 0; row < rows; row++) ...[
+                        if (row > 0)
+                          const SizedBox(height: SpacingTokens.sm),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              for (int col = 0; col < columns; col++) ...[
+                                if (col > 0)
+                                  const SizedBox(
+                                    width: SpacingTokens.sm,
+                                  ),
+                                Expanded(
+                                  child: row * columns + col < totalItems
+                                      ? _buildGradeCard(
+                                          ref,
+                                          grade: row * columns + col + 1,
+                                          selectedGrade: selectedGrade,
+                                          selectedSemester:
+                                              selectedSemester,
+                                          animIndex: row * columns + col,
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                },
+              ),
             ),
           ),
 
@@ -155,7 +164,8 @@ class MathTabPage extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () => context.push(AppRoutes.mathPractice),
+                      onPressed: () =>
+                          context.push(AppRoutes.mathPractice),
                       icon: const Icon(Icons.play_arrow_rounded),
                       label: Text(
                         '开始练习 · ${GradePresets.get(selectedGrade, selectedSemester).label}',
@@ -164,7 +174,8 @@ class MathTabPage extends ConsumerWidget {
                   ),
                   const SizedBox(width: SpacingTokens.sm),
                   FilledButton.tonalIcon(
-                    onPressed: () => context.push(AppRoutes.mathChallenge),
+                    onPressed: () =>
+                        context.push(AppRoutes.mathChallenge),
                     icon: const Icon(Icons.timer_rounded),
                     label: const Text('挑战'),
                   ),
@@ -198,6 +209,39 @@ class MathTabPage extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildGradeCard(
+    WidgetRef ref, {
+    required int grade,
+    required int selectedGrade,
+    required String selectedSemester,
+    required int animIndex,
+  }) {
+    final config = GradePresets.get(grade, selectedSemester);
+    final isSelected = selectedGrade == grade;
+
+    return GradeSemesterCard(
+      grade: grade,
+      semester: selectedSemester,
+      label: config.label,
+      description: _configDescription(config),
+      isSelected: isSelected,
+      onTap: () {
+        ref.read(mathGradeProvider.notifier).state = grade;
+      },
+    )
+        .animate()
+        .fadeIn(
+          delay: (80 * animIndex).ms,
+          duration: 300.ms,
+        )
+        .slideX(
+          begin: 0.1,
+          end: 0,
+          delay: (80 * animIndex).ms,
+          duration: 300.ms,
+        );
   }
 
   String _configDescription(GradeConfig config) {
