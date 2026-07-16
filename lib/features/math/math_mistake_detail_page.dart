@@ -15,6 +15,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
+import 'package:poemath/math_engine/models/math_problem.dart';
 
 class MathMistakeDetailPage extends ConsumerWidget {
   const MathMistakeDetailPage({super.key, required this.mistakeId});
@@ -408,8 +409,55 @@ class _ActionButtons extends ConsumerWidget {
   }
 
   void _generateSimilar(BuildContext context, WidgetRef ref) {
-    ref.read(mathGradeProvider.notifier).state = mistake.grade;
+    final errorType = mistake.errorType;
+    final grade = mistake.grade;
+
+    // 根据错因类型选择对应的练习模式
+    ProblemMode? targetMode;
+    if (errorType == 'carry_omission' || errorType == 'borrow_omission') {
+      // 进/退位错误 → 标准加减法
+      targetMode = ProblemMode.findResult;
+    } else if (errorType == 'multiplication_table') {
+      // 口诀错误 → 标准乘除法
+      targetMode = ProblemMode.findResult;
+    } else if (errorType == 'operation_order') {
+      // 运算顺序 → 连续运算
+      targetMode = ProblemMode.chain;
+    } else if (errorType == 'remainder_mistake') {
+      // 余数错误 → 标准（含除法）
+      targetMode = ProblemMode.findResult;
+    }
+
+    ref.read(mathGradeProvider.notifier).state = grade;
     ref.read(mathBatchSizeProvider.notifier).state = 5;
+    if (targetMode != null) {
+      ref.read(mathPracticeModeProvider.notifier).state = targetMode;
+    }
+
+    // 显示提示
+    if (errorType != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '已生成针对「${_errorTypeLabel(errorType)}」的练习题',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
     context.push(AppRoutes.mathPractice);
+  }
+
+  static String _errorTypeLabel(String errorType) {
+    return switch (errorType) {
+      'carry_omission' => '进位遗漏',
+      'borrow_omission' => '退位遗漏',
+      'multiplication_table' => '口诀错误',
+      'operation_order' => '运算顺序',
+      'remainder_mistake' => '余数错误',
+      'decimal_alignment' => '小数对位',
+      _ => errorType,
+    };
   }
 }
