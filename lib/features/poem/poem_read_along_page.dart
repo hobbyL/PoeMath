@@ -401,6 +401,18 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
             ? _buildCompleteView(theme)
             : _buildPracticeView(theme),
       ),
+      // 操作按钮固定在底部，避免 Spacer 在 ListView 中导致渲染异常
+      bottomNavigationBar: _phase != _ReadAlongPhase.complete
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.lg,
+                  vertical: SpacingTokens.md,
+                ),
+                child: _buildActionButtons(theme),
+              ),
+            )
+          : null,
     );
   }
 
@@ -422,12 +434,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         if (_phase == _ReadAlongPhase.recording ||
             _phase == _ReadAlongPhase.scored)
           _buildRecognitionResult(theme),
-
-        const Spacer(),
-
-        // 操作按钮
-        _buildActionButtons(theme),
-        const SizedBox(height: SpacingTokens.xl),
       ],
     );
   }
