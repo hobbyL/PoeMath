@@ -44,6 +44,9 @@ class HiveKeys {
   /// 用户统计 Box
   static const String userStatsBox = 'user_stats';
 
+  /// 挑战记录 Box
+  static const String challengeRecordBox = 'challenge_records';
+
   /// 设置 Box（KV 存储）
   static const String settingsBox = 'settings';
 

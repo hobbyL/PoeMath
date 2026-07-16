@@ -20,6 +20,7 @@ import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/data/models/challenge_record.dart';
 
 bool _adaptersRegistered = false;
 
@@ -44,6 +45,7 @@ void registerHiveAdapters() {
   Hive.registerAdapter(AchievementAdapter());         // typeId: 11
   Hive.registerAdapter(CheckInAdapter());             // typeId: 12
   Hive.registerAdapter(UserStatsAdapter());           // typeId: 13
+  Hive.registerAdapter(ChallengeRecordAdapter());     // typeId: 14
 
   // 枚举 Adapter
   Hive.registerAdapter(LearningStatusAdapter());      // typeId: 20

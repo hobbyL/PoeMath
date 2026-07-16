@@ -20,6 +20,7 @@ import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/data/models/challenge_record.dart';
 
 class HiveBoxes {
   const HiveBoxes._();
@@ -39,6 +40,7 @@ class HiveBoxes {
   static late Box<Achievement> achievements;
   static late Box<CheckIn> checkIns;
   static late Box<UserStats> userStats;
+  static late Box<ChallengeRecord> challengeRecords;
 
   // ============ KV Box ============
   static late Box<dynamic> settings;
@@ -62,6 +64,8 @@ class HiveBoxes {
     achievements = await Hive.openBox<Achievement>(HiveKeys.achievementBox);
     checkIns = await Hive.openBox<CheckIn>(HiveKeys.checkInBox);
     userStats = await Hive.openBox<UserStats>(HiveKeys.userStatsBox);
+    challengeRecords =
+        await Hive.openBox<ChallengeRecord>(HiveKeys.challengeRecordBox);
 
     // KV
     settings = await Hive.openBox(HiveKeys.settingsBox);

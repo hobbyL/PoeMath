@@ -8,6 +8,7 @@ import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/data/repositories/math_session_repository.dart';
+import 'package:poemath/data/repositories/challenge_record_repository.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 // ============ Repositories ============
@@ -18,6 +19,11 @@ final mathSessionRepoProvider = Provider<MathSessionRepository>((ref) {
 
 final mathMistakeRepoProvider = Provider<MathMistakeRepository>((ref) {
   return MathMistakeRepository();
+});
+
+final challengeRecordRepoProvider =
+    Provider<ChallengeRecordRepository>((ref) {
+  return ChallengeRecordRepository();
 });
 
 // ============ 练习选择 ============
