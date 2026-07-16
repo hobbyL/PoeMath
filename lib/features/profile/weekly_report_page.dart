@@ -440,7 +440,7 @@ class WeeklyReportPage extends ConsumerWidget {
       messages.add('比上周多学了 $poemDiff 首诗词 📚');
     }
     if (mathDiff > 0) {
-      messages.add('比上周多做了 $mathDiff 道口算 🧮');
+      messages.add('比上周多做了 $mathDiff 道口算 🔢');
     }
 
     // 活跃天数
