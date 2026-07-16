@@ -117,7 +117,6 @@ class MathTabPage extends ConsumerWidget {
                   final rows = (totalItems / columns).ceil();
 
                   return Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       for (int row = 0; row < rows; row++) ...[
                         if (row > 0)
