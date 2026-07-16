@@ -147,19 +147,28 @@ class MathTabPage extends ConsumerWidget {
           // 练习模式选择（比大小 / 竖式）
           _buildModeSelector(context, ref),
 
-          // 开始练习按钮
+          // 开始练习按钮 + 限时挑战
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(SpacingTokens.md),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => context.push(AppRoutes.mathPractice),
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: Text(
-                    '开始练习 · ${GradePresets.get(selectedGrade, selectedSemester).label}',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => context.push(AppRoutes.mathPractice),
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: Text(
+                        '开始练习 · ${GradePresets.get(selectedGrade, selectedSemester).label}',
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: SpacingTokens.sm),
+                  FilledButton.tonalIcon(
+                    onPressed: () => context.push(AppRoutes.mathChallenge),
+                    icon: const Icon(Icons.timer_rounded),
+                    label: const Text('挑战'),
+                  ),
+                ],
               ),
             ),
           ),

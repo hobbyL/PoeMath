@@ -18,6 +18,7 @@ import 'package:poemath/features/formula/formula_detail_page.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/home/learning_calendar_page.dart';
+import 'package:poemath/features/math/math_challenge_page.dart';
 import 'package:poemath/features/math/math_history_page.dart';
 import 'package:poemath/features/math/math_mistake_page.dart';
 import 'package:poemath/features/math/math_practice_page.dart';
@@ -128,6 +129,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const MathPracticePage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathChallenge,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const MathChallengePage(),
         ),
       ),
       GoRoute(

@@ -23,6 +23,7 @@ class AppRoutes {
 
   // ============ 口算模块 ============
   static const String mathPractice = '/math/practice';
+  static const String mathChallenge = '/math/challenge';
   static const String mathMistake = '/math/mistake';
   static const String mathHistory = '/math/history';
   static const String mathSessionDetail = '/math/session';
