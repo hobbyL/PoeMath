@@ -57,106 +57,146 @@ class MathTabPage extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // 统计概览
-          if (totalProblems > 0)
-            Container(
-              margin: const EdgeInsets.all(SpacingTokens.md),
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary.withValues(alpha: 0.15),
-                    theme.colorScheme.secondary.withValues(alpha: 0.1),
-                  ],
-                ),
-                borderRadius:
-                    BorderRadius.circular(SpacingTokens.radiusMedium),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStat(context, '$totalProblems', '已做题'),
-                  Container(
-                    width: 1,
-                    height: 30,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.2),
-                  ),
-                  _buildStat(
-                    context,
-                    '${(accuracy * 100).toStringAsFixed(0)}%',
-                    '正确率',
-                  ),
-                  Container(
-                    width: 1,
-                    height: 30,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.2),
-                  ),
-                  _buildStat(context, '$mistakeCount', '错题'),
-                ],
-              ),
-            )
-                .animate()
-                .fadeIn(duration: 400.ms)
-                .slideY(begin: 0.1, end: 0, duration: 400.ms),
-
-          // 年级列表（自适应列数，高度由内容决定）
+          // 可滚动内容区（统计概览 + 年级网格）
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: SpacingTokens.md,
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // 按 ~180px 每列计算列数，最少 2 列，最多 6 列
-                  final columns = (constraints.maxWidth / 180)
-                      .floor()
-                      .clamp(2, 6);
-                  const totalItems = 6;
-                  final rows = (totalItems / columns).ceil();
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // 按 ~180px 每列计算列数，最少 2 列，最多 6 列
+                final gridWidth =
+                    constraints.maxWidth - SpacingTokens.md * 2;
+                final columns =
+                    (gridWidth / 180).floor().clamp(2, 6);
+                const totalItems = 6;
+                final rows = (totalItems / columns).ceil();
 
-                  return Column(
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.only(
+                    bottom: SpacingTokens.md,
+                  ),
+                  child: Column(
                     children: [
-                      for (int row = 0; row < rows; row++) ...[
-                        if (row > 0)
-                          const SizedBox(height: SpacingTokens.sm),
-                        IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.stretch,
-                            children: [
-                              for (int col = 0;
-                                  col < columns;
-                                  col++) ...[
-                                if (col > 0)
-                                  const SizedBox(
-                                    width: SpacingTokens.sm,
-                                  ),
-                                Expanded(
-                                  child: row * columns + col <
-                                          totalItems
-                                      ? _buildGradeCard(
-                                          ref,
-                                          grade:
-                                              row * columns + col + 1,
-                                          selectedGrade: selectedGrade,
-                                          selectedSemester:
-                                              selectedSemester,
-                                          animIndex:
-                                              row * columns + col,
-                                        )
-                                      : const SizedBox.shrink(),
-                                ),
+                      // 统计概览
+                      if (totalProblems > 0)
+                        Container(
+                          margin:
+                              const EdgeInsets.all(SpacingTokens.md),
+                          padding:
+                              const EdgeInsets.all(SpacingTokens.md),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary
+                                    .withValues(alpha: 0.15),
+                                theme.colorScheme.secondary
+                                    .withValues(alpha: 0.1),
                               ],
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              SpacingTokens.radiusMedium,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStat(
+                                context,
+                                '$totalProblems',
+                                '已做题',
+                              ),
+                              Container(
+                                width: 1,
+                                height: 30,
+                                color: theme
+                                    .colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.2),
+                              ),
+                              _buildStat(
+                                context,
+                                '${(accuracy * 100).toStringAsFixed(0)}%',
+                                '正确率',
+                              ),
+                              Container(
+                                width: 1,
+                                height: 30,
+                                color: theme
+                                    .colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.2),
+                              ),
+                              _buildStat(
+                                context,
+                                '$mistakeCount',
+                                '错题',
+                              ),
                             ],
                           ),
+                        )
+                            .animate()
+                            .fadeIn(duration: 400.ms)
+                            .slideY(
+                              begin: 0.1,
+                              end: 0,
+                              duration: 400.ms,
+                            ),
+
+                      // 年级网格
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SpacingTokens.md,
                         ),
-                      ],
+                        child: Column(
+                          children: [
+                            for (int row = 0; row < rows;
+                                row++) ...[
+                              if (row > 0)
+                                const SizedBox(
+                                  height: SpacingTokens.sm,
+                                ),
+                              IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    for (int col = 0;
+                                        col < columns;
+                                        col++) ...[
+                                      if (col > 0)
+                                        const SizedBox(
+                                          width: SpacingTokens.sm,
+                                        ),
+                                      Expanded(
+                                        child: row * columns +
+                                                    col <
+                                                totalItems
+                                            ? _buildGradeCard(
+                                                ref,
+                                                grade:
+                                                    row * columns +
+                                                        col +
+                                                        1,
+                                                selectedGrade:
+                                                    selectedGrade,
+                                                selectedSemester:
+                                                    selectedSemester,
+                                                animIndex:
+                                                    row * columns +
+                                                        col,
+                                              )
+                                            : const SizedBox
+                                                .shrink(),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
 
