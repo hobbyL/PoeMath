@@ -41,6 +41,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>韵算需要使用麦克风来录制你的朗读，以便进行跟读评分</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>韵算需要使用语音识别来将你的朗读转换为文字，以便进行跟读评分</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

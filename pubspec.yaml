@@ -28,6 +28,7 @@ dependencies:
   # 文本 / 语音 / 拼音
   lpinyin: ^2.0.3
   flutter_tts: ^4.2.0
+  speech_to_text: ^7.0.0
   intl: ^0.20.0
 
   # UI / 渲染

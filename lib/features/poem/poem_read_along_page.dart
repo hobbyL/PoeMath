@@ -1,0 +1,883 @@
+// lib/features/poem/poem_read_along_page.dart
+//
+// 层级：features/poem
+// 职责：诗词朗读跟读评分页 — TTS 范读 + 语音识别跟读 + 逐字对比评分。
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+
+import 'package:poemath/core/services/sound_service.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/features/poem/providers/poem_providers.dart';
+
+/// 跟读状态。
+enum _ReadAlongPhase {
+  /// 等待用户操作。
+  idle,
+
+  /// TTS 范读中。
+  modelReading,
+
+  /// 语音录制中。
+  recording,
+
+  /// 显示本句得分。
+  scored,
+
+  /// 全部完成。
+  complete,
+}
+
+class PoemReadAlongPage extends ConsumerStatefulWidget {
+  const PoemReadAlongPage({super.key, required this.poemId});
+
+  final String poemId;
+
+  @override
+  ConsumerState<PoemReadAlongPage> createState() => _PoemReadAlongPageState();
+}
+
+class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
+  final SpeechToText _speech = SpeechToText();
+  bool _speechAvailable = false;
+
+  /// 诗句列表（按换行拆分）。
+  List<String> _lines = [];
+
+  /// 当前行索引。
+  int _currentLine = 0;
+
+  /// 当前阶段。
+  _ReadAlongPhase _phase = _ReadAlongPhase.idle;
+
+  /// 每行的识别文本。
+  final List<String> _recognizedTexts = [];
+
+  /// 每行的准确率（0.0 ~ 1.0）。
+  final List<double> _scores = [];
+
+  /// 当前实时识别文本。
+  String _liveText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _initSpeech();
+  }
+
+  Future<void> _initSpeech() async {
+    try {
+      _speechAvailable = await _speech.initialize(
+        onError: (error) {
+          debugPrint('语音识别错误: ${error.errorMsg}');
+          if (mounted && _phase == _ReadAlongPhase.recording) {
+            // 录制出错时以当前已识别文本评分
+            _finishRecording(_liveText);
+          }
+        },
+        onStatus: (status) {
+          debugPrint('语音识别状态: $status');
+          // 当语音识别自动停止时（用户沉默超时），完成录制
+          if (status == 'notListening' &&
+              _phase == _ReadAlongPhase.recording) {
+            _finishRecording(_liveText);
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('语音识别初始化失败: $e');
+    }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _speech.cancel();
+    ref.read(ttsServiceProvider).stop();
+    super.dispose();
+  }
+
+  /// 将诗词内容按换行拆分成行。
+  List<String> _splitLines(String content) {
+    return content
+        .split('\n')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  // ============ TTS 范读 ============
+
+  Future<void> _playModelReading() async {
+    if (_phase != _ReadAlongPhase.idle &&
+        _phase != _ReadAlongPhase.scored) {
+      return;
+    }
+
+    setState(() => _phase = _ReadAlongPhase.modelReading);
+
+    final tts = ref.read(ttsServiceProvider);
+    await tts.speak(_lines[_currentLine]);
+
+    if (mounted) {
+      setState(() {
+        _phase = _phase == _ReadAlongPhase.modelReading
+            ? _ReadAlongPhase.idle
+            : _phase;
+      });
+    }
+  }
+
+  // ============ 语音识别录制 ============
+
+  Future<void> _startRecording() async {
+    if (!_speechAvailable) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('语音识别不可用，请检查权限设置')),
+        );
+      }
+      return;
+    }
+
+    // 停止 TTS
+    await ref.read(ttsServiceProvider).stop();
+
+    setState(() {
+      _phase = _ReadAlongPhase.recording;
+      _liveText = '';
+    });
+
+    await _speech.listen(
+      onResult: _onSpeechResult,
+      listenOptions: SpeechListenOptions(
+        localeId: 'zh_CN',
+        listenMode: ListenMode.dictation,
+        cancelOnError: true,
+        listenFor: const Duration(seconds: 15),
+        pauseFor: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    if (!mounted) return;
+
+    setState(() => _liveText = result.recognizedWords);
+
+    if (result.finalResult) {
+      _finishRecording(result.recognizedWords);
+    }
+  }
+
+  void _finishRecording(String recognized) {
+    if (_phase != _ReadAlongPhase.recording) return;
+
+    _speech.stop();
+
+    final original = _lines[_currentLine];
+    final score = _calculateAccuracy(original, recognized);
+
+    setState(() {
+      _recognizedTexts.add(recognized);
+      _scores.add(score);
+      _phase = _ReadAlongPhase.scored;
+    });
+
+    // 触觉反馈
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    if (settingsRepo.hapticEnabled) {
+      if (score >= 0.8) {
+        HapticFeedback.lightImpact();
+      } else {
+        HapticFeedback.mediumImpact();
+      }
+    }
+
+    // 音效
+    final sound = ref.read(soundServiceProvider);
+    if (score >= 0.6) {
+      sound.play(SoundEffect.correct);
+    } else {
+      sound.play(SoundEffect.wrong);
+    }
+  }
+
+  void _stopRecording() {
+    _speech.stop();
+    if (_phase == _ReadAlongPhase.recording) {
+      _finishRecording(_liveText);
+    }
+  }
+
+  // ============ 评分算法 ============
+
+  /// 基于最长公共子序列 (LCS) 计算字符准确率。
+  ///
+  /// 去除标点符号后比较，返回 0.0 ~ 1.0。
+  double _calculateAccuracy(String original, String recognized) {
+    final originalClean = _removePunctuation(original);
+    final recognizedClean = _removePunctuation(recognized);
+
+    if (originalClean.isEmpty) return 1.0;
+    if (recognizedClean.isEmpty) return 0.0;
+
+    final lcsLen = _lcsLength(originalClean, recognizedClean);
+    return lcsLen / originalClean.length;
+  }
+
+  /// 去除中英文标点和空格。
+  String _removePunctuation(String text) {
+    return text.replaceAll(
+      RegExp('[，。！？、；：""''（）《》\\s,.!?;:\'"()\\[\\]{}]'),
+      '',
+    );
+  }
+
+  /// 最长公共子序列长度（动态规划）。
+  int _lcsLength(String a, String b) {
+    final m = a.length;
+    final n = b.length;
+    // 使用滚动数组节省空间
+    var prev = List.filled(n + 1, 0);
+    var curr = List.filled(n + 1, 0);
+
+    for (var i = 1; i <= m; i++) {
+      for (var j = 1; j <= n; j++) {
+        if (a[i - 1] == b[j - 1]) {
+          curr[j] = prev[j - 1] + 1;
+        } else {
+          curr[j] = curr[j - 1] > prev[j] ? curr[j - 1] : prev[j];
+        }
+      }
+      final tmp = prev;
+      prev = curr;
+      curr = tmp;
+      curr.fillRange(0, n + 1, 0);
+    }
+
+    return prev[n];
+  }
+
+  /// 逐字对比：返回原文每个字符是否匹配的列表。
+  List<bool> _charMatches(String original, String recognized) {
+    final origClean = _removePunctuation(original);
+    final recClean = _removePunctuation(recognized);
+
+    if (origClean.isEmpty) return [];
+    if (recClean.isEmpty) return List.filled(origClean.length, false);
+
+    // 使用 LCS 回溯确定匹配位置
+    final m = origClean.length;
+    final n = recClean.length;
+    final dp = List.generate(m + 1, (_) => List.filled(n + 1, 0));
+
+    for (var i = 1; i <= m; i++) {
+      for (var j = 1; j <= n; j++) {
+        if (origClean[i - 1] == recClean[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1] + 1;
+        } else {
+          dp[i][j] = dp[i - 1][j] > dp[i][j - 1]
+              ? dp[i - 1][j]
+              : dp[i][j - 1];
+        }
+      }
+    }
+
+    // 回溯
+    final matches = List.filled(m, false);
+    var i = m;
+    var j = n;
+    while (i > 0 && j > 0) {
+      if (origClean[i - 1] == recClean[j - 1]) {
+        matches[i - 1] = true;
+        i--;
+        j--;
+      } else if (dp[i - 1][j] > dp[i][j - 1]) {
+        i--;
+      } else {
+        j--;
+      }
+    }
+
+    return matches;
+  }
+
+  // ============ 导航 ============
+
+  void _nextLine() {
+    if (_currentLine < _lines.length - 1) {
+      setState(() {
+        _currentLine++;
+        _phase = _ReadAlongPhase.idle;
+        _liveText = '';
+      });
+    } else {
+      setState(() => _phase = _ReadAlongPhase.complete);
+    }
+  }
+
+  void _retryLine() {
+    // 移除最后一次得分
+    if (_recognizedTexts.isNotEmpty) {
+      _recognizedTexts.removeLast();
+      _scores.removeLast();
+    }
+    setState(() {
+      _phase = _ReadAlongPhase.idle;
+      _liveText = '';
+    });
+  }
+
+  double get _overallScore {
+    if (_scores.isEmpty) return 0;
+    return _scores.reduce((a, b) => a + b) / _scores.length;
+  }
+
+  String _scoreEmoji(double score) {
+    if (score >= 0.9) return '🌟';
+    if (score >= 0.7) return '👍';
+    if (score >= 0.5) return '💪';
+    return '🔄';
+  }
+
+  String _scoreLabel(double score) {
+    if (score >= 0.9) return '太棒了！';
+    if (score >= 0.7) return '读得不错！';
+    if (score >= 0.5) return '继续加油！';
+    return '再试一次吧';
+  }
+
+  Color _scoreColor(double score, ThemeData theme) {
+    if (score >= 0.8) return theme.semantic.success;
+    if (score >= 0.6) return theme.semantic.caution;
+    return theme.colorScheme.error;
+  }
+
+  // ============ UI ============
+
+  @override
+  Widget build(BuildContext context) {
+    final poem = ref.watch(poemByIdProvider(widget.poemId));
+    final theme = Theme.of(context);
+
+    if (poem == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('跟读练习')),
+        body: const Center(child: Text('诗词未找到')),
+      );
+    }
+
+    if (_lines.isEmpty) {
+      _lines = _splitLines(poem.content);
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(poem.title),
+        actions: [
+          if (_phase != _ReadAlongPhase.complete)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: SpacingTokens.md),
+                child: Text(
+                  '${_currentLine + 1} / ${_lines.length}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      body: SafeArea(
+        child: _phase == _ReadAlongPhase.complete
+            ? _buildCompleteView(theme)
+            : _buildPracticeView(theme),
+      ),
+    );
+  }
+
+  Widget _buildPracticeView(ThemeData theme) {
+    return AnimatedPageBody(
+      padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.lg),
+      children: [
+        const SizedBox(height: SpacingTokens.xl),
+
+        // 进度条
+        _buildProgressBar(theme),
+        const SizedBox(height: SpacingTokens.xl),
+
+        // 当前行文本
+        _buildLineCard(theme),
+        const SizedBox(height: SpacingTokens.lg),
+
+        // 识别结果 / 实时文本
+        if (_phase == _ReadAlongPhase.recording ||
+            _phase == _ReadAlongPhase.scored)
+          _buildRecognitionResult(theme),
+
+        const Spacer(),
+
+        // 操作按钮
+        _buildActionButtons(theme),
+        const SizedBox(height: SpacingTokens.xl),
+      ],
+    );
+  }
+
+  Widget _buildProgressBar(ThemeData theme) {
+    final progress = _lines.isEmpty
+        ? 0.0
+        : (_currentLine + (_phase == _ReadAlongPhase.scored ? 1 : 0)) /
+            _lines.length;
+
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 6,
+            backgroundColor:
+                theme.colorScheme.primary.withValues(alpha: 0.12),
+            valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.xs),
+        // 已完成行的得分预览
+        if (_scores.isNotEmpty)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: _scores.map((s) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.xs / 2,
+                ),
+                child: Text(
+                  _scoreEmoji(s),
+                  style: const TextStyle(fontSize: 16),
+                ),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLineCard(ThemeData theme) {
+    final line = _lines[_currentLine];
+    final isActive = _phase == _ReadAlongPhase.modelReading;
+
+    return ColoredCard(
+      color: isActive ? theme.colorScheme.primary : theme.colorScheme.surface,
+      backgroundOpacity: isActive ? 0.12 : 0.06,
+      width: double.infinity,
+      child: Column(
+        children: [
+          if (_phase == _ReadAlongPhase.scored)
+            _buildColoredLine(theme)
+          else
+            Text(
+              line,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                height: 1.8,
+                letterSpacing: 2,
+                color: isActive ? theme.colorScheme.primary : null,
+              ),
+              textAlign: TextAlign.center,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 评分后显示逐字着色的原文。
+  Widget _buildColoredLine(ThemeData theme) {
+    final original = _lines[_currentLine];
+    final recognized =
+        _recognizedTexts.isNotEmpty ? _recognizedTexts.last : '';
+    final matches = _charMatches(original, recognized);
+
+    // 还原原始文本的逐字着色（包含标点）
+    var cleanIdx = 0;
+
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: theme.textTheme.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          height: 1.8,
+          letterSpacing: 2,
+        ),
+        children: original.runes.map((rune) {
+          final char = String.fromCharCode(rune);
+          final isPunctuation =
+              _removePunctuation(char).isEmpty;
+
+          if (isPunctuation) {
+            // 标点符号用默认色
+            return TextSpan(text: char);
+          }
+
+          final isMatch =
+              cleanIdx < matches.length && matches[cleanIdx];
+          cleanIdx++;
+
+          return TextSpan(
+            text: char,
+            style: TextStyle(
+              color: isMatch
+                  ? theme.semantic.success
+                  : theme.colorScheme.error,
+              fontWeight: isMatch ? FontWeight.w600 : FontWeight.w800,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildRecognitionResult(ThemeData theme) {
+    if (_phase == _ReadAlongPhase.recording) {
+      return Column(
+        children: [
+          // 录音动画
+          Icon(
+            Icons.mic,
+            size: 48,
+            color: theme.colorScheme.error,
+          )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .scale(
+                begin: const Offset(0.8, 0.8),
+                end: const Offset(1.2, 1.2),
+                duration: 600.ms,
+              )
+              .then()
+              .fadeOut(duration: 300.ms)
+              .then()
+              .fadeIn(duration: 300.ms),
+          const SizedBox(height: SpacingTokens.sm),
+          Text(
+            _liveText.isEmpty ? '请开始朗读…' : _liveText,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      );
+    }
+
+    // scored 阶段
+    final score = _scores.isNotEmpty ? _scores.last : 0.0;
+    final percent = (score * 100).round();
+
+    return Column(
+      children: [
+        // 分数显示
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _scoreEmoji(score),
+              style: const TextStyle(fontSize: 32),
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            Text(
+              '$percent分',
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: _scoreColor(score, theme),
+              ),
+            ),
+          ],
+        )
+            .animate()
+            .scale(
+              begin: const Offset(0.5, 0.5),
+              end: const Offset(1.0, 1.0),
+              duration: 400.ms,
+              curve: Curves.elasticOut,
+            )
+            .fadeIn(duration: 300.ms),
+        const SizedBox(height: SpacingTokens.xs),
+        Text(
+          _scoreLabel(score),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: _scoreColor(score, theme),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        // 识别到的文字
+        if (_recognizedTexts.isNotEmpty &&
+            _recognizedTexts.last.isNotEmpty)
+          ColoredCard(
+            color: theme.colorScheme.surfaceContainerHighest,
+            backgroundOpacity: 0.5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '识别结果',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.xs),
+                Text(
+                  _recognizedTexts.last,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(ThemeData theme) {
+    switch (_phase) {
+      case _ReadAlongPhase.idle:
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _playModelReading,
+                icon: const Icon(Icons.volume_up),
+                label: const Text('听一听'),
+              ),
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _speechAvailable ? _startRecording : null,
+                icon: const Icon(Icons.mic),
+                label: const Text('读一读'),
+              ),
+            ),
+          ],
+        );
+
+      case _ReadAlongPhase.modelReading:
+        return SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              await ref.read(ttsServiceProvider).stop();
+              if (mounted) {
+                setState(() => _phase = _ReadAlongPhase.idle);
+              }
+            },
+            icon: const Icon(Icons.stop),
+            label: const Text('停止播放'),
+          ),
+        );
+
+      case _ReadAlongPhase.recording:
+        return SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _stopRecording,
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+            ),
+            icon: const Icon(Icons.stop),
+            label: const Text('结束录音'),
+          ),
+        );
+
+      case _ReadAlongPhase.scored:
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _retryLine,
+                icon: const Icon(Icons.refresh),
+                label: const Text('重读'),
+              ),
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _nextLine,
+                icon: Icon(
+                  _currentLine < _lines.length - 1
+                      ? Icons.arrow_forward
+                      : Icons.check,
+                ),
+                label: Text(
+                  _currentLine < _lines.length - 1 ? '下一句' : '查看结果',
+                ),
+              ),
+            ),
+          ],
+        );
+
+      case _ReadAlongPhase.complete:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildCompleteView(ThemeData theme) {
+    final overall = _overallScore;
+    final percent = (overall * 100).round();
+    final stars = overall >= 0.9
+        ? 3
+        : overall >= 0.7
+            ? 2
+            : overall >= 0.5
+                ? 1
+                : 0;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(SpacingTokens.lg),
+      child: Column(
+        children: [
+          const SizedBox(height: SpacingTokens.xl),
+
+          // 星星
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(3, (i) {
+              final filled = i < stars;
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.xs,
+                ),
+                child: Icon(
+                  filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                  size: 48,
+                  color: filled
+                      ? const Color(0xFFFFC107)
+                      : theme.colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.3),
+                ),
+              );
+            }),
+          )
+              .animate()
+              .scale(
+                begin: const Offset(0.3, 0.3),
+                end: const Offset(1.0, 1.0),
+                duration: 600.ms,
+                curve: Curves.elasticOut,
+              )
+              .fadeIn(duration: 300.ms),
+          const SizedBox(height: SpacingTokens.md),
+
+          // 总分
+          Text(
+            '$percent 分',
+            style: theme.textTheme.displaySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: _scoreColor(overall, theme),
+            ),
+          ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            _scoreLabel(overall),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: _scoreColor(overall, theme),
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.xl),
+
+          // 每行得分明细
+          ColoredCard(
+            color: theme.colorScheme.primary,
+            backgroundOpacity: 0.06,
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '各句得分',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                ...List.generate(_lines.length, (i) {
+                  final score = i < _scores.length ? _scores[i] : 0.0;
+                  final pct = (score * 100).round();
+                  return Padding(
+                    padding: const EdgeInsets.only(
+                      bottom: SpacingTokens.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          _scoreEmoji(score),
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(width: SpacingTokens.sm),
+                        Expanded(
+                          child: Text(
+                            _lines[i],
+                            style: theme.textTheme.bodyMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: SpacingTokens.sm),
+                        Text(
+                          '$pct分',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: _scoreColor(score, theme),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.lg),
+
+          // 操作按钮
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _currentLine = 0;
+                      _phase = _ReadAlongPhase.idle;
+                      _recognizedTexts.clear();
+                      _scores.clear();
+                      _liveText = '';
+                    });
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('再练一次'),
+                ),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.check),
+                  label: const Text('完成'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.lg),
+        ],
+      ),
+    );
+  }
+}

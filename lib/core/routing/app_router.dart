@@ -29,6 +29,7 @@ import 'package:poemath/features/poem/poem_detail_page.dart';
 import 'package:poemath/features/poem/poem_favorites_page.dart';
 import 'package:poemath/features/poem/poem_learning_path_page.dart';
 import 'package:poemath/features/poem/poem_quiz_page.dart';
+import 'package:poemath/features/poem/poem_read_along_page.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/poem_review_page.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
@@ -129,6 +130,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const PoemLearningPathPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.poemReadAlong,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: PoemReadAlongPage(poemId: state.pathParameters['id']!),
         ),
       ),
       // ============ 口算练习（非 Shell 子路由，全屏） ============

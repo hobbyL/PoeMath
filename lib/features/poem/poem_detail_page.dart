@@ -233,11 +233,23 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               ),
               const SizedBox(width: SpacingTokens.sm),
               Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    context.push(
+                      AppRoutes.poemReadAlongOf(widget.poemId),
+                    );
+                  },
+                  icon: const Icon(Icons.mic),
+                  label: const Text('跟读'),
+                ),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              Expanded(
                 child: FilledButton.icon(
                   onPressed: () =>
                       _showQuizTypePicker(context, widget.poemId),
                   icon: const Icon(Icons.quiz_outlined),
-                  label: const Text('开始测试'),
+                  label: const Text('测试'),
                 ),
               ),
             ],
