@@ -76,6 +76,12 @@ class PoemTabPage extends ConsumerWidget {
                 actions: [
                   IconButton(
                     onPressed: () =>
+                        context.push(AppRoutes.poemLearningPath),
+                    icon: const Icon(Icons.route_rounded),
+                    tooltip: '学习路径',
+                  ),
+                  IconButton(
+                    onPressed: () =>
                         context.push(AppRoutes.poemFavorites),
                     icon: const Icon(Icons.favorite_border),
                     tooltip: '我的收藏',
