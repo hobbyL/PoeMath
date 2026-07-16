@@ -19,6 +19,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/profile/backup_restore_page.dart';
 import 'package:poemath/features/profile/cloud_sync_page.dart';
+import 'package:poemath/features/profile/notification_settings_page.dart';
 import 'package:poemath/features/profile/practice_settings_page.dart';
 import 'package:poemath/features/profile/tts_settings_page.dart';
 
@@ -176,11 +177,8 @@ class SettingsPage extends ConsumerWidget {
             _buildPracticeSettings(context, ref),
             const SizedBox(height: SpacingTokens.md),
 
-            // 学习提醒
-            const _ReminderTile(),
-            const SizedBox(height: SpacingTokens.sm),
-            // 周报推送
-            const _WeeklyReportTile(),
+            // 通知设置（学习提醒 + 周报推送 → 子页面）
+            _buildNotificationSettings(context),
             const SizedBox(height: SpacingTokens.md),
 
             // 备份与恢复
@@ -378,181 +376,36 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
   }
-}
 
-/// 学习提醒设置行 — 开关 + 时间选择。
-///
-/// 独立 StatefulWidget 以管理通知服务的本地状态。
-class _ReminderTile extends StatefulWidget {
-  const _ReminderTile();
-
-  @override
-  State<_ReminderTile> createState() => _ReminderTileState();
-}
-
-class _ReminderTileState extends State<_ReminderTile> {
-  late bool _enabled;
-  late int _hour;
-  late int _minute;
-
-  @override
-  void initState() {
-    super.initState();
-    final svc = NotificationService.instance;
-    _enabled = svc.isReminderEnabled;
-    _hour = svc.reminderHour;
-    _minute = svc.reminderMinute;
-  }
-
-  String get _timeLabel =>
-      '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')}';
-
-  Future<void> _toggle(bool value) async {
-    final svc = NotificationService.instance;
-    if (value) {
-      final granted = await svc.requestPermission();
-      if (!granted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('需要通知权限才能设置提醒')),
-          );
-        }
-        return;
-      }
-      await svc.scheduleDailyReminder(_hour, _minute);
-    } else {
-      await svc.cancelDailyReminder();
-    }
-    if (mounted) setState(() => _enabled = value);
-  }
-
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: _hour, minute: _minute),
-      helpText: '选择提醒时间',
-    );
-    if (picked == null || !mounted) return;
-
-    setState(() {
-      _hour = picked.hour;
-      _minute = picked.minute;
-    });
-
-    if (_enabled) {
-      await NotificationService.instance
-          .scheduleDailyReminder(_hour, _minute);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildNotificationSettings(BuildContext context) {
     final theme = Theme.of(context);
+    final svc = NotificationService.instance;
+    final reminderOn = svc.isReminderEnabled;
+    final weeklyOn = svc.isWeeklyReportEnabled;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AppTile(
-          icon: Icons.notifications_outlined,
-          iconColor: theme.colorScheme.secondary,
-          title: '学习提醒',
-          subtitle: _enabled ? '每天 $_timeLabel 提醒' : '已关闭',
-          trailing: Switch(
-            value: _enabled,
-            onChanged: _toggle,
-          ),
-        ),
-        if (_enabled) ...[
-          const SizedBox(height: SpacingTokens.xs),
-          Padding(
-            padding: const EdgeInsets.only(left: 56),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-              onTap: _pickTime,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.md,
-                  vertical: SpacingTokens.sm,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.access_time,
-                      size: 18,
-                      color: theme.colorScheme.onSurface
-                          .withValues(alpha: 0.6),
-                    ),
-                    const SizedBox(width: SpacingTokens.sm),
-                    Text(
-                      '提醒时间：$_timeLabel',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.7),
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      Icons.edit_outlined,
-                      size: 16,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-/// 周报推送开关。
-class _WeeklyReportTile extends StatefulWidget {
-  const _WeeklyReportTile();
-
-  @override
-  State<_WeeklyReportTile> createState() => _WeeklyReportTileState();
-}
-
-class _WeeklyReportTileState extends State<_WeeklyReportTile> {
-  late bool _enabled;
-
-  @override
-  void initState() {
-    super.initState();
-    _enabled = NotificationService.instance.isWeeklyReportEnabled;
-  }
-
-  Future<void> _toggle(bool value) async {
-    if (value) {
-      final granted = await NotificationService.instance.requestPermission();
-      if (!granted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('需要通知权限才能开启周报推送')),
-          );
-        }
-        return;
-      }
-      await NotificationService.instance.scheduleWeeklyReport();
+    String subtitle;
+    if (reminderOn && weeklyOn) {
+      final h = svc.reminderHour.toString().padLeft(2, '0');
+      final m = svc.reminderMinute.toString().padLeft(2, '0');
+      subtitle = '提醒 $h:$m · 周报已开启';
+    } else if (reminderOn) {
+      final h = svc.reminderHour.toString().padLeft(2, '0');
+      final m = svc.reminderMinute.toString().padLeft(2, '0');
+      subtitle = '提醒 $h:$m · 周报已关闭';
+    } else if (weeklyOn) {
+      subtitle = '提醒已关闭 · 周报已开启';
     } else {
-      await NotificationService.instance.cancelWeeklyReport();
+      subtitle = '提醒已关闭 · 周报已关闭';
     }
-    if (mounted) setState(() => _enabled = value);
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return AppTile(
-      icon: Icons.insert_chart_outlined,
-      iconColor: theme.colorScheme.tertiary,
-      title: '学习周报',
-      subtitle: _enabled ? '每周日 18:00 推送' : '已关闭',
-      trailing: Switch(
-        value: _enabled,
-        onChanged: _toggle,
+      icon: Icons.notifications_outlined,
+      iconColor: theme.colorScheme.secondary,
+      title: '通知设置',
+      subtitle: subtitle,
+      onTap: () => Navigator.push<void>(
+        context,
+        fadeSlideRoute(builder: (_) => const NotificationSettingsPage()),
       ),
     );
   }

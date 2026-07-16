@@ -40,6 +40,7 @@ import 'package:poemath/features/profile/learning_stats_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/update_page.dart';
+import 'package:poemath/features/profile/weekly_report_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 import 'package:poemath/features/shell/onboarding_page.dart';
 import 'package:poemath/features/shell/splash_page.dart';
@@ -246,6 +247,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             updateClient: UpdateClient(updateUrl: AppConfig.updateCheckUrl),
             updateInstaller: AndroidUpdateInstaller(),
           ),
+        ),
+      ),
+      // ============ 学习周报（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.weeklyReport,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const WeeklyReportPage(),
         ),
       ),
     ],

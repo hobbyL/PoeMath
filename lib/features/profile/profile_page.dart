@@ -148,6 +148,16 @@ class ProfilePage extends ConsumerWidget {
                 ),
               ],
             ),
+            const SizedBox(height: SpacingTokens.sm),
+
+            // 本周学习周报
+            AppTile(
+              icon: Icons.insert_chart_outlined,
+              iconColor: theme.colorScheme.tertiary,
+              title: '本周学习周报',
+              subtitle: '查看本周学习汇总与趋势',
+              onTap: () => context.push(AppRoutes.weeklyReport),
+            ),
             const SizedBox(height: SpacingTokens.md),
           ],
         ),

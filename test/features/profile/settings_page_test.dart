@@ -111,7 +111,7 @@ void main() {
 
     // 验证有 Switch 控件
     final switches = find.byType(Switch);
-    expect(switches, findsNWidgets(4)); // 拼音、音效、触觉反馈、学习提醒
+    expect(switches, findsNWidgets(3)); // 拼音、音效、触觉反馈
 
     // 不抛异常即可
     expect(tester.takeException(), isNull);

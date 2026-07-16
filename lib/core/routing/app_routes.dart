@@ -43,6 +43,7 @@ class AppRoutes {
   static const String achievements = '/profile/achievements';
   static const String about = '/profile/about';
   static const String update = '/profile/update';
+  static const String weeklyReport = '/profile/weekly-report';
 
   // ============ 路径构造器 ============
   static String poemDetailOf(String id) => '/poem/detail/$id';
