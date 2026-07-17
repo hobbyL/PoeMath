@@ -40,12 +40,14 @@ class PoemTabPage extends ConsumerWidget {
     final selected = ref.watch(selectedGradeProvider);
     final statusFilter = ref.watch(selectedStatusFilterProvider);
     final theme = Theme.of(context);
+    final isWide = MediaQuery.sizeOf(context).width >= 420;
 
     final filterLabel = selected == null
         ? '全部'
         : _gradeLabels[selected] ?? '$selected 年级';
 
     final hasStatusFilter = statusFilter != null;
+    final statusLabel = _statusLabels[statusFilter] ?? '全部状态';
 
     return Scaffold(
       body: LayoutBuilder(
@@ -56,22 +58,50 @@ class PoemTabPage extends ConsumerWidget {
               SliverAppBar(
                 floating: true,
                 snap: true,
-                leading: Padding(
-                  padding: const EdgeInsets.only(left: SpacingTokens.xs),
-                  child: IconButton(
-                    onPressed: () =>
-                        _showStatusPicker(context, ref, statusFilter),
-                    icon: Icon(
-                      hasStatusFilter
-                          ? Icons.filter_alt
-                          : Icons.filter_alt_outlined,
-                      color: hasStatusFilter
-                          ? theme.colorScheme.primary
-                          : null,
-                    ),
-                    tooltip: _statusLabels[statusFilter] ?? '筛选状态',
-                  ),
-                ),
+                automaticallyImplyLeading: false,
+                leadingWidth: isWide ? 120.0 : null,
+                leading: isWide
+                    ? TextButton.icon(
+                        onPressed: () =>
+                            _showStatusPicker(context, ref, statusFilter),
+                        icon: Icon(
+                          hasStatusFilter
+                              ? Icons.filter_alt
+                              : Icons.filter_alt_outlined,
+                          size: 18,
+                          color: hasStatusFilter
+                              ? theme.colorScheme.primary
+                              : null,
+                        ),
+                        label: Text(
+                          statusLabel,
+                          style: hasStatusFilter
+                              ? TextStyle(
+                                  color: theme.colorScheme.primary,
+                                )
+                              : null,
+                        ),
+                      )
+                    : Padding(
+                        padding:
+                            const EdgeInsets.only(left: SpacingTokens.xs),
+                        child: IconButton(
+                          onPressed: () => _showStatusPicker(
+                            context,
+                            ref,
+                            statusFilter,
+                          ),
+                          icon: Icon(
+                            hasStatusFilter
+                                ? Icons.filter_alt
+                                : Icons.filter_alt_outlined,
+                            color: hasStatusFilter
+                                ? theme.colorScheme.primary
+                                : null,
+                          ),
+                          tooltip: statusLabel,
+                        ),
+                      ),
                 title: const Text('诗词'),
                 actions: [
                   IconButton(
@@ -86,12 +116,20 @@ class PoemTabPage extends ConsumerWidget {
                     icon: const Icon(Icons.favorite_border),
                     tooltip: '我的收藏',
                   ),
-                  TextButton.icon(
-                    onPressed: () =>
-                        _showGradePicker(context, ref, selected),
-                    icon: const Icon(Icons.filter_list, size: 18),
-                    label: Text(filterLabel),
-                  ),
+                  if (isWide)
+                    TextButton.icon(
+                      onPressed: () =>
+                          _showGradePicker(context, ref, selected),
+                      icon: const Icon(Icons.filter_list, size: 18),
+                      label: Text(filterLabel),
+                    )
+                  else
+                    IconButton(
+                      onPressed: () =>
+                          _showGradePicker(context, ref, selected),
+                      icon: const Icon(Icons.filter_list),
+                      tooltip: filterLabel,
+                    ),
                 ],
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(56),
