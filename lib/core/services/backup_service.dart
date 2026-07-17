@@ -64,6 +64,7 @@ class BackupService {
   ///
   /// 返回恢复的记录总数。
   /// 如果版本不兼容，抛出 [FormatException]。
+  /// 恢复失败时自动回滚到恢复前的数据状态。
   Future<int> restoreFromJson(String jsonString) async {
     final Map<String, dynamic> data;
     try {
@@ -77,6 +78,26 @@ class BackupService {
       throw FormatException('备份文件版本 ($version) 高于当前支持版本');
     }
 
+    // 恢复前先快照当前数据，失败时用于回滚
+    final snapshot = exportToJson();
+
+    try {
+      return await _doRestore(data);
+    } on Object {
+      // 恢复失败，回滚到快照
+      try {
+        final rollback =
+            jsonDecode(snapshot) as Map<String, dynamic>;
+        await _doRestore(rollback);
+      } on Object {
+        // 回滚也失败，数据可能不完整，但至少尝试过了
+      }
+      rethrow;
+    }
+  }
+
+  /// 执行实际的数据恢复，返回记录总数。
+  Future<int> _doRestore(Map<String, dynamic> data) async {
     var count = 0;
 
     count += await _restorePoemProgress(

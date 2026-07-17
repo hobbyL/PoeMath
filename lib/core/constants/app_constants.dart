@@ -13,7 +13,7 @@ class AppConstants {
   static const String appNameEn = 'PoeMath';
 
   /// 版本号（build 时可覆盖）
-  static const String appVersion = '0.1.0';
+  static const String appVersion = '1.0.0';
 
   /// 数据版本号（修改后首次启动会重新导入 asset 数据）
   static const String dataVersion = '1.0.0';

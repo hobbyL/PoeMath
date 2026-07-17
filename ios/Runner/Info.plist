@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>poemath</string>
+	<string>韵算</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -45,6 +45,8 @@
 	<string>韵算需要使用麦克风来录制你的朗读，以便进行跟读评分</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>韵算需要使用语音识别来将你的朗读转换为文字，以便进行跟读评分</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>韵算需要发送通知来提醒你每日学习和查看学习周报</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
