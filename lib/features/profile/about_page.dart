@@ -4,6 +4,7 @@
 // 职责：关于页面 — 展示应用版本、开发者信息、隐私政策和开源许可。
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -23,6 +24,9 @@ class AboutPage extends StatefulWidget {
 
 class _AboutPageState extends State<AboutPage> {
   PackageInfo? _packageInfo;
+
+  /// 缓存隐私政策加载，避免 BottomSheet 重建时重复读 asset。
+  Future<String>? _privacyPolicyFuture;
 
   @override
   void initState() {
@@ -232,20 +236,20 @@ class _AboutPageState extends State<AboutPage> {
 
   void _showPrivacyPolicy(BuildContext context) {
     final theme = Theme.of(context);
+    _privacyPolicyFuture ??= _loadPrivacyPolicyText();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
         return DraggableScrollableSheet(
           expand: false,
-          initialChildSize: 0.7,
-          maxChildSize: 0.9,
+          initialChildSize: 0.75,
+          maxChildSize: 0.95,
           minChildSize: 0.4,
           builder: (ctx, scrollController) {
             return SafeArea(
               child: Column(
                 children: [
-                  // 拖拽指示器
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       vertical: SpacingTokens.sm,
@@ -273,17 +277,31 @@ class _AboutPageState extends State<AboutPage> {
                   ),
                   const SizedBox(height: SpacingTokens.sm),
                   Expanded(
-                    child: SingleChildScrollView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(SpacingTokens.md),
-                      child: Text(
-                        _privacyPolicyText,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.8,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.8),
-                        ),
-                      ),
+                    child: FutureBuilder<String>(
+                      future: _privacyPolicyFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState !=
+                            ConnectionState.done) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        final text = snapshot.hasError
+                            ? _privacyPolicyFallback
+                            : (snapshot.data ?? _privacyPolicyFallback);
+                        return SingleChildScrollView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.all(SpacingTokens.md),
+                          child: Text(
+                            text,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              height: 1.7,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.85),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -295,47 +313,73 @@ class _AboutPageState extends State<AboutPage> {
     );
   }
 
-  static const String _privacyPolicyText = '''
+  /// 与 `docs/PRIVACY.md` 同源：打包资源 `assets/legal/privacy_policy.md`。
+  static Future<String> _loadPrivacyPolicyText() async {
+    final raw = await rootBundle.loadString(_privacyPolicyAsset);
+    return _markdownToPlainText(raw);
+  }
+
+  /// 轻量去掉 Markdown 标记，便于 BottomSheet 纯文本阅读。
+  static String _markdownToPlainText(String markdown) {
+    final lines = markdown.split('\n');
+    final out = <String>[];
+    for (final line in lines) {
+      var s = line;
+      // 跳过仅含引用提示的仓库维护说明行（应用内无需展示）
+      if (s.startsWith('> 本文档与应用内') ||
+          s.startsWith('> 修改隐私说明时')) {
+        continue;
+      }
+      s = s.replaceFirst(RegExp(r'^#{1,6}\s*'), '');
+      s = s.replaceAllMapped(
+        RegExp(r'\*\*(.+?)\*\*'),
+        (m) => m.group(1) ?? '',
+      );
+      s = s.replaceAllMapped(
+        RegExp(r'`([^`]+)`'),
+        (m) => m.group(1) ?? '',
+      );
+      s = s.replaceFirst(RegExp(r'^>\s?'), '');
+      // 表格分隔线省略
+      if (RegExp(r'^\|[\s:-]+\|$').hasMatch(s.replaceAll(' ', ''))) {
+        continue;
+      }
+      out.add(s);
+    }
+    return out.join('\n').trim();
+  }
+
+  static const String _privacyPolicyAsset =
+      'assets/legal/privacy_policy.md';
+
+  /// Asset 加载失败时的精简兜底（与正式政策原则一致，避免空白）。
+  static const String _privacyPolicyFallback = '''
 韵算 (PoeMath) 隐私政策
 
-最后更新日期：2026年7月
+最后更新：2026 年 7 月 17 日
 
-一、信息收集
+一、产品原则
+韵算为离线优先儿童学习应用。诗词、口算、公式、打卡等核心功能不依赖网络。不向开发者服务器收集个人信息；无广告、无内购、无分析追踪 SDK。
 
-韵算是一款纯本地应用，我们不会收集、传输或存储您的任何个人信息到远程服务器。
+二、本地数据
+学习进度、错题、成就等默认仅存本机。卸载将删除本地数据；请先使用「备份与恢复」导出。
 
-所有学习数据（包括学习进度、成就记录、练习历史等）均存储在您的设备本地。
+三、可选能力（需主动使用）
+• 本地备份/恢复：导出 JSON 或系统分享，不经开发者服务器
+• WebDAV：仅连接您配置的服务器；凭据加密存本机
+• 检查更新：仅在已配置更新地址且您点击后下载/校验/安装 APK
+• 诗词跟读：需麦克风，使用系统语音识别
+• 学习提醒：需通知权限，本机定时通知
 
-二、数据存储
+四、权限
+可能涉及：网络、安装应用包、麦克风、通知、振动、开机完成（恢复提醒）。不申请通讯录、定位、短信等无关权限。
 
-• 应用使用 Hive 数据库将所有数据存储在设备本地
-• 您可以通过"备份与恢复"功能导出数据到本地文件
-• 您可以选择通过 WebDAV 将数据同步到您自己的云端服务器
+五、儿童隐私
+面向 6–12 岁；建议家长管理 WebDAV、更新与敏感权限。
 
-三、第三方服务
+六、联系
+我的 → 关于 → 隐私政策；或通过开源仓库 Issue。
 
-• 应用不集成任何第三方分析、广告或追踪服务
-• TTS（文字转语音）功能使用系统内置引擎，不传输数据
-
-四、儿童隐私
-
-本应用面向儿童用户群体。我们严格遵守儿童隐私保护原则：
-• 不收集儿童的个人信息
-• 不包含任何广告内容
-• 不包含应用内购买
-• 不包含社交功能
-
-五、数据删除
-
-您可以随时通过以下方式删除所有数据：
-• 在应用内切换或删除学习档案
-• 卸载应用（将删除所有本地数据）
-
-六、政策更新
-
-我们可能会不时更新本隐私政策。更新后的政策将随应用新版本发布。
-
-七、联系我们
-
-如果您对本隐私政策有任何疑问，请通过应用商店页面联系我们。''';
+完整条款见应用资源 assets/legal/privacy_policy.md 与仓库 docs/PRIVACY.md。
+''';
 }

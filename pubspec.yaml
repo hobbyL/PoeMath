@@ -78,17 +78,4 @@ flutter:
     - assets/data/
     - assets/icons/
     - assets/sounds/
-    - assets/fonts/
-
-  # 字体文件在 Phase 0 尚未提供实文件，占位声明先注释掉，避免 pub get 报错。
-  # 待 Phase 1/2 补齐字体资源后启用。
-  # fonts:
-  #   - family: NotoSerifSC
-  #     fonts:
-  #       - asset: assets/fonts/NotoSerifSC-Regular.otf
-  #   - family: NotoSansSC
-  #     fonts:
-  #       - asset: assets/fonts/NotoSansSC-Regular.otf
-  #   - family: Nunito
-  #     fonts:
-  #       - asset: assets/fonts/Nunito-Regular.ttf
+    - assets/legal/

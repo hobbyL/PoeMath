@@ -104,90 +104,76 @@ class MathTheme {
     );
   }
 
+  /// 使用系统默认字体；口算主题用偏粗字重保持童趣识别度。
   static TextTheme _textTheme(Color color) => TextTheme(
         displayLarge: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: TypographyTokens.fsDisplay,
           fontWeight: FontWeight.w800,
           color: color,
         ),
         displayMedium: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: 28,
           fontWeight: FontWeight.w700,
           color: color,
         ),
         displaySmall: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: 24,
           fontWeight: FontWeight.w700,
           color: color,
         ),
         headlineLarge: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: TypographyTokens.fsHeadline,
           fontWeight: FontWeight.w700,
           color: color,
         ),
         headlineMedium: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: TypographyTokens.fsHeadline,
           fontWeight: FontWeight.w700,
           color: color,
         ),
         headlineSmall: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: 22,
           fontWeight: FontWeight.w600,
           color: color,
         ),
         titleLarge: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: TypographyTokens.fsTitle,
           fontWeight: FontWeight.w600,
           color: color,
         ),
         titleMedium: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: color,
         ),
         titleSmall: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: 14,
           fontWeight: FontWeight.w500,
           color: color,
         ),
         bodyLarge: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: TypographyTokens.fsBody,
           height: 1.5,
           color: color,
         ),
         bodyMedium: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: TypographyTokens.fsBody,
           color: color,
         ),
         bodySmall: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: TypographyTokens.fsCaption,
           color: color,
         ),
         labelLarge: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: 14,
           fontWeight: FontWeight.w500,
           color: color,
         ),
         labelMedium: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: TypographyTokens.fsLabel,
           color: color,
         ),
         labelSmall: TextStyle(
-          fontFamily: TypographyTokens.mathFontFamily,
           fontSize: 11,
           color: color,
         ),

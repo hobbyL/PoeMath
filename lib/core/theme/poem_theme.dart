@@ -104,87 +104,73 @@ class PoemTheme {
     );
   }
 
+  /// 使用系统默认字体；字号与字重区分层级。
   static TextTheme _textTheme(Color color) => TextTheme(
         displayLarge: TextStyle(
-          fontFamily: TypographyTokens.poemFontFamily,
           fontSize: TypographyTokens.fsDisplay,
           fontWeight: FontWeight.w700,
           color: color,
         ),
         displayMedium: TextStyle(
-          fontFamily: TypographyTokens.poemFontFamily,
           fontSize: 28,
           fontWeight: FontWeight.w600,
           color: color,
         ),
         displaySmall: TextStyle(
-          fontFamily: TypographyTokens.poemFontFamily,
           fontSize: 24,
           fontWeight: FontWeight.w600,
           color: color,
         ),
         headlineLarge: TextStyle(
-          fontFamily: TypographyTokens.poemFontFamily,
           fontSize: TypographyTokens.fsHeadline,
           fontWeight: FontWeight.w600,
           color: color,
         ),
         headlineMedium: TextStyle(
-          fontFamily: TypographyTokens.poemFontFamily,
           fontSize: TypographyTokens.fsHeadline,
           color: color,
         ),
         headlineSmall: TextStyle(
-          fontFamily: TypographyTokens.poemFontFamily,
           fontSize: 22,
           color: color,
         ),
         titleLarge: TextStyle(
-          fontFamily: TypographyTokens.poemFontFamily,
           fontSize: TypographyTokens.fsTitle,
           color: color,
         ),
         titleMedium: TextStyle(
-          fontFamily: TypographyTokens.uiFontFamily,
           fontSize: 16,
           fontWeight: FontWeight.w500,
           color: color,
         ),
         titleSmall: TextStyle(
-          fontFamily: TypographyTokens.uiFontFamily,
           fontSize: 14,
           fontWeight: FontWeight.w500,
           color: color,
         ),
         bodyLarge: TextStyle(
-          fontFamily: TypographyTokens.uiFontFamily,
           fontSize: TypographyTokens.fsBody,
           height: 1.5,
           color: color,
         ),
         bodyMedium: TextStyle(
-          fontFamily: TypographyTokens.uiFontFamily,
           fontSize: TypographyTokens.fsBody,
           color: color,
         ),
         bodySmall: TextStyle(
-          fontFamily: TypographyTokens.uiFontFamily,
           fontSize: TypographyTokens.fsCaption,
           color: color,
         ),
         labelLarge: TextStyle(
-          fontFamily: TypographyTokens.uiFontFamily,
           fontSize: 14,
           fontWeight: FontWeight.w500,
           color: color,
         ),
         labelMedium: TextStyle(
-          fontFamily: TypographyTokens.uiFontFamily,
           fontSize: TypographyTokens.fsLabel,
           color: color,
         ),
         labelSmall: TextStyle(
-          fontFamily: TypographyTokens.uiFontFamily,
           fontSize: 11,
           color: color,
         ),
@@ -200,7 +186,6 @@ class PoemThemeExt extends ThemeExtension<PoemThemeExt> {
   TextStyle get poemContent => TypographyTokens.poemContentStyle();
 
   TextStyle get pinyin => const TextStyle(
-        fontFamily: TypographyTokens.uiFontFamily,
         fontSize: TypographyTokens.fsPinyin,
         color: ColorTokens.poemInkLight,
       );
