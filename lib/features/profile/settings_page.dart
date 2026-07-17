@@ -53,8 +53,8 @@ class SettingsPage extends ConsumerWidget {
     };
 
     final subjectLabel = switch (subject) {
-      AppSubject.poem => '诗词',
-      AppSubject.math => '口算',
+      AppSubject.poem => '国风水墨',
+      AppSubject.math => '童趣马卡龙',
     };
 
     final modeLabel = switch (mode) {
@@ -264,15 +264,11 @@ class SettingsPage extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           RadioListTile<AppSubject>(
-                            title: Text('诗词'),
-                            subtitle: Text('国风水墨主题'),
-                            secondary: Icon(Icons.brush_rounded),
+                            title: Text('国风水墨主题'),
                             value: AppSubject.poem,
                           ),
                           RadioListTile<AppSubject>(
-                            title: Text('口算'),
-                            subtitle: Text('童趣马卡龙主题'),
-                            secondary: Icon(Icons.calculate_rounded),
+                            title: Text('童趣马卡龙主题'),
                             value: AppSubject.math,
                           ),
                         ],
