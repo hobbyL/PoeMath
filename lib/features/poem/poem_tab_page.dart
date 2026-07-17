@@ -59,11 +59,17 @@ class PoemTabPage extends ConsumerWidget {
                 floating: true,
                 snap: true,
                 automaticallyImplyLeading: false,
-                leadingWidth: isWide ? 120.0 : null,
-                leading: isWide
-                    ? TextButton.icon(
-                        onPressed: () =>
-                            _showStatusPicker(context, ref, statusFilter),
+                leadingWidth: isWide ? 168.0 : 96.0,
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isWide)
+                      TextButton.icon(
+                        onPressed: () => _showStatusPicker(
+                          context,
+                          ref,
+                          statusFilter,
+                        ),
                         icon: Icon(
                           hasStatusFilter
                               ? Icons.filter_alt
@@ -82,34 +88,33 @@ class PoemTabPage extends ConsumerWidget {
                               : null,
                         ),
                       )
-                    : Padding(
-                        padding:
-                            const EdgeInsets.only(left: SpacingTokens.xs),
-                        child: IconButton(
-                          onPressed: () => _showStatusPicker(
-                            context,
-                            ref,
-                            statusFilter,
-                          ),
-                          icon: Icon(
-                            hasStatusFilter
-                                ? Icons.filter_alt
-                                : Icons.filter_alt_outlined,
-                            color: hasStatusFilter
-                                ? theme.colorScheme.primary
-                                : null,
-                          ),
-                          tooltip: statusLabel,
+                    else
+                      IconButton(
+                        onPressed: () => _showStatusPicker(
+                          context,
+                          ref,
+                          statusFilter,
                         ),
+                        icon: Icon(
+                          hasStatusFilter
+                              ? Icons.filter_alt
+                              : Icons.filter_alt_outlined,
+                          color: hasStatusFilter
+                              ? theme.colorScheme.primary
+                              : null,
+                        ),
+                        tooltip: statusLabel,
                       ),
+                    IconButton(
+                      onPressed: () =>
+                          context.push(AppRoutes.poemLearningPath),
+                      icon: const Icon(Icons.route_rounded),
+                      tooltip: '学习路径',
+                    ),
+                  ],
+                ),
                 title: const Text('诗词'),
                 actions: [
-                  IconButton(
-                    onPressed: () =>
-                        context.push(AppRoutes.poemLearningPath),
-                    icon: const Icon(Icons.route_rounded),
-                    tooltip: '学习路径',
-                  ),
                   IconButton(
                     onPressed: () =>
                         context.push(AppRoutes.poemFavorites),
