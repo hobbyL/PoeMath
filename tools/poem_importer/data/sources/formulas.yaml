@@ -1,6 +1,6 @@
 # PoeMath 数学公式源 — 人教版小学数学 1-6 年级
 # 分类：几何面积/几何周长/几何体积/单位换算/数量关系/运算定律/分数小数/比例
-# 共 32 条示例（目标 60-80 条；本文件为 Phase 1 交付示例集）
+# 共 60+ 条（内容重建扩充）
 
 formulas:
   # ---------- 几何 · 周长 ----------
@@ -441,3 +441,380 @@ formulas:
     memory_tip: 内项之积等于外项之积。
     example: "3 : 4 = 6 : x → 3x = 24 → x = 8。"
     related_formulas: [formula_percentage]
+
+  # ---------- 内容重建追加（目标 60+）----------
+  - id: formula_area_rhombus
+    category: 几何面积
+    name: 菱形面积
+    formula_text: S = a × h = (d1 × d2) ÷ 2
+    formula_latex: "S = a h = \\frac{d_1 d_2}{2}"
+    grade: 5
+    params:
+      - {symbol: S, meaning: 面积}
+      - {symbol: a, meaning: 边长}
+      - {symbol: h, meaning: 对应高}
+      - {symbol: d1, meaning: 一条对角线}
+      - {symbol: d2, meaning: 另一条对角线}
+    memory_tip: 可看成底乘高；也可用对角线乘积的一半。
+    example: 对角线 6 cm、8 cm，面积 = 6×8÷2 = 24 cm²。
+    related_formulas: [formula_area_parallelogram]
+
+  - id: formula_area_sector
+    category: 几何面积
+    name: 扇形面积
+    formula_text: S = (n/360) × π × r²
+    formula_latex: "S = \\frac{n}{360}\\pi r^2"
+    grade: 6
+    params:
+      - {symbol: S, meaning: 扇形面积}
+      - {symbol: n, meaning: 圆心角度数}
+      - {symbol: r, meaning: 半径}
+    memory_tip: 扇形是圆的一部分，占 n/360。
+    example: 半径 6、圆心角 90°，面积 = 90/360×3.14×36 = 28.26。
+    related_formulas: [formula_area_circle, formula_arc_length]
+
+  - id: formula_arc_length
+    category: 几何周长
+    name: 弧长
+    formula_text: l = (n/360) × 2πr
+    formula_latex: "l = \\frac{n}{360} \\times 2\\pi r"
+    grade: 6
+    params:
+      - {symbol: l, meaning: 弧长}
+      - {symbol: n, meaning: 圆心角度数}
+      - {symbol: r, meaning: 半径}
+    memory_tip: 弧长是圆周长的 n/360。
+    example: r=5、n=72°，弧长 = 72/360×2×3.14×5 = 6.28。
+    related_formulas: [formula_perimeter_circle, formula_area_sector]
+
+  - id: formula_area_ring
+    category: 几何面积
+    name: 圆环面积
+    formula_text: S = π(R² − r²)
+    formula_latex: "S = \\pi(R^2 - r^2)"
+    grade: 6
+    params:
+      - {symbol: S, meaning: 圆环面积}
+      - {symbol: R, meaning: 外圆半径}
+      - {symbol: r, meaning: 内圆半径}
+    memory_tip: 大圆面积减小圆面积。
+    example: R=5、r=3，面积 = 3.14×(25-9)=50.24。
+    related_formulas: [formula_area_circle]
+
+  - id: formula_surface_cylinder
+    category: 几何面积
+    name: 圆柱侧面积与表面积
+    formula_text: S侧 = 2πrh；S表 = 2πr(h+r)
+    formula_latex: "S_{\\mathrm{side}}=2\\pi r h"
+    grade: 6
+    params:
+      - {symbol: r, meaning: 底面半径}
+      - {symbol: h, meaning: 高}
+    memory_tip: 侧面展开是长方形，长是底面周长。
+    example: r=2、h=5，侧面积 = 2×3.14×2×5=62.8。
+    related_formulas: [formula_volume_cylinder, formula_perimeter_circle]
+
+  - id: formula_triangle_sum
+    category: 几何关系
+    name: 三角形内角和
+    formula_text: ∠A + ∠B + ∠C = 180°
+    formula_latex: "\\angle A + \\angle B + \\angle C = 180^{\\circ}"
+    grade: 4
+    params:
+      - {symbol: A/B/C, meaning: 三个内角}
+    memory_tip: 三角形三个角加起来是平角。
+    example: 两角 40°、60°，第三角 = 80°。
+    related_formulas: [formula_triangle_sides]
+
+  - id: formula_triangle_sides
+    category: 几何关系
+    name: 三角形三边关系
+    formula_text: 两边之和大于第三边；两边之差小于第三边
+    formula_latex: "a+b>c"
+    grade: 4
+    params:
+      - {symbol: a,b,c, meaning: 三边长}
+    memory_tip: 能围成三角形，两边和必须大于第三边。
+    example: 3、4、5 可以；1、2、3 不可以。
+    related_formulas: [formula_triangle_sum]
+
+  - id: formula_square_diagonal
+    category: 几何关系
+    name: 长方形对角线性质
+    formula_text: 长方形对角线相等且互相平分
+    formula_latex: "d_1 = d_2"
+    grade: 4
+    params:
+      - {symbol: d, meaning: 对角线}
+    memory_tip: 长方形对角线一样长，正方形还互相垂直。
+    example: 长方形两条对角线都是 10 cm。
+    related_formulas: [formula_area_rect, formula_area_square]
+
+  - id: formula_avg
+    category: 数量关系
+    name: 平均数
+    formula_text: 平均数 = 总数量 ÷ 总份数
+    formula_latex: "\\bar{x} = \\frac{\\sum x}{n}"
+    grade: 3
+    params:
+      - {symbol: 平均数, meaning: 平均后的结果}
+      - {symbol: n, meaning: 份数}
+    memory_tip: 总数除以份数。
+    example: 3、5、7 的平均 = 15÷3 = 5。
+    related_formulas: [formula_price]
+
+  - id: formula_remainder
+    category: 数量关系
+    name: 有余数除法
+    formula_text: 被除数 = 除数 × 商 + 余数（0 ≤ 余数 < 除数）
+    formula_latex: "a = bq + r"
+    grade: 3
+    params:
+      - {symbol: a, meaning: 被除数}
+      - {symbol: b, meaning: 除数}
+      - {symbol: q, meaning: 商}
+      - {symbol: r, meaning: 余数}
+    memory_tip: 余数一定比除数小。
+    example: 17÷5 = 3……2，因为 5×3+2=17。
+    related_formulas: [formula_law_mul_commutative]
+
+  - id: formula_decimal_add
+    category: 分数小数
+    name: 小数加减
+    formula_text: 小数点对齐后按整数加减
+    formula_latex: "a \\pm b"
+    grade: 4
+    params: []
+    memory_tip: 小数点对齐，末尾可补 0。
+    example: 3.5 + 1.25 = 4.75。
+    related_formulas: [formula_decimal_mul]
+
+  - id: formula_decimal_mul
+    category: 分数小数
+    name: 小数乘法
+    formula_text: 按整数相乘，小数位数 = 因数小数位数之和
+    formula_latex: "a \\times b"
+    grade: 5
+    params: []
+    memory_tip: 先当整数乘，再点小数点。
+    example: 1.2×0.3 = 0.36。
+    related_formulas: [formula_decimal_div, formula_decimal_add]
+
+  - id: formula_decimal_div
+    category: 分数小数
+    name: 小数除法
+    formula_text: 除数化整数，被除数小数点同等移动
+    formula_latex: "a \\div b"
+    grade: 5
+    params: []
+    memory_tip: 除数变整数，被除数跟着挪小数点。
+    example: 3.6÷0.4 = 36÷4 = 9。
+    related_formulas: [formula_decimal_mul]
+
+  - id: formula_fraction_basic
+    category: 分数小数
+    name: 分数基本性质
+    formula_text: 分子分母同乘或同除一个不为 0 的数，分数大小不变
+    formula_latex: "\\frac{a}{b}=\\frac{ak}{bk}"
+    grade: 5
+    params: []
+    memory_tip: 上下同乘同除，大小不变（约分通分依据）。
+    example: 1/2 = 2/4 = 3/6。
+    related_formulas: [formula_fraction_add_diff_denom]
+
+  - id: formula_reciprocal
+    category: 分数小数
+    name: 倒数
+    formula_text: a 与 1/a 互为倒数（a≠0）；乘积为 1
+    formula_latex: "a \\times \\frac{1}{a} = 1"
+    grade: 6
+    params: []
+    memory_tip: 分子分母调个个，就是倒数。
+    example: 3/4 的倒数是 4/3。
+    related_formulas: [formula_fraction_divide]
+
+  - id: formula_percent_three
+    category: 比例
+    name: 百分数三种量
+    formula_text: 比较量 = 标准量 × 百分率；标准量 = 比较量 ÷ 百分率
+    formula_latex: "a = b \\times p\\%"
+    grade: 6
+    params:
+      - {symbol: a, meaning: 比较量}
+      - {symbol: b, meaning: 标准量}
+      - {symbol: p%, meaning: 百分率}
+    memory_tip: 单位「1」× 百分率 = 对应数量。
+    example: 80 的 25% 是 20。
+    related_formulas: [formula_percentage, formula_ratio]
+
+  - id: formula_scale
+    category: 比例
+    name: 比例尺
+    formula_text: 比例尺 = 图上距离 ∶ 实际距离
+    formula_latex: "\\text{scale}=\\text{map}:\\text{real}"
+    grade: 6
+    params: []
+    memory_tip: 图上 1，实际是多少，写成分数或比。
+    example: 1:100000 表示图上 1 cm 实际 1 km。
+    related_formulas: [formula_ratio]
+
+  - id: formula_direct_prop
+    category: 比例
+    name: 正比例
+    formula_text: y/x = k（一定），y 与 x 成正比例
+    formula_latex: "\\frac{y}{x}=k"
+    grade: 6
+    params:
+      - {symbol: k, meaning: 比例系数}
+    memory_tip: 一个量扩大几倍，另一个也扩大几倍。
+    example: 速度一定时，路程与时间成正比例。
+    related_formulas: [formula_inverse_prop, formula_speed]
+
+  - id: formula_inverse_prop
+    category: 比例
+    name: 反比例
+    formula_text: x × y = k（一定），y 与 x 成反比例
+    formula_latex: "xy=k"
+    grade: 6
+    params:
+      - {symbol: k, meaning: 积一定}
+    memory_tip: 一个量扩大，另一个反而缩小。
+    example: 路程一定时，速度与时间成反比例。
+    related_formulas: [formula_direct_prop, formula_speed]
+
+  - id: formula_simple_equation
+    category: 数量关系
+    name: 简易方程
+    formula_text: 使等式左右相等的未知数的值叫解
+    formula_latex: "ax+b=c"
+    grade: 5
+    params:
+      - {symbol: x, meaning: 未知数}
+    memory_tip: 等式两边同时加减乘除同一个数（除数不为 0）。
+    example: 2x+3=11 → 2x=8 → x=4。
+    related_formulas: [formula_law_distributive]
+
+  - id: formula_interest
+    category: 数量关系
+    name: 利息
+    formula_text: 利息 = 本金 × 利率 × 时间
+    formula_latex: "I = P \\times r \\times t"
+    grade: 6
+    params:
+      - {symbol: I, meaning: 利息}
+      - {symbol: P, meaning: 本金}
+      - {symbol: r, meaning: 利率}
+      - {symbol: t, meaning: 时间}
+    memory_tip: 本金乘利率再乘存的时间。
+    example: 本金 1000 元，年利率 2%，存 1 年利息 20 元。
+    related_formulas: [formula_percentage]
+
+  - id: formula_discount
+    category: 数量关系
+    name: 折扣
+    formula_text: 折后价 = 原价 × 折扣
+    formula_latex: "\\text{sale}=\\text{price}\\times\\text{discount}"
+    grade: 6
+    params: []
+    memory_tip: 八折就是 ×0.8；打六折就是 ×0.6。
+    example: 200 元打八折 = 160 元。
+    related_formulas: [formula_percentage, formula_price]
+
+  - id: formula_tree_planting
+    category: 数量关系
+    name: 植树问题
+    formula_text: 两端都栽：棵数 = 段数 + 1；一端栽：棵数 = 段数；两端不栽：棵数 = 段数 − 1
+    formula_latex: "n_{tree}=n_{gap}\\pm 1"
+    grade: 5
+    params: []
+    memory_tip: 先分清两端栽不栽，再数间隔。
+    example: 全长 20 m，每隔 5 m 栽一棵且两端栽，棵数 = 4+1=5。
+    related_formulas: [formula_enclosure]
+
+  - id: formula_enclosure
+    category: 数量关系
+    name: 方阵围边问题
+    formula_text: 最外层人数 ≈ 4×(边长 − 1)（正方形方阵）
+    formula_latex: "4(n-1)"
+    grade: 5
+    params: []
+    memory_tip: 四边都要数，角上的人别重复。
+    example: 每边 10 人的空心方阵最外层 36 人。
+    related_formulas: [formula_tree_planting]
+
+  - id: formula_age
+    category: 数量关系
+    name: 年龄问题
+    formula_text: 两人年龄差不变；年龄和随时间增加
+    formula_latex: "a-b=c"
+    grade: 4
+    params: []
+    memory_tip: 年龄差不变是突破口。
+    example: 爸爸比儿子大 28 岁，永远大 28 岁。
+    related_formulas: [formula_avg]
+
+  - id: formula_angle_types
+    category: 几何关系
+    name: 角的分类
+    formula_text: 锐角 < 90°；直角 = 90°；钝角 90°–180°；平角 = 180°；周角 = 360°
+    formula_latex: "90^{\\circ}, 180^{\\circ}, 360^{\\circ}"
+    grade: 4
+    params: []
+    memory_tip: 直角三角板是 90°，平角像一条直线。
+    example: 120° 是钝角。
+    related_formulas: [formula_triangle_sum]
+
+  - id: formula_volume_capacity
+    category: 单位换算
+    name: 容积与体积
+    formula_text: 容积 ≈ 容器内部体积；1 L = 1 dm³；1 mL = 1 cm³
+    formula_latex: "1\\,\\mathrm{L}=1\\,\\mathrm{dm}^3"
+    grade: 5
+    params: []
+    memory_tip: 装水的本领叫容积，单位常用升、毫升。
+    example: 矿泉水 500 mL = 500 cm³。
+    related_formulas: [formula_volume_units]
+
+  - id: formula_area_units_mu
+    category: 单位换算
+    name: 土地面积单位
+    formula_text: 1 公顷 = 10000 m² = 15 亩；1 亩 ≈ 666.7 m²
+    formula_latex: "1\\,\\mathrm{ha}=10000\\,\\mathrm{m}^2"
+    grade: 4
+    params: []
+    memory_tip: 公顷很大，边长 100 m 的正方形是 1 公顷。
+    example: 2 公顷 = 20000 m²。
+    related_formulas: [formula_area_units]
+
+  - id: formula_ops_order
+    category: 运算定律
+    name: 四则运算顺序
+    formula_text: 先乘除后加减；有括号先算括号
+    formula_latex: "(a+b)\\times c"
+    grade: 3
+    params: []
+    memory_tip: 括号→乘除→加减；同级从左到右。
+    example: 3+4×5 = 3+20 = 23。
+    related_formulas: [formula_law_distributive]
+
+  - id: formula_factor_multiple
+    category: 数量关系
+    name: 因数与倍数
+    formula_text: 如果 a÷b 能整除，则 a 是 b 的倍数，b 是 a 的因数
+    formula_latex: "a=bc"
+    grade: 5
+    params: []
+    memory_tip: 能整除才能说倍数、因数。
+    example: 12 的因数有 1,2,3,4,6,12。
+    related_formulas: [formula_remainder]
+
+  - id: formula_gcd_lcm_idea
+    category: 数量关系
+    name: 公因数与公倍数
+    formula_text: 公因数是共有的因数；公倍数是共有的倍数
+    formula_latex: "\\gcd,\\ \\mathrm{lcm}"
+    grade: 5
+    params: []
+    memory_tip: 求最大公因数、最小公倍数，可列因数或短除法。
+    example: 12 与 18 的最大公因数是 6，最小公倍数是 36。
+    related_formulas: [formula_factor_multiple]

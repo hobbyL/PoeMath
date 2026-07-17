@@ -1,213 +1,795 @@
-# 作者信息种子数据（20+ 常见诗人）
-#
-# Phase 1 目标：200+ 作者；本文件先收录 24 位常见诗人作为示例。
-# 全量数据在后续通过全自动脚本从 yxcs/poems-db 补齐。
+# 作者信息种子数据（内容重建：高频作者覆盖）
+# 由 tools/content_rebuild/rebuild_assets.py 生成/合并
 
 authors:
   - id: author_libai
     name: 李白
     dynasty: 唐
-    life_years: "701-762"
+    life_years: 701-762
     title: 诗仙
-    brief: 唐代伟大浪漫主义诗人，字太白，号青莲居士。诗风飘逸奔放，想象奇特，被誉为"诗仙"。代表作有《静夜思》《望庐山瀑布》《早发白帝城》等。
-    representative_works: [poem_core_001, poem_core_026, poem_exp_001, poem_exp_002]
+    brief: "唐代伟大浪漫主义诗人，字太白，号青莲居士。诗风飘逸奔放，想象奇特，被誉为\"诗仙\"。代表作有《静夜思》《望庐山瀑布》《早发白帝城》等。"
+    representative_works: [poem_core_005, poem_core_007, poem_core_013, poem_core_020, poem_core_028, poem_core_031]
     avatar: default_avatar.png
 
-  - id: author_dufu
-    name: 杜甫
-    dynasty: 唐
-    life_years: "712-770"
-    title: 诗圣
-    brief: 唐代伟大现实主义诗人，字子美。诗歌反映社会现实，风格沉郁顿挫，被誉为"诗圣"，其诗被称为"诗史"。代表作有《春夜喜雨》《绝句》《望岳》等。
-    representative_works: [poem_core_014, poem_core_015]
+  - id: author_yiming
+    name: 佚名
+    dynasty: 先秦
+    life_years: ""
+    title: 
+    brief: 作者已佚名，多见于乐府民歌、民间歌谣与部分古诗辑录。语言质朴，情感真挚，是了解古代民间文学的重要窗口。
+    representative_works: [poem_core_068, poem_core_109, poem_ext_184, poem_exp_023, poem_exp_024, poem_exp_055]
     avatar: default_avatar.png
 
   - id: author_bailuyi
     name: 白居易
     dynasty: 唐
-    life_years: "772-846"
+    life_years: 772-846
     title: 香山居士
-    brief: 唐代现实主义诗人，字乐天，号香山居士。诗歌语言通俗易懂，主张"文章合为时而著，歌诗合为事而作"。代表作有《赋得古原草送别》《忆江南》《暮江吟》等。
-    representative_works: [poem_core_007, poem_core_017, poem_core_030]
+    brief: "唐代现实主义诗人，字乐天，号香山居士。诗歌语言通俗易懂，主张\"文章合为时而著，歌诗合为事而作\"。代表作有《赋得古原草送别》《忆江南》《暮江吟》等。"
+    representative_works: [poem_core_009, poem_core_016, poem_core_025, poem_core_030, poem_core_082, poem_core_116]
+    avatar: default_avatar.png
+
+  - id: author_dufu
+    name: 杜甫
+    dynasty: 唐
+    life_years: 712-770
+    title: 诗圣
+    brief: "唐代伟大现实主义诗人，字子美。诗歌反映社会现实，风格沉郁顿挫，被誉为\"诗圣\"，其诗被称为\"诗史\"。代表作有《春夜喜雨》《绝句》《望岳》等。"
+    representative_works: [poem_core_033, poem_core_035, poem_core_057, poem_core_079, poem_core_106, poem_core_107]
     avatar: default_avatar.png
 
   - id: author_wangwei
     name: 王维
     dynasty: 唐
-    life_years: "701-761"
+    life_years: 701-761
     title: 诗佛
-    brief: 唐代著名诗人、画家，字摩诘。诗以山水田园为主，追求"诗中有画，画中有诗"的意境。代表作有《鹿柴》《山居秋暝》《九月九日忆山东兄弟》等。
-    representative_works: [poem_core_005, poem_exp_004]
+    brief: "唐代著名诗人、画家，字摩诘。诗以山水田园为主，追求\"诗中有画，画中有诗\"的意境。代表作有《鹿柴》《山居秋暝》《九月九日忆山东兄弟》等。"
+    representative_works: [poem_core_003, poem_core_022, poem_core_049, poem_core_077, poem_core_087, poem_core_088]
     avatar: default_avatar.png
 
-  - id: author_mengzaoran
-    name: 孟浩然
+  - id: author_lishangyin
+    name: 李商隐
     dynasty: 唐
-    life_years: "689-740"
-    title: 孟襄阳
-    brief: 唐代山水田园派诗人，与王维并称"王孟"。诗多写山水田园和隐逸生活。代表作有《春晓》《过故人庄》等。
-    representative_works: [poem_core_003]
-    avatar: default_avatar.png
-
-  - id: author_wangzhihuan
-    name: 王之涣
-    dynasty: 唐
-    life_years: "688-742"
-    title: ""
-    brief: 唐代著名边塞诗人。传世作品仅六首，但《登鹳雀楼》《凉州词》皆为千古绝唱。
-    representative_works: [poem_core_006]
-    avatar: default_avatar.png
-
-  - id: author_luobingwang
-    name: 骆宾王
-    dynasty: 唐
-    life_years: "约638-约684"
-    title: 初唐四杰
-    brief: 初唐四杰之一，七岁作《咏鹅》。文学成就以骈文见长。
-    representative_works: [poem_core_002]
-    avatar: default_avatar.png
-
-  - id: author_hezhi zhang
-    name: 贺知章
-    dynasty: 唐
-    life_years: "659-744"
-    title: 四明狂客
-    brief: 唐代著名诗人、书法家，字季真。为人放旷豪迈，晚年自号"四明狂客"。代表作有《咏柳》《回乡偶书》等。
-    representative_works: [poem_core_010]
-    avatar: default_avatar.png
-
-  - id: author_liyu
-    name: 李峤
-    dynasty: 唐
-    life_years: "645-714"
-    title: ""
-    brief: 唐代诗人，字巨山。其诗多咏物之作，《风》是其代表作。
-    representative_works: [poem_core_004]
-    avatar: default_avatar.png
-
-  - id: author_liyu_shen
-    name: 李绅
-    dynasty: 唐
-    life_years: "772-846"
-    title: ""
-    brief: 唐代诗人，字公垂。《悯农》二首反映农民生活疾苦，广为传诵。
-    representative_works: [poem_core_009, poem_core_022]
-    avatar: default_avatar.png
-
-  - id: author_zhang zhi
-    name: 张继
-    dynasty: 唐
-    life_years: "约715-约779"
-    title: ""
-    brief: 唐代诗人，字懿孙。以《枫桥夜泊》一诗流传千古。
-    representative_works: [poem_core_008]
-    avatar: default_avatar.png
-
-  - id: author_yuanzhen
-    name: 元稹
-    dynasty: 唐
-    life_years: "779-831"
-    title: ""
-    brief: 唐代诗人，字微之。与白居易共同倡导新乐府运动，世称"元白"。
-    representative_works: []
-    avatar: default_avatar.png
-
-  - id: author_wangan shi
-    name: 王安石
-    dynasty: 宋
-    life_years: "1021-1086"
-    title: 临川先生
-    brief: 北宋政治家、思想家、文学家，字介甫，号半山。主持变法。诗文皆有大成，唐宋八大家之一。代表作有《泊船瓜洲》《元日》等。
-    representative_works: [poem_core_023, poem_exp_005]
+    life_years: 约813-约858
+    title: 小李
+    brief: 晚唐著名诗人，字义山，号玉溪生。诗风绮丽深情，善用典故，无题诗与咏史诗成就突出。代表作有《锦瑟》《夜雨寄北》等。
+    representative_works: [poem_core_099, poem_core_100, poem_core_108, poem_core_112, poem_ext_038, poem_ext_039]
     avatar: default_avatar.png
 
   - id: author_susu shi
     name: 苏轼
     dynasty: 宋
-    life_years: "1037-1101"
+    life_years: 1037-1101
     title: 东坡居士
     brief: 北宋文学家、书画家，字子瞻，号东坡居士。唐宋八大家之一，词开豪放派。代表作有《题西林壁》《饮湖上初晴后雨》《水调歌头·明月几时有》等。
-    representative_works: [poem_core_020, poem_core_027, poem_exp_003]
+    representative_works: [poem_core_018, poem_core_021, poem_core_026, poem_core_036, poem_core_059, poem_ext_198]
     avatar: default_avatar.png
 
-  - id: author_luyou
-    name: 陆游
+  - id: author_wuwenying
+    name: 吴文英
     dynasty: 宋
-    life_years: "1125-1210"
-    title: 放翁
-    brief: 南宋著名爱国诗人，字务观，号放翁。一生留下诗作近万首，作品多以爱国和忧国忧民为主题。代表作有《示儿》《游山西村》等。
-    representative_works: [poem_exp_007]
+    life_years: 约1200-约1260
+    title: 梦窗
+    brief: 南宋词人，字君特，号梦窗。词风密丽深婉，结构精巧，与周邦彦并称。作品以慢词见长。
+    representative_works: [poem_ext_213, poem_ext_214, poem_ext_215, poem_ext_216, poem_ext_217, poem_ext_218]
     avatar: default_avatar.png
 
-  - id: author_yang wan li
-    name: 杨万里
+  - id: author_xinqiji
+    name: 辛弃疾
     dynasty: 宋
-    life_years: "1127-1206"
-    title: 诚斋先生
-    brief: 南宋诗人，字廷秀，号诚斋。诗风自然清新，被誉为"诚斋体"。代表作有《晓出净慈寺送林子方》《小池》等。
-    representative_works: [poem_core_016, poem_core_019]
+    life_years: 1140-1207
+    title: 稼轩
+    brief: 南宋豪放派词人，字幼安，号稼轩。词作气势雄健，兼具爱国情怀与田园闲适。代表作有《破阵子》《永遇乐·京口北固亭怀古》等。
+    representative_works: [poem_core_042, poem_core_060, poem_ext_195, poem_ext_196, poem_ext_199, poem_ext_200]
     avatar: default_avatar.png
 
-  - id: author_ye shao weng
-    name: 叶绍翁
+  - id: author_dumu
+    name: 杜牧
+    dynasty: 唐
+    life_years: 803-约852
+    title: 小杜
+    brief: 晚唐诗人，字牧之。诗风俊爽清丽，咏史与七绝尤佳。代表作有《清明》《泊秦淮》《山行》等。
+    representative_works: [poem_core_017, poem_core_023, poem_core_063, poem_core_097, poem_core_098, poem_ext_007]
+    avatar: default_avatar.png
+
+  - id: author_liuchangqing
+    name: 刘长卿
+    dynasty: 唐
+    life_years: 约726-约786
+    title: 
+    brief: 中唐诗人，字文房。尤工五言，有「五言长城」之称。诗多写贬谪与山水，风格清冷。
+    representative_works: [poem_core_091, poem_ext_026, poem_ext_027, poem_ext_028, poem_ext_098, poem_ext_099]
+    avatar: default_avatar.png
+
+  - id: author_weiyingwu
+    name: 韦应物
+    dynasty: 唐
+    life_years: 737-约792
+    title: 
+    brief: 中唐诗人，诗风恬淡高远，多写山水田园与吏隐情怀。代表作有《滁州西涧》等。
+    representative_works: [poem_core_093, poem_ext_023, poem_ext_092, poem_ext_093, poem_ext_134, poem_ext_155]
+    avatar: default_avatar.png
+
+  - id: author_liuyuxi
+    name: 刘禹锡
+    dynasty: 唐
+    life_years: 772-842
+    title: 诗豪
+    brief: 中唐诗人、文学家，字梦得。诗风豪迈清新，咏史怀古与民歌体成就突出。代表作有《陋室铭》《竹枝词》《乌衣巷》等。
+    representative_works: [poem_core_029, poem_core_062, poem_core_095, poem_core_096, poem_core_119, poem_ext_102]
+    avatar: default_avatar.png
+
+  - id: author_mengzaoran
+    name: 孟浩然
+    dynasty: 唐
+    life_years: 689-740
+    title: 孟襄阳
+    brief: "唐代山水田园派诗人，与王维并称\"王孟\"。诗多写山水田园和隐逸生活。代表作有《春晓》《过故人庄》等。"
+    representative_works: [poem_core_006, poem_core_058, poem_core_111, poem_ext_086, poem_ext_087, poem_ext_089]
+    avatar: default_avatar.png
+
+  - id: author_liqingzhao
+    name: 李清照
     dynasty: 宋
-    life_years: "生卒不详"
-    title: ""
-    brief: 南宋中期诗人，字嗣宗。诗风清新自然，代表作有《游园不值》《夜书所见》等。
-    representative_works: [poem_core_012]
+    life_years: 1084-约1155
+    title: 易安居士
+    brief: 宋代女词人，号易安居士。早期清新婉约，南渡后多写家国身世之感。代表作有《如梦令》《声声慢》等。
+    representative_works: [poem_core_040, poem_ext_202, poem_ext_203, poem_ext_243, poem_ext_244, poem_ext_245]
     avatar: default_avatar.png
 
-  - id: author_lin sheng
-    name: 林升
-    dynasty: 宋
-    life_years: "1123-1189"
-    title: ""
-    brief: 南宋诗人，字梦屏。因《题临安邸》一诗批判南宋朝廷偏安享乐而流传。
-    representative_works: [poem_core_024]
-    avatar: default_avatar.png
-
-  - id: author_zhu xi
-    name: 朱熹
-    dynasty: 宋
-    life_years: "1130-1200"
-    title: 朱文公
-    brief: 南宋著名理学家、思想家、教育家，字元晦，号晦庵。宋代理学集大成者。代表诗作有《春日》《观书有感》等。
-    representative_works: [poem_core_013]
-    avatar: default_avatar.png
-
-  - id: author_gao ding
-    name: 高鼎
-    dynasty: 清
-    life_years: "生卒不详"
-    title: ""
-    brief: 清代诗人，字象一。诗擅长描写自然景物，代表作《村居》。
-    representative_works: [poem_core_011]
-    avatar: default_avatar.png
-
-  - id: author_wang mian
-    name: 王冕
-    dynasty: 元
-    life_years: "1287-1359"
-    title: 煮石山农
-    brief: 元代著名画家、诗人，字元章，号煮石山农。擅画墨梅。代表诗作《墨梅》。
-    representative_works: [poem_core_028]
-    avatar: default_avatar.png
-
-  - id: author_yu qian
-    name: 于谦
-    dynasty: 明
-    life_years: "1398-1457"
-    title: 少保
-    brief: 明代政治家、军事家、诗人，字廷益。土木堡之变后拥立景帝、保卫京师有大功。诗风刚直。代表作《石灰吟》。
-    representative_works: [poem_exp_008]
+  - id: author_wentingyun
+    name: 温庭筠
+    dynasty: 唐
+    life_years: 约812-约866
+    title: 
+    brief: 晚唐诗人、词人，花间词派重要代表。词风浓艳精美，对后世词体发展影响很大。
+    representative_works: [poem_core_129, poem_ext_050, poem_ext_138, poem_ext_207, poem_exp_011, poem_exp_029]
     avatar: default_avatar.png
 
   - id: author_wang chang ling
     name: 王昌龄
     dynasty: 唐
-    life_years: "698-756"
+    life_years: 698-756
     title: 七绝圣手
-    brief: 盛唐著名边塞诗人，字少伯。七言绝句成就极高，被誉为"七绝圣手"。代表作《出塞》《芙蓉楼送辛渐》。
-    representative_works: [poem_exp_006]
+    brief: "盛唐著名边塞诗人，字少伯。七言绝句成就极高，被誉为\"七绝圣手\"。代表作《出塞》《芙蓉楼送辛渐》。"
+    representative_works: [poem_core_027, poem_core_043, poem_core_055, poem_core_121, poem_ext_030, poem_ext_031]
     avatar: default_avatar.png
 
+  - id: author_cencan
+    name: 岑参
+    dynasty: 唐
+    life_years: 约715-770
+    title: 
+    brief: 盛唐边塞诗人，与高适并称。诗写边地风光与军旅生活，气势雄奇。代表作有《白雪歌送武判官归京》等。
+    representative_works: [poem_ext_036, poem_ext_066, poem_exp_018, poem_exp_050, poem_exp_097, poem_exp_111]
+    avatar: default_avatar.png
+
+  - id: author_liuzongyuan
+    name: 柳宗元
+    dynasty: 唐
+    life_years: 773-819
+    title: 柳河东
+    brief: 中唐文学家，字子厚，与韩愈共同倡导古文运动。山水游记与寓言成就突出，诗风清峭。代表作有《江雪》《捕蛇者说》等。
+    representative_works: [poem_core_076, poem_ext_132, poem_ext_153, poem_ext_154, poem_ext_168, poem_exp_045]
+    avatar: default_avatar.png
+
+  - id: author_luyou
+    name: 陆游
+    dynasty: 宋
+    life_years: 1125-1210
+    title: 放翁
+    brief: 南宋著名爱国诗人，字务观，号放翁。一生留下诗作近万首，作品多以爱国和忧国忧民为主题。代表作有《示儿》《游山西村》等。
+    representative_works: [poem_core_046, poem_core_056, poem_ext_205, poem_ext_206, poem_exp_157, poem_exp_276]
+    avatar: default_avatar.png
+
+  - id: author_wangan shi
+    name: 王安石
+    dynasty: 宋
+    life_years: 1021-1086
+    title: 临川先生
+    brief: 北宋政治家、思想家、文学家，字介甫，号半山。主持变法。诗文皆有大成，唐宋八大家之一。代表作有《泊船瓜洲》《元日》等。
+    representative_works: [poem_core_011, poem_core_024, poem_core_061, poem_core_105, poem_exp_105, poem_exp_132]
+    avatar: default_avatar.png
+
+  - id: author_fengyansi
+    name: 冯延巳
+    dynasty: 五代
+    life_years: 约903-960
+    title: 
+    brief: 南唐词人，词风细腻感伤，对北宋词影响深远。代表作有《鹊踏枝》等。
+    representative_works: [poem_exp_047, poem_exp_145, poem_exp_367, poem_exp_403, poem_exp_422, poem_exp_484]
+    avatar: default_avatar.png
+
+  - id: author_lulun
+    name: 卢纶
+    dynasty: 唐
+    life_years: 约748-约799
+    title: 大历十才子
+    brief: 中唐诗人，大历十才子之一。边塞组诗《塞下曲》流传广泛。
+    representative_works: [poem_core_044, poem_ext_142, poem_ext_188, poem_ext_236, poem_exp_021, poem_exp_022]
+    avatar: default_avatar.png
+
+  - id: author_zhangjiuling
+    name: 张九龄
+    dynasty: 唐
+    life_years: 678-740
+    title: 
+    brief: 盛唐政治家、诗人。诗风清雅醇正，以《望月怀远》等名篇著称。
+    representative_works: [poem_ext_097, poem_ext_160, poem_ext_161, poem_ext_162, poem_exp_019, poem_exp_102]
+    avatar: default_avatar.png
+
+  - id: author_chenyuyi
+    name: 陈与义
+    dynasty: 宋
+    life_years: 1090-1138
+    title: 简斋
+    brief: 南北宋之交诗人，江西诗派重要人物。诗风由清新转向沉郁，南渡后多家国之叹。
+    representative_works: [poem_exp_501, poem_exp_502, poem_exp_503, poem_exp_504, poem_exp_505, poem_exp_506]
+    avatar: default_avatar.png
+
+  - id: author_cuihao
+    name: 崔颢
+    dynasty: 唐
+    life_years: 约704-754
+    title: 
+    brief: 盛唐诗人。《黄鹤楼》被誉为唐人七律压卷之作，边塞诗亦有佳作。
+    representative_works: [poem_core_115, poem_ext_186, poem_ext_187, poem_exp_168, poem_exp_571]
+    avatar: default_avatar.png
+
+  - id: author_liyu_n
+    name: 李煜
+    dynasty: 五代
+    life_years: 937-978
+    title: 李后主
+    brief: 南唐后主，词人。前期多写宫廷生活，亡国后词作沉痛真挚，语言自然。代表作有《虞美人》《相见欢》等。
+    representative_works: [poem_exp_188, poem_exp_407, poem_exp_456, poem_exp_474, poem_exp_519]
+    avatar: default_avatar.png
+
+  - id: author_liyi
+    name: 李益
+    dynasty: 唐
+    life_years: 748-约829
+    title: 
+    brief: 中唐边塞诗人，七绝尤工。诗写边愁征人，音节谐美。
+    representative_works: [poem_ext_037, poem_ext_182, poem_ext_224, poem_exp_572, poem_exp_573]
+    avatar: default_avatar.png
+
+  - id: author_maozedong
+    name: 毛泽东
+    dynasty: 现代
+    life_years: 1893-1976
+    title: 
+    brief: 中国现代伟大的无产阶级革命家、战略家与诗人。诗词气魄雄浑，富于革命浪漫主义色彩。
+    representative_works: [poem_exp_280, poem_exp_313, poem_exp_399, poem_exp_419, poem_exp_459]
+    avatar: default_avatar.png
+
+  - id: author_zhengxie
+    name: 郑燮
+    dynasty: 清
+    life_years: 1693-1765
+    title: 郑板桥
+    brief: 清代书画家、文学家，「扬州八怪」之一。诗书画三绝，题画诗与民本关怀并存。
+    representative_works: [poem_core_066, poem_exp_284, poem_exp_346, poem_exp_557, poem_exp_558]
+    avatar: default_avatar.png
+
+  - id: author_yuanzhen
+    name: 元稹
+    dynasty: 唐
+    life_years: 779-831
+    title: 
+    brief: "唐代诗人，字微之。与白居易共同倡导新乐府运动，世称\"元白\"。"
+    representative_works: [poem_ext_011, poem_ext_106, poem_ext_107, poem_ext_108]
+    avatar: default_avatar.png
+
+  - id: author_zhoubangyan
+    name: 周邦彦
+    dynasty: 宋
+    life_years: 1056-1121
+    title: 清真居士
+    brief: 北宋词人，格律精严，被誉为「词中老杜」。对后世格律词派影响极大。
+    representative_works: [poem_ext_211, poem_exp_175, poem_exp_353, poem_exp_488]
+    avatar: default_avatar.png
+
+  - id: author_sunguangxian
+    name: 孙光宪
+    dynasty: 五代
+    life_years: 约900-968
+    title: 
+    brief: 五代词人，花间词派重要作者之一，词作题材较广。
+    representative_works: [poem_exp_357, poem_exp_358, poem_exp_531, poem_exp_542]
+    avatar: default_avatar.png
+
+  - id: author_yanshu
+    name: 晏殊
+    dynasty: 宋
+    life_years: 991-1055
+    title: 晏元献
+    brief: 北宋词人、政治家。词风温润闲雅，多写时光流逝与离愁。代表作有《浣溪沙》等。
+    representative_works: [poem_ext_209, poem_ext_210, poem_exp_366, poem_exp_468]
+    avatar: default_avatar.png
+
+  - id: author_zhu xi
+    name: 朱熹
+    dynasty: 宋
+    life_years: 1130-1200
+    title: 朱文公
+    brief: 南宋著名理学家、思想家、教育家，字元晦，号晦庵。宋代理学集大成者。代表诗作有《春日》《观书有感》等。
+    representative_works: [poem_core_080, poem_core_120, poem_exp_252, poem_exp_340]
+    avatar: default_avatar.png
+
+  - id: author_liqi
+    name: 李颀
+    dynasty: 唐
+    life_years: 约690-约751
+    title: 
+    brief: 盛唐诗人，边塞与音乐题材诗著名。代表作有《古从军行》等。
+    representative_works: [poem_ext_120, poem_ext_166, poem_ext_167, poem_ext_183]
+    avatar: default_avatar.png
+
+  - id: author_yang wan li
+    name: 杨万里
+    dynasty: 宋
+    life_years: 1127-1206
+    title: 诚斋先生
+    brief: "南宋诗人，字廷秀，号诚斋。诗风自然清新，被誉为\"诚斋体\"。代表作有《晓出净慈寺送林子方》《小池》等。"
+    representative_works: [poem_core_010, poem_core_034, poem_core_041, poem_core_053]
+    avatar: default_avatar.png
+
+  - id: author_ouyangxiu
+    name: 欧阳修
+    dynasty: 宋
+    life_years: 1007-1072
+    title: 醉翁
+    brief: 北宋文坛领袖，唐宋八大家之一。诗、词、文兼擅，词风清新疏宕。代表作有《醉翁亭记》《生查子》等。
+    representative_works: [poem_exp_335, poem_exp_395, poem_exp_458, poem_exp_463]
+    avatar: default_avatar.png
+
+  - id: author_wangzhihuan
+    name: 王之涣
+    dynasty: 唐
+    life_years: 688-742
+    title: 
+    brief: 唐代著名边塞诗人。传世作品仅六首，但《登鹳雀楼》《凉州词》皆为千古绝唱。
+    representative_works: [poem_core_012, poem_core_086, poem_exp_564, poem_exp_565]
+    avatar: default_avatar.png
+
+  - id: author_nalanxingde
+    name: 纳兰性德
+    dynasty: 清
+    life_years: 1655-1685
+    title: 纳兰容若
+    brief: 清代满族词人，词风清新婉丽，哀感顽艳。代表作有《木兰花·拟古决绝词》等。
+    representative_works: [poem_core_051, poem_exp_162, poem_exp_356, poem_exp_460]
+    avatar: default_avatar.png
+
+  - id: author_yushinan
+    name: 虞世南
+    dynasty: 唐
+    life_years: 558-638
+    title: 
+    brief: 唐初书法家、诗人，书法与欧阳询、褚遂良等齐名。诗作典雅清丽。
+    representative_works: [poem_core_092, poem_exp_498, poem_exp_499, poem_exp_500]
+    avatar: default_avatar.png
+
+  - id: author_yuanquhua
+    name: 袁去华
+    dynasty: 宋
+    life_years: 生卒年不详
+    title: 
+    brief: 南宋词人，词风清丽，多写羁旅与离情。
+    representative_works: [poem_exp_237, poem_exp_515, poem_exp_516, poem_exp_517]
+    avatar: default_avatar.png
+
+  - id: author_xuhun
+    name: 许浑
+    dynasty: 唐
+    life_years: 约791-约858
+    title: 
+    brief: 晚唐诗人，律诗圆熟，多写登临怀古与水乡风光。
+    representative_works: [poem_exp_009, poem_exp_010, poem_exp_028, poem_exp_258]
+    avatar: default_avatar.png
+
+  - id: author_gaoshi
+    name: 高适
+    dynasty: 唐
+    life_years: 约700-765
+    title: 
+    brief: 盛唐边塞诗人，与岑参并称。诗风雄浑悲壮，代表作有《燕歌行》等。
+    representative_works: [poem_core_083, poem_ext_136, poem_exp_051, poem_exp_130]
+    avatar: default_avatar.png
+
+  - id: author_sikongshu
+    name: 司空曙
+    dynasty: 唐
+    life_years: 约720-约790
+    title: 大历十才子
+    brief: 中唐诗人，大历十才子之一。诗多写羁旅友情，风格清雅。
+    representative_works: [poem_ext_062, poem_ext_063, poem_exp_579]
+    avatar: default_avatar.png
+
+  - id: author_lihe
+    name: 李贺
+    dynasty: 唐
+    life_years: 约790-约816
+    title: 诗鬼
+    brief: 中唐诗人，想象奇诡，语言冷艳，有「诗鬼」之称。代表作有《李凭箜篌引》等。
+    representative_works: [poem_core_064, poem_exp_093, poem_exp_312]
+    avatar: default_avatar.png
+
+  - id: author_qinguan
+    name: 秦观
+    dynasty: 宋
+    life_years: 1049-1100
+    title: 淮海居士
+    brief: 北宋词人，苏门四学士之一。词风婉约清丽，多写爱情与贬谪之感。
+    representative_works: [poem_ext_212, poem_exp_352, poem_exp_441]
+    avatar: default_avatar.png
+
+  - id: author_fanzhongyan
+    name: 范仲淹
+    dynasty: 宋
+    life_years: 989-1052
+    title: 
+    brief: 北宋名臣、文学家。词作苍凉悲壮，散文《岳阳楼记》以「先天下之忧而忧」传世。
+    representative_works: [poem_core_074, poem_ext_208, poem_exp_417]
+    avatar: default_avatar.png
+
+  - id: author_hezhi zhang
+    name: 贺知章
+    dynasty: 唐
+    life_years: 659-744
+    title: 四明狂客
+    brief: "唐代著名诗人、书法家，字季真。为人放旷豪迈，晚年自号\"四明狂客\"。代表作有《咏柳》《回乡偶书》等。"
+    representative_works: [poem_core_014, poem_core_104, poem_ext_049]
+    avatar: default_avatar.png
+
+  - id: author_qianqi
+    name: 钱起
+    dynasty: 唐
+    life_years: 约722-约780
+    title: 大历十才子
+    brief: 中唐诗人，大历十才子之一。诗风清奇，写景细致。
+    representative_works: [poem_ext_104, poem_ext_237, poem_exp_013]
+    avatar: default_avatar.png
+
+  - id: author_chenziang
+    name: 陈子昂
+    dynasty: 唐
+    life_years: 661-702
+    title: 
+    brief: 初唐诗人，倡导汉魏风骨，反对齐梁绮靡。代表作有《登幽州台歌》。
+    representative_works: [poem_core_114, poem_exp_164, poem_exp_556]
+    avatar: default_avatar.png
+
+  - id: author_taoyuanming
+    name: 陶渊明
+    dynasty: 东晋
+    life_years: 约365-427
+    title: 靖节先生
+    brief: 东晋大诗人，田园诗派开创者。诗风自然冲淡，代表作有《饮酒》《归园田居》等。
+    representative_works: [poem_exp_088, poem_exp_146, poem_exp_327]
+    avatar: default_avatar.png
+
+  - id: author_yu qian
+    name: 于谦
+    dynasty: 明
+    life_years: 1398-1457
+    title: 少保
+    brief: 明代政治家、军事家、诗人，字廷益。土木堡之变后拥立景帝、保卫京师有大功。诗风刚直。代表作《石灰吟》。
+    representative_works: [poem_core_065, poem_exp_569]
+    avatar: default_avatar.png
+
+  - id: author_luzhaolin
+    name: 卢照邻
+    dynasty: 唐
+    life_years: 约634-约689
+    title: 初唐四杰
+    brief: 初唐四杰之一，诗风清峻，代表作有《长安古意》。
+    representative_works: [poem_exp_189, poem_exp_275]
+    avatar: default_avatar.png
+
+  - id: author_ye shao weng
+    name: 叶绍翁
+    dynasty: 宋
+    life_years: 生卒不详
+    title: 
+    brief: 南宋中期诗人，字嗣宗。诗风清新自然，代表作有《游园不值》《夜书所见》等。
+    representative_works: [poem_core_019, poem_core_085]
+    avatar: default_avatar.png
+
+  - id: author_jiangkui
+    name: 姜夔
+    dynasty: 宋
+    life_years: 约1155-约1221
+    title: 白石道人
+    brief: 南宋词人、音乐家。词风清空骚雅，自度曲成就突出。
+    representative_works: [poem_exp_535, poem_exp_546]
+    avatar: default_avatar.png
+
+  - id: author_yuefei
+    name: 岳飞
+    dynasty: 宋
+    life_years: 1103-1142
+    title: 
+    brief: 南宋抗金名将。词《满江红》气壮山河，流传千古。
+    representative_works: [poem_exp_278, poem_exp_338]
+    avatar: default_avatar.png
+
+  - id: author_changjian
+    name: 常建
+    dynasty: 唐
+    life_years: 生卒年不详
+    title: 
+    brief: 盛唐诗人，山水田园与边塞题材兼擅。《题破山寺后禅院》以「曲径通幽」著称。
+    representative_works: [poem_core_127, poem_exp_107]
+    avatar: default_avatar.png
+
+  - id: author_zhanghu
+    name: 张祜
+    dynasty: 唐
+    life_years: 约785-约849
+    title: 
+    brief: 中晚唐诗人，宫词与山水小诗清俊可诵。
+    representative_works: [poem_ext_025, poem_ext_047]
+    avatar: default_avatar.png
+
+  - id: author_liyu_shen
+    name: 李绅
+    dynasty: 唐
+    life_years: 772-846
+    title: 
+    brief: 唐代诗人，字公垂。《悯农》二首反映农民生活疾苦，广为传诵。
+    representative_works: [poem_core_004, poem_core_075]
+    avatar: default_avatar.png
+
+  - id: author_hanyuefu
+    name: 汉乐府
+    dynasty: 汉
+    life_years: ""
+    title: 乐府
+    brief: 汉代乐府机关采集与创作的诗歌总称，题材广泛，语言质朴，叙事性强，对后世诗歌影响深远。
+    representative_works: [poem_core_002, poem_core_089]
+    avatar: default_avatar.png
+
+  - id: author_wangjian
+    name: 王建
+    dynasty: 唐
+    life_years: 约767-约830
+    title: 
+    brief: 中唐诗人，以宫词与乐府著称，反映社会百态。
+    representative_works: [poem_core_069, poem_ext_012]
+    avatar: default_avatar.png
+
+  - id: author_wanghan
+    name: 王翰
+    dynasty: 唐
+    life_years: 生卒年不详
+    title: 
+    brief: 盛唐边塞诗人。《凉州词》「葡萄美酒夜光杯」传诵极广。
+    representative_works: [poem_core_039, poem_ext_032]
+    avatar: default_avatar.png
+
+  - id: author_weizhuang
+    name: 韦庄
+    dynasty: 唐
+    life_years: 约836-910
+    title: 
+    brief: 晚唐五代诗人、词人。诗写乱离，词开花间清丽一派。
+    representative_works: [poem_ext_045, poem_ext_091]
+    avatar: default_avatar.png
+
+  - id: author_hanyu
+    name: 韩愈
+    dynasty: 唐
+    life_years: 768-824
+    title: 韩昌黎
+    brief: 中唐文学家，唐宋八大家之首，倡导古文运动。诗风奇崛，文以载道。
+    representative_works: [poem_core_094, poem_core_128]
+    avatar: default_avatar.png
+
+  - id: author_luobingwang
+    name: 骆宾王
+    dynasty: 唐
+    life_years: 约638-约684
+    title: 初唐四杰
+    brief: 初唐四杰之一，七岁作《咏鹅》。文学成就以骈文见长。
+    representative_works: [poem_core_001, poem_exp_014]
+    avatar: default_avatar.png
+
+  - id: author_huangtingjian
+    name: 黄庭坚
+    dynasty: 宋
+    life_years: 1045-1105
+    title: 山谷道人
+    brief: 北宋诗人、书法家，江西诗派开山之祖。诗风生新瘦硬。
+    representative_works: [poem_ext_242, poem_exp_554]
+    avatar: default_avatar.png
+
+  - id: author_gongzizhen
+    name: 龚自珍
+    dynasty: 清
+    life_years: 1792-1841
+    title: 
+    brief: 清代思想家、诗人。诗风雄奇，富有社会批判精神。代表作有《己亥杂诗》。
+    representative_works: [poem_core_048, poem_exp_570]
+    avatar: default_avatar.png
+
+  - id: author_guanhanqing
+    name: 关汉卿
+    dynasty: 元
+    life_years: 约1220-约1300
+    title: 
+    brief: 元代戏曲家，「元曲四大家」之首。剧作深刻反映社会现实，代表作有《窦娥冤》等。
+    representative_works: [poem_exp_495]
+    avatar: default_avatar.png
+
+  - id: author_mengjiao
+    name: 孟郊
+    dynasty: 唐
+    life_years: 751-814
+    title: 
+    brief: 中唐诗人，与贾岛并称「郊寒岛瘦」。诗多写世态炎凉与贫士悲慨。
+    representative_works: [poem_core_078]
+    avatar: default_avatar.png
+
+  - id: author_zhangxian
+    name: 张先
+    dynasty: 宋
+    life_years: 990-1078
+    title: 张三影
+    brief: 北宋词人，以善用「影」字著称，词风清丽。
+    representative_works: [poem_ext_225]
+    avatar: default_avatar.png
+
+  - id: author_zhang zhi
+    name: 张继
+    dynasty: 唐
+    life_years: 约715-约779
+    title: 
+    brief: 唐代诗人，字懿孙。以《枫桥夜泊》一诗流传千古。
+    representative_works: [poem_core_050]
+    avatar: default_avatar.png
+
+  - id: author_wentianxiang
+    name: 文天祥
+    dynasty: 宋
+    life_years: 1236-1283
+    title: 文山
+    brief: 南宋末大臣、文学家。诗作充满爱国正气，代表作有《过零丁洋》《正气歌》。
+    representative_works: [poem_core_122]
+    avatar: default_avatar.png
+
+  - id: author_yanjidao
+    name: 晏几道
+    dynasty: 宋
+    life_years: 1038-1110
+    title: 小山
+    brief: 北宋词人，晏殊幼子。词风婉丽感伤，多写恋情与追忆。
+    representative_works: [poem_ext_241]
+    avatar: default_avatar.png
+
+  - id: author_caozhi
+    name: 曹植
+    dynasty: 三国
+    life_years: 192-232
+    title: 陈思王
+    brief: 三国魏诗人，曹操之子。才思敏捷，五言诗成就很高，代表作有《七步诗》《洛神赋》等。
+    representative_works: [poem_core_090]
+    avatar: default_avatar.png
+
+  - id: author_liyu
+    name: 李峤
+    dynasty: 唐
+    life_years: 645-714
+    title: 
+    brief: 唐代诗人，字巨山。其诗多咏物之作，《风》是其代表作。
+    representative_works: [poem_core_070]
+    avatar: default_avatar.png
+
+  - id: author_duxunhe
+    name: 杜荀鹤
+    dynasty: 唐
+    life_years: 846-904
+    title: 
+    brief: 晚唐诗人，诗风质朴，多写民生疾苦。
+    representative_works: [poem_ext_085]
+    avatar: default_avatar.png
+
+  - id: author_yangjiong
+    name: 杨炯
+    dynasty: 唐
+    life_years: 650-约693
+    title: 初唐四杰
+    brief: 初唐四杰之一，边塞诗刚健有力。
+    representative_works: [poem_exp_161]
+    avatar: default_avatar.png
+
+  - id: author_lin sheng
+    name: 林升
+    dynasty: 宋
+    life_years: 1123-1189
+    title: 
+    brief: 南宋诗人，字梦屏。因《题临安邸》一诗批判南宋朝廷偏安享乐而流传。
+    representative_works: [poem_core_047]
+    avatar: default_avatar.png
+
+  - id: author_liuyong
+    name: 柳永
+    dynasty: 宋
+    life_years: 约984-约1053
+    title: 柳七
+    brief: 北宋词人，慢词大家。词写市井与羁旅，语言通俗，流传极广。代表作有《雨霖铃》等。
+    representative_works: [poem_exp_462]
+    avatar: default_avatar.png
+
+  - id: author_wang mian
+    name: 王冕
+    dynasty: 元
+    life_years: 1287-1359
+    title: 煮石山农
+    brief: 元代著名画家、诗人，字元章，号煮石山农。擅画墨梅。代表诗作《墨梅》。
+    representative_works: [poem_core_045]
+    avatar: default_avatar.png
+
+  - id: author_wangbo
+    name: 王勃
+    dynasty: 唐
+    life_years: 约650-约676
+    title: 初唐四杰
+    brief: 初唐四杰之首，诗文清新刚健。代表作有《滕王阁序》《送杜少府之任蜀州》。
+    representative_works: [poem_core_110]
+    avatar: default_avatar.png
+
+  - id: author_wangwan
+    name: 王湾
+    dynasty: 唐
+    life_years: 生卒年不详
+    title: 
+    brief: 盛唐诗人。《次北固山下》「海日生残夜，江春入旧年」为千古名句。
+    representative_works: [poem_ext_061]
+    avatar: default_avatar.png
+
+  - id: author_baipu
+    name: 白朴
+    dynasty: 元
+    life_years: 1226-约1306
+    title: 
+    brief: 元曲四大家之一，杂剧与散曲兼擅。
+    representative_works: [poem_exp_563]
+    avatar: default_avatar.png
+
+  - id: author_hezhu
+    name: 贺铸
+    dynasty: 宋
+    life_years: 1052-1125
+    title: 贺方回
+    brief: 北宋词人，词风刚柔兼济，《青玉案》等名篇流传。
+    representative_works: [poem_exp_555]
+    avatar: default_avatar.png
+
+  - id: author_jiadao
+    name: 贾岛
+    dynasty: 唐
+    life_years: 779-843
+    title: 
+    brief: 中唐诗人，以苦吟著称，「推敲」典故与之相关。诗风清奇僻苦。
+    representative_works: [poem_core_008]
+    avatar: default_avatar.png
+
+  - id: author_mazhiyuan
+    name: 马致远
+    dynasty: 元
+    life_years: 约1250-约1321
+    title: 东篱
+    brief: 元曲四大家之一。散曲《天净沙·秋思》被誉为「秋思之祖」。
+    representative_works: [poem_exp_314]
+    avatar: default_avatar.png
+
+  - id: author_gao ding
+    name: 高鼎
+    dynasty: 清
+    life_years: 生卒不详
+    title: 
+    brief: 清代诗人，字象一。诗擅长描写自然景物，代表作《村居》。
+    representative_works: [poem_core_015]
+    avatar: default_avatar.png
