@@ -118,7 +118,7 @@ class HomePage extends ConsumerWidget {
 
             // 今日目标
             _buildDailyGoal(context, dueReviews, ref),
-            // 底部留白：为 NotchedBottomBar 预留空间 (barHeight + fabTopReserve)
+            // 底部留白：为底部导航栏预留空间
             const SizedBox(height: 100),
           ],
       ),

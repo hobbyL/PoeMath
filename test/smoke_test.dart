@@ -1,15 +1,15 @@
 // test/smoke_test.dart
 //
 // Phase 0 冒烟测试：确保 App 冷启动能展示 SplashPage，
-// 并在 splash 定时结束后自动进入 MainShell + NotchedBottomBar。
+// 并在 splash 定时结束后自动进入 MainShell + NavigationBar。
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/app.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 import 'package:poemath/features/shell/splash_page.dart';
-import 'package:poemath/features/shell/widgets/notched_bottom_bar.dart';
 
 import 'helpers/hive_test_helper.dart';
 
@@ -35,7 +35,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.byType(MainShell), findsOneWidget);
-    expect(find.byType(NotchedBottomBar), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
 
     // 消耗 MainShell IndexedStack 中所有 tab 页面的
     // flutter_animate 入场动画计时器

@@ -3,13 +3,13 @@
 // MainShell 5-Tab 点击测试：点击 tab 后应正确切换页面；
 // 主题由用户在设置页手动切换，tab 切换不改变主题。
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/app.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
-import 'package:poemath/features/shell/widgets/notched_bottom_bar.dart';
 
 import '../helpers/hive_test_helper.dart';
 
@@ -47,7 +47,7 @@ void main() {
 
     await _pumpPastSplashAndAnimations(tester);
 
-    expect(find.byType(NotchedBottomBar), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
 
     // 记录初始主题
     final initialSubject = container.read(activeSubjectProvider);
