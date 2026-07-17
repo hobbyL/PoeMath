@@ -17,7 +17,8 @@ class AppConstants {
 
   /// 数据版本号（修改后首次启动会重新导入 asset 数据）
   /// 1.1.0: 作者库/公式库扩充，extended+explore 去模板赏析
-  static const String dataVersion = '1.1.0';
+  /// 1.2.0: extended 扩至 400；作者全覆盖；explore 重分层
+  static const String dataVersion = '1.2.0';
 
   /// slogan
   static const String slogan = '读诗、算数，慢慢来';

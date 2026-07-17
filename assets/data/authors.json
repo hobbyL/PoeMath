@@ -27,9 +27,9 @@
       "poem_core_068",
       "poem_core_109",
       "poem_ext_184",
-      "poem_exp_023",
-      "poem_exp_024",
-      "poem_exp_055"
+      "poem_ext_297",
+      "poem_ext_337",
+      "poem_ext_341"
     ],
     "avatar": "default_avatar.png"
   },
@@ -266,8 +266,8 @@
       "poem_ext_050",
       "poem_ext_138",
       "poem_ext_207",
-      "poem_exp_011",
-      "poem_exp_029"
+      "poem_ext_258",
+      "poem_ext_274"
     ],
     "avatar": "default_avatar.png"
   },
@@ -298,10 +298,10 @@
     "representative_works": [
       "poem_ext_036",
       "poem_ext_066",
-      "poem_exp_018",
-      "poem_exp_050",
-      "poem_exp_097",
-      "poem_exp_111"
+      "poem_ext_265",
+      "poem_ext_286",
+      "poem_ext_313",
+      "poem_ext_324"
     ],
     "avatar": "default_avatar.png"
   },
@@ -318,7 +318,7 @@
       "poem_ext_153",
       "poem_ext_154",
       "poem_ext_168",
-      "poem_exp_045"
+      "poem_ext_283"
     ],
     "avatar": "default_avatar.png"
   },
@@ -334,8 +334,8 @@
       "poem_core_056",
       "poem_ext_205",
       "poem_ext_206",
-      "poem_exp_157",
-      "poem_exp_276"
+      "poem_ext_362",
+      "poem_exp_157"
     ],
     "avatar": "default_avatar.png"
   },
@@ -351,8 +351,8 @@
       "poem_core_024",
       "poem_core_061",
       "poem_core_105",
-      "poem_exp_105",
-      "poem_exp_132"
+      "poem_ext_319",
+      "poem_ext_397"
     ],
     "avatar": "default_avatar.png"
   },
@@ -364,11 +364,11 @@
     "title": "",
     "brief": "南唐词人，词风细腻感伤，对北宋词影响深远。代表作有《鹊踏枝》等。",
     "representative_works": [
-      "poem_exp_047",
+      "poem_ext_284",
+      "poem_ext_386",
+      "poem_ext_391",
       "poem_exp_145",
       "poem_exp_367",
-      "poem_exp_403",
-      "poem_exp_422",
       "poem_exp_484"
     ],
     "avatar": "default_avatar.png"
@@ -385,8 +385,8 @@
       "poem_ext_142",
       "poem_ext_188",
       "poem_ext_236",
-      "poem_exp_021",
-      "poem_exp_022"
+      "poem_ext_268",
+      "poem_ext_269"
     ],
     "avatar": "default_avatar.png"
   },
@@ -402,8 +402,8 @@
       "poem_ext_160",
       "poem_ext_161",
       "poem_ext_162",
-      "poem_exp_019",
-      "poem_exp_102"
+      "poem_ext_266",
+      "poem_ext_316"
     ],
     "avatar": "default_avatar.png"
   },
@@ -415,10 +415,10 @@
     "title": "简斋",
     "brief": "南北宋之交诗人，江西诗派重要人物。诗风由清新转向沉郁，南渡后多家国之叹。",
     "representative_works": [
+      "poem_ext_405",
+      "poem_ext_406",
       "poem_exp_501",
-      "poem_exp_502",
       "poem_exp_503",
-      "poem_exp_504",
       "poem_exp_505",
       "poem_exp_506"
     ],
@@ -448,10 +448,10 @@
     "title": "李后主",
     "brief": "南唐后主，词人。前期多写宫廷生活，亡国后词作沉痛真挚，语言自然。代表作有《虞美人》《相见欢》等。",
     "representative_works": [
+      "poem_ext_387",
+      "poem_ext_398",
       "poem_exp_188",
-      "poem_exp_407",
       "poem_exp_456",
-      "poem_exp_474",
       "poem_exp_519"
     ],
     "avatar": "default_avatar.png"
@@ -497,8 +497,8 @@
     "brief": "清代书画家、文学家，「扬州八怪」之一。诗书画三绝，题画诗与民本关怀并存。",
     "representative_works": [
       "poem_core_066",
+      "poem_ext_368",
       "poem_exp_284",
-      "poem_exp_346",
       "poem_exp_557",
       "poem_exp_558"
     ],
@@ -528,8 +528,8 @@
     "brief": "北宋词人，格律精严，被誉为「词中老杜」。对后世格律词派影响极大。",
     "representative_works": [
       "poem_ext_211",
+      "poem_ext_375",
       "poem_exp_175",
-      "poem_exp_353",
       "poem_exp_488"
     ],
     "avatar": "default_avatar.png"
@@ -542,8 +542,8 @@
     "title": "",
     "brief": "五代词人，花间词派重要作者之一，词作题材较广。",
     "representative_works": [
+      "poem_ext_377",
       "poem_exp_357",
-      "poem_exp_358",
       "poem_exp_531",
       "poem_exp_542"
     ],
@@ -617,9 +617,9 @@
     "title": "醉翁",
     "brief": "北宋文坛领袖，唐宋八大家之一。诗、词、文兼擅，词风清新疏宕。代表作有《醉翁亭记》《生查子》等。",
     "representative_works": [
-      "poem_exp_335",
+      "poem_ext_358",
+      "poem_ext_395",
       "poem_exp_395",
-      "poem_exp_458",
       "poem_exp_463"
     ],
     "avatar": "default_avatar.png"
@@ -677,8 +677,8 @@
     "title": "",
     "brief": "南宋词人，词风清丽，多写羁旅与离情。",
     "representative_works": [
+      "poem_ext_408",
       "poem_exp_237",
-      "poem_exp_515",
       "poem_exp_516",
       "poem_exp_517"
     ],
@@ -692,9 +692,9 @@
     "title": "",
     "brief": "晚唐诗人，律诗圆熟，多写登临怀古与水乡风光。",
     "representative_works": [
-      "poem_exp_009",
-      "poem_exp_010",
-      "poem_exp_028",
+      "poem_ext_256",
+      "poem_ext_257",
+      "poem_ext_273",
       "poem_exp_258"
     ],
     "avatar": "default_avatar.png"
@@ -709,8 +709,36 @@
     "representative_works": [
       "poem_core_083",
       "poem_ext_136",
-      "poem_exp_051",
+      "poem_ext_287",
       "poem_exp_130"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e4b989e5ba86",
+    "name": "刘义庆",
+    "dynasty": "南朝宋",
+    "life_years": "403-444",
+    "title": "",
+    "brief": "南朝文学家，编撰《世说新语》，记魏晋名士言行，影响极大。",
+    "representative_works": [
+      "poem_exp_574",
+      "poem_exp_575",
+      "poem_exp_576"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58fb2e8bebee7a596",
+    "name": "史达祖",
+    "dynasty": "宋",
+    "life_years": "约1163-约1220",
+    "title": "",
+    "brief": "南宋词人，善咏物，词风细腻工巧。",
+    "representative_works": [
+      "poem_ext_402",
+      "poem_ext_413",
+      "poem_exp_489"
     ],
     "avatar": "default_avatar.png"
   },
@@ -729,6 +757,48 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e58fb8e9a9ace58589",
+    "name": "司马光",
+    "dynasty": "宋",
+    "life_years": "1019-1086",
+    "title": "",
+    "brief": "北宋史学家、政治家，主编《资治通鉴》。诗文亦有可观之作。",
+    "representative_works": [
+      "poem_exp_511",
+      "poem_exp_512",
+      "poem_exp_513"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e7828e",
+    "name": "张炎",
+    "dynasty": "宋",
+    "life_years": "1248-约1320",
+    "title": "玉田",
+    "brief": "南宋末词人，词风清空骚雅，精于音律，著有《词源》。",
+    "representative_works": [
+      "poem_ext_222",
+      "poem_exp_560",
+      "poem_exp_561"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69cb1e6a0b4",
+    "name": "朱栴",
+    "dynasty": "明",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "明代宗室文人，有诗文传世。",
+    "representative_works": [
+      "poem_exp_091",
+      "poem_exp_426",
+      "poem_exp_549"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_lihe",
     "name": "李贺",
     "dynasty": "唐",
@@ -737,8 +807,36 @@
     "brief": "中唐诗人，想象奇诡，语言冷艳，有「诗鬼」之称。代表作有《李凭箜篌引》等。",
     "representative_works": [
       "poem_core_064",
-      "poem_exp_093",
-      "poem_exp_312"
+      "poem_ext_310",
+      "poem_ext_342"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69e97e9808b",
+    "name": "林逋",
+    "dynasty": "宋",
+    "life_years": "967-1028",
+    "title": "和靖先生",
+    "brief": "北宋隐逸诗人，爱梅养鹤，称「梅妻鹤子」。诗风淡远，《山园小梅》最为著名。",
+    "representative_works": [
+      "poem_ext_357",
+      "poem_ext_407",
+      "poem_exp_285"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be59bbde7bbb4",
+    "name": "王国维",
+    "dynasty": "近现代",
+    "life_years": "1877-1927",
+    "title": "",
+    "brief": "近代学者、词人。治学贯通中西，词作与词论《人间词话》影响深远。",
+    "representative_works": [
+      "poem_exp_416",
+      "poem_exp_580",
+      "poem_exp_581"
     ],
     "avatar": "default_avatar.png"
   },
@@ -751,7 +849,7 @@
     "brief": "北宋词人，苏门四学士之一。词风婉约清丽，多写爱情与贬谪之感。",
     "representative_works": [
       "poem_ext_212",
-      "poem_exp_352",
+      "poem_ext_374",
       "poem_exp_441"
     ],
     "avatar": "default_avatar.png"
@@ -766,7 +864,7 @@
     "representative_works": [
       "poem_core_074",
       "poem_ext_208",
-      "poem_exp_417"
+      "poem_ext_390"
     ],
     "avatar": "default_avatar.png"
   },
@@ -794,7 +892,7 @@
     "representative_works": [
       "poem_ext_104",
       "poem_ext_237",
-      "poem_exp_013"
+      "poem_ext_260"
     ],
     "avatar": "default_avatar.png"
   },
@@ -820,9 +918,22 @@
     "title": "靖节先生",
     "brief": "东晋大诗人，田园诗派开创者。诗风自然冲淡，代表作有《饮酒》《归园田居》等。",
     "representative_works": [
+      "poem_ext_350",
       "poem_exp_088",
-      "poem_exp_146",
-      "poem_exp_327"
+      "poem_exp_146"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4b994e59089",
+    "name": "乔吉",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_138",
+      "poem_exp_526"
     ],
     "avatar": "default_avatar.png"
   },
@@ -836,6 +947,45 @@
     "representative_works": [
       "poem_core_065",
       "poem_exp_569"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58897e5bea1e5af87",
+    "name": "列御寇",
+    "dynasty": "先秦",
+    "life_years": "",
+    "title": "",
+    "brief": "先秦诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_316",
+      "poem_exp_494"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e696b9e5b9b3",
+    "name": "刘方平",
+    "dynasty": "唐",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "唐诗人，写景诗细腻，《月夜》等小诗清新可诵。",
+    "representative_works": [
+      "poem_ext_051",
+      "poem_ext_052"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e697b6e4b8ad",
+    "name": "刘时中",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_520",
+      "poem_exp_551"
     ],
     "avatar": "default_avatar.png"
   },
@@ -866,6 +1016,32 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e59091e5ad90e8abb2",
+    "name": "向子諲",
+    "dynasty": "宋",
+    "life_years": "1085-1152",
+    "title": "",
+    "brief": "南宋词人，词分江南、江北，风格清旷。",
+    "representative_works": [
+      "poem_ext_228",
+      "poem_ext_229"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e59095e4b88de99fa6",
+    "name": "吕不韦 撰",
+    "dynasty": "先秦",
+    "life_years": "",
+    "title": "",
+    "brief": "先秦诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_250",
+      "poem_exp_253"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_jiangkui",
     "name": "姜夔",
     "dynasty": "宋",
@@ -873,8 +1049,47 @@
     "title": "白石道人",
     "brief": "南宋词人、音乐家。词风清空骚雅，自度曲成就突出。",
     "representative_works": [
-      "poem_exp_535",
+      "poem_ext_410",
       "poem_exp_546"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5ad99e6b499",
+    "name": "孙洙",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_381",
+      "poem_exp_486"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5ae8be4b98be997ae",
+    "name": "宋之问",
+    "dynasty": "唐",
+    "life_years": "约656-约712",
+    "title": "",
+    "brief": "初唐诗人，与沈佺期并称，近体律诗定型过程中的重要人物。",
+    "representative_works": [
+      "poem_ext_020",
+      "poem_ext_065"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5af87e58786",
+    "name": "寇准",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_355",
+      "poem_ext_392"
     ],
     "avatar": "default_avatar.png"
   },
@@ -886,8 +1101,34 @@
     "title": "",
     "brief": "南宋抗金名将。词《满江红》气壮山河，流传千古。",
     "representative_works": [
-      "poem_exp_278",
-      "poem_exp_338"
+      "poem_ext_361",
+      "poem_exp_278"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5b494e68aa4",
+    "name": "崔护",
+    "dynasty": "唐",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "唐诗人，以《题都城南庄》「人面桃花」一典闻名。",
+    "representative_works": [
+      "poem_core_117",
+      "poem_exp_509"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5b494e6b682",
+    "name": "崔涂",
+    "dynasty": "唐",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "唐诗人，羁旅诗情感真挚，《除夜有怀》等较有名。",
+    "representative_works": [
+      "poem_ext_096",
+      "poem_ext_239"
     ],
     "avatar": "default_avatar.png"
   },
@@ -900,7 +1141,59 @@
     "brief": "盛唐诗人，山水田园与边塞题材兼擅。《题破山寺后禅院》以「曲径通幽」著称。",
     "representative_works": [
       "poem_core_127",
-      "poem_exp_107"
+      "poem_ext_321"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bb96e4b896e7be8e",
+    "name": "廖世美",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_206",
+      "poem_exp_470"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e4b994",
+    "name": "张乔",
+    "dynasty": "唐",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "唐诗人，写景抒情清雅。",
+    "representative_works": [
+      "poem_ext_255",
+      "poem_exp_567"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e58583e5b9b2",
+    "name": "张元干",
+    "dynasty": "宋",
+    "life_years": "1091-约1161",
+    "title": "",
+    "brief": "南宋词人，词多爱国感慨，风格豪迈。",
+    "representative_works": [
+      "poem_ext_227",
+      "poem_exp_221"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e5ad90e5aeb9",
+    "name": "张子容",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_300",
+      "poem_exp_267"
     ],
     "avatar": "default_avatar.png"
   },
@@ -918,6 +1211,123 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e68890e5bda6e99b84",
+    "name": "成彦雄",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_196",
+      "poem_exp_265"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e697a0e58faf",
+    "name": "无可",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_301",
+      "poem_exp_262"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69981e7abafe7a4bc",
+    "name": "晁端礼",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_491",
+      "poem_exp_492"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69981e8a1a5e4b98b",
+    "name": "晁补之",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_394",
+      "poem_exp_411"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69cb1e5ba86e9a680",
+    "name": "朱庆馀",
+    "dynasty": "唐",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "中唐诗人，《近试上张水部》以比兴写科举心态，流传甚广。",
+    "representative_works": [
+      "poem_ext_034",
+      "poem_ext_035"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69cb1e695a6e58492",
+    "name": "朱敦儒",
+    "dynasty": "宋",
+    "life_years": "1081-1159",
+    "title": "岩壑",
+    "brief": "两宋之交词人，早年豪放，南渡后多写隐逸闲适。",
+    "representative_works": [
+      "poem_ext_221",
+      "poem_exp_559"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee4b896e6b091",
+    "name": "李世民",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_270",
+      "poem_exp_582"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee6b689",
+    "name": "李涉",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_147",
+      "poem_exp_493"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee78fa3",
+    "name": "李珣",
+    "dynasty": "五代",
+    "life_years": "",
+    "title": "",
+    "brief": "五代诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_142",
+      "poem_exp_281"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_liyu_shen",
     "name": "李绅",
     "dynasty": "唐",
@@ -927,6 +1337,32 @@
     "representative_works": [
       "poem_core_004",
       "poem_core_075"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6aca7e998b3e782af",
+    "name": "欧阳炯",
+    "dynasty": "五代",
+    "life_years": "896-971",
+    "title": "",
+    "brief": "五代词人，花间词派重要作者。",
+    "representative_works": [
+      "poem_exp_425",
+      "poem_exp_449"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6af9be69687e994a1",
+    "name": "毛文锡",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_533",
+      "poem_exp_547"
     ],
     "avatar": "default_avatar.png"
   },
@@ -944,6 +1380,32 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e6b19fe680bb",
+    "name": "江总",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_353",
+      "poem_exp_109"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6bb95e5aebe",
+    "name": "滕宾",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_539",
+      "poem_exp_540"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_wangjian",
     "name": "王建",
     "dynasty": "唐",
@@ -953,6 +1415,32 @@
     "representative_works": [
       "poem_core_069",
       "poem_ext_012"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be6b6af",
+    "name": "王涯",
+    "dynasty": "唐",
+    "life_years": "约764-835",
+    "title": "",
+    "brief": "中唐诗人、政治家，诗作以宫词等见长。",
+    "representative_works": [
+      "poem_ext_271",
+      "poem_exp_208"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be7a6b9e58181",
+    "name": "王禹偁",
+    "dynasty": "宋",
+    "life_years": "954-1001",
+    "title": "",
+    "brief": "北宋文学家，诗文通俗，关心民谟，开北宋诗文革新先声。",
+    "representative_works": [
+      "poem_ext_385",
+      "poem_exp_154"
     ],
     "avatar": "default_avatar.png"
   },
@@ -970,6 +1458,136 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e78e8be8a782",
+    "name": "王观",
+    "dynasty": "宋",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "北宋词人，《卜算子·送鲍浩然之浙东》以「水是眼波横」著名。",
+    "representative_works": [
+      "poem_ext_372",
+      "poem_exp_514"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be8b4a8",
+    "name": "王质",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_131",
+      "poem_exp_139"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e79a87e794abe69dbe",
+    "name": "皇甫松",
+    "dynasty": "唐",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "唐词人，花间词作者，小令清丽。",
+    "representative_works": [
+      "poem_ext_370",
+      "poem_exp_541"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7a596e5928f",
+    "name": "祖咏",
+    "dynasty": "唐",
+    "life_years": "约699-约746",
+    "title": "",
+    "brief": "盛唐诗人，山水诗清新，《终南望余雪》尤为著名。",
+    "representative_works": [
+      "poem_ext_024",
+      "poem_ext_263"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7a88be59e93",
+    "name": "程垓",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_432",
+      "poem_exp_562"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e88c83e68890e5a4a7",
+    "name": "范成大",
+    "dynasty": "宋",
+    "life_years": "1126-1193",
+    "title": "石湖",
+    "brief": "南宋诗人。",
+    "representative_works": [
+      "poem_core_052",
+      "poem_ext_414"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8928be68db7",
+    "name": "蒋捷",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_577",
+      "poem_exp_583"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e5b888e7a780",
+    "name": "赵师秀",
+    "dynasty": "宋",
+    "life_years": "1170-1219",
+    "title": "永嘉四灵",
+    "brief": "南宋诗人，永嘉四灵之一，诗风清苦工巧。",
+    "representative_works": [
+      "poem_core_126",
+      "poem_exp_125"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99986e9be9fe89299",
+    "name": "陆龟蒙",
+    "dynasty": "唐",
+    "life_years": "约？-约881",
+    "title": "",
+    "brief": "晚唐文学家，与皮日休齐名，诗文多写隐逸与咏物。",
+    "representative_works": [
+      "poem_ext_293",
+      "poem_ext_309"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99988e5858b",
+    "name": "陈克",
+    "dynasty": "宋",
+    "life_years": "1081-1137",
+    "title": "",
+    "brief": "南北宋之交词人，词风清丽。",
+    "representative_works": [
+      "poem_ext_270",
+      "poem_exp_424"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_weizhuang",
     "name": "韦庄",
     "dynasty": "唐",
@@ -979,6 +1597,19 @@
     "representative_works": [
       "poem_ext_045",
       "poem_ext_091"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99fa9e58193",
+    "name": "韩偓",
+    "dynasty": "唐",
+    "life_years": "约842-约923",
+    "title": "",
+    "brief": "晚唐诗人。",
+    "representative_works": [
+      "poem_ext_253",
+      "poem_ext_378"
     ],
     "avatar": "default_avatar.png"
   },
@@ -996,6 +1627,45 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e99fa9e7bf83",
+    "name": "韩翃",
+    "dynasty": "唐",
+    "life_years": "生卒年不详",
+    "title": "大历十才子",
+    "brief": "中唐诗人，大历十才子之一。《寒食》一诗广为流传。",
+    "representative_works": [
+      "poem_core_067",
+      "poem_ext_262"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9a1bee695bb",
+    "name": "顾敻",
+    "dynasty": "五代",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "五代词人，花间词作者。",
+    "representative_works": [
+      "poem_exp_203",
+      "poem_exp_369"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9a9ace688b4",
+    "name": "马戴",
+    "dynasty": "唐",
+    "life_years": "生卒年不详",
+    "title": "",
+    "brief": "晚唐诗人，边塞与写景诗清峭，为晚唐五律名家。",
+    "representative_works": [
+      "poem_ext_094",
+      "poem_ext_095"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_luobingwang",
     "name": "骆宾王",
     "dynasty": "唐",
@@ -1004,7 +1674,20 @@
     "brief": "初唐四杰之一，七岁作《咏鹅》。文学成就以骈文见长。",
     "representative_works": [
       "poem_core_001",
-      "poem_exp_014"
+      "poem_ext_261"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9b28de785a7",
+    "name": "鲍照",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 2 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_152",
+      "poem_exp_205"
     ],
     "avatar": "default_avatar.png"
   },
@@ -1030,7 +1713,187 @@
     "brief": "清代思想家、诗人。诗风雄奇，富有社会批判精神。代表作有《己亥杂诗》。",
     "representative_works": [
       "poem_core_048",
-      "poem_exp_570"
+      "poem_ext_415"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4b898e4b8ba",
+    "name": "丘为",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_152"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4b898e6b59a",
+    "name": "丘浚",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_087"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4b898e980a2e794b2",
+    "name": "丘逢甲",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_369"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4b8a5e6ada6",
+    "name": "严武",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_274"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4b8a5e8958a",
+    "name": "严蕊",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_440"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4bbb2e6ae8a",
+    "name": "仲殊",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_444"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4bd95e5b88ce5b0a7",
+    "name": "何希尧",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_290"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4bd95e9808a",
+    "name": "何逊",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_174"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4bd99e58589e4b8ad",
+    "name": "余光中",
+    "dynasty": "近代",
+    "life_years": "",
+    "title": "",
+    "brief": "近代诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_190"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4beafe5af98",
+    "name": "侯寘",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_548"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4beafe69687e69b9c",
+    "name": "侯文曜",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_219"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e4bf9ee59bbde5ae9d",
+    "name": "俞国宝",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_396"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e583a7e4bcbde696af",
+    "name": "僧伽斯那",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_248"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e583a7e5ae9ae6b89a",
+    "name": "僧定渚",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_318"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58583e9b98f",
+    "name": "元鹏",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_035"
     ],
     "avatar": "default_avatar.png"
   },
@@ -1047,6 +1910,450 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e586afe5ad90e68caf",
+    "name": "冯子振",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_044"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e59fba",
+    "name": "刘基",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_078"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e5a699e5aeb9",
+    "name": "刘妙容",
+    "dynasty": "魏晋",
+    "life_years": "",
+    "title": "",
+    "brief": "魏晋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_126"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e5ad9de58588",
+    "name": "刘孝先",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_065"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e5bda4",
+    "name": "刘彤",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_382"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e6989ae8999a",
+    "name": "刘昚虚",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_103"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e698b6",
+    "name": "刘昶",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_352"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e6b2a7",
+    "name": "刘沧",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_282"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e6be9c",
+    "name": "刘澜",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_530"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e78795e593a5",
+    "name": "刘燕哥",
+    "dynasty": "未知",
+    "life_years": "",
+    "title": "",
+    "brief": "未知诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_478"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e7bb98",
+    "name": "刘绘",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_059"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e8beb0e7bf81",
+    "name": "刘辰翁",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_220"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58898e8bf87",
+    "name": "刘过",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_400"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58c97e69c9de6b091",
+    "name": "北朝民歌",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_core_072"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58d8ee6b885e6b791",
+    "name": "华清淑",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_393"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58da2e992ba",
+    "name": "卢钺",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_core_038"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e58dabe7ab8be4b8ad",
+    "name": "卫立中",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_553"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_e58fb8e9a9ace5858920e692b0",
+    "name": "司马光 撰",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_344"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e59095e5a4aae4b880",
+    "name": "吕太一",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_289"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e590b4e5b888e98193",
+    "name": "吴师道",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_197"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e590b4e6b88a",
+    "name": "吴渊",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_396"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e590b4e6bd9c",
+    "name": "吴潜",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_568"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e590b4e6be84",
+    "name": "吴澄",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_052"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e590b4e6bf80",
+    "name": "吴激",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_184"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e590b4e7bf8ce587a4",
+    "name": "吴翌凤",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_218"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e590b4e994a1e9ba92",
+    "name": "吴锡麒",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_393"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e591a8e4b98be790a6",
+    "name": "周之琦",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_415"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e591a8e5af86",
+    "name": "周密",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_128"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e591a8e681a9e69da5",
+    "name": "周恩来",
+    "dynasty": "现代",
+    "life_years": "",
+    "title": "",
+    "brief": "现代诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_160"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e591a8e7b4abe88a9d",
+    "name": "周紫芝",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_230"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e59490e6af85e5a4ab",
+    "name": "唐毅夫",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_552"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e59490e78ea8",
+    "name": "唐玨",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_334"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5a48fe5ae8ce6b7b3",
+    "name": "夏完淳",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_220"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5a79ae787a7",
+    "name": "姚燧",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_410"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5a79ce5bda7",
+    "name": "姜彧",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_354"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5ad94e7bb8de5ae89",
+    "name": "孔绍安",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_354"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5ad9fe4ba91e58dbf",
+    "name": "孟云卿",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_261"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_mengjiao",
     "name": "孟郊",
     "dynasty": "唐",
@@ -1055,6 +2362,138 @@
     "brief": "中唐诗人，与贾岛并称「郊寒岛瘦」。诗多写世态炎凉与贫士悲慨。",
     "representative_works": [
       "poem_core_078"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5ae8be7a581",
+    "name": "宋祁",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_212"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5ae8ce9a29ce792b9",
+    "name": "完颜璹",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_238"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5b494e4b88ee4b98b",
+    "name": "崔与之",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_373"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5b494e58581",
+    "name": "崔允",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_056"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5b494e69b99",
+    "name": "崔曙",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_137"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5b494e6b6b2",
+    "name": "崔液",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_225"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5b494e98193e89e8d",
+    "name": "崔道融",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_251"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5b7a6e7baac",
+    "name": "左纬",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_296"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5b7a6e8be85",
+    "name": "左辅",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_427"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5ba8fe781af",
+    "name": "序灯",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_447"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5ba9ee59eb2",
+    "name": "庞垲",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_224"
     ],
     "avatar": "default_avatar.png"
   },
@@ -1071,6 +2510,174 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e5bca0e58fafe4b985",
+    "name": "张可久",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_524"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e5a4a7e78388",
+    "name": "张大烈",
+    "dynasty": "未知",
+    "life_years": "",
+    "title": "",
+    "brief": "未知诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_215"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e5ad9de7a5a5",
+    "name": "张孝祥",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_421"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e5b5b2",
+    "name": "张嵲",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_255"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e5bf97e5928c",
+    "name": "张志和",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_core_118"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e683a0e8a880",
+    "name": "张惠言",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_544"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e68aa1",
+    "name": "张抡",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_404"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e697ad",
+    "name": "张旭",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_251"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e699afe7a581",
+    "name": "张景祁",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_454"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e69e97",
+    "name": "张林",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_438"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e69ea2",
+    "name": "张枢",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_452"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e6b38c",
+    "name": "张泌",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_046"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e6b791e88ab3",
+    "name": "张淑芳",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_467"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e6b88ae687bf",
+    "name": "张渊懿",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_418"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_zhang zhi",
     "name": "张继",
     "dynasty": "唐",
@@ -1079,6 +2686,126 @@
     "brief": "唐代诗人，字懿孙。以《枫桥夜泊》一诗流传千古。",
     "representative_works": [
       "poem_core_050"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e8be91",
+    "name": "张辑",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_127"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5bca0e98ea1",
+    "name": "张鎡",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_377"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5be90e5868de6809d",
+    "name": "徐再思",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_522"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e5be90e7a5afe58dbf",
+    "name": "徐祯卿",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_363"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e683a0e6a087",
+    "name": "惠标",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_054"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e686a8e5b1b1e5beb7",
+    "name": "憨山德清",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_061"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6888ee698b1",
+    "name": "戎昱",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_645"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6889ae7bba7e58589",
+    "name": "戚继光",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_273"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e688b4e58f94e4bca6",
+    "name": "戴叔伦",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_105"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e68ba9e79298",
+    "name": "择璘",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_299"
     ],
     "avatar": "default_avatar.png"
   },
@@ -1095,6 +2822,66 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e69687e5be81e6988e",
+    "name": "文征明",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_243"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69687e6a3ae",
+    "name": "文森",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_445"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e696bde5b2b3",
+    "name": "施岳",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_413"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e696bde997b0e7aba0",
+    "name": "施闰章",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_144"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69981e586b2e4b98b",
+    "name": "晁冲之",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_263"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_yanjidao",
     "name": "晏几道",
     "dynasty": "宋",
@@ -1103,6 +2890,30 @@
     "brief": "北宋词人，晏殊幼子。词风婉丽感伤，多写恋情与追忆。",
     "representative_works": [
       "poem_ext_241"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69bb9e4b895",
+    "name": "曹丕",
+    "dynasty": "魏晋",
+    "life_years": "",
+    "title": "",
+    "brief": "魏晋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_086"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69bb9e69dbe",
+    "name": "曹松",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_235"
     ],
     "avatar": "default_avatar.png"
   },
@@ -1119,6 +2930,186 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e69bbee58581e58583",
+    "name": "曾允元",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_402"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69bbee587a0",
+    "name": "曾几",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_core_037"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69bbee5b7a9",
+    "name": "曾巩",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_359"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69cb1e597a3e58f91",
+    "name": "朱嗣发",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_451"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69cb1e5ad9fe5beb7",
+    "name": "朱孟德",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_230"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69cb1e5baade78e89",
+    "name": "朱庭玉",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_528"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69cb1e6999ee9a29c",
+    "name": "朱晞颜",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_482"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69cb1e6b791e79c9f",
+    "name": "朱淑真",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_167"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d83e5beb7e88886",
+    "name": "权德舆",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_029"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee4b8ad",
+    "name": "李中",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_186"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee58583e886ba",
+    "name": "李元膺",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_411"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee586b6",
+    "name": "李冶",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_266"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee5a484e585a8",
+    "name": "李处全",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_374"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee5a5bde58fa4",
+    "name": "李好古",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_339"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee5ad98e58b96",
+    "name": "李存勖",
+    "dynasty": "五代",
+    "life_years": "",
+    "title": "",
+    "brief": "五代诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_217"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_liyu",
     "name": "李峤",
     "dynasty": "唐",
@@ -1131,6 +3122,138 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e69d8ee69480e9be99",
+    "name": "李攀龙",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_365"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee6b885e887a3",
+    "name": "李清臣",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_423"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee788bd",
+    "name": "李爽",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_181"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee7929f",
+    "name": "李璟",
+    "dynasty": "五代",
+    "life_years": "",
+    "title": "",
+    "brief": "五代诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_401"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee7abaf",
+    "name": "李端",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_019"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee7bab2",
+    "name": "李纲",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_304"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee8bf9c",
+    "name": "李远",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_317"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee9a291",
+    "name": "李频",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_129"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d8ee9b8bfe7aba0",
+    "name": "李鸿章",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_158"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d9ce585ace79ebb",
+    "name": "杜公瞻",
+    "dynasty": "隋代",
+    "life_years": "",
+    "title": "",
+    "brief": "隋代诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_272"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69d9ce5aea1e8a880",
+    "name": "杜审言",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_232"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_duxunhe",
     "name": "杜荀鹤",
     "dynasty": "唐",
@@ -1139,6 +3262,66 @@
     "brief": "晚唐诗人，诗风质朴，多写民生疾苦。",
     "representative_works": [
       "poem_ext_085"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69da8e4babf",
+    "name": "杨亿",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_356"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69da8e5bebde4b98b",
+    "name": "杨徽之",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_227"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69da8e6858e",
+    "name": "杨慎",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_389"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69da8e69e9c",
+    "name": "杨果",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_527"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69da8e7828ee6ada3",
+    "name": "杨炎正",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_372"
     ],
     "avatar": "default_avatar.png"
   },
@@ -1167,6 +3350,54 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e69e97e69db0",
+    "name": "林杰",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_core_081"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69fa5e6858ee8a18c",
+    "name": "查慎行",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_069"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69fb3e4b8ade5bab8",
+    "name": "柳中庸",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_250"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e69fb3e5a682e698af",
+    "name": "柳如是",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_191"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_liuyong",
     "name": "柳永",
     "dynasty": "宋",
@@ -1175,6 +3406,198 @@
     "brief": "北宋词人，慢词大家。词写市井与羁旅，语言通俗，流传极广。代表作有《雨霖铃》等。",
     "representative_works": [
       "poem_exp_462"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6a281e6a08b",
+    "name": "梁栋",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_236"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6ada6e58583e8a1a1",
+    "name": "武元衡",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_256"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6ada6e58899e5a4a9",
+    "name": "武则天",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_507"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6af9be6bb82",
+    "name": "毛滂",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_226"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6af9be78699e99c87",
+    "name": "毛熙震",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_404"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6af9be78f9d",
+    "name": "毛珝",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_305"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6b1a4e58581e7bba9",
+    "name": "汤允绩",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_214"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6b1a4e698bee7a596",
+    "name": "汤显祖",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_366"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6b1aae897bb",
+    "name": "汪藻",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_360"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6b288e4bdbae69c9f",
+    "name": "沈佺期",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_185"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6b288e5beb7e6bd9c",
+    "name": "沈德潜",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_367"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6b4aae791b9",
+    "name": "洪瑹",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_379"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e6b885e6b19f",
+    "name": "清江",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_177"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7899be5b3a4",
+    "name": "牛峤",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_371"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7899be5b88ce6b58e",
+    "name": "牛希济",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_434"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be583a7e5adba",
+    "name": "王僧孺",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_182"
     ],
     "avatar": "default_avatar.png"
   },
@@ -1203,6 +3626,66 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e78e8be5a3abe7a5af",
+    "name": "王士祯",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_362"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be5ae88e4bb81",
+    "name": "王守仁",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_529"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be5af82",
+    "name": "王寂",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_095"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be681bd",
+    "name": "王恽",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_370"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be69c88e5b1b1",
+    "name": "王月山",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_461"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_wangwan",
     "name": "王湾",
     "dynasty": "唐",
@@ -1215,6 +3698,78 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e78e8be7a390",
+    "name": "王磐",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_412"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be99583",
+    "name": "王镃",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_323"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be99bb1",
+    "name": "王雱",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_373"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78e8be9b98fe8bf90",
+    "name": "王鹏运",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_368"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e78eafe5b1b1e6a8b5",
+    "name": "环山樵",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_079"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e794b0e994a1",
+    "name": "田锡",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_302"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_baipu",
     "name": "白朴",
     "dynasty": "元",
@@ -1223,6 +3778,510 @@
     "brief": "元曲四大家之一，杂剧与散曲兼擅。",
     "representative_works": [
       "poem_exp_563"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e79a87e794abe58689",
+    "name": "皇甫冉",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_133"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e79c9fe5beb7e7a780",
+    "name": "真德秀",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_394"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e79fb3e78ea0",
+    "name": "石玠",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_039"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e79fb3e88c82e58d8e",
+    "name": "石茂华",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_233"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7a4bce8b59e",
+    "name": "礼赞",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_257"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7a798e6bc94",
+    "name": "秘演",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_314"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7a7a6e99face78e89",
+    "name": "秦韬玉",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_135"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7a88be9a2a2",
+    "name": "程颢",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_268"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7aba0e5ad9de6a087",
+    "name": "章孝标",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_134"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7aba0e889afe883bd",
+    "name": "章良能",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_453"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7ae80e995bf",
+    "name": "简长",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_187"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7b6a6e6af8be6bd9c",
+    "name": "綦毋潜",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_163"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7baaae698a0e6b7ae",
+    "name": "纪映淮",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_155"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7bd97e58583e790a6",
+    "name": "罗元琦",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_101"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7bd97e982ba",
+    "name": "罗邺",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_295"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e7bd97e99a90",
+    "name": "罗隐",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_core_084"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e883a1e4bba4e883bd",
+    "name": "胡令能",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_core_032"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e883a1e7a789e6ada3",
+    "name": "胡秉正",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_099"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e88892e4bab6",
+    "name": "舒亶",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_388"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e88892e4bab6ee88b8",
+    "name": "舒亶",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_380"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e88b8fe4bd91",
+    "name": "苏佑",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_150"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e88b8fe591b3e98193",
+    "name": "苏味道",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_247"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e88b8fe8889ce992a6",
+    "name": "苏舜钦",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_133"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e890a7e68aa1e8b093",
+    "name": "萧抡谓",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_282"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8928be698a5e99c96",
+    "name": "蒋春霖",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_420"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8928be6b08fe5a5b3",
+    "name": "蒋氏女",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_383"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e894a1e68cba",
+    "name": "蔡挺",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_159"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e894a1e8a584",
+    "name": "蔡襄",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_275"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8969be697b6e99ba8",
+    "name": "薛时雨",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_391"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8969be980a2",
+    "name": "薛逢",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_279"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8a281e4b8ade98193",
+    "name": "袁中道",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_040"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8a281e69e9a",
+    "name": "袁枚",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_core_071"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8a3b4e5baa6",
+    "name": "裴度",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_333"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8a3b4e8afb4",
+    "name": "裴说",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_326"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8a5bfe98499e4baba",
+    "name": "西鄙人",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_016"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8aeb8e6a390ee87a9",
+    "name": "许棐",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_457"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8aeb8e6a3a0",
+    "name": "许棠",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_124"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b0a2e683a0e8bf9e",
+    "name": "谢惠连",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_046"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b0a2e69c93",
+    "name": "谢朓",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_351"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b0a2e787ae",
+    "name": "谢燮",
+    "dynasty": "南北朝",
+    "life_years": "",
+    "title": "",
+    "brief": "南北朝诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_083"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b4afe4ba91e79fb3",
+    "name": "贯云石",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_037"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b4afe4bc91",
+    "name": "贯休",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_320"
     ],
     "avatar": "default_avatar.png"
   },
@@ -1251,6 +4310,462 @@
     "avatar": "default_avatar.png"
   },
   {
+    "id": "author_a_e8b5b5e4bba4",
+    "name": "赵令",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_202"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e4bba4e795a4",
+    "name": "赵令畤",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_306"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e4bdb6",
+    "name": "赵佶",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_197"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e5988f",
+    "name": "赵嘏",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_140"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e5ad9fe9a0ab",
+    "name": "赵孟頫",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_409"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e5b487",
+    "name": "赵崇",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_340"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e5bda6e698ad",
+    "name": "赵彦昭",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_234"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e697b6e698a5",
+    "name": "赵时春",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_232"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e69882",
+    "name": "赵昂",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_480"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e6b2a8",
+    "name": "赵沨",
+    "dynasty": "金",
+    "life_years": "",
+    "title": "",
+    "brief": "金诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_036"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8b5b5e7a6b9e59cad",
+    "name": "赵禹圭",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_525"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e8beb9e8b4a1",
+    "name": "边贡",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_364"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e98293e589a1",
+    "name": "邓剡",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_194"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9838ee5a3abe58583",
+    "name": "郎士元",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_303"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e98391e5889ae4b8ad",
+    "name": "郑刚中",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_228"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e98391e6809de88296",
+    "name": "郑思肖",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_151"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e98391e7958b",
+    "name": "郑畋",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_053"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e98391e8a789e9bd90",
+    "name": "郑觉齐",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_521"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9878ae59684e4bd8f",
+    "name": "释善住",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_049"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9878ae699bae69c8b",
+    "name": "释智朋",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_172"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e98791e6988ce7bbaa",
+    "name": "金昌绪",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_022"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e98791e7aba0e5ae97",
+    "name": "金章宗",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_437"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e992b1e78f9d",
+    "name": "钱珝",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_278"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e994bae8bf87",
+    "name": "锺过",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_476"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e998aee99885",
+    "name": "阮阅",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_464"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e998b4e8a18ce58588",
+    "name": "阴行先",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_231"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99985e699ba",
+    "name": "际智",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_057"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99986e5ae8fe5ae9a",
+    "name": "陆宏定",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_550"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99988e4babae69db0",
+    "name": "陈人杰",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_400"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99988e999b6",
+    "name": "陈陶",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_252"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e999b6e5bcbc",
+    "name": "陶弼",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_148"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99bb7e99c87",
+    "name": "雷震",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_core_054"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99d99e8afba",
+    "name": "静诺",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_080"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99fa9e58583e59089",
+    "name": "韩元吉",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_389"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e99fa9e99d9e",
+    "name": "韩非",
+    "dynasty": "先秦",
+    "life_years": "",
+    "title": "",
+    "brief": "先秦诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_578"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9a1bee5beb7e6b6a6",
+    "name": "顾德润",
+    "dynasty": "元",
+    "life_years": "",
+    "title": "",
+    "brief": "元诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_034"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9a5b6e88a82",
+    "name": "饶节",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_288"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9a9ace591a8",
+    "name": "马周",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_329"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
     "id": "author_mazhiyuan",
     "name": "马致远",
     "dynasty": "元",
@@ -1258,7 +4773,31 @@
     "title": "东篱",
     "brief": "元曲四大家之一。散曲《天净沙·秋思》被誉为「秋思之祖」。",
     "representative_works": [
-      "poem_exp_314"
+      "poem_ext_343"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9ab98e89fbe",
+    "name": "高蟾",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_259"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9ab98e8a782e59bbd",
+    "name": "高观国",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_497"
     ],
     "avatar": "default_avatar.png"
   },
@@ -1271,6 +4810,66 @@
     "brief": "清代诗人，字象一。诗擅长描写自然景物，代表作《村居》。",
     "representative_works": [
       "poem_core_015"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9ad8fe5aeaa",
+    "name": "魏宪",
+    "dynasty": "清",
+    "life_years": "",
+    "title": "",
+    "brief": "清诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_487"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9b1bce78e84e69cba",
+    "name": "鱼玄机",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_331"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9bb84e58d87",
+    "name": "黄升",
+    "dynasty": "宋",
+    "life_years": "",
+    "title": "",
+    "brief": "宋诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_ext_231"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9bb84e6bb94",
+    "name": "黄滔",
+    "dynasty": "唐",
+    "life_years": "",
+    "title": "",
+    "brief": "唐诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_135"
+    ],
+    "avatar": "default_avatar.png"
+  },
+  {
+    "id": "author_a_e9bd90e4b98be9b8be",
+    "name": "齐之鸾",
+    "dynasty": "明",
+    "life_years": "",
+    "title": "",
+    "brief": "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。",
+    "representative_works": [
+      "poem_exp_446"
     ],
     "avatar": "default_avatar.png"
   }
