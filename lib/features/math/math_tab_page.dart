@@ -41,6 +41,11 @@ class MathTabPage extends ConsumerWidget {
             : null,
         actions: [
           IconButton(
+            onPressed: () => context.push(AppRoutes.studyHub),
+            icon: const Icon(Icons.auto_stories_outlined),
+            tooltip: '公式知识库',
+          ),
+          IconButton(
             onPressed: () => context.push(AppRoutes.mathHistory),
             icon: const Icon(Icons.history_outlined),
             tooltip: '练习记录',

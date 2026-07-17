@@ -27,7 +27,7 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  testWidgets('App 启动后 5 个 Tab 均可切换', (tester) async {
+  testWidgets('App 启动后 4 个 Tab 均可切换', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: App()));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 200));
@@ -38,7 +38,7 @@ void main() {
     expect(find.byType(MainShell), findsOneWidget);
     expect(find.byType(NavigationBar), findsOneWidget);
 
-    for (final label in ['诗词', '知识库', '口算', '我的', '首页']) {
+    for (final label in ['诗词', '口算', '我的', '首页']) {
       await tester.tap(_bottomBarItem(label));
       await tester.pumpAndSettle();
     }

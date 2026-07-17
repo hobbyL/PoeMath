@@ -71,10 +71,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const PoemTabPage(),
           ),
           GoRoute(
-            path: AppRoutes.studyHub,
-            builder: (context, state) => const StudyHubPage(),
-          ),
-          GoRoute(
             path: AppRoutes.mathTab,
             builder: (context, state) => const MathTabPage(),
           ),
@@ -83,6 +79,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ProfilePage(),
           ),
         ],
+      ),
+      // ============ 公式知识库（全屏，从口算页或首页进入） ============
+      GoRoute(
+        path: AppRoutes.studyHub,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const StudyHubPage(),
+        ),
       ),
       // ============ 诗词详情（非 Shell 子路由，全屏） ============
       GoRoute(

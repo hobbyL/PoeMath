@@ -394,7 +394,7 @@ class HomePage extends ConsumerWidget {
             icon: Icons.functions_rounded,
             label: '查公式',
             color: primary.withValues(alpha: 0.7),
-            onTap: () => context.go(AppRoutes.studyHub),
+            onTap: () => context.push(AppRoutes.studyHub),
           ),
         ),
         const SizedBox(width: SpacingTokens.sm),
