@@ -122,6 +122,7 @@ AGENTS.md
 .trellis/
 .claude/
 .codex/
+docs/
 
 # FVM Version Cache
 .fvm/

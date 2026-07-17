@@ -227,10 +227,9 @@ cat keystore.b64 | pbcopy
 
 ## 隐私政策
 
-韵算严格保护用户隐私。**完整政策**（与应用内同源）：
+韵算严格保护用户隐私。**完整政策**以应用内资源为准：
 
-- 仓库文档：[docs/PRIVACY.md](docs/PRIVACY.md)
-- 应用资源：`assets/legal/privacy_policy.md`（「我的 → 关于 → 隐私政策」读取此文件）
+- `assets/legal/privacy_policy.md`（「我的 → 关于 → 隐私政策」读取此文件）
 
 要点：
 
@@ -238,13 +237,9 @@ cat keystore.b64 | pbcopy
 - ✅ 不收集个人信息到开发者服务器；无广告 / 分析 / 追踪 SDK
 - ✅ 无内购或付费功能
 - ✅ 学习数据默认仅存本地；备份 / WebDAV / 检查更新 / 跟读 / 通知需用户主动操作或授权
-- ✅ 权限与行为对照见隐私政策第 4–5 节（含 `INTERNET`、麦克风、通知、安装 APK 等说明）
+- ✅ 权限与行为对照见隐私政策正文（含 `INTERNET`、麦克风、通知、安装 APK 等说明）
 - ✅ 联系方式：应用内关于页；开源发行可通过仓库 Issue（客服邮箱待渠道确定后补充）
 
 ## 许可证
 
 MIT License
-
-## 版本历史
-
-详见 [CHANGELOG](docs/CHANGELOG.md)。

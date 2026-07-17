@@ -313,7 +313,7 @@ class _AboutPageState extends State<AboutPage> {
     );
   }
 
-  /// 与 `docs/PRIVACY.md` 同源：打包资源 `assets/legal/privacy_policy.md`。
+  /// 隐私政策正文：`assets/legal/privacy_policy.md`（单一来源）。
   static Future<String> _loadPrivacyPolicyText() async {
     final raw = await rootBundle.loadString(_privacyPolicyAsset);
     return _markdownToPlainText(raw);
@@ -380,6 +380,6 @@ class _AboutPageState extends State<AboutPage> {
 六、联系
 我的 → 关于 → 隐私政策；或通过开源仓库 Issue。
 
-完整条款见应用资源 assets/legal/privacy_policy.md 与仓库 docs/PRIVACY.md。
+完整条款见应用资源 assets/legal/privacy_policy.md。
 ''';
 }
