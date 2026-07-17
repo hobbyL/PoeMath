@@ -20,6 +20,7 @@ import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/services/haptic_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
@@ -84,7 +85,8 @@ final userStatsRepositoryProvider = Provider<UserStatsRepository>((ref) {
 });
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
-  return SettingsRepository();
+  final credentialStore = ref.watch(secureCredentialStoreProvider);
+  return SettingsRepository(credentialStore: credentialStore);
 });
 
 // ============ 服务 Provider ============
@@ -103,6 +105,11 @@ final hapticServiceProvider = Provider<HapticService>((ref) {
 
 final backupServiceProvider = Provider<BackupService>((ref) {
   return BackupService();
+});
+
+final secureCredentialStoreProvider =
+    Provider<SecureCredentialStore>((ref) {
+  return SecureCredentialStore();
 });
 
 final webDavServiceProvider = Provider<WebDavService>((ref) {

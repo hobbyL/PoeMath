@@ -30,6 +30,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
   late final TextEditingController _pathController;
   bool _testing = false;
   bool _saving = false;
+  bool _loadingCredentials = false;
 
   @override
   void initState() {
@@ -42,6 +43,26 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
     _pathController = TextEditingController(
       text: e?.remotePath ?? '/poemath/',
     );
+
+    // 编辑已有配置且凭据为空时，从安全存储加载
+    if (e != null && e.username.isEmpty && e.password.isEmpty) {
+      _loadCredentials(e);
+    }
+  }
+
+  Future<void> _loadCredentials(WebDavConfig config) async {
+    setState(() => _loadingCredentials = true);
+    try {
+      final settingsRepo = ref.read(settingsRepositoryProvider);
+      final full =
+          await settingsRepo.loadWebDavConfigWithCredentials(config);
+      if (mounted) {
+        _usernameController.text = full.username;
+        _passwordController.text = full.password;
+      }
+    } finally {
+      if (mounted) setState(() => _loadingCredentials = false);
+    }
   }
 
   @override
@@ -188,7 +209,9 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _testing ? null : _testConnection,
+                      onPressed: _testing || _loadingCredentials
+                          ? null
+                          : _testConnection,
                       icon: _testing
                           ? SizedBox(
                               width: 16,
@@ -205,7 +228,9 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
                   const SizedBox(width: SpacingTokens.md),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: _saving ? null : _save,
+                      onPressed: _saving || _loadingCredentials
+                          ? null
+                          : _save,
                       icon: _saving
                           ? const SizedBox(
                               width: 16,

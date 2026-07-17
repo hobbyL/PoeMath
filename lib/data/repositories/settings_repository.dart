@@ -5,10 +5,13 @@
 
 import 'dart:convert';
 
+import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 
 class SettingsRepository {
+  SettingsRepository({SecureCredentialStore? credentialStore})
+      : _credentialStore = credentialStore ?? SecureCredentialStore();
   // ============ KV 键名 ============
   static const String _keyThemeMode = 'theme_mode'; // 'system' | 'light' | 'dark'
   static const String _keyActiveSubject = 'active_subject'; // 'poem' | 'math'
@@ -147,8 +150,6 @@ class SettingsRepository {
     await HiveBoxes.settings.put(_keyMathDifficulty, difficulty);
   }
 
-  // ============ WebDAV 配置 ============
-
   // ============ 新手引导 ============
 
   /// 用户是否已完成新手引导。
@@ -161,33 +162,101 @@ class SettingsRepository {
 
   // ============ WebDAV 配置（移至底部） ============
 
-  /// 所有 WebDAV 同步配置。
+  final SecureCredentialStore _credentialStore;
+
+  /// 所有 WebDAV 同步配置（不含凭据，仅用于列表展示）。
   List<WebDavConfig> get webDavConfigs {
     final json = HiveBoxes.settings.get(_keyWebDavConfigs) as String?;
     return WebDavConfig.decodeList(json);
   }
 
+  /// 加载完整的 WebDAV 配置（含凭据）。
+  ///
+  /// 若安全存储中无凭据，尝试从 Hive 迁移旧明文凭据。
+  Future<WebDavConfig> loadWebDavConfigWithCredentials(
+    WebDavConfig config,
+  ) async {
+    // 先尝试从安全存储读取
+    final creds =
+        await _credentialStore.readWebDavCredentials(config.id);
+    if (creds != null) {
+      return WebDavConfig(
+        id: config.id,
+        name: config.name,
+        url: config.url,
+        username: creds.username,
+        password: creds.password,
+        remotePath: config.remotePath,
+      );
+    }
+
+    // 安全存储无数据，检查 Hive 中是否有旧明文凭据（迁移）
+    if (config.username.isNotEmpty && config.password.isNotEmpty) {
+      await _credentialStore.saveWebDavCredentials(
+        configId: config.id,
+        username: config.username,
+        password: config.password,
+      );
+      // 清除 Hive 中的明文凭据
+      await _saveConfigsToHive(
+        webDavConfigs.map((c) {
+          return WebDavConfig(
+            id: c.id,
+            name: c.name,
+            url: c.url,
+            username: '',
+            password: '',
+            remotePath: c.remotePath,
+          );
+        }).toList(),
+      );
+      return config; // 原始 config 已含凭据
+    }
+
+    return config;
+  }
+
   /// 保存（新增或更新）一条 WebDAV 配置。
+  ///
+  /// 凭据存入安全存储，非敏感信息存入 Hive。
   Future<void> saveWebDavConfig(WebDavConfig config) async {
+    // 凭据 → 安全存储
+    await _credentialStore.saveWebDavCredentials(
+      configId: config.id,
+      username: config.username,
+      password: config.password,
+    );
+
+    // 非敏感信息 → Hive（凭据字段置空）
+    final stripped = WebDavConfig(
+      id: config.id,
+      name: config.name,
+      url: config.url,
+      username: '',
+      password: '',
+      remotePath: config.remotePath,
+    );
     final list = webDavConfigs;
     final index = list.indexWhere((c) => c.id == config.id);
     if (index >= 0) {
-      list[index] = config;
+      list[index] = stripped;
     } else {
-      list.add(config);
+      list.add(stripped);
     }
-    await HiveBoxes.settings.put(
-      _keyWebDavConfigs,
-      WebDavConfig.encodeList(list),
-    );
+    await _saveConfigsToHive(list);
   }
 
   /// 删除一条 WebDAV 配置。
   Future<void> deleteWebDavConfig(String id) async {
+    await _credentialStore.deleteWebDavCredentials(id);
     final list = webDavConfigs..removeWhere((c) => c.id == id);
+    await _saveConfigsToHive(list);
+  }
+
+  Future<void> _saveConfigsToHive(List<WebDavConfig> configs) async {
     await HiveBoxes.settings.put(
       _keyWebDavConfigs,
-      WebDavConfig.encodeList(list),
+      WebDavConfig.encodeList(configs),
     );
   }
 }

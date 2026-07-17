@@ -40,10 +40,16 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   }
 
   Future<void> _editConfig(WebDavConfig config) async {
+    // 从安全存储加载凭据，以便编辑页预填充
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    final fullConfig =
+        await settingsRepo.loadWebDavConfigWithCredentials(config);
+
+    if (!mounted) return;
     final result = await Navigator.push<bool>(
       context,
       fadeSlideRoute(
-        builder: (_) => WebDavConfigPage(existing: config),
+        builder: (_) => WebDavConfigPage(existing: fullConfig),
       ),
     );
     if (result == true) {
@@ -93,10 +99,13 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     final scaffold = ScaffoldMessenger.of(context);
 
     try {
+      final settingsRepo = ref.read(settingsRepositoryProvider);
+      final fullConfig =
+          await settingsRepo.loadWebDavConfigWithCredentials(config);
       final backup = ref.read(backupServiceProvider);
       final webdav = ref.read(webDavServiceProvider);
       final json = backup.exportToJson();
-      await webdav.upload(config, json);
+      await webdav.upload(fullConfig, json);
 
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
@@ -150,9 +159,12 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     final scaffold = ScaffoldMessenger.of(context);
 
     try {
+      final settingsRepo = ref.read(settingsRepositoryProvider);
+      final fullConfig =
+          await settingsRepo.loadWebDavConfigWithCredentials(config);
       final webdav = ref.read(webDavServiceProvider);
       final backup = ref.read(backupServiceProvider);
-      final json = await webdav.download(config);
+      final json = await webdav.download(fullConfig);
       final count = await backup.restoreFromJson(json);
 
       // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
