@@ -27,37 +27,72 @@ class MathTabPage extends ConsumerWidget {
     final accuracy = ref.watch(overallAccuracyProvider);
     final mistakeCount = ref.watch(mistakeCountProvider);
     final theme = Theme.of(context);
+    final isWide = MediaQuery.sizeOf(context).width >= 420;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('口算练习'),
-        leadingWidth: mistakeCount > 0 ? 100 : null,
-        leading: mistakeCount > 0
-            ? TextButton.icon(
-                onPressed: () => context.push(AppRoutes.mathMistake),
-                icon: const Icon(Icons.error_outline, size: 18),
-                label: Text('错题 $mistakeCount'),
-              )
+        automaticallyImplyLeading: false,
+        leadingWidth: mistakeCount > 0
+            ? (isWide ? 160.0 : 96.0)
             : null,
+        leading: mistakeCount > 0
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isWide)
+                    TextButton.icon(
+                      onPressed: () =>
+                          context.push(AppRoutes.mathMistake),
+                      icon: const Icon(Icons.error_outline, size: 18),
+                      label: Text('错题 $mistakeCount'),
+                    )
+                  else
+                    IconButton(
+                      onPressed: () =>
+                          context.push(AppRoutes.mathMistake),
+                      icon: Badge(
+                        label: Text('$mistakeCount'),
+                        child: const Icon(Icons.error_outline),
+                      ),
+                      tooltip: '错题 $mistakeCount',
+                    ),
+                  IconButton(
+                    onPressed: () =>
+                        context.push(AppRoutes.studyHub),
+                    icon: const Icon(Icons.auto_stories_outlined),
+                    tooltip: '公式知识库',
+                  ),
+                ],
+              )
+            : IconButton(
+                onPressed: () => context.push(AppRoutes.studyHub),
+                icon: const Icon(Icons.auto_stories_outlined),
+                tooltip: '公式知识库',
+              ),
         actions: [
-          IconButton(
-            onPressed: () => context.push(AppRoutes.studyHub),
-            icon: const Icon(Icons.auto_stories_outlined),
-            tooltip: '公式知识库',
-          ),
           IconButton(
             onPressed: () => context.push(AppRoutes.mathHistory),
             icon: const Icon(Icons.history_outlined),
             tooltip: '练习记录',
           ),
-          TextButton.icon(
-            onPressed: () =>
-                _showSemesterPicker(context, ref, selectedSemester),
-            icon: const Icon(Icons.filter_list, size: 18),
-            label: Text(
-              _semesterLabels[selectedSemester] ?? selectedSemester,
+          if (isWide)
+            TextButton.icon(
+              onPressed: () =>
+                  _showSemesterPicker(context, ref, selectedSemester),
+              icon: const Icon(Icons.filter_list, size: 18),
+              label: Text(
+                _semesterLabels[selectedSemester] ?? selectedSemester,
+              ),
+            )
+          else
+            IconButton(
+              onPressed: () =>
+                  _showSemesterPicker(context, ref, selectedSemester),
+              icon: const Icon(Icons.filter_list),
+              tooltip: _semesterLabels[selectedSemester] ??
+                  selectedSemester,
             ),
-          ),
         ],
       ),
       body: Column(
