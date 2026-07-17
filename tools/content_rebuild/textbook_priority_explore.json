@@ -1,0 +1,1531 @@
+{
+  "count": 218,
+  "items": [
+    {
+      "id": "poem_exp_185",
+      "title": "流夜郎题葵叶",
+      "author": "李白",
+      "score": 11,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_564",
+      "title": "送别",
+      "author": "王之涣",
+      "score": 11,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_585",
+      "title": "劳劳亭",
+      "author": "李白",
+      "score": 11,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_591",
+      "title": "望木瓜山",
+      "author": "李白",
+      "score": 11,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_624",
+      "title": "别东林寺僧",
+      "author": "李白",
+      "score": 11,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_629",
+      "title": "遗爱寺",
+      "author": "白居易",
+      "score": 11,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_430",
+      "title": "浪淘沙·其七",
+      "author": "刘禹锡",
+      "score": 11,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_534",
+      "title": "踏歌词四首·其二",
+      "author": "刘禹锡",
+      "score": 11,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_565",
+      "title": "宴词",
+      "author": "王之涣",
+      "score": 11,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_597",
+      "title": "永王东巡歌·其三",
+      "author": "李白",
+      "score": 11,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_604",
+      "title": "送韩侍御之广德",
+      "author": "李白",
+      "score": 11,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_613",
+      "title": "永王东巡歌·其六",
+      "author": "李白",
+      "score": 11,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_638",
+      "title": "邯郸冬至夜思家",
+      "author": "白居易",
+      "score": 11,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_649",
+      "title": "魏王堤",
+      "author": "白居易",
+      "score": 11,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_441",
+      "title": "如梦令·池上春归何处",
+      "author": "秦观",
+      "score": 11,
+      "cl": 33
+    },
+    {
+      "id": "poem_exp_164",
+      "title": "春夜别友人二首·其二",
+      "author": "陈子昂",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_173",
+      "title": "南阳送客",
+      "author": "李白",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_436",
+      "title": "生查子·题京口郡治尘表亭",
+      "author": "辛弃疾",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_471",
+      "title": "酒泉子·楚女不归",
+      "author": "温庭筠",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_556",
+      "title": "度荆门望楚",
+      "author": "陈子昂",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_590",
+      "title": "过崔八丈水亭",
+      "author": "李白",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_595",
+      "title": "对雨",
+      "author": "李白",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_599",
+      "title": "太原早秋",
+      "author": "李白",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_600",
+      "title": "金陵新亭",
+      "author": "李白",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_601",
+      "title": "送范山人归泰山",
+      "author": "李白",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_605",
+      "title": "宫中行乐词·其四",
+      "author": "李白",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_611",
+      "title": "宴陶家亭子",
+      "author": "李白",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_623",
+      "title": "大堤曲",
+      "author": "李白",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_647",
+      "title": "送客归京",
+      "author": "白居易",
+      "score": 11,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_253",
+      "title": "父善游",
+      "author": "吕不韦 撰",
+      "score": 10,
+      "cl": 51
+    },
+    {
+      "id": "poem_exp_250",
+      "title": "掩耳盗铃",
+      "author": "吕不韦 撰",
+      "score": 10,
+      "cl": 55
+    },
+    {
+      "id": "poem_exp_248",
+      "title": "愚人食盐",
+      "author": "僧伽斯那",
+      "score": 10,
+      "cl": 64
+    },
+    {
+      "id": "poem_exp_356",
+      "title": "浣溪沙·杨柳千条送马蹄",
+      "author": "纳兰性德",
+      "score": 9,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_360",
+      "title": "浣溪沙·波面铜花冷不收",
+      "author": "吴文英",
+      "score": 9,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_363",
+      "title": "浣溪沙·菊节",
+      "author": "苏轼",
+      "score": 9,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_162",
+      "title": "菩萨蛮·新寒中酒敲窗雨",
+      "author": "纳兰性德",
+      "score": 9,
+      "cl": 44
+    },
+    {
+      "id": "poem_exp_406",
+      "title": "清平乐·检校山园书所见",
+      "author": "辛弃疾",
+      "score": 9,
+      "cl": 46
+    },
+    {
+      "id": "poem_exp_468",
+      "title": "更漏子·雪藏梅",
+      "author": "晏殊",
+      "score": 9,
+      "cl": 46
+    },
+    {
+      "id": "poem_exp_456",
+      "title": "喜迁莺·晓月坠",
+      "author": "李煜",
+      "score": 9,
+      "cl": 47
+    },
+    {
+      "id": "poem_exp_213",
+      "title": "谪仙怨·晴川落日初低",
+      "author": "刘长卿",
+      "score": 9,
+      "cl": 48
+    },
+    {
+      "id": "poem_exp_555",
+      "title": "眼儿媚·萧萧江上荻花秋",
+      "author": "贺铸",
+      "score": 9,
+      "cl": 48
+    },
+    {
+      "id": "poem_exp_462",
+      "title": "少年游·长安古道马迟迟",
+      "author": "柳永",
+      "score": 9,
+      "cl": 50
+    },
+    {
+      "id": "poem_exp_433",
+      "title": "南歌子·见说东园好",
+      "author": "苏轼",
+      "score": 9,
+      "cl": 52
+    },
+    {
+      "id": "poem_exp_188",
+      "title": "望江南·闲梦远",
+      "author": "李煜",
+      "score": 9,
+      "cl": 54
+    },
+    {
+      "id": "poem_exp_385",
+      "title": "鹧鸪天·鹅湖归病起作",
+      "author": "辛弃疾",
+      "score": 9,
+      "cl": 55
+    },
+    {
+      "id": "poem_exp_245",
+      "title": "寒食野望吟",
+      "author": "白居易",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_286",
+      "title": "宣州送裴坦判官往舒州时牧欲赴官归京",
+      "author": "杜牧",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_287",
+      "title": "返照",
+      "author": "杜甫",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_409",
+      "title": "虞美人·秋感",
+      "author": "吴文英",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_614",
+      "title": "送族弟绾从军安西",
+      "author": "李白",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_627",
+      "title": "放言五首·其三",
+      "author": "白居易",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_628",
+      "title": "南湖早春",
+      "author": "白居易",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_631",
+      "title": "放言五首·其五",
+      "author": "白居易",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_633",
+      "title": "琴茶",
+      "author": "白居易",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_637",
+      "title": "庾楼晓望",
+      "author": "白居易",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_642",
+      "title": "放言五首·其二",
+      "author": "白居易",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_644",
+      "title": "晚秋夜",
+      "author": "白居易",
+      "score": 9,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_518",
+      "title": "一斛珠·洛城春晚",
+      "author": "苏轼",
+      "score": 9,
+      "cl": 57
+    },
+    {
+      "id": "poem_exp_455",
+      "title": "小重山·三山与客泛西湖",
+      "author": "辛弃疾",
+      "score": 9,
+      "cl": 58
+    },
+    {
+      "id": "poem_exp_210",
+      "title": "之广陵宿常二南郭幽居",
+      "author": "李白",
+      "score": 9,
+      "cl": 60
+    },
+    {
+      "id": "poem_exp_395",
+      "title": "蝶恋花",
+      "author": "欧阳修",
+      "score": 9,
+      "cl": 60
+    },
+    {
+      "id": "poem_exp_596",
+      "title": "五松山送殷淑",
+      "author": "李白",
+      "score": 9,
+      "cl": 60
+    },
+    {
+      "id": "poem_exp_603",
+      "title": "送友人寻越中山水",
+      "author": "李白",
+      "score": 9,
+      "cl": 60
+    },
+    {
+      "id": "poem_exp_589",
+      "title": "鸣雁行",
+      "author": "李白",
+      "score": 9,
+      "cl": 65
+    },
+    {
+      "id": "poem_exp_469",
+      "title": "行香子·与泗守过南山晚归作",
+      "author": "苏轼",
+      "score": 9,
+      "cl": 66
+    },
+    {
+      "id": "poem_exp_088",
+      "title": "和郭主簿·其二",
+      "author": "陶渊明",
+      "score": 9,
+      "cl": 70
+    },
+    {
+      "id": "poem_exp_153",
+      "title": "江上秋怀",
+      "author": "李白",
+      "score": 9,
+      "cl": 70
+    },
+    {
+      "id": "poem_exp_466",
+      "title": "江神子·十日荷塘小隐赏桂呈朔翁",
+      "author": "吴文英",
+      "score": 9,
+      "cl": 70
+    },
+    {
+      "id": "poem_exp_615",
+      "title": "秋浦寄内",
+      "author": "李白",
+      "score": 9,
+      "cl": 80
+    },
+    {
+      "id": "poem_exp_616",
+      "title": "春日归山寄孟浩然",
+      "author": "李白",
+      "score": 9,
+      "cl": 80
+    },
+    {
+      "id": "poem_exp_257",
+      "title": "邴原泣学",
+      "author": "礼赞",
+      "score": 9,
+      "cl": 99
+    },
+    {
+      "id": "poem_exp_085",
+      "title": "青阳渡",
+      "author": "佚名",
+      "score": 8,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_136",
+      "title": "子夜四时歌·春林花多媚",
+      "author": "佚名",
+      "score": 8,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_499",
+      "title": "咏舞",
+      "author": "虞世南",
+      "score": 8,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_500",
+      "title": "咏萤",
+      "author": "虞世南",
+      "score": 8,
+      "cl": 20
+    },
+    {
+      "id": "poem_exp_067",
+      "title": "朱鹭",
+      "author": "佚名",
+      "score": 8,
+      "cl": 25
+    },
+    {
+      "id": "poem_exp_069",
+      "title": "晓过鸳湖",
+      "author": "查慎行",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_128",
+      "title": "夜归",
+      "author": "周密",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_224",
+      "title": "长安杂兴效竹枝体",
+      "author": "庞垲",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_225",
+      "title": "上元夜六首·其一",
+      "author": "崔液",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_254",
+      "title": "送别诗",
+      "author": "佚名",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_255",
+      "title": "墨梅",
+      "author": "张嵲",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_259",
+      "title": "金陵晚望",
+      "author": "高蟾",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_285",
+      "title": "咏秋江",
+      "author": "林逋",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_493",
+      "title": "润州听暮角",
+      "author": "李涉",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_506",
+      "title": "清明二绝·其一",
+      "author": "陈与义",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_513",
+      "title": "客中初夏",
+      "author": "司马光",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_528",
+      "title": "天净沙·秋",
+      "author": "朱庭玉",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_579",
+      "title": "江村即事",
+      "author": "司空曙",
+      "score": 8,
+      "cl": 28
+    },
+    {
+      "id": "poem_exp_037",
+      "title": "清江引·立春",
+      "author": "贯云石",
+      "score": 8,
+      "cl": 30
+    },
+    {
+      "id": "poem_exp_309",
+      "title": "周颂·噫嘻",
+      "author": "佚名",
+      "score": 8,
+      "cl": 32
+    },
+    {
+      "id": "poem_exp_223",
+      "title": "绵州巴歌",
+      "author": "佚名",
+      "score": 8,
+      "cl": 34
+    },
+    {
+      "id": "poem_exp_023",
+      "title": "临高台",
+      "author": "佚名",
+      "score": 8,
+      "cl": 36
+    },
+    {
+      "id": "poem_exp_059",
+      "title": "咏萍",
+      "author": "刘绘",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_099",
+      "title": "咏贺兰山",
+      "author": "胡秉正",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_109",
+      "title": "雨雪曲",
+      "author": "江总",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_177",
+      "title": "送赞律师归嵩山",
+      "author": "清江",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_231",
+      "title": "和张燕公湘中九日登高",
+      "author": "阴行先",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_232",
+      "title": "原州九日",
+      "author": "赵时春",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_247",
+      "title": "正月十五夜",
+      "author": "苏味道",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_435",
+      "title": "生查子·三尺龙泉剑",
+      "author": "佚名",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_437",
+      "title": "生查子·软金杯",
+      "author": "金章宗",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_512",
+      "title": "送龚章判官之卫州·新及第",
+      "author": "司马光",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_571",
+      "title": "入若耶溪",
+      "author": "崔颢",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_645",
+      "title": "塞下曲·其六",
+      "author": "戎昱",
+      "score": 8,
+      "cl": 40
+    },
+    {
+      "id": "poem_exp_646",
+      "title": "忆江南词三首",
+      "author": "白居易",
+      "score": 8,
+      "cl": 81
+    },
+    {
+      "id": "poem_exp_536",
+      "title": "凄凉犯·重台水仙",
+      "author": "吴文英",
+      "score": 8,
+      "cl": 91
+    },
+    {
+      "id": "poem_exp_386",
+      "title": "满江红·翠幕深庭",
+      "author": "吴文英",
+      "score": 8,
+      "cl": 93
+    },
+    {
+      "id": "poem_exp_387",
+      "title": "满江红·刘朔斋赋菊和韵",
+      "author": "吴文英",
+      "score": 8,
+      "cl": 93
+    },
+    {
+      "id": "poem_exp_209",
+      "title": "箜篌谣",
+      "author": "李白",
+      "score": 8,
+      "cl": 94
+    },
+    {
+      "id": "poem_exp_545",
+      "title": "双双燕·小桃谢后",
+      "author": "吴文英",
+      "score": 8,
+      "cl": 96
+    },
+    {
+      "id": "poem_exp_183",
+      "title": "郢门秋怀",
+      "author": "李白",
+      "score": 8,
+      "cl": 100
+    },
+    {
+      "id": "poem_exp_554",
+      "title": "次韵伯氏长芦寺下",
+      "author": "黄庭坚",
+      "score": 8,
+      "cl": 100
+    },
+    {
+      "id": "poem_exp_602",
+      "title": "送裴十八图南归嵩山二首",
+      "author": "李白",
+      "score": 8,
+      "cl": 100
+    },
+    {
+      "id": "poem_exp_610",
+      "title": "江上寄元六林宗",
+      "author": "李白",
+      "score": 8,
+      "cl": 100
+    },
+    {
+      "id": "poem_exp_412",
+      "title": "水龙吟·小沟东接长江",
+      "author": "苏轼",
+      "score": 8,
+      "cl": 102
+    },
+    {
+      "id": "poem_exp_490",
+      "title": "竹枝词·瞿塘峡口水烟低",
+      "author": "白居易",
+      "score": 8,
+      "cl": 112
+    },
+    {
+      "id": "poem_exp_586",
+      "title": "独漉篇",
+      "author": "李白",
+      "score": 8,
+      "cl": 116
+    },
+    {
+      "id": "poem_exp_178",
+      "title": "送岑征君归鸣皋山",
+      "author": "李白",
+      "score": 8,
+      "cl": 120
+    },
+    {
+      "id": "poem_exp_655",
+      "title": "杏园中枣树",
+      "author": "白居易",
+      "score": 8,
+      "cl": 120
+    },
+    {
+      "id": "poem_exp_434",
+      "title": "生查子·春山烟欲收",
+      "author": "牛希济",
+      "score": 6,
+      "cl": 41
+    },
+    {
+      "id": "poem_exp_202",
+      "title": "浣溪沙·水满池塘花满枝",
+      "author": "赵令",
+      "score": 6,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_214",
+      "title": "浣溪沙·燕垒雏空日正长",
+      "author": "汤允绩",
+      "score": 6,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_354",
+      "title": "浣溪沙·山滴岚光水拍堤",
+      "author": "姜彧",
+      "score": 6,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_357",
+      "title": "浣溪沙·花渐凋疏不耐风",
+      "author": "孙光宪",
+      "score": 6,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_362",
+      "title": "浣溪沙·红桥",
+      "author": "王士祯",
+      "score": 6,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_369",
+      "title": "浣溪沙·云淡风高叶乱飞",
+      "author": "顾敻",
+      "score": 6,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_527",
+      "title": "小桃红·碧湖湖上柳阴阴",
+      "author": "杨果",
+      "score": 6,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_551",
+      "title": "醉中天·花木相思树",
+      "author": "刘时中",
+      "score": 6,
+      "cl": 42
+    },
+    {
+      "id": "poem_exp_184",
+      "title": "诉衷情·夜寒茅店不成眠",
+      "author": "吴激",
+      "score": 6,
+      "cl": 44
+    },
+    {
+      "id": "poem_exp_459",
+      "title": "采桑子·重阳",
+      "author": "毛泽东",
+      "score": 6,
+      "cl": 44
+    },
+    {
+      "id": "poem_exp_415",
+      "title": "好事近·杭苇岸才登",
+      "author": "周之琦",
+      "score": 6,
+      "cl": 45
+    },
+    {
+      "id": "poem_exp_167",
+      "title": "清平乐·风光紧急",
+      "author": "朱淑真",
+      "score": 6,
+      "cl": 46
+    },
+    {
+      "id": "poem_exp_280",
+      "title": "忆秦娥·娄山关",
+      "author": "毛泽东",
+      "score": 6,
+      "cl": 46
+    },
+    {
+      "id": "poem_exp_405",
+      "title": "清平乐令·帘卷曲阑独倚",
+      "author": "佚名",
+      "score": 6,
+      "cl": 46
+    },
+    {
+      "id": "poem_exp_467",
+      "title": "更漏子·秋",
+      "author": "张淑芳",
+      "score": 6,
+      "cl": 46
+    },
+    {
+      "id": "poem_exp_552",
+      "title": "殿前欢·大都西山",
+      "author": "唐毅夫",
+      "score": 6,
+      "cl": 46
+    },
+    {
+      "id": "poem_exp_215",
+      "title": "阮郎归·立夏",
+      "author": "张大烈",
+      "score": 6,
+      "cl": 47
+    },
+    {
+      "id": "poem_exp_457",
+      "title": "喜迁莺·鸠雨细",
+      "author": "许棐",
+      "score": 6,
+      "cl": 47
+    },
+    {
+      "id": "poem_exp_219",
+      "title": "虞美人·影松峦峰",
+      "author": "侯文曜",
+      "score": 6,
+      "cl": 48
+    },
+    {
+      "id": "poem_exp_238",
+      "title": "朝中措·襄阳古道灞陵桥",
+      "author": "完颜璹",
+      "score": 6,
+      "cl": 48
+    },
+    {
+      "id": "poem_exp_298",
+      "title": "匪风",
+      "author": "佚名",
+      "score": 6,
+      "cl": 48
+    },
+    {
+      "id": "poem_exp_299",
+      "title": "蜉蝣",
+      "author": "佚名",
+      "score": 6,
+      "cl": 48
+    },
+    {
+      "id": "poem_exp_410",
+      "title": "满庭芳·天风海涛",
+      "author": "姚燧",
+      "score": 6,
+      "cl": 48
+    },
+    {
+      "id": "poem_exp_438",
+      "title": "柳梢青·灯花",
+      "author": "张林",
+      "score": 6,
+      "cl": 49
+    },
+    {
+      "id": "poem_exp_489",
+      "title": "留春令·咏梅花",
+      "author": "史达祖",
+      "score": 6,
+      "cl": 50
+    },
+    {
+      "id": "poem_exp_548",
+      "title": "四犯令·月破轻云天淡注",
+      "author": "侯寘",
+      "score": 6,
+      "cl": 50
+    },
+    {
+      "id": "poem_exp_553",
+      "title": "殿前欢·碧云深",
+      "author": "卫立中",
+      "score": 6,
+      "cl": 50
+    },
+    {
+      "id": "poem_exp_583",
+      "title": "燕归梁·凤莲",
+      "author": "蒋捷",
+      "score": 6,
+      "cl": 52
+    },
+    {
+      "id": "poem_exp_426",
+      "title": "浪淘沙·秋",
+      "author": "朱栴",
+      "score": 6,
+      "cl": 54
+    },
+    {
+      "id": "poem_exp_095",
+      "title": "鹧鸪天·秋后亭皋木叶稀",
+      "author": "王寂",
+      "score": 6,
+      "cl": 55
+    },
+    {
+      "id": "poem_exp_384",
+      "title": "鹧鸪天·月满蓬壶灿烂灯",
+      "author": "佚名",
+      "score": 6,
+      "cl": 55
+    },
+    {
+      "id": "poem_exp_036",
+      "title": "黄山道中",
+      "author": "赵沨",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_056",
+      "title": "花马池咏",
+      "author": "崔允",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_091",
+      "title": "官桥柳色",
+      "author": "朱栴",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_129",
+      "title": "湘口送友人",
+      "author": "李频",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_133",
+      "title": "过苏州",
+      "author": "苏舜钦",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_140",
+      "title": "宿楚国寺有怀",
+      "author": "赵嘏",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_218",
+      "title": "玉楼春·空园数日无芳信",
+      "author": "吴翌凤",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_227",
+      "title": "寒食寄郑起侍郎",
+      "author": "杨徽之",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_233",
+      "title": "九月九日登长城关",
+      "author": "石茂华",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_236",
+      "title": "金陵三迁有感",
+      "author": "梁栋",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_419",
+      "title": "卜算子·咏梅",
+      "author": "毛泽东",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_446",
+      "title": "九日登清水营城",
+      "author": "齐之鸾",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_526",
+      "title": "折桂令·风雨登虎丘",
+      "author": "乔吉",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_529",
+      "title": "春晴",
+      "author": "王守仁",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_569",
+      "title": "立春日感怀",
+      "author": "于谦",
+      "score": 6,
+      "cl": 56
+    },
+    {
+      "id": "poem_exp_203",
+      "title": "虞美人·触帘风送景阳钟",
+      "author": "顾敻",
+      "score": 6,
+      "cl": 58
+    },
+    {
+      "id": "poem_exp_454",
+      "title": "小重山·几点疏雅誊柳条",
+      "author": "张景祁",
+      "score": 6,
+      "cl": 58
+    },
+    {
+      "id": "poem_exp_220",
+      "title": "一剪梅·咏柳",
+      "author": "夏完淳",
+      "score": 6,
+      "cl": 60
+    },
+    {
+      "id": "poem_exp_267",
+      "title": "春江花月夜二首",
+      "author": "张子容",
+      "score": 6,
+      "cl": 60
+    },
+    {
+      "id": "poem_exp_393",
+      "title": "临江仙·夜泊瓜洲",
+      "author": "吴锡麒",
+      "score": 6,
+      "cl": 60
+    },
+    {
+      "id": "poem_exp_484",
+      "title": "鹊踏枝·六曲阑干偎碧树",
+      "author": "冯延巳",
+      "score": 6,
+      "cl": 60
+    },
+    {
+      "id": "poem_exp_505",
+      "title": "临江仙·高咏楚词酬午日",
+      "author": "陈与义",
+      "score": 6,
+      "cl": 60
+    },
+    {
+      "id": "poem_exp_418",
+      "title": "渔家傲·东昌道中",
+      "author": "张渊懿",
+      "score": 6,
+      "cl": 62
+    },
+    {
+      "id": "poem_exp_549",
+      "title": "青杏儿·秋",
+      "author": "朱栴",
+      "score": 6,
+      "cl": 62
+    },
+    {
+      "id": "poem_exp_300",
+      "title": "下泉",
+      "author": "佚名",
+      "score": 6,
+      "cl": 64
+    },
+    {
+      "id": "poem_exp_303",
+      "title": "菁菁者莪",
+      "author": "佚名",
+      "score": 6,
+      "cl": 64
+    },
+    {
+      "id": "poem_exp_292",
+      "title": "竹竿",
+      "author": "佚名",
+      "score": 6,
+      "cl": 65
+    },
+    {
+      "id": "poem_exp_212",
+      "title": "锦缠道·燕子呢喃",
+      "author": "宋祁",
+      "score": 6,
+      "cl": 66
+    },
+    {
+      "id": "poem_exp_319",
+      "title": "今日良宴会",
+      "author": "佚名",
+      "score": 6,
+      "cl": 70
+    },
+    {
+      "id": "poem_exp_575",
+      "title": "咏雪",
+      "author": "刘义庆",
+      "score": 6,
+      "cl": 71
+    },
+    {
+      "id": "poem_exp_486",
+      "title": "河满子·秋怨",
+      "author": "孙洙",
+      "score": 6,
+      "cl": 74
+    },
+    {
+      "id": "poem_exp_480",
+      "title": "婆罗门引·暮霞照水",
+      "author": "赵昂",
+      "score": 6,
+      "cl": 76
+    },
+    {
+      "id": "poem_exp_035",
+      "title": "山中四咏",
+      "author": "元鹏",
+      "score": 6,
+      "cl": 80
+    },
+    {
+      "id": "poem_exp_086",
+      "title": "芙蓉池作",
+      "author": "曹丕",
+      "score": 6,
+      "cl": 80
+    },
+    {
+      "id": "poem_exp_126",
+      "title": "宛转歌",
+      "author": "刘妙容",
+      "score": 6,
+      "cl": 80
+    },
+    {
+      "id": "poem_exp_216",
+      "title": "御街行·霜风渐紧寒侵被",
+      "author": "佚名",
+      "score": 6,
+      "cl": 80
+    },
+    {
+      "id": "poem_exp_304",
+      "title": "小雅·鼓钟",
+      "author": "佚名",
+      "score": 6,
+      "cl": 80
+    },
+    {
+      "id": "poem_exp_301",
+      "title": "鸱鸮",
+      "author": "佚名",
+      "score": 5,
+      "cl": 87
+    },
+    {
+      "id": "poem_exp_294",
+      "title": "采苓",
+      "author": "佚名",
+      "score": 5,
+      "cl": 93
+    },
+    {
+      "id": "poem_exp_558",
+      "title": "满江红·思家",
+      "author": "郑燮",
+      "score": 5,
+      "cl": 93
+    },
+    {
+      "id": "poem_exp_568",
+      "title": "满江红·金陵乌衣园",
+      "author": "吴潜",
+      "score": 5,
+      "cl": 93
+    },
+    {
+      "id": "poem_exp_237",
+      "title": "水调歌头·定王台",
+      "author": "袁去华",
+      "score": 5,
+      "cl": 95
+    },
+    {
+      "id": "poem_exp_372",
+      "title": "水调歌头·登多景楼",
+      "author": "杨炎正",
+      "score": 5,
+      "cl": 95
+    },
+    {
+      "id": "poem_exp_373",
+      "title": "水调歌头·题剑阁",
+      "author": "崔与之",
+      "score": 5,
+      "cl": 95
+    },
+    {
+      "id": "poem_exp_271",
+      "title": "苛政猛于虎",
+      "author": "佚名",
+      "score": 5,
+      "cl": 96
+    },
+    {
+      "id": "poem_exp_521",
+      "title": "扬州慢·琼花",
+      "author": "郑觉齐",
+      "score": 5,
+      "cl": 98
+    },
+    {
+      "id": "poem_exp_052",
+      "title": "渡江云·揭浩斋送春和韵",
+      "author": "吴澄",
+      "score": 5,
+      "cl": 99
+    },
+    {
+      "id": "poem_exp_061",
+      "title": "咏竹五首",
+      "author": "憨山德清",
+      "score": 5,
+      "cl": 100
+    },
+    {
+      "id": "poem_exp_302",
+      "title": "小雅·四牡",
+      "author": "佚名",
+      "score": 5,
+      "cl": 100
+    },
+    {
+      "id": "poem_exp_492",
+      "title": "水龙吟·咏月",
+      "author": "晁端礼",
+      "score": 5,
+      "cl": 101
+    },
+    {
+      "id": "poem_exp_221",
+      "title": "石州慢·己酉秋吴兴舟中作",
+      "author": "张元干",
+      "score": 5,
+      "cl": 102
+    },
+    {
+      "id": "poem_exp_411",
+      "title": "水龙吟·次歆林圣予惜春",
+      "author": "晁补之",
+      "score": 5,
+      "cl": 102
+    },
+    {
+      "id": "poem_exp_413",
+      "title": "水龙吟·翠鳌涌出沧溟",
+      "author": "施岳",
+      "score": 5,
+      "cl": 102
+    },
+    {
+      "id": "poem_exp_461",
+      "title": "齐天乐·夜来疏雨鸣金井",
+      "author": "王月山",
+      "score": 5,
+      "cl": 102
+    },
+    {
+      "id": "poem_exp_574",
+      "title": "陈太丘与友期",
+      "author": "刘义庆",
+      "score": 5,
+      "cl": 102
+    },
+    {
+      "id": "poem_exp_497",
+      "title": "解连环·柳",
+      "author": "高观国",
+      "score": 5,
+      "cl": 106
+    },
+    {
+      "id": "poem_exp_517",
+      "title": "安公子·弱柳丝千缕",
+      "author": "袁去华",
+      "score": 5,
+      "cl": 106
+    },
+    {
+      "id": "poem_exp_317",
+      "title": "大道之行也",
+      "author": "佚名",
+      "score": 5,
+      "cl": 107
+    },
+    {
+      "id": "poem_exp_318",
+      "title": "惠子相梁",
+      "author": "佚名",
+      "score": 5,
+      "cl": 108
+    },
+    {
+      "id": "poem_exp_482",
+      "title": "一萼红·盆梅",
+      "author": "朱晞颜",
+      "score": 5,
+      "cl": 110
+    },
+    {
+      "id": "poem_exp_291",
+      "title": "载驰",
+      "author": "佚名",
+      "score": 5,
+      "cl": 113
+    },
+    {
+      "id": "poem_exp_399",
+      "title": "沁园春·雪",
+      "author": "毛泽东",
+      "score": 5,
+      "cl": 114
+    },
+    {
+      "id": "poem_exp_400",
+      "title": "沁园春·丁酉岁感事",
+      "author": "陈人杰",
+      "score": 5,
+      "cl": 114
+    },
+    {
+      "id": "poem_exp_451",
+      "title": "摸鱼儿·对西风",
+      "author": "朱嗣发",
+      "score": 5,
+      "cl": 116
+    },
+    {
+      "id": "poem_exp_577",
+      "title": "贺新郎·秋晓",
+      "author": "蒋捷",
+      "score": 5,
+      "cl": 116
+    },
+    {
+      "id": "poem_exp_288",
+      "title": "国风·鄘风·柏舟",
+      "author": "佚名",
+      "score": 5,
+      "cl": 120
+    }
+  ]
+}
