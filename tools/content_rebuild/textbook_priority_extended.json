@@ -1,0 +1,1259 @@
+{
+  "count": 119,
+  "items": [
+    {
+      "id": "poem_ext_064",
+      "title": "草",
+      "author": "白居易",
+      "score": 12,
+      "reasons": [
+        "tang300",
+        "school",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_049",
+      "title": "回乡偶书二首·其一",
+      "author": "贺知章",
+      "score": 11,
+      "reasons": [
+        "tang300",
+        "school",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_379",
+      "title": "菩萨蛮·书江西造口壁",
+      "author": "辛弃疾",
+      "score": 11,
+      "reasons": [
+        "song",
+        "school",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_372",
+      "title": "卜算子·送鲍浩然之浙东",
+      "author": "王观",
+      "score": 9,
+      "reasons": [
+        "song",
+        "school"
+      ]
+    },
+    {
+      "id": "poem_ext_038",
+      "title": "贾生",
+      "author": "李商隐",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_039",
+      "title": "隋宫",
+      "author": "李商隐",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_041",
+      "title": "赠别",
+      "author": "杜牧",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_043",
+      "title": "寄扬州韩绰判官",
+      "author": "杜牧",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_044",
+      "title": "遣怀",
+      "author": "杜牧",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_055",
+      "title": "汉江临泛",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_056",
+      "title": "终南别业",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_057",
+      "title": "酬张少府",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_058",
+      "title": "过香积寺",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_059",
+      "title": "辋川闲居赠裴秀才迪",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_060",
+      "title": "归嵩山作",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_067",
+      "title": "听蜀僧濬弹琴",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_069",
+      "title": "赠孟浩然",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_070",
+      "title": "渡荆门送别",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_075",
+      "title": "风雨",
+      "author": "李商隐",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_078",
+      "title": "奉济驿重送严公四韵",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_079",
+      "title": "旅夜书怀",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_080",
+      "title": "月夜忆舍弟",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_082",
+      "title": "月夜",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_084",
+      "title": "旅宿",
+      "author": "杜牧",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_087",
+      "title": "早寒江上有怀",
+      "author": "孟浩然",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_090",
+      "title": "望洞庭湖赠张丞相",
+      "author": "孟浩然",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_102",
+      "title": "蜀先主庙",
+      "author": "刘禹锡",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_109",
+      "title": "积雨辋川庄作",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_110",
+      "title": "登金陵凤凰台",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_113",
+      "title": "无题·相见时难别亦难",
+      "author": "李商隐",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_114",
+      "title": "无题·来是空言去绝踪",
+      "author": "李商隐",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_115",
+      "title": "无题·飒飒东风细雨来",
+      "author": "李商隐",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_116",
+      "title": "无题·昨夜星辰昨夜风",
+      "author": "李商隐",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_118",
+      "title": "筹笔驿",
+      "author": "李商隐",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_121",
+      "title": "咏怀古迹五首·其一",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_123",
+      "title": "咏怀古迹五首·其三",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_124",
+      "title": "咏怀古迹五首·其四",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_127",
+      "title": "登高",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_128",
+      "title": "登楼",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_132",
+      "title": "登柳州城楼寄漳汀封连四州",
+      "author": "柳宗元",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_141",
+      "title": "西塞山怀古",
+      "author": "刘禹锡",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_144",
+      "title": "西施咏",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_145",
+      "title": "下终南山过斛斯山人宿置酒",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_146",
+      "title": "月下独酌四首·其一",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_147",
+      "title": "春思",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_150",
+      "title": "夏日南亭怀辛大",
+      "author": "孟浩然",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_151",
+      "title": "宿业师山房期丁大不至",
+      "author": "孟浩然",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_153",
+      "title": "晨诣超师院读禅经",
+      "author": "柳宗元",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_154",
+      "title": "溪居",
+      "author": "柳宗元",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_164",
+      "title": "宣州谢脁楼饯别校书叔云",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_165",
+      "title": "金陵酒肆留别",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_168",
+      "title": "渔翁",
+      "author": "柳宗元",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_170",
+      "title": "塞上曲·其一",
+      "author": "王昌龄",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_171",
+      "title": "塞下曲",
+      "author": "王昌龄",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_172",
+      "title": "秋夜曲",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_173",
+      "title": "清平调·其一",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_175",
+      "title": "清平调·名花倾国两相欢",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_177",
+      "title": "玉阶怨",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_178",
+      "title": "长相思·其一",
+      "author": "李白",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_189",
+      "title": "望月有感",
+      "author": "白居易",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_191",
+      "title": "佳人",
+      "author": "杜甫",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_233",
+      "title": "终南山",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_234",
+      "title": "同从弟南斋玩月忆山阴崔少府",
+      "author": "王昌龄",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_254",
+      "title": "送梓州李使君",
+      "author": "王维",
+      "score": 8,
+      "reasons": [
+        "tang300",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_013",
+      "title": "杂诗三首·其二",
+      "author": "王维",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_014",
+      "title": "送别",
+      "author": "王维",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_015",
+      "title": "问刘十九",
+      "author": "白居易",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_017",
+      "title": "怨情",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_021",
+      "title": "八阵图",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_030",
+      "title": "闺怨",
+      "author": "王昌龄",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_031",
+      "title": "春宫曲",
+      "author": "王昌龄",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_033",
+      "title": "后宫词",
+      "author": "白居易",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_036",
+      "title": "逢入京使",
+      "author": "岑参",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_040",
+      "title": "江南逢李龟年",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_042",
+      "title": "金谷园",
+      "author": "杜牧",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_066",
+      "title": "寄左省杜拾遗",
+      "author": "岑参",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_068",
+      "title": "夜泊牛渚怀古",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_071",
+      "title": "送友人",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_072",
+      "title": "凉思",
+      "author": "李商隐",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_073",
+      "title": "北青萝",
+      "author": "李商隐",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_074",
+      "title": "蝉",
+      "author": "李商隐",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_076",
+      "title": "落花",
+      "author": "李商隐",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_077",
+      "title": "登岳阳楼",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_081",
+      "title": "天末怀李白",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_083",
+      "title": "春宿左省",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_086",
+      "title": "宿桐庐江寄广陵旧游",
+      "author": "孟浩然",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_089",
+      "title": "秦中感秋寄远上人",
+      "author": "孟浩然",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_111",
+      "title": "无题·重帏深下莫愁堂",
+      "author": "李商隐",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_112",
+      "title": "无题·凤尾香罗薄几重",
+      "author": "李商隐",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_117",
+      "title": "春雨",
+      "author": "李商隐",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_122",
+      "title": "咏怀古迹五首·其二",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_125",
+      "title": "咏怀古迹五首·其五",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_126",
+      "title": "宿府",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_129",
+      "title": "蜀相",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_130",
+      "title": "客至",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_131",
+      "title": "野望",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_136",
+      "title": "送李少府贬峡中王少府贬长沙",
+      "author": "高适",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_143",
+      "title": "渭川田家",
+      "author": "王维",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_148",
+      "title": "梦李白二首·其二",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_174",
+      "title": "清平调·其二",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_176",
+      "title": "行路难·其一",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_179",
+      "title": "长相思·其二",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_180",
+      "title": "子夜吴歌·夏歌",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_181",
+      "title": "子夜吴歌·秋歌",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_190",
+      "title": "赠卫八处士",
+      "author": "杜甫",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_193",
+      "title": "行路难·其二",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_194",
+      "title": "行路难·其三",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_204",
+      "title": "瑶池",
+      "author": "李商隐",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_235",
+      "title": "关山月",
+      "author": "李白",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_240",
+      "title": "赠别二首",
+      "author": "杜牧",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_246",
+      "title": "念奴娇·春情",
+      "author": "李清照",
+      "score": 7,
+      "reasons": [
+        "song",
+        "famous",
+        "needs_human_tr"
+      ]
+    },
+    {
+      "id": "poem_ext_248",
+      "title": "寄令狐郎中",
+      "author": "李商隐",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_249",
+      "title": "将赴吴兴登乐游原一绝",
+      "author": "杜牧",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_264",
+      "title": "送綦毋潜落第还乡",
+      "author": "王维",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_265",
+      "title": "与高适薛据同登慈恩寺浮图",
+      "author": "岑参",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_267",
+      "title": "夜归鹿门山歌",
+      "author": "孟浩然",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_350",
+      "title": "饮酒·其五",
+      "author": "陶渊明",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_358",
+      "title": "戏答元珍",
+      "author": "欧阳修",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    },
+    {
+      "id": "poem_ext_362",
+      "title": "梅花绝句·其一",
+      "author": "陆游",
+      "score": 7,
+      "reasons": [
+        "tang300",
+        "famous"
+      ]
+    }
+  ]
+}
