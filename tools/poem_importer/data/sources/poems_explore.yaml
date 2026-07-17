@@ -16720,3 +16720,272 @@ poems:
   tags:
   - 哲理
   - 古诗词
+- id: poem_exp_656
+  title: "绝句·迟日江山丽"
+  author: "杜甫"
+  dynasty: "唐"
+  content: "迟日江山丽，春风花草香。\n泥融飞燕子，沙暖睡鸳鸯。"
+  translation: "春日江山明丽，春风里花草飘香。泥土融软燕子飞，沙地温暖鸳鸯睡。"
+  appreciation: "杜甫春日小景。泥融沙暖，生机盈盈。"
+  background: "唐杜甫《绝句》。"
+  famous_lines:
+    - "泥融飞燕子，沙暖睡鸳鸯"
+  tags:
+    - "春天"
+    - "唐诗"
+  layer: explore
+- id: poem_exp_657
+  title: "赋得古原草送别"
+  author: "白居易"
+  dynasty: "唐"
+  content: "离离原上草，一岁一枯荣。\n野火烧不尽，春风吹又生。\n远芳侵古道，晴翠接荒城。\n又送王孙去，萋萋满别情。"
+  translation: "原上草长得茂盛，一年一度枯了又荣。野火烧不尽，春风吹又生。远芳侵入古道，晴翠连向荒城。又送王孙去，萋萋满是别情。"
+  appreciation: "白居易成名作。野火春风写生命力，后幅转入送别。"
+  background: "唐白居易《赋得古原草送别》。"
+  famous_lines:
+    - "野火烧不尽，春风吹又生"
+  tags:
+    - "送别"
+    - "唐诗"
+  layer: explore
+- id: poem_exp_658
+  title: "四时田园杂兴·其二十五"
+  author: "范成大"
+  dynasty: "宋"
+  content: "梅子金黄杏子肥，麦花雪白菜花稀。\n日长篱落无人过，惟有蜻蜓蛱蝶飞。"
+  translation: "梅子金黄杏子肥，麦花雪白，菜花渐稀。日长篱落无人过，只有蜻蜓蛱蝶飞。"
+  appreciation: "范成大初夏田园。梅杏麦菜，静美。"
+  background: "宋范成大《四时田园杂兴》。"
+  famous_lines:
+    - "日长篱落无人过，惟有蜻蜓蛱蝶飞"
+  tags:
+    - "田园"
+    - "宋诗"
+  layer: explore
+- id: poem_exp_659
+  title: "四时田园杂兴·其三十一"
+  author: "范成大"
+  dynasty: "宋"
+  content: "昼出耘田夜绩麻，村庄儿女各当家。\n童孙未解供耕织，也傍桑阴学种瓜。"
+  translation: "白天耘田夜里绩麻，村庄儿女各当家。童孙还不懂耕织，也靠桑阴学种瓜。"
+  appreciation: "范成大田园童趣。学种瓜一句最可爱。"
+  background: "宋范成大《四时田园杂兴》。"
+  famous_lines:
+    - "童孙未解供耕织，也傍桑阴学种瓜"
+  tags:
+    - "田园"
+    - "宋诗"
+    - "小学古诗"
+  layer: explore
+- id: poem_exp_660
+  title: "回乡偶书·其二"
+  author: "贺知章"
+  dynasty: "唐"
+  content: "离别家乡岁月多，近来人事半消磨。\n惟有门前镜湖水，春风不改旧时波。"
+  translation: "离别家乡岁月已多，近来人事大半消磨。只有门前镜湖水，春风不改旧时波。"
+  appreciation: "贺知章回乡其二。人事消磨而湖波依旧。"
+  background: "唐贺知章《回乡偶书》其二。"
+  famous_lines:
+    - "惟有门前镜湖水，春风不改旧时波"
+  tags:
+    - "思乡"
+    - "唐诗"
+  layer: explore
+- id: poem_exp_661
+  title: "悯农·其二"
+  author: "李绅"
+  dynasty: "唐"
+  content: "锄禾日当午，汗滴禾下土。\n谁知盘中餐，粒粒皆辛苦。"
+  translation: "中午烈日下锄禾，汗滴进禾下土。谁知盘中餐，粒粒皆辛苦。"
+  appreciation: "李绅悯农。粒粒皆辛苦，劝惜粮食。"
+  background: "唐李绅《悯农》其二。"
+  famous_lines:
+    - "谁知盘中餐，粒粒皆辛苦"
+  tags:
+    - "悯农"
+    - "小学古诗"
+    - "哲理"
+  layer: explore
+- id: poem_exp_662
+  title: "悯农·其一"
+  author: "李绅"
+  dynasty: "唐"
+  content: "春种一粒粟，秋收万颗子。\n四海无闲田，农夫犹饿死。"
+  translation: "春种一粒粟，秋收万颗子。四海没有闲田，农夫却仍饿死。"
+  appreciation: "李绅悯农其一。丰收与饿死对照，讽苛政。"
+  background: "唐李绅《悯农》其一。"
+  famous_lines:
+    - "四海无闲田，农夫犹饿死"
+  tags:
+    - "悯农"
+    - "唐诗"
+    - "哲理"
+  layer: explore
+- id: poem_exp_663
+  title: "己亥杂诗·其二百二十"
+  author: "龚自珍"
+  dynasty: "清"
+  content: "九州生气恃风雷，万马齐喑究可哀。\n我劝天公重抖擞，不拘一格降人材。"
+  translation: "九州生气靠风雷，万马齐喑终究可哀。我劝天公重新振作，不拘一格降下人材。"
+  appreciation: "龚自珍名篇。不拘一格降人材，呼唤变革。"
+  background: "清龚自珍《己亥杂诗》。"
+  famous_lines:
+    - "我劝天公重抖擞，不拘一格降人材"
+  tags:
+    - "抒怀"
+    - "清诗"
+  layer: explore
+- id: poem_exp_664
+  title: "舟夜书所见"
+  author: "查慎行"
+  dynasty: "清"
+  content: "月黑见渔灯，孤光一点萤。\n微微风簇浪，散作满河星。"
+  translation: "月黑只见渔灯，孤光如一点萤。微风簇起细浪，灯影散作满河星。"
+  appreciation: "查慎行舟夜。满河星一喻精妙。"
+  background: "清查慎行《舟夜书所见》。"
+  famous_lines:
+    - "散作满河星"
+  tags:
+    - "写景"
+    - "清诗"
+  layer: explore
+- id: poem_exp_665
+  title: "画鸡"
+  author: "唐寅"
+  dynasty: "明"
+  content: "头上红冠不用裁，满身雪白走将来。\n平生不敢轻言语，一叫千门万户开。"
+  translation: "头上红冠不用裁，满身雪白走过来。平生不敢轻言语，一叫千门万户开。"
+  appreciation: "唐寅题画鸡。一叫千门开，有势。"
+  background: "明唐寅《画鸡》。"
+  famous_lines:
+    - "一叫千门万户开"
+  tags:
+    - "咏物"
+    - "明诗"
+  layer: explore
+- id: poem_exp_666
+  title: "明日歌"
+  author: "钱福"
+  dynasty: "明"
+  content: "明日复明日，明日何其多。\n我生待明日，万事成蹉跎。\n世人若被明日累，春去秋来老将至。\n朝看水东流，暮看日西坠。\n百年明日能几何，请君听我明日歌。"
+  translation: "明日又明日，明日何其多。我一生等待明日，万事成蹉跎。世人若被明日拖累，春去秋来老将至。朝看水东流，暮看日西坠。百年能有多少明日，请听我明日歌。"
+  appreciation: "钱福明日歌。劝惜今日，勿待明日。"
+  background: "明钱福《明日歌》。"
+  famous_lines:
+    - "我生待明日，万事成蹉跎"
+  tags:
+    - "哲理"
+    - "明诗"
+  layer: explore
+- id: poem_exp_667
+  title: "雪梅·其一"
+  author: "卢梅坡"
+  dynasty: "宋"
+  content: "梅雪争春未肯降，骚人搁笔费评章。\n梅须逊雪三分白，雪却输梅一段香。"
+  translation: "梅雪争春互不相让，诗人搁笔难评章。梅须逊雪三分白，雪却输梅一段香。"
+  appreciation: "卢梅坡雪梅。各有千秋，理趣巧妙。"
+  background: "宋卢梅坡《雪梅》。"
+  famous_lines:
+    - "梅须逊雪三分白，雪却输梅一段香"
+  tags:
+    - "咏物"
+    - "宋诗"
+  layer: explore
+- id: poem_exp_668
+  title: "过华清宫绝句"
+  author: "杜牧"
+  dynasty: "唐"
+  content: "长安回望绣成堆，山顶千门次第开。\n一骑红尘妃子笑，无人知是荔枝来。"
+  translation: "长安回望如绣成堆，山顶千门依次打开。一骑红尘妃子笑，无人知道是荔枝来。"
+  appreciation: "杜牧过华清宫。荔枝与妃子笑，讽奢。"
+  background: "唐杜牧《过华清宫》。"
+  famous_lines:
+    - "一骑红尘妃子笑，无人知是荔枝来"
+  tags:
+    - "怀古"
+    - "唐诗"
+  layer: explore
+- id: poem_exp_669
+  title: "山亭夏日"
+  author: "高骈"
+  dynasty: "唐"
+  content: "绿树阴浓夏日长，楼台倒影入池塘。\n水晶帘动微风起，满架蔷薇一院香。"
+  translation: "绿树阴浓夏日长，楼台倒影入池塘。水晶帘动微风起，满架蔷薇一院香。"
+  appreciation: "高骈山亭夏日。蔷薇一院香，夏景清丽。"
+  background: "唐高骈《山亭夏日》。"
+  famous_lines:
+    - "满架蔷薇一院香"
+  tags:
+    - "夏天"
+    - "唐诗"
+  layer: explore
+- id: poem_exp_670
+  title: "晓窗"
+  author: "魏源"
+  dynasty: "清"
+  content: "少闻鸡声眠，老听鸡声起。\n千古万代人，消磨数声里。"
+  translation: "年少闻鸡声才睡，年老听鸡声就起。千古万代人，都消磨在这几声里。"
+  appreciation: "魏源晓窗。鸡声里见人生，简劲。"
+  background: "清魏源《晓窗》。"
+  famous_lines:
+    - "千古万代人，消磨数声里"
+  tags:
+    - "哲理"
+    - "清诗"
+  layer: explore
+- id: poem_exp_671
+  title: "乡村四月"
+  author: "翁卷"
+  dynasty: "宋"
+  content: "绿遍山原白满川，子规声里雨如烟。\n乡村四月闲人少，才了蚕桑又插田。"
+  translation: "绿遍山原，白水满川；子规声里，雨细如烟。乡村四月闲人少，刚了蚕桑又插田。"
+  appreciation: "翁卷乡村四月。蚕桑插田，忙中有诗。"
+  background: "宋翁卷《乡村四月》。"
+  famous_lines:
+    - "乡村四月闲人少，才了蚕桑又插田"
+  tags:
+    - "田园"
+    - "宋诗"
+  layer: explore
+- id: poem_exp_672
+  title: "冬夜读书示子聿"
+  author: "陆游"
+  dynasty: "宋"
+  content: "古人学问无遗力，少壮工夫老始成。\n纸上得来终觉浅，绝知此事要躬行。"
+  translation: "古人做学问不遗余力，少壮工夫到老才成。纸上得来终究觉得浅，要真正知道必须亲自实行。"
+  appreciation: "陆游示子聿。纸上得来终觉浅，劝实践。"
+  background: "宋陆游《冬夜读书示子聿》。"
+  famous_lines:
+    - "纸上得来终觉浅，绝知此事要躬行"
+  tags:
+    - "哲理"
+    - "宋诗"
+  layer: explore
+- id: poem_exp_673
+  title: "观书有感·其一"
+  author: "朱熹"
+  dynasty: "宋"
+  content: "半亩方塘一鉴开，天光云影共徘徊。\n问渠那得清如许，为有源头活水来。"
+  translation: "半亩方塘像一面镜子打开，天光云影在其中徘徊。问它怎能如此清澈，因为有源头活水来。"
+  appreciation: "朱熹观书有感。源头活水，喻学须出新。"
+  background: "宋朱熹《观书有感》。"
+  famous_lines:
+    - "问渠那得清如许，为有源头活水来"
+  tags:
+    - "哲理"
+    - "宋诗"
+  layer: explore
+- id: poem_exp_674
+  title: "观书有感·其二"
+  author: "朱熹"
+  dynasty: "宋"
+  content: "昨夜江边春水生，蒙冲巨舰一毛轻。\n向来枉费推移力，此日中流自在行。"
+  translation: "昨夜江边春水生，蒙冲巨舰轻如一毛。从前白费推移之力，今日在中流自在航行。"
+  appreciation: "朱熹观书其二。水涨船轻，喻学有积累。"
+  background: "宋朱熹《观书有感》其二。"
+  famous_lines:
+    - "向来枉费推移力，此日中流自在行"
+  tags:
+    - "哲理"
+    - "宋诗"
+  layer: explore
