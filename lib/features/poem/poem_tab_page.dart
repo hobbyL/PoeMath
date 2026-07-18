@@ -240,8 +240,15 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
 
   Widget _buildSearchPanel(BuildContext context) {
     final theme = Theme.of(context);
-    final authors = ref.watch(availableAuthorsProvider);
-    final dynasties = ref.watch(availableDynastiesProvider);
+
+    // 根据选中年级联动计算可选作者/朝代
+    final repo = ref.read(poemRepoProvider);
+    final gradePoems = _localGrade != null
+        ? repo.byGrade(_localGrade!)
+        : repo.getAll();
+    final authors = gradePoems.map((p) => p.author).toSet().toList()..sort();
+    final dynasties = gradePoems.map((p) => p.dynasty).toSet().toList()
+      ..sort();
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -376,6 +383,23 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
       _localAuthor != null ||
       _localDynasty != null;
 
+  /// 年级变化后，清除不再属于该年级的作者/朝代选择。
+  void _invalidateLinkedFilters() {
+    if (_localAuthor == null && _localDynasty == null) return;
+    final repo = ref.read(poemRepoProvider);
+    final poems = _localGrade != null
+        ? repo.byGrade(_localGrade!)
+        : repo.getAll();
+    if (_localAuthor != null &&
+        !poems.any((p) => p.author == _localAuthor)) {
+      _localAuthor = null;
+    }
+    if (_localDynasty != null &&
+        !poems.any((p) => p.dynasty == _localDynasty)) {
+      _localDynasty = null;
+    }
+  }
+
   /// 作者/朝代的可点击选择行。
   Widget _buildDropdownTile({
     required ThemeData theme,
@@ -508,7 +532,11 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                     child: RadioGroup<int?>(
                       groupValue: _localGrade,
                       onChanged: (v) {
-                        setState(() => _localGrade = v);
+                        setState(() {
+                          _localGrade = v;
+                          // 年级变化后清除不再可用的作者/朝代
+                          _invalidateLinkedFilters();
+                        });
                         Navigator.pop(ctx);
                       },
                       child: Column(
