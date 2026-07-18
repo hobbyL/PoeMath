@@ -281,51 +281,29 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
               ),
               const SizedBox(height: SpacingTokens.md),
 
-              // ---- 学习状态 ----
-              _buildSectionLabel(theme, '学习状态'),
-              const SizedBox(height: SpacingTokens.xs),
-              Wrap(
-                spacing: SpacingTokens.xs,
-                runSpacing: SpacingTokens.xs,
-                children: _statusLabels.entries.map((e) {
-                  return ChoiceChip(
-                    label: Text(e.value),
-                    selected: _localStatus == e.key,
-                    onSelected: (_) =>
-                        setState(() => _localStatus = e.key),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-
-              // ---- 年级 ----
-              _buildSectionLabel(theme, '年级'),
-              const SizedBox(height: SpacingTokens.xs),
-              Wrap(
-                spacing: SpacingTokens.xs,
-                runSpacing: SpacingTokens.xs,
-                children: [
-                  ChoiceChip(
-                    label: const Text('全部'),
-                    selected: _localGrade == null,
-                    onSelected: (_) =>
-                        setState(() => _localGrade = null),
-                  ),
-                  ..._gradeLabels.entries.map((e) {
-                    return ChoiceChip(
-                      label: Text(e.value),
-                      selected: _localGrade == e.key,
-                      onSelected: (_) =>
-                          setState(() => _localGrade = e.key),
-                    );
-                  }),
-                ],
-              ),
-              const SizedBox(height: SpacingTokens.md),
-
-              // ---- 作者 & 朝代 ----
+              // ---- 筛选项（一行四个） ----
               Row(
                 children: [
+                  Expanded(
+                    child: _buildDropdownTile(
+                      theme: theme,
+                      label: '状态',
+                      value: _statusLabels[_localStatus] ?? '全部',
+                      onTap: () => _showStatusSheet(),
+                    ),
+                  ),
+                  const SizedBox(width: SpacingTokens.xs),
+                  Expanded(
+                    child: _buildDropdownTile(
+                      theme: theme,
+                      label: '年级',
+                      value: _localGrade == null
+                          ? '全部'
+                          : _gradeLabels[_localGrade] ?? '$_localGrade',
+                      onTap: () => _showGradeSheet(),
+                    ),
+                  ),
+                  const SizedBox(width: SpacingTokens.xs),
                   Expanded(
                     child: _buildDropdownTile(
                       theme: theme,
@@ -341,7 +319,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: SpacingTokens.sm),
+                  const SizedBox(width: SpacingTokens.xs),
                   Expanded(
                     child: _buildDropdownTile(
                       theme: theme,
@@ -398,16 +376,6 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
       _localAuthor != null ||
       _localDynasty != null;
 
-  Widget _buildSectionLabel(ThemeData theme, String text) {
-    return Text(
-      text,
-      style: theme.textTheme.labelMedium?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
   /// 作者/朝代的可点击选择行。
   Widget _buildDropdownTile({
     required ThemeData theme,
@@ -460,8 +428,117 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   }
 
   // ----------------------------------------------------------------
-  // 通用选择 Sheet（作者 / 朝代）
+  // 筛选 Sheet
   // ----------------------------------------------------------------
+
+  void _showStatusSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '筛选学习状态',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<LearningStatus?>(
+                      groupValue: _localStatus,
+                      onChanged: (v) {
+                        setState(() => _localStatus = v);
+                        Navigator.pop(ctx);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _statusLabels.entries.map((e) {
+                          return RadioListTile<LearningStatus?>(
+                            title: Text(e.value),
+                            value: e.key,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showGradeSheet() {
+    final grades = ref.read(availableGradesProvider);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '选择年级',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<int?>(
+                      groupValue: _localGrade,
+                      onChanged: (v) {
+                        setState(() => _localGrade = v);
+                        Navigator.pop(ctx);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const RadioListTile<int?>(
+                            title: Text('全部'),
+                            value: null,
+                          ),
+                          ...grades.map((g) {
+                            return RadioListTile<int?>(
+                              title: Text(_gradeLabels[g] ?? '$g 年级'),
+                              value: g,
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 通用 String 选择 Sheet（作者 / 朝代）。
 
   void _showPickerSheet({
     required String title,
