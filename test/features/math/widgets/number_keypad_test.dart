@@ -53,7 +53,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: NumberKeypad(
-              onNumberTap: (num) => tappedNumber = num,
+              onNumberTap: (n) => tappedNumber = n,
               onBackspace: () {},
               onSubmit: () {},
             ),
@@ -191,7 +191,7 @@ void main() {
       for (final container in containers) {
         final height = container.constraints?.minHeight ?? 0;
         expect(height, greaterThanOrEqualTo(56),
-            reason: '键盘按钮高度应 ≥56pt');
+            reason: '键盘按钮高度应 ≥56pt',);
       }
     });
 

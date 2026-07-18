@@ -38,7 +38,7 @@ void main() {
     expect(violations, 0, reason: 'constraint violations=$violations');
     // ignore: avoid_print
     print('modes seen: $modesSeen');
-  }, timeout: const Timeout(Duration(minutes: 2)));
+  }, timeout: const Timeout(Duration(minutes: 2)),);
 
   test('五年级上 操作数不超过 maxOperand', () {
     for (var i = 0; i < 200; i++) {

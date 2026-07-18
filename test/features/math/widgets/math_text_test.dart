@@ -60,7 +60,7 @@ void main() {
       await tester.pumpWidget(buildApp(
         '25 + 38 = ?',
         style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-      ));
+      ),);
 
       final textWidget = tester.widget<Text>(find.text('25 + 38 = ?'));
       expect(textWidget.style?.fontSize, 32);
