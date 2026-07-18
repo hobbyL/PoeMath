@@ -98,12 +98,16 @@ class SessionResultDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(
+          onPressed: () => Navigator.of(context).pop('home'),
+          child: const Text('返回首页'),
+        ),
+        OutlinedButton(
           onPressed: () => Navigator.of(context).pop('review'),
           child: const Text('查看错题'),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop('done'),
-          child: const Text('完成'),
+          onPressed: () => Navigator.of(context).pop('retry'),
+          child: const Text('再练一组'),
         ),
       ],
     );

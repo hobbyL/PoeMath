@@ -52,10 +52,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   final List<ProblemRecord> _problemRecords = [];
 
   /// 练习开始时间
-  late final DateTime _startTime;
+  late DateTime _startTime;
 
   /// 当前 session ID
-  late final String _sessionId;
+  late String _sessionId;
 
   /// 当前连续答对数（答错时清零）
   int _consecutiveCorrect = 0;
@@ -391,9 +391,28 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     if (action == 'review') {
       context.pushReplacement(AppRoutes.mathMistake);
+    } else if (action == 'retry') {
+      _retrySession();
     } else {
+      // 'home' 或 dismiss → 返回首页
       context.pop();
     }
+  }
+
+  /// 重置答题状态并重新生成同类题目。
+  void _retrySession() {
+    _answerController.clear();
+    _problemRecords.clear();
+    _consecutiveCorrect = 0;
+    _bestConsecutive = 0;
+    _isFinishing = false;
+    _startTime = DateTime.now();
+    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    setState(() {
+      _judgement = null;
+      _showSteps = false;
+    });
+    _generateProblems();
   }
 
   @override

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/data/repositories/math_session_repository.dart';
 import 'package:poemath/data/repositories/challenge_record_repository.dart';
@@ -34,10 +35,10 @@ final mathGradeProvider = StateProvider<int>((ref) => 1);
 /// 当前选中学期
 final mathSemesterProvider = StateProvider<String>((ref) => '上');
 
-/// 每组题目数量（从设置中读取）
+/// 每组题目数量（初始值从 settings 中读取）
 final mathBatchSizeProvider = StateProvider<int>((ref) {
-  // 启动时由 math_tab_page 从 settings 同步
-  return 10;
+  final settings = ref.read(settingsRepositoryProvider);
+  return settings.mathBatchSize;
 });
 
 /// 难度级别
