@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/theme/poem_theme.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
@@ -156,10 +157,11 @@ class PoemReciteModePage extends ConsumerWidget {
                   children: [
                     Text(
                       poem.content,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        height: 2,
-                        letterSpacing: 1.5,
-                      ),
+                      style: theme.extension<PoemThemeExt>()?.poemContent ??
+                          theme.textTheme.bodyMedium?.copyWith(
+                            height: 2,
+                            letterSpacing: 1.5,
+                          ),
                     ),
                   ],
                 ),

@@ -32,6 +32,15 @@ class TypographyTokens {
   /// 口算大数字（低龄用户高识别）
   static const double fsMathProblem = 42.0;
 
+  /// Serif 字体回退列表（优先使用系统已有的衬线字体，不捆绑字体文件）。
+  static const List<String> serifFallback = [
+    'Noto Serif SC', // Android 通常预装
+    'Source Han Serif', // Android 备选
+    'Songti SC', // macOS/iOS 预装的宋体
+    'STSong', // iOS 备选
+    'serif', // 通用 serif fallback
+  ];
+
   /// 诗句正文样式（挂到 PoemThemeExt.poemContent）
   static TextStyle poemContentStyle({Color color = ColorTokens.poemInk}) =>
       TextStyle(
@@ -39,6 +48,7 @@ class TypographyTokens {
         height: 1.8,
         letterSpacing: 2.0,
         color: color,
+        fontFamilyFallback: serifFallback,
       );
 
   /// 口算题目大数字样式（挂到 MathThemeExt.problemNumber）

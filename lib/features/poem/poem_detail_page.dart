@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/theme/poem_theme.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -318,10 +319,12 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   /// 逐行构建诗词正文，朗读时高亮当前行。
   Widget _buildContentLines(Poem poem, ThemeData theme) {
     final lines = _splitLines(poem.content);
-    final baseStyle = theme.textTheme.bodyLarge?.copyWith(
-      height: 2,
-      letterSpacing: 1.5,
-    );
+    final poemExt = theme.extension<PoemThemeExt>();
+    final baseStyle = poemExt?.poemContent ??
+        theme.textTheme.bodyLarge?.copyWith(
+          height: 2,
+          letterSpacing: 1.5,
+        );
 
     return Column(
       children: List.generate(lines.length, (i) {

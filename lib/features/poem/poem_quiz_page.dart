@@ -321,6 +321,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         height: 1.8,
+                        fontFamilyFallback: TypographyTokens.serifFallback,
                       ),
                     ),
                     const SizedBox(height: SpacingTokens.md),
@@ -333,6 +334,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                         height: 1.8,
+                        fontFamilyFallback: TypographyTokens.serifFallback,
                       ),
                     ),
                     const SizedBox(height: SpacingTokens.lg),

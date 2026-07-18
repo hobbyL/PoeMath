@@ -451,6 +451,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
                 letterSpacing: 2,
+                fontFamilyFallback: TypographyTokens.serifFallback,
               ),
               textAlign: TextAlign.center,
             ).animate().fadeIn(duration: 300.ms),
@@ -692,6 +693,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                 isFilled ? FontWeight.bold : FontWeight.normal,
             letterSpacing: 2,
             height: 2,
+            fontFamilyFallback: TypographyTokens.serifFallback,
           ),
         );
 
