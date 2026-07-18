@@ -244,7 +244,6 @@ class _ModeCard extends StatelessWidget {
       iconColor: iconColor,
       title: title,
       subtitle: subtitle,
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: onTap,
     );
   }

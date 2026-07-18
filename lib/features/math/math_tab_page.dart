@@ -10,7 +10,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
-import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/grade_semester_card.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -241,12 +240,6 @@ class MathTabPage extends ConsumerWidget {
             ),
           ),
 
-          // 练习模式选择
-          _buildModeSelector(context, ref),
-
-          // 题量快捷选择
-          _buildBatchSizeSelector(context, ref),
-
           // 开始练习按钮 + 限时挑战
           SafeArea(
             child: Padding(
@@ -349,136 +342,6 @@ class MathTabPage extends ConsumerWidget {
     if (config.allowNegative) parts.add('正负数');
     if (config.allowRemainder) parts.add('有余数');
     return parts.join(' · ');
-  }
-
-  Widget _buildModeSelector(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final selectedMode = ref.watch(mathPracticeModeProvider);
-    final gradeConfig = ref.watch(gradeConfigProvider);
-
-    final hasCompare =
-        gradeConfig.allowedModes.contains(ProblemMode.compare);
-    final hasVertical =
-        gradeConfig.allowedModes.contains(ProblemMode.vertical);
-    final hasFindMissing =
-        gradeConfig.allowedModes.contains(ProblemMode.findMissing);
-    final hasChain =
-        gradeConfig.allowedModes.contains(ProblemMode.chain);
-    final hasWithBrackets =
-        gradeConfig.allowedModes.contains(ProblemMode.withBrackets);
-
-    // 只有当前年级支持除 findResult 以外的模式时才显示选择器
-    if (!hasCompare &&
-        !hasVertical &&
-        !hasFindMissing &&
-        !hasChain &&
-        !hasWithBrackets) {
-      return const SizedBox.shrink();
-    }
-
-    final modes = <(ProblemMode?, String, IconData)>[
-      (null, '综合', Icons.shuffle_rounded),
-      if (hasFindMissing)
-        (ProblemMode.findMissing, '求未知', Icons.help_outline_rounded),
-      if (hasCompare)
-        (ProblemMode.compare, '比大小', Icons.compare_arrows_rounded),
-      if (hasVertical)
-        (ProblemMode.vertical, '竖式', Icons.view_column_rounded),
-      if (hasChain)
-        (ProblemMode.chain, '连续运算', Icons.link_rounded),
-      if (hasWithBrackets)
-        (ProblemMode.withBrackets, '带括号', Icons.data_array_rounded),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
-      child: Row(
-        children: [
-          Text(
-            '模式',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: SpacingTokens.sm),
-          Expanded(
-            child: Wrap(
-              spacing: SpacingTokens.xs,
-              children: modes.map((m) {
-                final (mode, label, icon) = m;
-                final isActive = selectedMode == mode;
-                return ChoiceChip(
-                  avatar: Icon(icon, size: 16),
-                  label: Text(label),
-                  selected: isActive,
-                  onSelected: (_) {
-                    ref.read(mathPracticeModeProvider.notifier).state = mode;
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBatchSizeSelector(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final rawBatchSize = ref.watch(mathBatchSizeProvider);
-    final settingsRepo = ref.watch(settingsRepositoryProvider);
-
-    const options = [10, 20, 50];
-
-    // 当前值不在选项中时（如从设置页或错题页设置了 5/15/30/100），
-    // 回退到最近的可选项，避免 SegmentedButton 断言失败。
-    final batchSize = options.contains(rawBatchSize)
-        ? rawBatchSize
-        : options.reduce(
-            (a, b) =>
-                (a - rawBatchSize).abs() <= (b - rawBatchSize).abs() ? a : b,
-          );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: SpacingTokens.md,
-        vertical: SpacingTokens.xs,
-      ),
-      child: Row(
-        children: [
-          Text(
-            '题量',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: SpacingTokens.sm),
-          SegmentedButton<int>(
-            segments: options
-                .map(
-                  (n) => ButtonSegment<int>(
-                    value: n,
-                    label: Text('$n 题'),
-                  ),
-                )
-                .toList(),
-            selected: {batchSize},
-            onSelectionChanged: (selected) {
-              final value = selected.first;
-              ref.read(mathBatchSizeProvider.notifier).state = value;
-              settingsRepo.setMathBatchSize(value);
-            },
-            showSelectedIcon: false,
-            style: const ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showSemesterPicker(

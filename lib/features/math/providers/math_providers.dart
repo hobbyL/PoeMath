@@ -45,8 +45,13 @@ final mathBatchSizeProvider = StateProvider<int>((ref) {
 final mathDifficultyProvider =
     StateProvider<DifficultyLevel>((ref) => DifficultyLevel.medium);
 
-/// 练习模式（null = 综合随机，compare = 比大小，vertical = 竖式）
-final mathPracticeModeProvider = StateProvider<ProblemMode?>((ref) => null);
+/// 练习模式（null = 综合随机，初始值从 settings 中读取）
+final mathPracticeModeProvider = StateProvider<ProblemMode?>((ref) {
+  final settings = ref.read(settingsRepositoryProvider);
+  final modeName = settings.mathPracticeMode;
+  if (modeName == null) return null;
+  return ProblemMode.values.where((m) => m.name == modeName).firstOrNull;
+});
 
 // ============ 练习进行中 ============
 

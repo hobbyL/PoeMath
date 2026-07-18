@@ -43,6 +43,8 @@ class SessionResultDialog extends StatelessWidget {
     return (text: '多多练习！', icon: Icons.menu_book_rounded);
   }
 
+  bool get _allCorrect => correctCount == totalProblems;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -94,22 +96,38 @@ class SessionResultDialog extends StatelessWidget {
           ),
           const SizedBox(height: SpacingTokens.sm),
           _buildStatRow(context, '用时', _durationText),
+
+          const SizedBox(height: SpacingTokens.lg),
+
+          // 按钮行
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop('home'),
+                  child: const Text('返回首页'),
+                ),
+              ),
+              if (!_allCorrect) ...[
+                const SizedBox(width: SpacingTokens.sm),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop('review'),
+                    child: const Text('查看错题'),
+                  ),
+                ),
+              ],
+              const SizedBox(width: SpacingTokens.sm),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop('retry'),
+                  child: const Text('再练一组'),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop('home'),
-          child: const Text('返回首页'),
-        ),
-        OutlinedButton(
-          onPressed: () => Navigator.of(context).pop('review'),
-          child: const Text('查看错题'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop('retry'),
-          child: const Text('再练一组'),
-        ),
-      ],
     );
   }
 

@@ -26,6 +26,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
   late int _mathGoal;
   late int _batchSize;
   late DifficultyLevel _difficulty;
+  late ProblemMode? _practiceMode;
   bool _initialized = false;
 
   static const int _poemMin = 1;
@@ -44,6 +45,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
       _mathGoal = ref.read(dailyMathGoalProvider);
       _batchSize = settings.mathBatchSize;
       _difficulty = _parseDifficulty(settings.mathDifficulty);
+      _practiceMode = ref.read(mathPracticeModeProvider);
       _initialized = true;
     }
   }
@@ -61,9 +63,11 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
     await settings.setDailyMathGoal(_mathGoal);
     await settings.setMathBatchSize(_batchSize);
     await settings.setMathDifficulty(_difficulty.name);
+    await settings.setMathPracticeMode(_practiceMode?.name);
 
     // 同步 in-memory provider
     ref.read(mathDifficultyProvider.notifier).state = _difficulty;
+    ref.read(mathPracticeModeProvider.notifier).state = _practiceMode;
 
     ref.invalidate(settingsRepositoryProvider);
     ref.invalidate(dailyPoemGoalProvider);
@@ -118,6 +122,10 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                 ],
               ),
             ),
+            const SizedBox(height: SpacingTokens.md),
+
+            // ============ 练习模式 ============
+            _buildModeCard(theme),
             const SizedBox(height: SpacingTokens.md),
 
             // ============ 练习难度 ============
@@ -253,6 +261,64 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildModeCard(ThemeData theme) {
+    const modes = <(ProblemMode?, String, IconData)>[
+      (null, '综合', Icons.shuffle_rounded),
+      (ProblemMode.findMissing, '求未知', Icons.help_outline_rounded),
+      (ProblemMode.compare, '比大小', Icons.compare_arrows_rounded),
+      (ProblemMode.vertical, '竖式', Icons.view_column_rounded),
+      (ProblemMode.chain, '连续运算', Icons.link_rounded),
+      (ProblemMode.withBrackets, '带括号', Icons.data_array_rounded),
+    ];
+
+    return ColoredCard(
+      color: theme.colorScheme.primary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.gamepad_outlined,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              Text(
+                '练习模式',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          Wrap(
+            spacing: SpacingTokens.sm,
+            runSpacing: SpacingTokens.xs,
+            children: modes.map((m) {
+              final (mode, label, icon) = m;
+              return ChoiceChip(
+                avatar: Icon(icon, size: 16),
+                label: Text(label),
+                selected: _practiceMode == mode,
+                onSelected: (_) =>
+                    setState(() => _practiceMode = mode),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            '实际可用模式取决于所选年级学期的课标范围',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -286,7 +286,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                     );
                   },
                   icon: const Icon(Icons.school_outlined),
-                  label: const Text('开始学习'),
+                  label: const Text('学习'),
                 ),
               ),
               const SizedBox(width: SpacingTokens.sm),

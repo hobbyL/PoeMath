@@ -26,6 +26,7 @@ class SettingsRepository {
   static const String _keyWebDavConfigs = 'webdav_configs';
   static const String _keyMathBatchSize = 'math_batch_size';
   static const String _keyMathDifficulty = 'math_difficulty';
+  static const String _keyMathPracticeMode = 'math_practice_mode';
   static const String _keyHasOnboarded = 'has_onboarded';
 
   // ============ 主题 ============
@@ -148,6 +149,18 @@ class SettingsRepository {
 
   Future<void> setMathDifficulty(String difficulty) async {
     await HiveBoxes.settings.put(_keyMathDifficulty, difficulty);
+  }
+
+  /// 口算练习模式（null = 综合，否则为 ProblemMode.name）
+  String? get mathPracticeMode =>
+      HiveBoxes.settings.get(_keyMathPracticeMode) as String?;
+
+  Future<void> setMathPracticeMode(String? mode) async {
+    if (mode == null) {
+      await HiveBoxes.settings.delete(_keyMathPracticeMode);
+    } else {
+      await HiveBoxes.settings.put(_keyMathPracticeMode, mode);
+    }
   }
 
   // ============ 新手引导 ============
