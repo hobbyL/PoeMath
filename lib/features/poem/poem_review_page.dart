@@ -73,6 +73,25 @@ class PoemReviewPage extends ConsumerWidget {
                       .slideY(begin: 0.1, end: 0, duration: 400.ms),
                   const SizedBox(height: SpacingTokens.lg),
 
+                  // 一键复习按钮
+                  if (dueToday.isNotEmpty) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => _startBatchReview(
+                          context,
+                          ref,
+                          dueToday,
+                        ),
+                        icon: const Icon(Icons.play_circle_outline),
+                        label: Text(
+                          '一键复习今日全部（${dueToday.length} 首）',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: SpacingTokens.lg),
+                  ],
+
                   // 今日待复习
                   if (dueToday.isNotEmpty) ...[
                     _buildSectionTitle(
@@ -362,6 +381,34 @@ class PoemReviewPage extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// 一键复习：逐首进入测试模式，返回后自动进入下一首。
+  Future<void> _startBatchReview(
+    BuildContext context,
+    WidgetRef ref,
+    List<ReviewSchedule> schedules,
+  ) async {
+    for (var i = 0; i < schedules.length; i++) {
+      if (!context.mounted) break;
+      final schedule = schedules[i];
+      // 使用选择题模式进行复习
+      await _navigateAndComplete(
+        context,
+        ref,
+        schedule,
+        '${AppRoutes.poemQuizOf(schedule.poemId)}?type=choice',
+      );
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('今日复习已全部完成！'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   /// 导航到复习页面，返回后标记复习完成。

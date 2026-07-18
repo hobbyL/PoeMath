@@ -31,6 +31,7 @@ import 'package:poemath/features/poem/poem_favorites_page.dart';
 import 'package:poemath/features/poem/poem_learning_path_page.dart';
 import 'package:poemath/features/poem/poem_quiz_page.dart';
 import 'package:poemath/features/poem/poem_read_along_page.dart';
+import 'package:poemath/features/poem/poem_recite_mode_page.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/poem_review_page.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
@@ -104,13 +105,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: AppRoutes.poemReciteMode,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: PoemReciteModePage(poemId: state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.poemQuiz,
         pageBuilder: (context, state) {
           final id = state.pathParameters['id']!;
           final typeStr = state.uri.queryParameters['type'] ?? 'fill';
-          final quizType = typeStr == 'choice'
-              ? QuizType.multipleChoice
-              : QuizType.fillBlank;
+          final quizType = switch (typeStr) {
+            'choice' => QuizType.multipleChoice,
+            'author' => QuizType.chooseAuthor,
+            'dynasty' => QuizType.chooseDynasty,
+            _ => QuizType.fillBlank,
+          };
           return fadeSlideTransitionPage(
             state: state,
             child: PoemQuizPage(poemId: id, quizType: quizType),

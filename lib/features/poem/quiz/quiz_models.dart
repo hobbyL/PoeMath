@@ -5,10 +5,16 @@
 /// 测试题型。
 enum QuizType {
   fillBlank('填空测试'),
-  multipleChoice('选择题');
+  multipleChoice('选择题'),
+  chooseAuthor('选作者'),
+  chooseDynasty('选朝代');
 
   const QuizType(this.label);
   final String label;
+
+  /// 是否为选择类题型（4 选 1）。
+  bool get isChoice =>
+      this == multipleChoice || this == chooseAuthor || this == chooseDynasty;
 }
 
 /// 一道测试题。

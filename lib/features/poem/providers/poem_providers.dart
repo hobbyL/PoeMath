@@ -43,12 +43,20 @@ final selectedStatusFilterProvider =
 /// 搜索关键词
 final poemSearchQueryProvider = StateProvider<String>((ref) => '');
 
+/// 当前选中作者筛选（null = 全部）
+final selectedAuthorFilterProvider = StateProvider<String?>((ref) => null);
+
+/// 当前选中朝代筛选（null = 全部）
+final selectedDynastyFilterProvider = StateProvider<String?>((ref) => null);
+
 /// 筛选后的诗词列表
 final filteredPoemsProvider = Provider<List<Poem>>((ref) {
   final repo = ref.watch(poemRepoProvider);
   final grade = ref.watch(selectedGradeProvider);
   final query = ref.watch(poemSearchQueryProvider);
   final statusFilter = ref.watch(selectedStatusFilterProvider);
+  final authorFilter = ref.watch(selectedAuthorFilterProvider);
+  final dynastyFilter = ref.watch(selectedDynastyFilterProvider);
 
   List<Poem> poems;
   if (grade != null) {
@@ -69,6 +77,16 @@ final filteredPoemsProvider = Provider<List<Poem>>((ref) {
         .toList();
   }
 
+  // 按作者筛选
+  if (authorFilter != null) {
+    poems = poems.where((p) => p.author == authorFilter).toList();
+  }
+
+  // 按朝代筛选
+  if (dynastyFilter != null) {
+    poems = poems.where((p) => p.dynasty == dynastyFilter).toList();
+  }
+
   // 按学习状态筛选
   if (statusFilter != null) {
     final progressRepo = ref.watch(poemProgressRepoProvider);
@@ -86,6 +104,18 @@ final filteredPoemsProvider = Provider<List<Poem>>((ref) {
 final availableGradesProvider = Provider<List<int>>((ref) {
   final repo = ref.watch(poemRepoProvider);
   return repo.availableGrades;
+});
+
+/// 可用作者列表
+final availableAuthorsProvider = Provider<List<String>>((ref) {
+  final repo = ref.watch(poemRepoProvider);
+  return repo.availableAuthors;
+});
+
+/// 可用朝代列表
+final availableDynastiesProvider = Provider<List<String>>((ref) {
+  final repo = ref.watch(poemRepoProvider);
+  return repo.availableDynasties;
 });
 
 // ============ 诗词详情 ============

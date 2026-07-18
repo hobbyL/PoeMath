@@ -105,6 +105,120 @@ class QuizEngine {
     return lines.take(maxLines).toList();
   }
 
+  /// 生成"选作者"题目。
+  ///
+  /// 给出某首诗的一句，从 4 个诗人中选正确作者。
+  /// [allPoems] 用于采集干扰项作者。
+  static List<QuizQuestion> generateChooseAuthor(
+    Poem poem, {
+    required List<Poem> allPoems,
+    int maxQuestions = 5,
+    Random? random,
+  }) {
+    final r = random ?? Random();
+    final lines = _splitLines(poem.content);
+    if (lines.isEmpty) return [];
+
+    // 收集其他作者作为干扰项
+    final otherAuthors = <String>{};
+    for (final p in allPoems) {
+      if (p.author != poem.author) {
+        otherAuthors.add(p.author);
+      }
+    }
+
+    final shuffledLines = List<String>.from(lines)..shuffle(r);
+    final count = shuffledLines.length.clamp(2, maxQuestions);
+
+    return shuffledLines.take(count).map((line) {
+      final distractors = _pickStringDistractors(
+        correct: poem.author,
+        candidates: otherAuthors,
+        count: 3,
+        random: r,
+        fallbackPrefix: '佚名',
+      );
+      final options = [poem.author, ...distractors]..shuffle(r);
+
+      return QuizQuestion(
+        type: QuizType.chooseAuthor,
+        contextLine: '「$line」',
+        promptLine: '这句诗的作者是谁？',
+        correctAnswer: poem.author,
+        options: options,
+      );
+    }).toList();
+  }
+
+  /// 生成"选朝代"题目。
+  ///
+  /// 给出诗题 + 作者，从 4 个朝代中选正确朝代。
+  /// [allPoems] 用于采集干扰项朝代。
+  static List<QuizQuestion> generateChooseDynasty(
+    Poem poem, {
+    required List<Poem> allPoems,
+    int maxQuestions = 3,
+    Random? random,
+  }) {
+    final r = random ?? Random();
+
+    // 收集其他朝代作为干扰项
+    final otherDynasties = <String>{};
+    for (final p in allPoems) {
+      if (p.dynasty != poem.dynasty) {
+        otherDynasties.add(p.dynasty);
+      }
+    }
+
+    // 朝代题只需 1-3 道（一首诗只有一个朝代）
+    final count = maxQuestions.clamp(1, 3);
+    final lines = _splitLines(poem.content);
+    final shuffledLines = List<String>.from(lines)..shuffle(r);
+
+    return List.generate(count.clamp(0, shuffledLines.length), (i) {
+      final contextLine = shuffledLines[i];
+      final distractors = _pickStringDistractors(
+        correct: poem.dynasty,
+        candidates: otherDynasties,
+        count: 3,
+        random: r,
+        fallbackPrefix: '朝',
+      );
+      final options = [poem.dynasty, ...distractors]..shuffle(r);
+
+      return QuizQuestion(
+        type: QuizType.chooseDynasty,
+        contextLine: '《${poem.title}》 ${poem.author}\n「$contextLine」',
+        promptLine: '这首诗的朝代是？',
+        correctAnswer: poem.dynasty,
+        options: options,
+      );
+    });
+  }
+
+  /// 从候选字符串中选择干扰项。
+  static List<String> _pickStringDistractors({
+    required String correct,
+    required Set<String> candidates,
+    required int count,
+    required Random random,
+    required String fallbackPrefix,
+  }) {
+    final pool = candidates.where((c) => c != correct).toList()..shuffle(random);
+    final result = pool.take(count).toList();
+
+    // 不足时补充
+    var idx = 1;
+    while (result.length < count) {
+      final fallback = '$fallbackPrefix$idx';
+      if (!result.contains(fallback) && fallback != correct) {
+        result.add(fallback);
+      }
+      idx++;
+    }
+    return result;
+  }
+
   // ============ 内部方法 ============
 
   /// 将诗词正文按行拆分，过滤空行和纯标点行。

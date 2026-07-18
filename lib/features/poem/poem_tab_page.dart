@@ -39,6 +39,10 @@ class PoemTabPage extends ConsumerWidget {
     final poems = ref.watch(filteredPoemsProvider);
     final selected = ref.watch(selectedGradeProvider);
     final statusFilter = ref.watch(selectedStatusFilterProvider);
+    final authorFilter = ref.watch(selectedAuthorFilterProvider);
+    final dynastyFilter = ref.watch(selectedDynastyFilterProvider);
+    final authors = ref.watch(availableAuthorsProvider);
+    final dynasties = ref.watch(availableDynastiesProvider);
     final theme = Theme.of(context);
     final isWide = MediaQuery.sizeOf(context).width >= 420;
 
@@ -48,6 +52,8 @@ class PoemTabPage extends ConsumerWidget {
 
     final hasStatusFilter = statusFilter != null;
     final statusLabel = _statusLabels[statusFilter] ?? '全部状态';
+
+    final hasAnyChipFilter = authorFilter != null || dynastyFilter != null;
 
     return Scaffold(
       body: LayoutBuilder(
@@ -167,6 +173,161 @@ class PoemTabPage extends ConsumerWidget {
                   ),
                 ),
               ),
+              // ── 作者 / 朝代 FilterChip 行 ──
+              if (authors.isNotEmpty || dynasties.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 作者筛选行
+                      if (authors.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: SpacingTokens.md,
+                            right: SpacingTokens.md,
+                            top: SpacingTokens.xs,
+                          ),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    right: SpacingTokens.xs,
+                                  ),
+                                  child: Icon(
+                                    Icons.person_outline,
+                                    size: 16,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                FilterChip(
+                                  label: const Text('全部作者'),
+                                  selected: authorFilter == null,
+                                  onSelected: (_) {
+                                    ref
+                                        .read(
+                                          selectedAuthorFilterProvider.notifier,
+                                        )
+                                        .state = null;
+                                  },
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                const SizedBox(width: SpacingTokens.xs),
+                                ...authors.take(20).map((author) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      right: SpacingTokens.xs,
+                                    ),
+                                    child: FilterChip(
+                                      label: Text(author),
+                                      selected: authorFilter == author,
+                                      onSelected: (selected) {
+                                        ref
+                                            .read(
+                                              selectedAuthorFilterProvider
+                                                  .notifier,
+                                            )
+                                            .state = selected ? author : null;
+                                      },
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ),
+                      // 朝代筛选行
+                      if (dynasties.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: SpacingTokens.md,
+                            right: SpacingTokens.md,
+                            top: SpacingTokens.xs,
+                          ),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    right: SpacingTokens.xs,
+                                  ),
+                                  child: Icon(
+                                    Icons.history_edu_outlined,
+                                    size: 16,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                FilterChip(
+                                  label: const Text('全部朝代'),
+                                  selected: dynastyFilter == null,
+                                  onSelected: (_) {
+                                    ref
+                                        .read(
+                                          selectedDynastyFilterProvider.notifier,
+                                        )
+                                        .state = null;
+                                  },
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                const SizedBox(width: SpacingTokens.xs),
+                                ...dynasties.map((dynasty) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      right: SpacingTokens.xs,
+                                    ),
+                                    child: FilterChip(
+                                      label: Text(dynasty),
+                                      selected: dynastyFilter == dynasty,
+                                      onSelected: (selected) {
+                                        ref
+                                            .read(
+                                              selectedDynastyFilterProvider
+                                                  .notifier,
+                                            )
+                                            .state =
+                                            selected ? dynasty : null;
+                                      },
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ),
+                      // 清除筛选按钮
+                      if (hasAnyChipFilter)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: SpacingTokens.md,
+                            top: SpacingTokens.xs,
+                          ),
+                          child: TextButton.icon(
+                            onPressed: () {
+                              ref
+                                  .read(
+                                    selectedAuthorFilterProvider.notifier,
+                                  )
+                                  .state = null;
+                              ref
+                                  .read(
+                                    selectedDynastyFilterProvider.notifier,
+                                  )
+                                  .state = null;
+                            },
+                            icon: const Icon(Icons.clear, size: 16),
+                            label: const Text('清除筛选'),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               if (poems.isEmpty)
                 SliverFillRemaining(
                   child: Center(

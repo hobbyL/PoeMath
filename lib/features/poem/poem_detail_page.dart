@@ -278,12 +278,14 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           child: Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: FilledButton.icon(
                   onPressed: () {
-                    context.push(AppRoutes.poemReciteOf(widget.poemId));
+                    context.push(
+                      AppRoutes.poemReciteModeOf(widget.poemId),
+                    );
                   },
-                  icon: const Icon(Icons.record_voice_over),
-                  label: const Text('背诵'),
+                  icon: const Icon(Icons.school_outlined),
+                  label: const Text('开始学习'),
                 ),
               ),
               const SizedBox(width: SpacingTokens.sm),
@@ -304,15 +306,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   onPressed: () => _sharePoem(poem),
                   icon: const Icon(Icons.share_outlined),
                   label: const Text('分享'),
-                ),
-              ),
-              const SizedBox(width: SpacingTokens.sm),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () =>
-                      _showQuizTypePicker(context, widget.poemId),
-                  icon: const Icon(Icons.quiz_outlined),
-                  label: const Text('测试'),
                 ),
               ),
             ],
@@ -537,55 +530,4 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     );
   }
 
-  void _showQuizTypePicker(BuildContext context, String poemId) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const SizedBox(height: SpacingTokens.md),
-                Text(
-                  '选择测试模式',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                ListTile(
-                  leading: const Icon(Icons.edit_note),
-                  title: const Text('填空测试'),
-                  subtitle: const Text('补全诗句中缺失的文字'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    context.push(
-                      '${AppRoutes.poemQuizOf(poemId)}?type=fill',
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.checklist),
-                  title: const Text('选择题'),
-                  subtitle: const Text('根据上句选择正确的下句'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    context.push(
-                      '${AppRoutes.poemQuizOf(poemId)}?type=choice',
-                    );
-                  },
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }

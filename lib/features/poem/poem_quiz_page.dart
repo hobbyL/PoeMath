@@ -65,21 +65,56 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final random = Random();
     List<QuizQuestion> questions;
 
-    if (widget.quizType == QuizType.fillBlank) {
-      questions = QuizEngine.generateFillBlank(poem, random: random);
-    } else {
-      // 收集干扰行
-      final allPoems = ref.read(filteredPoemsProvider);
-      final extraLines = QuizEngine.collectExtraLines(
-        allPoems,
-        excludeId: widget.poemId,
-        random: random,
-      );
-      questions = QuizEngine.generateMultipleChoice(
-        poem,
-        extraLines: extraLines,
-        random: random,
-      );
+    switch (widget.quizType) {
+      case QuizType.fillBlank:
+        questions = QuizEngine.generateFillBlank(poem, random: random);
+      case QuizType.multipleChoice:
+        // 收集干扰行
+        final allPoems = ref.read(filteredPoemsProvider);
+        final extraLines = QuizEngine.collectExtraLines(
+          allPoems,
+          excludeId: widget.poemId,
+          random: random,
+        );
+        // 生成混合选择题：上下句 + 选作者 + 选朝代
+        final choiceQuestions = QuizEngine.generateMultipleChoice(
+          poem,
+          extraLines: extraLines,
+          random: random,
+          maxQuestions: 3,
+        );
+        final authorQuestions = QuizEngine.generateChooseAuthor(
+          poem,
+          allPoems: allPoems,
+          maxQuestions: 2,
+          random: random,
+        );
+        final dynastyQuestions = QuizEngine.generateChooseDynasty(
+          poem,
+          allPoems: allPoems,
+          maxQuestions: 1,
+          random: random,
+        );
+        questions = [...choiceQuestions, ...authorQuestions, ...dynastyQuestions]
+          ..shuffle(random);
+        // 限制总题数
+        if (questions.length > 8) {
+          questions = questions.sublist(0, 8);
+        }
+      case QuizType.chooseAuthor:
+        final allPoems = ref.read(filteredPoemsProvider);
+        questions = QuizEngine.generateChooseAuthor(
+          poem,
+          allPoems: allPoems,
+          random: random,
+        );
+      case QuizType.chooseDynasty:
+        final allPoems = ref.read(filteredPoemsProvider);
+        questions = QuizEngine.generateChooseDynasty(
+          poem,
+          allPoems: allPoems,
+          random: random,
+        );
     }
 
     if (questions.isEmpty) {
@@ -294,7 +329,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                     Text(
                       q.type == QuizType.fillBlank
                           ? q.promptLine
-                          : '下一句是？',
+                          : q.promptLine,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                         height: 1.8,
@@ -305,7 +340,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                     // 作答区域
                     if (q.type == QuizType.fillBlank)
                       _buildFillBlankInput(context, q, theme)
-                    else
+                    else if (q.type.isChoice)
                       _buildChoiceOptions(context, q, theme),
 
                     // 反馈区域

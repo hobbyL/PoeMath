@@ -354,70 +354,6 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     });
   }
 
-  void _showLevelSheet(BuildContext context) {
-    final theme = Theme.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: SpacingTokens.md),
-                Text(
-                  '选择难度',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      for (final l in ReciteLevel.values)
-                        ListTile(
-                          leading: Icon(
-                            _levelIcon(l),
-                            color: _level == l
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant,
-                          ),
-                          title: Text(l.label),
-                          subtitle: Text(l.desc),
-                          selected: _level == l,
-                          selectedColor: theme.colorScheme.primary,
-                          onTap: () {
-                            Navigator.pop(ctx);
-                            _changeLevel(l);
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  IconData _levelIcon(ReciteLevel l) {
-    return switch (l) {
-      ReciteLevel.easy => Icons.sentiment_satisfied,
-      ReciteLevel.medium => Icons.sentiment_neutral,
-      ReciteLevel.hard => Icons.sentiment_dissatisfied,
-      ReciteLevel.dictation => Icons.edit_note,
-    };
-  }
-
   // ─────────────────────────────────────────────────────────────
   // 默写模式：逐字比对
   // ─────────────────────────────────────────────────────────────
@@ -455,7 +391,6 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   @override
   Widget build(BuildContext context) {
     final poem = ref.watch(poemByIdProvider(widget.poemId));
-    final theme = Theme.of(context);
 
     if (poem == null || _lines.isEmpty) {
       return Scaffold(
@@ -467,23 +402,6 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(poem.title),
-        actions: [
-          InkWell(
-            onTap: () => _showLevelSheet(context),
-            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_level.label, style: theme.textTheme.labelLarge),
-                  const Icon(Icons.arrow_drop_down),
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
       body: Stack(
         children: [
@@ -516,6 +434,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
         children: [
           // ── 诗人信息 ──
           _buildAuthorInfo(context),
+          const SizedBox(height: SpacingTokens.sm),
+
+          // ── 难度 Slider ──
+          _buildLevelSlider(context),
           const SizedBox(height: SpacingTokens.sm),
 
           // ── 进度条 ──
@@ -637,6 +559,57 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLevelSlider(BuildContext context) {
+    final theme = Theme.of(context);
+    final levelIndex = ReciteLevel.values.indexOf(_level).toDouble();
+
+    return Column(
+      children: [
+        Row(
+          children: ReciteLevel.values.map((l) {
+            final isActive = l == _level;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => _changeLevel(l),
+                child: Text(
+                  l.label,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: isActive
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 4,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+          ),
+          child: Slider(
+            value: levelIndex,
+            min: 0,
+            max: (ReciteLevel.values.length - 1).toDouble(),
+            divisions: ReciteLevel.values.length - 1,
+            activeColor: theme.colorScheme.primary,
+            inactiveColor:
+                theme.colorScheme.primary.withValues(alpha: 0.2),
+            onChanged: (v) {
+              final newLevel = ReciteLevel.values[v.round()];
+              if (newLevel != _level) {
+                _changeLevel(newLevel);
+              }
+            },
+          ),
         ),
       ],
     );
@@ -820,6 +793,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       child: Column(
         children: [
           _buildAuthorInfo(context),
+          const SizedBox(height: SpacingTokens.sm),
+          _buildLevelSlider(context),
           const SizedBox(height: SpacingTokens.md),
           Text(
             '请默写全文',

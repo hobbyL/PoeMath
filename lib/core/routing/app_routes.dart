@@ -21,6 +21,7 @@ class AppRoutes {
   static const String poemReview = '/poem/review';
   static const String poemFavorites = '/poem/favorites';
   static const String poemLearningPath = '/poem/path';
+  static const String poemReciteMode = '/poem/recite-mode/:id';
   static const String poemReadAlong = '/poem/read-along/:id';
 
   // ============ 口算模块 ============
@@ -50,6 +51,7 @@ class AppRoutes {
   static String poemDetailOf(String id) => '/poem/detail/$id';
   static String poemReciteOf(String id) => '/poem/recite/$id';
   static String poemQuizOf(String id) => '/poem/quiz/$id';
+  static String poemReciteModeOf(String id) => '/poem/recite-mode/$id';
   static String poemReadAlongOf(String id) => '/poem/read-along/$id';
   static String formulaDetailOf(String id) => '/formula/detail/$id';
 }
