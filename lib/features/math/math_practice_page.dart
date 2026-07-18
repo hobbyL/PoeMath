@@ -25,6 +25,7 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/level_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/widgets/session_result_dialog.dart';
 import 'package:poemath/features/math/widgets/vertical_calc_widget.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -527,12 +528,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       decoration: BoxDecoration(
         color: judgement.isCorrect
             ? theme.semantic.success.withValues(alpha: 0.15)
-            : theme.colorScheme.error.withValues(alpha: 0.15),
+            : theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
         border: Border.all(
+          width: 2,
           color: judgement.isCorrect
               ? theme.semantic.success
-              : theme.colorScheme.error,
+              : theme.colorScheme.tertiary.withValues(alpha: 0.4),
         ),
       ),
       child: Column(
@@ -542,19 +544,20 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
               Icon(
                 judgement.isCorrect
                     ? Icons.check_circle_rounded
-                    : Icons.cancel_rounded,
+                    : Icons.lightbulb_outline_rounded,
                 color: judgement.isCorrect
                     ? theme.semantic.success
-                    : theme.colorScheme.error,
+                    : theme.colorScheme.tertiary,
+                size: 24,
               ),
               const SizedBox(width: SpacingTokens.sm),
               Text(
-                judgement.isCorrect ? '回答正确！' : '答错了',
+                judgement.isCorrect ? '回答正确！' : '再想想',
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: judgement.isCorrect
                       ? theme.semantic.success
-                      : theme.colorScheme.error,
+                      : theme.colorScheme.onTertiaryContainer,
                 ),
               ),
             ],
@@ -692,44 +695,81 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       return _buildCompareButtons(context);
     }
 
-    // 普通模式：显示输入框
-    return Row(
+    // 余数模式：显示商…余格式提示
+    final isRemainder = problem?.resultForm == ResultForm.withRemainder;
+
+    // 普通模式：显示自定义数字键盘
+    final theme = Theme.of(context);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: TextField(
-            controller: _answerController,
-            focusNode: _focusNode,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(
-              decimal: true,
-              signed: true,
+        // 答案输入框（只读，通过键盘输入）
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.md,
+            vertical: SpacingTokens.lg,
+          ),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.3),
             ),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: TypographyTokens.fsTitle,
-              fontWeight: FontWeight.bold,
-            ),
-            decoration: InputDecoration(
-              hintText: '输入答案',
-              border: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(SpacingTokens.radiusMedium),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _answerController.text.isEmpty
+                    ? (isRemainder ? '输入答案（格式：商…余）' : '输入答案')
+                    : _answerController.text,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: TypographyTokens.fsTitle,
+                  fontWeight: FontWeight.bold,
+                  color: _answerController.text.isEmpty
+                      ? theme.colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.5)
+                      : theme.colorScheme.onSurface,
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: SpacingTokens.md,
-                vertical: SpacingTokens.md,
-              ),
-            ),
-            onSubmitted: (_) => _submitAnswer(),
+              if (isRemainder && _answerController.text.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: SpacingTokens.xs),
+                  child: Text(
+                    '例如：3…2',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
-        const SizedBox(width: SpacingTokens.md),
-        SizedBox(
-          height: 56,
-          child: FilledButton(
-            onPressed: _submitAnswer,
-            child: const Text('确定'),
-          ),
+        const SizedBox(height: SpacingTokens.md),
+        // 儿童数字键盘
+        NumberKeypad(
+          onNumberTap: (digit) {
+            setState(() {
+              _answerController.text += digit;
+            });
+          },
+          onBackspace: () {
+            setState(() {
+              if (_answerController.text.isNotEmpty) {
+                _answerController.text = _answerController.text.substring(
+                  0,
+                  _answerController.text.length - 1,
+                );
+              }
+            });
+          },
+          onSubmit: _submitAnswer,
+          submitEnabled: _answerController.text.isNotEmpty,
+          showEllipsis: isRemainder,
         ),
       ],
     );
