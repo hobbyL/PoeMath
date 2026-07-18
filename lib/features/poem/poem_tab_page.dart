@@ -1,7 +1,7 @@
 // lib/features/poem/poem_tab_page.dart
 //
 // 层级：features/poem
-// 职责：诗词 Tab 主页 — 搜索栏 + 年级筛选 + 诗词列表。
+// 职责：诗词 Tab 主页 — 搜索面板 + 诗词列表。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -14,9 +14,14 @@ import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/poem_card.dart';
 
-class PoemTabPage extends ConsumerWidget {
+class PoemTabPage extends ConsumerStatefulWidget {
   const PoemTabPage({super.key});
 
+  @override
+  ConsumerState<PoemTabPage> createState() => _PoemTabPageState();
+}
+
+class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   static const _gradeLabels = {
     1: '一年级',
     2: '二年级',
@@ -26,32 +31,80 @@ class PoemTabPage extends ConsumerWidget {
     6: '六年级',
   };
 
-  static const _statusLabels = {
-    null: '全部状态',
+  static const _statusLabels = <LearningStatus?, String>{
+    null: '全部',
     LearningStatus.notStarted: '未开始',
     LearningStatus.learning: '学习中',
     LearningStatus.reviewing: '复习中',
     LearningStatus.mastered: '已掌握',
   };
 
+  /// 搜索面板是否展开
+  bool _panelOpen = false;
+
+  // ---- 搜索面板本地状态（点击"搜索"才同步到 provider） ----
+  final _searchController = TextEditingController();
+  int? _localGrade;
+  LearningStatus? _localStatus;
+  String? _localAuthor;
+  String? _localDynasty;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// 打开面板时，从 provider 读取当前筛选值填入本地状态。
+  void _openPanel() {
+    _searchController.text = ref.read(poemSearchQueryProvider);
+    _localGrade = ref.read(selectedGradeProvider);
+    _localStatus = ref.read(selectedStatusFilterProvider);
+    _localAuthor = ref.read(selectedAuthorFilterProvider);
+    _localDynasty = ref.read(selectedDynastyFilterProvider);
+    setState(() => _panelOpen = true);
+  }
+
+  /// 关闭面板（取消，不修改 provider）。
+  void _closePanel() {
+    setState(() => _panelOpen = false);
+  }
+
+  /// 应用搜索（同步本地状态到 provider 并关闭面板）。
+  void _applySearch() {
+    ref.read(poemSearchQueryProvider.notifier).state =
+        _searchController.text.trim();
+    ref.read(selectedGradeProvider.notifier).state = _localGrade;
+    ref.read(selectedStatusFilterProvider.notifier).state = _localStatus;
+    ref.read(selectedAuthorFilterProvider.notifier).state = _localAuthor;
+    ref.read(selectedDynastyFilterProvider.notifier).state = _localDynasty;
+    setState(() => _panelOpen = false);
+  }
+
+  /// 清空全部筛选条件。
+  void _clearAll() {
+    _searchController.clear();
+    setState(() {
+      _localGrade = null;
+      _localStatus = null;
+      _localAuthor = null;
+      _localDynasty = null;
+    });
+  }
+
+  /// 当前 provider 中是否有任何筛选生效。
+  bool get _hasActiveFilters {
+    return ref.watch(poemSearchQueryProvider).isNotEmpty ||
+        ref.watch(selectedGradeProvider) != null ||
+        ref.watch(selectedStatusFilterProvider) != null ||
+        ref.watch(selectedAuthorFilterProvider) != null ||
+        ref.watch(selectedDynastyFilterProvider) != null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final poems = ref.watch(filteredPoemsProvider);
-    final selected = ref.watch(selectedGradeProvider);
-    final statusFilter = ref.watch(selectedStatusFilterProvider);
-    final authorFilter = ref.watch(selectedAuthorFilterProvider);
-    final dynastyFilter = ref.watch(selectedDynastyFilterProvider);
-    final authors = ref.watch(availableAuthorsProvider);
-    final dynasties = ref.watch(availableDynastiesProvider);
     final theme = Theme.of(context);
-    final isWide = MediaQuery.sizeOf(context).width >= 420;
-
-    final filterLabel = selected == null
-        ? '全部'
-        : _gradeLabels[selected] ?? '$selected 年级';
-
-    final hasStatusFilter = statusFilter != null;
-    final statusLabel = _statusLabels[statusFilter] ?? '全部状态';
 
     return Scaffold(
       body: LayoutBuilder(
@@ -59,63 +112,16 @@ class PoemTabPage extends ConsumerWidget {
           final columns = _responsiveColumns(constraints.maxWidth);
           return CustomScrollView(
             slivers: [
+              // ============ AppBar（精简版） ============
               SliverAppBar(
                 floating: true,
                 snap: true,
                 automaticallyImplyLeading: false,
-                leadingWidth: isWide ? 168.0 : 96.0,
-                leading: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isWide)
-                      TextButton.icon(
-                        onPressed: () => _showStatusPicker(
-                          context,
-                          ref,
-                          statusFilter,
-                        ),
-                        icon: Icon(
-                          hasStatusFilter
-                              ? Icons.filter_alt
-                              : Icons.filter_alt_outlined,
-                          size: 18,
-                          color: hasStatusFilter
-                              ? theme.colorScheme.primary
-                              : null,
-                        ),
-                        label: Text(
-                          statusLabel,
-                          style: hasStatusFilter
-                              ? TextStyle(
-                                  color: theme.colorScheme.primary,
-                                )
-                              : null,
-                        ),
-                      )
-                    else
-                      IconButton(
-                        onPressed: () => _showStatusPicker(
-                          context,
-                          ref,
-                          statusFilter,
-                        ),
-                        icon: Icon(
-                          hasStatusFilter
-                              ? Icons.filter_alt
-                              : Icons.filter_alt_outlined,
-                          color: hasStatusFilter
-                              ? theme.colorScheme.primary
-                              : null,
-                        ),
-                        tooltip: statusLabel,
-                      ),
-                    IconButton(
-                      onPressed: () =>
-                          context.push(AppRoutes.poemLearningPath),
-                      icon: const Icon(Icons.route_rounded),
-                      tooltip: '学习路径',
-                    ),
-                  ],
+                leading: IconButton(
+                  onPressed: () =>
+                      context.push(AppRoutes.poemLearningPath),
+                  icon: const Icon(Icons.route_rounded),
+                  tooltip: '学习路径',
                 ),
                 title: const Text('诗词'),
                 actions: [
@@ -125,87 +131,32 @@ class PoemTabPage extends ConsumerWidget {
                     icon: const Icon(Icons.favorite_border),
                     tooltip: '我的收藏',
                   ),
-                  if (isWide)
-                    TextButton.icon(
-                      onPressed: () =>
-                          _showGradePicker(context, ref, selected),
-                      icon: const Icon(Icons.filter_list, size: 18),
-                      label: Text(filterLabel),
-                    )
-                  else
-                    IconButton(
-                      onPressed: () =>
-                          _showGradePicker(context, ref, selected),
-                      icon: const Icon(Icons.filter_list),
-                      tooltip: filterLabel,
+                  IconButton(
+                    onPressed: _panelOpen ? _closePanel : _openPanel,
+                    icon: Badge(
+                      isLabelVisible: _hasActiveFilters && !_panelOpen,
+                      child: Icon(
+                        _panelOpen ? Icons.search_off : Icons.search,
+                      ),
                     ),
-                ],
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(56),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpacingTokens.md,
-                      vertical: SpacingTokens.xs,
-                    ),
-                    child: Row(
-                      children: [
-                        // 搜索框
-                        Expanded(
-                          child: TextField(
-                            decoration: InputDecoration(
-                              hintText: '搜索诗词…',
-                              prefixIcon: const Icon(Icons.search, size: 20),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(24),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor:
-                                  theme.colorScheme.surfaceContainerHighest,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: SpacingTokens.sm,
-                              ),
-                              isDense: true,
-                            ),
-                            onChanged: (value) {
-                              ref
-                                  .read(poemSearchQueryProvider.notifier)
-                                  .state = value;
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: SpacingTokens.xs),
-                        // 作者筛选按钮
-                        if (authors.length > 1)
-                          _FilterButton(
-                            label: authorFilter ?? '作者',
-                            isActive: authorFilter != null,
-                            onTap: () => _showAuthorPicker(
-                              context,
-                              ref,
-                              authorFilter,
-                              authors,
-                            ),
-                          ),
-                        // 朝代筛选按钮
-                        if (dynasties.length > 1) ...[
-                          const SizedBox(width: SpacingTokens.xs),
-                          _FilterButton(
-                            label: dynastyFilter ?? '朝代',
-                            isActive: dynastyFilter != null,
-                            onTap: () => _showDynastyPicker(
-                              context,
-                              ref,
-                              dynastyFilter,
-                              dynasties,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                    tooltip: '搜索筛选',
                   ),
+                ],
+              ),
+
+              // ============ 可收起搜索面板 ============
+              SliverToBoxAdapter(
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeInOut,
+                  alignment: Alignment.topCenter,
+                  child: _panelOpen
+                      ? _buildSearchPanel(context)
+                      : const SizedBox.shrink(),
                 ),
               ),
+
+              // ============ 诗词列表 ============
               if (poems.isEmpty)
                 SliverFillRemaining(
                   child: Center(
@@ -283,301 +234,301 @@ class PoemTabPage extends ConsumerWidget {
     );
   }
 
+  // ----------------------------------------------------------------
+  // 搜索面板
+  // ----------------------------------------------------------------
+
+  Widget _buildSearchPanel(BuildContext context) {
+    final theme = Theme.of(context);
+    final authors = ref.watch(availableAuthorsProvider);
+    final dynasties = ref.watch(availableDynastiesProvider);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.md,
+        vertical: SpacingTokens.sm,
+      ),
+      child: Material(
+        elevation: 2,
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+        color: theme.colorScheme.surfaceContainerLow,
+        child: Padding(
+          padding: const EdgeInsets.all(SpacingTokens.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ---- 搜索输入 ----
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: '搜索诗词…',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(
+                      SpacingTokens.radiusPill,
+                    ),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest,
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: SpacingTokens.sm,
+                  ),
+                  isDense: true,
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+
+              // ---- 学习状态 ----
+              _buildSectionLabel(theme, '学习状态'),
+              const SizedBox(height: SpacingTokens.xs),
+              Wrap(
+                spacing: SpacingTokens.xs,
+                runSpacing: SpacingTokens.xs,
+                children: _statusLabels.entries.map((e) {
+                  return ChoiceChip(
+                    label: Text(e.value),
+                    selected: _localStatus == e.key,
+                    onSelected: (_) =>
+                        setState(() => _localStatus = e.key),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+
+              // ---- 年级 ----
+              _buildSectionLabel(theme, '年级'),
+              const SizedBox(height: SpacingTokens.xs),
+              Wrap(
+                spacing: SpacingTokens.xs,
+                runSpacing: SpacingTokens.xs,
+                children: [
+                  ChoiceChip(
+                    label: const Text('全部'),
+                    selected: _localGrade == null,
+                    onSelected: (_) =>
+                        setState(() => _localGrade = null),
+                  ),
+                  ..._gradeLabels.entries.map((e) {
+                    return ChoiceChip(
+                      label: Text(e.value),
+                      selected: _localGrade == e.key,
+                      onSelected: (_) =>
+                          setState(() => _localGrade = e.key),
+                    );
+                  }),
+                ],
+              ),
+              const SizedBox(height: SpacingTokens.md),
+
+              // ---- 作者 & 朝代 ----
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDropdownTile(
+                      theme: theme,
+                      label: '作者',
+                      value: _localAuthor ?? '全部',
+                      onTap: () => _showPickerSheet(
+                        title: '选择作者',
+                        current: _localAuthor,
+                        items: authors,
+                        allLabel: '全部作者',
+                        onChanged: (v) =>
+                            setState(() => _localAuthor = v),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: SpacingTokens.sm),
+                  Expanded(
+                    child: _buildDropdownTile(
+                      theme: theme,
+                      label: '朝代',
+                      value: _localDynasty ?? '全部',
+                      onTap: () => _showPickerSheet(
+                        title: '选择朝代',
+                        current: _localDynasty,
+                        items: dynasties,
+                        allLabel: '全部朝代',
+                        onChanged: (v) =>
+                            setState(() => _localDynasty = v),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: SpacingTokens.lg),
+
+              // ---- 操作按钮 ----
+              Row(
+                children: [
+                  // 清空按钮（有任何本地筛选时显示）
+                  if (_hasLocalFilters)
+                    TextButton(
+                      onPressed: _clearAll,
+                      child: const Text('清空'),
+                    ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _closePanel,
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: SpacingTokens.sm),
+                  FilledButton.icon(
+                    onPressed: _applySearch,
+                    icon: const Icon(Icons.search, size: 18),
+                    label: const Text('搜索'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 本地筛选是否有任何非默认值。
+  bool get _hasLocalFilters =>
+      _searchController.text.isNotEmpty ||
+      _localGrade != null ||
+      _localStatus != null ||
+      _localAuthor != null ||
+      _localDynasty != null;
+
+  Widget _buildSectionLabel(ThemeData theme, String text) {
+    return Text(
+      text,
+      style: theme.textTheme.labelMedium?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  /// 作者/朝代的可点击选择行。
+  Widget _buildDropdownTile({
+    required ThemeData theme,
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.sm,
+          vertical: SpacingTokens.sm,
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------
+  // 通用选择 Sheet（作者 / 朝代）
+  // ----------------------------------------------------------------
+
+  void _showPickerSheet({
+    required String title,
+    required String? current,
+    required List<String> items,
+    required String allLabel,
+    required ValueChanged<String?> onChanged,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  title,
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<String?>(
+                      groupValue: current,
+                      onChanged: (v) {
+                        onChanged(v);
+                        Navigator.pop(ctx);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RadioListTile<String?>(
+                            title: Text(allLabel),
+                            value: null,
+                          ),
+                          ...items.map((item) {
+                            return RadioListTile<String?>(
+                              title: Text(item),
+                              value: item,
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// 根据可用宽度计算列数。
   static int _responsiveColumns(double width) {
     if (width >= 900) return 3;
     if (width >= 600) return 2;
     return 1;
-  }
-
-  void _showGradePicker(
-    BuildContext context,
-    WidgetRef ref,
-    int? current,
-  ) {
-    final grades = ref.read(availableGradesProvider);
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: SpacingTokens.md),
-                Text(
-                  '选择年级',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: RadioGroup<int?>(
-                      groupValue: current,
-                      onChanged: (v) {
-                        ref.read(selectedGradeProvider.notifier).state = v;
-                        Navigator.pop(ctx);
-                      },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const RadioListTile<int?>(
-                            title: Text('全部'),
-                            value: null,
-                          ),
-                          ...grades.map((g) {
-                            return RadioListTile<int?>(
-                              title: Text(_gradeLabels[g] ?? '$g 年级'),
-                              value: g,
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showStatusPicker(
-    BuildContext context,
-    WidgetRef ref,
-    LearningStatus? current,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: SpacingTokens.md),
-                Text(
-                  '筛选学习状态',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: RadioGroup<LearningStatus?>(
-                      groupValue: current,
-                      onChanged: (v) {
-                        ref
-                            .read(selectedStatusFilterProvider.notifier)
-                            .state = v;
-                        Navigator.pop(ctx);
-                      },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: _statusLabels.entries.map((e) {
-                          return RadioListTile<LearningStatus?>(
-                            title: Text(e.value),
-                            value: e.key,
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showAuthorPicker(
-    BuildContext context,
-    WidgetRef ref,
-    String? current,
-    List<String> authors,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: SpacingTokens.md),
-                Text(
-                  '选择作者',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: RadioGroup<String?>(
-                      groupValue: current,
-                      onChanged: (v) {
-                        ref
-                            .read(selectedAuthorFilterProvider.notifier)
-                            .state = v;
-                        Navigator.pop(ctx);
-                      },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const RadioListTile<String?>(
-                            title: Text('全部作者'),
-                            value: null,
-                          ),
-                          ...authors.map((a) {
-                            return RadioListTile<String?>(
-                              title: Text(a),
-                              value: a,
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showDynastyPicker(
-    BuildContext context,
-    WidgetRef ref,
-    String? current,
-    List<String> dynasties,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: SpacingTokens.md),
-                Text(
-                  '选择朝代',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: RadioGroup<String?>(
-                      groupValue: current,
-                      onChanged: (v) {
-                        ref
-                            .read(selectedDynastyFilterProvider.notifier)
-                            .state = v;
-                        Navigator.pop(ctx);
-                      },
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const RadioListTile<String?>(
-                            title: Text('全部朝代'),
-                            value: null,
-                          ),
-                          ...dynasties.map((d) {
-                            return RadioListTile<String?>(
-                              title: Text(d),
-                              value: d,
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// 紧凑型筛选按钮（搜索栏右侧）。
-class _FilterButton extends StatelessWidget {
-  const _FilterButton({
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = isActive ? theme.colorScheme.primary : null;
-    return TextButton(
-      onPressed: onTap,
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(
-          horizontal: SpacingTokens.sm,
-        ),
-        minimumSize: const Size(0, 40),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        foregroundColor: color,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: color ?? theme.colorScheme.onSurfaceVariant,
-              fontWeight: isActive ? FontWeight.w600 : null,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          Icon(
-            Icons.arrow_drop_down,
-            size: 18,
-            color: color ?? theme.colorScheme.onSurfaceVariant,
-          ),
-        ],
-      ),
-    );
   }
 }
