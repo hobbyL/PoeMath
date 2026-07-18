@@ -86,6 +86,33 @@ final mathMistakesProvider = Provider<List<MathMistake>>((ref) {
   return repo.getAll();
 });
 
+// ============ 错题筛选 ============
+
+/// 错题筛选：年级（null = 全部）
+final mistakeGradeFilterProvider = StateProvider<int?>((ref) => null);
+
+/// 错题筛选：状态（null = 全部, true = 已掌握, false = 待复练）
+final mistakeStatusFilterProvider = StateProvider<bool?>((ref) => null);
+
+/// 筛选后的错题列表
+final filteredMistakesProvider = Provider<List<MathMistake>>((ref) {
+  final mistakes = ref.watch(mathMistakesProvider);
+  final gradeFilter = ref.watch(mistakeGradeFilterProvider);
+  final statusFilter = ref.watch(mistakeStatusFilterProvider);
+
+  var result = mistakes;
+
+  if (gradeFilter != null) {
+    result = result.where((m) => m.grade == gradeFilter).toList();
+  }
+
+  if (statusFilter != null) {
+    result = result.where((m) => m.isResolved == statusFilter).toList();
+  }
+
+  return result;
+});
+
 /// 未解决的错题
 final unresolvedMistakesProvider = Provider<List<MathMistake>>((ref) {
   final repo = ref.watch(mathMistakeRepoProvider);

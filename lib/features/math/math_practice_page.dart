@@ -25,6 +25,7 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/level_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/widgets/session_result_dialog.dart';
 import 'package:poemath/features/math/widgets/vertical_calc_widget.dart';
@@ -478,7 +479,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                                   problem: problem,
                                   showAnswer: _judgement != null,
                                 ) as Widget
-                              : Text(
+                              : MathText(
                                   problem.problemText,
                                   style: TypographyTokens.mathProblemStyle(
                                     color: theme.colorScheme.onSurface,

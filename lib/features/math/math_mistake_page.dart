@@ -1,7 +1,7 @@
 // lib/features/math/math_mistake_page.dart
 //
 // 错题本页面：展示错题列表，点击跳转详情页。
-// 宽屏支持多列布局。
+// 支持按年级/状态筛选，宽屏支持多列布局。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -13,6 +13,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 
 class MathMistakePage extends ConsumerWidget {
@@ -20,24 +21,34 @@ class MathMistakePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mistakes = ref.watch(mathMistakesProvider);
+    final allMistakes = ref.watch(mathMistakesProvider);
+    final filteredMistakes = ref.watch(filteredMistakesProvider);
+    final gradeFilter = ref.watch(mistakeGradeFilterProvider);
+    final statusFilter = ref.watch(mistakeStatusFilterProvider);
     final theme = Theme.of(context);
 
-    final resolvedCount = mistakes.where((m) => m.isResolved).length;
-    final unresolvedCount = mistakes.length - resolvedCount;
+    final resolvedCount = allMistakes.where((m) => m.isResolved).length;
+    final unresolvedCount = allMistakes.length - resolvedCount;
+
+    // 收集所有错题中出现的年级，用于筛选 chips
+    final availableGrades = <int>{};
+    for (final m in allMistakes) {
+      availableGrades.add(m.grade);
+    }
+    final sortedGrades = availableGrades.toList()..sort();
 
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
           final columns = _responsiveColumns(constraints.maxWidth);
 
-          return mistakes.isEmpty
+          return allMistakes.isEmpty
               ? CustomScrollView(
                   slivers: [
                     SliverAppBar(
                       floating: true,
                       snap: true,
-                      title: Text('错题本（${mistakes.length}）'),
+                      title: Text('错题本（${allMistakes.length}）'),
                     ),
                     SliverFillRemaining(
                       hasScrollBody: false,
@@ -69,7 +80,7 @@ class MathMistakePage extends ConsumerWidget {
                     SliverAppBar(
                       floating: true,
                       snap: true,
-                      title: Text('错题本（${mistakes.length}）'),
+                      title: Text('错题本（${allMistakes.length}）'),
                     ),
 
                     // 统计概览 — 使用 primary 色突出主题差异
@@ -88,7 +99,7 @@ class MathMistakePage extends ConsumerWidget {
                             children: [
                               _StatBadge(
                                 label: '总错题',
-                                value: '${mistakes.length}',
+                                value: '${allMistakes.length}',
                                 color: theme.colorScheme.primary,
                               ),
                               _StatBadge(
@@ -110,6 +121,124 @@ class MathMistakePage extends ConsumerWidget {
                       ),
                     ),
 
+                    // 筛选行
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          SpacingTokens.md,
+                          SpacingTokens.sm,
+                          SpacingTokens.md,
+                          0,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 年级筛选
+                            if (sortedGrades.length > 1)
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      '年级',
+                                      style:
+                                          theme.textTheme.labelMedium?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: SpacingTokens.sm),
+                                    FilterChip(
+                                      label: const Text('全部'),
+                                      selected: gradeFilter == null,
+                                      onSelected: (_) {
+                                        ref
+                                            .read(mistakeGradeFilterProvider
+                                                .notifier,)
+                                            .state = null;
+                                      },
+                                    ),
+                                    for (final g in sortedGrades) ...[
+                                      const SizedBox(width: SpacingTokens.xs),
+                                      FilterChip(
+                                        label: Text('$g年级'),
+                                        selected: gradeFilter == g,
+                                        onSelected: (_) {
+                                          ref
+                                              .read(mistakeGradeFilterProvider
+                                                  .notifier,)
+                                              .state = gradeFilter == g
+                                              ? null
+                                              : g;
+                                        },
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+
+                            const SizedBox(height: SpacingTokens.xs),
+
+                            // 状态筛选
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '状态',
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      color:
+                                          theme.colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: SpacingTokens.sm),
+                                  ChoiceChip(
+                                    label: const Text('全部'),
+                                    selected: statusFilter == null,
+                                    onSelected: (_) {
+                                      ref
+                                          .read(mistakeStatusFilterProvider
+                                              .notifier,)
+                                          .state = null;
+                                    },
+                                  ),
+                                  const SizedBox(width: SpacingTokens.xs),
+                                  ChoiceChip(
+                                    label: const Text('待复练'),
+                                    selected: statusFilter == false,
+                                    onSelected: (_) {
+                                      ref
+                                          .read(mistakeStatusFilterProvider
+                                              .notifier,)
+                                          .state = statusFilter == false
+                                          ? null
+                                          : false;
+                                    },
+                                  ),
+                                  const SizedBox(width: SpacingTokens.xs),
+                                  ChoiceChip(
+                                    label: const Text('已掌握'),
+                                    selected: statusFilter == true,
+                                    onSelected: (_) {
+                                      ref
+                                          .read(mistakeStatusFilterProvider
+                                              .notifier,)
+                                          .state = statusFilter == true
+                                          ? null
+                                          : true;
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
                     // 错题重练按钮（有未掌握错题时显示）
                     if (unresolvedCount > 0)
                       SliverToBoxAdapter(
@@ -124,7 +253,7 @@ class MathMistakePage extends ConsumerWidget {
                             onPressed: () => _startBatchRepractice(
                               context,
                               ref,
-                              mistakes
+                              allMistakes
                                   .where((m) => !m.isResolved)
                                   .toList(),
                             ),
@@ -138,67 +267,97 @@ class MathMistakePage extends ConsumerWidget {
                         ),
                       ),
 
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpacingTokens.md,
-                        vertical: SpacingTokens.sm,
-                      ),
-                      sliver: SliverList.builder(
-                        itemCount:
-                            (mistakes.length + columns - 1) ~/ columns,
-                        itemBuilder: (context, rowIndex) {
-                          final start = rowIndex * columns;
-                          final rowWidgets = <Widget>[];
-                          for (int col = 0; col < columns; col++) {
-                            if (col > 0) {
-                              rowWidgets.add(
-                                const SizedBox(width: SpacingTokens.sm),
-                              );
-                            }
-                            final idx = start + col;
-                            if (idx < mistakes.length) {
-                              final mistake = mistakes[idx];
-                              rowWidgets.add(
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () => context.push(
-                                      AppRoutes.mathMistakeDetail,
-                                      extra: mistake.id,
-                                    ),
-                                    child: _MistakeCard(mistake: mistake),
-                                  )
-                                      .animate()
-                                      .fadeIn(
-                                        delay: (80 * idx).ms,
-                                        duration: 300.ms,
-                                      )
-                                      .slideX(
-                                        begin: 0.1,
-                                        end: 0,
-                                        delay: (80 * idx).ms,
-                                        duration: 300.ms,
-                                      ),
-                                ),
-                              );
-                            } else {
-                              rowWidgets.add(const Expanded(child: SizedBox()));
-                            }
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: SpacingTokens.sm,
-                            ),
-                            child: IntrinsicHeight(
-                              child: Row(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
-                                children: rowWidgets,
+                    // 筛选结果为空提示
+                    if (filteredMistakes.isEmpty && allMistakes.isNotEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.filter_alt_outlined,
+                                size: 48,
+                                color: theme.colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.4),
                               ),
-                            ),
-                          );
-                        },
+                              const SizedBox(height: SpacingTokens.sm),
+                              Text(
+                                '当前筛选条件下无错题',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+
+                    if (filteredMistakes.isNotEmpty)
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SpacingTokens.md,
+                          vertical: SpacingTokens.sm,
+                        ),
+                        sliver: SliverList.builder(
+                          itemCount:
+                              (filteredMistakes.length + columns - 1) ~/
+                                  columns,
+                          itemBuilder: (context, rowIndex) {
+                            final start = rowIndex * columns;
+                            final rowWidgets = <Widget>[];
+                            for (int col = 0; col < columns; col++) {
+                              if (col > 0) {
+                                rowWidgets.add(
+                                  const SizedBox(width: SpacingTokens.sm),
+                                );
+                              }
+                              final idx = start + col;
+                              if (idx < filteredMistakes.length) {
+                                final mistake = filteredMistakes[idx];
+                                rowWidgets.add(
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () => context.push(
+                                        AppRoutes.mathMistakeDetail,
+                                        extra: mistake.id,
+                                      ),
+                                      child:
+                                          _MistakeCard(mistake: mistake),
+                                    )
+                                        .animate()
+                                        .fadeIn(
+                                          delay: (80 * idx).ms,
+                                          duration: 300.ms,
+                                        )
+                                        .slideX(
+                                          begin: 0.1,
+                                          end: 0,
+                                          delay: (80 * idx).ms,
+                                          duration: 300.ms,
+                                        ),
+                                  ),
+                                );
+                              } else {
+                                rowWidgets
+                                    .add(const Expanded(child: SizedBox()));
+                              }
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: SpacingTokens.sm,
+                              ),
+                              child: IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: rowWidgets,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                   ],
                 );
         },
@@ -388,13 +547,11 @@ class _MistakeCard extends StatelessWidget {
           const SizedBox(height: SpacingTokens.sm),
 
           // 题目行
-          Text(
+          MathText(
             mistake.problemText,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
 
           const SizedBox(height: SpacingTokens.xs),

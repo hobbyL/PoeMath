@@ -14,6 +14,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 import 'package:poemath/math_engine/models/math_problem.dart';
 
@@ -59,7 +60,7 @@ class MathMistakeDetailPage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 题目文本
-                  Text(
+                  MathText(
                     mistake.problemText,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
