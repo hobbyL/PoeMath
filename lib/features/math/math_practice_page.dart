@@ -452,7 +452,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       body: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.all(SpacingTokens.lg),
+            padding: const EdgeInsets.symmetric(
+              horizontal: SpacingTokens.md,
+              vertical: SpacingTokens.sm,
+            ),
             child: Column(
               children: [
             // 进度条
@@ -463,7 +466,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
               color: theme.colorScheme.primary,
               borderRadius: BorderRadius.circular(4),
             ),
-            const SizedBox(height: SpacingTokens.xl),
+            const SizedBox(height: SpacingTokens.md),
 
             // 题目显示
             Expanded(
@@ -526,7 +529,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
             ),
 
             // 答案输入区
-            const SizedBox(height: SpacingTokens.md),
+            const SizedBox(height: SpacingTokens.sm),
             _buildAnswerInput(context),
           ],
         ),

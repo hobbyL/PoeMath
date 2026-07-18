@@ -102,22 +102,15 @@ class SessionResultDialog extends StatelessWidget {
           // 按钮行
           Row(
             children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop('home'),
-                  child: const Text('返回首页'),
-                ),
-              ),
               if (!_allCorrect) ...[
-                const SizedBox(width: SpacingTokens.sm),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(context).pop('review'),
                     child: const Text('查看错题'),
                   ),
                 ),
+                const SizedBox(width: SpacingTokens.sm),
               ],
-              const SizedBox(width: SpacingTokens.sm),
               Expanded(
                 child: FilledButton(
                   onPressed: () => Navigator.of(context).pop('retry'),
