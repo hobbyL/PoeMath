@@ -17,17 +17,33 @@ class AdditionSubtractionGen extends BaseGenerator {
           .intersection({Operator.add, Operator.subtract}),
     );
 
+    // 操作数必须落在 [minOperand, maxOperand]；结果不超过 maxResult。
+    // 不能用 maxResult 当操作数上界（如 5 年级上 maxResult=100000、maxOperand=1000）。
+    final minOp = config.minOperand.round().clamp(0, 1000000);
+    final maxOp = config.maxOperand.round().clamp(minOp, 1000000);
+    final maxRes = config.maxResult.round().clamp(0, 100000000);
+
     final int a;
     final int b;
     final int result;
 
     if (op == Operator.add) {
-      result = randomInt(0, config.maxResult);
-      a = randomInt(config.minOperand, result);
-      b = result - a;
+      a = randomInt(minOp, maxOp);
+      final maxB = (maxRes - a).clamp(minOp, maxOp);
+      if (maxB < minOp) return generate();
+      b = randomInt(minOp, maxB);
+      result = a + b;
     } else {
-      a = randomInt(0, config.maxResult);
-      b = randomInt(config.minOperand, a);
+      // 减法：被减数 a ∈ [minOp, maxOp]，减数 b ∈ [minOp, a] 且 ≤ maxOp
+      a = randomInt(minOp, maxOp);
+      if (a < minOp) return generate();
+      final maxB = a < maxOp ? a : maxOp;
+      if (maxB < minOp) {
+        // 允许 b=0 的退路（一年级上 min 可为 0）
+        b = minOp;
+      } else {
+        b = randomInt(minOp, maxB);
+      }
       result = a - b;
     }
 

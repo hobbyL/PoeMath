@@ -18,14 +18,18 @@ class MultiDigitMulDivGen extends BaseGenerator {
   }
 
   MathProblem _generateMultiplication() {
-    final maxA = config.maxMultiplier.clamp(10, 999);
+    final maxOp = config.maxOperand.round().clamp(10, 999999);
+    final maxMul = config.maxMultiplier.clamp(2, maxOp);
+    final maxA = maxMul.clamp(10, maxOp);
     final a = randomInt(10, maxA);
     // 3年级上：多位数×一位数，3年级下：两位数×两位数
-    final maxB = config.semester == '上' ? 9 : 99.clamp(1, config.maxMultiplier);
+    final maxBRaw = config.semester == '上' ? 9 : 99;
+    final maxB = maxBRaw.clamp(1, maxMul).clamp(1, maxOp);
     final b = randomInt(2, maxB);
     final result = a * b;
 
     if (result > config.maxResult) return generate();
+    if (a > config.maxOperand || b > config.maxOperand) return generate();
 
     final operands = [NumberValue.fromInt(a), NumberValue.fromInt(b)];
     final operators = [Operator.multiply];
@@ -48,11 +52,19 @@ class MultiDigitMulDivGen extends BaseGenerator {
   }
 
   MathProblem _generateDivision() {
-    final b = randomInt(2, config.semester == '上' ? 9 : 99);
-    final quotient = randomInt(10, (config.maxDividend / b).floor().clamp(10, 999));
+    final maxOp = config.maxOperand.round().clamp(10, 999999);
+    final maxDivisor = (config.semester == '上' ? 9 : 99).clamp(2, maxOp);
+    final b = randomInt(2, maxDivisor);
+    // 被除数 a 必须 ≤ maxOperand 且 ≤ maxDividend
+    final maxDividend = config.maxDividend.clamp(10, maxOp);
+    final maxQuotient = (maxDividend / b).floor().clamp(1, 999);
+    if (maxQuotient < 1) return _generateMultiplication();
+    final quotient = randomInt(1, maxQuotient);
     final a = b * quotient;
 
-    if (a > config.maxDividend) return _generateDivision();
+    if (a > maxDividend || a > config.maxOperand || b > config.maxOperand) {
+      return _generateMultiplication();
+    }
 
     final operands = [NumberValue.fromInt(a), NumberValue.fromInt(b)];
     final operators = [Operator.divide];
