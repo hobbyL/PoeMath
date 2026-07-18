@@ -470,10 +470,16 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
             // 题目显示
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
                     // 题目文本（竖式模式特殊展示）
                     KeyedSubtree(
                       key: ValueKey('q_$currentIndex'),
@@ -523,8 +529,11 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                       if (_judgement!.correctSteps.isNotEmpty)
                         _buildStepsSection(context),
                     ],
-                  ],
-                ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
 
