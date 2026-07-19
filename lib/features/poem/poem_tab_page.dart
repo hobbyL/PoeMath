@@ -39,6 +39,13 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
     LearningStatus.mastered: '已掌握',
   };
 
+  static const _layerLabels = <String?, String>{
+    null: '全部',
+    'core': '必背',
+    'extended': '扩展',
+    'explore': '拓展',
+  };
+
   /// 搜索面板是否展开
   bool _panelOpen = false;
 
@@ -48,6 +55,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   LearningStatus? _localStatus;
   String? _localAuthor;
   String? _localDynasty;
+  String? _localLayer;
 
   @override
   void dispose() {
@@ -62,6 +70,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
     _localStatus = ref.read(selectedStatusFilterProvider);
     _localAuthor = ref.read(selectedAuthorFilterProvider);
     _localDynasty = ref.read(selectedDynastyFilterProvider);
+    _localLayer = ref.read(selectedLayerFilterProvider);
     setState(() => _panelOpen = true);
   }
 
@@ -78,6 +87,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
     ref.read(selectedStatusFilterProvider.notifier).state = _localStatus;
     ref.read(selectedAuthorFilterProvider.notifier).state = _localAuthor;
     ref.read(selectedDynastyFilterProvider.notifier).state = _localDynasty;
+    ref.read(selectedLayerFilterProvider.notifier).state = _localLayer;
     setState(() => _panelOpen = false);
   }
 
@@ -89,6 +99,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
       _localStatus = null;
       _localAuthor = null;
       _localDynasty = null;
+      _localLayer = null;
     });
   }
 
@@ -98,7 +109,8 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
         ref.watch(selectedGradeProvider) != null ||
         ref.watch(selectedStatusFilterProvider) != null ||
         ref.watch(selectedAuthorFilterProvider) != null ||
-        ref.watch(selectedDynastyFilterProvider) != null;
+        ref.watch(selectedDynastyFilterProvider) != null ||
+        ref.watch(selectedLayerFilterProvider) != null;
   }
 
   @override
@@ -288,7 +300,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
               ),
               const SizedBox(height: SpacingTokens.md),
 
-              // ---- 筛选项（窄屏两行、宽屏一行） ----
+              // ---- 筛选项（窄屏三行、宽屏两行） ----
               LayoutBuilder(
                 builder: (context, constraints) {
                   final statusTile = _buildDropdownTile(
@@ -304,6 +316,12 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                         ? '全部'
                         : _gradeLabels[_localGrade] ?? '$_localGrade',
                     onTap: () => _showGradeSheet(),
+                  );
+                  final layerTile = _buildDropdownTile(
+                    theme: theme,
+                    label: '类型',
+                    value: _layerLabels[_localLayer] ?? '全部',
+                    onTap: () => _showLayerSheet(),
                   );
                   final authorTile = _buildDropdownTile(
                     theme: theme,
@@ -332,22 +350,32 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                     ),
                   );
 
-                  if (constraints.maxWidth >= 400) {
-                    // 宽屏：一行四个
-                    return Row(
+                  if (constraints.maxWidth >= 480) {
+                    // 宽屏：两行 — 3+2
+                    return Column(
                       children: [
-                        Expanded(child: statusTile),
-                        const SizedBox(width: SpacingTokens.xs),
-                        Expanded(child: gradeTile),
-                        const SizedBox(width: SpacingTokens.xs),
-                        Expanded(child: authorTile),
-                        const SizedBox(width: SpacingTokens.xs),
-                        Expanded(child: dynastyTile),
+                        Row(
+                          children: [
+                            Expanded(child: statusTile),
+                            const SizedBox(width: SpacingTokens.xs),
+                            Expanded(child: gradeTile),
+                            const SizedBox(width: SpacingTokens.xs),
+                            Expanded(child: layerTile),
+                          ],
+                        ),
+                        const SizedBox(height: SpacingTokens.xs),
+                        Row(
+                          children: [
+                            Expanded(child: authorTile),
+                            const SizedBox(width: SpacingTokens.xs),
+                            Expanded(child: dynastyTile),
+                          ],
+                        ),
                       ],
                     );
                   }
 
-                  // 窄屏：两行，每行两个
+                  // 窄屏：三行 — 2+2+1
                   return Column(
                     children: [
                       Row(
@@ -360,8 +388,14 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                       const SizedBox(height: SpacingTokens.xs),
                       Row(
                         children: [
-                          Expanded(child: authorTile),
+                          Expanded(child: layerTile),
                           const SizedBox(width: SpacingTokens.xs),
+                          Expanded(child: authorTile),
+                        ],
+                      ),
+                      const SizedBox(height: SpacingTokens.xs),
+                      Row(
+                        children: [
                           Expanded(child: dynastyTile),
                         ],
                       ),
@@ -406,7 +440,8 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
       _localGrade != null ||
       _localStatus != null ||
       _localAuthor != null ||
-      _localDynasty != null;
+      _localDynasty != null ||
+      _localLayer != null;
 
   /// 年级变化后，清除不再属于该年级的作者/朝代选择。
   void _invalidateLinkedFilters() {
@@ -578,6 +613,56 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                             );
                           }),
                         ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showLayerSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '选择类型',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<String?>(
+                      groupValue: _localLayer,
+                      onChanged: (v) {
+                        setState(() => _localLayer = v);
+                        Navigator.pop(ctx);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _layerLabels.entries.map((e) {
+                          return RadioListTile<String?>(
+                            title: Text(e.value),
+                            value: e.key,
+                          );
+                        }).toList(),
                       ),
                     ),
                   ),

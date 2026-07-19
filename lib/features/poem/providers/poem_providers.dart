@@ -49,6 +49,9 @@ final selectedAuthorFilterProvider = StateProvider<String?>((ref) => null);
 /// 当前选中朝代筛选（null = 全部）
 final selectedDynastyFilterProvider = StateProvider<String?>((ref) => null);
 
+/// 当前选中层级筛选（null = 全部，'core'/'extended'/'explore'）
+final selectedLayerFilterProvider = StateProvider<String?>((ref) => null);
+
 /// 筛选后的诗词列表
 final filteredPoemsProvider = Provider<List<Poem>>((ref) {
   final repo = ref.watch(poemRepoProvider);
@@ -57,6 +60,7 @@ final filteredPoemsProvider = Provider<List<Poem>>((ref) {
   final statusFilter = ref.watch(selectedStatusFilterProvider);
   final authorFilter = ref.watch(selectedAuthorFilterProvider);
   final dynastyFilter = ref.watch(selectedDynastyFilterProvider);
+  final layerFilter = ref.watch(selectedLayerFilterProvider);
 
   List<Poem> poems;
   if (grade != null) {
@@ -85,6 +89,11 @@ final filteredPoemsProvider = Provider<List<Poem>>((ref) {
   // 按朝代筛选
   if (dynastyFilter != null) {
     poems = poems.where((p) => p.dynasty == dynastyFilter).toList();
+  }
+
+  // 按层级筛选
+  if (layerFilter != null) {
+    poems = poems.where((p) => p.layer == layerFilter).toList();
   }
 
   // 按学习状态筛选
