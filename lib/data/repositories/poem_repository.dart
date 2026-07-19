@@ -28,10 +28,8 @@ class PoemRepository {
     _byLayer = {};
 
     for (final poem in HiveBoxes.poems.values) {
-      // 年级索引
-      if (poem.grade != null) {
-        _byGrade.putIfAbsent(poem.grade!, () => []).add(poem.id);
-      }
+      // 年级索引（无 grade 的诗词按 difficulty 推算）
+      _byGrade.putIfAbsent(poem.effectiveGrade, () => []).add(poem.id);
       // 作者索引
       _byAuthor.putIfAbsent(poem.author, () => []).add(poem.id);
       // 朝代索引

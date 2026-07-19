@@ -113,6 +113,18 @@ void main() {
         expect(grade1.map((p) => p.title), containsAll(['静夜思', '春晓']));
       });
 
+      test('byGrade 包含 difficulty 推算的诗词', () {
+        // poem_ext_001: difficulty=2 → effectiveGrade=3
+        final grade3 = repo.byGrade(3);
+        expect(grade3.length, 1);
+        expect(grade3.first.id, 'poem_ext_001');
+
+        // poem_exp_001: difficulty=3 → effectiveGrade=5
+        final grade5 = repo.byGrade(5);
+        expect(grade5.length, 1);
+        expect(grade5.first.id, 'poem_exp_001');
+      });
+
       test('byGrade 无匹配返回空列表', () {
         expect(repo.byGrade(6), isEmpty);
       });
@@ -150,8 +162,10 @@ void main() {
         expect(explore.length, 1);
       });
 
-      test('availableGrades 已排序', () {
-        expect(repo.availableGrades, [1, 2]);
+      test('availableGrades 已排序（含 difficulty 推算）', () {
+        // poem_ext_001: grade=null, difficulty=2 → effectiveGrade=3
+        // poem_exp_001: grade=null, difficulty=3 → effectiveGrade=5
+        expect(repo.availableGrades, [1, 2, 3, 5]);
       });
 
       test('availableAuthors 已排序', () {

@@ -30,10 +30,17 @@ class PoemCard extends StatelessWidget {
     final primary = theme.colorScheme.primary;
     final secondary = theme.colorScheme.secondary;
 
+    // 层级标签颜色
+    final layerColor = switch (poem.layer) {
+      'core' => secondary,
+      'extended' => primary,
+      _ => theme.colorScheme.tertiary,
+    };
+
     // 收集标签
     final tags = <Widget>[
+      _buildTag(poem.layerLabel, layerColor),
       ...poem.tags.take(3).map((tag) => _buildTag(tag, primary)),
-      if (poem.isRequired) _buildTag('必背', secondary),
     ];
 
     // 判断是否显示已背诵丝带

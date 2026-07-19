@@ -121,6 +121,32 @@ class Poem extends HiveObject {
     );
   }
 
+  /// 有效年级：有 grade 取 grade，无 grade 按 difficulty 推算。
+  int get effectiveGrade => grade ?? _gradeFromDifficulty(difficulty);
+
+  /// 层级中文标签：必背(core) / 扩展(extended) / 拓展(explore)。
+  String get layerLabel => switch (layer) {
+        'core' => '必背',
+        'extended' => '扩展',
+        _ => '拓展',
+      };
+
+  /// difficulty → grade 映射（仅用于无 grade 的诗词）。
+  ///
+  /// 基于核心课标诗词的 difficulty-grade 分布推算：
+  /// - difficulty 1 → 低年级（grade 2）
+  /// - difficulty 2 → 中年级（grade 3）
+  /// - difficulty 3 → 高年级（grade 5）
+  /// - difficulty 4 → 高年级（grade 6）
+  static int _gradeFromDifficulty(int difficulty) {
+    return switch (difficulty) {
+      1 => 2,
+      2 => 3,
+      3 => 5,
+      _ => 6,
+    };
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
