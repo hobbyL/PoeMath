@@ -288,61 +288,86 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
               ),
               const SizedBox(height: SpacingTokens.md),
 
-              // ---- 筛选项（一行四个） ----
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildDropdownTile(
-                      theme: theme,
-                      label: '状态',
-                      value: _statusLabels[_localStatus] ?? '全部',
-                      onTap: () => _showStatusSheet(),
+              // ---- 筛选项（窄屏两行、宽屏一行） ----
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final statusTile = _buildDropdownTile(
+                    theme: theme,
+                    label: '状态',
+                    value: _statusLabels[_localStatus] ?? '全部',
+                    onTap: () => _showStatusSheet(),
+                  );
+                  final gradeTile = _buildDropdownTile(
+                    theme: theme,
+                    label: '年级',
+                    value: _localGrade == null
+                        ? '全部'
+                        : _gradeLabels[_localGrade] ?? '$_localGrade',
+                    onTap: () => _showGradeSheet(),
+                  );
+                  final authorTile = _buildDropdownTile(
+                    theme: theme,
+                    label: '作者',
+                    value: _localAuthor ?? '全部',
+                    onTap: () => _showPickerSheet(
+                      title: '选择作者',
+                      current: _localAuthor,
+                      items: authors,
+                      allLabel: '全部作者',
+                      onChanged: (v) =>
+                          setState(() => _localAuthor = v),
                     ),
-                  ),
-                  const SizedBox(width: SpacingTokens.xs),
-                  Expanded(
-                    child: _buildDropdownTile(
-                      theme: theme,
-                      label: '年级',
-                      value: _localGrade == null
-                          ? '全部'
-                          : _gradeLabels[_localGrade] ?? '$_localGrade',
-                      onTap: () => _showGradeSheet(),
+                  );
+                  final dynastyTile = _buildDropdownTile(
+                    theme: theme,
+                    label: '朝代',
+                    value: _localDynasty ?? '全部',
+                    onTap: () => _showPickerSheet(
+                      title: '选择朝代',
+                      current: _localDynasty,
+                      items: dynasties,
+                      allLabel: '全部朝代',
+                      onChanged: (v) =>
+                          setState(() => _localDynasty = v),
                     ),
-                  ),
-                  const SizedBox(width: SpacingTokens.xs),
-                  Expanded(
-                    child: _buildDropdownTile(
-                      theme: theme,
-                      label: '作者',
-                      value: _localAuthor ?? '全部',
-                      onTap: () => _showPickerSheet(
-                        title: '选择作者',
-                        current: _localAuthor,
-                        items: authors,
-                        allLabel: '全部作者',
-                        onChanged: (v) =>
-                            setState(() => _localAuthor = v),
+                  );
+
+                  if (constraints.maxWidth >= 400) {
+                    // 宽屏：一行四个
+                    return Row(
+                      children: [
+                        Expanded(child: statusTile),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Expanded(child: gradeTile),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Expanded(child: authorTile),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Expanded(child: dynastyTile),
+                      ],
+                    );
+                  }
+
+                  // 窄屏：两行，每行两个
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: statusTile),
+                          const SizedBox(width: SpacingTokens.xs),
+                          Expanded(child: gradeTile),
+                        ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: SpacingTokens.xs),
-                  Expanded(
-                    child: _buildDropdownTile(
-                      theme: theme,
-                      label: '朝代',
-                      value: _localDynasty ?? '全部',
-                      onTap: () => _showPickerSheet(
-                        title: '选择朝代',
-                        current: _localDynasty,
-                        items: dynasties,
-                        allLabel: '全部朝代',
-                        onChanged: (v) =>
-                            setState(() => _localDynasty = v),
+                      const SizedBox(height: SpacingTokens.xs),
+                      Row(
+                        children: [
+                          Expanded(child: authorTile),
+                          const SizedBox(width: SpacingTokens.xs),
+                          Expanded(child: dynastyTile),
+                        ],
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: SpacingTokens.lg),
 
