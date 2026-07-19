@@ -123,7 +123,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                   icon: const Icon(Icons.route_rounded),
                   tooltip: '学习路径',
                 ),
-                title: const Text('诗词'),
+                title: Text('诗词(${poems.length})'),
                 actions: [
                   IconButton(
                     onPressed: () =>
