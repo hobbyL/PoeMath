@@ -351,31 +351,23 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                   );
 
                   if (constraints.maxWidth >= 480) {
-                    // 宽屏：两行 — 3+2
-                    return Column(
+                    // 宽屏：一行五个
+                    return Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(child: statusTile),
-                            const SizedBox(width: SpacingTokens.xs),
-                            Expanded(child: gradeTile),
-                            const SizedBox(width: SpacingTokens.xs),
-                            Expanded(child: layerTile),
-                          ],
-                        ),
-                        const SizedBox(height: SpacingTokens.xs),
-                        Row(
-                          children: [
-                            Expanded(child: authorTile),
-                            const SizedBox(width: SpacingTokens.xs),
-                            Expanded(child: dynastyTile),
-                          ],
-                        ),
+                        Expanded(child: statusTile),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Expanded(child: gradeTile),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Expanded(child: layerTile),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Expanded(child: authorTile),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Expanded(child: dynastyTile),
                       ],
                     );
                   }
 
-                  // 窄屏：三行 — 2+2+1
+                  // 窄屏：两行 — 3+2
                   return Column(
                     children: [
                       Row(
@@ -383,19 +375,15 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                           Expanded(child: statusTile),
                           const SizedBox(width: SpacingTokens.xs),
                           Expanded(child: gradeTile),
-                        ],
-                      ),
-                      const SizedBox(height: SpacingTokens.xs),
-                      Row(
-                        children: [
-                          Expanded(child: layerTile),
                           const SizedBox(width: SpacingTokens.xs),
-                          Expanded(child: authorTile),
+                          Expanded(child: layerTile),
                         ],
                       ),
                       const SizedBox(height: SpacingTokens.xs),
                       Row(
                         children: [
+                          Expanded(child: authorTile),
+                          const SizedBox(width: SpacingTokens.xs),
                           Expanded(child: dynastyTile),
                         ],
                       ),
