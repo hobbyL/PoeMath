@@ -49,7 +49,30 @@ void main() {
       await repo.addStars(10);
       await repo.addStars(5);
 
-      expect(repo.get().totalStars, 15);
+      final stats = repo.get();
+      expect(stats.totalStars, 15);
+      expect(stats.level, 0);
+    });
+
+    test('addStars 跨越阈值时同步更新等级', () async {
+      await repo.addStars(49);
+      expect(repo.get().level, 0);
+
+      await repo.addStars(1);
+
+      final stats = repo.get();
+      expect(stats.totalStars, 50);
+      expect(stats.level, 1);
+      expect(stats.levelName, '秀才');
+    });
+
+    test('addStars 一次跨越多个阈值时写入对应等级', () async {
+      await repo.addStars(800);
+
+      final stats = repo.get();
+      expect(stats.totalStars, 800);
+      expect(stats.level, 5);
+      expect(stats.levelName, '榜眼');
     });
 
     test('updateStreak 更新连续打卡', () async {
@@ -97,14 +120,6 @@ void main() {
       final stats = repo.get();
       expect(stats.mathTotalProblems, 15);
       expect(stats.mathTotalCorrect, 13);
-    });
-
-    test('updateLevel 更新等级', () async {
-      await repo.getOrCreate();
-      await repo.updateLevel(3);
-
-      expect(repo.get().level, 3);
-      expect(repo.get().levelName, '进士');
     });
   });
 }

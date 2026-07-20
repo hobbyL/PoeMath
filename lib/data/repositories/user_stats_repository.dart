@@ -6,6 +6,7 @@
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/domain/level_calculator.dart';
 
 class UserStatsRepository {
   /// 获取当前 profile 的统计数据
@@ -35,10 +36,11 @@ class UserStatsRepository {
     await HiveBoxes.userStats.put(key, stats);
   }
 
-  /// 增加星星
+  /// 增加星星，并同步更新由总星星数派生的等级。
   Future<void> addStars(int count) async {
     final stats = await getOrCreate();
     stats.totalStars += count;
+    stats.level = LevelCalculator.calculate(stats.totalStars);
     await stats.save();
   }
 
@@ -78,12 +80,5 @@ class UserStatsRepository {
       stats.mathBestStreak = streak;
       await stats.save();
     }
-  }
-
-  /// 更新等级
-  Future<void> updateLevel(int level) async {
-    final stats = await getOrCreate();
-    stats.level = level;
-    await stats.save();
   }
 }

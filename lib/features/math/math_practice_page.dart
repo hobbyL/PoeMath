@@ -22,7 +22,6 @@ import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
-import 'package:poemath/domain/level_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
@@ -330,21 +329,20 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     // 做题数和连对数已在 _persistProgress() 中逐题更新，只需添加星星
     final statsRepo = ref.read(userStatsRepoProvider);
+    final levelBeforeReward = statsRepo.get().level;
     if (stars > 0) {
       await statsRepo.addStars(stars);
     }
 
-    // 等级自动计算
+    // addStars 会同步重算等级；页面仅负责展示升级反馈。
     final updatedStats = statsRepo.get();
-    final newLevel = LevelCalculator.calculate(updatedStats.totalStars);
-    if (newLevel != updatedStats.level) {
-      await statsRepo.updateLevel(newLevel);
+    if (updatedStats.level > levelBeforeReward) {
       if (mounted) {
         showCelebration(
           context,
           type: CelebrationType.levelUp,
-          subtitle: newLevel < UserStats.levelNames.length
-              ? UserStats.levelNames[newLevel]
+          subtitle: updatedStats.level < UserStats.levelNames.length
+              ? UserStats.levelNames[updatedStats.level]
               : '诗仙',
         );
       }
