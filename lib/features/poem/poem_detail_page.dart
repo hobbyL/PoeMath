@@ -2,14 +2,18 @@
 //
 // 诗词详情页：展示全文、拼音、译文、赏析、注释，可收藏、TTS朗读和开始背诵。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/poem_theme.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -32,15 +36,31 @@ class PoemDetailPage extends ConsumerStatefulWidget {
 }
 
 class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
+  late final TtsService _tts;
   bool _isSpeaking = false;
 
   /// 当前正在朗读的行索引，-1 表示未朗读。
   int _currentLineIndex = -1;
 
   @override
+  void initState() {
+    super.initState();
+    _tts = ref.read(ttsServiceProvider);
+  }
+
+  @override
   void dispose() {
     // 退出页面时停止朗读
-    ref.read(ttsServiceProvider).stop();
+    unawaited(
+      _tts.stop().onError(
+            (error, stackTrace) => AppLogger.e(
+              '退出诗词详情页时停止朗读失败',
+              tag: 'PoemDetail',
+              error: error,
+              stackTrace: stackTrace,
+            ),
+          ),
+    );
     super.dispose();
   }
 
@@ -54,34 +74,66 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   }
 
   Future<void> _toggleTts(Poem poem) async {
-    final tts = ref.read(ttsServiceProvider);
+    final scaffold = ScaffoldMessenger.of(context);
     if (_isSpeaking) {
-      await tts.stop();
-      if (mounted) {
-        setState(() {
-          _isSpeaking = false;
-          _currentLineIndex = -1;
-        });
+      try {
+        await _tts.stop();
+      } on Exception catch (error, stackTrace) {
+        AppLogger.e(
+          '停止诗词朗读失败',
+          tag: 'PoemDetail',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        if (mounted) {
+          scaffold.clearSnackBars();
+          scaffold.showSnackBar(
+            const SnackBar(content: Text('停止朗读失败，请稍后重试')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+            _currentLineIndex = -1;
+          });
+        }
       }
     } else {
       final lines = _splitLines(poem.content);
       setState(() => _isSpeaking = true);
-      await tts.speakLines(
-        lines,
-        onLineStart: (index) {
-          if (mounted) {
-            setState(() => _currentLineIndex = index);
-          }
-        },
-        onComplete: () {
-          if (mounted) {
-            setState(() {
-              _isSpeaking = false;
-              _currentLineIndex = -1;
-            });
-          }
-        },
-      );
+      try {
+        await _tts.speakLines(
+          lines,
+          onLineStart: (index) {
+            if (mounted) {
+              setState(() => _currentLineIndex = index);
+            }
+          },
+        );
+      } on Exception catch (error, stackTrace) {
+        AppLogger.e(
+          '诗词朗读失败',
+          tag: 'PoemDetail',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        if (mounted) {
+          scaffold.clearSnackBars();
+          scaffold.showSnackBar(
+            const SnackBar(
+              content: Text('朗读失败，请检查系统语音服务后重试'),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+            _currentLineIndex = -1;
+          });
+        }
+      }
     }
   }
 
@@ -532,5 +584,4 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       ),
     );
   }
-
 }

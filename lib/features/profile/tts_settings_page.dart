@@ -3,10 +3,14 @@
 // 层级：features/profile
 // 职责：TTS 音频设置子页面 — 音色选择 + 语速调节。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 
@@ -18,16 +22,19 @@ class TtsSettingsPage extends ConsumerStatefulWidget {
 }
 
 class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
+  late final TtsService _tts;
   List<Map<String, String>>? _voices;
   Map<String, String>? _selectedVoice;
   late double _speed;
   bool _loading = true;
+  String? _loadError;
 
   static const _previewText = '床前明月光，疑是地上霜。';
 
   @override
   void initState() {
     super.initState();
+    _tts = ref.read(ttsServiceProvider);
     final settingsRepo = ref.read(settingsRepositoryProvider);
     _selectedVoice = settingsRepo.ttsVoice;
     _speed = settingsRepo.ttsSpeed;
@@ -35,44 +42,100 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
   }
 
   Future<void> _loadVoices() async {
-    final tts = ref.read(ttsServiceProvider);
-    final voices = await tts.getChineseVoices();
     if (mounted) {
       setState(() {
-        _voices = voices;
-        _loading = false;
+        _loading = true;
+        _loadError = null;
       });
+    }
+
+    try {
+      final voices = await _tts.getChineseVoices();
+      if (mounted) {
+        setState(() {
+          _voices = voices;
+          _loading = false;
+        });
+      }
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '加载系统音色失败',
+        tag: 'TtsSettings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        setState(() {
+          _voices = const [];
+          _loading = false;
+          _loadError = '音色加载失败，请检查系统语音服务';
+        });
+      }
     }
   }
 
-  Future<void> _previewVoice(Map<String, String>? voice) async {
-    final tts = ref.read(ttsServiceProvider);
-    await tts.stop();
-    // 临时应用选中的音色试听
-    await tts.setVoice(voice);
-    await tts.preview(_previewText);
+  Future<void> _selectVoice(Map<String, String>? voice) async {
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      await _tts.stop();
+      await _tts.setVoice(voice);
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '保存 TTS 音色失败',
+        tag: 'TtsSettings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('音色设置失败，请稍后重试')),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _selectedVoice = voice);
+    }
+
+    try {
+      await _tts.preview(_previewText);
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        'TTS 音色试听失败',
+        tag: 'TtsSettings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('音色已保存，但试听失败')),
+        );
+      }
+    }
   }
 
   Future<void> _onSpeedChanged(double speed) async {
     setState(() => _speed = speed);
     final settingsRepo = ref.read(settingsRepositoryProvider);
     await settingsRepo.setTtsSpeed(speed);
-    ref.invalidate(settingsRepositoryProvider);
-  }
-
-  void _selectVoice(Map<String, String>? voice) {
-    setState(() => _selectedVoice = voice);
-    final tts = ref.read(ttsServiceProvider);
-    tts.setVoice(voice);
-    ref.invalidate(settingsRepositoryProvider);
-    ref.invalidate(ttsServiceProvider);
-    _previewVoice(voice);
   }
 
   @override
   void dispose() {
     // 离开页面停止试听
-    ref.read(ttsServiceProvider).stop();
+    unawaited(
+      _tts.stop().onError(
+            (error, stackTrace) => AppLogger.e(
+              '退出音频设置页时停止试听失败',
+              tag: 'TtsSettings',
+              error: error,
+              stackTrace: stackTrace,
+            ),
+          ),
+    );
     super.dispose();
   }
 
@@ -207,6 +270,34 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
               const Padding(
                 padding: EdgeInsets.all(SpacingTokens.xl),
                 child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_loadError != null)
+              Padding(
+                padding: const EdgeInsets.all(SpacingTokens.xl),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.record_voice_over_outlined,
+                        color: theme.colorScheme.error,
+                      ),
+                      const SizedBox(height: SpacingTokens.sm),
+                      Text(
+                        _loadError!,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                      const SizedBox(height: SpacingTokens.md),
+                      OutlinedButton.icon(
+                        onPressed: _loadVoices,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('重新加载'),
+                      ),
+                    ],
+                  ),
+                ),
               )
             else ...[
               // 系统默认

@@ -3,6 +3,8 @@
 // 层级：features/poem
 // 职责：诗词朗读跟读评分页 — TTS 范读 + 语音识别跟读 + 逐字对比评分。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -11,7 +13,9 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'package:poemath/core/services/sound_service.dart';
+import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -35,16 +39,22 @@ enum _ReadAlongPhase {
 }
 
 class PoemReadAlongPage extends ConsumerStatefulWidget {
-  const PoemReadAlongPage({super.key, required this.poemId});
+  const PoemReadAlongPage({
+    super.key,
+    required this.poemId,
+    this.speechToText,
+  });
 
   final String poemId;
+  final SpeechToText? speechToText;
 
   @override
   ConsumerState<PoemReadAlongPage> createState() => _PoemReadAlongPageState();
 }
 
 class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
-  final SpeechToText _speech = SpeechToText();
+  late final SpeechToText _speech;
+  late final TtsService _tts;
   bool _speechAvailable = false;
 
   /// 诗句列表（按换行拆分）。
@@ -68,6 +78,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   @override
   void initState() {
     super.initState();
+    _speech = widget.speechToText ?? SpeechToText();
+    _tts = ref.read(ttsServiceProvider);
     _initSpeech();
   }
 
@@ -87,8 +99,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         onStatus: (status) {
           debugPrint('语音识别状态: $status');
           // 当语音识别自动停止时（用户沉默超时），完成录制
-          if (status == 'notListening' &&
-              _phase == _ReadAlongPhase.recording) {
+          if (status == 'notListening' && _phase == _ReadAlongPhase.recording) {
             _finishRecording(_liveText);
           }
         },
@@ -106,7 +117,16 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   @override
   void dispose() {
     _speech.cancel();
-    ref.read(ttsServiceProvider).stop();
+    unawaited(
+      _tts.stop().onError(
+            (error, stackTrace) => AppLogger.e(
+              '退出跟读页时停止范读失败',
+              tag: 'PoemReadAlong',
+              error: error,
+              stackTrace: stackTrace,
+            ),
+          ),
+    );
     super.dispose();
   }
 
@@ -122,22 +142,58 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   // ============ TTS 范读 ============
 
   Future<void> _playModelReading() async {
-    if (_phase != _ReadAlongPhase.idle &&
-        _phase != _ReadAlongPhase.scored) {
+    if (_phase != _ReadAlongPhase.idle && _phase != _ReadAlongPhase.scored) {
       return;
     }
 
+    final scaffold = ScaffoldMessenger.of(context);
     setState(() => _phase = _ReadAlongPhase.modelReading);
 
-    final tts = ref.read(ttsServiceProvider);
-    await tts.speak(_lines[_currentLine]);
+    try {
+      await _tts.speak(_lines[_currentLine]);
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '诗词范读失败',
+        tag: 'PoemReadAlong',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(
+            content: Text('范读失败，请检查系统语音服务后重试'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted && _phase == _ReadAlongPhase.modelReading) {
+        setState(() => _phase = _ReadAlongPhase.idle);
+      }
+    }
+  }
 
-    if (mounted) {
-      setState(() {
-        _phase = _phase == _ReadAlongPhase.modelReading
-            ? _ReadAlongPhase.idle
-            : _phase;
-      });
+  Future<void> _stopModelReading() async {
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      await _tts.stop();
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '停止诗词范读失败',
+        tag: 'PoemReadAlong',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('停止范读失败，请稍后重试')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _phase = _ReadAlongPhase.idle);
+      }
     }
   }
 
@@ -152,9 +208,27 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       }
       if (!_speechAvailable) return;
     }
+    if (!mounted) return;
 
     // 停止 TTS
-    await ref.read(ttsServiceProvider).stop();
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      await _tts.stop();
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '开始跟读前停止范读失败',
+        tag: 'PoemReadAlong',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('无法开始跟读，请稍后重试')),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _phase = _ReadAlongPhase.recording;
@@ -302,7 +376,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   /// 去除中英文标点和空格。
   String _removePunctuation(String text) {
     return text.replaceAll(
-      RegExp('[，。！？、；：""''（）《》\\s,.!?;:\'"()\\[\\]{}]'),
+      RegExp('[，。！？、；：""' '（）《》\\s,.!?;:\'"()\\[\\]{}]'),
       '',
     );
   }
@@ -350,9 +424,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         if (origClean[i - 1] == recClean[j - 1]) {
           dp[i][j] = dp[i - 1][j - 1] + 1;
         } else {
-          dp[i][j] = dp[i - 1][j] > dp[i][j - 1]
-              ? dp[i - 1][j]
-              : dp[i][j - 1];
+          dp[i][j] = dp[i - 1][j] > dp[i][j - 1] ? dp[i - 1][j] : dp[i][j - 1];
         }
       }
     }
@@ -518,8 +590,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
           child: LinearProgressIndicator(
             value: progress,
             minHeight: 6,
-            backgroundColor:
-                theme.colorScheme.primary.withValues(alpha: 0.12),
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
             valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
           ),
         ),
@@ -576,8 +647,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   /// 评分后显示逐字着色的原文。
   Widget _buildColoredLine(ThemeData theme) {
     final original = _lines[_currentLine];
-    final recognized =
-        _recognizedTexts.isNotEmpty ? _recognizedTexts.last : '';
+    final recognized = _recognizedTexts.isNotEmpty ? _recognizedTexts.last : '';
     final matches = _charMatches(original, recognized);
 
     // 还原原始文本的逐字着色（包含标点）
@@ -593,24 +663,20 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         ),
         children: original.runes.map((rune) {
           final char = String.fromCharCode(rune);
-          final isPunctuation =
-              _removePunctuation(char).isEmpty;
+          final isPunctuation = _removePunctuation(char).isEmpty;
 
           if (isPunctuation) {
             // 标点符号用默认色
             return TextSpan(text: char);
           }
 
-          final isMatch =
-              cleanIdx < matches.length && matches[cleanIdx];
+          final isMatch = cleanIdx < matches.length && matches[cleanIdx];
           cleanIdx++;
 
           return TextSpan(
             text: char,
             style: TextStyle(
-              color: isMatch
-                  ? theme.semantic.success
-                  : theme.colorScheme.error,
+              color: isMatch ? theme.semantic.success : theme.colorScheme.error,
               fontWeight: isMatch ? FontWeight.w600 : FontWeight.w800,
             ),
           );
@@ -694,8 +760,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         ),
         const SizedBox(height: SpacingTokens.sm),
         // 识别到的文字
-        if (_recognizedTexts.isNotEmpty &&
-            _recognizedTexts.last.isNotEmpty)
+        if (_recognizedTexts.isNotEmpty && _recognizedTexts.last.isNotEmpty)
           ColoredCard(
             color: theme.colorScheme.surfaceContainerHighest,
             backgroundOpacity: 0.5,
@@ -747,12 +812,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         return SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () async {
-              await ref.read(ttsServiceProvider).stop();
-              if (mounted) {
-                setState(() => _phase = _ReadAlongPhase.idle);
-              }
-            },
+            onPressed: _stopModelReading,
             icon: const Icon(Icons.stop),
             label: const Text('停止播放'),
           ),

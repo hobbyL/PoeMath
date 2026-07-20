@@ -2,6 +2,8 @@
 //
 // TTS 朗读服务：封装 flutter_tts，提供中文全文/逐句朗读。
 
+import 'dart:async';
+
 import 'package:flutter_tts/flutter_tts.dart';
 
 import 'package:poemath/data/repositories/settings_repository.dart';
@@ -11,17 +13,19 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 /// 使用 flutter_tts 实现中文语音合成。
 /// 支持全文朗读和逐句朗读，以及音色选择。
 class TtsService {
-  final FlutterTts _tts = FlutterTts();
+  final FlutterTts _tts;
   final SettingsRepository _settings;
 
   bool _initialized = false;
   bool _isSpeaking = false;
+  String? _engineErrorMessage;
 
   /// 用户主动停止标志，仅 [stop] 方法设置，
   /// 避免 completionHandler 干扰 [speakLines] 循环。
   bool _stopRequested = false;
 
-  TtsService(this._settings);
+  TtsService(this._settings, {FlutterTts? flutterTts})
+      : _tts = flutterTts ?? FlutterTts();
 
   /// 当前是否正在朗读。
   bool get isSpeaking => _isSpeaking;
@@ -30,32 +34,54 @@ class TtsService {
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
 
-    await _tts.setLanguage('zh-CN');
-    await _tts.setSpeechRate(_settings.ttsSpeed);
-    await _tts.setVolume(1.0);
-    await _tts.setPitch(1.0);
+    await _runEngineOperation('语音引擎初始化失败', () async {
+      await _tts.setLanguage('zh-CN');
+      await _tts.setSpeechRate(_settings.ttsSpeed);
+      await _tts.setVolume(1.0);
+      await _tts.setPitch(1.0);
 
-    // 应用用户已保存的音色
-    final savedVoice = _settings.ttsVoice;
-    if (savedVoice != null) {
-      await _tts.setVoice(savedVoice);
-    }
+      final savedVoice = _settings.ttsVoice;
+      if (savedVoice != null) {
+        await _tts.setVoice(savedVoice);
+      }
 
-    // 注意：completionHandler 在每次 speak() 完成后触发，
-    // 但在 speakLines/speakSentences 场景下不应中断循环，
-    // 所以这里不再设置 _isSpeaking = false，改由各方法自行管理。
+      // 该设置决定后续 speak() 的 Future 是否等待朗读完成，
+      // 必须在第一次 speak() 之前启用。
+      await _tts.awaitSpeakCompletion(true);
 
-    _tts.setCancelHandler(() {
-      _isSpeaking = false;
-      _stopRequested = true;
-    });
+      _tts.setCancelHandler(() {
+        _isSpeaking = false;
+        _stopRequested = true;
+      });
 
-    _tts.setErrorHandler((msg) {
-      _isSpeaking = false;
-      _stopRequested = true;
+      _tts.setErrorHandler((message) {
+        _engineErrorMessage = message.toString();
+        _isSpeaking = false;
+        _stopRequested = true;
+      });
     });
 
     _initialized = true;
+  }
+
+  Future<T> _runEngineOperation<T>(
+    String failureMessage,
+    Future<T> Function() operation,
+  ) async {
+    try {
+      return await operation();
+    } on TtsException {
+      rethrow;
+    } on Exception catch (error) {
+      throw TtsException(failureMessage, cause: error);
+    }
+  }
+
+  void _throwIfEngineReportedError() {
+    final message = _engineErrorMessage;
+    if (message != null) {
+      throw TtsException('语音引擎朗读失败：$message');
+    }
   }
 
   /// 获取可用的中文音色列表（已去重）。
@@ -65,16 +91,23 @@ class TtsService {
   /// 按 name+locale 去重，避免 Android 上返回多个完全相同的条目。
   Future<List<Map<String, String>>> getChineseVoices() async {
     await _ensureInitialized();
-    final voices = await _tts.getVoices as List<dynamic>;
+    final Object? voices = await _runEngineOperation<Object?>(
+      '获取系统音色失败',
+      () => _tts.getVoices,
+    );
+    if (voices is! List<Object?>) {
+      throw const TtsException('系统返回了无效的音色数据');
+    }
+
     final seen = <String>{};
     final chineseVoices = <Map<String, String>>[];
 
-    for (final v in voices) {
-      final map = Map<String, dynamic>.from(v as Map);
-      final locale = (map['locale'] ?? '').toString();
+    for (final voice in voices) {
+      if (voice is! Map<Object?, Object?>) continue;
+      final locale = (voice['locale'] ?? '').toString();
       if (!locale.startsWith('zh')) continue;
 
-      final name = (map['name'] ?? '').toString();
+      final name = (voice['name'] ?? '').toString();
       final key = '$name|$locale';
       if (seen.contains(key)) continue;
       seen.add(key);
@@ -98,31 +131,36 @@ class TtsService {
   /// 设置音色并保存到设置。传 null 恢复系统默认。
   Future<void> setVoice(Map<String, String>? voice) async {
     await _ensureInitialized();
-    if (voice != null) {
-      await _tts.setVoice(voice);
-    } else {
-      // 恢复默认：重设语言让系统选择默认音色
-      await _tts.setLanguage('zh-CN');
-    }
+    await _runEngineOperation('设置系统音色失败', () async {
+      if (voice != null) {
+        await _tts.setVoice(voice);
+      } else {
+        // 恢复默认：重设语言让系统选择默认音色
+        await _tts.setLanguage('zh-CN');
+      }
+    });
     await _settings.setTtsVoice(voice);
   }
 
   /// 试听当前音色：朗读一段示例文本。
-  Future<void> preview(String text) async {
-    await _ensureInitialized();
-    await _tts.setSpeechRate(_settings.ttsSpeed);
-    await _tts.speak(text);
-  }
+  Future<void> preview(String text) => speak(text);
 
   /// 朗读文本（全文一次性读完）。
   Future<void> speak(String text) async {
     await _ensureInitialized();
-    await _tts.setSpeechRate(_settings.ttsSpeed);
     _isSpeaking = true;
     _stopRequested = false;
-    await _tts.speak(text);
-    await _tts.awaitSpeakCompletion(true);
-    _isSpeaking = false;
+    _engineErrorMessage = null;
+
+    try {
+      await _runEngineOperation('朗读失败', () async {
+        await _tts.setSpeechRate(_settings.ttsSpeed);
+        await _tts.speak(text);
+        _throwIfEngineReportedError();
+      });
+    } finally {
+      _isSpeaking = false;
+    }
   }
 
   /// 逐句朗读：按句号、问号、感叹号、逗号、换行分割，依次朗读。
@@ -135,8 +173,8 @@ class TtsService {
     void Function()? onComplete,
   }) async {
     await _ensureInitialized();
-    await _tts.setSpeechRate(_settings.ttsSpeed);
     _stopRequested = false;
+    _engineErrorMessage = null;
 
     // 分割句子（按中文标点和换行）
     final sentences = text
@@ -145,16 +183,28 @@ class TtsService {
         .where((s) => s.isNotEmpty)
         .toList();
 
+    var completed = false;
     _isSpeaking = true;
-    for (var i = 0; i < sentences.length; i++) {
-      if (_stopRequested) break;
-      onSentenceStart?.call(i);
-      await _tts.speak(sentences[i]);
-      await _tts.awaitSpeakCompletion(true);
+    try {
+      await _runEngineOperation(
+        '逐句朗读失败',
+        () => _tts.setSpeechRate(_settings.ttsSpeed),
+      );
+      for (var i = 0; i < sentences.length; i++) {
+        if (_stopRequested) break;
+        onSentenceStart?.call(i);
+        await _runEngineOperation(
+          '逐句朗读失败',
+          () => _tts.speak(sentences[i]),
+        );
+        _throwIfEngineReportedError();
+      }
+      completed = !_stopRequested;
+    } finally {
+      _isSpeaking = false;
     }
 
-    _isSpeaking = false;
-    onComplete?.call();
+    if (completed) onComplete?.call();
   }
 
   /// 逐行朗读：调用方提供已拆分的行列表，确保索引与视觉行一一对应。
@@ -167,32 +217,60 @@ class TtsService {
     void Function()? onComplete,
   }) async {
     await _ensureInitialized();
-    await _tts.setSpeechRate(_settings.ttsSpeed);
     _stopRequested = false;
+    _engineErrorMessage = null;
 
+    var completed = false;
     _isSpeaking = true;
-    for (var i = 0; i < lines.length; i++) {
-      if (_stopRequested) break;
-      onLineStart?.call(i);
-      await _tts.speak(lines[i]);
-      await _tts.awaitSpeakCompletion(true);
+    try {
+      await _runEngineOperation(
+        '逐行朗读失败',
+        () => _tts.setSpeechRate(_settings.ttsSpeed),
+      );
+      for (var i = 0; i < lines.length; i++) {
+        if (_stopRequested) break;
+        onLineStart?.call(i);
+        await _runEngineOperation(
+          '逐行朗读失败',
+          () => _tts.speak(lines[i]),
+        );
+        _throwIfEngineReportedError();
+      }
+      completed = !_stopRequested;
+    } finally {
+      _isSpeaking = false;
     }
 
-    _isSpeaking = false;
-    onComplete?.call();
+    if (completed) onComplete?.call();
   }
 
   /// 停止朗读。
   Future<void> stop() async {
     _stopRequested = true;
     _isSpeaking = false;
-    await _tts.stop();
+    await _runEngineOperation('停止朗读失败', _tts.stop);
   }
 
   /// 释放资源。
   void dispose() {
     _stopRequested = true;
     _isSpeaking = false;
-    _tts.stop();
+    unawaited(
+      _tts.stop().then<void>(
+            (_) {},
+            onError: (Object error, StackTrace stackTrace) {},
+          ),
+    );
   }
+}
+
+/// TTS 引擎初始化或调用失败。
+class TtsException implements Exception {
+  const TtsException(this.message, {this.cause});
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => 'TtsException: $message';
 }
