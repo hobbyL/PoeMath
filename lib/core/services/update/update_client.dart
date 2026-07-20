@@ -3,6 +3,7 @@
 // 层级：core/services/update
 // 职责：检查更新、下载 APK、SHA256 校验。
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,6 +12,8 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:poemath/core/services/update/update_models.dart';
+
+typedef TemporaryDirectoryProvider = Future<Directory> Function();
 
 /// 更新检查 URL 未配置时抛出。
 class UpdateConfigurationException implements Exception {
@@ -45,11 +48,15 @@ class UpdateCancelledException implements Exception {
 /// 下载取消令牌。
 class UpdateDownloadCancelToken {
   bool _isCancelled = false;
+  final Completer<void> _abortCompleter = Completer<void>();
 
   bool get isCancelled => _isCancelled;
+  Future<void> get abortTrigger => _abortCompleter.future;
 
   void cancel() {
+    if (_isCancelled) return;
     _isCancelled = true;
+    _abortCompleter.complete();
   }
 
   void throwIfCancelled() {
@@ -62,11 +69,26 @@ class UpdateClient {
   UpdateClient({
     required String updateUrl,
     http.Client? client,
+    Duration requestTimeout = const Duration(seconds: 30),
+    TemporaryDirectoryProvider? temporaryDirectoryProvider,
   })  : _updateUrl = updateUrl.trim(),
-        _client = client ?? http.Client();
+        _client = client ?? http.Client(),
+        _requestTimeout = requestTimeout,
+        _temporaryDirectoryProvider =
+            temporaryDirectoryProvider ?? getTemporaryDirectory {
+    if (requestTimeout <= Duration.zero) {
+      throw ArgumentError.value(
+        requestTimeout,
+        'requestTimeout',
+        '必须大于零',
+      );
+    }
+  }
 
   final String _updateUrl;
   final http.Client _client;
+  final Duration _requestTimeout;
+  final TemporaryDirectoryProvider _temporaryDirectoryProvider;
 
   /// 更新 URL 是否有效。
   bool get isConfigured {
@@ -77,10 +99,25 @@ class UpdateClient {
   /// 获取最新版本信息。
   Future<AppUpdateInfo> fetchLatest() async {
     final uri = _updateUri();
-    final response = await _client.get(
-      uri,
-      headers: const {'Accept': 'application/json'},
-    );
+    final http.Response response;
+    try {
+      final abortTrigger = Future<void>.delayed(_requestTimeout);
+      final request = http.AbortableRequest(
+        'GET',
+        uri,
+        abortTrigger: abortTrigger,
+      )..headers['Accept'] = 'application/json';
+      final streamedResponse = await _client.send(request).timeout(
+            _requestTimeout,
+          );
+      response = await http.Response.fromStream(streamedResponse).timeout(
+        _requestTimeout,
+      );
+    } on http.RequestAbortedException {
+      throw const UpdateException('检查更新超时');
+    } on TimeoutException {
+      throw const UpdateException('检查更新超时');
+    }
     final payload = _readPayload(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw UpdateException(
@@ -112,13 +149,41 @@ class UpdateClient {
       throw const UpdateException('安装包下载地址不正确');
     }
 
-    final request = http.Request('GET', uri);
-    final response = await _client.send(request);
+    cancelToken?.throwIfCancelled();
+    final timeoutAbortCompleter = Completer<void>();
+    final abortTrigger = cancelToken == null
+        ? timeoutAbortCompleter.future
+        : Future.any<void>([
+            cancelToken.abortTrigger,
+            timeoutAbortCompleter.future,
+          ]);
+    final request = http.AbortableRequest(
+      'GET',
+      uri,
+      abortTrigger: abortTrigger,
+    );
+    final http.StreamedResponse response;
+    try {
+      response = await _client.send(request).timeout(
+        _requestTimeout,
+        onTimeout: () {
+          if (!timeoutAbortCompleter.isCompleted) {
+            timeoutAbortCompleter.complete();
+          }
+          throw TimeoutException('等待安装包响应超时');
+        },
+      );
+    } on http.RequestAbortedException {
+      _throwDownloadInterrupted(cancelToken);
+    } on TimeoutException {
+      _throwDownloadInterrupted(cancelToken);
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw UpdateException('安装包下载失败', statusCode: response.statusCode);
     }
 
-    final directory = await getTemporaryDirectory();
+    cancelToken?.throwIfCancelled();
+    final directory = await _temporaryDirectoryProvider();
     final updateDirectory = Directory('${directory.path}/poemath_update');
     if (!await updateDirectory.exists()) {
       await updateDirectory.create(recursive: true);
@@ -134,23 +199,38 @@ class UpdateClient {
     var received = 0;
     final sink = file.openWrite();
     try {
-      await for (final chunk in response.stream) {
+      final responseStream = response.stream.timeout(
+        _requestTimeout,
+        onTimeout: (eventSink) {
+          if (!timeoutAbortCompleter.isCompleted) {
+            timeoutAbortCompleter.complete();
+          }
+          eventSink
+            ..addError(TimeoutException('安装包下载数据等待超时'))
+            ..close();
+        },
+      );
+      await for (final chunk in responseStream) {
         cancelToken?.throwIfCancelled();
         sink.add(chunk);
         received += chunk.length;
         onProgress?.call(received, total > 0 ? total : null);
       }
       cancelToken?.throwIfCancelled();
+      await sink.close();
     } on UpdateCancelledException {
-      await sink.close();
-      if (await file.exists()) await file.delete();
+      await _discardPartialFile(file, sink);
       rethrow;
+    } on http.RequestAbortedException {
+      await _discardPartialFile(file, sink);
+      _throwDownloadInterrupted(cancelToken);
+    } on TimeoutException {
+      await _discardPartialFile(file, sink);
+      _throwDownloadInterrupted(cancelToken);
     } catch (_) {
-      await sink.close();
-      if (await file.exists()) await file.delete();
+      await _discardPartialFile(file, sink);
       rethrow;
     }
-    await sink.close();
     onProgress?.call(received, total > 0 ? total : null);
     return file;
   }
@@ -204,5 +284,25 @@ class UpdateClient {
 
   bool _isSha256(String value) {
     return RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(value);
+  }
+
+  Never _throwDownloadInterrupted(UpdateDownloadCancelToken? cancelToken) {
+    if (cancelToken?.isCancelled ?? false) {
+      throw const UpdateCancelledException();
+    }
+    throw const UpdateException('安装包下载超时');
+  }
+
+  Future<void> _discardPartialFile(File file, IOSink sink) async {
+    try {
+      await sink.close();
+    } catch (_) {
+      // Preserve the download error while still attempting file cleanup.
+    }
+    try {
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      // Cleanup is best-effort; the original error remains actionable.
+    }
   }
 }
