@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/routing/page_transitions.dart';
+import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/webdav_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -184,6 +185,11 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       scaffold.showSnackBar(
         SnackBar(content: Text('恢复失败: ${e.message}')),
       );
+    } on BackupRestoreException catch (e) {
+      scaffold.clearSnackBars();
+      scaffold.showSnackBar(
+        SnackBar(content: Text('恢复失败: ${e.message}')),
+      );
     } on Exception catch (e) {
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
@@ -243,8 +249,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                               ? theme.colorScheme.primary
                               : theme.colorScheme.outline,
                           backgroundOpacity: selected ? 0.12 : 0.04,
-                          onTap: () =>
-                              setState(() => _selectedId = config.id),
+                          onTap: () => setState(() => _selectedId = config.id),
                           child: Row(
                             children: [
                               // 选中标记
@@ -261,13 +266,12 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                               // 配置信息
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       config.name,
-                                      style: theme.textTheme.titleSmall
-                                          ?.copyWith(
+                                      style:
+                                          theme.textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -276,10 +280,10 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                                     ),
                                     Text(
                                       config.url,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                        color: theme
-                                            .colorScheme.onSurfaceVariant,
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,

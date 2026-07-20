@@ -42,13 +42,11 @@ final formulaRepositoryProvider = Provider<FormulaRepository>((ref) {
 
 // ============ 动态数据 Repository ============
 
-final poemProgressRepositoryProvider =
-    Provider<PoemProgressRepository>((ref) {
+final poemProgressRepositoryProvider = Provider<PoemProgressRepository>((ref) {
   return PoemProgressRepository();
 });
 
-final poemFavoriteRepositoryProvider =
-    Provider<PoemFavoriteRepository>((ref) {
+final poemFavoriteRepositoryProvider = Provider<PoemFavoriteRepository>((ref) {
   return PoemFavoriteRepository();
 });
 
@@ -56,13 +54,11 @@ final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
   return ReviewRepository();
 });
 
-final mathMistakeRepositoryProvider =
-    Provider<MathMistakeRepository>((ref) {
+final mathMistakeRepositoryProvider = Provider<MathMistakeRepository>((ref) {
   return MathMistakeRepository();
 });
 
-final mathSessionRepositoryProvider =
-    Provider<MathSessionRepository>((ref) {
+final mathSessionRepositoryProvider = Provider<MathSessionRepository>((ref) {
   return MathSessionRepository();
 });
 
@@ -71,8 +67,7 @@ final formulaFavoriteRepositoryProvider =
   return FormulaFavoriteRepository();
 });
 
-final achievementRepositoryProvider =
-    Provider<AchievementRepository>((ref) {
+final achievementRepositoryProvider = Provider<AchievementRepository>((ref) {
   return AchievementRepository();
 });
 
@@ -107,13 +102,14 @@ final backupServiceProvider = Provider<BackupService>((ref) {
   return BackupService();
 });
 
-final secureCredentialStoreProvider =
-    Provider<SecureCredentialStore>((ref) {
+final secureCredentialStoreProvider = Provider<SecureCredentialStore>((ref) {
   return SecureCredentialStore();
 });
 
 final webDavServiceProvider = Provider<WebDavService>((ref) {
-  return WebDavService();
+  final service = WebDavService();
+  ref.onDispose(service.dispose);
+  return service;
 });
 
 final ttsServiceProvider = Provider<TtsService>((ref) {

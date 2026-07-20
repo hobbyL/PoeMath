@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:poemath/core/services/webdav_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/webdav_config.dart';
@@ -54,8 +55,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
     setState(() => _loadingCredentials = true);
     try {
       final settingsRepo = ref.read(settingsRepositoryProvider);
-      final full =
-          await settingsRepo.loadWebDavConfigWithCredentials(config);
+      final full = await settingsRepo.loadWebDavConfigWithCredentials(config);
       if (mounted) {
         _usernameController.text = full.username;
         _passwordController.text = full.password;
@@ -81,18 +81,35 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
 
     final config = _buildConfig();
     final webdav = ref.read(webDavServiceProvider);
-    final ok = await webdav.testConnection(config);
-
-    if (!mounted) return;
-    setState(() => _testing = false);
-
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(ok ? '连接成功 ✓' : '连接失败，请检查配置'),
-        backgroundColor: ok ? Theme.of(context).semantic.success : null,
-      ),
-    );
+    final scaffold = ScaffoldMessenger.of(context);
+    final successColor = Theme.of(context).semantic.success;
+    try {
+      final ok = await webdav.testConnection(config);
+      if (!mounted) return;
+      scaffold.clearSnackBars();
+      scaffold.showSnackBar(
+        SnackBar(
+          content: Text(ok ? '连接成功 ✓' : '连接失败，请检查配置'),
+          backgroundColor: ok ? successColor : null,
+        ),
+      );
+    } on WebDavException catch (error) {
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          SnackBar(content: Text('连接失败: ${error.message}')),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          SnackBar(content: Text('连接失败: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _testing = false);
+    }
   }
 
   Future<void> _save() async {
@@ -101,11 +118,23 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
 
     final config = _buildConfig();
     final settingsRepo = ref.read(settingsRepositoryProvider);
-    await settingsRepo.saveWebDavConfig(config);
-    ref.invalidate(settingsRepositoryProvider);
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      await settingsRepo.saveWebDavConfig(config);
+      ref.invalidate(settingsRepositoryProvider);
 
-    if (!mounted) return;
-    Navigator.pop(context, true);
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } on Object catch (error) {
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          SnackBar(content: Text('保存失败: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   WebDavConfig _buildConfig() {
@@ -159,9 +188,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
                 keyboardType: TextInputType.url,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return '请输入服务器地址';
-                  final uri = Uri.tryParse(v.trim());
-                  if (uri == null || !uri.hasScheme) return '请输入完整地址（含 http/https）';
-                  return null;
+                  return WebDavConfig.validateUrl(v);
                 },
               ),
               const SizedBox(height: SpacingTokens.md),
@@ -186,8 +213,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
                   prefixIcon: Icon(Icons.lock_outlined),
                 ),
                 obscureText: true,
-                validator: (v) =>
-                    v == null || v.isEmpty ? '请输入密码' : null,
+                validator: (v) => v == null || v.isEmpty ? '请输入密码' : null,
               ),
               const SizedBox(height: SpacingTokens.md),
 
@@ -228,9 +254,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
                   const SizedBox(width: SpacingTokens.md),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: _saving || _loadingCredentials
-                          ? null
-                          : _save,
+                      onPressed: _saving || _loadingCredentials ? null : _save,
                       icon: _saving
                           ? const SizedBox(
                               width: 16,
