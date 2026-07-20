@@ -248,6 +248,8 @@ class TtsService {
   Future<void> stop() async {
     _stopRequested = true;
     _isSpeaking = false;
+    // 页面离开时可能从未启动过引擎；无需触发平台通道。
+    if (!_initialized) return;
     await _runEngineOperation('停止朗读失败', _tts.stop);
   }
 

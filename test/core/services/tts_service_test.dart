@@ -227,4 +227,10 @@ void main() {
     expect(completed, isFalse);
     expect(service.isSpeaking, isFalse);
   });
+
+  test('未初始化时停止朗读不会调用平台引擎', () async {
+    await service.stop();
+
+    expect(engine.calls, isEmpty);
+  });
 }

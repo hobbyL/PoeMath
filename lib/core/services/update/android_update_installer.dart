@@ -28,22 +28,23 @@ class UpdateInstallException implements Exception {
 /// - 调用系统安装器安装 APK
 class AndroidUpdateInstaller {
   AndroidUpdateInstaller({
-    MethodChannel channel =
-        const MethodChannel('com.poemath.app/app_update'),
-  }) : _channel = channel;
+    MethodChannel channel = const MethodChannel('com.poemath.app/app_update'),
+    bool? isAndroid,
+  })  : _channel = channel,
+        _isAndroid = isAndroid ?? Platform.isAndroid;
 
   final MethodChannel _channel;
+  final bool _isAndroid;
 
   /// 当前平台是否支持应用内安装。
-  bool get isSupported => Platform.isAndroid;
+  bool get isSupported => _isAndroid;
 
   /// 获取当前安装的应用版本信息。
   Future<AppVersionInfo> getCurrentVersion() async {
     if (!isSupported) {
       throw const UpdateInstallException('当前平台不支持应用内安装更新');
     }
-    final value =
-        await _invokeRequired<Map<dynamic, dynamic>>('getAppVersion');
+    final value = await _invokeRequired<Map<dynamic, dynamic>>('getAppVersion');
     return AppVersionInfo.fromMap(value);
   }
 
@@ -52,8 +53,7 @@ class AndroidUpdateInstaller {
     if (!isSupported) {
       throw const UpdateInstallException('当前平台不支持读取安装包信息');
     }
-    final value =
-        await _invokeNullable<Object>('inspectApk', {'path': path});
+    final value = await _invokeNullable<Object>('inspectApk', {'path': path});
     if (value == null) return null;
     if (value is Map<dynamic, dynamic>) return AppVersionInfo.fromMap(value);
     throw const UpdateInstallException('安装包信息格式不正确');
