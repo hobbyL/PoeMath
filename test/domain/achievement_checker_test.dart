@@ -1,9 +1,12 @@
 // test/domain/achievement_checker_test.dart
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/domain/achievement_checker.dart';
+
+import '../helpers/hive_test_helper.dart';
 
 /// 构建一个最小化的检查上下文。
 AchievementCheckContext _ctx({
@@ -25,6 +28,31 @@ AchievementCheckContext _ctx({
 }
 
 void main() {
+  group('AchievementChecker persistence', () {
+    setUp(() async {
+      await setUpHiveForTesting();
+    });
+
+    tearDown(() async {
+      await tearDownHiveForTesting();
+    });
+
+    test('完成五轮复习后持久化并解锁复习成就', () async {
+      final repo = AchievementRepository();
+      final newlyUnlocked = await AchievementChecker(repo).check(
+        _ctx(completedReviewRounds: 5),
+      );
+
+      final achievement = repo.getById('review_complete_5');
+      expect(achievement, isNotNull);
+      expect(achievement!.isUnlocked, isTrue);
+      expect(
+        newlyUnlocked.map((item) => item.id),
+        contains('review_complete_5'),
+      );
+    });
+  });
+
   group('AchievementDefinitions', () {
     test('all definitions have unique IDs', () {
       final ids = AchievementDefinitions.all.map((d) => d.id).toSet();
@@ -57,9 +85,11 @@ void main() {
       final def =
           AchievementDefinitions.all.firstWhere((d) => d.id == 'streak_3');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(profileId: 'test', currentStreak: 3),
-        ),),
+        def.progressFn(
+          _ctx(
+            stats: UserStats(profileId: 'test', currentStreak: 3),
+          ),
+        ),
         1.0,
       );
     });
@@ -69,9 +99,11 @@ void main() {
       final def =
           AchievementDefinitions.all.firstWhere((d) => d.id == 'poems_10');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(profileId: 'test', poemsLearned: 10),
-        ),),
+        def.progressFn(
+          _ctx(
+            stats: UserStats(profileId: 'test', poemsLearned: 10),
+          ),
+        ),
         1.0,
       );
     });
@@ -80,9 +112,11 @@ void main() {
       final def =
           AchievementDefinitions.all.firstWhere((d) => d.id == 'poems_1000');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(profileId: 'test', poemsLearned: 500),
-        ),),
+        def.progressFn(
+          _ctx(
+            stats: UserStats(profileId: 'test', poemsLearned: 500),
+          ),
+        ),
         0.5,
       );
     });
@@ -92,9 +126,11 @@ void main() {
       final def =
           AchievementDefinitions.all.firstWhere((d) => d.id == 'math_100');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(profileId: 'test', mathTotalProblems: 100),
-        ),),
+        def.progressFn(
+          _ctx(
+            stats: UserStats(profileId: 'test', mathTotalProblems: 100),
+          ),
+        ),
         1.0,
       );
     });
@@ -104,13 +140,15 @@ void main() {
       final def = AchievementDefinitions.all
           .firstWhere((d) => d.id == 'math_accuracy_90');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(
-            profileId: 'test',
-            mathTotalProblems: 30,
-            mathTotalCorrect: 30,
+        def.progressFn(
+          _ctx(
+            stats: UserStats(
+              profileId: 'test',
+              mathTotalProblems: 30,
+              mathTotalCorrect: 30,
+            ),
           ),
-        ),),
+        ),
         0.0,
       );
     });
@@ -119,13 +157,15 @@ void main() {
       final def = AchievementDefinitions.all
           .firstWhere((d) => d.id == 'math_accuracy_90');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(
-            profileId: 'test',
-            mathTotalProblems: 100,
-            mathTotalCorrect: 90,
+        def.progressFn(
+          _ctx(
+            stats: UserStats(
+              profileId: 'test',
+              mathTotalProblems: 100,
+              mathTotalCorrect: 90,
+            ),
           ),
-        ),),
+        ),
         1.0,
       );
     });
@@ -135,24 +175,28 @@ void main() {
           .firstWhere((d) => d.id == 'math_accuracy_95');
       // 100 题虽然 100% 正确率也不够
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(
-            profileId: 'test',
-            mathTotalProblems: 100,
-            mathTotalCorrect: 100,
+        def.progressFn(
+          _ctx(
+            stats: UserStats(
+              profileId: 'test',
+              mathTotalProblems: 100,
+              mathTotalCorrect: 100,
+            ),
           ),
-        ),),
+        ),
         0.0,
       );
       // 200 题 95% 才行
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(
-            profileId: 'test',
-            mathTotalProblems: 200,
-            mathTotalCorrect: 190,
+        def.progressFn(
+          _ctx(
+            stats: UserStats(
+              profileId: 'test',
+              mathTotalProblems: 200,
+              mathTotalCorrect: 190,
+            ),
           ),
-        ),),
+        ),
         1.0,
       );
     });
@@ -188,12 +232,14 @@ void main() {
 
     // ======== 连击 ========
     test('math_combo_30 reaches 1.0 at 30 best streak', () {
-      final def = AchievementDefinitions.all
-          .firstWhere((d) => d.id == 'math_combo_30');
+      final def =
+          AchievementDefinitions.all.firstWhere((d) => d.id == 'math_combo_30');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(profileId: 'test', mathBestStreak: 30),
-        ),),
+        def.progressFn(
+          _ctx(
+            stats: UserStats(profileId: 'test', mathBestStreak: 30),
+          ),
+        ),
         1.0,
       );
     });
@@ -215,8 +261,8 @@ void main() {
     });
 
     test('math_hard_100 tracks hard mode total', () {
-      final def = AchievementDefinitions.all
-          .firstWhere((d) => d.id == 'math_hard_100');
+      final def =
+          AchievementDefinitions.all.firstWhere((d) => d.id == 'math_hard_100');
       expect(def.progressFn(_ctx(hardModeTotalProblems: 50)), 0.5);
       expect(def.progressFn(_ctx(hardModeTotalProblems: 100)), 1.0);
     });
@@ -233,7 +279,10 @@ void main() {
     test('review_complete_5 tracks completed rounds', () {
       final def = AchievementDefinitions.all
           .firstWhere((d) => d.id == 'review_complete_5');
-      expect(def.progressFn(_ctx(completedReviewRounds: 3)), closeTo(0.6, 0.01));
+      expect(
+        def.progressFn(_ctx(completedReviewRounds: 3)),
+        closeTo(0.6, 0.01),
+      );
       expect(def.progressFn(_ctx(completedReviewRounds: 5)), 1.0);
     });
 
@@ -249,9 +298,11 @@ void main() {
       final def =
           AchievementDefinitions.all.firstWhere((d) => d.id == 'stars_50');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(profileId: 'test', totalStars: 50),
-        ),),
+        def.progressFn(
+          _ctx(
+            stats: UserStats(profileId: 'test', totalStars: 50),
+          ),
+        ),
         1.0,
       );
     });
@@ -260,9 +311,11 @@ void main() {
       final def =
           AchievementDefinitions.all.firstWhere((d) => d.id == 'level_3');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(profileId: 'test', level: 3),
-        ),),
+        def.progressFn(
+          _ctx(
+            stats: UserStats(profileId: 'test', level: 3),
+          ),
+        ),
         1.0,
       );
     });
@@ -271,9 +324,11 @@ void main() {
       final def =
           AchievementDefinitions.all.firstWhere((d) => d.id == 'streak_3');
       expect(
-        def.progressFn(_ctx(
-          stats: UserStats(profileId: 'test', currentStreak: 100),
-        ),),
+        def.progressFn(
+          _ctx(
+            stats: UserStats(profileId: 'test', currentStreak: 100),
+          ),
+        ),
         1.0,
       );
     });
