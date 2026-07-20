@@ -146,6 +146,51 @@ void main() {
       expect(progress.status, LearningStatus.reviewing);
     });
 
+    test('recordRecitation 记录完成模式对应的掌握等级', () async {
+      final progress = await repo.recordRecitation('poem_recite', level: 3);
+
+      expect(progress.status, LearningStatus.learning);
+      expect(progress.studyCount, 1);
+      expect(progress.masteryLevel, 3);
+      expect(repo.get('poem_recite')!.masteryLevel, 3);
+    });
+
+    test('recordRecitation 重练较低等级时不降低历史最高等级', () async {
+      await repo.recordRecitation('poem_recite', level: 4);
+      final progress = await repo.recordRecitation('poem_recite', level: 2);
+
+      expect(progress.studyCount, 2);
+      expect(progress.masteryLevel, 4);
+    });
+
+    test('recordRecitation 不覆盖测试通过等级 5', () async {
+      await repo.save(PoemProgress(
+        poemId: 'poem_quiz_passed',
+        profileId: ProfileScope.currentId,
+        status: LearningStatus.reviewing,
+        masteryLevel: 5,
+      ),);
+
+      final progress = await repo.recordRecitation(
+        'poem_quiz_passed',
+        level: 4,
+      );
+
+      expect(progress.status, LearningStatus.reviewing);
+      expect(progress.masteryLevel, 5);
+    });
+
+    test('recordRecitation 拒绝 1-4 之外的等级', () async {
+      expect(
+        () => repo.recordRecitation('poem_invalid', level: 0),
+        throwsRangeError,
+      );
+      expect(
+        () => repo.recordRecitation('poem_invalid', level: 5),
+        throwsRangeError,
+      );
+    });
+
     test('delete 删除指定进度', () async {
       await repo.save(PoemProgress(
         poemId: 'poem_del',

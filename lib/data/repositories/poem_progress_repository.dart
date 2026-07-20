@@ -60,6 +60,24 @@ class PoemProgressRepository {
 
   /// 记录一次学习
   Future<PoemProgress> recordStudy(String poemId) async {
+    return _recordStudy(poemId);
+  }
+
+  /// 记录完成一次背诵，并保留历史最高背诵等级（1-4）。
+  Future<PoemProgress> recordRecitation(
+    String poemId, {
+    required int level,
+  }) async {
+    if (level < 1 || level > 4) {
+      throw RangeError.range(level, 1, 4, 'level');
+    }
+    return _recordStudy(poemId, recitationLevel: level);
+  }
+
+  Future<PoemProgress> _recordStudy(
+    String poemId, {
+    int? recitationLevel,
+  }) async {
     var progress = get(poemId);
     progress ??= PoemProgress(
       poemId: poemId,
@@ -71,6 +89,10 @@ class PoemProgressRepository {
     progress.lastStudiedAt = DateTime.now();
     if (progress.status == LearningStatus.notStarted) {
       progress.status = LearningStatus.learning;
+    }
+    if (recitationLevel != null &&
+        recitationLevel > progress.masteryLevel) {
+      progress.masteryLevel = recitationLevel;
     }
     await save(progress);
     return progress;

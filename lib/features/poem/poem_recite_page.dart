@@ -20,14 +20,15 @@ import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 /// 背诵难度级别。
 enum ReciteLevel {
-  easy('简单', '每句填 1 字'),
-  medium('中等', '每句填一半'),
-  hard('困难', '每句全填'),
-  dictation('默写', '键盘输入全文');
+  easy('简单', '每句填 1 字', 1),
+  medium('中等', '每句填一半', 2),
+  hard('困难', '每句全填', 3),
+  dictation('默写', '键盘输入全文', 4);
 
-  const ReciteLevel(this.label, this.desc);
+  const ReciteLevel(this.label, this.desc, this.masteryLevel);
   final String label;
   final String desc;
+  final int masteryLevel;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -295,7 +296,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   Future<void> _onAllLinesComplete() async {
     // 记录学习
     final progressRepo = ref.read(poemProgressRepoProvider);
-    await progressRepo.recordStudy(widget.poemId);
+    await progressRepo.recordRecitation(
+      widget.poemId,
+      level: _level.masteryLevel,
+    );
     ref.invalidate(poemProgressProvider(widget.poemId));
 
     final statsRepo = ref.read(userStatsRepoProvider);
