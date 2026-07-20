@@ -46,6 +46,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   bool _allowResultPop = false;
   bool _isFinishing = false;
   int _starsEarned = 0;
+  String? _activityId;
 
   @override
   void initState() {
@@ -136,6 +137,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     }
 
     setState(() {
+      _activityId =
+          'poem_quiz:${widget.poemId}:${DateTime.now().microsecondsSinceEpoch}';
       _session = QuizSession(
         poemId: widget.poemId,
         type: widget.quizType,
@@ -189,6 +192,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     if (mounted) setState(() {});
 
     final session = _session!;
+    final activityId = _activityId!;
     final stars = LearningRewardCalculator.calculateStars(
       activityType: LearningActivityType.poemQuiz,
       totalItems: session.questions.length,
@@ -206,9 +210,10 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       final learnedCount = progressRepo.learnedCount;
       await statsRepo.updatePoemStats(learned: learnedCount);
       if (stars > 0) {
-        await statsRepo.addStars(stars);
+        await statsRepo.addStars(stars, activityId: activityId);
       }
       await ref.read(checkInRepoProvider).updateToday(
+            activityId: activityId,
             addPoems: 1,
             addStars: stars,
             addDuration: session.elapsedSeconds,

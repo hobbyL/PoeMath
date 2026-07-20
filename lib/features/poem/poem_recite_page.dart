@@ -91,6 +91,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   int _linesCompleted = 0;
   bool _isComplete = false;
   DateTime _startTime = DateTime.now();
+  late String _activityId;
 
   // ── 默写模式 ──
   bool _showDictDiff = false;
@@ -99,6 +100,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   @override
   void initState() {
     super.initState();
+    _activityId = _newActivityId();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initPoem());
   }
 
@@ -296,6 +298,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
   Future<void> _onAllLinesComplete() async {
     final rewardStars = _calculateRewardStars();
+    final activityId = _activityId;
 
     // 记录学习
     final progressRepo = ref.read(poemProgressRepoProvider);
@@ -310,11 +313,12 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
     // 记录星星到全局统计
     if (rewardStars > 0) {
-      await statsRepo.addStars(rewardStars);
+      await statsRepo.addStars(rewardStars, activityId: activityId);
     }
 
     final checkInRepo = ref.read(checkInRepoProvider);
     await checkInRepo.updateToday(
+      activityId: activityId,
       addPoems: 1,
       addStars: rewardStars,
       addDuration: DateTime.now().difference(_startTime).inSeconds,
@@ -358,6 +362,11 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     );
   }
 
+  String _newActivityId() {
+    return 'poem_recitation:${widget.poemId}:'
+        '${DateTime.now().microsecondsSinceEpoch}';
+  }
+
   void _restart() {
     setState(() {
       _totalStars = 0;
@@ -366,6 +375,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _showDictDiff = false;
       _dictController.clear();
       _startTime = DateTime.now();
+      _activityId = _newActivityId();
       _setupLine(0);
     });
   }
@@ -379,6 +389,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _showDictDiff = false;
       _dictController.clear();
       _startTime = DateTime.now();
+      _activityId = _newActivityId();
       _setupLine(0);
     });
   }

@@ -104,6 +104,44 @@ void main() {
       expect(repo.getToday()!.poemCount, 5);
     });
 
+    test('updateToday 同一活动并发重放只汇总一次', () async {
+      await Future.wait([
+        repo.updateToday(
+          activityId: 'challenge-1',
+          addMathTotal: 10,
+          addMathCorrect: 9,
+          addStars: 2,
+          addDuration: 60,
+        ),
+        repo.updateToday(
+          activityId: 'challenge-1',
+          addMathTotal: 10,
+          addMathCorrect: 9,
+          addStars: 2,
+          addDuration: 60,
+        ),
+      ]);
+
+      final record = repo.getToday()!;
+      expect(record.mathTotalCount, 10);
+      expect(record.mathCorrectCount, 9);
+      expect(record.starsEarned, 2);
+      expect(record.durationSeconds, 60);
+    });
+
+    test('updateToday 不同活动分别汇总', () async {
+      for (final id in ['practice-1', 'practice-2']) {
+        await repo.updateToday(
+          activityId: id,
+          addMathTotal: 5,
+          addStars: 1,
+        );
+      }
+
+      expect(repo.getToday()!.mathTotalCount, 10);
+      expect(repo.getToday()!.starsEarned, 2);
+    });
+
     test('calculateStreak 无打卡返回 0', () {
       expect(repo.calculateStreak(), 0);
     });
@@ -167,7 +205,13 @@ void main() {
       await repo.checkInToday();
 
       expect(repo.getMonthlyCount(now.year, now.month), 1);
-      expect(repo.getMonthlyCount(now.year, now.month + 1 > 12 ? 1 : now.month + 1), 0);
+      expect(
+        repo.getMonthlyCount(
+          now.year,
+          now.month + 1 > 12 ? 1 : now.month + 1,
+        ),
+        0,
+      );
     });
 
     test('getByMonth 不包含其他 profile 的数据', () async {

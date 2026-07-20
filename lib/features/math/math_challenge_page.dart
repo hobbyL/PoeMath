@@ -80,6 +80,8 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   /// 记录实际用时
   DateTime? _startedAt;
 
+  late String _challengeId;
+
   /// 答对/错 反馈动画
   bool? _lastCorrect;
 
@@ -105,6 +107,8 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
 
   void _startChallenge() {
     setState(() {
+      _challengeId =
+          'math_challenge:${DateTime.now().microsecondsSinceEpoch}';
       _started = true;
       _remainingSeconds = _initialSeconds;
       _startedAt = DateTime.now();
@@ -324,7 +328,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final difficulty = settingsRepo.mathDifficulty;
 
     final record = ChallengeRecord(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: _challengeId,
       profileId: ProfileScope.currentId,
       mode: _challengeMode,
       score: _score,
@@ -343,12 +347,14 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final checkInRepo = ref.read(checkInRepoProvider);
     await repo.save(record);
     await statsRepo.settleMathChallenge(
+      activityId: record.id,
       problems: _totalAnswered,
       correct: _correctCount,
       bestStreak: _bestCombo,
       stars: stars,
     );
     await checkInRepo.updateToday(
+      activityId: record.id,
       addMathTotal: _totalAnswered,
       addMathCorrect: _correctCount,
       addStars: stars,

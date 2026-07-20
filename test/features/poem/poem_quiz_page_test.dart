@@ -42,7 +42,7 @@ class _ImmediateStatsRepository extends UserStatsRepository {
   UserStats get() => UserStats(profileId: 'test');
 
   @override
-  Future<void> addStars(int count) async {
+  Future<void> addStars(int count, {String? activityId}) async {
     starsAdded += count;
   }
 
@@ -55,6 +55,7 @@ class _ImmediateCheckInRepository extends CheckInRepository {
 
   @override
   Future<void> updateToday({
+    String? activityId,
     int? addPoems,
     int? addMathTotal,
     int? addMathCorrect,

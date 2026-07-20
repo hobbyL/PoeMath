@@ -333,9 +333,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final statsRepo = ref.read(userStatsRepoProvider);
     final levelBeforeReward = statsRepo.get().level;
     if (stars > 0) {
-      await statsRepo.addStars(stars);
+      await statsRepo.addStars(
+        stars,
+        activityId: 'math_practice:${session.id}',
+      );
     }
     await ref.read(checkInRepoProvider).updateToday(
+      activityId: 'math_practice:${session.id}',
       addMathTotal: problems.length,
       addMathCorrect: correctCount,
       addStars: stars,

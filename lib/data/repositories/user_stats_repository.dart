@@ -6,6 +6,7 @@
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/domain/level_calculator.dart';
 
 class UserStatsRepository {
@@ -37,11 +38,27 @@ class UserStatsRepository {
   }
 
   /// 增加星星，并同步更新由总星星数派生的等级。
-  Future<void> addStars(int count) async {
-    final stats = await getOrCreate();
-    stats.totalStars += count;
-    stats.level = LevelCalculator.calculate(stats.totalStars);
-    await stats.save();
+  Future<void> addStars(int count, {String? activityId}) async {
+    if (count < 0) {
+      throw RangeError.range(count, 0, null, 'count');
+    }
+
+    Future<void> add() async {
+      final stats = await getOrCreate();
+      stats.totalStars += count;
+      stats.level = LevelCalculator.calculate(stats.totalStars);
+      await stats.save();
+    }
+
+    if (activityId == null) {
+      await add();
+      return;
+    }
+    await ActivitySettlementLedger.runOnce(
+      channel: ActivitySettlementLedger.userStatsChannel,
+      activityId: activityId,
+      action: add,
+    );
   }
 
   /// 更新连续打卡
@@ -84,6 +101,7 @@ class UserStatsRepository {
 
   /// 一次性结算限时挑战的口算统计、连击、星星和等级。
   Future<UserStats> settleMathChallenge({
+    String? activityId,
     required int problems,
     required int correct,
     required int bestStreak,
@@ -102,17 +120,29 @@ class UserStatsRepository {
       throw RangeError.range(stars, 0, null, 'stars');
     }
 
-    final key = ProfileScope.key('stats');
-    final stats = HiveBoxes.userStats.get(key) ??
-        UserStats(profileId: ProfileScope.currentId);
-    stats.mathTotalProblems += problems;
-    stats.mathTotalCorrect += correct;
-    if (bestStreak > stats.mathBestStreak) {
-      stats.mathBestStreak = bestStreak;
+    Future<void> settle() async {
+      final key = ProfileScope.key('stats');
+      final stats = HiveBoxes.userStats.get(key) ??
+          UserStats(profileId: ProfileScope.currentId);
+      stats.mathTotalProblems += problems;
+      stats.mathTotalCorrect += correct;
+      if (bestStreak > stats.mathBestStreak) {
+        stats.mathBestStreak = bestStreak;
+      }
+      stats.totalStars += stars;
+      stats.level = LevelCalculator.calculate(stats.totalStars);
+      await HiveBoxes.userStats.put(key, stats);
     }
-    stats.totalStars += stars;
-    stats.level = LevelCalculator.calculate(stats.totalStars);
-    await HiveBoxes.userStats.put(key, stats);
-    return stats;
+
+    if (activityId == null) {
+      await settle();
+    } else {
+      await ActivitySettlementLedger.runOnce(
+        channel: ActivitySettlementLedger.userStatsChannel,
+        activityId: activityId,
+        action: settle,
+      );
+    }
+    return get();
   }
 }

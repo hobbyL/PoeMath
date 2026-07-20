@@ -6,6 +6,7 @@
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/check_in.dart';
+import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 
 class CheckInRepository {
   /// 日期格式化辅助
@@ -50,25 +51,38 @@ class CheckInRepository {
 
   /// 更新今日数据
   Future<void> updateToday({
+    String? activityId,
     int? addPoems,
     int? addMathTotal,
     int? addMathCorrect,
     int? addStars,
     int? addDuration,
   }) async {
-    final record = await _getOrCreateToday(isCheckedIn: false);
-    if (addPoems != null) {
-      record.poemCount += addPoems;
-      record.activitySources |= CheckIn.poemActivitySource;
+    Future<void> update() async {
+      final record = await _getOrCreateToday(isCheckedIn: false);
+      if (addPoems != null) {
+        record.poemCount += addPoems;
+        record.activitySources |= CheckIn.poemActivitySource;
+      }
+      if (addMathTotal != null) {
+        record.mathTotalCount += addMathTotal;
+        record.activitySources |= CheckIn.mathActivitySource;
+      }
+      if (addMathCorrect != null) record.mathCorrectCount += addMathCorrect;
+      if (addStars != null) record.starsEarned += addStars;
+      if (addDuration != null) record.durationSeconds += addDuration;
+      await record.save();
     }
-    if (addMathTotal != null) {
-      record.mathTotalCount += addMathTotal;
-      record.activitySources |= CheckIn.mathActivitySource;
+
+    if (activityId == null) {
+      await update();
+      return;
     }
-    if (addMathCorrect != null) record.mathCorrectCount += addMathCorrect;
-    if (addStars != null) record.starsEarned += addStars;
-    if (addDuration != null) record.durationSeconds += addDuration;
-    await record.save();
+    await ActivitySettlementLedger.runOnce(
+      channel: ActivitySettlementLedger.dailySummaryChannel,
+      activityId: activityId,
+      action: update,
+    );
   }
 
   /// 判断今日是否已打卡

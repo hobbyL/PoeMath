@@ -75,6 +75,22 @@ void main() {
       expect(stats.levelName, '榜眼');
     });
 
+    test('addStars 同一活动并发重放只奖励一次', () async {
+      await Future.wait([
+        repo.addStars(3, activityId: 'poem-quiz-1'),
+        repo.addStars(3, activityId: 'poem-quiz-1'),
+      ]);
+
+      expect(repo.get().totalStars, 3);
+    });
+
+    test('addStars 不同活动分别奖励', () async {
+      await repo.addStars(2, activityId: 'poem-quiz-1');
+      await repo.addStars(3, activityId: 'poem-quiz-2');
+
+      expect(repo.get().totalStars, 5);
+    });
+
     test('updateStreak 更新连续打卡', () async {
       await repo.getOrCreate();
       await repo.updateStreak(5);
@@ -157,6 +173,45 @@ void main() {
       );
 
       expect(repo.get().mathBestStreak, 20);
+    });
+
+    test('settleMathChallenge 同一活动并发重放只结算一次', () async {
+      await Future.wait([
+        repo.settleMathChallenge(
+          activityId: 'challenge-1',
+          problems: 10,
+          correct: 9,
+          bestStreak: 5,
+          stars: 2,
+        ),
+        repo.settleMathChallenge(
+          activityId: 'challenge-1',
+          problems: 10,
+          correct: 9,
+          bestStreak: 5,
+          stars: 2,
+        ),
+      ]);
+
+      final stats = repo.get();
+      expect(stats.mathTotalProblems, 10);
+      expect(stats.mathTotalCorrect, 9);
+      expect(stats.totalStars, 2);
+    });
+
+    test('settleMathChallenge 不同活动分别结算', () async {
+      for (final id in ['challenge-1', 'challenge-2']) {
+        await repo.settleMathChallenge(
+          activityId: id,
+          problems: 5,
+          correct: 4,
+          bestStreak: 3,
+          stars: 1,
+        );
+      }
+
+      expect(repo.get().mathTotalProblems, 10);
+      expect(repo.get().totalStars, 2);
     });
   });
 }
