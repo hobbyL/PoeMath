@@ -15,6 +15,7 @@ import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 /// 背诵难度级别。
@@ -91,6 +92,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
   // ── 默写模式 ──
   bool _showDictDiff = false;
+  bool _allowResultPop = false;
 
   @override
   void initState() {
@@ -384,6 +386,16 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     await _onAllLinesComplete();
   }
 
+  void _exitWithResult() {
+    if (_allowResultPop) return;
+    setState(() => _allowResultPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context).pop(PoemPracticeResult.recitationCompleted);
+      }
+    });
+  }
+
   // ─────────────────────────────────────────────────────────────
   // Build
   // ─────────────────────────────────────────────────────────────
@@ -399,21 +411,27 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(poem.title),
-      ),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: _isComplete
-                ? _buildResultCard(context)
-                : _level == ReciteLevel.dictation
-                    ? _buildDictation(context)
-                    : _buildCharSelect(context),
-          ),
-          ConfettiOverlay(controller: _celebrationCtrl),
-        ],
+    return PopScope<PoemPracticeResult>(
+      canPop: !_isComplete || _allowResultPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _isComplete) _exitWithResult();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(poem.title),
+        ),
+        body: Stack(
+          children: [
+            SafeArea(
+              child: _isComplete
+                  ? _buildResultCard(context)
+                  : _level == ReciteLevel.dictation
+                      ? _buildDictation(context)
+                      : _buildCharSelect(context),
+            ),
+            ConfettiOverlay(controller: _celebrationCtrl),
+          ],
+        ),
       ),
     );
   }
@@ -984,7 +1002,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: _exitWithResult,
                     icon: const Icon(Icons.arrow_back),
                     label: const Text('返回'),
                   ),

@@ -15,6 +15,7 @@ import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 class PoemReviewPage extends ConsumerWidget {
@@ -389,38 +390,45 @@ class PoemReviewPage extends ConsumerWidget {
     WidgetRef ref,
     List<ReviewSchedule> schedules,
   ) async {
+    var completedCount = 0;
     for (var i = 0; i < schedules.length; i++) {
       if (!context.mounted) break;
       final schedule = schedules[i];
       // 使用选择题模式进行复习
-      await _navigateAndComplete(
+      final didComplete = await _navigateAndComplete(
         context,
         ref,
         schedule,
         '${AppRoutes.poemQuizOf(schedule.poemId)}?type=choice',
       );
+      if (!didComplete) break;
+      completedCount++;
     }
 
     if (context.mounted) {
+      final message = completedCount == schedules.length
+          ? '今日复习已全部完成！'
+          : '已完成 $completedCount/${schedules.length} 首，剩余复习未记录';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('今日复习已全部完成！'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
   }
 
-  /// 导航到复习页面，返回后标记复习完成。
-  Future<void> _navigateAndComplete(
+  /// 导航到复习页面，仅在练习明确完成或测试通过时推进复习。
+  Future<bool> _navigateAndComplete(
     BuildContext context,
     WidgetRef ref,
     ReviewSchedule schedule,
     String route,
   ) async {
-    await context.push(route);
+    final result = await context.push<PoemPracticeResult>(route);
+    if (result?.completesReview != true || !context.mounted) return false;
 
-    // 返回后推进复习计划
+    // 明确完成后推进复习计划
     if (context.mounted) {
       final reviewRepo = ref.read(reviewRepoProvider);
       await reviewRepo.completeReview(schedule.poemId);
@@ -475,6 +483,7 @@ class PoemReviewPage extends ConsumerWidget {
         );
       }
     }
+    return true;
   }
 
   String _formatNextDate(ReviewSchedule schedule) {

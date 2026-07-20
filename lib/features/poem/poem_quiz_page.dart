@@ -17,6 +17,7 @@ import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/quiz/quiz_engine.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
@@ -41,6 +42,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   final _fillController = TextEditingController();
   final _fillFocusNode = FocusNode();
   late final CelebrationController _confettiController;
+  bool _allowResultPop = false;
 
   @override
   void initState() {
@@ -236,6 +238,20 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     if (mounted) setState(() {});
   }
 
+  void _exitWithResult() {
+    if (_allowResultPop) return;
+    final session = _session;
+    if (session == null || !session.isFinished) return;
+
+    setState(() => _allowResultPop = true);
+    final result = session.isPassed
+        ? PoemPracticeResult.quizPassed
+        : PoemPracticeResult.quizFailed;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).pop(result);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final poem = ref.watch(poemByIdProvider(widget.poemId));
@@ -257,17 +273,23 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
     final session = _session!;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.quizType.label} · ${poem.title}'),
-      ),
-      body: Stack(
-        children: [
-          session.isFinished
-              ? _buildResult(context, session)
-              : _buildQuestion(context, session, theme),
-          ConfettiOverlay(controller: _confettiController),
-        ],
+    return PopScope<PoemPracticeResult>(
+      canPop: !session.isFinished || _allowResultPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && session.isFinished) _exitWithResult();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('${widget.quizType.label} · ${poem.title}'),
+        ),
+        body: Stack(
+          children: [
+            session.isFinished
+                ? _buildResult(context, session)
+                : _buildQuestion(context, session, theme),
+            ConfettiOverlay(controller: _confettiController),
+          ],
+        ),
       ),
     );
   }
@@ -734,6 +756,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                     setState(() {
                       _session = null;
                       _answered = false;
+                      _allowResultPop = false;
                       _fillController.clear();
                     });
                     _initQuiz();
@@ -745,7 +768,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
               const SizedBox(width: SpacingTokens.md),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: _exitWithResult,
                   icon: const Icon(Icons.check),
                   label: const Text('完成'),
                 ),
