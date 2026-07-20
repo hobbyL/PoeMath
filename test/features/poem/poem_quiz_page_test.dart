@@ -8,10 +8,12 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/poem_progress.dart';
+import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/poem_progress_repository.dart';
+import 'package:poemath/data/repositories/review_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_quiz_page.dart';
@@ -34,14 +36,23 @@ class _BlockingPoemProgressRepository extends PoemProgressRepository {
 }
 
 class _ImmediateStatsRepository extends UserStatsRepository {
+  var starsAdded = 0;
+
   @override
   UserStats get() => UserStats(profileId: 'test');
+
+  @override
+  Future<void> addStars(int count) async {
+    starsAdded += count;
+  }
 
   @override
   Future<void> updatePoemStats({int? learned, int? mastered}) async {}
 }
 
 class _ImmediateCheckInRepository extends CheckInRepository {
+  var starsAdded = 0;
+
   @override
   Future<void> updateToday({
     int? addPoems,
@@ -49,7 +60,37 @@ class _ImmediateCheckInRepository extends CheckInRepository {
     int? addMathCorrect,
     int? addStars,
     int? addDuration,
-  }) async {}
+  }) async {
+    starsAdded += addStars ?? 0;
+  }
+}
+
+class _ImmediatePoemProgressRepository extends PoemProgressRepository {
+  @override
+  int get learnedCount => 1;
+
+  @override
+  Future<PoemProgress> recordStudy(String poemId) async {
+    return PoemProgress(
+      poemId: poemId,
+      profileId: 'test',
+      status: LearningStatus.learning,
+    );
+  }
+
+  @override
+  Future<void> save(PoemProgress progress) async {}
+}
+
+class _ExistingReviewRepository extends ReviewRepository {
+  @override
+  ReviewSchedule? get(String poemId) {
+    return ReviewSchedule(
+      poemId: poemId,
+      profileId: 'test',
+      nextReviewDate: DateTime.now(),
+    );
+  }
 }
 
 class _AlreadyUnlockedAchievementRepository extends AchievementRepository {
@@ -145,6 +186,69 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 3));
     await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  testWidgets('满分诗词测试统一奖励三颗星并写入今日汇总', (tester) async {
+    final poem = Poem(
+      id: 'quiz_reward',
+      title: '奖励测试诗',
+      author: '测试作者',
+      dynasty: '唐',
+      content: '第一句长长',
+      pinyin: '',
+      layer: 'core',
+      grade: 1,
+    );
+    await tester.runAsync(() async {
+      await HiveBoxes.settings.put('sound_enabled', false);
+      await HiveBoxes.settings.put('haptic_enabled', false);
+    });
+    final statsRepo = _ImmediateStatsRepository();
+    final checkInRepo = _ImmediateCheckInRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          poemByIdProvider('quiz_reward').overrideWith((ref) => poem),
+          poemProgressRepoProvider.overrideWith(
+            (ref) => _ImmediatePoemProgressRepository(),
+          ),
+          reviewRepoProvider.overrideWith(
+            (ref) => _ExistingReviewRepository(),
+          ),
+          checkInRepoProvider.overrideWith((ref) => checkInRepo),
+          userStatsRepoProvider.overrideWith((ref) => statsRepo),
+          achievementRepoProvider.overrideWith(
+            (ref) => _AlreadyUnlockedAchievementRepository(),
+          ),
+        ],
+        child: const MaterialApp(
+          home: PoemQuizPage(
+            poemId: 'quiz_reward',
+            quizType: QuizType.chooseDynasty,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    await tester.tap(find.text('唐'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    await tester.tap(find.text('查看结果'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+
+    expect(statsRepo.starsAdded, 3);
+    expect(checkInRepo.starsAdded, 3);
+    expect(find.text('获得 3 颗星星'), findsOneWidget);
+
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });

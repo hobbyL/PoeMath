@@ -16,6 +16,7 @@ import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -44,6 +45,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   late final CelebrationController _confettiController;
   bool _allowResultPop = false;
   bool _isFinishing = false;
+  int _starsEarned = 0;
 
   @override
   void initState() {
@@ -187,6 +189,12 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     if (mounted) setState(() {});
 
     final session = _session!;
+    final stars = LearningRewardCalculator.calculateStars(
+      activityType: LearningActivityType.poemQuiz,
+      totalItems: session.questions.length,
+      successfulItems: session.correctCount,
+    );
+    _starsEarned = stars;
     try {
       // 记录学习
       final progressRepo = ref.read(poemProgressRepoProvider);
@@ -197,8 +205,12 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       final statsRepo = ref.read(userStatsRepoProvider);
       final learnedCount = progressRepo.learnedCount;
       await statsRepo.updatePoemStats(learned: learnedCount);
+      if (stars > 0) {
+        await statsRepo.addStars(stars);
+      }
       await ref.read(checkInRepoProvider).updateToday(
             addPoems: 1,
+            addStars: stars,
             addDuration: session.elapsedSeconds,
           );
       ref.invalidate(learnedCountProvider);
@@ -726,6 +738,24 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                           .withValues(alpha: 0.2),
                     ),
                     _buildStatItem(context, timeText, '用时'),
+                  ],
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.star_rounded,
+                      size: 18,
+                      color: theme.colorScheme.secondary,
+                    ),
+                    const SizedBox(width: SpacingTokens.xs),
+                    Text(
+                      _starsEarned > 0 ? '获得 $_starsEarned 颗星星' : '本次未获得星星',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
                 if (session.isPassed) ...[

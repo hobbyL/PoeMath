@@ -14,6 +14,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -294,6 +295,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   }
 
   Future<void> _onAllLinesComplete() async {
+    final rewardStars = _calculateRewardStars();
+
     // 记录学习
     final progressRepo = ref.read(poemProgressRepoProvider);
     await progressRepo.recordRecitation(
@@ -306,14 +309,14 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     await statsRepo.updatePoemStats(learned: progressRepo.learnedCount);
 
     // 记录星星到全局统计
-    if (_totalStars > 0) {
-      await statsRepo.addStars(_totalStars);
+    if (rewardStars > 0) {
+      await statsRepo.addStars(rewardStars);
     }
 
     final checkInRepo = ref.read(checkInRepoProvider);
     await checkInRepo.updateToday(
       addPoems: 1,
-      addStars: _totalStars,
+      addStars: rewardStars,
       addDuration: DateTime.now().difference(_startTime).inSeconds,
     );
 
@@ -343,6 +346,16 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
     _celebrationCtrl.play();
     setState(() => _isComplete = true);
+  }
+
+  int _calculateRewardStars() {
+    final maxQualityPoints =
+        _level == ReciteLevel.dictation ? 3 : _lines.length * 3;
+    return LearningRewardCalculator.calculateStars(
+      activityType: LearningActivityType.poemRecitation,
+      totalItems: maxQualityPoints,
+      successfulItems: _totalStars.clamp(0, maxQualityPoints),
+    );
   }
 
   void _restart() {
@@ -934,7 +947,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final theme = Theme.of(context);
     final elapsed = DateTime.now().difference(_startTime).inSeconds;
     final maxStars = _level == ReciteLevel.dictation ? 3 : _lines.length * 3;
-    final displayStars = _totalStars.clamp(0, 3);
+    final displayStars = _calculateRewardStars();
 
     return Center(
       child: SingleChildScrollView(

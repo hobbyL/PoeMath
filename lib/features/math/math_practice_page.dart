@@ -22,7 +22,7 @@ import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
-import 'package:poemath/domain/math_reward_calculator.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
@@ -302,9 +302,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final correctCount = ref.read(mathCorrectCountProvider);
     final duration = DateTime.now().difference(_startTime).inSeconds;
 
-    final stars = MathRewardCalculator.calculateStars(
-      totalProblems: problems.length,
-      correctCount: correctCount,
+    final stars = LearningRewardCalculator.calculateStars(
+      activityType: LearningActivityType.mathPractice,
+      totalItems: problems.length,
+      successfulItems: correctCount,
     );
 
     // 保存 session

@@ -24,7 +24,7 @@ import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
-import 'package:poemath/domain/math_reward_calculator.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/math_engine/math_engine.dart';
@@ -245,9 +245,10 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final elapsed = _startedAt != null
         ? DateTime.now().difference(_startedAt!).inSeconds
         : _initialSeconds;
-    final stars = MathRewardCalculator.calculateStars(
-      totalProblems: _totalAnswered,
-      correctCount: _correctCount,
+    final stars = LearningRewardCalculator.calculateStars(
+      activityType: LearningActivityType.mathChallenge,
+      totalItems: _totalAnswered,
+      successfulItems: _correctCount,
     );
     final statsRepo = ref.read(userStatsRepoProvider);
     final levelBeforeReward = statsRepo.get().level;
