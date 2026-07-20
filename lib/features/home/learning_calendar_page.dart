@@ -246,7 +246,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
   /// 活跃等级：0=无，1=少量，2=中等，3=活跃，4=非常活跃
   int _activityLevel(CheckIn? checkIn) {
     if (checkIn == null) return 0;
-    final total = checkIn.poemCount + checkIn.mathCorrectCount;
+    final total = checkIn.poemCount + checkIn.legacyCompatibleMathTotalCount;
     if (total == 0) return 0;
     if (total <= 3) return 1;
     if (total <= 10) return 2;
@@ -328,8 +328,9 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
                 _buildDetailRow(
                   theme,
                   Icons.calculate_rounded,
-                  '口算正确',
-                  '${checkIn.mathCorrectCount} 题',
+                  '口算答题',
+                  '${checkIn.mathCorrectCount}/'
+                      '${checkIn.legacyCompatibleMathTotalCount} 题',
                   theme.colorScheme.secondary,
                 ),
                 const SizedBox(height: SpacingTokens.sm),

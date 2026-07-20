@@ -21,6 +21,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/math_engine/math_engine.dart';
 import 'package:poemath/math_engine/models/answer_judgement.dart';
@@ -225,7 +226,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   }
 
   /// 保存挑战记录到 Hive
-  void _saveRecord() {
+  Future<void> _saveRecord() async {
     final grade = ref.read(mathGradeProvider);
     final semester = ref.read(mathSemesterProvider);
     final settingsRepo = ref.read(settingsRepositoryProvider);
@@ -250,7 +251,14 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     );
 
     final repo = ref.read(challengeRecordRepoProvider);
-    repo.save(record);
+    final checkInRepo = ref.read(checkInRepoProvider);
+    await repo.save(record);
+    await checkInRepo.updateToday(
+      addMathTotal: _totalAnswered,
+      addMathCorrect: _correctCount,
+      addDuration: elapsed,
+    );
+    if (mounted) ref.invalidate(todayCheckInProvider);
   }
 
   @override

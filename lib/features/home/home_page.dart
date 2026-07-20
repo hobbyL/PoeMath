@@ -225,12 +225,6 @@ class HomePage extends ConsumerWidget {
                 final checkInRepo = ref.read(checkInRepoProvider);
                 await checkInRepo.checkInToday();
 
-                // 更新打卡的实际数据
-                await checkInRepo.updateToday(
-                  addPoems: todayPoems,
-                  addMathCorrect: todayMath,
-                );
-
                 // 更新连续打卡天数到 UserStats
                 final newStreak = checkInRepo.calculateStreak();
                 final statsRepo = ref.read(userStatsRepoProvider);

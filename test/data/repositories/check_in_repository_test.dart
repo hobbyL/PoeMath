@@ -30,6 +30,27 @@ void main() {
       expect(repo.isCheckedInToday(), isFalse);
     });
 
+    test('updateToday 创建活动记录但不自动打卡', () async {
+      await repo.updateToday(addPoems: 1, addDuration: 30);
+
+      final record = repo.getToday()!;
+      expect(record.hasActivitySummary, isTrue);
+      expect(record.isCheckedIn, isFalse);
+      expect(repo.isCheckedInToday(), isFalse);
+      expect(repo.calculateStreak(), 0);
+    });
+
+    test('checkInToday 将已有活动记录标记为已打卡并保留数据', () async {
+      await repo.updateToday(addPoems: 2, addStars: 3);
+
+      final record = await repo.checkInToday();
+
+      expect(record.isCheckedIn, isTrue);
+      expect(record.poemCount, 2);
+      expect(record.starsEarned, 3);
+      expect(repo.isCheckedInToday(), isTrue);
+    });
+
     test('checkInToday 创建打卡记录', () async {
       final record = await repo.checkInToday();
       expect(record.profileId, 'default');
@@ -49,6 +70,7 @@ void main() {
       await repo.checkInToday();
       await repo.updateToday(
         addPoems: 3,
+        addMathTotal: 12,
         addMathCorrect: 10,
         addStars: 5,
         addDuration: 600,
@@ -56,9 +78,23 @@ void main() {
 
       final record = repo.getToday()!;
       expect(record.poemCount, 3);
+      expect(record.mathTotalCount, 12);
       expect(record.mathCorrectCount, 10);
+      expect(record.legacyCompatibleMathTotalCount, 12);
       expect(record.starsEarned, 5);
       expect(record.durationSeconds, 600);
+      expect(record.hasActivitySummary, isTrue);
+    });
+
+    test('旧版记录用 mathCorrectCount 兼容展示总题数', () {
+      final record = CheckIn(
+        profileId: 'default',
+        date: '2026-07-20',
+        mathCorrectCount: 10,
+      );
+
+      expect(record.hasActivitySummary, isFalse);
+      expect(record.legacyCompatibleMathTotalCount, 10);
     });
 
     test('updateToday 多次累加', () async {

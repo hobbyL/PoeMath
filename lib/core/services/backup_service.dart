@@ -255,9 +255,12 @@ class BackupService {
         'profileId': c.profileId,
         'date': c.date,
         'poemCount': c.poemCount,
+        'mathTotalCount': c.mathTotalCount,
         'mathCorrectCount': c.mathCorrectCount,
         'starsEarned': c.starsEarned,
         'durationSeconds': c.durationSeconds,
+        'isCheckedIn': c.isCheckedIn,
+        'activitySources': c.activitySources,
       };
     }).toList();
   }
@@ -457,9 +460,12 @@ class BackupService {
         profileId: m['profileId'] as String,
         date: m['date'] as String,
         poemCount: m['poemCount'] as int? ?? 0,
+        mathTotalCount: m['mathTotalCount'] as int? ?? 0,
         mathCorrectCount: m['mathCorrectCount'] as int? ?? 0,
         starsEarned: m['starsEarned'] as int? ?? 0,
         durationSeconds: m['durationSeconds'] as int? ?? 0,
+        isCheckedIn: m['isCheckedIn'] as bool? ?? true,
+        activitySources: m['activitySources'] as int? ?? 0,
       );
       await box.put('${obj.profileId}_${obj.date}', obj);
     }

@@ -23,6 +23,15 @@ class CheckInRepository {
 
   /// 记录今日打卡（创建或更新）
   Future<CheckIn> checkInToday() async {
+    final record = await _getOrCreateToday(isCheckedIn: true);
+    if (!record.isCheckedIn) {
+      record.isCheckedIn = true;
+      await record.save();
+    }
+    return record;
+  }
+
+  Future<CheckIn> _getOrCreateToday({required bool isCheckedIn}) async {
     final now = DateTime.now();
     final dateStr = _dateKey(now);
     final key = ProfileScope.key(dateStr);
@@ -32,6 +41,7 @@ class CheckInRepository {
       record = CheckIn(
         profileId: ProfileScope.currentId,
         date: dateStr,
+        isCheckedIn: isCheckedIn,
       );
       await HiveBoxes.checkIns.put(key, record);
     }
@@ -41,12 +51,20 @@ class CheckInRepository {
   /// 更新今日数据
   Future<void> updateToday({
     int? addPoems,
+    int? addMathTotal,
     int? addMathCorrect,
     int? addStars,
     int? addDuration,
   }) async {
-    final record = await checkInToday();
-    if (addPoems != null) record.poemCount += addPoems;
+    final record = await _getOrCreateToday(isCheckedIn: false);
+    if (addPoems != null) {
+      record.poemCount += addPoems;
+      record.activitySources |= CheckIn.poemActivitySource;
+    }
+    if (addMathTotal != null) {
+      record.mathTotalCount += addMathTotal;
+      record.activitySources |= CheckIn.mathActivitySource;
+    }
     if (addMathCorrect != null) record.mathCorrectCount += addMathCorrect;
     if (addStars != null) record.starsEarned += addStars;
     if (addDuration != null) record.durationSeconds += addDuration;
@@ -54,7 +72,7 @@ class CheckInRepository {
   }
 
   /// 判断今日是否已打卡
-  bool isCheckedInToday() => getToday() != null;
+  bool isCheckedInToday() => getToday()?.isCheckedIn ?? false;
 
   /// 计算连续打卡天数（往回数）
   int calculateStreak() {
@@ -62,11 +80,11 @@ class CheckInRepository {
     var date = DateTime.now();
 
     // 今天没打卡的话，从昨天开始数
-    if (getByDate(date) == null) {
+    if (getByDate(date)?.isCheckedIn != true) {
       date = date.subtract(const Duration(days: 1));
     }
 
-    while (getByDate(date) != null) {
+    while (getByDate(date)?.isCheckedIn == true) {
       streak++;
       date = date.subtract(const Duration(days: 1));
     }
@@ -87,6 +105,6 @@ class CheckInRepository {
 
   /// 当月打卡天数
   int getMonthlyCount(int year, int month) {
-    return getByMonth(year, month).length;
+    return getByMonth(year, month).where((c) => c.isCheckedIn).length;
   }
 }

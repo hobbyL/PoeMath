@@ -89,7 +89,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   int _totalStars = 0;
   int _linesCompleted = 0;
   bool _isComplete = false;
-  final _startTime = DateTime.now();
+  DateTime _startTime = DateTime.now();
 
   // ── 默写模式 ──
   bool _showDictDiff = false;
@@ -310,9 +310,17 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       await statsRepo.addStars(_totalStars);
     }
 
+    final checkInRepo = ref.read(checkInRepoProvider);
+    await checkInRepo.updateToday(
+      addPoems: 1,
+      addStars: _totalStars,
+      addDuration: DateTime.now().difference(_startTime).inSeconds,
+    );
+
     ref.invalidate(learnedCountProvider);
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayPoemCountProvider);
+    ref.invalidate(todayCheckInProvider);
 
     // 成就自动检查
     final newlyUnlocked = await checkAchievements(ref);
@@ -344,6 +352,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _isComplete = false;
       _showDictDiff = false;
       _dictController.clear();
+      _startTime = DateTime.now();
       _setupLine(0);
     });
   }
@@ -356,6 +365,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _isComplete = false;
       _showDictDiff = false;
       _dictController.clear();
+      _startTime = DateTime.now();
       _setupLine(0);
     });
   }

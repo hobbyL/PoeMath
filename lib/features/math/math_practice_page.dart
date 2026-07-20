@@ -333,6 +333,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     if (stars > 0) {
       await statsRepo.addStars(stars);
     }
+    await ref.read(checkInRepoProvider).updateToday(
+      addMathTotal: problems.length,
+      addMathCorrect: correctCount,
+      addStars: stars,
+      addDuration: duration,
+    );
 
     // addStars 会同步重算等级；页面仅负责展示升级反馈。
     final updatedStats = statsRepo.get();
@@ -353,6 +359,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     // 刷新首页统计 providers
     ref.invalidate(userStatsProvider);
+    ref.invalidate(todayCheckInProvider);
     ref.invalidate(todayMathCountProvider);
     ref.invalidate(unlockedAchievementsCountProvider);
     ref.invalidate(recentSessionsProvider);

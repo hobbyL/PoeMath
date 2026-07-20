@@ -108,8 +108,13 @@ void main() {
         profileId: 'default',
         date: '2026-07-13',
         poemCount: 2,
+        mathTotalCount: 12,
         mathCorrectCount: 10,
         starsEarned: 5,
+        durationSeconds: 600,
+        isCheckedIn: false,
+        activitySources:
+            CheckIn.poemActivitySource | CheckIn.mathActivitySource,
       ),
     );
     await HiveBoxes.userStats.put(
@@ -135,7 +140,12 @@ void main() {
 
     final restoredCheckIn = HiveBoxes.checkIns.get('default_2026-07-13');
     expect(restoredCheckIn!.poemCount, equals(2));
+    expect(restoredCheckIn.mathTotalCount, equals(12));
     expect(restoredCheckIn.mathCorrectCount, equals(10));
+    expect(restoredCheckIn.starsEarned, equals(5));
+    expect(restoredCheckIn.durationSeconds, equals(600));
+    expect(restoredCheckIn.isCheckedIn, isFalse);
+    expect(restoredCheckIn.hasActivitySummary, isTrue);
   });
 
   test('恢复无效 JSON 应抛出 FormatException', () {

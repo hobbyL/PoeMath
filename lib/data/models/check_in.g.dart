@@ -23,13 +23,16 @@ class CheckInAdapter extends TypeAdapter<CheckIn> {
       mathCorrectCount: fields[3] as int,
       starsEarned: fields[4] as int,
       durationSeconds: fields[5] as int,
+      isCheckedIn: fields[6] == null ? true : fields[6] as bool,
+      mathTotalCount: fields[7] == null ? 0 : fields[7] as int,
+      activitySources: fields[8] == null ? 0 : fields[8] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, CheckIn obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.profileId)
       ..writeByte(1)
@@ -41,7 +44,13 @@ class CheckInAdapter extends TypeAdapter<CheckIn> {
       ..writeByte(4)
       ..write(obj.starsEarned)
       ..writeByte(5)
-      ..write(obj.durationSeconds);
+      ..write(obj.durationSeconds)
+      ..writeByte(6)
+      ..write(obj.isCheckedIn)
+      ..writeByte(7)
+      ..write(obj.mathTotalCount)
+      ..writeByte(8)
+      ..write(obj.activitySources);
   }
 
   @override
