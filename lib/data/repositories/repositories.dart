@@ -15,3 +15,4 @@ export 'achievement_repository.dart';
 export 'check_in_repository.dart';
 export 'user_stats_repository.dart';
 export 'settings_repository.dart';
+export 'learning_activity_repository.dart';

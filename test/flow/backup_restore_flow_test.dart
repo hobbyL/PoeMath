@@ -12,9 +12,11 @@ import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/challenge_record.dart';
+import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 
 import '../helpers/hive_test_helper.dart';
 
@@ -101,6 +103,70 @@ void main() {
     expect(restored.level, equals(3));
     expect(restored.mathTotalProblems, equals(200));
     expect(restored.mathTotalCorrect, equals(180));
+  });
+
+  test('备份并恢复逐次学习活动，旧备份缺失字段时兼容为空', () async {
+    final completedAt = DateTime(2026, 7, 20, 12);
+    final activity = LearningActivity(
+      id: 'poem_quiz:poem_1:1',
+      profileId: 'default',
+      activityType: LearningActivityType.poemQuiz.name,
+      totalItems: 5,
+      successfulItems: 5,
+      poemId: 'poem_1',
+      starsEarned: 3,
+      durationSeconds: 45,
+      completedAt: completedAt,
+    );
+    await HiveBoxes.learningActivities.put(
+      'default_${activity.id}',
+      activity,
+    );
+
+    final json = backupService.exportToJson();
+    await HiveBoxes.learningActivities.clear();
+    expect(await backupService.restoreFromJson(json), 1);
+
+    final restored = HiveBoxes.learningActivities.get('default_${activity.id}');
+    expect(restored, isNotNull);
+    expect(restored!.type, LearningActivityType.poemQuiz);
+    expect(restored.completedAt, completedAt);
+
+    final legacy = jsonDecode(json) as Map<String, dynamic>;
+    legacy.remove('learningActivities');
+    await backupService.restoreFromJson(jsonEncode(legacy));
+    expect(HiveBoxes.learningActivities, isEmpty);
+  });
+
+  test('恢复逐次学习活动时拒绝重复 ID 和未知类型', () async {
+    final activity = <String, dynamic>{
+      'id': 'duplicate',
+      'profileId': 'default',
+      'activityType': LearningActivityType.mathPractice.name,
+      'totalItems': 1,
+      'successfulItems': 1,
+      'poemId': null,
+      'starsEarned': 3,
+      'durationSeconds': 1,
+      'completedAt': DateTime(2026, 7, 20).toIso8601String(),
+    };
+    final duplicateBackup =
+        jsonDecode(backupService.exportToJson()) as Map<String, dynamic>;
+    duplicateBackup['learningActivities'] = [activity, activity];
+
+    expect(
+      () => backupService.restoreFromJson(jsonEncode(duplicateBackup)),
+      throwsA(isA<FormatException>()),
+    );
+
+    final unknownTypeBackup = Map<String, dynamic>.from(duplicateBackup);
+    unknownTypeBackup['learningActivities'] = [
+      {...activity, 'activityType': 'unknown'},
+    ];
+    expect(
+      () => backupService.restoreFromJson(jsonEncode(unknownTypeBackup)),
+      throwsA(isA<FormatException>()),
+    );
   });
 
   test('备份并恢复多种数据类型', () async {

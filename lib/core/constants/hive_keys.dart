@@ -47,6 +47,9 @@ class HiveKeys {
   /// 挑战记录 Box
   static const String challengeRecordBox = 'challenge_records';
 
+  /// 逐次学习活动事件 Box
+  static const String learningActivityBox = 'learning_activities';
+
   /// 设置 Box（KV 存储）
   static const String settingsBox = 'settings';
 

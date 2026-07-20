@@ -300,7 +300,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final grade = ref.read(mathGradeProvider);
     final problems = ref.read(mathProblemsProvider);
     final correctCount = ref.read(mathCorrectCountProvider);
-    final duration = DateTime.now().difference(_startTime).inSeconds;
+    final completedAt = DateTime.now();
+    final duration = completedAt.difference(_startTime).inSeconds;
 
     final stars = LearningRewardCalculator.calculateStars(
       activityType: LearningActivityType.mathPractice,
@@ -318,7 +319,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       correctCount: correctCount,
       durationSeconds: duration,
       starsEarned: stars,
-      finishedAt: DateTime.now(),
+      finishedAt: completedAt,
       semester: ref.read(mathSemesterProvider),
       difficulty: ref.read(settingsRepositoryProvider).mathDifficulty,
       problemsJson: jsonEncode(
@@ -328,6 +329,16 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     final repo = ref.read(mathSessionRepoProvider);
     await repo.save(session);
+    final activityId = 'math_practice:${session.id}';
+    await ref.read(learningActivityRepositoryProvider).record(
+          id: activityId,
+          activityType: LearningActivityType.mathPractice,
+          totalItems: problems.length,
+          successfulItems: correctCount,
+          starsEarned: stars,
+          durationSeconds: duration,
+          completedAt: completedAt,
+        );
 
     // 做题数和连对数已在 _persistProgress() 中逐题更新，只需添加星星
     final statsRepo = ref.read(userStatsRepoProvider);
@@ -335,16 +346,16 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     if (stars > 0) {
       await statsRepo.addStars(
         stars,
-        activityId: 'math_practice:${session.id}',
+        activityId: activityId,
       );
     }
     await ref.read(checkInRepoProvider).updateToday(
-      activityId: 'math_practice:${session.id}',
-      addMathTotal: problems.length,
-      addMathCorrect: correctCount,
-      addStars: stars,
-      addDuration: duration,
-    );
+          activityId: activityId,
+          addMathTotal: problems.length,
+          addMathCorrect: correctCount,
+          addStars: stars,
+          addDuration: duration,
+        );
 
     // addStars 会同步重算等级；页面仅负责展示升级反馈。
     final updatedStats = statsRepo.get();
@@ -469,92 +480,95 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
             ),
             child: Column(
               children: [
-            // 进度条
-            LinearProgressIndicator(
-              value: (currentIndex + 1) / problems.length,
-              backgroundColor:
-                  theme.colorScheme.primary.withValues(alpha: 0.1),
-              color: theme.colorScheme.primary,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            const SizedBox(height: SpacingTokens.md),
+                // 进度条
+                LinearProgressIndicator(
+                  value: (currentIndex + 1) / problems.length,
+                  backgroundColor:
+                      theme.colorScheme.primary.withValues(alpha: 0.1),
+                  color: theme.colorScheme.primary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                const SizedBox(height: SpacingTokens.md),
 
-            // 题目显示
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                    // 题目文本（竖式模式特殊展示）
-                    KeyedSubtree(
-                      key: ValueKey('q_$currentIndex'),
-                      child: (problem.mode == ProblemMode.vertical
-                              ? VerticalCalcWidget(
-                                  problem: problem,
-                                  showAnswer: _judgement != null,
-                                ) as Widget
-                              : MathText(
-                                  problem.problemText,
-                                  style: TypographyTokens.mathProblemStyle(
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ))
-                          .animate()
-                          .fadeIn(duration: 350.ms)
-                          .slideX(
-                            begin: 0.12,
-                            end: 0,
-                            duration: 350.ms,
-                            curve: Curves.easeOutCubic,
+                // 题目显示
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
                           ),
-                    ),
-                    const SizedBox(height: SpacingTokens.xl),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // 题目文本（竖式模式特殊展示）
+                              KeyedSubtree(
+                                key: ValueKey('q_$currentIndex'),
+                                child: (problem.mode == ProblemMode.vertical
+                                        ? VerticalCalcWidget(
+                                            problem: problem,
+                                            showAnswer: _judgement != null,
+                                          ) as Widget
+                                        : MathText(
+                                            problem.problemText,
+                                            style: TypographyTokens
+                                                .mathProblemStyle(
+                                              color:
+                                                  theme.colorScheme.onSurface,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ))
+                                    .animate()
+                                    .fadeIn(duration: 350.ms)
+                                    .slideX(
+                                      begin: 0.12,
+                                      end: 0,
+                                      duration: 350.ms,
+                                      curve: Curves.easeOutCubic,
+                                    ),
+                              ),
+                              const SizedBox(height: SpacingTokens.xl),
 
-                    // 判定反馈
-                    if (_judgement != null) ...[
-                      _buildJudgementFeedback(context)
-                          .animate()
-                          .fadeIn(duration: 300.ms)
-                          .scale(
-                            begin: const Offset(0.9, 0.9),
-                            end: const Offset(1, 1),
-                            duration: 300.ms,
-                            curve: Curves.easeOutBack,
-                          )
-                          .then()
-                          .shimmer(
-                            delay: 200.ms,
-                            duration: 600.ms,
-                            color: _judgement!.isCorrect
-                                ? theme.semantic.success.withValues(alpha: 0.3)
-                                : Colors.transparent,
+                              // 判定反馈
+                              if (_judgement != null) ...[
+                                _buildJudgementFeedback(context)
+                                    .animate()
+                                    .fadeIn(duration: 300.ms)
+                                    .scale(
+                                      begin: const Offset(0.9, 0.9),
+                                      end: const Offset(1, 1),
+                                      duration: 300.ms,
+                                      curve: Curves.easeOutBack,
+                                    )
+                                    .then()
+                                    .shimmer(
+                                      delay: 200.ms,
+                                      duration: 600.ms,
+                                      color: _judgement!.isCorrect
+                                          ? theme.semantic.success
+                                              .withValues(alpha: 0.3)
+                                          : Colors.transparent,
+                                    ),
+                                const SizedBox(height: SpacingTokens.md),
+                                if (_judgement!.correctSteps.isNotEmpty)
+                                  _buildStepsSection(context),
+                              ],
+                            ],
                           ),
-                      const SizedBox(height: SpacingTokens.md),
-                      if (_judgement!.correctSteps.isNotEmpty)
-                        _buildStepsSection(context),
-                    ],
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
 
-            // 答案输入区
-            const SizedBox(height: SpacingTokens.sm),
-            _buildAnswerInput(context),
-          ],
-        ),
-      ),
-      ConfettiOverlay(controller: _confettiController),
+                // 答案输入区
+                const SizedBox(height: SpacingTokens.sm),
+                _buildAnswerInput(context),
+              ],
+            ),
+          ),
+          ConfettiOverlay(controller: _confettiController),
         ],
       ),
     );
@@ -684,8 +698,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                                 color: theme.colorScheme.onSurface,
                               ),
                             ),
-                            if (judgement
-                                .correctSteps[i].resultHint.isNotEmpty)
+                            if (judgement.correctSteps[i].resultHint.isNotEmpty)
                               Text(
                                 judgement.correctSteps[i].resultHint,
                                 style: theme.textTheme.bodySmall?.copyWith(
@@ -721,10 +734,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                 : '下一题',
           ),
         ),
-      )
-          .animate()
-          .fadeIn(duration: 250.ms)
-          .slideY(
+      ).animate().fadeIn(duration: 250.ms).slideY(
             begin: 0.2,
             end: 0,
             duration: 250.ms,

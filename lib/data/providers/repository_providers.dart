@@ -18,6 +18,7 @@ import 'package:poemath/data/repositories/formula_favorite_repository.dart';
 import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
+import 'package:poemath/data/repositories/learning_activity_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
@@ -77,6 +78,11 @@ final checkInRepositoryProvider = Provider<CheckInRepository>((ref) {
 
 final userStatsRepositoryProvider = Provider<UserStatsRepository>((ref) {
   return UserStatsRepository();
+});
+
+final learningActivityRepositoryProvider =
+    Provider<LearningActivityRepository>((ref) {
+  return LearningActivityRepository();
 });
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {

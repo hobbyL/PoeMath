@@ -16,11 +16,13 @@ import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/models/challenge_record.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 
 /// 备份数据版本号，用于兼容性检查。
 const int _backupVersion = 1;
@@ -41,6 +43,7 @@ class BackupService {
       'checkIns': _exportCheckIns(),
       'userStats': _exportUserStats(),
       'challengeRecords': _exportChallengeRecords(),
+      'learningActivities': _exportLearningActivities(),
       'settings': _exportSettings(),
     };
     return const JsonEncoder.withIndent('  ').convert(data);
@@ -119,6 +122,9 @@ class BackupService {
     );
     count += await _restoreChallengeRecords(
       data['challengeRecords'] as List<dynamic>? ?? [],
+    );
+    count += await _restoreLearningActivities(
+      data['learningActivities'] as List<dynamic>? ?? [],
     );
     if (data.containsKey('settings')) {
       await _restoreSettings(data['settings'] as Map<String, dynamic>);
@@ -291,6 +297,22 @@ class BackupService {
         'durationSeconds': r.durationSeconds,
         'createdAt': r.createdAt.toIso8601String(),
         'starsEarned': r.starsEarned,
+      };
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _exportLearningActivities() {
+    return HiveBoxes.learningActivities.values.map((activity) {
+      return <String, dynamic>{
+        'id': activity.id,
+        'profileId': activity.profileId,
+        'activityType': activity.activityType,
+        'totalItems': activity.totalItems,
+        'successfulItems': activity.successfulItems,
+        'poemId': activity.poemId,
+        'starsEarned': activity.starsEarned,
+        'durationSeconds': activity.durationSeconds,
+        'completedAt': activity.completedAt.toIso8601String(),
       };
     }).toList();
   }
@@ -512,6 +534,27 @@ class BackupService {
     return items.length;
   }
 
+  Future<int> _restoreLearningActivities(List<dynamic> items) async {
+    final box = HiveBoxes.learningActivities;
+    await box.clear();
+    for (final item in items) {
+      final m = item as Map<String, dynamic>;
+      final activity = LearningActivity(
+        id: m['id'] as String,
+        profileId: m['profileId'] as String,
+        activityType: m['activityType'] as String,
+        totalItems: m['totalItems'] as int,
+        successfulItems: m['successfulItems'] as int,
+        poemId: m['poemId'] as String?,
+        starsEarned: m['starsEarned'] as int,
+        durationSeconds: m['durationSeconds'] as int,
+        completedAt: DateTime.parse(m['completedAt'] as String),
+      );
+      await box.put('${activity.profileId}_${activity.id}', activity);
+    }
+    return items.length;
+  }
+
   Future<void> _restoreSettings(Map<String, dynamic> items) async {
     final box = HiveBoxes.settings;
     // 备份包含完整 settings 时替换旧键，确保恢复和回滚都是精确快照。
@@ -562,6 +605,8 @@ class BackupService {
     _validateList(data, 'checkIns', _validateCheckIn);
     _validateList(data, 'userStats', _validateUserStats);
     _validateList(data, 'challengeRecords', _validateChallengeRecord);
+    _validateList(data, 'learningActivities', _validateLearningActivity);
+    _validateUniqueLearningActivityIds(data);
 
     if (data.containsKey('settings')) {
       final settings = data['settings'];
@@ -790,6 +835,69 @@ class BackupService {
     }
     _optionalNonNegativeInt(item, 'starsEarned', path);
     _validateOptionalDate(item, 'createdAt', path);
+  }
+
+  void _validateLearningActivity(Map<String, dynamic> item, String path) {
+    _requiredString(item, 'id', path);
+    _requiredString(item, 'profileId', path);
+    final activityType = _requiredString(item, 'activityType', path);
+    final allowedTypes =
+        LearningActivityType.values.map((type) => type.name).toSet();
+    if (!allowedTypes.contains(activityType)) {
+      _invalidField('$path.activityType', '不是受支持的枚举值');
+    }
+
+    final totalItems = _requiredInt(item, 'totalItems', path);
+    final successfulItems = _requiredInt(item, 'successfulItems', path);
+    final starsEarned = _requiredInt(item, 'starsEarned', path);
+    final durationSeconds = _requiredInt(item, 'durationSeconds', path);
+    if (totalItems < 0) {
+      _invalidField('$path.totalItems', '不能为负数');
+    }
+    if (successfulItems < 0 || successfulItems > totalItems) {
+      _invalidField('$path.successfulItems', '必须介于 0 和总数之间');
+    }
+    if (starsEarned < 0 || starsEarned > 3) {
+      _invalidField('$path.starsEarned', '必须介于 0 和 3 之间');
+    }
+    if (durationSeconds < 0) {
+      _invalidField('$path.durationSeconds', '不能为负数');
+    }
+
+    _optionalNullableString(item, 'poemId', path);
+    final poemId = item['poemId'];
+    if (poemId is String && poemId.isEmpty) {
+      _invalidField('$path.poemId', '不能是空字符串');
+    }
+    final requiresPoem =
+        activityType == LearningActivityType.poemRecitation.name ||
+            activityType == LearningActivityType.poemQuiz.name ||
+            activityType == LearningActivityType.readAlong.name;
+    if (requiresPoem && poemId is! String) {
+      _invalidField('$path.poemId', '诗词活动必须提供诗词 ID');
+    }
+
+    final completedAt = item['completedAt'];
+    if (completedAt is! String || DateTime.tryParse(completedAt) == null) {
+      _invalidField('$path.completedAt', '必须是有效的 ISO 日期字符串');
+    }
+  }
+
+  void _validateUniqueLearningActivityIds(Map<String, dynamic> data) {
+    final activities = data['learningActivities'];
+    if (activities is! List<Object?>) return;
+
+    final keys = <String>{};
+    for (var index = 0; index < activities.length; index++) {
+      final activity = activities[index] as Map<Object?, Object?>;
+      final key = '${activity['profileId']}\u0000${activity['id']}';
+      if (!keys.add(key)) {
+        _invalidField(
+          'learningActivities[$index].id',
+          '同一用户下活动 ID 重复',
+        );
+      }
+    }
   }
 
   void _validateJsonObject(Map<Object?, Object?> object, String path) {

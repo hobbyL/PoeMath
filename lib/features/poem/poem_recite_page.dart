@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
@@ -36,19 +37,63 @@ enum ReciteLevel {
 // 中文标点集合（不作为填空目标）
 // ─────────────────────────────────────────────────────────────────
 const _punctuation = {
-  '，', '。', '！', '？', '、', '；', '：',
-  '“', '”',
-  '‘', '’',
-  '（', '）', '《', '》', '【', '】', '…', '—', '　',
-  ',', '.', '!', '?', ':', ';', '"', "'", '(', ')', ' ',
+  '，',
+  '。',
+  '！',
+  '？',
+  '、',
+  '；',
+  '：',
+  '“',
+  '”',
+  '‘',
+  '’',
+  '（',
+  '）',
+  '《',
+  '》',
+  '【',
+  '】',
+  '…',
+  '—',
+  '　',
+  ',',
+  '.',
+  '!',
+  '?',
+  ':',
+  ';',
+  '"',
+  "'",
+  '(',
+  ')',
+  ' ',
 };
 
 bool _isPunctuation(String ch) => _punctuation.contains(ch);
 
 /// 当诗中唯一字不够 6 个候选时的兜底字池。
 const _fallbackPool = [
-  '山', '水', '风', '月', '花', '云', '雨', '春', '秋', '雪',
-  '天', '地', '日', '夜', '人', '心', '梦', '鸟', '树', '石',
+  '山',
+  '水',
+  '风',
+  '月',
+  '花',
+  '云',
+  '雨',
+  '春',
+  '秋',
+  '雪',
+  '天',
+  '地',
+  '日',
+  '夜',
+  '人',
+  '心',
+  '梦',
+  '鸟',
+  '树',
+  '石',
 ];
 
 class PoemRecitePage extends ConsumerStatefulWidget {
@@ -223,8 +268,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     }
 
     final blankPos = _blankPositions[_currentBlankIdx];
-    final correctChar =
-        _lines[_currentLineIndex].characters.toList()[blankPos];
+    final correctChar = _lines[_currentLineIndex].characters.toList()[blankPos];
 
     if (char == correctChar) {
       HapticFeedback.lightImpact();
@@ -297,6 +341,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   }
 
   Future<void> _onAllLinesComplete() async {
+    final completedAt = DateTime.now();
+    final duration = completedAt.difference(_startTime).inSeconds;
+    final maxQualityPoints = _maxQualityPoints;
+    final qualityPoints = _totalStars.clamp(0, maxQualityPoints);
     final rewardStars = _calculateRewardStars();
     final activityId = _activityId;
 
@@ -310,6 +358,16 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
     final statsRepo = ref.read(userStatsRepoProvider);
     await statsRepo.updatePoemStats(learned: progressRepo.learnedCount);
+    await ref.read(learningActivityRepositoryProvider).record(
+          id: activityId,
+          activityType: LearningActivityType.poemRecitation,
+          totalItems: maxQualityPoints,
+          successfulItems: qualityPoints,
+          poemId: widget.poemId,
+          starsEarned: rewardStars,
+          durationSeconds: duration,
+          completedAt: completedAt,
+        );
 
     // 记录星星到全局统计
     if (rewardStars > 0) {
@@ -321,7 +379,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       activityId: activityId,
       addPoems: 1,
       addStars: rewardStars,
-      addDuration: DateTime.now().difference(_startTime).inSeconds,
+      addDuration: duration,
     );
 
     ref.invalidate(learnedCountProvider);
@@ -352,13 +410,14 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     setState(() => _isComplete = true);
   }
 
+  int get _maxQualityPoints =>
+      _level == ReciteLevel.dictation ? 3 : _lines.length * 3;
+
   int _calculateRewardStars() {
-    final maxQualityPoints =
-        _level == ReciteLevel.dictation ? 3 : _lines.length * 3;
     return LearningRewardCalculator.calculateStars(
       activityType: LearningActivityType.poemRecitation,
-      totalItems: maxQualityPoints,
-      successfulItems: _totalStars.clamp(0, maxQualityPoints),
+      totalItems: _maxQualityPoints,
+      successfulItems: _totalStars.clamp(0, _maxQualityPoints),
     );
   }
 
@@ -528,9 +587,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
             TextButton.icon(
               onPressed: _toggleHint,
               icon: Icon(
-                _showHint
-                    ? Icons.lightbulb
-                    : Icons.lightbulb_outline,
+                _showHint ? Icons.lightbulb : Icons.lightbulb_outline,
                 size: 18,
               ),
               label: Text(_showHint ? '已显示提示' : '显示拼音提示'),
@@ -544,10 +601,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
               ),
-            )
-                .animate()
-                .fadeIn(duration: 300.ms)
-                .scale(
+            ).animate().fadeIn(duration: 300.ms).scale(
                   begin: const Offset(0.5, 0.5),
                   end: const Offset(1, 1),
                   duration: 300.ms,
@@ -658,8 +712,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
             max: (ReciteLevel.values.length - 1).toDouble(),
             divisions: ReciteLevel.values.length - 1,
             activeColor: theme.colorScheme.primary,
-            inactiveColor:
-                theme.colorScheme.primary.withValues(alpha: 0.2),
+            inactiveColor: theme.colorScheme.primary.withValues(alpha: 0.2),
             onChanged: (v) {
               final newLevel = ReciteLevel.values[v.round()];
               if (newLevel != _level) {
@@ -705,8 +758,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
           // 在活跃空白槽位上方显示拼音提示
           if (isActiveBlank && _showHint) {
-            final pinyin =
-                i < pinyinParts.length ? pinyinParts[i] : '';
+            final pinyin = i < pinyinParts.length ? pinyinParts[i] : '';
             if (pinyin.isNotEmpty && !_isPunctuation(pinyin)) {
               slot = Column(
                 mainAxisSize: MainAxisSize.min,
@@ -717,10 +769,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                       color: theme.colorScheme.tertiary,
                       fontWeight: FontWeight.w600,
                     ),
-                  )
-                      .animate()
-                      .fadeIn(duration: 300.ms)
-                      .slideY(
+                  ).animate().fadeIn(duration: 300.ms).slideY(
                         begin: 0.3,
                         end: 0,
                         duration: 300.ms,
@@ -745,8 +794,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
           displayChar,
           style: theme.textTheme.headlineSmall?.copyWith(
             color: color,
-            fontWeight:
-                isFilled ? FontWeight.bold : FontWeight.normal,
+            fontWeight: isFilled ? FontWeight.bold : FontWeight.normal,
             letterSpacing: 2,
             height: 2,
             fontFamilyFallback: TypographyTokens.serifFallback,
@@ -755,9 +803,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
         // 刚填入的字：缩放入场
         if (isFilled && _correctFlash) {
-          charWidget = charWidget
-              .animate()
-              .scale(
+          charWidget = charWidget.animate().scale(
                 begin: const Offset(1.3, 1.3),
                 end: const Offset(1, 1),
                 duration: 300.ms,
@@ -801,17 +847,15 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
           color: Colors.transparent,
           child: InkWell(
             onTap: () => _onCandidateTap(char),
-            borderRadius:
-                BorderRadius.circular(SpacingTokens.radiusMedium),
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
             child: AnimatedContainer(
               duration: 200.ms,
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer
-                    .withValues(alpha: 0.5),
-                borderRadius:
-                    BorderRadius.circular(SpacingTokens.radiusMedium),
+                color:
+                    theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
                 border: Border.all(
                   color: theme.colorScheme.primary.withValues(alpha: 0.2),
                 ),
@@ -886,9 +930,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
           const SizedBox(height: SpacingTokens.md),
           if (!_showDictDiff)
             FilledButton.icon(
-              onPressed: _dictController.text.trim().isEmpty
-                  ? null
-                  : _submitDictation,
+              onPressed:
+                  _dictController.text.trim().isEmpty ? null : _submitDictation,
               icon: const Icon(Icons.check_circle_outline),
               label: const Text('提交默写'),
             ),
@@ -981,9 +1024,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                     color: filled
                         ? theme.colorScheme.secondary
                         : theme.colorScheme.onSurface.withValues(alpha: 0.2),
-                  )
-                      .animate()
-                      .scale(
+                  ).animate().scale(
                         begin: const Offset(0, 0),
                         end: const Offset(1, 1),
                         delay: (200 * i).ms,

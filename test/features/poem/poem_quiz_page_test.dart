@@ -6,15 +6,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/achievement.dart';
+import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
+import 'package:poemath/data/repositories/learning_activity_repository.dart';
 import 'package:poemath/data/repositories/poem_progress_repository.dart';
 import 'package:poemath/data/repositories/review_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_quiz_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -83,6 +87,35 @@ class _ImmediatePoemProgressRepository extends PoemProgressRepository {
   Future<void> save(PoemProgress progress) async {}
 }
 
+class _ImmediateLearningActivityRepository extends LearningActivityRepository {
+  LearningActivity? recorded;
+
+  @override
+  Future<bool> record({
+    required String id,
+    required LearningActivityType activityType,
+    required int totalItems,
+    required int successfulItems,
+    required int starsEarned,
+    required int durationSeconds,
+    required DateTime completedAt,
+    String? poemId,
+  }) async {
+    recorded = LearningActivity(
+      id: id,
+      profileId: 'test',
+      activityType: activityType.name,
+      totalItems: totalItems,
+      successfulItems: successfulItems,
+      poemId: poemId,
+      starsEarned: starsEarned,
+      durationSeconds: durationSeconds,
+      completedAt: completedAt,
+    );
+    return true;
+  }
+}
+
 class _ExistingReviewRepository extends ReviewRepository {
   @override
   ReviewSchedule? get(String poemId) {
@@ -134,6 +167,7 @@ void main() {
       await HiveBoxes.settings.put('haptic_enabled', false);
     });
     final progressRepo = _BlockingPoemProgressRepository();
+    final activityRepo = _ImmediateLearningActivityRepository();
 
     await tester.pumpWidget(
       ProviderScope(
@@ -145,6 +179,9 @@ void main() {
           ),
           userStatsRepoProvider.overrideWith(
             (ref) => _ImmediateStatsRepository(),
+          ),
+          learningActivityRepositoryProvider.overrideWith(
+            (ref) => activityRepo,
           ),
           achievementRepoProvider.overrideWith(
             (ref) => _AlreadyUnlockedAchievementRepository(),
@@ -208,6 +245,7 @@ void main() {
     });
     final statsRepo = _ImmediateStatsRepository();
     final checkInRepo = _ImmediateCheckInRepository();
+    final activityRepo = _ImmediateLearningActivityRepository();
 
     await tester.pumpWidget(
       ProviderScope(
@@ -221,6 +259,9 @@ void main() {
           ),
           checkInRepoProvider.overrideWith((ref) => checkInRepo),
           userStatsRepoProvider.overrideWith((ref) => statsRepo),
+          learningActivityRepositoryProvider.overrideWith(
+            (ref) => activityRepo,
+          ),
           achievementRepoProvider.overrideWith(
             (ref) => _AlreadyUnlockedAchievementRepository(),
           ),
@@ -248,6 +289,12 @@ void main() {
 
     expect(statsRepo.starsAdded, 3);
     expect(checkInRepo.starsAdded, 3);
+    final activity = activityRepo.recorded!;
+    expect(activity.type, LearningActivityType.poemQuiz);
+    expect(activity.poemId, poem.id);
+    expect(activity.totalItems, 1);
+    expect(activity.successfulItems, 1);
+    expect(activity.starsEarned, 3);
     expect(find.text('获得 3 颗星星'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());

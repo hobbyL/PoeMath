@@ -107,8 +107,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
 
   void _startChallenge() {
     setState(() {
-      _challengeId =
-          'math_challenge:${DateTime.now().microsecondsSinceEpoch}';
+      _challengeId = 'math_challenge:${DateTime.now().microsecondsSinceEpoch}';
       _started = true;
       _remainingSeconds = _initialSeconds;
       _startedAt = DateTime.now();
@@ -326,6 +325,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final semester = ref.read(mathSemesterProvider);
     final settingsRepo = ref.read(settingsRepositoryProvider);
     final difficulty = settingsRepo.mathDifficulty;
+    final completedAt = DateTime.now();
 
     final record = ChallengeRecord(
       id: _challengeId,
@@ -340,12 +340,22 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       difficulty: difficulty,
       durationSeconds: elapsed,
       starsEarned: stars,
+      createdAt: completedAt,
     );
 
     final repo = ref.read(challengeRecordRepoProvider);
     final statsRepo = ref.read(userStatsRepoProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
     await repo.save(record);
+    await ref.read(learningActivityRepositoryProvider).record(
+          id: record.id,
+          activityType: LearningActivityType.mathChallenge,
+          totalItems: _totalAnswered,
+          successfulItems: _correctCount,
+          starsEarned: stars,
+          durationSeconds: elapsed,
+          completedAt: completedAt,
+        );
     await statsRepo.settleMathChallenge(
       activityId: record.id,
       problems: _totalAnswered,

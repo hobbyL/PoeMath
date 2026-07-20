@@ -16,3 +16,4 @@ export 'formula_favorite.dart';
 export 'achievement.dart';
 export 'check_in.dart';
 export 'user_stats.dart';
+export 'learning_activity.dart';

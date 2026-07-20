@@ -6,8 +6,10 @@ import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/features/profile/providers/stats_chart_providers.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
@@ -210,6 +212,115 @@ void main() {
     expect(stat.starsEarned, 6);
     expect(stat.durationSeconds, 90);
   });
+
+  test('日报汇总缺失时从逐次活动事件精确聚合重复诗词与口算', () async {
+    final now = DateTime(2026, 7, 20, 12);
+    await _putActivity(
+      id: 'recite-1',
+      type: LearningActivityType.poemRecitation,
+      completedAt: now.subtract(const Duration(hours: 2)),
+      total: 6,
+      successful: 6,
+      poemId: 'poem_1',
+      stars: 3,
+      duration: 50,
+    );
+    await _putActivity(
+      id: 'quiz-1',
+      type: LearningActivityType.poemQuiz,
+      completedAt: now.subtract(const Duration(hours: 1)),
+      total: 5,
+      successful: 4,
+      poemId: 'poem_1',
+      stars: 1,
+      duration: 40,
+    );
+    await _putActivity(
+      id: 'math-1',
+      type: LearningActivityType.mathPractice,
+      completedAt: now,
+      total: 10,
+      successful: 9,
+      stars: 2,
+      duration: 60,
+    );
+
+    // 同源旧明细与事件并存时不得重复累计。
+    await HiveBoxes.mathSessions.put(
+      'default_math-1',
+      MathSession(
+        id: 'math-1',
+        profileId: 'default',
+        grade: 1,
+        problemType: 'mixed',
+        totalProblems: 10,
+        correctCount: 9,
+        starsEarned: 2,
+        durationSeconds: 60,
+        startedAt: now,
+        finishedAt: now,
+      ),
+    );
+
+    final stat = buildDailyStats(days: 1, now: now).single;
+
+    expect(stat.poemCount, 2);
+    expect(stat.mathTotal, 10);
+    expect(stat.mathCorrect, 9);
+    expect(stat.starsEarned, 6);
+    expect(stat.durationSeconds, 150);
+  });
+
+  test('日报忽略未知活动类型，避免损坏历史阻断统计页面', () async {
+    await HiveBoxes.learningActivities.put(
+      'default_unknown',
+      LearningActivity(
+        id: 'unknown',
+        profileId: 'default',
+        activityType: 'future_activity',
+        totalItems: 10,
+        successfulItems: 10,
+        starsEarned: 3,
+        durationSeconds: 60,
+        completedAt: DateTime(2026, 7, 20),
+      ),
+    );
+
+    final stat = buildDailyStats(
+      days: 1,
+      now: DateTime(2026, 7, 20, 12),
+    ).single;
+
+    expect(stat.mathTotal, 0);
+    expect(stat.starsEarned, 0);
+    expect(stat.durationSeconds, 0);
+  });
+}
+
+Future<void> _putActivity({
+  required String id,
+  required LearningActivityType type,
+  required DateTime completedAt,
+  required int total,
+  required int successful,
+  required int stars,
+  required int duration,
+  String? poemId,
+}) async {
+  await HiveBoxes.learningActivities.put(
+    'default_$id',
+    LearningActivity(
+      id: id,
+      profileId: 'default',
+      activityType: type.name,
+      totalItems: total,
+      successfulItems: successful,
+      poemId: poemId,
+      starsEarned: stars,
+      durationSeconds: duration,
+      completedAt: completedAt,
+    ),
+  );
 }
 
 Future<void> _putSummary(
@@ -232,8 +343,7 @@ Future<void> _putSummary(
       starsEarned: stars,
       durationSeconds: duration,
       isCheckedIn: false,
-      activitySources:
-          CheckIn.poemActivitySource | CheckIn.mathActivitySource,
+      activitySources: CheckIn.poemActivitySource | CheckIn.mathActivitySource,
     ),
   );
 }

@@ -198,6 +198,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       totalItems: session.questions.length,
       successfulItems: session.correctCount,
     );
+    final completedAt = DateTime.now();
     _starsEarned = stars;
     try {
       // 记录学习
@@ -209,6 +210,16 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       final statsRepo = ref.read(userStatsRepoProvider);
       final learnedCount = progressRepo.learnedCount;
       await statsRepo.updatePoemStats(learned: learnedCount);
+      await ref.read(learningActivityRepositoryProvider).record(
+            id: activityId,
+            activityType: LearningActivityType.poemQuiz,
+            totalItems: session.questions.length,
+            successfulItems: session.correctCount,
+            poemId: widget.poemId,
+            starsEarned: stars,
+            durationSeconds: session.elapsedSeconds,
+            completedAt: completedAt,
+          );
       if (stars > 0) {
         await statsRepo.addStars(stars, activityId: activityId);
       }
