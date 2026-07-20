@@ -81,4 +81,38 @@ class UserStatsRepository {
       await stats.save();
     }
   }
+
+  /// 一次性结算限时挑战的口算统计、连击、星星和等级。
+  Future<UserStats> settleMathChallenge({
+    required int problems,
+    required int correct,
+    required int bestStreak,
+    required int stars,
+  }) async {
+    if (problems < 0) {
+      throw RangeError.range(problems, 0, null, 'problems');
+    }
+    if (correct < 0 || correct > problems) {
+      throw RangeError.range(correct, 0, problems, 'correct');
+    }
+    if (bestStreak < 0) {
+      throw RangeError.range(bestStreak, 0, null, 'bestStreak');
+    }
+    if (stars < 0) {
+      throw RangeError.range(stars, 0, null, 'stars');
+    }
+
+    final key = ProfileScope.key('stats');
+    final stats = HiveBoxes.userStats.get(key) ??
+        UserStats(profileId: ProfileScope.currentId);
+    stats.mathTotalProblems += problems;
+    stats.mathTotalCorrect += correct;
+    if (bestStreak > stats.mathBestStreak) {
+      stats.mathBestStreak = bestStreak;
+    }
+    stats.totalStars += stars;
+    stats.level = LevelCalculator.calculate(stats.totalStars);
+    await HiveBoxes.userStats.put(key, stats);
+    return stats;
+  }
 }

@@ -10,6 +10,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/data/repositories/math_session_repository.dart';
 import 'package:poemath/data/repositories/challenge_record_repository.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 // ============ Repositories ============
@@ -140,14 +141,12 @@ final recentSessionsProvider = Provider<List<MathSession>>((ref) {
 
 /// 总做题数
 final totalProblemsCountProvider = Provider<int>((ref) {
-  final repo = ref.watch(mathSessionRepoProvider);
-  return repo.totalProblems;
+  return ref.watch(userStatsProvider).mathTotalProblems;
 });
 
 /// 总正确率
 final overallAccuracyProvider = Provider<double>((ref) {
-  final repo = ref.watch(mathSessionRepoProvider);
-  return repo.overallAccuracy;
+  return ref.watch(userStatsProvider).mathAccuracy;
 });
 
 /// 当前年级预设配置

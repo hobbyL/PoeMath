@@ -28,6 +28,7 @@ class ChallengeRecordAdapter extends TypeAdapter<ChallengeRecord> {
       semester: fields[8] as String,
       difficulty: fields[9] as String,
       durationSeconds: fields[10] as int,
+      starsEarned: fields[12] == null ? 0 : fields[12] as int,
       createdAt: fields[11] as DateTime?,
     );
   }
@@ -35,7 +36,7 @@ class ChallengeRecordAdapter extends TypeAdapter<ChallengeRecord> {
   @override
   void write(BinaryWriter writer, ChallengeRecord obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +60,9 @@ class ChallengeRecordAdapter extends TypeAdapter<ChallengeRecord> {
       ..writeByte(10)
       ..write(obj.durationSeconds)
       ..writeByte(11)
-      ..write(obj.createdAt);
+      ..write(obj.createdAt)
+      ..writeByte(12)
+      ..write(obj.starsEarned);
   }
 
   @override

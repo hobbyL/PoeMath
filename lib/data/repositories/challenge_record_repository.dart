@@ -14,6 +14,11 @@ class ChallengeRecordRepository {
     await HiveBoxes.challengeRecords.put(key, record);
   }
 
+  /// 按 ID 获取当前 profile 的挑战记录
+  ChallengeRecord? getById(String id) {
+    return HiveBoxes.challengeRecords.get(ProfileScope.key(id));
+  }
+
   /// 获取当前 profile 的所有记录（按时间倒序）
   List<ChallengeRecord> getAll() {
     return HiveBoxes.challengeRecords.values
@@ -38,5 +43,21 @@ class ChallengeRecordRepository {
     final records = getByMode(mode);
     if (records.isEmpty) return null;
     return records.map((r) => r.score).reduce((a, b) => a > b ? a : b);
+  }
+
+  /// 今日挑战完成的题数
+  int get todayProblems {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    return getAll()
+        .where((r) => !r.createdAt.isBefore(todayStart))
+        .fold<int>(0, (sum, r) => sum + r.totalAnswered);
+  }
+
+  /// 困难模式累计完成的题数
+  int get hardModeTotalProblems {
+    return getAll()
+        .where((r) => r.difficulty == 'hard')
+        .fold<int>(0, (sum, r) => sum + r.totalAnswered);
   }
 }

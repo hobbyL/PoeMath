@@ -16,11 +16,15 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/domain/achievement_check_helper.dart';
+import 'package:poemath/domain/math_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/math_engine/math_engine.dart';
@@ -67,6 +71,11 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   int _currentCombo = 0;
   int _bestCombo = 0;
   int _score = 0;
+  int _starsEarned = 0;
+
+  /// 挑战结束后等待所有统计和奖励完成持久化。
+  bool _isSaving = false;
+  String? _saveError;
 
   /// 记录实际用时
   DateTime? _startedAt;
@@ -106,16 +115,21 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   }
 
   void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      final shouldFinish = _remainingSeconds <= 1;
       setState(() {
-        _remainingSeconds--;
-        if (_remainingSeconds <= 0) {
-          _remainingSeconds = 0;
-          _finished = true;
-          timer.cancel();
-          _saveRecord();
-        }
+        _remainingSeconds = shouldFinish ? 0 : _remainingSeconds - 1;
       });
+
+      if (shouldFinish) {
+        timer.cancel();
+        await _finishChallenge();
+      }
     });
   }
 
@@ -225,16 +239,88 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
         .join('\n');
   }
 
-  /// 保存挑战记录到 Hive
-  Future<void> _saveRecord() async {
-    final grade = ref.read(mathGradeProvider);
-    final semester = ref.read(mathSemesterProvider);
-    final settingsRepo = ref.read(settingsRepositoryProvider);
-    final difficulty = settingsRepo.mathDifficulty;
+  Future<void> _finishChallenge() async {
+    if (_finished || _isSaving) return;
 
     final elapsed = _startedAt != null
         ? DateTime.now().difference(_startedAt!).inSeconds
         : _initialSeconds;
+    final stars = MathRewardCalculator.calculateStars(
+      totalProblems: _totalAnswered,
+      correctCount: _correctCount,
+    );
+    final statsRepo = ref.read(userStatsRepoProvider);
+    final levelBeforeReward = statsRepo.get().level;
+    final messenger = ScaffoldMessenger.of(context);
+
+    setState(() {
+      _finished = true;
+      _isSaving = true;
+      _starsEarned = stars;
+      _saveError = null;
+    });
+
+    try {
+      await _saveRecord(elapsed: elapsed, stars: stars);
+      if (!mounted) return;
+      final newlyUnlocked = await checkAchievements(ref);
+
+      if (!mounted) return;
+
+      ref.invalidate(userStatsProvider);
+      ref.invalidate(todayCheckInProvider);
+      ref.invalidate(todayMathCountProvider);
+      ref.invalidate(unlockedAchievementsCountProvider);
+      ref.invalidate(challengeRecordRepoProvider);
+      ref.invalidate(totalProblemsCountProvider);
+      ref.invalidate(overallAccuracyProvider);
+
+      setState(() => _isSaving = false);
+
+      final updatedStats = statsRepo.get();
+      if (updatedStats.level > levelBeforeReward) {
+        await showCelebration(
+          context,
+          type: CelebrationType.levelUp,
+          subtitle: updatedStats.levelName,
+        );
+        if (!mounted) return;
+      }
+      if (newlyUnlocked.isNotEmpty) {
+        await showCelebration(
+          context,
+          type: CelebrationType.achievement,
+          subtitle:
+              newlyUnlocked.map((achievement) => achievement.title).join('、'),
+        );
+      }
+    } catch (error, stackTrace) {
+      AppLogger.e(
+        '挑战结算保存失败',
+        tag: 'MathChallenge',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+        _saveError = '挑战记录保存失败';
+      });
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('挑战记录保存失败')));
+    }
+  }
+
+  /// 保存挑战记录及其关联统计。
+  Future<void> _saveRecord({
+    required int elapsed,
+    required int stars,
+  }) async {
+    final grade = ref.read(mathGradeProvider);
+    final semester = ref.read(mathSemesterProvider);
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    final difficulty = settingsRepo.mathDifficulty;
 
     final record = ChallengeRecord(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -248,17 +334,25 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       semester: semester,
       difficulty: difficulty,
       durationSeconds: elapsed,
+      starsEarned: stars,
     );
 
     final repo = ref.read(challengeRecordRepoProvider);
+    final statsRepo = ref.read(userStatsRepoProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
     await repo.save(record);
+    await statsRepo.settleMathChallenge(
+      problems: _totalAnswered,
+      correct: _correctCount,
+      bestStreak: _bestCombo,
+      stars: stars,
+    );
     await checkInRepo.updateToday(
       addMathTotal: _totalAnswered,
       addMathCorrect: _correctCount,
+      addStars: stars,
       addDuration: elapsed,
     );
-    if (mounted) ref.invalidate(todayCheckInProvider);
   }
 
   @override
@@ -267,27 +361,32 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final grade = ref.watch(mathGradeProvider);
     final semester = ref.watch(mathSemesterProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          '限时挑战 · ${GradePresets.get(grade, semester).label}',
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history_rounded),
-            tooltip: '挑战记录',
-            onPressed: () => context.push(AppRoutes.challengeHistory),
+    return PopScope(
+      canPop: !_isSaving,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            '限时挑战 · ${GradePresets.get(grade, semester).label}',
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(SpacingTokens.md),
-          child: _finished
-              ? _buildResult(theme)
-              : _started
-                  ? _buildChallenge(theme)
-                  : _buildStart(theme),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.history_rounded),
+              tooltip: '挑战记录',
+              onPressed: _isSaving
+                  ? null
+                  : () => context.push(AppRoutes.challengeHistory),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            child: _finished
+                ? _buildResult(theme)
+                : _started
+                    ? _buildChallenge(theme)
+                    : _buildStart(theme),
+          ),
         ),
       ),
     );
@@ -428,7 +527,11 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
         ),
         child: Column(
           children: [
-            Icon(icon, size: 40, color: isSelected ? color : theme.colorScheme.onSurfaceVariant),
+            Icon(
+              icon,
+              size: 40,
+              color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
               title,
@@ -458,9 +561,8 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
         ? _remainingSeconds.clamp(_initialSeconds, _remainingSeconds)
         : _initialSeconds;
     final timeRatio = _remainingSeconds / baseSeconds;
-    final timeColor = timeRatio > 0.3
-        ? theme.colorScheme.primary
-        : theme.colorScheme.error;
+    final timeColor =
+        timeRatio > 0.3 ? theme.colorScheme.primary : theme.colorScheme.error;
 
     return Column(
       children: [
@@ -499,8 +601,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                 ),
                 decoration: BoxDecoration(
                   color: theme.semantic.caution.withValues(alpha: 0.15),
-                  borderRadius:
-                      BorderRadius.circular(SpacingTokens.radiusPill),
+                  borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -529,13 +630,11 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
 
         // 时间进度条
         ClipRRect(
-          borderRadius:
-              BorderRadius.circular(SpacingTokens.radiusSmall),
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
           child: LinearProgressIndicator(
             value: timeRatio.clamp(0.0, 1.0),
             minHeight: 6,
-            backgroundColor:
-                theme.colorScheme.surfaceContainerHighest,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
             valueColor: AlwaysStoppedAnimation(timeColor),
           ),
         ),
@@ -689,8 +788,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
             ),
             decoration: BoxDecoration(
               color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius:
-                  BorderRadius.circular(SpacingTokens.radiusPill),
+              borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
             ),
             child: Text(
               _challengeMode == 'fixed' ? '固定时间' : '续命模式',
@@ -712,6 +810,28 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
           ),
           Text(
             '总分',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (var index = 0; index < 3; index++)
+                Icon(
+                  index < _starsEarned
+                      ? Icons.star_rounded
+                      : Icons.star_outline_rounded,
+                  size: 32,
+                  color: index < _starsEarned
+                      ? theme.semantic.caution
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+            ],
+          ),
+          Text(
+            '获得 $_starsEarned 颗星',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -757,12 +877,33 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
           ),
           const SizedBox(height: SpacingTokens.lg),
 
+          if (_isSaving) ...[
+            const CircularProgressIndicator(),
+            const SizedBox(height: SpacingTokens.sm),
+            Text(
+              '正在保存挑战结果',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.lg),
+          ] else if (_saveError != null) ...[
+            Text(
+              _saveError!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
+
           // 操作按钮
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed:
+                      _isSaving ? null : () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.arrow_back),
                   label: const Text('返回'),
                   style: OutlinedButton.styleFrom(
@@ -773,7 +914,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
               const SizedBox(width: SpacingTokens.sm),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: _restartChallenge,
+                  onPressed: _isSaving ? null : _restartChallenge,
                   icon: const Icon(Icons.replay_rounded),
                   label: const Text('再来一次'),
                   style: FilledButton.styleFrom(
@@ -824,6 +965,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       _currentCombo = 0;
       _bestCombo = 0;
       _score = 0;
+      _starsEarned = 0;
+      _isSaving = false;
+      _saveError = null;
       _remainingSeconds = _initialSeconds;
       _currentProblem = null;
       _lastCorrect = null;

@@ -26,6 +26,7 @@ Future<List<Achievement>> checkAchievements(
   final statsRepo = ref.read(userStatsRepoProvider);
   final mistakeRepo = ref.read(mathMistakeRepoProvider);
   final sessionRepo = ref.read(mathSessionRepoProvider);
+  final challengeRepo = ref.read(challengeRecordRepoProvider);
   final formulaFavRepo = ref.read(formulaFavoriteRepositoryProvider);
 
   final resolvedMistakes =
@@ -34,9 +35,10 @@ Future<List<Achievement>> checkAchievements(
       .where((s) => s.profileId == ProfileScope.currentId)
       .fold<int>(0, (sum, s) => sum + s.currentRound);
   final hardModeTotal = sessionRepo
-      .getAll()
-      .where((s) => s.difficulty == 'hard')
-      .fold<int>(0, (sum, s) => sum + s.totalProblems);
+          .getAll()
+          .where((s) => s.difficulty == 'hard')
+          .fold<int>(0, (sum, s) => sum + s.totalProblems) +
+      challengeRepo.hardModeTotalProblems;
 
   final checker = AchievementChecker(achievementRepo);
   return checker.check(

@@ -2,11 +2,14 @@
 //
 // 流程测试：备份 → 清空 → 恢复 → 验证数据完整性。
 
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/check_in.dart';
+import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/user_stats.dart';
@@ -177,5 +180,42 @@ void main() {
 
     expect(HiveBoxes.settings.get('tts_speed'), equals(0.8));
     expect(HiveBoxes.settings.get('pinyin_visible'), equals(true));
+  });
+
+  test('备份并恢复挑战奖励，旧备份缺少奖励字段时默认为 0', () async {
+    final record = ChallengeRecord(
+      id: 'challenge',
+      profileId: 'default',
+      mode: 'fixed',
+      score: 90,
+      totalAnswered: 10,
+      correctCount: 9,
+      bestCombo: 6,
+      grade: 2,
+      semester: '下',
+      difficulty: 'hard',
+      durationSeconds: 60,
+      starsEarned: 2,
+    );
+    await HiveBoxes.challengeRecords.put('default_challenge', record);
+
+    final json = backupService.exportToJson();
+    await HiveBoxes.challengeRecords.clear();
+    await backupService.restoreFromJson(json);
+    expect(
+      HiveBoxes.challengeRecords.get('default_challenge')!.starsEarned,
+      2,
+    );
+
+    final legacy = jsonDecode(json) as Map<String, dynamic>;
+    final records = legacy['challengeRecords'] as List<dynamic>;
+    (records.single as Map<String, dynamic>).remove('starsEarned');
+    await HiveBoxes.challengeRecords.clear();
+    await backupService.restoreFromJson(jsonEncode(legacy));
+
+    expect(
+      HiveBoxes.challengeRecords.get('default_challenge')!.starsEarned,
+      0,
+    );
   });
 }

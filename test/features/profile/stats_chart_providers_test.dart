@@ -130,6 +130,7 @@ void main() {
         semester: '上',
         difficulty: 'medium',
         durationSeconds: 30,
+        starsEarned: 2,
         createdAt: date,
       ),
     );
@@ -165,7 +166,7 @@ void main() {
     expect(stat.poemCount, 1);
     expect(stat.mathTotal, 10);
     expect(stat.mathCorrect, 7);
-    expect(stat.starsEarned, 2);
+    expect(stat.starsEarned, 4);
     expect(stat.durationSeconds, 90);
     expect(stat.mistakeCount, 1);
   });

@@ -57,6 +57,10 @@ class ChallengeRecord extends HiveObject {
   @HiveField(11)
   final DateTime createdAt;
 
+  /// 本次挑战获得的星星
+  @HiveField(12, defaultValue: 0)
+  final int starsEarned;
+
   ChallengeRecord({
     required this.id,
     required this.profileId,
@@ -69,6 +73,7 @@ class ChallengeRecord extends HiveObject {
     required this.semester,
     required this.difficulty,
     required this.durationSeconds,
+    this.starsEarned = 0,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 

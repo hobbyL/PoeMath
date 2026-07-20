@@ -121,5 +121,42 @@ void main() {
       expect(stats.mathTotalProblems, 15);
       expect(stats.mathTotalCorrect, 13);
     });
+
+    test('settleMathChallenge 一次结算挑战统计和奖励', () async {
+      final stats = await repo.getOrCreate();
+      stats.mathTotalProblems = 10;
+      stats.mathTotalCorrect = 8;
+      stats.mathBestStreak = 4;
+      stats.totalStars = 49;
+      await stats.save();
+
+      final settled = await repo.settleMathChallenge(
+        problems: 12,
+        correct: 11,
+        bestStreak: 7,
+        stars: 2,
+      );
+
+      expect(settled.mathTotalProblems, 22);
+      expect(settled.mathTotalCorrect, 19);
+      expect(settled.mathBestStreak, 7);
+      expect(settled.totalStars, 51);
+      expect(settled.level, 1);
+    });
+
+    test('settleMathChallenge 不降低历史最佳连击', () async {
+      final stats = await repo.getOrCreate();
+      stats.mathBestStreak = 20;
+      await stats.save();
+
+      await repo.settleMathChallenge(
+        problems: 5,
+        correct: 4,
+        bestStreak: 3,
+        stars: 1,
+      );
+
+      expect(repo.get().mathBestStreak, 20);
+    });
   });
 }

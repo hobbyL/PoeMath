@@ -8,6 +8,7 @@ import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/repositories/achievement_repository.dart';
+import 'package:poemath/data/repositories/challenge_record_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/math_session_repository.dart';
 import 'package:poemath/data/repositories/poem_progress_repository.dart';
@@ -67,8 +68,9 @@ final todayPoemCountProvider = Provider<int>((ref) {
 
 /// 今日口算做题数
 final todayMathCountProvider = Provider<int>((ref) {
-  final repo = MathSessionRepository();
-  return repo.todayProblems;
+  final sessionRepo = MathSessionRepository();
+  final challengeRepo = ChallengeRecordRepository();
+  return sessionRepo.todayProblems + challengeRepo.todayProblems;
 });
 
 // ============ 每日目标 ============

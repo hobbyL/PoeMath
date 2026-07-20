@@ -298,6 +298,7 @@ class BackupService {
         'difficulty': r.difficulty,
         'durationSeconds': r.durationSeconds,
         'createdAt': r.createdAt.toIso8601String(),
+        'starsEarned': r.starsEarned,
       };
     }).toList();
   }
@@ -513,6 +514,7 @@ class BackupService {
         difficulty: m['difficulty'] as String,
         durationSeconds: m['durationSeconds'] as int? ?? 0,
         createdAt: _parseDateTime(m['createdAt']),
+        starsEarned: m['starsEarned'] as int? ?? 0,
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }

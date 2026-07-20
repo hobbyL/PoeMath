@@ -78,14 +78,17 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
   }
 
   // 旧版回退：挑战记录此前未写入每日聚合。
-  final challengeMap = <String, ({int total, int correct, int duration})>{};
+  final challengeMap =
+      <String, ({int total, int correct, int stars, int duration})>{};
   for (final r in HiveBoxes.challengeRecords.values) {
     if (r.profileId != ProfileScope.currentId) continue;
     final key = _dateKey(r.createdAt);
-    final prev = challengeMap[key] ?? (total: 0, correct: 0, duration: 0);
+    final prev = challengeMap[key] ??
+        (total: 0, correct: 0, stars: 0, duration: 0);
     challengeMap[key] = (
       total: prev.total + r.totalAnswered,
       correct: prev.correct + r.correctCount,
+      stars: prev.stars + r.starsEarned,
       duration: prev.duration + r.durationSeconds,
     );
   }
@@ -130,7 +133,9 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
       mathCorrect:
           hasMathSummary ? summary!.mathCorrectCount : legacyMathCorrect,
       starsEarned: (summary?.starsEarned ?? 0) +
-          (hasMathSummary ? 0 : session?.stars ?? 0),
+          (hasMathSummary
+              ? 0
+              : (session?.stars ?? 0) + (challenge?.stars ?? 0)),
       durationSeconds: (summary?.durationSeconds ?? 0) +
           (hasMathSummary ? 0 : legacyDuration),
       mistakeCount: mistakes,

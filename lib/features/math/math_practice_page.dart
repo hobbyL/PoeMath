@@ -22,6 +22,7 @@ import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
+import 'package:poemath/domain/math_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
@@ -296,15 +297,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final correctCount = ref.read(mathCorrectCountProvider);
     final duration = DateTime.now().difference(_startTime).inSeconds;
 
-    // 计算星星：全对 → 3星, 90%+ → 2星, 70%+ → 1星
-    final accuracy = problems.isNotEmpty ? correctCount / problems.length : 0.0;
-    final stars = accuracy >= 1.0
-        ? 3
-        : accuracy >= 0.9
-            ? 2
-            : accuracy >= 0.7
-                ? 1
-                : 0;
+    final stars = MathRewardCalculator.calculateStars(
+      totalProblems: problems.length,
+      correctCount: correctCount,
+    );
 
     // 保存 session
     final session = MathSession(
