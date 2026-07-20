@@ -6,19 +6,39 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'package:poemath/data/hive/hive_boxes.dart';
 
+typedef LocalTimeZoneIdentifierResolver = Future<String> Function();
+
+Future<String> _resolveLocalTimeZoneIdentifier() async {
+  final timeZone = await FlutterTimezone.getLocalTimezone();
+  return timeZone.identifier;
+}
+
 /// 每日学习提醒通知服务。
 class NotificationService {
-  NotificationService._();
+  NotificationService._({
+    FlutterLocalNotificationsPlugin? plugin,
+    LocalTimeZoneIdentifierResolver? localTimeZoneIdentifierResolver,
+  })  : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
+        _localTimeZoneIdentifierResolver =
+            localTimeZoneIdentifierResolver ?? _resolveLocalTimeZoneIdentifier;
+
+  @visibleForTesting
+  NotificationService.forTesting({
+    required FlutterLocalNotificationsPlugin plugin,
+    required LocalTimeZoneIdentifierResolver localTimeZoneIdentifierResolver,
+  })  : _plugin = plugin,
+        _localTimeZoneIdentifierResolver = localTimeZoneIdentifierResolver;
 
   static final NotificationService instance = NotificationService._();
 
-  final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _plugin;
+  final LocalTimeZoneIdentifierResolver _localTimeZoneIdentifierResolver;
 
   // ============ Hive 持久化键 ============
 
@@ -59,6 +79,8 @@ class NotificationService {
   /// 初始化通知插件。应用启动时调用一次。
   Future<void> initialize() async {
     tz.initializeTimeZones();
+    final timeZoneIdentifier = await _localTimeZoneIdentifierResolver();
+    tz.setLocalLocation(tz.getLocation(timeZoneIdentifier));
 
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',

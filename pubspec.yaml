@@ -54,6 +54,7 @@ dependencies:
 
   # 本地通知（每日学习提醒）
   flutter_local_notifications: ^19.0.0
+  flutter_timezone: ^5.1.0
   timezone: ^0.10.0
 
 dev_dependencies:
