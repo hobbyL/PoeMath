@@ -42,20 +42,23 @@ class MathMistakeRepository {
     return getAll().where((m) => !m.isResolved).toList();
   }
 
-  /// 标记错题已解决
+  /// 手动标记错题已解决，不计入重练次数
   Future<void> resolve(String id) async {
     final mistake = getById(id);
     if (mistake == null) return;
     mistake.isResolved = true;
-    mistake.retryCount++;
     await mistake.save();
   }
 
-  /// 增加重练次数
-  Future<void> incrementRetry(String id) async {
+  /// 记录一次已提交的重练结果；答对时同时标记为已解决
+  Future<void> recordRetryResult(
+    String id, {
+    required bool isCorrect,
+  }) async {
     final mistake = getById(id);
     if (mistake == null) return;
     mistake.retryCount++;
+    if (isCorrect) mistake.isResolved = true;
     await mistake.save();
   }
 

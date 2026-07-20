@@ -400,11 +400,7 @@ class _ActionButtons extends ConsumerWidget {
     if (result == null) return;
 
     final repo = ref.read(mathMistakeRepoProvider);
-    await repo.incrementRetry(mistake.id);
-
-    if (result) {
-      await repo.resolve(mistake.id);
-    }
+    await repo.recordRetryResult(mistake.id, isCorrect: result);
 
     ref.invalidate(mathMistakeRepoProvider);
   }

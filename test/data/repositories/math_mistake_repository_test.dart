@@ -95,21 +95,31 @@ void main() {
       expect(repo.getUnresolved().first.id, 'm1');
     });
 
-    test('resolve 标记已解决', () async {
+    test('resolve 手动标记已解决但不增加重练次数', () async {
       await repo.add(makeMistake(id: 'm1'));
       await repo.resolve('m1');
 
       final m = repo.getById('m1')!;
       expect(m.isResolved, isTrue);
-      expect(m.retryCount, 1);
+      expect(m.retryCount, 0);
     });
 
-    test('incrementRetry 增加重练次数', () async {
+    test('recordRetryResult 答错只增加一次重练次数', () async {
       await repo.add(makeMistake(id: 'm1'));
-      await repo.incrementRetry('m1');
-      await repo.incrementRetry('m1');
+      await repo.recordRetryResult('m1', isCorrect: false);
 
-      expect(repo.getById('m1')!.retryCount, 2);
+      final m = repo.getById('m1')!;
+      expect(m.retryCount, 1);
+      expect(m.isResolved, isFalse);
+    });
+
+    test('recordRetryResult 答对只增加一次并标记已解决', () async {
+      await repo.add(makeMistake(id: 'm1'));
+      await repo.recordRetryResult('m1', isCorrect: true);
+
+      final m = repo.getById('m1')!;
+      expect(m.retryCount, 1);
+      expect(m.isResolved, isTrue);
     });
 
     test('totalCount 和 unresolvedCount', () async {

@@ -380,6 +380,7 @@ class MathMistakePage extends ConsumerWidget {
   ) async {
     var correctCount = 0;
     var totalDone = 0;
+    final repo = ref.read(mathMistakeRepoProvider);
 
     for (final mistake in unresolved) {
       if (!context.mounted) break;
@@ -398,12 +399,8 @@ class MathMistakePage extends ConsumerWidget {
       if (result == null) break;
 
       totalDone++;
-      if (result) {
-        correctCount++;
-        // 更新重练次数
-        mistake.retryCount++;
-        await mistake.save();
-      }
+      if (result) correctCount++;
+      await repo.recordRetryResult(mistake.id, isCorrect: result);
     }
 
     if (totalDone > 0 && context.mounted) {
