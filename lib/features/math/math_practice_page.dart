@@ -64,6 +64,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   /// 本次练习最佳连续答对数
   int _bestConsecutive = 0;
 
+  /// 当前页面固定使用的题数，避免“再练一组”丢失临时覆盖。
+  int? _sessionBatchSize;
+
   @override
   void initState() {
     super.initState();
@@ -81,7 +84,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final grade = ref.read(mathGradeProvider);
     final semester = ref.read(mathSemesterProvider);
     final settingsRepo = ref.read(settingsRepositoryProvider);
-    final batchSize = settingsRepo.mathBatchSize;
+    final batchSize = _sessionBatchSize ??= ref
+        .read(mathBatchSizeOverrideProvider.notifier)
+        .consumeOr(settingsRepo.mathBatchSize);
     final practiceMode = ref.read(mathPracticeModeProvider);
     final difficulty = DifficultyLevel.values.firstWhere(
       (d) => d.name == settingsRepo.mathDifficulty,

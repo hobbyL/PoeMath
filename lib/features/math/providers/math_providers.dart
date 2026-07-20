@@ -36,11 +36,30 @@ final mathGradeProvider = StateProvider<int>((ref) => 1);
 /// 当前选中学期
 final mathSemesterProvider = StateProvider<String>((ref) => '上');
 
-/// 每组题目数量（初始值从 settings 中读取）
-final mathBatchSizeProvider = StateProvider<int>((ref) {
-  final settings = ref.read(settingsRepositoryProvider);
-  return settings.mathBatchSize;
-});
+/// 管理下一次练习使用的一次性题数覆盖。
+class MathBatchSizeOverrideNotifier extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void setNext(int count) {
+    if (count <= 0) {
+      throw ArgumentError.value(count, 'count', 'must be positive');
+    }
+    state = count;
+  }
+
+  int consumeOr(int fallback) {
+    final batchSize = state ?? fallback;
+    state = null;
+    return batchSize;
+  }
+}
+
+/// 下一次进入练习页时使用的临时题数；消费后恢复持久化设置。
+final mathBatchSizeOverrideProvider =
+    NotifierProvider<MathBatchSizeOverrideNotifier, int?>(
+  MathBatchSizeOverrideNotifier.new,
+);
 
 /// 难度级别
 final mathDifficultyProvider =

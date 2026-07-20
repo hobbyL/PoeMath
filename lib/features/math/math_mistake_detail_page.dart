@@ -426,7 +426,7 @@ class _ActionButtons extends ConsumerWidget {
     }
 
     ref.read(mathGradeProvider.notifier).state = grade;
-    ref.read(mathBatchSizeProvider.notifier).state = 5;
+    ref.read(mathBatchSizeOverrideProvider.notifier).setNext(5);
     if (targetMode != null) {
       ref.read(mathPracticeModeProvider.notifier).state = targetMode;
     }
