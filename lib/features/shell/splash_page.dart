@@ -16,11 +16,25 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/bootstrap.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 
+typedef SplashDataInitializer = Future<bool> Function(
+  BootstrapProgressCallback onProgress,
+);
+typedef SplashIndexBuilder = Future<void> Function();
+
 class SplashPage extends ConsumerStatefulWidget {
-  const SplashPage({super.key});
+  const SplashPage({
+    super.key,
+    this.dataInitializer,
+    this.indexBuilder,
+  });
+
+  final SplashDataInitializer? dataInitializer;
+  final SplashIndexBuilder? indexBuilder;
 
   @override
   ConsumerState<SplashPage> createState() => _SplashPageState();
@@ -30,49 +44,82 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   double _progress = 0.0;
   String _statusText = '正在启动…';
   bool _isImporting = false;
+  bool _isInitializing = false;
+  Object? _initializationError;
 
   @override
   void initState() {
     super.initState();
-    _initializeData();
+    unawaited(_initializeData());
   }
 
   Future<void> _initializeData() async {
-    // 执行数据导入（首次启动或数据版本升级）
-    final didImport = await DataBootstrap.ensureInitialized(
-      onProgress: (progress) {
-        if (!mounted) return;
-        setState(() {
-          _progress = progress;
-          _isImporting = true;
-          if (progress < 0.3) {
-            _statusText = '正在加载诗词数据…';
-          } else if (progress < 0.6) {
-            _statusText = '正在整理古诗…';
-          } else if (progress < 0.8) {
-            _statusText = '正在加载作者资料…';
-          } else if (progress < 0.95) {
-            _statusText = '正在加载数学公式…';
-          } else {
-            _statusText = '即将完成…';
-          }
-        });
-      },
-    );
+    if (_isInitializing) return;
+    setState(() {
+      _isInitializing = true;
+      _progress = 0;
+      _statusText = '正在启动…';
+      _isImporting = false;
+    });
 
-    // 构建诗词索引
-    await ref.read(poemRepositoryProvider).buildIndices();
+    try {
+      final didImport = widget.dataInitializer != null
+          ? await widget.dataInitializer!(_updateProgress)
+          : await DataBootstrap.ensureInitialized(
+              onProgress: _updateProgress,
+            );
 
-    if (!mounted) return;
+      if (widget.indexBuilder != null) {
+        await widget.indexBuilder!();
+      } else {
+        await ref.read(poemRepositoryProvider).buildIndices();
+      }
 
-    if (!didImport) {
-      // 未导入 → 短暂展示 Splash 后跳转
-      await Future<void>.delayed(
-        const Duration(milliseconds: AppConstants.splashMinDurationMs),
+      if (!didImport) {
+        // 未导入 → 短暂展示 Splash 后跳转
+        await Future<void>.delayed(
+          const Duration(milliseconds: AppConstants.splashMinDurationMs),
+        );
+      }
+
+      if (!mounted) return;
+      _goHome();
+    } catch (error) {
+      AppLogger.e(
+        '静态数据初始化失败',
+        tag: 'Startup',
+        error: error,
       );
+      if (!mounted) return;
+      setState(() {
+        _initializationError = error;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
     }
+  }
 
-    _goHome();
+  void _updateProgress(double progress) {
+    if (!mounted) return;
+    setState(() {
+      _progress = progress;
+      _isImporting = true;
+      if (progress < 0.3) {
+        _statusText = '正在加载诗词数据…';
+      } else if (progress < 0.6) {
+        _statusText = '正在整理古诗…';
+      } else if (progress < 0.8) {
+        _statusText = '正在加载作者资料…';
+      } else if (progress < 0.95) {
+        _statusText = '正在加载数学公式…';
+      } else {
+        _statusText = '即将完成…';
+      }
+    });
   }
 
   void _goHome() {
@@ -90,6 +137,16 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (_initializationError != null) {
+      return Scaffold(
+        body: StartupFailureView(
+          message: '学习资料加载失败，请重试。',
+          onRetry: _initializeData,
+          isRetrying: _isInitializing,
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(

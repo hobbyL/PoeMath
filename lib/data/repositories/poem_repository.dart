@@ -21,26 +21,32 @@ class PoemRepository {
   Future<void> buildIndices() async {
     if (_indexBuilt) return;
 
-    _byGrade = {};
-    _byAuthor = {};
-    _byDynasty = {};
-    _byTag = {};
-    _byLayer = {};
+    final byGrade = <int, List<String>>{};
+    final byAuthor = <String, List<String>>{};
+    final byDynasty = <String, List<String>>{};
+    final byTag = <String, List<String>>{};
+    final byLayer = <String, List<String>>{};
 
     for (final poem in HiveBoxes.poems.values) {
       // 年级索引（无 grade 的诗词按 difficulty 推算）
-      _byGrade.putIfAbsent(poem.effectiveGrade, () => []).add(poem.id);
+      byGrade.putIfAbsent(poem.effectiveGrade, () => []).add(poem.id);
       // 作者索引
-      _byAuthor.putIfAbsent(poem.author, () => []).add(poem.id);
+      byAuthor.putIfAbsent(poem.author, () => []).add(poem.id);
       // 朝代索引
-      _byDynasty.putIfAbsent(poem.dynasty, () => []).add(poem.id);
+      byDynasty.putIfAbsent(poem.dynasty, () => []).add(poem.id);
       // 标签索引
       for (final tag in poem.tags) {
-        _byTag.putIfAbsent(tag, () => []).add(poem.id);
+        byTag.putIfAbsent(tag, () => []).add(poem.id);
       }
       // 层级索引
-      _byLayer.putIfAbsent(poem.layer, () => []).add(poem.id);
+      byLayer.putIfAbsent(poem.layer, () => []).add(poem.id);
     }
+
+    _byGrade = byGrade;
+    _byAuthor = byAuthor;
+    _byDynasty = byDynasty;
+    _byTag = byTag;
+    _byLayer = byLayer;
     _indexBuilt = true;
   }
 
