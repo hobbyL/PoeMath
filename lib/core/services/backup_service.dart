@@ -50,11 +50,8 @@ class BackupService {
   Future<String> exportToFile() async {
     final json = exportToJson();
     final dir = await getTemporaryDirectory();
-    final timestamp = DateTime.now()
-        .toIso8601String()
-        .replaceAll(':', '-')
-        .split('.')
-        .first;
+    final timestamp =
+        DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
     final file = File('${dir.path}/poemath_backup_$timestamp.json');
     await file.writeAsString(json);
     return file.path;
@@ -66,33 +63,26 @@ class BackupService {
   /// 如果版本不兼容，抛出 [FormatException]。
   /// 恢复失败时自动回滚到恢复前的数据状态。
   Future<int> restoreFromJson(String jsonString) async {
-    final Map<String, dynamic> data;
-    try {
-      data = jsonDecode(jsonString) as Map<String, dynamic>;
-    } on FormatException {
-      throw const FormatException('无效的备份文件格式');
-    }
-
-    final version = data['version'] as int? ?? 0;
-    if (version > _backupVersion) {
-      throw FormatException('备份文件版本 ($version) 高于当前支持版本');
-    }
+    final data = _decodeAndValidate(jsonString);
 
     // 恢复前先快照当前数据，失败时用于回滚
     final snapshot = exportToJson();
 
     try {
       return await _doRestore(data);
-    } on Object {
+    } on Object catch (error, stackTrace) {
       // 恢复失败，回滚到快照
       try {
-        final rollback =
-            jsonDecode(snapshot) as Map<String, dynamic>;
+        final rollback = _decodeAndValidate(snapshot);
         await _doRestore(rollback);
-      } on Object {
-        // 回滚也失败，数据可能不完整，但至少尝试过了
+      } on Object catch (rollbackError) {
+        throw BackupRestoreException(
+          '恢复失败，且回滚失败，请检查数据完整性',
+          cause: error,
+          rollbackError: rollbackError,
+        );
       }
-      rethrow;
+      Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
@@ -130,7 +120,9 @@ class BackupService {
     count += await _restoreChallengeRecords(
       data['challengeRecords'] as List<dynamic>? ?? [],
     );
-    _restoreSettings(data['settings'] as Map<String, dynamic>? ?? {});
+    if (data.containsKey('settings')) {
+      await _restoreSettings(data['settings'] as Map<String, dynamic>);
+    }
 
     return count;
   }
@@ -358,8 +350,7 @@ class BackupService {
         poemId: m['poemId'] as String,
         profileId: m['profileId'] as String,
         currentRound: m['currentRound'] as int? ?? 0,
-        nextReviewDate:
-            _parseDateTime(m['nextReviewDate']) ?? DateTime.now(),
+        nextReviewDate: _parseDateTime(m['nextReviewDate']) ?? DateTime.now(),
         lastReviewedAt: _parseDateTime(m['lastReviewedAt']),
         isCompleted: m['isCompleted'] as bool? ?? false,
       );
@@ -521,19 +512,438 @@ class BackupService {
     return items.length;
   }
 
-  void _restoreSettings(Map<String, dynamic> items) {
+  Future<void> _restoreSettings(Map<String, dynamic> items) async {
     final box = HiveBoxes.settings;
-    // 不清除 settings，采用覆盖策略
+    // 备份包含完整 settings 时替换旧键，确保恢复和回滚都是精确快照。
+    await box.clear();
     for (final entry in items.entries) {
-      box.put(entry.key, entry.value);
+      await box.put(entry.key, entry.value);
     }
   }
 
   // ============ 工具 ============
+
+  Map<String, dynamic> _decodeAndValidate(String jsonString) {
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(jsonString);
+    } on FormatException {
+      throw const FormatException('无效的备份文件格式');
+    }
+
+    if (decoded is! Map<Object?, Object?>) {
+      throw const FormatException('备份文件顶层必须是 JSON 对象');
+    }
+
+    final data = <String, dynamic>{};
+    for (final entry in decoded.entries) {
+      if (entry.key is! String) {
+        throw const FormatException('备份文件包含无效的顶层键');
+      }
+      data[entry.key as String] = entry.value;
+    }
+
+    final version = data['version'];
+    if (version != null && (version is! int || version < 0)) {
+      throw const FormatException('备份文件版本号无效');
+    }
+    if (version is int && version > _backupVersion) {
+      throw FormatException('备份文件版本 ($version) 高于当前支持版本');
+    }
+    _validateOptionalDate(data, 'exportedAt', 'top-level');
+
+    _validateList(data, 'poemProgress', _validatePoemProgress);
+    _validateList(data, 'poemFavorites', _validatePoemFavorite);
+    _validateList(data, 'reviewSchedules', _validateReviewSchedule);
+    _validateList(data, 'mathMistakes', _validateMathMistake);
+    _validateList(data, 'mathSessions', _validateMathSession);
+    _validateList(data, 'formulaFavorites', _validateFormulaFavorite);
+    _validateList(data, 'achievements', _validateAchievement);
+    _validateList(data, 'checkIns', _validateCheckIn);
+    _validateList(data, 'userStats', _validateUserStats);
+    _validateList(data, 'challengeRecords', _validateChallengeRecord);
+
+    if (data.containsKey('settings')) {
+      final settings = data['settings'];
+      if (settings is! Map<Object?, Object?>) {
+        _invalidField('settings', '必须是 JSON 对象');
+      }
+      _validateJsonObject(settings, 'settings');
+    }
+
+    return data;
+  }
+
+  void _validateList(
+    Map<String, dynamic> data,
+    String key,
+    void Function(Map<String, dynamic> item, String path) validator,
+  ) {
+    if (!data.containsKey(key)) return;
+    final value = data[key];
+    if (value is! List<Object?>) {
+      _invalidField(key, '必须是 JSON 数组');
+    }
+
+    for (var index = 0; index < value.length; index++) {
+      final rawItem = value[index];
+      if (rawItem is! Map<Object?, Object?>) {
+        _invalidField('$key[$index]', '必须是 JSON 对象');
+      }
+      final item = <String, dynamic>{};
+      for (final entry in rawItem.entries) {
+        if (entry.key is! String) {
+          _invalidField('$key[$index]', '包含无效字段名');
+        }
+        item[entry.key as String] = entry.value;
+      }
+      validator(item, '$key[$index]');
+    }
+  }
+
+  void _validatePoemProgress(Map<String, dynamic> item, String path) {
+    _requiredString(item, 'poemId', path);
+    _requiredString(item, 'profileId', path);
+    _optionalInt(
+      item,
+      'status',
+      path,
+      min: 0,
+      max: LearningStatus.values.length - 1,
+    );
+    _optionalInt(item, 'masteryLevel', path, min: 0, max: 5);
+    _optionalNonNegativeInt(item, 'studyCount', path);
+    _optionalNonNegativeInt(item, 'stars', path);
+    _validateOptionalDate(item, 'lastStudiedAt', path);
+    _validateOptionalDate(item, 'firstStudiedAt', path);
+  }
+
+  void _validatePoemFavorite(Map<String, dynamic> item, String path) {
+    _requiredString(item, 'poemId', path);
+    _requiredString(item, 'profileId', path);
+    _validateOptionalDate(item, 'createdAt', path);
+  }
+
+  void _validateReviewSchedule(Map<String, dynamic> item, String path) {
+    _requiredString(item, 'poemId', path);
+    _requiredString(item, 'profileId', path);
+    _optionalInt(
+      item,
+      'currentRound',
+      path,
+      min: 0,
+      max: ReviewSchedule.intervals.length,
+    );
+    _validateOptionalDate(item, 'nextReviewDate', path);
+    _validateOptionalDate(item, 'lastReviewedAt', path);
+    _optionalBool(item, 'isCompleted', path);
+  }
+
+  void _validateMathMistake(Map<String, dynamic> item, String path) {
+    for (final key in <String>[
+      'id',
+      'profileId',
+      'problemText',
+      'correctAnswer',
+      'userAnswer',
+      'problemType',
+    ]) {
+      _requiredString(item, key, path);
+    }
+    _requiredInt(item, 'grade', path);
+    _optionalNullableString(item, 'errorType', path);
+    _optionalNullableString(item, 'solutionStepsJson', path);
+    _validateOptionalDate(item, 'createdAt', path);
+    _optionalBool(item, 'isResolved', path);
+    _optionalNonNegativeInt(item, 'retryCount', path);
+  }
+
+  void _validateMathSession(Map<String, dynamic> item, String path) {
+    for (final key in <String>['id', 'profileId', 'problemType']) {
+      _requiredString(item, key, path);
+    }
+    _requiredInt(item, 'grade', path);
+    _requiredNonNegativeInt(item, 'totalProblems', path);
+    _optionalNonNegativeInt(item, 'correctCount', path);
+    _optionalNonNegativeInt(item, 'durationSeconds', path);
+    _optionalNonNegativeInt(item, 'starsEarned', path);
+    _validateOptionalDate(item, 'startedAt', path);
+    _validateOptionalDate(item, 'finishedAt', path);
+    _optionalNullableString(item, 'semester', path);
+    _optionalNullableString(item, 'difficulty', path);
+    if (item['semester'] != null) {
+      _optionalEnumString(
+        item,
+        'semester',
+        path,
+        const <String>{'上', '下'},
+      );
+    }
+    if (item['difficulty'] != null) {
+      _optionalEnumString(
+        item,
+        'difficulty',
+        path,
+        const <String>{'easy', 'medium', 'hard'},
+      );
+    }
+    _optionalNullableString(item, 'problemsJson', path);
+  }
+
+  void _validateFormulaFavorite(Map<String, dynamic> item, String path) {
+    _requiredString(item, 'formulaId', path);
+    _requiredString(item, 'profileId', path);
+    _validateOptionalDate(item, 'createdAt', path);
+  }
+
+  void _validateAchievement(Map<String, dynamic> item, String path) {
+    _requiredString(item, 'id', path);
+    _requiredString(item, 'profileId', path);
+    _requiredString(item, 'title', path);
+    _optionalNullableString(item, 'description', path);
+    _optionalNullableString(item, 'iconName', path);
+    _optionalBool(item, 'isUnlocked', path);
+    _validateOptionalDate(item, 'unlockedAt', path);
+    final progress = item['progress'];
+    if (progress != null &&
+        (progress is! num || progress < 0 || progress > 1)) {
+      _invalidField('$path.progress', '必须是 0 到 1 之间的数字');
+    }
+  }
+
+  void _validateCheckIn(Map<String, dynamic> item, String path) {
+    _requiredString(item, 'profileId', path);
+    _requiredString(item, 'date', path);
+    for (final key in <String>[
+      'poemCount',
+      'mathTotalCount',
+      'mathCorrectCount',
+      'starsEarned',
+      'durationSeconds',
+    ]) {
+      _optionalNonNegativeInt(item, key, path);
+    }
+    _optionalBool(item, 'isCheckedIn', path);
+    final sources = item['activitySources'];
+    if (sources != null &&
+        (sources is! int || sources < 0 || (sources & ~3) != 0)) {
+      _invalidField('$path.activitySources', '包含未知来源标记');
+    }
+  }
+
+  void _validateUserStats(Map<String, dynamic> item, String path) {
+    _requiredString(item, 'profileId', path);
+    for (final key in <String>[
+      'totalStars',
+      'currentStreak',
+      'longestStreak',
+      'poemsLearned',
+      'poemsMastered',
+      'mathTotalProblems',
+      'mathTotalCorrect',
+      'mathBestStreak',
+    ]) {
+      _optionalNonNegativeInt(item, key, path);
+    }
+    _optionalInt(
+      item,
+      'level',
+      path,
+      min: 0,
+      max: UserStats.levelNames.length - 1,
+    );
+    _validateOptionalDate(item, 'createdAt', path);
+  }
+
+  void _validateChallengeRecord(Map<String, dynamic> item, String path) {
+    for (final key in <String>[
+      'id',
+      'profileId',
+      'mode',
+      'semester',
+      'difficulty',
+    ]) {
+      _requiredString(item, key, path);
+    }
+    _optionalEnumString(
+      item,
+      'mode',
+      path,
+      const <String>{'fixed', 'extending'},
+    );
+    _optionalEnumString(item, 'semester', path, const <String>{'上', '下'});
+    _optionalEnumString(
+      item,
+      'difficulty',
+      path,
+      const <String>{'easy', 'medium', 'hard'},
+    );
+    for (final key in <String>[
+      'score',
+      'totalAnswered',
+      'correctCount',
+      'bestCombo',
+      'grade',
+      'durationSeconds',
+    ]) {
+      _requiredNonNegativeInt(item, key, path);
+    }
+    _optionalNonNegativeInt(item, 'starsEarned', path);
+    _validateOptionalDate(item, 'createdAt', path);
+  }
+
+  void _validateJsonObject(Map<Object?, Object?> object, String path) {
+    for (final entry in object.entries) {
+      if (entry.key is! String) {
+        _invalidField(path, '包含无效字段名');
+      }
+      _validateJsonValue(entry.value, '$path.${entry.key}');
+    }
+  }
+
+  void _validateJsonValue(Object? value, String path) {
+    if (value == null || value is String || value is num || value is bool) {
+      return;
+    }
+    if (value is List<Object?>) {
+      for (var index = 0; index < value.length; index++) {
+        _validateJsonValue(value[index], '$path[$index]');
+      }
+      return;
+    }
+    if (value is Map<Object?, Object?>) {
+      _validateJsonObject(value, path);
+      return;
+    }
+    _invalidField(path, '不是有效的 JSON 值');
+  }
+
+  String _requiredString(
+    Map<String, dynamic> item,
+    String key,
+    String path,
+  ) {
+    final value = item[key];
+    if (value is! String || value.isEmpty) {
+      _invalidField('$path.$key', '必须是非空字符串');
+    }
+    return value;
+  }
+
+  void _optionalNullableString(
+    Map<String, dynamic> item,
+    String key,
+    String path,
+  ) {
+    final value = item[key];
+    if (value != null && value is! String) {
+      _invalidField('$path.$key', '必须是字符串或 null');
+    }
+  }
+
+  int _requiredInt(Map<String, dynamic> item, String key, String path) {
+    final value = item[key];
+    if (value is! int) _invalidField('$path.$key', '必须是整数');
+    return value;
+  }
+
+  void _requiredNonNegativeInt(
+    Map<String, dynamic> item,
+    String key,
+    String path,
+  ) {
+    final value = _requiredInt(item, key, path);
+    if (value < 0) _invalidField('$path.$key', '不能为负数');
+  }
+
+  void _optionalNonNegativeInt(
+    Map<String, dynamic> item,
+    String key,
+    String path,
+  ) {
+    final value = item[key];
+    if (value == null) return;
+    if (value is! int || value < 0) {
+      _invalidField('$path.$key', '必须是非负整数');
+    }
+  }
+
+  void _optionalInt(
+    Map<String, dynamic> item,
+    String key,
+    String path, {
+    int? min,
+    int? max,
+  }) {
+    final value = item[key];
+    if (value == null) return;
+    if (value is! int ||
+        (min != null && value < min) ||
+        (max != null && value > max)) {
+      _invalidField('$path.$key', '整数超出允许范围');
+    }
+  }
+
+  void _optionalBool(
+    Map<String, dynamic> item,
+    String key,
+    String path,
+  ) {
+    final value = item[key];
+    if (value != null && value is! bool) {
+      _invalidField('$path.$key', '必须是布尔值');
+    }
+  }
+
+  void _optionalEnumString(
+    Map<String, dynamic> item,
+    String key,
+    String path,
+    Set<String> allowed,
+  ) {
+    final value = item[key];
+    if (value is! String || !allowed.contains(value)) {
+      _invalidField('$path.$key', '不是受支持的枚举值');
+    }
+  }
+
+  void _validateOptionalDate(
+    Map<String, dynamic> item,
+    String key,
+    String path,
+  ) {
+    final value = item[key];
+    if (value == null) return;
+    if (value is! String || DateTime.tryParse(value) == null) {
+      _invalidField('$path.$key', '必须是有效的 ISO 日期字符串或 null');
+    }
+  }
+
+  Never _invalidField(String path, String reason) {
+    throw FormatException('备份字段 $path 无效：$reason');
+  }
 
   DateTime? _parseDateTime(dynamic value) {
     if (value == null) return null;
     if (value is String) return DateTime.tryParse(value);
     return null;
   }
+}
+
+/// 恢复写入失败；[rollbackError] 非 null 表示回滚也失败。
+class BackupRestoreException implements Exception {
+  const BackupRestoreException(
+    this.message, {
+    this.cause,
+    this.rollbackError,
+  });
+
+  final String message;
+  final Object? cause;
+  final Object? rollbackError;
+
+  bool get rollbackFailed => rollbackError != null;
+
+  @override
+  String toString() => 'BackupRestoreException: $message';
 }

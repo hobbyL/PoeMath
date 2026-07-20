@@ -5,6 +5,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -15,6 +17,8 @@ import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/user_stats.dart';
 
 import '../helpers/hive_test_helper.dart';
+
+class _MockPoemFavoriteBox extends Mock implements Box<PoemFavorite> {}
 
 void main() {
   late BackupService backupService;
@@ -165,6 +169,53 @@ void main() {
     );
   });
 
+  test('顶层 JSON 数组应被拒绝且不修改现有数据', () async {
+    final existing = PoemProgress(
+      poemId: 'existing',
+      profileId: 'default',
+      status: LearningStatus.learning,
+      studyCount: 4,
+    );
+    await HiveBoxes.poemProgress.put('default_existing', existing);
+
+    await expectLater(
+      backupService.restoreFromJson('[]'),
+      throwsA(isA<FormatException>()),
+    );
+
+    expect(
+      HiveBoxes.poemProgress.get('default_existing')!.studyCount,
+      equals(4),
+    );
+  });
+
+  test('越界学习状态应在清空 Box 前被拒绝', () async {
+    final existing = PoemProgress(
+      poemId: 'existing',
+      profileId: 'default',
+      status: LearningStatus.learning,
+    );
+    await HiveBoxes.poemProgress.put('default_existing', existing);
+    final invalid = jsonEncode({
+      'version': 1,
+      'poemProgress': [
+        <String, dynamic>{
+          'poemId': 'new',
+          'profileId': 'default',
+          'status': 99,
+        },
+      ],
+    });
+
+    await expectLater(
+      backupService.restoreFromJson(invalid),
+      throwsA(isA<FormatException>()),
+    );
+
+    expect(HiveBoxes.poemProgress.get('default_existing'), isNotNull);
+    expect(HiveBoxes.poemProgress.get('default_new'), isNull);
+  });
+
   test('导出并恢复 Settings KV 数据', () async {
     // 写入设置
     await HiveBoxes.settings.put('tts_speed', 0.8);
@@ -180,6 +231,112 @@ void main() {
 
     expect(HiveBoxes.settings.get('tts_speed'), equals(0.8));
     expect(HiveBoxes.settings.get('pinyin_visible'), equals(true));
+  });
+
+  test('恢复 settings 会等待写入并移除备份中不存在的旧键', () async {
+    await HiveBoxes.settings.put('stale_setting', 'remove-me');
+    final json = jsonEncode({
+      'version': 1,
+      'settings': <String, dynamic>{'tts_speed': 0.8},
+    });
+
+    await backupService.restoreFromJson(json);
+
+    expect(HiveBoxes.settings.get('tts_speed'), equals(0.8));
+    expect(HiveBoxes.settings.get('stale_setting'), isNull);
+  });
+
+  test('中途写入失败时回滚已写入 Box，并保留原始异常', () async {
+    final existing = PoemProgress(
+      poemId: 'existing',
+      profileId: 'default',
+      status: LearningStatus.learning,
+      studyCount: 7,
+    );
+    await HiveBoxes.poemProgress.put('default_existing', existing);
+    final json = jsonEncode({
+      'version': 1,
+      'poemProgress': [
+        <String, dynamic>{
+          'poemId': 'replacement',
+          'profileId': 'default',
+          'status': 1,
+          'studyCount': 1,
+        },
+      ],
+    });
+
+    final originalBox = HiveBoxes.poemFavorites;
+    final failingBox = _MockPoemFavoriteBox();
+    var clearCalls = 0;
+    when(() => failingBox.values).thenReturn(const <PoemFavorite>[]);
+    when(() => failingBox.clear()).thenAnswer((_) async {
+      clearCalls++;
+      if (clearCalls == 1) throw StateError('simulated write failure');
+      return 0;
+    });
+    HiveBoxes.poemFavorites = failingBox;
+
+    try {
+      await expectLater(
+        backupService.restoreFromJson(json),
+        throwsA(isA<StateError>()),
+      );
+      expect(clearCalls, equals(2));
+      expect(
+        HiveBoxes.poemProgress.get('default_existing')!.studyCount,
+        equals(7),
+      );
+      expect(HiveBoxes.poemProgress.get('default_replacement'), isNull);
+    } finally {
+      HiveBoxes.poemFavorites = originalBox;
+    }
+  });
+
+  test('回滚失败时抛出带 rollbackFailed 标记的异常', () async {
+    final existing = PoemProgress(
+      poemId: 'existing',
+      profileId: 'default',
+      status: LearningStatus.learning,
+    );
+    await HiveBoxes.poemProgress.put('default_existing', existing);
+    final json = jsonEncode({
+      'version': 1,
+      'poemProgress': [
+        <String, dynamic>{
+          'poemId': 'replacement',
+          'profileId': 'default',
+          'status': 1,
+        },
+      ],
+    });
+
+    final originalBox = HiveBoxes.poemFavorites;
+    final failingBox = _MockPoemFavoriteBox();
+    when(() => failingBox.values).thenReturn(const <PoemFavorite>[]);
+    when(
+      () => failingBox.clear(),
+    ).thenAnswer((_) async => throw StateError('rollback failure'));
+    HiveBoxes.poemFavorites = failingBox;
+
+    try {
+      await expectLater(
+        backupService.restoreFromJson(json),
+        throwsA(
+          isA<BackupRestoreException>().having(
+            (error) => error.rollbackFailed,
+            'rollbackFailed',
+            isTrue,
+          ),
+        ),
+      );
+      expect(
+        HiveBoxes.poemProgress.get('default_existing')!.status,
+        equals(LearningStatus.learning),
+      );
+    } finally {
+      HiveBoxes.poemFavorites = originalBox;
+    }
   });
 
   test('备份并恢复挑战奖励，旧备份缺少奖励字段时默认为 0', () async {

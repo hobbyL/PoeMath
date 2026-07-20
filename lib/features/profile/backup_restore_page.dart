@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
@@ -29,72 +30,72 @@ class BackupRestorePage extends ConsumerWidget {
         child: AnimatedPageBody(
           padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
-              Text(
-                '数据安全',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+            Text(
+              '数据安全',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: SpacingTokens.xs),
-              Text(
-                '定期备份学习数据，防止意外丢失',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              '定期备份学习数据，防止意外丢失',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: SpacingTokens.lg),
+            ),
+            const SizedBox(height: SpacingTokens.lg),
 
-              // 两个并排卡片
-              Row(
-                children: [
-                  Expanded(
-                    child: _ActionCard(
-                      icon: Icons.upload_file_rounded,
-                      title: '导出备份',
-                      subtitle: '保存或分享备份',
-                      color: theme.colorScheme.primary,
-                      onTap: () => _exportBackup(context, ref),
-                    ),
+            // 两个并排卡片
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionCard(
+                    icon: Icons.upload_file_rounded,
+                    title: '导出备份',
+                    subtitle: '保存或分享备份',
+                    color: theme.colorScheme.primary,
+                    onTap: () => _exportBackup(context, ref),
                   ),
-                  const SizedBox(width: SpacingTokens.md),
+                ),
+                const SizedBox(width: SpacingTokens.md),
+                Expanded(
+                  child: _ActionCard(
+                    icon: Icons.download_rounded,
+                    title: '从备份恢复',
+                    subtitle: '选择备份文件',
+                    color: theme.colorScheme.secondary,
+                    onTap: () => _importBackup(context, ref),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: SpacingTokens.lg),
+            // 提示信息
+            ColoredCard(
+              color: theme.semantic.caution,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: theme.semantic.caution,
+                    size: 20,
+                  ),
+                  const SizedBox(width: SpacingTokens.sm),
                   Expanded(
-                    child: _ActionCard(
-                      icon: Icons.download_rounded,
-                      title: '从备份恢复',
-                      subtitle: '选择备份文件',
-                      color: theme.colorScheme.secondary,
-                      onTap: () => _importBackup(context, ref),
+                    child: Text(
+                      '备份包含所有学习进度、打卡记录和设置。'
+                      '诗词、公式等静态数据由应用内置，不参与备份。',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
               ),
-
-              const SizedBox(height: SpacingTokens.lg),
-              // 提示信息
-              ColoredCard(
-                color: theme.semantic.caution,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      color: theme.semantic.caution,
-                      size: 20,
-                    ),
-                    const SizedBox(width: SpacingTokens.sm),
-                    Expanded(
-                      child: Text(
-                        '备份包含所有学习进度、打卡记录和设置。'
-                        '诗词、公式等静态数据由应用内置，不参与备份。',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
+          ],
         ),
       ),
     );
@@ -209,6 +210,10 @@ class BackupRestorePage extends ConsumerWidget {
         SnackBar(content: Text('恢复成功，共恢复 $count 条记录')),
       );
     } on FormatException catch (e) {
+      scaffold.showSnackBar(
+        SnackBar(content: Text('恢复失败: ${e.message}')),
+      );
+    } on BackupRestoreException catch (e) {
       scaffold.showSnackBar(
         SnackBar(content: Text('恢复失败: ${e.message}')),
       );
