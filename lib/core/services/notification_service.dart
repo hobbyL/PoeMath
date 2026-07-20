@@ -10,6 +10,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 
 typedef LocalTimeZoneIdentifierResolver = Future<String> Function();
@@ -102,12 +103,19 @@ class NotificationService {
 
     // 如果之前已开启提醒，重新调度（应用重启后恢复）
     if (isReminderEnabled) {
-      await scheduleDailyReminder(reminderHour, reminderMinute);
+      final scheduled =
+          await scheduleDailyReminder(reminderHour, reminderMinute);
+      if (!scheduled) {
+        await HiveBoxes.settings.put(_keyReminderEnabled, false);
+      }
     }
 
     // 恢复周报通知
     if (isWeeklyReportEnabled) {
-      await scheduleWeeklyReport();
+      final scheduled = await scheduleWeeklyReport();
+      if (!scheduled) {
+        await HiveBoxes.settings.put(_keyWeeklyEnabled, false);
+      }
     }
   }
 
@@ -155,16 +163,8 @@ class NotificationService {
 
   // ============ 调度 ============
 
-  /// 开启并调度每日提醒。
-  Future<void> scheduleDailyReminder(int hour, int minute) async {
-    // 保存设置
-    await HiveBoxes.settings.put(_keyReminderEnabled, true);
-    await HiveBoxes.settings.put(_keyReminderHour, hour);
-    await HiveBoxes.settings.put(_keyReminderMinute, minute);
-
-    // 取消旧的
-    await _plugin.cancel(_notificationId);
-
+  /// 开启并调度每日提醒。只有系统调度成功后才持久化设置。
+  Future<bool> scheduleDailyReminder(int hour, int minute) async {
     // 选一条随机文案（基于日期做伪随机，每天不同）
     final dayIndex = DateTime.now().day;
     final title = _titles[dayIndex % _titles.length];
@@ -193,15 +193,25 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
       );
-    } catch (e) {
-      debugPrint('调度通知失败: $e');
+    } on Exception catch (error) {
+      AppLogger.e(
+        '调度每日提醒失败',
+        tag: 'Notify',
+        error: error,
+      );
+      return false;
     }
+
+    await HiveBoxes.settings.put(_keyReminderHour, hour);
+    await HiveBoxes.settings.put(_keyReminderMinute, minute);
+    await HiveBoxes.settings.put(_keyReminderEnabled, true);
+    return true;
   }
 
   /// 关闭每日提醒。
   Future<void> cancelDailyReminder() async {
-    await HiveBoxes.settings.put(_keyReminderEnabled, false);
     await _plugin.cancel(_notificationId);
+    await HiveBoxes.settings.put(_keyReminderEnabled, false);
   }
 
   /// 计算指定时间的下一次触发 TZDateTime。
@@ -228,11 +238,8 @@ class NotificationService {
   bool get isWeeklyReportEnabled =>
       HiveBoxes.settings.get(_keyWeeklyEnabled, defaultValue: false) as bool;
 
-  /// 开启周报推送（每周日 18:00）。
-  Future<void> scheduleWeeklyReport() async {
-    await HiveBoxes.settings.put(_keyWeeklyEnabled, true);
-    await _plugin.cancel(_weeklyReportId);
-
+  /// 开启周报推送（每周日 18:00）。只有系统调度成功后才持久化设置。
+  Future<bool> scheduleWeeklyReport() async {
     final scheduledDate = _nextSunday(18, 0);
 
     try {
@@ -255,15 +262,23 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       );
-    } catch (e) {
-      debugPrint('调度周报通知失败: $e');
+    } on Exception catch (error) {
+      AppLogger.e(
+        '调度周报通知失败',
+        tag: 'Notify',
+        error: error,
+      );
+      return false;
     }
+
+    await HiveBoxes.settings.put(_keyWeeklyEnabled, true);
+    return true;
   }
 
   /// 关闭周报推送。
   Future<void> cancelWeeklyReport() async {
-    await HiveBoxes.settings.put(_keyWeeklyEnabled, false);
     await _plugin.cancel(_weeklyReportId);
+    await HiveBoxes.settings.put(_keyWeeklyEnabled, false);
   }
 
   /// 计算下一个周日指定时间的 TZDateTime。

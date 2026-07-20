@@ -12,7 +12,12 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
-  const NotificationSettingsPage({super.key});
+  const NotificationSettingsPage({
+    super.key,
+    this.notificationService,
+  });
+
+  final NotificationService? notificationService;
 
   @override
   State<NotificationSettingsPage> createState() =>
@@ -25,10 +30,13 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   late int _reminderMinute;
   late bool _weeklyEnabled;
 
+  NotificationService get _notificationService =>
+      widget.notificationService ?? NotificationService.instance;
+
   @override
   void initState() {
     super.initState();
-    final svc = NotificationService.instance;
+    final svc = _notificationService;
     _reminderEnabled = svc.isReminderEnabled;
     _reminderHour = svc.reminderHour;
     _reminderMinute = svc.reminderMinute;
@@ -41,7 +49,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   // ============ 学习提醒 ============
 
   Future<void> _toggleReminder(bool value) async {
-    final svc = NotificationService.instance;
+    final svc = _notificationService;
     if (value) {
       final granted = await svc.requestPermission();
       if (!granted) {
@@ -52,7 +60,12 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         }
         return;
       }
-      await svc.scheduleDailyReminder(_reminderHour, _reminderMinute);
+      final scheduled =
+          await svc.scheduleDailyReminder(_reminderHour, _reminderMinute);
+      if (!scheduled) {
+        _showScheduleFailure('每日提醒设置失败，请稍后重试');
+        return;
+      }
     } else {
       await svc.cancelDailyReminder();
     }
@@ -67,22 +80,31 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     );
     if (picked == null || !mounted) return;
 
-    setState(() {
-      _reminderHour = picked.hour;
-      _reminderMinute = picked.minute;
-    });
-
     if (_reminderEnabled) {
-      await NotificationService.instance
-          .scheduleDailyReminder(_reminderHour, _reminderMinute);
+      final scheduled = await _notificationService.scheduleDailyReminder(
+        picked.hour,
+        picked.minute,
+      );
+      if (!scheduled) {
+        _showScheduleFailure('提醒时间更新失败，请稍后重试');
+        return;
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _reminderHour = picked.hour;
+        _reminderMinute = picked.minute;
+      });
     }
   }
 
   // ============ 学习周报 ============
 
   Future<void> _toggleWeekly(bool value) async {
+    final svc = _notificationService;
     if (value) {
-      final granted = await NotificationService.instance.requestPermission();
+      final granted = await svc.requestPermission();
       if (!granted) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -91,11 +113,22 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         }
         return;
       }
-      await NotificationService.instance.scheduleWeeklyReport();
+      final scheduled = await svc.scheduleWeeklyReport();
+      if (!scheduled) {
+        _showScheduleFailure('周报推送设置失败，请稍后重试');
+        return;
+      }
     } else {
-      await NotificationService.instance.cancelWeeklyReport();
+      await svc.cancelWeeklyReport();
     }
     if (mounted) setState(() => _weeklyEnabled = value);
+  }
+
+  void _showScheduleFailure(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
