@@ -4,7 +4,7 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.44-blue.svg)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.12-blue.svg)](https://dart.dev)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache--2.0-green.svg)](LICENSE)
 
 ## 简介
 
@@ -240,10 +240,10 @@ cat keystore.b64 | pbcopy
 - ✅ **离线优先**：核心学习不依赖网络，飞行模式可用
 - ✅ 不收集个人信息到开发者服务器；无广告 / 分析 / 追踪 SDK
 - ✅ 无内购或付费功能
-- ✅ 学习数据默认仅存本地；备份 / WebDAV / 检查更新 / 跟读 / 通知需用户主动操作或授权
+- ✅ 学习数据主要保存在本机；Android 可能按系统设置备份或迁移，WebDAV / 检查更新 / 跟读 / 通知需用户主动操作或授权
 - ✅ 权限与行为对照见隐私政策正文（含 `INTERNET`、麦克风、通知、安装 APK 等说明）
 - ✅ 联系方式：应用内关于页；开源发行可通过仓库 Issue（客服邮箱待渠道确定后补充）
 
 ## 许可证
 
-MIT License
+Apache License 2.0

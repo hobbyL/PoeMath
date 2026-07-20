@@ -23,6 +23,48 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def releaseSigningPropertyNames = [
+    'storeFile',
+    'storePassword',
+    'keyAlias',
+    'keyPassword',
+]
+def missingReleaseSigningProperties = releaseSigningPropertyNames.findAll { name ->
+    !keystoreProperties.getProperty(name)?.trim()
+}
+def releaseKeystoreFile = missingReleaseSigningProperties.isEmpty()
+    ? file(keystoreProperties.getProperty('storeFile'))
+    : null
+def hasReleaseSigningConfig = keystorePropertiesFile.exists()
+    && missingReleaseSigningProperties.isEmpty()
+    && releaseKeystoreFile.exists()
+
+def validateReleaseSigning = {
+    if (!keystorePropertiesFile.exists()) {
+        throw new GradleException(
+            "Release signing config is missing: ${keystorePropertiesFile}",
+        )
+    }
+    if (!missingReleaseSigningProperties.isEmpty()) {
+        throw new GradleException(
+            "Release signing config is incomplete. Missing: "
+                + missingReleaseSigningProperties.join(', '),
+        )
+    }
+    if (!releaseKeystoreFile.exists()) {
+        throw new GradleException(
+            "Release keystore does not exist: ${releaseKeystoreFile}",
+        )
+    }
+}
+
+def isRequestedReleaseBuild = gradle.startParameter.taskNames.any { taskName ->
+    taskName.toLowerCase().contains('release')
+}
+if (isRequestedReleaseBuild) {
+    validateReleaseSigning()
+}
+
 android {
     namespace = "com.poemath.app"
     compileSdk = 36
@@ -51,11 +93,11 @@ android {
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        if (hasReleaseSigningConfig) {
             release {
                 keyAlias = keystoreProperties['keyAlias']
                 keyPassword = keystoreProperties['keyPassword']
-                storeFile = file(keystoreProperties['storeFile'])
+                storeFile = releaseKeystoreFile
                 storePassword = keystoreProperties['storePassword']
             }
         }
@@ -63,9 +105,19 @@ android {
 
     buildTypes {
         release {
-            signingConfig = keystorePropertiesFile.exists()
-                ? signingConfigs.release
-                : signingConfigs.debug
+            if (hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.release
+            }
+        }
+    }
+}
+
+// Also guard aggregate tasks such as `build` whose requested name does not
+// itself contain "release" but which execute release variant tasks.
+tasks.configureEach { task ->
+    if (task.name.toLowerCase().contains('release')) {
+        task.doFirst {
+            validateReleaseSigning()
         }
     }
 }
