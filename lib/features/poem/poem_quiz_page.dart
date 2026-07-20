@@ -43,6 +43,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   final _fillFocusNode = FocusNode();
   late final CelebrationController _confettiController;
   bool _allowResultPop = false;
+  bool _isFinishing = false;
 
   @override
   void initState() {
@@ -97,8 +98,11 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
           maxQuestions: 1,
           random: random,
         );
-        questions = [...choiceQuestions, ...authorQuestions, ...dynastyQuestions]
-          ..shuffle(random);
+        questions = [
+          ...choiceQuestions,
+          ...authorQuestions,
+          ...dynastyQuestions,
+        ]..shuffle(random);
         // 限制总题数
         if (questions.length > 8) {
           questions = questions.sublist(0, 8);
@@ -178,69 +182,75 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   }
 
   Future<void> _finishQuiz() async {
-    final session = _session!;
-
-    // 记录学习
-    final progressRepo = ref.read(poemProgressRepoProvider);
-    final progress = await progressRepo.recordStudy(widget.poemId);
-    ref.invalidate(poemProgressProvider(widget.poemId));
-
-    // 更新全局统计
-    final statsRepo = ref.read(userStatsRepoProvider);
-    final learnedCount = progressRepo.learnedCount;
-    await statsRepo.updatePoemStats(learned: learnedCount);
-    await ref.read(checkInRepoProvider).updateToday(
-      addPoems: 1,
-      addDuration: session.elapsedSeconds,
-    );
-    ref.invalidate(learnedCountProvider);
-    ref.invalidate(userStatsProvider);
-    ref.invalidate(todayPoemCountProvider);
-    ref.invalidate(todayCheckInProvider);
-
-    // 通过时更新掌握等级、状态和复习计划
-    if (session.isPassed) {
-      var needSave = false;
-
-      if (progress.masteryLevel < 5) {
-        progress.masteryLevel = 5; // 测试通过 = 等级 5
-        needSave = true;
-      }
-
-      // 测试通过 → 进入复习阶段
-      if (progress.status == LearningStatus.learning) {
-        progress.status = LearningStatus.reviewing;
-        needSave = true;
-      }
-
-      if (needSave) {
-        await progressRepo.save(progress);
-        ref.invalidate(poemProgressProvider(widget.poemId));
-      }
-
-      // 首次通过 → 创建艾宾浩斯复习计划
-      final reviewRepo = ref.read(reviewRepoProvider);
-      final existing = reviewRepo.get(widget.poemId);
-      if (existing == null) {
-        await reviewRepo.createSchedule(widget.poemId);
-      }
-    }
-
-    // 成就自动检查
-    final newlyUnlocked = await checkAchievements(ref);
-    ref.invalidate(unlockedAchievementsCountProvider);
-
-    if (mounted && newlyUnlocked.isNotEmpty) {
-      _confettiController.play();
-      final names = newlyUnlocked.map((a) => a.title).join('、');
-      showCelebration(
-        context,
-        type: CelebrationType.achievement,
-        subtitle: names,
-      );
-    }
-
+    if (_isFinishing) return;
+    _isFinishing = true;
     if (mounted) setState(() {});
+
+    final session = _session!;
+    try {
+      // 记录学习
+      final progressRepo = ref.read(poemProgressRepoProvider);
+      final progress = await progressRepo.recordStudy(widget.poemId);
+      ref.invalidate(poemProgressProvider(widget.poemId));
+
+      // 更新全局统计
+      final statsRepo = ref.read(userStatsRepoProvider);
+      final learnedCount = progressRepo.learnedCount;
+      await statsRepo.updatePoemStats(learned: learnedCount);
+      await ref.read(checkInRepoProvider).updateToday(
+            addPoems: 1,
+            addDuration: session.elapsedSeconds,
+          );
+      ref.invalidate(learnedCountProvider);
+      ref.invalidate(userStatsProvider);
+      ref.invalidate(todayPoemCountProvider);
+      ref.invalidate(todayCheckInProvider);
+
+      // 通过时更新掌握等级、状态和复习计划
+      if (session.isPassed) {
+        var needSave = false;
+
+        if (progress.masteryLevel < 5) {
+          progress.masteryLevel = 5; // 测试通过 = 等级 5
+          needSave = true;
+        }
+
+        // 测试通过 → 进入复习阶段
+        if (progress.status == LearningStatus.learning) {
+          progress.status = LearningStatus.reviewing;
+          needSave = true;
+        }
+
+        if (needSave) {
+          await progressRepo.save(progress);
+          ref.invalidate(poemProgressProvider(widget.poemId));
+        }
+
+        // 首次通过 → 创建艾宾浩斯复习计划
+        final reviewRepo = ref.read(reviewRepoProvider);
+        final existing = reviewRepo.get(widget.poemId);
+        if (existing == null) {
+          await reviewRepo.createSchedule(widget.poemId);
+        }
+      }
+
+      // 成就自动检查
+      final newlyUnlocked = await checkAchievements(ref);
+      ref.invalidate(unlockedAchievementsCountProvider);
+
+      if (mounted && newlyUnlocked.isNotEmpty) {
+        _confettiController.play();
+        final names = newlyUnlocked.map((a) => a.title).join('、');
+        showCelebration(
+          context,
+          type: CelebrationType.achievement,
+          subtitle: names,
+        );
+      }
+    } finally {
+      _isFinishing = false;
+      if (mounted) setState(() {});
+    }
   }
 
   void _exitWithResult() {
@@ -405,12 +415,14 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: session.currentIndex < session.questions.length - 1
-                    ? _nextQuestion
-                    : () async {
-                        session.advance();
-                        await _finishQuiz();
-                      },
+                onPressed: _isFinishing
+                    ? null
+                    : session.currentIndex < session.questions.length - 1
+                        ? _nextQuestion
+                        : () async {
+                            session.advance();
+                            await _finishQuiz();
+                          },
                 icon: Icon(
                   session.currentIndex < session.questions.length - 1
                       ? Icons.arrow_forward
@@ -738,10 +750,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                 ],
               ],
             ),
-          )
-              .animate()
-              .fadeIn(delay: 600.ms, duration: 400.ms)
-              .slideY(
+          ).animate().fadeIn(delay: 600.ms, duration: 400.ms).slideY(
                 begin: 0.15,
                 end: 0,
                 delay: 600.ms,

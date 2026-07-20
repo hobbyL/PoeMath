@@ -807,6 +807,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           },
           onSubmit: _submitAnswer,
           submitEnabled: _answerController.text.isNotEmpty,
+          showDecimal: problem?.resultForm == ResultForm.decimal,
           showEllipsis: isRemainder,
         ),
       ],
