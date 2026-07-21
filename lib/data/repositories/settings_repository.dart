@@ -200,8 +200,24 @@ class SettingsRepository {
     return _credentialStore.readTencentAsrCredentials();
   }
 
-  Future<SpeechRecognitionSettingsState> loadSpeechRecognitionSettings() async {
+  Future<SpeechRecognitionSettingsSnapshot>
+      loadSpeechRecognitionSettingsSnapshot() async {
     final credentials = await readTencentAsrCredentials();
+    final settings = await _resolveSpeechRecognitionSettings(credentials);
+    return SpeechRecognitionSettingsSnapshot(
+      credentials: credentials,
+      settings: settings,
+    );
+  }
+
+  Future<SpeechRecognitionSettingsState> loadSpeechRecognitionSettings() async {
+    final snapshot = await loadSpeechRecognitionSettingsSnapshot();
+    return snapshot.settings;
+  }
+
+  Future<SpeechRecognitionSettingsState> _resolveSpeechRecognitionSettings(
+    TencentAsrCredentials? credentials,
+  ) async {
     final storedFingerprint =
         HiveBoxes.settings.get(_keyTencentAsrCredentialFingerprint) as String?;
     final verifiedAt = tencentAsrVerifiedAt;

@@ -9,6 +9,7 @@ import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.d
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 
@@ -26,7 +27,13 @@ class _SpeechRecognitionSettingsPageState
 
   late final TextEditingController _secretIdController;
   late final TextEditingController _secretKeyController;
-  SpeechRecognitionSettingsState? _settings;
+  SpeechRecognitionSettingsState _settings =
+      const SpeechRecognitionSettingsState(
+    hasCredentials: false,
+    isVerified: false,
+    highAccuracyEnabled: false,
+  );
+  bool _loadingSettings = true;
   bool _obscureSecretKey = true;
   bool _busy = false;
   bool _recording = false;
@@ -47,12 +54,35 @@ class _SpeechRecognitionSettingsPageState
 
   Future<void> _loadSettings() async {
     final repo = ref.read(settingsRepositoryProvider);
-    final credentials = await repo.readTencentAsrCredentials();
-    final settings = await repo.loadSpeechRecognitionSettings();
-    if (!mounted) return;
-    _secretIdController.text = credentials?.secretId ?? '';
-    _secretKeyController.text = credentials?.secretKey ?? '';
-    setState(() => _settings = settings);
+    try {
+      final snapshot = await repo.loadSpeechRecognitionSettingsSnapshot();
+      if (!mounted) return;
+      _secretIdController.text = snapshot.credentials?.secretId ?? '';
+      _secretKeyController.text = snapshot.credentials?.secretKey ?? '';
+      setState(() {
+        _settings = snapshot.settings;
+        _loadingSettings = false;
+      });
+    } on Object catch (error) {
+      AppLogger.e(
+        '读取语音识别设置失败',
+        tag: 'Speech',
+        error: error,
+      );
+      if (!mounted) return;
+      _secretIdController.clear();
+      _secretKeyController.clear();
+      setState(() {
+        _settings = const SpeechRecognitionSettingsState(
+          hasCredentials: false,
+          isVerified: false,
+          highAccuracyEnabled: false,
+        );
+        _loadingSettings = false;
+        _message = '读取本地密钥失败，请重新输入';
+        _messageIsError = true;
+      });
+    }
   }
 
   TencentAsrCredentials? _readFormCredentials() {
@@ -258,13 +288,6 @@ class _SpeechRecognitionSettingsPageState
   @override
   Widget build(BuildContext context) {
     final settings = _settings;
-    if (settings == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('语音识别设置')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
     final theme = Theme.of(context);
     final statusColor =
         _messageIsError ? theme.colorScheme.error : theme.colorScheme.primary;
@@ -275,7 +298,9 @@ class _SpeechRecognitionSettingsPageState
         title: const Text('语音识别设置'),
         actions: [
           IconButton(
-            onPressed: _busy || _recording ? null : _deleteCredentials,
+            onPressed: _loadingSettings || _busy || _recording
+                ? null
+                : _deleteCredentials,
             icon: const Icon(Icons.delete_outline),
             tooltip: '删除腾讯云密钥',
           ),
@@ -289,10 +314,14 @@ class _SpeechRecognitionSettingsPageState
           ),
           children: <Widget>[
             Text('腾讯云密钥', style: theme.textTheme.titleMedium),
+            if (_loadingSettings) ...[
+              const SizedBox(height: SpacingTokens.sm),
+              const LinearProgressIndicator(),
+            ],
             const SizedBox(height: SpacingTokens.sm),
             TextField(
               controller: _secretIdController,
-              enabled: !_busy && !_recording,
+              enabled: !_loadingSettings && !_busy && !_recording,
               decoration: const InputDecoration(
                 labelText: 'SecretId (AK)',
                 prefixIcon: Icon(Icons.key_outlined),
@@ -302,7 +331,7 @@ class _SpeechRecognitionSettingsPageState
             const SizedBox(height: SpacingTokens.sm),
             TextField(
               controller: _secretKeyController,
-              enabled: !_busy && !_recording,
+              enabled: !_loadingSettings && !_busy && !_recording,
               obscureText: _obscureSecretKey,
               decoration: InputDecoration(
                 labelText: 'SecretKey (SK)',
@@ -325,7 +354,9 @@ class _SpeechRecognitionSettingsPageState
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
-                onPressed: _busy || _recording ? null : _saveCredentials,
+                onPressed: _loadingSettings || _busy || _recording
+                    ? null
+                    : _saveCredentials,
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('保存密钥'),
               ),
@@ -344,7 +375,10 @@ class _SpeechRecognitionSettingsPageState
                       : '完成真实录音测试后可开启',
               trailing: Switch(
                 value: settings.highAccuracyEnabled,
-                onChanged: settings.isVerified && !_busy && !_recording
+                onChanged: settings.isVerified &&
+                        !_loadingSettings &&
+                        !_busy &&
+                        !_recording
                     ? _toggleHighAccuracy
                     : null,
               ),
@@ -381,7 +415,7 @@ class _SpeechRecognitionSettingsPageState
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _busy
+                      onPressed: _loadingSettings || _busy
                           ? null
                           : _recording
                               ? _finishTest

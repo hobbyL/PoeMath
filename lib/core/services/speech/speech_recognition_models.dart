@@ -36,6 +36,17 @@ final class SpeechRecognitionSettingsState {
   final DateTime? verifiedAt;
 }
 
+/// Credentials and their effective gate state loaded from one secure read.
+final class SpeechRecognitionSettingsSnapshot {
+  const SpeechRecognitionSettingsSnapshot({
+    required this.credentials,
+    required this.settings,
+  });
+
+  final TencentAsrCredentials? credentials;
+  final SpeechRecognitionSettingsState settings;
+}
+
 enum SpeechRecognitionSource { local, tencentCloud }
 
 /// Final result for one recorded utterance.

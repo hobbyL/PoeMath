@@ -16,6 +16,9 @@ final class _FakeSettingsRepository extends SettingsRepository {
   bool _verified = false;
   bool _highAccuracyEnabled = false;
   DateTime? _verifiedAt;
+  Completer<void>? loadGate;
+  Object? loadError;
+  int snapshotLoadCalls = 0;
 
   @override
   DateTime? get tencentAsrVerifiedAt => _verifiedAt;
@@ -41,6 +44,23 @@ final class _FakeSettingsRepository extends SettingsRepository {
 
   @override
   Future<SpeechRecognitionSettingsState> loadSpeechRecognitionSettings() async {
+    return _currentSettings;
+  }
+
+  @override
+  Future<SpeechRecognitionSettingsSnapshot>
+      loadSpeechRecognitionSettingsSnapshot() async {
+    snapshotLoadCalls++;
+    await loadGate?.future;
+    final error = loadError;
+    if (error != null) throw error;
+    return SpeechRecognitionSettingsSnapshot(
+      credentials: _credentials,
+      settings: _currentSettings,
+    );
+  }
+
+  SpeechRecognitionSettingsState get _currentSettings {
     return SpeechRecognitionSettingsState(
       hasCredentials: _credentials != null,
       isVerified: _verified,
@@ -192,6 +212,51 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 1));
   }
+
+  testWidgets('首帧显示完整页面且安全设置只加载一次', (tester) async {
+    final gate = Completer<void>();
+    settings.loadGate = gate;
+    final service = _FakeSpeechRecognitionService();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          settingsRepositoryProvider.overrideWithValue(settings),
+          speechRecognitionServiceProvider.overrideWithValue(service),
+        ],
+        child: const MaterialApp(home: SpeechRecognitionSettingsPage()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('腾讯云密钥'), findsOneWidget);
+    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(settings.snapshotLoadCalls, 1);
+    expect(service.initializeCalls, 0);
+
+    gate.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(settings.snapshotLoadCalls, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('安全存储读取失败时回退为可编辑离线状态', (tester) async {
+    settings.loadError = StateError('secure storage unavailable');
+    await pumpPage(tester, _FakeSpeechRecognitionService());
+
+    expect(find.text('读取本地密钥失败，请重新输入'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    final secretIdField = tester.widget<TextField>(
+      find.widgetWithText(TextField, 'SecretId (AK)'),
+    );
+    expect(secretIdField.enabled, isTrue);
+  });
 
   testWidgets('真实录音测试成功后才能开启高精度识别', (tester) async {
     final service = _FakeSpeechRecognitionService();

@@ -1,14 +1,43 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
 final class _MemoryCredentialStore extends SecureCredentialStore {
   TencentAsrCredentials? credentials;
+  final Map<String, ({String username, String password})> webDavCredentials =
+      <String, ({String username, String password})>{};
+  int readCalls = 0;
+
+  @override
+  Future<void> saveWebDavCredentials({
+    required String configId,
+    required String username,
+    required String password,
+  }) async {
+    webDavCredentials[configId] = (
+      username: username,
+      password: password,
+    );
+  }
+
+  @override
+  Future<({String username, String password})?> readWebDavCredentials(
+    String configId,
+  ) async {
+    return webDavCredentials[configId];
+  }
+
+  @override
+  Future<void> deleteWebDavCredentials(String configId) async {
+    webDavCredentials.remove(configId);
+  }
 
   @override
   Future<void> saveTencentAsrCredentials(
@@ -19,6 +48,7 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
 
   @override
   Future<TencentAsrCredentials?> readTencentAsrCredentials() async {
+    readCalls++;
     return credentials;
   }
 
@@ -58,6 +88,55 @@ void main() {
     expect(state.hasCredentials, isTrue);
     expect(state.isVerified, isFalse);
     expect(state.highAccuracyEnabled, isFalse);
+  });
+
+  test('设置快照只读取一次安全存储', () async {
+    credentialStore.credentials = const TencentAsrCredentials(
+      secretId: 'AKID',
+      secretKey: 'SK',
+    );
+    credentialStore.readCalls = 0;
+
+    final snapshot = await repository.loadSpeechRecognitionSettingsSnapshot();
+
+    expect(snapshot.credentials?.secretId, 'AKID');
+    expect(snapshot.settings.hasCredentials, isTrue);
+    expect(credentialStore.readCalls, 1);
+  });
+
+  test('备份不含敏感凭据且恢复不覆盖设备安全存储', () async {
+    await repository.saveTencentAsrCredentials(
+      secretId: 'AKID-private',
+      secretKey: 'SK-private',
+    );
+    await repository.saveWebDavConfig(
+      WebDavConfig(
+        id: 'dav-1',
+        name: '家庭云盘',
+        url: 'https://dav.example.com',
+        username: 'dav-private-user',
+        password: 'dav-private-password',
+        remotePath: '/poemath',
+      ),
+    );
+    final backup = BackupService();
+    final json = backup.exportToJson();
+
+    expect(json, isNot(contains('AKID-private')));
+    expect(json, isNot(contains('SK-private')));
+    expect(json, isNot(contains('dav-private-user')));
+    expect(json, isNot(contains('dav-private-password')));
+
+    await backup.restoreFromJson(json);
+
+    final tencent = await repository.readTencentAsrCredentials();
+    expect(tencent?.secretId, 'AKID-private');
+    expect(tencent?.secretKey, 'SK-private');
+    final restoredConfig = repository.webDavConfigs.single;
+    final fullConfig =
+        await repository.loadWebDavConfigWithCredentials(restoredConfig);
+    expect(fullConfig.username, 'dav-private-user');
+    expect(fullConfig.password, 'dav-private-password');
   });
 
   test('未完成真实测试不能开启高精度', () async {
