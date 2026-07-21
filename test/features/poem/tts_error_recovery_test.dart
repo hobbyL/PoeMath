@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 
+import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -16,7 +16,8 @@ class _MockTtsService extends Mock implements TtsService {}
 
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
 
-class _MockSpeechToText extends Mock implements SpeechToText {}
+class _MockSpeechRecognitionService extends Mock
+    implements SpeechRecognitionService {}
 
 const _poemId = 'tts-test-poem';
 
@@ -32,18 +33,13 @@ final _poem = Poem(
 
 void main() {
   late _MockTtsService tts;
-  late _MockSpeechToText speech;
+  late _MockSpeechRecognitionService speech;
 
   setUp(() {
     tts = _MockTtsService();
-    speech = _MockSpeechToText();
+    speech = _MockSpeechRecognitionService();
     when(() => tts.stop()).thenAnswer((_) async {});
-    when(
-      () => speech.initialize(
-        onError: any(named: 'onError'),
-        onStatus: any(named: 'onStatus'),
-      ),
-    ).thenAnswer((_) async => true);
+    when(() => speech.initialize()).thenAnswer((_) async {});
     when(() => speech.cancel()).thenAnswer((_) async {});
   });
 
@@ -96,7 +92,7 @@ void main() {
         child: MaterialApp(
           home: PoemReadAlongPage(
             poemId: _poemId,
-            speechToText: speech,
+            speechRecognitionService: speech,
           ),
         ),
       ),
@@ -128,7 +124,7 @@ void main() {
         child: MaterialApp(
           home: PoemReadAlongPage(
             poemId: _poemId,
-            speechToText: speech,
+            speechRecognitionService: speech,
           ),
         ),
       ),

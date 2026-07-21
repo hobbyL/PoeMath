@@ -5,7 +5,10 @@
 
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
+
 import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 
@@ -13,13 +16,15 @@ class SettingsRepository {
   SettingsRepository({SecureCredentialStore? credentialStore})
       : _credentialStore = credentialStore ?? SecureCredentialStore();
   // ============ KV 键名 ============
-  static const String _keyThemeMode = 'theme_mode'; // 'system' | 'light' | 'dark'
+  static const String _keyThemeMode =
+      'theme_mode'; // 'system' | 'light' | 'dark'
   static const String _keyActiveSubject = 'active_subject'; // 'poem' | 'math'
   static const String _keySoundEnabled = 'sound_enabled';
   static const String _keyHapticEnabled = 'haptic_enabled';
   static const String _keySelectedGrade = 'selected_grade';
   static const String _keyTtsSpeed = 'tts_speed';
-  static const String _keyTtsVoice = 'tts_voice'; // JSON: {"name":"...", "locale":"..."}
+  static const String _keyTtsVoice =
+      'tts_voice'; // JSON: {"name":"...", "locale":"..."}
   static const String _keyPinyinVisible = 'pinyin_visible';
   static const String _keyDailyPoemGoal = 'daily_poem_goal';
   static const String _keyDailyMathGoal = 'daily_math_goal';
@@ -28,6 +33,11 @@ class SettingsRepository {
   static const String _keyMathDifficulty = 'math_difficulty';
   static const String _keyMathPracticeMode = 'math_practice_mode';
   static const String _keyHasOnboarded = 'has_onboarded';
+  static const String _keyTencentAsrCredentialFingerprint =
+      'tencent_asr_credential_fingerprint';
+  static const String _keyTencentAsrVerifiedAt = 'tencent_asr_verified_at';
+  static const String _keyTencentAsrHighAccuracyEnabled =
+      'tencent_asr_high_accuracy_enabled';
 
   // ============ 主题 ============
 
@@ -173,6 +183,126 @@ class SettingsRepository {
     await HiveBoxes.settings.put(_keyHasOnboarded, value);
   }
 
+  // ============ 语音识别设置 ============
+
+  bool get tencentAsrHighAccuracyEnabled => HiveBoxes.settings.get(
+        _keyTencentAsrHighAccuracyEnabled,
+        defaultValue: false,
+      ) as bool;
+
+  DateTime? get tencentAsrVerifiedAt {
+    final value = HiveBoxes.settings.get(_keyTencentAsrVerifiedAt);
+    if (value is! int) return null;
+    return DateTime.fromMillisecondsSinceEpoch(value);
+  }
+
+  Future<TencentAsrCredentials?> readTencentAsrCredentials() {
+    return _credentialStore.readTencentAsrCredentials();
+  }
+
+  Future<SpeechRecognitionSettingsState> loadSpeechRecognitionSettings() async {
+    final credentials = await readTencentAsrCredentials();
+    final storedFingerprint =
+        HiveBoxes.settings.get(_keyTencentAsrCredentialFingerprint) as String?;
+    final verifiedAt = tencentAsrVerifiedAt;
+    final isVerified = credentials != null &&
+        storedFingerprint == _credentialFingerprint(credentials) &&
+        verifiedAt != null;
+    final requestedHighAccuracy = tencentAsrHighAccuracyEnabled;
+
+    if (requestedHighAccuracy && !isVerified) {
+      await HiveBoxes.settings.put(
+        _keyTencentAsrHighAccuracyEnabled,
+        false,
+      );
+    }
+
+    return SpeechRecognitionSettingsState(
+      hasCredentials: credentials != null,
+      isVerified: isVerified,
+      highAccuracyEnabled: requestedHighAccuracy && isVerified,
+      verifiedAt: isVerified ? verifiedAt : null,
+    );
+  }
+
+  Future<void> saveTencentAsrCredentials({
+    required String secretId,
+    required String secretKey,
+  }) async {
+    final credentials = TencentAsrCredentials(
+      secretId: secretId.trim(),
+      secretKey: secretKey.trim(),
+    );
+    if (!credentials.isComplete) {
+      throw ArgumentError('SecretId 和 SecretKey 不能为空');
+    }
+
+    final existing = await readTencentAsrCredentials();
+    final changed = existing == null ||
+        _credentialFingerprint(existing) != _credentialFingerprint(credentials);
+    if (changed) {
+      await invalidateTencentAsrVerification();
+    }
+    await _credentialStore.saveTencentAsrCredentials(credentials);
+  }
+
+  Future<void> markTencentAsrCredentialsVerified({
+    required TencentAsrCredentials testedCredentials,
+    DateTime? verifiedAt,
+  }) async {
+    final current = await readTencentAsrCredentials();
+    if (current == null ||
+        _credentialFingerprint(current) !=
+            _credentialFingerprint(testedCredentials)) {
+      await invalidateTencentAsrVerification();
+      throw StateError('腾讯云密钥已发生变化，请重新测试');
+    }
+
+    await HiveBoxes.settings.put(
+      _keyTencentAsrCredentialFingerprint,
+      _credentialFingerprint(current),
+    );
+    await HiveBoxes.settings.put(
+      _keyTencentAsrVerifiedAt,
+      (verifiedAt ?? DateTime.now()).millisecondsSinceEpoch,
+    );
+  }
+
+  Future<void> setTencentAsrHighAccuracyEnabled(bool enabled) async {
+    if (enabled) {
+      final state = await loadSpeechRecognitionSettings();
+      if (!state.isVerified) {
+        throw StateError('请先完成腾讯云真实录音测试');
+      }
+    }
+    await HiveBoxes.settings.put(
+      _keyTencentAsrHighAccuracyEnabled,
+      enabled,
+    );
+  }
+
+  Future<void> invalidateTencentAsrVerification() async {
+    await HiveBoxes.settings.put(
+      _keyTencentAsrHighAccuracyEnabled,
+      false,
+    );
+    await HiveBoxes.settings.delete(_keyTencentAsrCredentialFingerprint);
+    await HiveBoxes.settings.delete(_keyTencentAsrVerifiedAt);
+  }
+
+  Future<void> deleteTencentAsrCredentials() async {
+    await invalidateTencentAsrVerification();
+    await _credentialStore.deleteTencentAsrCredentials();
+  }
+
+  static String _credentialFingerprint(TencentAsrCredentials credentials) {
+    final canonical = jsonEncode(<String>[
+      credentials.secretId,
+      credentials.secretKey,
+    ]);
+    return sha256.convert(utf8.encode(canonical)).toString();
+  }
+
   // ============ WebDAV 配置（移至底部） ============
 
   final SecureCredentialStore _credentialStore;
@@ -190,8 +320,7 @@ class SettingsRepository {
     WebDavConfig config,
   ) async {
     // 先尝试从安全存储读取
-    final creds =
-        await _credentialStore.readWebDavCredentials(config.id);
+    final creds = await _credentialStore.readWebDavCredentials(config.id);
     if (creds != null) {
       return WebDavConfig(
         id: config.id,

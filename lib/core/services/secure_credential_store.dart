@@ -6,7 +6,9 @@
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// WebDAV 凭据的安全存储。
+import 'package:poemath/core/services/speech/speech_recognition_models.dart';
+
+/// WebDAV and Tencent ASR credentials backed by platform secure storage.
 ///
 /// 密钥格式：`webdav_{configId}_username` / `webdav_{configId}_password`。
 class SecureCredentialStore {
@@ -52,8 +54,42 @@ class SecureCredentialStore {
     await _storage.delete(key: _passwordKey(configId));
   }
 
+  // ============ Tencent ASR 凭据 ============
+
+  Future<void> saveTencentAsrCredentials(
+    TencentAsrCredentials credentials,
+  ) async {
+    await _storage.write(
+      key: _tencentSecretIdKey,
+      value: credentials.secretId,
+    );
+    await _storage.write(
+      key: _tencentSecretKeyKey,
+      value: credentials.secretKey,
+    );
+  }
+
+  Future<TencentAsrCredentials?> readTencentAsrCredentials() async {
+    final secretId = await _storage.read(key: _tencentSecretIdKey);
+    final secretKey = await _storage.read(key: _tencentSecretKeyKey);
+    if (secretId == null || secretKey == null) return null;
+    final credentials = TencentAsrCredentials(
+      secretId: secretId,
+      secretKey: secretKey,
+    );
+    return credentials.isComplete ? credentials : null;
+  }
+
+  Future<void> deleteTencentAsrCredentials() async {
+    await _storage.delete(key: _tencentSecretIdKey);
+    await _storage.delete(key: _tencentSecretKeyKey);
+  }
+
   // ============ 内部 ============
 
   static String _usernameKey(String id) => 'webdav_${id}_username';
   static String _passwordKey(String id) => 'webdav_${id}_password';
+
+  static const String _tencentSecretIdKey = 'tencent_asr_secret_id';
+  static const String _tencentSecretKeyKey = 'tencent_asr_secret_key';
 }

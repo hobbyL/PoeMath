@@ -4,6 +4,8 @@
 // 职责：所有 Repository 的 Riverpod Provider。
 //       全局单例，App 生命周期内不销毁。
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/repositories/poem_repository.dart';
@@ -22,6 +24,10 @@ import 'package:poemath/data/repositories/learning_activity_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.dart';
+import 'package:poemath/core/services/speech/local_speech_recognizer.dart';
+import 'package:poemath/core/services/speech/speech_audio_recorder.dart';
+import 'package:poemath/core/services/speech/tencent_asr_client.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/services/haptic_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
@@ -122,5 +128,24 @@ final ttsServiceProvider = Provider<TtsService>((ref) {
   final settings = ref.watch(settingsRepositoryProvider);
   final service = TtsService(settings);
   ref.onDispose(service.dispose);
+  return service;
+});
+
+final tencentAsrClientProvider = Provider<TencentAsrClient>((ref) {
+  final client = TencentAsrClient();
+  ref.onDispose(client.close);
+  return client;
+});
+
+final speechRecognitionServiceProvider = Provider<SpeechRecognitionService>((
+  ref,
+) {
+  final service = HybridSpeechRecognitionService(
+    recorder: RecordSpeechAudioRecorder(),
+    localRecognizer: SherpaLocalSpeechRecognizer(),
+    tencentClient: ref.watch(tencentAsrClientProvider),
+    settingsRepository: ref.watch(settingsRepositoryProvider),
+  );
+  ref.onDispose(() => unawaited(service.dispose()));
   return service;
 });

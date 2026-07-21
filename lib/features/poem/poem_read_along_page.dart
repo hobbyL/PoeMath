@@ -9,9 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:speech_to_text/speech_recognition_result.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 
+import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.dart';
+import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -31,6 +31,9 @@ enum _ReadAlongPhase {
   /// 语音录制中。
   recording,
 
+  /// 本地识别收尾及可选云端识别中。
+  processing,
+
   /// 显示本句得分。
   scored,
 
@@ -42,20 +45,22 @@ class PoemReadAlongPage extends ConsumerStatefulWidget {
   const PoemReadAlongPage({
     super.key,
     required this.poemId,
-    this.speechToText,
+    this.speechRecognitionService,
   });
 
   final String poemId;
-  final SpeechToText? speechToText;
+  final SpeechRecognitionService? speechRecognitionService;
 
   @override
   ConsumerState<PoemReadAlongPage> createState() => _PoemReadAlongPageState();
 }
 
 class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
-  late final SpeechToText _speech;
+  late final SpeechRecognitionService _speech;
   late final TtsService _tts;
   bool _speechAvailable = false;
+  Timer? _recordingTimer;
+  SpeechRecognitionSource _recognitionSource = SpeechRecognitionSource.local;
 
   /// 诗句列表（按换行拆分）。
   List<String> _lines = [];
@@ -78,9 +83,10 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   @override
   void initState() {
     super.initState();
-    _speech = widget.speechToText ?? SpeechToText();
+    _speech = widget.speechRecognitionService ??
+        ref.read(speechRecognitionServiceProvider);
     _tts = ref.read(ttsServiceProvider);
-    _initSpeech();
+    unawaited(_initSpeech());
   }
 
   /// 语音识别初始化失败的原因描述。
@@ -88,35 +94,29 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
   Future<void> _initSpeech() async {
     try {
-      _speechAvailable = await _speech.initialize(
-        onError: (error) {
-          debugPrint('语音识别错误: ${error.errorMsg}');
-          if (mounted && _phase == _ReadAlongPhase.recording) {
-            // 录制出错时以当前已识别文本评分
-            _finishRecording(_liveText);
-          }
-        },
-        onStatus: (status) {
-          debugPrint('语音识别状态: $status');
-          // 当语音识别自动停止时（用户沉默超时），完成录制
-          if (status == 'notListening' && _phase == _ReadAlongPhase.recording) {
-            _finishRecording(_liveText);
-          }
-        },
+      await _speech.initialize();
+      _speechAvailable = true;
+      _speechUnavailableReason = '';
+    } on SpeechRecognitionException catch (error) {
+      _speechAvailable = false;
+      _speechUnavailableReason = error.message;
+    } on Object catch (error, stackTrace) {
+      _speechAvailable = false;
+      _speechUnavailableReason = '离线语音模型初始化失败';
+      AppLogger.e(
+        '离线语音模型初始化失败',
+        tag: 'PoemReadAlong',
+        error: error,
+        stackTrace: stackTrace,
       );
-      if (!_speechAvailable) {
-        _speechUnavailableReason = '设备未安装语音识别服务';
-      }
-    } catch (e) {
-      debugPrint('语音识别初始化失败: $e');
-      _speechUnavailableReason = '语音识别初始化失败：$e';
     }
     if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _speech.cancel();
+    _recordingTimer?.cancel();
+    unawaited(_speech.cancel());
     unawaited(
       _tts.stop().onError(
             (error, stackTrace) => AppLogger.e(
@@ -201,7 +201,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
   Future<void> _startRecording() async {
     if (!_speechAvailable) {
-      // 尝试重新初始化（用户可能刚授权权限）
       await _initSpeech();
       if (!_speechAvailable && mounted) {
         _showSpeechUnavailableDialog();
@@ -234,17 +233,50 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       _phase = _ReadAlongPhase.recording;
       _liveText = '';
     });
-
-    await _speech.listen(
-      onResult: _onSpeechResult,
-      listenOptions: SpeechListenOptions(
-        localeId: 'zh_CN',
-        listenMode: ListenMode.dictation,
-        cancelOnError: true,
-        listenFor: const Duration(seconds: 15),
-        pauseFor: const Duration(seconds: 3),
-      ),
-    );
+    try {
+      await _speech.start(
+        onPartialResult: (text) {
+          if (mounted && _phase == _ReadAlongPhase.recording) {
+            setState(() => _liveText = text);
+          }
+        },
+      );
+      if (!mounted) return;
+      _recordingTimer = Timer(
+        const Duration(seconds: 15),
+        () => unawaited(_stopRecording()),
+      );
+    } on SpeechPermissionDeniedException {
+      if (mounted) setState(() => _phase = _ReadAlongPhase.idle);
+      _speechUnavailableReason = '未获得麦克风权限';
+      if (mounted) _showSpeechUnavailableDialog();
+    } on SpeechRecognitionException catch (error, stackTrace) {
+      AppLogger.e(
+        '开始离线跟读失败',
+        tag: 'PoemReadAlong',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        setState(() => _phase = _ReadAlongPhase.idle);
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '开始跟读录音失败',
+        tag: 'PoemReadAlong',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        setState(() => _phase = _ReadAlongPhase.idle);
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('无法开始跟读，请检查麦克风权限')),
+        );
+      }
+    }
   }
 
   void _showSpeechUnavailableDialog() {
@@ -286,10 +318,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
             const SizedBox(height: SpacingTokens.sm),
             Text(
               '1. 确认已授予麦克风权限\n'
-              '2. 安装或更新「Google」应用\n'
-              '3. 在系统设置 → 语言与输入法 → 语音输入中，'
-              '启用 Google 语音识别\n'
-              '4. 重启应用后重试',
+              '2. 确认设备有足够的可用存储空间\n'
+              '3. 重新进入页面后重试',
               style: theme.textTheme.bodySmall?.copyWith(
                 height: 1.6,
                 color: theme.colorScheme.onSurfaceVariant,
@@ -307,27 +337,15 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     );
   }
 
-  void _onSpeechResult(SpeechRecognitionResult result) {
-    if (!mounted) return;
-
-    setState(() => _liveText = result.recognizedWords);
-
-    if (result.finalResult) {
-      _finishRecording(result.recognizedWords);
-    }
-  }
-
-  void _finishRecording(String recognized) {
-    if (_phase != _ReadAlongPhase.recording) return;
-
-    _speech.stop();
-
+  void _applyRecognitionResult(SpeechRecognitionResult result) {
+    final recognized = result.text;
     final original = _lines[_currentLine];
     final score = _calculateAccuracy(original, recognized);
 
     setState(() {
       _recognizedTexts.add(recognized);
       _scores.add(score);
+      _recognitionSource = result.source;
       _phase = _ReadAlongPhase.scored;
     });
 
@@ -350,10 +368,49 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     }
   }
 
-  void _stopRecording() {
-    _speech.stop();
-    if (_phase == _ReadAlongPhase.recording) {
-      _finishRecording(_liveText);
+  Future<void> _stopRecording() async {
+    if (_phase != _ReadAlongPhase.recording) return;
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+    final scaffold = ScaffoldMessenger.of(context);
+    setState(() => _phase = _ReadAlongPhase.processing);
+
+    try {
+      final result = await _speech.stop();
+      if (!mounted) return;
+      _applyRecognitionResult(result);
+      if (result.fellBackFromCloud) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('高精度识别暂不可用，已使用离线结果')),
+        );
+      }
+    } on SpeechRecognitionException catch (error, stackTrace) {
+      AppLogger.e(
+        '跟读识别失败',
+        tag: 'PoemReadAlong',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        setState(() => _phase = _ReadAlongPhase.idle);
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '跟读识别失败',
+        tag: 'PoemReadAlong',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        setState(() => _phase = _ReadAlongPhase.idle);
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('语音识别失败，请重新朗读')),
+        );
+      }
     }
   }
 
@@ -571,6 +628,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
         // 识别结果 / 实时文本
         if (_phase == _ReadAlongPhase.recording ||
+            _phase == _ReadAlongPhase.processing ||
             _phase == _ReadAlongPhase.scored)
           _buildRecognitionResult(theme),
       ],
@@ -717,6 +775,21 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       );
     }
 
+    if (_phase == _ReadAlongPhase.processing) {
+      return Column(
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: SpacingTokens.sm),
+          Text(
+            '正在生成识别结果…',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      );
+    }
+
     // scored 阶段
     final score = _scores.isNotEmpty ? _scores.last : 0.0;
     final percent = (score * 100).round();
@@ -768,7 +841,9 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '识别结果',
+                  _recognitionSource == SpeechRecognitionSource.tencentCloud
+                      ? '高精度识别结果'
+                      : '离线识别结果',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -822,12 +897,25 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         return SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: _stopRecording,
+            onPressed: () => unawaited(_stopRecording()),
             style: FilledButton.styleFrom(
               backgroundColor: theme.colorScheme.error,
             ),
             icon: const Icon(Icons.stop),
             label: const Text('结束录音'),
+          ),
+        );
+
+      case _ReadAlongPhase.processing:
+        return SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: null,
+            icon: const SizedBox.square(
+              dimension: SpacingTokens.md,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            label: const Text('识别中'),
           ),
         );
 
