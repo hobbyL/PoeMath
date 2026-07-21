@@ -426,7 +426,7 @@ class SettingsPage extends ConsumerWidget {
                       groupValue: current,
                       onChanged: (v) {
                         if (v == null) return;
-                        ref.read(themeModeProvider.notifier).state = v;
+                        ref.read(themeModeProvider.notifier).setMode(v);
                         Navigator.pop(ctx);
                       },
                       child: const Column(

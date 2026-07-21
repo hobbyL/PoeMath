@@ -5,6 +5,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
@@ -39,4 +40,6 @@ void invalidateAllHiveProviders(void Function(ProviderOrFamily) invalidate) {
 
   // ---- 设置 ----
   invalidate(settingsRepositoryProvider);
+  invalidate(activeSubjectProvider);
+  invalidate(themeModeProvider);
 }

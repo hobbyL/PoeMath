@@ -21,9 +21,8 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 class ActiveSubjectNotifier extends Notifier<AppSubject> {
   @override
   AppSubject build() {
-    final stored =
-        HiveBoxes.settings.get('active_subject', defaultValue: 'poem')
-            as String;
+    final stored = HiveBoxes.settings
+        .get('active_subject', defaultValue: 'poem') as String;
 
     // 监听后续变更，自动持久化到 Hive
     listenSelf((prev, next) {
@@ -53,9 +52,46 @@ final activeSubjectProvider =
   ActiveSubjectNotifier.new,
 );
 
-/// 亮色 / 暗色 / 跟随系统。默认跟随系统。
-final themeModeProvider = StateProvider<ThemeMode>(
-  (ref) => ThemeMode.system,
+/// 外观模式 Notifier — 初始值从 Hive 读取，变更时自动写回。
+class ThemeModeNotifier extends Notifier<ThemeMode> {
+  static const String _storageKey = 'theme_mode';
+
+  @override
+  ThemeMode build() {
+    final stored = HiveBoxes.settings.get(
+      _storageKey,
+      defaultValue: 'system',
+    ) as String;
+
+    listenSelf((prev, next) {
+      if (prev != null && prev != next) {
+        Zone.root.run(() {
+          HiveBoxes.settings.put(_storageKey, _serialize(next));
+        });
+      }
+    });
+
+    return switch (stored) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
+  }
+
+  void setMode(ThemeMode mode) {
+    state = mode;
+  }
+
+  static String _serialize(ThemeMode mode) => switch (mode) {
+        ThemeMode.system => 'system',
+        ThemeMode.light => 'light',
+        ThemeMode.dark => 'dark',
+      };
+}
+
+/// 亮色 / 暗色 / 跟随系统。
+final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
+  ThemeModeNotifier.new,
 );
 
 /// 派生 Provider：根据当前 subject 返回亮色 ThemeData。
