@@ -108,6 +108,26 @@ void main() {
     when(() => settings.soundEnabled).thenReturn(false);
   });
 
+  testWidgets('跟读页首帧应直接显示诗句内容', (tester) async {
+    final speech = _FakeSpeechRecognitionService();
+
+    await _pumpPage(
+      tester,
+      speech,
+      tts,
+      settings,
+      settleAnimations: false,
+    );
+    await tester.pump();
+
+    expect(find.text('床前明月光，'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(tester.getSize(find.byType(ListView)).height, greaterThan(0));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
   testWidgets('点击读一读立即显示准备状态并复用初始化任务', (tester) async {
     final initialization = Completer<void>();
     final speech = _FakeSpeechRecognitionService(
@@ -288,8 +308,9 @@ Future<void> _pumpPage(
   WidgetTester tester,
   SpeechRecognitionService speech,
   TtsService tts,
-  SettingsRepository settings,
-) async {
+  SettingsRepository settings, {
+  bool settleAnimations = true,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -311,5 +332,7 @@ Future<void> _pumpPage(
       ),
     ),
   );
-  await tester.pump(const Duration(seconds: 1));
+  if (settleAnimations) {
+    await tester.pump(const Duration(seconds: 1));
+  }
 }

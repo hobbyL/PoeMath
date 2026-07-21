@@ -922,6 +922,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
             sizeFactor: animation,
             axis: Axis.horizontal,
             alignment: Alignment.centerLeft,
+            fixedCrossAxisSizeFactor: 1,
             child: child,
           ),
         );
