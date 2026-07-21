@@ -12,13 +12,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 
 class BackupRestorePage extends ConsumerWidget {
-  const BackupRestorePage({super.key});
+  const BackupRestorePage({
+    super.key,
+    this.notificationService,
+  });
+
+  final NotificationService? notificationService;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -166,6 +172,7 @@ class BackupRestorePage extends ConsumerWidget {
 
   Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
     final scaffold = ScaffoldMessenger.of(context);
+    final notifications = notificationService ?? NotificationService.instance;
 
     // 确认对话框
     final confirmed = await showDialog<bool>(
@@ -188,7 +195,8 @@ class BackupRestorePage extends ConsumerWidget {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true || !context.mounted) return;
+    final backup = ref.read(backupServiceProvider);
 
     try {
       final result = await FilePicker.pickFiles(
@@ -200,14 +208,19 @@ class BackupRestorePage extends ConsumerWidget {
       final filePath = result.files.single.path;
       if (filePath == null) return;
 
-      final backup = ref.read(backupServiceProvider);
       final count = await backup.restoreFromFile(filePath);
+      final notificationsApplied =
+          await notifications.reconcileWithStoredSettings();
+      if (!context.mounted) return;
 
       // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
       invalidateAllHiveProviders(ref.invalidate);
 
+      final notificationMessage = notificationsApplied ? '' : '，但通知设置未完全应用';
       scaffold.showSnackBar(
-        SnackBar(content: Text('恢复成功，共恢复 $count 条记录')),
+        SnackBar(
+          content: Text('恢复成功，共恢复 $count 条记录$notificationMessage'),
+        ),
       );
     } on FormatException catch (e) {
       scaffold.showSnackBar(

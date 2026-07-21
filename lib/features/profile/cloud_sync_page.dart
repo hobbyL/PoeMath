@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/webdav_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -18,7 +19,12 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/webdav_config_page.dart';
 
 class CloudSyncPage extends ConsumerStatefulWidget {
-  const CloudSyncPage({super.key});
+  const CloudSyncPage({
+    super.key,
+    this.notificationService,
+  });
+
+  final NotificationService? notificationService;
 
   @override
   ConsumerState<CloudSyncPage> createState() => _CloudSyncPageState();
@@ -152,28 +158,34 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
 
     setState(() => _downloading = true);
-
-    if (!mounted) return;
     final scaffold = ScaffoldMessenger.of(context);
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    final webdav = ref.read(webDavServiceProvider);
+    final backup = ref.read(backupServiceProvider);
+    final notifications =
+        widget.notificationService ?? NotificationService.instance;
 
     try {
-      final settingsRepo = ref.read(settingsRepositoryProvider);
       final fullConfig =
           await settingsRepo.loadWebDavConfigWithCredentials(config);
-      final webdav = ref.read(webDavServiceProvider);
-      final backup = ref.read(backupServiceProvider);
       final json = await webdav.download(fullConfig);
       final count = await backup.restoreFromJson(json);
+      final notificationsApplied =
+          await notifications.reconcileWithStoredSettings();
+      if (!mounted) return;
 
       // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
       invalidateAllHiveProviders(ref.invalidate);
 
+      final notificationMessage = notificationsApplied ? '' : '，但通知设置未完全应用';
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
-        SnackBar(content: Text('恢复成功，共恢复 $count 条记录')),
+        SnackBar(
+          content: Text('恢复成功，共恢复 $count 条记录$notificationMessage'),
+        ),
       );
     } on WebDavException catch (e) {
       scaffold.clearSnackBars();

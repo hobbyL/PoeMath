@@ -40,6 +40,9 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin;
   final LocalTimeZoneIdentifierResolver _localTimeZoneIdentifierResolver;
+  Future<void>? _initializeFuture;
+  bool _initialized = false;
+  bool _lastReconciliationSucceeded = true;
 
   // ============ Hive 持久化键 ============
 
@@ -78,7 +81,20 @@ class NotificationService {
   ];
 
   /// 初始化通知插件。应用启动时调用一次。
-  Future<void> initialize() async {
+  Future<void> initialize() {
+    return _initializeFuture ??= _initializeOnce();
+  }
+
+  Future<void> _initializeOnce() async {
+    try {
+      await _initializePlugin();
+    } on Exception {
+      _initializeFuture = null;
+      rethrow;
+    }
+  }
+
+  Future<void> _initializePlugin() async {
     tz.initializeTimeZones();
     final timeZoneIdentifier = await _localTimeZoneIdentifierResolver();
     tz.setLocalLocation(tz.getLocation(timeZoneIdentifier));
@@ -100,23 +116,71 @@ class NotificationService {
     );
 
     await _plugin.initialize(settings);
+    _lastReconciliationSucceeded = await _reconcileStoredSchedules();
+    _initialized = true;
+  }
 
-    // 如果之前已开启提醒，重新调度（应用重启后恢复）
+  /// 根据 Hive 中的设置重新调度或取消设备通知。
+  Future<bool> reconcileWithStoredSettings() async {
+    if (!_initialized) {
+      try {
+        await initialize();
+        return _lastReconciliationSucceeded;
+      } on Exception catch (error) {
+        AppLogger.e(
+          '初始化通知服务失败，无法应用恢复设置',
+          tag: 'Notify',
+          error: error,
+        );
+        return false;
+      }
+    }
+    return _reconcileStoredSchedules();
+  }
+
+  Future<bool> _reconcileStoredSchedules() async {
+    var succeeded = true;
+
     if (isReminderEnabled) {
       final scheduled =
           await scheduleDailyReminder(reminderHour, reminderMinute);
       if (!scheduled) {
         await HiveBoxes.settings.put(_keyReminderEnabled, false);
+        succeeded = false;
+      }
+    } else {
+      try {
+        await cancelDailyReminder();
+      } on Exception catch (error) {
+        AppLogger.e(
+          '取消每日提醒失败',
+          tag: 'Notify',
+          error: error,
+        );
+        succeeded = false;
       }
     }
 
-    // 恢复周报通知
     if (isWeeklyReportEnabled) {
       final scheduled = await scheduleWeeklyReport();
       if (!scheduled) {
         await HiveBoxes.settings.put(_keyWeeklyEnabled, false);
+        succeeded = false;
+      }
+    } else {
+      try {
+        await cancelWeeklyReport();
+      } on Exception catch (error) {
+        AppLogger.e(
+          '取消周报通知失败',
+          tag: 'Notify',
+          error: error,
+        );
+        succeeded = false;
       }
     }
+
+    return succeeded;
   }
 
   // ============ 设置存取 ============
