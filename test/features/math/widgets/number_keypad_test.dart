@@ -167,35 +167,46 @@ void main() {
       expect(find.text('.'), findsNothing);
     });
 
-    testWidgets('键盘按钮高度应该 ≥56pt', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: NumberKeypad(
-              onNumberTap: (_) {},
-              onBackspace: () {},
-              onSubmit: () {},
+    testWidgets('普通、小数和余数模式的按钮高度都应该 ≥56pt', (tester) async {
+      for (final mode in const [
+        (showDecimal: false, showEllipsis: false),
+        (showDecimal: true, showEllipsis: false),
+        (showDecimal: false, showEllipsis: true),
+      ]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: NumberKeypad(
+                onNumberTap: (_) {},
+                onBackspace: () {},
+                onSubmit: () {},
+                showDecimal: mode.showDecimal,
+                showEllipsis: mode.showEllipsis,
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      // 查找所有 InkWell 的 Container（按钮容器）
-      final containers = tester.widgetList<Container>(
-        find.descendant(
-          of: find.byType(InkWell),
-          matching: find.byType(Container),
-        ),
-      );
+        // 查找所有 InkWell 的 Container（按钮容器）
+        final containers = tester.widgetList<Container>(
+          find.descendant(
+            of: find.byType(InkWell),
+            matching: find.byType(Container),
+          ),
+        );
 
-      for (final container in containers) {
-        final height = container.constraints?.minHeight ?? 0;
-        expect(height, greaterThanOrEqualTo(56),
-            reason: '键盘按钮高度应 ≥56pt',);
+        for (final container in containers) {
+          final height = container.constraints?.minHeight ?? 0;
+          expect(
+            height,
+            greaterThanOrEqualTo(56),
+            reason: '键盘按钮高度应 ≥56pt',
+          );
+        }
       }
     });
 
-    testWidgets('showEllipsis=true 时应该显示省略号键', (tester) async {
+    testWidgets('showEllipsis=true 时应该同时显示省略号和提交键', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -211,7 +222,7 @@ void main() {
 
       expect(find.text('…'), findsOneWidget);
       expect(find.text('.'), findsNothing);
-      expect(find.byIcon(Icons.check_rounded), findsNothing);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
     });
 
     testWidgets('showEllipsis=false 时不应该显示省略号键', (tester) async {
@@ -229,6 +240,26 @@ void main() {
       );
 
       expect(find.text('…'), findsNothing);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    });
+
+    testWidgets('小数与余数标记同时开启时省略号优先且保留提交键', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NumberKeypad(
+              onNumberTap: (_) {},
+              onBackspace: () {},
+              onSubmit: () {},
+              showDecimal: true,
+              showEllipsis: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('…'), findsOneWidget);
+      expect(find.text('.'), findsNothing);
       expect(find.byIcon(Icons.check_rounded), findsOneWidget);
     });
 
@@ -251,6 +282,29 @@ void main() {
       await tester.pump();
 
       expect(tappedDigit, '…');
+    });
+
+    testWidgets('特殊输入模式下点击提交仍然触发 onSubmit', (tester) async {
+      var submitPressed = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NumberKeypad(
+              onNumberTap: (_) {},
+              onBackspace: () {},
+              onSubmit: () => submitPressed = true,
+              showDecimal: true,
+              submitEnabled: true,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.check_rounded));
+      await tester.pump();
+
+      expect(submitPressed, isTrue);
     });
   });
 }

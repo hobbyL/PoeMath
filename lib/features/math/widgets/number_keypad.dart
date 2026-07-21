@@ -8,10 +8,11 @@ import 'package:poemath/core/theme/design_tokens.dart';
 /// 儿童友好数字键盘，用于口算练习答题。
 ///
 /// 特性：
-/// - 3×4 网格布局，按钮 ≥56pt（逻辑像素）
+/// - 前三行三列，最后一行按模式显示 3 或 4 个操作键
+/// - 按钮 ≥56pt（逻辑像素）
 /// - 0-9 数字 + 退格 + 提交
 /// - 按下有轻微视觉反馈
-/// - 可配置是否显示小数点（分数/余数模式不显示）
+/// - 可配置小数点或余数省略号，特殊输入模式仍保留提交键
 class NumberKeypad extends StatelessWidget {
   const NumberKeypad({
     super.key,
@@ -45,18 +46,24 @@ class NumberKeypad extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // 3×4 布局：1-9 在前 3 行，最后一行为 backspace / 0 / submit/decimal/ellipsis
-    // showEllipsis 优先级最高（余数模式）
-    // showDecimal 次之（小数模式）
-    // 否则显示提交按钮
-    final String lastKey =
-        showEllipsis ? '…' : (showDecimal ? '.' : '✓');
+    // 1-9 在前 3 行，最后一行始终保留提交按钮。
+    // showEllipsis 优先级最高（余数模式），showDecimal 次之（小数模式）。
+    final specialKey = showEllipsis
+        ? '…'
+        : showDecimal
+            ? '.'
+            : null;
 
     final keys = [
       ['1', '2', '3'],
       ['4', '5', '6'],
       ['7', '8', '9'],
-      ['⌫', '0', lastKey],
+      [
+        '⌫',
+        '0',
+        if (specialKey != null) specialKey,
+        '✓',
+      ],
     ];
 
     return Container(
@@ -104,9 +111,8 @@ class NumberKeypad extends StatelessWidget {
         ? theme.colorScheme.primary
         : theme.colorScheme.surfaceContainerHigh;
 
-    final textColor = isSubmit
-        ? theme.colorScheme.onPrimary
-        : theme.colorScheme.onSurface;
+    final textColor =
+        isSubmit ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
 
     return Material(
       color: buttonColor,
