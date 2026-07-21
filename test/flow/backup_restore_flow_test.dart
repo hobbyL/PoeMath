@@ -16,6 +16,7 @@ import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/user_stats.dart';
+import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 
 import '../helpers/hive_test_helper.dart';
@@ -167,6 +168,74 @@ void main() {
       () => backupService.restoreFromJson(jsonEncode(unknownTypeBackup)),
       throwsA(isA<FormatException>()),
     );
+  });
+
+  test('备份恢复活动结算标记且保留其他 meta 数据', () async {
+    await HiveBoxes.meta.put('device_meta', 'keep-me');
+    for (final channel in <String>[
+      ActivitySettlementLedger.userStatsChannel,
+      ActivitySettlementLedger.dailySummaryChannel,
+    ]) {
+      await ActivitySettlementLedger.runOnce(
+        channel: channel,
+        activityId: 'activity:1',
+        action: () async {},
+      );
+    }
+    final expectedKeys = ActivitySettlementLedger.completedKeys;
+    final json = backupService.exportToJson();
+
+    await ActivitySettlementLedger.replaceCompletedKeys(
+      const <String>[
+        'default_activity_settlement:user_stats:replacement',
+      ],
+    );
+    await backupService.restoreFromJson(json);
+
+    expect(ActivitySettlementLedger.completedKeys, expectedKeys);
+    expect(HiveBoxes.meta.get('device_meta'), 'keep-me');
+  });
+
+  test('旧备份缺少活动结算字段时保留当前标记', () async {
+    final legacy = jsonDecode(backupService.exportToJson())
+        as Map<String, dynamic>
+      ..remove('activitySettlements');
+    const currentKey =
+        'default_activity_settlement:daily_summary:current-activity';
+    await ActivitySettlementLedger.replaceCompletedKeys(
+      const <String>[currentKey],
+    );
+
+    await backupService.restoreFromJson(jsonEncode(legacy));
+
+    expect(ActivitySettlementLedger.completedKeys, const <String>[currentKey]);
+  });
+
+  test('非法或重复活动结算标记在修改数据前被拒绝', () async {
+    final existing = PoemProgress(
+      poemId: 'existing',
+      profileId: 'default',
+      status: LearningStatus.learning,
+    );
+    await HiveBoxes.poemProgress.put('default_existing', existing);
+    final invalid = jsonDecode(backupService.exportToJson())
+        as Map<String, dynamic>
+      ..['activitySettlements'] = <String>['device_meta'];
+
+    await expectLater(
+      backupService.restoreFromJson(jsonEncode(invalid)),
+      throwsA(isA<FormatException>()),
+    );
+    expect(HiveBoxes.poemProgress.get('default_existing'), isNotNull);
+
+    const validKey =
+        'default_activity_settlement:user_stats:duplicate-activity';
+    invalid['activitySettlements'] = <String>[validKey, validKey];
+    await expectLater(
+      backupService.restoreFromJson(jsonEncode(invalid)),
+      throwsA(isA<FormatException>()),
+    );
+    expect(HiveBoxes.poemProgress.get('default_existing'), isNotNull);
   });
 
   test('备份并恢复多种数据类型', () async {

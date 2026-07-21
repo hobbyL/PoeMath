@@ -101,5 +101,31 @@ void main() {
       ),
       throwsArgumentError,
     );
+    await expectLater(
+      ActivitySettlementLedger.runOnce(
+        channel: 'unknown',
+        activityId: 'activity-1',
+        action: () async {},
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('替换完成标记时拒绝非账本键且不修改现有标记', () async {
+    await ActivitySettlementLedger.runOnce(
+      channel: ActivitySettlementLedger.userStatsChannel,
+      activityId: 'activity-1',
+      action: () async {},
+    );
+    final before = ActivitySettlementLedger.completedKeys;
+
+    await expectLater(
+      ActivitySettlementLedger.replaceCompletedKeys(
+        const <String>['device_meta'],
+      ),
+      throwsArgumentError,
+    );
+
+    expect(ActivitySettlementLedger.completedKeys, before);
   });
 }

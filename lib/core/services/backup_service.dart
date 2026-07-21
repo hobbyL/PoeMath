@@ -22,6 +22,7 @@ import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/models/challenge_record.dart';
+import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 
 /// 备份数据版本号，用于兼容性检查。
@@ -44,6 +45,7 @@ class BackupService {
       'userStats': _exportUserStats(),
       'challengeRecords': _exportChallengeRecords(),
       'learningActivities': _exportLearningActivities(),
+      'activitySettlements': ActivitySettlementLedger.completedKeys,
       'settings': _exportSettings(),
     };
     return const JsonEncoder.withIndent('  ').convert(data);
@@ -126,6 +128,11 @@ class BackupService {
     count += await _restoreLearningActivities(
       data['learningActivities'] as List<dynamic>? ?? [],
     );
+    if (data.containsKey('activitySettlements')) {
+      await ActivitySettlementLedger.replaceCompletedKeys(
+        (data['activitySettlements'] as List<dynamic>).cast<String>(),
+      );
+    }
     if (data.containsKey('settings')) {
       await _restoreSettings(data['settings'] as Map<String, dynamic>);
     }
@@ -607,6 +614,7 @@ class BackupService {
     _validateList(data, 'challengeRecords', _validateChallengeRecord);
     _validateList(data, 'learningActivities', _validateLearningActivity);
     _validateUniqueLearningActivityIds(data);
+    _validateActivitySettlements(data);
 
     if (data.containsKey('settings')) {
       final settings = data['settings'];
@@ -617,6 +625,25 @@ class BackupService {
     }
 
     return data;
+  }
+
+  void _validateActivitySettlements(Map<String, dynamic> data) {
+    if (!data.containsKey('activitySettlements')) return;
+    final value = data['activitySettlements'];
+    if (value is! List<Object?>) {
+      _invalidField('activitySettlements', '必须是 JSON 数组');
+    }
+
+    final keys = <String>{};
+    for (var index = 0; index < value.length; index++) {
+      final key = value[index];
+      if (key is! String || !ActivitySettlementLedger.isSettlementKey(key)) {
+        _invalidField('activitySettlements[$index]', '不是有效的活动结算标记');
+      }
+      if (!keys.add(key)) {
+        _invalidField('activitySettlements[$index]', '活动结算标记重复');
+      }
+    }
   }
 
   void _validateList(
