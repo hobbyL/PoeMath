@@ -19,11 +19,15 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
+import 'package:poemath/features/poem/widgets/read_along_voice_status_button.dart';
 
 /// 跟读状态。
 enum _ReadAlongPhase {
   /// 等待用户操作。
   idle,
+
+  /// 准备初始化模型、权限和录音。
+  preparing,
 
   /// TTS 范读中。
   modelReading,
@@ -56,10 +60,13 @@ class PoemReadAlongPage extends ConsumerStatefulWidget {
 }
 
 class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
+  static const _maxRecordingDurationSeconds = 15;
+
   late final SpeechRecognitionService _speech;
   late final TtsService _tts;
   bool _speechAvailable = false;
   Timer? _recordingTimer;
+  Future<void>? _speechInitialization;
   SpeechRecognitionSource _recognitionSource = SpeechRecognitionSource.local;
 
   /// 诗句列表（按换行拆分）。
@@ -80,6 +87,9 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   /// 当前实时识别文本。
   String _liveText = '';
 
+  /// 当前录音已持续秒数。
+  int _recordingElapsedSeconds = 0;
+
   @override
   void initState() {
     super.initState();
@@ -93,6 +103,24 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   String _speechUnavailableReason = '';
 
   Future<void> _initSpeech() async {
+    final existingInitialization = _speechInitialization;
+    if (existingInitialization != null) {
+      await existingInitialization;
+      return;
+    }
+
+    final initialization = _initializeSpeech();
+    _speechInitialization = initialization;
+    try {
+      await initialization;
+    } finally {
+      if (identical(_speechInitialization, initialization)) {
+        _speechInitialization = null;
+      }
+    }
+  }
+
+  Future<void> _initializeSpeech() async {
     try {
       await _speech.initialize();
       _speechAvailable = true;
@@ -200,14 +228,25 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   // ============ 语音识别录制 ============
 
   Future<void> _startRecording() async {
+    if (!mounted ||
+        (_phase != _ReadAlongPhase.idle && _phase != _ReadAlongPhase.scored)) {
+      return;
+    }
+    setState(() {
+      _phase = _ReadAlongPhase.preparing;
+      _liveText = '';
+      _recordingElapsedSeconds = 0;
+    });
+
     if (!_speechAvailable) {
       await _initSpeech();
       if (!_speechAvailable && mounted) {
+        setState(() => _phase = _ReadAlongPhase.idle);
         _showSpeechUnavailableDialog();
       }
       if (!_speechAvailable) return;
     }
-    if (!mounted) return;
+    if (!mounted || _phase != _ReadAlongPhase.preparing) return;
 
     // 停止 TTS
     final scaffold = ScaffoldMessenger.of(context);
@@ -221,6 +260,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         stackTrace: stackTrace,
       );
       if (mounted) {
+        setState(() => _phase = _ReadAlongPhase.idle);
         scaffold.clearSnackBars();
         scaffold.showSnackBar(
           const SnackBar(content: Text('无法开始跟读，请稍后重试')),
@@ -229,23 +269,28 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       return;
     }
 
-    setState(() {
-      _phase = _ReadAlongPhase.recording;
-      _liveText = '';
-    });
+    if (!mounted || _phase != _ReadAlongPhase.preparing) return;
+
     try {
       await _speech.start(
         onPartialResult: (text) {
-          if (mounted && _phase == _ReadAlongPhase.recording) {
+          if (mounted &&
+              (_phase == _ReadAlongPhase.preparing ||
+                  _phase == _ReadAlongPhase.recording)) {
             setState(() => _liveText = text);
           }
         },
       );
-      if (!mounted) return;
-      _recordingTimer = Timer(
-        const Duration(seconds: 15),
-        () => unawaited(_stopRecording()),
-      );
+      if (!mounted) {
+        await _speech.cancel();
+        return;
+      }
+      if (_phase != _ReadAlongPhase.preparing) {
+        await _speech.cancel();
+        return;
+      }
+      setState(() => _phase = _ReadAlongPhase.recording);
+      _startRecordingTimer();
     } on SpeechPermissionDeniedException {
       if (mounted) setState(() => _phase = _ReadAlongPhase.idle);
       _speechUnavailableReason = '未获得麦克风权限';
@@ -277,6 +322,25 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         );
       }
     }
+  }
+
+  void _startRecordingTimer() {
+    _recordingTimer?.cancel();
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _phase != _ReadAlongPhase.recording) {
+        timer.cancel();
+        _recordingTimer = null;
+        return;
+      }
+
+      final elapsed = _recordingElapsedSeconds + 1;
+      setState(() => _recordingElapsedSeconds = elapsed);
+      if (elapsed >= _maxRecordingDurationSeconds) {
+        timer.cancel();
+        _recordingTimer = null;
+        unawaited(_stopRecording());
+      }
+    });
   }
 
   void _showSpeechUnavailableDialog() {
@@ -605,7 +669,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                   horizontal: SpacingTokens.lg,
                   vertical: SpacingTokens.md,
                 ),
-                child: _buildActionButtons(theme),
+                child: _buildActionArea(),
               ),
             )
           : null,
@@ -747,23 +811,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     if (_phase == _ReadAlongPhase.recording) {
       return Column(
         children: [
-          // 录音动画
-          Icon(
-            Icons.mic,
-            size: 48,
-            color: theme.colorScheme.error,
-          )
-              .animate(onPlay: (c) => c.repeat(reverse: true))
-              .scale(
-                begin: const Offset(0.8, 0.8),
-                end: const Offset(1.2, 1.2),
-                duration: 600.ms,
-              )
-              .then()
-              .fadeOut(duration: 300.ms)
-              .then()
-              .fadeIn(duration: 300.ms),
-          const SizedBox(height: SpacingTokens.sm),
           Text(
             _liveText.isEmpty ? '请开始朗读…' : _liveText,
             style: theme.textTheme.bodyLarge?.copyWith(
@@ -778,8 +825,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     if (_phase == _ReadAlongPhase.processing) {
       return Column(
         children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: SpacingTokens.sm),
           Text(
             '正在生成识别结果…',
             style: theme.textTheme.bodyLarge?.copyWith(
@@ -860,7 +905,52 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     );
   }
 
-  Widget _buildActionButtons(ThemeData theme) {
+  Widget _buildActionArea() {
+    final mediaQuery = MediaQuery.of(context);
+    final reduceMotion =
+        mediaQuery.disableAnimations || mediaQuery.accessibleNavigation;
+
+    return AnimatedSwitcher(
+      duration:
+          reduceMotion ? Duration.zero : const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            axis: Axis.horizontal,
+            alignment: Alignment.centerLeft,
+            child: child,
+          ),
+        );
+      },
+      layoutBuilder: (currentChild, previousChildren) {
+        return currentChild ?? const SizedBox.shrink();
+      },
+      child: KeyedSubtree(
+        key: ValueKey(_actionAreaKey),
+        child: _buildActionButtons(),
+      ),
+    );
+  }
+
+  Object get _actionAreaKey {
+    switch (_phase) {
+      case _ReadAlongPhase.preparing:
+      case _ReadAlongPhase.recording:
+      case _ReadAlongPhase.processing:
+        return 'voice-status';
+      case _ReadAlongPhase.idle:
+      case _ReadAlongPhase.modelReading:
+      case _ReadAlongPhase.scored:
+      case _ReadAlongPhase.complete:
+        return _phase;
+    }
+  }
+
+  Widget _buildActionButtons() {
     switch (_phase) {
       case _ReadAlongPhase.idle:
         return Row(
@@ -893,30 +983,25 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
           ),
         );
 
+      case _ReadAlongPhase.preparing:
+        return const ReadAlongVoiceStatusButton(
+          status: ReadAlongVoiceStatus.preparing,
+          elapsedSeconds: 0,
+          onPressed: null,
+        );
+
       case _ReadAlongPhase.recording:
-        return SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: () => unawaited(_stopRecording()),
-            style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.error,
-            ),
-            icon: const Icon(Icons.stop),
-            label: const Text('结束录音'),
-          ),
+        return ReadAlongVoiceStatusButton(
+          status: ReadAlongVoiceStatus.recording,
+          elapsedSeconds: _recordingElapsedSeconds,
+          onPressed: () => unawaited(_stopRecording()),
         );
 
       case _ReadAlongPhase.processing:
-        return SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: null,
-            icon: const SizedBox.square(
-              dimension: SpacingTokens.md,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            label: const Text('识别中'),
-          ),
+        return const ReadAlongVoiceStatusButton(
+          status: ReadAlongVoiceStatus.processing,
+          elapsedSeconds: 0,
+          onPressed: null,
         );
 
       case _ReadAlongPhase.scored:
