@@ -41,6 +41,7 @@ import 'package:poemath/features/profile/achievement_page.dart';
 import 'package:poemath/features/profile/learning_stats_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
+import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 import 'package:poemath/features/profile/update_page.dart';
 import 'package:poemath/features/profile/weekly_report_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
@@ -228,6 +229,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const SettingsPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.speechRecognitionSettings,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const SpeechRecognitionSettingsPage(),
         ),
       ),
       // ============ 学习报告（非 Shell 子路由，全屏） ============

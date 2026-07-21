@@ -56,6 +56,12 @@ void main() {
     expect(find.text('云端同步'), findsOneWidget);
 
     await tester.scrollUntilVisible(
+      find.text('语音识别设置'),
+      50,
+    );
+    expect(find.text('语音识别设置'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
       find.text('关于韵算'),
       50,
     );

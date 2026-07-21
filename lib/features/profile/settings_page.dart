@@ -66,9 +66,8 @@ class SettingsPage extends ConsumerWidget {
     // 音频设置 subtitle
     final rawVoiceName = settingsRepo.ttsVoice?['name'];
     // 如果 voiceName 是纯 locale code（如 "zh"），映射为友好名称
-    final voiceLabel = rawVoiceName != null
-        ? _friendlyVoiceName(rawVoiceName)
-        : null;
+    final voiceLabel =
+        rawVoiceName != null ? _friendlyVoiceName(rawVoiceName) : null;
     final audioSubtitle = voiceLabel != null
         ? '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)} · $voiceLabel'
         : '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)}';
@@ -94,9 +93,8 @@ class SettingsPage extends ConsumerWidget {
 
             // 外观模式
             AppTile(
-              icon: isDark
-                  ? Icons.dark_mode_outlined
-                  : Icons.light_mode_outlined,
+              icon:
+                  isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
               iconColor: theme.colorScheme.secondary,
               title: '外观模式',
               subtitle: modeLabel,
@@ -156,9 +154,7 @@ class SettingsPage extends ConsumerWidget {
               icon: Icons.vibration_outlined,
               iconColor: theme.colorScheme.error,
               title: '触觉反馈',
-              subtitle: settingsRepo.hapticEnabled
-                  ? '已开启（需真机体验）'
-                  : '已关闭',
+              subtitle: settingsRepo.hapticEnabled ? '已开启（需真机体验）' : '已关闭',
               trailing: Switch(
                 value: settingsRepo.hapticEnabled,
                 onChanged: (v) async {
@@ -179,6 +175,18 @@ class SettingsPage extends ConsumerWidget {
 
             // 通知设置（学习提醒 + 周报推送 → 子页面）
             _buildNotificationSettings(context),
+            const SizedBox(height: SpacingTokens.md),
+
+            // 语音识别设置
+            AppTile(
+              icon: Icons.record_voice_over_outlined,
+              iconColor: theme.colorScheme.primary,
+              title: '语音识别设置',
+              subtitle: settingsRepo.tencentAsrHighAccuracyEnabled
+                  ? '高精度云端识别已开启'
+                  : '默认使用离线识别',
+              onTap: () => context.push(AppRoutes.speechRecognitionSettings),
+            ),
             const SizedBox(height: SpacingTokens.md),
 
             // 备份与恢复

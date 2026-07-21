@@ -40,6 +40,8 @@ class AppRoutes {
   static const String splash = '/splash';
   static const String onboarding = '/onboarding';
   static const String settings = '/profile/settings';
+  static const String speechRecognitionSettings =
+      '/profile/settings/speech-recognition';
   static const String learningStats = '/profile/stats';
   static const String learningCalendar = '/profile/calendar';
   static const String achievements = '/profile/achievements';
