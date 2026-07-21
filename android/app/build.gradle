@@ -90,6 +90,15 @@ android {
         targetSdk = 35
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
+
+        // --target-platform only limits Flutter's own native artifacts.
+        // Filter transitive sherpa/ONNX jniLibs at packaging time as well.
+        if (isRequestedReleaseBuild) {
+            ndk {
+                abiFilters.clear()
+                abiFilters.add("arm64-v8a")
+            }
+        }
     }
 
     signingConfigs {

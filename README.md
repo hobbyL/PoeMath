@@ -101,10 +101,11 @@ flutter analyze
 flutter build apk --release --target-platform android-arm64
 ```
 
-正式发布包仅包含 `arm64-v8a`，适用于绝大多数现代 Android 真机。该策略保留
-单 APK 的应用内更新流程，并避免把 ARMv7、x86_64 的 Flutter、ONNX Runtime
-和 sherpa-onnx 原生库重复打入同一个安装包；32 位 ARM 设备和 x86_64 模拟器
-不在正式发布包的支持范围内。开发调试构建不受此限制。
+正式发布包仅包含 `arm64-v8a`，适用于绝大多数现代 Android 真机。除了构建命令
+指定 `--target-platform android-arm64`，Release 构建还会在 Gradle 打包层过滤
+第三方插件的 JNI 库，避免 `sherpa_onnx` 依赖的 ARMv7、x86_64 ONNX Runtime
+进入同一个安装包。32 位 ARM 设备和 x86_64 模拟器不在正式发布包的支持范围
+内，Debug 构建不受此限制。
 
 ## CI/CD
 
