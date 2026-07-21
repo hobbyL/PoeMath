@@ -98,8 +98,13 @@ flutter test
 flutter analyze
 
 # 构建 Release APK
-flutter build apk --release
+flutter build apk --release --target-platform android-arm64
 ```
+
+正式发布包仅包含 `arm64-v8a`，适用于绝大多数现代 Android 真机。该策略保留
+单 APK 的应用内更新流程，并避免把 ARMv7、x86_64 的 Flutter、ONNX Runtime
+和 sherpa-onnx 原生库重复打入同一个安装包；32 位 ARM 设备和 x86_64 模拟器
+不在正式发布包的支持范围内。开发调试构建不受此限制。
 
 ## CI/CD
 
@@ -120,7 +125,7 @@ analyze → test
 打 `v*` 格式的 tag 时自动触发完整构建并发布到 GitHub Release：
 
 ```
-analyze → test → build release APK → 创建 GitHub Release
+analyze → test → build ARM64 release APK → 创建 GitHub Release
 ```
 
 #### 使用方式
