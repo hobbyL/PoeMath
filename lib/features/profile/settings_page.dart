@@ -21,10 +21,17 @@ import 'package:poemath/features/profile/backup_restore_page.dart';
 import 'package:poemath/features/profile/cloud_sync_page.dart';
 import 'package:poemath/features/profile/notification_settings_page.dart';
 import 'package:poemath/features/profile/practice_settings_page.dart';
+import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 import 'package:poemath/features/profile/tts_settings_page.dart';
 
+enum _SettingsSection { hub, appearance, sound, learning, data }
+
 class SettingsPage extends ConsumerWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key}) : _section = _SettingsSection.hub;
+
+  const SettingsPage._category(this._section);
+
+  final _SettingsSection _section;
 
   /// 将原始 voice name 映射为友好名称（用于 subtitle 显示）。
   static String _friendlyVoiceName(String name) {
@@ -72,8 +79,16 @@ class SettingsPage extends ConsumerWidget {
         ? '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)} · $voiceLabel'
         : '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)}';
 
+    final pageTitle = switch (_section) {
+      _SettingsSection.hub => '设置',
+      _SettingsSection.appearance => '外观与显示',
+      _SettingsSection.sound => '声音与交互',
+      _SettingsSection.learning => '学习与提醒',
+      _SettingsSection.data => '数据与同步',
+    };
+
     return Scaffold(
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(title: Text(pageTitle)),
       body: SafeArea(
         child: AnimatedPageBody(
           padding: const EdgeInsets.symmetric(
@@ -81,156 +96,243 @@ class SettingsPage extends ConsumerWidget {
             vertical: SpacingTokens.sm,
           ),
           children: <Widget>[
+            if (_section == _SettingsSection.hub)
+              AppTile(
+                icon: Icons.palette_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '外观与显示',
+                subtitle: '主题、明暗模式与拼音显示',
+                onTap: () => _openSection(
+                  context,
+                  _SettingsSection.appearance,
+                ),
+              ),
+            if (_section == _SettingsSection.hub)
+              const SizedBox(height: SpacingTokens.sm),
+            if (_section == _SettingsSection.hub)
+              AppTile(
+                icon: Icons.volume_up_outlined,
+                iconColor: theme.semantic.caution,
+                title: '声音与交互',
+                subtitle: '朗读、语音识别、音效与触觉反馈',
+                onTap: () => _openSection(context, _SettingsSection.sound),
+              ),
+            if (_section == _SettingsSection.hub)
+              const SizedBox(height: SpacingTokens.sm),
+            if (_section == _SettingsSection.hub)
+              AppTile(
+                icon: Icons.tune_outlined,
+                iconColor: theme.colorScheme.secondary,
+                title: '学习与提醒',
+                subtitle: '练习设置、每日目标与学习提醒',
+                onTap: () => _openSection(context, _SettingsSection.learning),
+              ),
+            if (_section == _SettingsSection.hub)
+              const SizedBox(height: SpacingTokens.sm),
+            if (_section == _SettingsSection.hub)
+              AppTile(
+                icon: Icons.cloud_sync_outlined,
+                iconColor: theme.colorScheme.tertiary,
+                title: '数据与同步',
+                subtitle: '本地备份与 WebDAV 云端同步',
+                onTap: () => _openSection(context, _SettingsSection.data),
+              ),
+            if (_section == _SettingsSection.hub)
+              const SizedBox(height: SpacingTokens.sm),
+
             // 主题设置
-            AppTile(
-              icon: Icons.palette_outlined,
-              iconColor: theme.colorScheme.primary,
-              title: '主题设置',
-              subtitle: subjectLabel,
-              onTap: () => _showSubjectPicker(context, ref, subject),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
+            if (_section == _SettingsSection.appearance)
+              AppTile(
+                icon: Icons.palette_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '主题设置',
+                subtitle: subjectLabel,
+                onTap: () => _showSubjectPicker(context, ref, subject),
+              ),
+            if (_section == _SettingsSection.appearance)
+              const SizedBox(height: SpacingTokens.sm),
 
             // 外观模式
-            AppTile(
-              icon:
-                  isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
-              iconColor: theme.colorScheme.secondary,
-              title: '外观模式',
-              subtitle: modeLabel,
-              onTap: () => _showThemeModePicker(context, ref, mode),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
+            if (_section == _SettingsSection.appearance)
+              AppTile(
+                icon: isDark
+                    ? Icons.dark_mode_outlined
+                    : Icons.light_mode_outlined,
+                iconColor: theme.colorScheme.secondary,
+                title: '外观模式',
+                subtitle: modeLabel,
+                onTap: () => _showThemeModePicker(context, ref, mode),
+              ),
+            if (_section == _SettingsSection.appearance)
+              const SizedBox(height: SpacingTokens.sm),
 
             // 音频设置（语速 + 音色 → 子页面）
-            AppTile(
-              icon: Icons.volume_up_outlined,
-              iconColor: theme.semantic.caution,
-              title: '音频设置',
-              subtitle: audioSubtitle,
-              onTap: () => Navigator.push<void>(
-                context,
-                fadeSlideRoute(
-                  builder: (_) => const TtsSettingsPage(),
+            if (_section == _SettingsSection.sound)
+              AppTile(
+                icon: Icons.volume_up_outlined,
+                iconColor: theme.semantic.caution,
+                title: '音频设置',
+                subtitle: audioSubtitle,
+                onTap: () => Navigator.push<void>(
+                  context,
+                  fadeSlideRoute(
+                    builder: (_) => const TtsSettingsPage(),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
+            if (_section == _SettingsSection.sound)
+              const SizedBox(height: SpacingTokens.sm),
 
             // 拼音显示
-            AppTile(
-              icon: Icons.text_fields_outlined,
-              iconColor: theme.semantic.success,
-              title: '拼音显示',
-              subtitle: settingsRepo.pinyinVisible ? '已开启' : '已关闭',
-              trailing: Switch(
-                value: settingsRepo.pinyinVisible,
-                onChanged: (v) async {
-                  await settingsRepo.setPinyinVisible(v);
-                  ref.invalidate(settingsRepositoryProvider);
-                },
+            if (_section == _SettingsSection.appearance)
+              AppTile(
+                icon: Icons.text_fields_outlined,
+                iconColor: theme.semantic.success,
+                title: '拼音显示',
+                subtitle: settingsRepo.pinyinVisible ? '已开启' : '已关闭',
+                trailing: Switch(
+                  value: settingsRepo.pinyinVisible,
+                  onChanged: (v) async {
+                    await settingsRepo.setPinyinVisible(v);
+                    if (context.mounted) {
+                      ref.invalidate(settingsRepositoryProvider);
+                    }
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-
-            // 音效
-            AppTile(
-              icon: Icons.music_note_outlined,
-              iconColor: theme.colorScheme.tertiary,
-              title: '音效',
-              subtitle: settingsRepo.soundEnabled ? '已开启' : '已关闭',
-              trailing: Switch(
-                value: settingsRepo.soundEnabled,
-                onChanged: (v) async {
-                  await settingsRepo.setSoundEnabled(v);
-                  ref.invalidate(settingsRepositoryProvider);
-                },
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-
-            // 触觉反馈
-            AppTile(
-              icon: Icons.vibration_outlined,
-              iconColor: theme.colorScheme.error,
-              title: '触觉反馈',
-              subtitle: settingsRepo.hapticEnabled ? '已开启（需真机体验）' : '已关闭',
-              trailing: Switch(
-                value: settingsRepo.hapticEnabled,
-                onChanged: (v) async {
-                  await settingsRepo.setHapticEnabled(v);
-                  ref.invalidate(settingsRepositoryProvider);
-                  // 开启时触发一次测试震动
-                  if (v) {
-                    await HapticFeedback.mediumImpact();
-                  }
-                },
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-
-            // 练习设置（每组题数 + 难度 + 每日目标）
-            _buildPracticeSettings(context, ref),
-            const SizedBox(height: SpacingTokens.md),
-
-            // 通知设置（学习提醒 + 周报推送 → 子页面）
-            _buildNotificationSettings(context),
-            const SizedBox(height: SpacingTokens.md),
+            if (_section == _SettingsSection.appearance)
+              const SizedBox(height: SpacingTokens.md),
 
             // 语音识别设置
-            AppTile(
-              icon: Icons.record_voice_over_outlined,
-              iconColor: theme.colorScheme.primary,
-              title: '语音识别设置',
-              subtitle: settingsRepo.tencentAsrHighAccuracyEnabled
-                  ? '高精度云端识别已开启'
-                  : '默认使用离线识别',
-              onTap: () => context.push(AppRoutes.speechRecognitionSettings),
-            ),
-            const SizedBox(height: SpacingTokens.md),
+            if (_section == _SettingsSection.sound)
+              AppTile(
+                icon: Icons.record_voice_over_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '语音识别设置',
+                subtitle: settingsRepo.tencentAsrHighAccuracyEnabled
+                    ? '高精度云端识别已开启'
+                    : '默认使用离线识别',
+                onTap: () => Navigator.push<void>(
+                  context,
+                  fadeSlideRoute(
+                    builder: (_) => const SpeechRecognitionSettingsPage(),
+                  ),
+                ),
+              ),
+            if (_section == _SettingsSection.sound)
+              const SizedBox(height: SpacingTokens.sm),
+
+            // 音效
+            if (_section == _SettingsSection.sound)
+              AppTile(
+                icon: Icons.music_note_outlined,
+                iconColor: theme.colorScheme.tertiary,
+                title: '音效',
+                subtitle: settingsRepo.soundEnabled ? '已开启' : '已关闭',
+                trailing: Switch(
+                  value: settingsRepo.soundEnabled,
+                  onChanged: (v) async {
+                    await settingsRepo.setSoundEnabled(v);
+                    if (context.mounted) {
+                      ref.invalidate(settingsRepositoryProvider);
+                    }
+                  },
+                ),
+              ),
+            if (_section == _SettingsSection.sound)
+              const SizedBox(height: SpacingTokens.sm),
+
+            // 触觉反馈
+            if (_section == _SettingsSection.sound)
+              AppTile(
+                icon: Icons.vibration_outlined,
+                iconColor: theme.colorScheme.error,
+                title: '触觉反馈',
+                subtitle: settingsRepo.hapticEnabled ? '已开启（需真机体验）' : '已关闭',
+                trailing: Switch(
+                  value: settingsRepo.hapticEnabled,
+                  onChanged: (v) async {
+                    await settingsRepo.setHapticEnabled(v);
+                    if (context.mounted) {
+                      ref.invalidate(settingsRepositoryProvider);
+                    }
+                    // 开启时触发一次测试震动
+                    if (v) {
+                      await HapticFeedback.mediumImpact();
+                    }
+                  },
+                ),
+              ),
+            if (_section == _SettingsSection.sound)
+              const SizedBox(height: SpacingTokens.md),
+
+            // 练习设置（每组题数 + 难度 + 每日目标）
+            if (_section == _SettingsSection.learning)
+              _buildPracticeSettings(context, ref),
+            if (_section == _SettingsSection.learning)
+              const SizedBox(height: SpacingTokens.sm),
+
+            // 通知设置（学习提醒 + 周报推送 → 子页面）
+            if (_section == _SettingsSection.learning)
+              _buildNotificationSettings(context),
+            if (_section == _SettingsSection.learning)
+              const SizedBox(height: SpacingTokens.md),
 
             // 备份与恢复
-            AppTile(
-              icon: Icons.folder_outlined,
-              iconColor: theme.colorScheme.primary,
-              title: '备份与恢复',
-              subtitle: '导出或恢复学习数据',
-              onTap: () => Navigator.push<void>(
-                context,
-                fadeSlideRoute(
-                  builder: (_) => const BackupRestorePage(),
+            if (_section == _SettingsSection.data)
+              AppTile(
+                icon: Icons.folder_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '备份与恢复',
+                subtitle: '导出或恢复学习数据',
+                onTap: () => Navigator.push<void>(
+                  context,
+                  fadeSlideRoute(
+                    builder: (_) => const BackupRestorePage(),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
+            if (_section == _SettingsSection.data)
+              const SizedBox(height: SpacingTokens.sm),
 
             // 云端同步
-            AppTile(
-              icon: Icons.cloud_sync_outlined,
-              iconColor: theme.colorScheme.tertiary,
-              title: '云端同步',
-              subtitle: '通过 WebDAV 同步数据',
-              onTap: () => Navigator.push<void>(
-                context,
-                fadeSlideRoute(
-                  builder: (_) => const CloudSyncPage(),
+            if (_section == _SettingsSection.data)
+              AppTile(
+                icon: Icons.cloud_sync_outlined,
+                iconColor: theme.colorScheme.tertiary,
+                title: '云端同步',
+                subtitle: '通过 WebDAV 同步数据',
+                onTap: () => Navigator.push<void>(
+                  context,
+                  fadeSlideRoute(
+                    builder: (_) => const CloudSyncPage(),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: SpacingTokens.md),
+            if (_section == _SettingsSection.data)
+              const SizedBox(height: SpacingTokens.md),
 
             // 关于
-            AppTile(
-              icon: Icons.info_outline,
-              iconColor: theme.colorScheme.onSurfaceVariant,
-              title: '关于韵算',
-              subtitle: '版本信息、隐私政策',
-              onTap: () => context.push(AppRoutes.about),
-            ),
-            const SizedBox(height: SpacingTokens.md),
+            if (_section == _SettingsSection.hub)
+              AppTile(
+                icon: Icons.info_outline,
+                iconColor: theme.colorScheme.onSurfaceVariant,
+                title: '关于韵算',
+                subtitle: '版本信息、更新与隐私政策',
+                onTap: () => context.push(AppRoutes.about),
+              ),
+            if (_section == _SettingsSection.hub)
+              const SizedBox(height: SpacingTokens.md),
           ],
         ),
       ),
+    );
+  }
+
+  void _openSection(BuildContext context, _SettingsSection section) {
+    Navigator.push<void>(
+      context,
+      fadeSlideRoute(builder: (_) => SettingsPage._category(section)),
     );
   }
 

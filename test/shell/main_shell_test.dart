@@ -109,8 +109,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('设置'), findsOneWidget);
-    expect(find.text('主题设置'), findsOneWidget);
-    expect(find.text('外观模式'), findsOneWidget);
+    expect(find.text('外观与显示'), findsOneWidget);
+    expect(find.text('声音与交互'), findsOneWidget);
+    expect(find.text('数据与同步'), findsOneWidget);
 
     // 消耗剩余 flutter_animate 计时器
     await tester.pump(const Duration(seconds: 2));
