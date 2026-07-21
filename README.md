@@ -26,6 +26,7 @@
 - 💾 **数据备份/恢复**（可选）：一键导出学习数据为 JSON，跨设备恢复
 - ☁️ **WebDAV 云端同步**（可选）：同步到**用户自有** WebDAV，凭据加密存储
 - 🔄 **应用内更新**（可选）：检查新版本、下载 APK、校验安装（需配置更新源）
+- 🎙️ **混合语音识别**：Sherpa-ONNX 中文模型默认离线识别；家长可配置腾讯云一句话识别，失败自动回退本地结果
 - 🔒 **隐私友好**：不收集个人信息到开发者服务器；无广告、无内购、无分析追踪 SDK
 
 ## 功能截图
@@ -39,7 +40,8 @@
 | UI | Flutter 3.44 + Material Design 3 |
 | 状态管理 | Riverpod (Provider/StateProvider/Family) |
 | 路由 | GoRouter (Navigator 2.0) |
-| 本地存储 | Hive (NoSQL) + flutter_secure_storage (加密凭据) |
+| 本地存储 | Hive (NoSQL) + flutter_secure_storage (WebDAV / 腾讯云凭据) |
+| 语音识别 | Sherpa-ONNX Zipformer 14M mobile INT8 + 可选腾讯云 SentenceRecognition |
 | 口算引擎 | 纯 Dart (lib/math_engine/) |
 | 主题系统 | 双主题（国风水墨 / 童趣马卡龙）|
 | 导航 | 4-Tab NavigationBar（首页/诗词/口算/我的）|
@@ -52,7 +54,7 @@ lib/
 │   ├── routing/       # GoRouter 路由定义
 │   ├── theme/         # 双主题系统 (诗词/口算)
 │   ├── widgets/       # 共享组件 (ColoredCard, AppTile, ConfettiOverlay, CelebrationDialog)
-│   └── services/      # TTS、音效、触觉、备份、应用更新服务
+│   └── services/      # 语音识别、TTS、音效、触觉、备份、应用更新服务
 ├── data/              # Hive 模型、仓储、Provider
 │   ├── models/        # 15 个 Hive 模型
 │   └── repositories/  # 14 个仓储类
@@ -240,7 +242,8 @@ cat keystore.b64 | pbcopy
 - ✅ **离线优先**：核心学习不依赖网络，飞行模式可用
 - ✅ 不收集个人信息到开发者服务器；无广告 / 分析 / 追踪 SDK
 - ✅ 无内购或付费功能
-- ✅ 学习数据主要保存在本机；Android 可能按系统设置备份或迁移，WebDAV / 检查更新 / 跟读 / 通知需用户主动操作或授权
+- ✅ 跟读默认使用本地 Sherpa-ONNX；腾讯云高精度识别需家长填写 AK/SK、通过真实录音测试并主动开启
+- ✅ 学习数据主要保存在本机；Android 可能按系统设置备份或迁移，WebDAV / 检查更新 / 腾讯云识别 / 通知需用户主动操作或授权
 - ✅ 权限与行为对照见隐私政策正文（含 `INTERNET`、麦克风、通知、安装 APK 等说明）
 - ✅ 联系方式：应用内关于页；开源发行可通过仓库 Issue（客服邮箱待渠道确定后补充）
 
