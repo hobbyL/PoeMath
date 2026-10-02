@@ -29,6 +29,7 @@ import 'package:poemath/core/services/speech/tencent_asr_client.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/services/haptic_service.dart';
+import 'package:poemath/core/services/tts/tencent_tts_client.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/services/webdav_service.dart';
 
@@ -125,13 +126,22 @@ final webDavServiceProvider = Provider<WebDavService>((ref) {
 
 final ttsServiceProvider = Provider<TtsService>((ref) {
   final settings = ref.watch(settingsRepositoryProvider);
-  final service = TtsService(settings);
+  final service = TtsService(
+    settings,
+    cloudClient: ref.watch(tencentTtsClientProvider),
+  );
   ref.onDispose(service.dispose);
   return service;
 });
 
 final tencentAsrClientProvider = Provider<TencentAsrClient>((ref) {
   final client = TencentAsrClient();
+  ref.onDispose(client.close);
+  return client;
+});
+
+final tencentTtsClientProvider = Provider<TencentTtsClient>((ref) {
+  final client = TencentTtsClient();
   ref.onDispose(client.close);
   return client;
 });

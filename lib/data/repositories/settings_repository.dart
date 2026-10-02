@@ -9,6 +9,7 @@ import 'package:crypto/crypto.dart';
 
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
+import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 
@@ -36,6 +37,8 @@ class SettingsRepository {
   static const String _keyTencentAsrCredentialFingerprint =
       'tencent_asr_credential_fingerprint';
   static const String _keyTencentAsrVerifiedAt = 'tencent_asr_verified_at';
+  static const String _keyTtsCloudEnabled = 'tts_cloud_enabled';
+  static const String _keyTtsCloudVoiceType = 'tts_cloud_voice_type';
 
   // ============ 主题 ============
 
@@ -111,6 +114,26 @@ class SettingsRepository {
     } else {
       await HiveBoxes.settings.put(_keyTtsVoice, jsonEncode(voice));
     }
+  }
+
+  // ============ 腾讯云语音合成（可选） ============
+
+  /// 云端朗读开关，默认关闭；开启需腾讯云凭据已验证。
+  bool get ttsCloudEnabled =>
+      HiveBoxes.settings.get(_keyTtsCloudEnabled, defaultValue: false) as bool;
+
+  Future<void> setTtsCloudEnabled(bool enabled) async {
+    await HiveBoxes.settings.put(_keyTtsCloudEnabled, enabled);
+  }
+
+  /// 云端朗读音色（腾讯云 VoiceType 编号），默认 101001 智瑜。
+  int get ttsCloudVoiceType => HiveBoxes.settings.get(
+        _keyTtsCloudVoiceType,
+        defaultValue: kDefaultTencentVoiceType,
+      ) as int;
+
+  Future<void> setTtsCloudVoiceType(int voiceType) async {
+    await HiveBoxes.settings.put(_keyTtsCloudVoiceType, voiceType);
   }
 
   // ============ 拼音显示 ============

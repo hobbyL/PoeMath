@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
+import 'package:poemath/core/services/tencent/tc3_signer.dart';
 
 void main() {
   const credentials = TencentAsrCredentials(

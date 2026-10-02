@@ -1,20 +1,42 @@
 // lib/core/services/tts_service.dart
 //
-// TTS 朗读服务：封装 flutter_tts，提供中文全文/逐句朗读。
+// TTS 朗读服务：系统引擎（flutter_tts）+ 可选腾讯云合成。
+// 云端开启且凭据已验证时云优先，失败静默回退系统音色，朗读不中断。
 
 import 'dart:async';
 
+import 'dart:typed_data';
+
 import 'package:flutter_tts/flutter_tts.dart';
 
+import 'package:poemath/core/services/speech/speech_recognition_models.dart';
+import 'package:poemath/core/services/tts/tencent_tts_client.dart';
+import 'package:poemath/core/services/tts/tts_models.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 /// TTS 朗读服务。
 ///
-/// 使用 flutter_tts 实现中文语音合成。
-/// 支持全文朗读和逐句朗读，以及音色选择。
+/// 支持全文朗读、逐句/逐行朗读与音色选择；云端模式逐段合成、
+/// 逐段播放，`onLineStart` / `onSentenceStart` 回调时序与系统模式一致。
 class TtsService {
+  static const String _logTag = 'Tts';
+
+  /// 云端合成内存 LRU 容量（行级 mp3，< 2MB）。
+  static const int _cloudCacheCapacity = 32;
+
   final FlutterTts _tts;
   final SettingsRepository _settings;
+  final TencentTtsClient? _cloudClient;
+
+  CloudAudioPlayer? _cloudPlayer;
+  final Map<String, Uint8List> _cloudCache = <String, Uint8List>{};
+
+  TencentAsrCredentials? _cloudCredentials;
+
+  /// 额度/鉴权/服务未开通后置位：本次朗读整段降级系统音色，
+  /// 避免逐行重复撞额度；下次朗读入口重置。
+  bool _cloudSessionDisabled = false;
 
   bool _initialized = false;
   bool _isSpeaking = false;
@@ -24,11 +46,21 @@ class TtsService {
   /// 避免 completionHandler 干扰 [speakLines] 循环。
   bool _stopRequested = false;
 
-  TtsService(this._settings, {FlutterTts? flutterTts})
-      : _tts = flutterTts ?? FlutterTts();
+  TtsService(
+    this._settings, {
+    FlutterTts? flutterTts,
+    TencentTtsClient? cloudClient,
+    CloudAudioPlayer? cloudPlayer,
+  })  : _tts = flutterTts ?? FlutterTts(),
+        _cloudClient = cloudClient,
+        _cloudPlayer = cloudPlayer;
 
   /// 当前是否正在朗读。
   bool get isSpeaking => _isSpeaking;
+
+  /// 云端播放器（懒创建，未注入且从未走云路径时为 null，不触平台通道）。
+  CloudAudioPlayer get _cloudPlayerResolved =>
+      _cloudPlayer ??= AudioplayersCloudAudioPlayer();
 
   /// 初始化 TTS 引擎。
   Future<void> _ensureInitialized() async {
@@ -62,6 +94,110 @@ class TtsService {
     });
 
     _initialized = true;
+  }
+
+  /// 朗读会话入口：刷新云端可用状态（开关 + 凭据验证）。
+  Future<void> _refreshCloudState() async {
+    _cloudSessionDisabled = false;
+    if (_cloudClient == null || !_settings.ttsCloudEnabled) {
+      _cloudCredentials = null;
+      return;
+    }
+    try {
+      final state = await _settings.loadSpeechRecognitionSettings();
+      _cloudCredentials = state.isVerified
+          ? await _settings.readTencentAsrCredentials()
+          : null;
+    } on Object catch (error) {
+      AppLogger.w('读取云端朗读凭据失败，本次使用系统音色：$error', tag: _logTag);
+      _cloudCredentials = null;
+    }
+  }
+
+  /// 本次会话是否走云端合成。
+  bool get _cloudMode =>
+      _cloudClient != null && _cloudCredentials != null && !_cloudSessionDisabled;
+
+  /// 应用内语速 [0.1, 1.0]（0.5 = 系统正常语速）线性映射到腾讯云
+  /// Speed [0.2, 2.0]：0.5 → 1.0 对齐云端正常语速。
+  double _cloudSpeed() => (_settings.ttsSpeed * 2).clamp(0.5, 2.0);
+
+  /// 严格合成：命中缓存或请求云端，异常上抛。
+  Future<Uint8List> _synthesizeStrict(String text) async {
+    final voiceType = _settings.ttsCloudVoiceType;
+    final speed = _cloudSpeed();
+    final cacheKey = '$voiceType|${speed.toStringAsFixed(2)}|$text';
+    final cached = _cloudCache.remove(cacheKey);
+    if (cached != null) {
+      _cloudCache[cacheKey] = cached;
+      return cached;
+    }
+
+    final bytes = await _cloudClient!.synthesize(
+      text: text,
+      credentials: _cloudCredentials!,
+      voiceType: voiceType,
+      speed: speed,
+    );
+    _storeCache(cacheKey, bytes);
+    return bytes;
+  }
+
+  /// 宽松合成：失败返回 null（调用方回退系统音色）。
+  ///
+  /// 额度/鉴权/服务未开通类错误将本次朗读整段降级。
+  Future<Uint8List?> _synthesizeCloud(String text) async {
+    if (!_cloudMode) return null;
+    try {
+      return await _synthesizeStrict(text);
+    } on TencentTtsException catch (error) {
+      switch (error.kind) {
+        case TencentTtsErrorKind.quota:
+        case TencentTtsErrorKind.authentication:
+        case TencentTtsErrorKind.serviceNotEnabled:
+          _cloudSessionDisabled = true;
+        case TencentTtsErrorKind.request:
+        case TencentTtsErrorKind.network:
+        case TencentTtsErrorKind.response:
+          break;
+      }
+      AppLogger.w('云端合成失败，回退系统音色：${error.message}', tag: _logTag);
+      return null;
+    } on Object catch (error) {
+      AppLogger.w('云端合成异常，回退系统音色：$error', tag: _logTag);
+      return null;
+    }
+  }
+
+  void _storeCache(String key, Uint8List bytes) {
+    _cloudCache
+      ..remove(key)
+      ..[key] = bytes;
+    while (_cloudCache.length > _cloudCacheCapacity) {
+      _cloudCache.remove(_cloudCache.keys.first);
+    }
+  }
+
+  /// 单段朗读统一入口：云端优先，失败回退系统引擎完成当段。
+  Future<void> _speakSegmentBestEffort(String text) async {
+    if (_cloudMode) {
+      final bytes = await _synthesizeCloud(text);
+      if (bytes != null) {
+        try {
+          await _cloudPlayerResolved.play(bytes);
+          return;
+        } on Object catch (error) {
+          // 播放失败不回退系统朗读，避免同一句双读。
+          AppLogger.w('云端音频播放失败，跳过该句：$error', tag: _logTag);
+          return;
+        }
+      }
+    }
+    await _runEngineOperation('朗读失败', () async {
+      await _tts.setSpeechRate(_settings.ttsSpeed);
+      await _tts.speak(text);
+      _throwIfEngineReportedError();
+    });
   }
 
   Future<T> _runEngineOperation<T>(
@@ -128,7 +264,7 @@ class TtsService {
     return chineseVoices;
   }
 
-  /// 设置音色并保存到设置。传 null 恢复系统默认。
+  /// 设置系统音色并保存到设置。传 null 恢复系统默认。
   Future<void> setVoice(Map<String, String>? voice) async {
     await _ensureInitialized();
     await _runEngineOperation('设置系统音色失败', () async {
@@ -142,22 +278,32 @@ class TtsService {
     await _settings.setTtsVoice(voice);
   }
 
-  /// 试听当前音色：朗读一段示例文本。
+  /// 试听当前音色：朗读一段示例文本（系统音色路径）。
   Future<void> preview(String text) => speak(text);
+
+  /// 云端音色试听：强制走云合成，失败上抛具体原因（设置页展示）。
+  Future<void> previewCloud(String text) async {
+    await _refreshCloudState();
+    if (_cloudClient == null || _cloudCredentials == null) {
+      throw const TencentTtsException(
+        '请先配置腾讯云密钥并通过真实录音测试',
+        kind: TencentTtsErrorKind.authentication,
+      );
+    }
+    final bytes = await _synthesizeStrict(text);
+    await _cloudPlayerResolved.play(bytes);
+  }
 
   /// 朗读文本（全文一次性读完）。
   Future<void> speak(String text) async {
     await _ensureInitialized();
+    await _refreshCloudState();
     _isSpeaking = true;
     _stopRequested = false;
     _engineErrorMessage = null;
 
     try {
-      await _runEngineOperation('朗读失败', () async {
-        await _tts.setSpeechRate(_settings.ttsSpeed);
-        await _tts.speak(text);
-        _throwIfEngineReportedError();
-      });
+      await _speakSegmentBestEffort(text);
     } finally {
       _isSpeaking = false;
     }
@@ -173,6 +319,7 @@ class TtsService {
     void Function()? onComplete,
   }) async {
     await _ensureInitialized();
+    await _refreshCloudState();
     _stopRequested = false;
     _engineErrorMessage = null;
 
@@ -186,18 +333,10 @@ class TtsService {
     var completed = false;
     _isSpeaking = true;
     try {
-      await _runEngineOperation(
-        '逐句朗读失败',
-        () => _tts.setSpeechRate(_settings.ttsSpeed),
-      );
       for (var i = 0; i < sentences.length; i++) {
         if (_stopRequested) break;
         onSentenceStart?.call(i);
-        await _runEngineOperation(
-          '逐句朗读失败',
-          () => _tts.speak(sentences[i]),
-        );
-        _throwIfEngineReportedError();
+        await _speakSegmentBestEffort(sentences[i]);
       }
       completed = !_stopRequested;
     } finally {
@@ -217,24 +356,17 @@ class TtsService {
     void Function()? onComplete,
   }) async {
     await _ensureInitialized();
+    await _refreshCloudState();
     _stopRequested = false;
     _engineErrorMessage = null;
 
     var completed = false;
     _isSpeaking = true;
     try {
-      await _runEngineOperation(
-        '逐行朗读失败',
-        () => _tts.setSpeechRate(_settings.ttsSpeed),
-      );
       for (var i = 0; i < lines.length; i++) {
         if (_stopRequested) break;
         onLineStart?.call(i);
-        await _runEngineOperation(
-          '逐行朗读失败',
-          () => _tts.speak(lines[i]),
-        );
-        _throwIfEngineReportedError();
+        await _speakSegmentBestEffort(lines[i]);
       }
       completed = !_stopRequested;
     } finally {
@@ -244,10 +376,18 @@ class TtsService {
     if (completed) onComplete?.call();
   }
 
-  /// 停止朗读。
+  /// 停止朗读（云端与系统引擎均停止）。
   Future<void> stop() async {
     _stopRequested = true;
     _isSpeaking = false;
+    final player = _cloudPlayer;
+    if (player != null) {
+      try {
+        await player.stop();
+      } on Object catch (error) {
+        AppLogger.w('停止云端播放失败（忽略）：$error', tag: _logTag);
+      }
+    }
     // 页面离开时可能从未启动过引擎；无需触发平台通道。
     if (!_initialized) return;
     await _runEngineOperation('停止朗读失败', _tts.stop);
@@ -257,6 +397,15 @@ class TtsService {
   void dispose() {
     _stopRequested = true;
     _isSpeaking = false;
+    final player = _cloudPlayer;
+    if (player != null) {
+      unawaited(
+        player.dispose().then<void>(
+              (_) {},
+              onError: (Object error, StackTrace stackTrace) {},
+            ),
+      );
+    }
     unawaited(
       _tts.stop().then<void>(
             (_) {},

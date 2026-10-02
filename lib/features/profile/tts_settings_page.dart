@@ -7,7 +7,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -29,6 +32,12 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
   bool _loading = true;
   String? _loadError;
 
+  // ====== 云端朗读（腾讯云合成） ======
+  bool _tencentVerified = false;
+  bool _cloudEnabled = false;
+  int _cloudVoiceType = kDefaultTencentVoiceType;
+  bool _cloudBusy = false;
+
   static const _previewText = '床前明月光，疑是地上霜。';
 
   @override
@@ -38,7 +47,28 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     final settingsRepo = ref.read(settingsRepositoryProvider);
     _selectedVoice = settingsRepo.ttsVoice;
     _speed = settingsRepo.ttsSpeed;
+    _cloudEnabled = settingsRepo.ttsCloudEnabled;
+    _cloudVoiceType = settingsRepo.ttsCloudVoiceType;
     _loadVoices();
+    _loadVerification();
+  }
+
+  Future<void> _loadVerification() async {
+    try {
+      final settings =
+          await ref.read(settingsRepositoryProvider).loadSpeechRecognitionSettings();
+      if (mounted) {
+        setState(() => _tencentVerified = settings.isVerified);
+      }
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '读取腾讯云验证状态失败',
+        tag: 'TtsSettings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) setState(() => _tencentVerified = false);
+    }
   }
 
   Future<void> _loadVoices() async {
@@ -121,6 +151,56 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     setState(() => _speed = speed);
     final settingsRepo = ref.read(settingsRepositoryProvider);
     await settingsRepo.setTtsSpeed(speed);
+  }
+
+  // ====== 云端朗读（腾讯云合成） ======
+
+  Future<void> _onCloudToggle(bool enabled) async {
+    setState(() => _cloudEnabled = enabled);
+    await ref.read(settingsRepositoryProvider).setTtsCloudEnabled(enabled);
+  }
+
+  Future<void> _selectCloudVoice(TencentTtsVoice voice) async {
+    setState(() => _cloudVoiceType = voice.id);
+    await ref.read(settingsRepositoryProvider).setTtsCloudVoiceType(voice.id);
+    await _previewCloudVoice();
+  }
+
+  /// 云端音色试听：不回退，失败显示具体原因（便于家长排障）。
+  Future<void> _previewCloudVoice() async {
+    if (_cloudBusy) return;
+    setState(() => _cloudBusy = true);
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      await _tts.stop();
+      await _tts.previewCloud(_previewText);
+    } on TencentTtsException catch (error) {
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '云端音色试听失败',
+        tag: 'TtsSettings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('试听失败，请检查网络后重试')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cloudBusy = false);
+    }
+  }
+
+  Future<void> _goToSpeechSettings() async {
+    await context.push(AppRoutes.speechRecognitionSettings);
+    // 返回后刷新验证状态（可能已完成配置并通过测试）。
+    await _loadVerification();
   }
 
   @override
@@ -240,7 +320,12 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
 
             const SizedBox(height: SpacingTokens.lg),
 
-            // ====== 音色选择 ======
+            // ====== 云端朗读音色（腾讯云合成） ======
+            _buildCloudCard(theme),
+
+            const SizedBox(height: SpacingTokens.lg),
+
+            // ====== 系统音色（离线可用） ======
             Row(
               children: [
                 Icon(
@@ -250,7 +335,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
                 ),
                 const SizedBox(width: SpacingTokens.sm),
                 Text(
-                  '音色选择',
+                  '系统音色（离线可用）',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -344,6 +429,106 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// 云端朗读音色卡片：未验证时引导配置；已验证时开关 + 音色 + 试听。
+  Widget _buildCloudCard(ThemeData theme) {
+    final canEnable = _tencentVerified && !_cloudBusy;
+    final selectedVoice = kTencentPremiumVoices
+        .where((voice) => voice.id == _cloudVoiceType)
+        .firstOrNull;
+
+    return ColoredCard(
+      color: theme.colorScheme.primary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.cloud_outlined,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              Expanded(
+                child: Text(
+                  '云端朗读音色（腾讯云）',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Switch(
+                value: _cloudEnabled,
+                onChanged: canEnable ? _onCloudToggle : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            _tencentVerified
+                ? _cloudEnabled
+                    ? '朗读将使用云端合成，失败自动回退系统音色'
+                    : '开启后朗读使用更自然的云端音色'
+                : '需先在语音识别设置中配置密钥并通过真实录音测试',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (!_tencentVerified) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            OutlinedButton.icon(
+              onPressed: _goToSpeechSettings,
+              icon: const Icon(Icons.key_outlined),
+              label: const Text('去配置密钥'),
+            ),
+          ],
+          if (_tencentVerified && _cloudEnabled) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            ...kTencentPremiumVoices.map(
+              (voice) => Padding(
+                padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
+                child: AppTile(
+                  icon: voice.id == _cloudVoiceType
+                      ? Icons.check_circle
+                      : Icons.graphic_eq,
+                  iconColor: voice.id == _cloudVoiceType
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outline,
+                  title: voice.name,
+                  subtitle: voice.style,
+                  // AppTile 在 trailing 非空时忽略 onTap，
+                  // 与系统音色一致：点试听按钮即选择并试听。
+                  trailing: _cloudBusy && voice.id == _cloudVoiceType
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : IconButton(
+                          icon: Icon(
+                            Icons.play_circle_outline,
+                            color: theme.colorScheme.primary,
+                          ),
+                          tooltip: '试听',
+                          onPressed: _cloudBusy
+                              ? null
+                              : () => _selectCloudVoice(voice),
+                        ),
+                ),
+              ),
+            ),
+            Text(
+              selectedVoice == null ? '' : '当前音色：${selectedVoice.name}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
