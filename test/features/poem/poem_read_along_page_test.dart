@@ -7,8 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
+import 'package:poemath/core/services/speech/tencent_asr_client.dart';
+import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -23,18 +24,17 @@ class _MockSettingsRepository extends Mock implements SettingsRepository {}
 
 final class _FakeSpeechRecognitionService implements SpeechRecognitionService {
   _FakeSpeechRecognitionService({
-    this.initializeCompleter,
     this.startCompleter,
     this.stopCompleter,
     this.startError,
+    this.stopError,
   });
 
-  final Completer<void>? initializeCompleter;
   final Completer<void>? startCompleter;
   final Completer<SpeechRecognitionResult>? stopCompleter;
   final Object? startError;
+  final Object? stopError;
 
-  int initializeCalls = 0;
   int startCalls = 0;
   int stopCalls = 0;
   int cancelCalls = 0;
@@ -44,13 +44,10 @@ final class _FakeSpeechRecognitionService implements SpeechRecognitionService {
   bool get isRecording => _isRecording;
 
   @override
-  Future<void> initialize() async {
-    initializeCalls++;
-    await initializeCompleter?.future;
-  }
+  Future<void> initialize() async {}
 
   @override
-  Future<void> start({void Function(String text)? onPartialResult}) async {
+  Future<void> start() async {
     startCalls++;
     await startCompleter?.future;
     if (startError != null) throw startError!;
@@ -58,18 +55,14 @@ final class _FakeSpeechRecognitionService implements SpeechRecognitionService {
   }
 
   @override
-  Future<SpeechRecognitionResult> stop({
-    bool requireTencentCloud = false,
-  }) async {
+  Future<SpeechRecognitionResult> stop() async {
     stopCalls++;
+    if (stopError != null) {
+      _isRecording = false;
+      throw stopError!;
+    }
     final result = await (stopCompleter?.future ??
-        Future.value(
-          const SpeechRecognitionResult(
-            text: '床前明月光',
-            localText: '床前明月光',
-            source: SpeechRecognitionSource.local,
-          ),
-        ));
+        Future.value(const SpeechRecognitionResult(text: '床前明月光')));
     _isRecording = false;
     return result;
   }
@@ -96,6 +89,16 @@ final _poem = Poem(
   layer: 'core',
 );
 
+const _verifiedSettings = SpeechRecognitionSettingsState(
+  hasCredentials: true,
+  isVerified: true,
+);
+
+const _unverifiedSettings = SpeechRecognitionSettingsState(
+  hasCredentials: false,
+  isVerified: false,
+);
+
 void main() {
   late _MockTtsService tts;
   late _MockSettingsRepository settings;
@@ -106,6 +109,9 @@ void main() {
     when(() => tts.stop()).thenAnswer((_) async {});
     when(() => settings.hapticEnabled).thenReturn(false);
     when(() => settings.soundEnabled).thenReturn(false);
+    // 默认已配置腾讯云，未配置场景单独覆盖。
+    when(() => settings.loadSpeechRecognitionSettings())
+        .thenAnswer((_) async => _verifiedSettings);
   });
 
   testWidgets('跟读页首帧应直接显示诗句内容', (tester) async {
@@ -128,11 +134,37 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('点击读一读立即显示准备状态并复用初始化任务', (tester) async {
-    final initialization = Completer<void>();
-    final speech = _FakeSpeechRecognitionService(
-      initializeCompleter: initialization,
-    );
+  testWidgets('未配置腾讯云时按钮置灰且点击弹配置引导，不发起录音', (tester) async {
+    when(() => settings.loadSpeechRecognitionSettings())
+        .thenAnswer((_) async => _unverifiedSettings);
+    final speech = _FakeSpeechRecognitionService();
+
+    await _pumpPage(tester, speech, tts, settings);
+    await tester.pump();
+
+    final button = find.widgetWithText(FilledButton, '读一读（需配置）');
+    expect(button, findsOneWidget);
+
+    await tester.tap(button);
+    await tester.pump();
+
+    expect(find.text('需要配置语音识别'), findsOneWidget);
+    expect(find.text('去设置'), findsOneWidget);
+    expect(speech.startCalls, 0);
+
+    await tester.tap(find.text('取消'));
+    await tester.pump();
+
+    expect(find.text('需要配置语音识别'), findsNothing);
+    expect(speech.startCalls, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('点击读一读立即显示准备状态且重复点击不重复启动', (tester) async {
+    final start = Completer<void>();
+    final speech = _FakeSpeechRecognitionService(startCompleter: start);
 
     await _pumpPage(tester, speech, tts, settings);
     await tester.tap(find.text('读一读'));
@@ -142,9 +174,8 @@ void main() {
     expect(find.text('准备录音'), findsOneWidget);
     expect(find.text('听一听'), findsNothing);
     expect(find.text('读一读'), findsNothing);
-    expect(speech.initializeCalls, 1);
 
-    initialization.complete();
+    start.complete();
     await tester.pump();
     await tester.pump();
 
@@ -155,7 +186,7 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('录音状态显示秒数，点击后进入识别状态并展示结果', (tester) async {
+  testWidgets('录音状态显示秒数与聆听提示，点击后进入识别状态并展示结果', (tester) async {
     final recognition = Completer<SpeechRecognitionResult>();
     final speech = _FakeSpeechRecognitionService(
       stopCompleter: recognition,
@@ -170,9 +201,11 @@ void main() {
     expect(find.byKey(const ValueKey('read-along-voice-bars')), findsOneWidget);
     expect(find.text('录音中'), findsOneWidget);
     expect(find.text('0秒'), findsOneWidget);
+    expect(find.text('正在聆听… 0/15 秒'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('1秒'), findsOneWidget);
+    expect(find.text('正在聆听… 1/15 秒'), findsOneWidget);
 
     await tester.tap(find.text('录音中'));
     await tester.pump();
@@ -181,11 +214,7 @@ void main() {
     expect(speech.stopCalls, 1);
 
     recognition.complete(
-      const SpeechRecognitionResult(
-        text: '床前明月光',
-        localText: '床前明月光',
-        source: SpeechRecognitionSource.local,
-      ),
+      const SpeechRecognitionResult(text: '床前明月光'),
     );
     await tester.pump();
     await tester.pump();
@@ -201,7 +230,32 @@ void main() {
       findsOneWidget,
       reason: '$renderedTexts',
     );
+    expect(find.text('识别结果', skipOffstage: false), findsOneWidget);
     expect(find.text('床前明月光', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('腾讯云识别失败时提示重试并回到空闲状态', (tester) async {
+    final speech = _FakeSpeechRecognitionService(
+      stopError: const TencentAsrException(
+        '腾讯云识别失败',
+        kind: TencentAsrErrorKind.response,
+      ),
+    );
+
+    await _pumpPage(tester, speech, tts, settings);
+    await tester.tap(find.text('读一读'));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('录音中'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('腾讯云识别失败'), findsOneWidget);
+    expect(find.text('读一读'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
   });
 
   testWidgets('页面退出后录音启动完成会继续取消服务', (tester) async {
@@ -261,11 +315,7 @@ void main() {
     expect(find.text('识别中'), findsOneWidget);
 
     recognition.complete(
-      const SpeechRecognitionResult(
-        text: '床前明月光',
-        localText: '床前明月光',
-        source: SpeechRecognitionSource.local,
-      ),
+      const SpeechRecognitionResult(text: '床前明月光'),
     );
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));

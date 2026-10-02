@@ -87,7 +87,6 @@ void main() {
     final state = await repository.loadSpeechRecognitionSettings();
     expect(state.hasCredentials, isTrue);
     expect(state.isVerified, isFalse);
-    expect(state.highAccuracyEnabled, isFalse);
   });
 
   test('设置快照只读取一次安全存储', () async {
@@ -139,20 +138,7 @@ void main() {
     expect(fullConfig.password, 'dav-private-password');
   });
 
-  test('未完成真实测试不能开启高精度', () async {
-    await repository.saveTencentAsrCredentials(
-      secretId: 'AKID',
-      secretKey: 'SK',
-    );
-
-    await expectLater(
-      repository.setTencentAsrHighAccuracyEnabled(true),
-      throwsStateError,
-    );
-    expect(repository.tencentAsrHighAccuracyEnabled, isFalse);
-  });
-
-  test('测试成功后可开启，修改凭据立即撤销验证', () async {
+  test('测试通过后即视为已配置，修改凭据立即撤销验证', () async {
     const first = TencentAsrCredentials(secretId: 'AKID-1', secretKey: 'SK-1');
     await repository.saveTencentAsrCredentials(
       secretId: first.secretId,
@@ -162,11 +148,13 @@ void main() {
       testedCredentials: first,
       verifiedAt: DateTime.utc(2026, 7, 21),
     );
-    await repository.setTencentAsrHighAccuracyEnabled(true);
 
     var state = await repository.loadSpeechRecognitionSettings();
     expect(state.isVerified, isTrue);
-    expect(state.highAccuracyEnabled, isTrue);
+    expect(
+      state.verifiedAt?.millisecondsSinceEpoch,
+      DateTime.utc(2026, 7, 21).millisecondsSinceEpoch,
+    );
 
     await repository.saveTencentAsrCredentials(
       secretId: 'AKID-2',
@@ -174,11 +162,11 @@ void main() {
     );
     state = await repository.loadSpeechRecognitionSettings();
     expect(state.isVerified, isFalse);
-    expect(state.highAccuracyEnabled, isFalse);
+    expect(state.verifiedAt, isNull);
     expect(repository.tencentAsrVerifiedAt, isNull);
   });
 
-  test('删除凭据会关闭高精度并清除验证状态', () async {
+  test('删除凭据清除验证状态', () async {
     const credentials =
         TencentAsrCredentials(secretId: 'AKID', secretKey: 'SK');
     await repository.saveTencentAsrCredentials(
@@ -188,7 +176,6 @@ void main() {
     await repository.markTencentAsrCredentialsVerified(
       testedCredentials: credentials,
     );
-    await repository.setTencentAsrHighAccuracyEnabled(true);
 
     await repository.deleteTencentAsrCredentials();
 
@@ -196,6 +183,5 @@ void main() {
     final state = await repository.loadSpeechRecognitionSettings();
     expect(state.hasCredentials, isFalse);
     expect(state.isVerified, isFalse);
-    expect(state.highAccuracyEnabled, isFalse);
   });
 }

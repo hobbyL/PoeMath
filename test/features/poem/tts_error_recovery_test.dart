@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.dart';
+import 'package:poemath/core/services/speech/speech_recognition_models.dart';
+import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -29,6 +30,11 @@ final _poem = Poem(
   content: '床前明月光，\n疑是地上霜。',
   pinyin: '',
   layer: 'core',
+);
+
+const _verifiedSettings = SpeechRecognitionSettingsState(
+  hasCredentials: true,
+  isVerified: true,
 );
 
 void main() {
@@ -82,10 +88,14 @@ void main() {
 
   testWidgets('跟读范读失败后恢复听一听按钮并提示', (tester) async {
     when(() => tts.speak(any<String>())).thenThrow(const TtsException('引擎不可用'));
+    final settings = _MockSettingsRepository();
+    when(() => settings.loadSpeechRecognitionSettings())
+        .thenAnswer((_) async => _verifiedSettings);
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          settingsRepositoryProvider.overrideWithValue(settings),
           ttsServiceProvider.overrideWithValue(tts),
           poemByIdProvider(_poemId).overrideWith((ref) => _poem),
         ],
@@ -114,10 +124,14 @@ void main() {
     when(() => tts.stop()).thenAnswer(
       (_) async => throw const TtsException('停止失败'),
     );
+    final settings = _MockSettingsRepository();
+    when(() => settings.loadSpeechRecognitionSettings())
+        .thenAnswer((_) async => _verifiedSettings);
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          settingsRepositoryProvider.overrideWithValue(settings),
           ttsServiceProvider.overrideWithValue(tts),
           poemByIdProvider(_poemId).overrideWith((ref) => _poem),
         ],
@@ -129,6 +143,7 @@ void main() {
         ),
       ),
     );
+    await tester.pump();
     await tester.pump();
 
     await tester.tap(find.text('读一读'));

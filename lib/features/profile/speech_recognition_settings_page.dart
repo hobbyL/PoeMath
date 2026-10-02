@@ -5,9 +5,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
+import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -31,13 +31,11 @@ class _SpeechRecognitionSettingsPageState
       const SpeechRecognitionSettingsState(
     hasCredentials: false,
     isVerified: false,
-    highAccuracyEnabled: false,
   );
   bool _loadingSettings = true;
   bool _obscureSecretKey = true;
   bool _busy = false;
   bool _recording = false;
-  String _liveText = '';
   String? _message;
   bool _messageIsError = false;
   Timer? _recordingTimer;
@@ -76,7 +74,6 @@ class _SpeechRecognitionSettingsPageState
         _settings = const SpeechRecognitionSettingsState(
           hasCredentials: false,
           isVerified: false,
-          highAccuracyEnabled: false,
         );
         _loadingSettings = false;
         _message = '读取本地密钥失败，请重新输入';
@@ -133,7 +130,6 @@ class _SpeechRecognitionSettingsPageState
     setState(() {
       _busy = true;
       _message = null;
-      _liveText = '';
     });
     try {
       final credentials = await _saveFormCredentials();
@@ -142,11 +138,7 @@ class _SpeechRecognitionSettingsPageState
         return;
       }
       await _speechService.initialize();
-      await _speechService.start(
-        onPartialResult: (text) {
-          if (mounted) setState(() => _liveText = text);
-        },
-      );
+      await _speechService.start();
       if (!mounted) {
         await _speechService.cancel();
         return;
@@ -184,14 +176,14 @@ class _SpeechRecognitionSettingsPageState
       if (credentials == null) {
         throw const SpeechRecognitionException('腾讯云密钥已被清空');
       }
-      final result = await _speechService.stop(requireTencentCloud: true);
+      final result = await _speechService.stop();
       await repo.markTencentAsrCredentialsVerified(
         testedCredentials: credentials,
       );
       await _loadSettings();
       if (mounted) {
         _showMessage(
-          result.text.isEmpty ? '测试未返回文字' : '测试成功，可开启高精度识别',
+          result.text.isEmpty ? '测试未返回文字' : '测试成功，跟读评分已可用',
         );
       }
     } on TencentAsrException catch (error) {
@@ -202,7 +194,7 @@ class _SpeechRecognitionSettingsPageState
       if (mounted) _showMessage(error.message, isError: true);
     } on Object {
       await _invalidateAfterFailedTest();
-      if (mounted) _showMessage('测试失败，已保持离线识别', isError: true);
+      if (mounted) _showMessage('测试失败，请检查网络后重试', isError: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -231,24 +223,7 @@ class _SpeechRecognitionSettingsPageState
         _recording = false;
         _busy = false;
       });
-      _showMessage('测试已取消，继续使用离线识别', isError: true);
-    }
-  }
-
-  Future<void> _toggleHighAccuracy(bool enabled) async {
-    if (_busy || _recording) return;
-    try {
-      await ref
-          .read(settingsRepositoryProvider)
-          .setTencentAsrHighAccuracyEnabled(enabled);
-      await _loadSettings();
-      if (mounted) {
-        _showMessage(enabled ? '已开启高精度识别' : '已关闭高精度识别');
-      }
-    } on StateError catch (error) {
-      if (mounted) _showMessage(error.message, isError: true);
-    } on Object {
-      if (mounted) _showMessage('设置更新失败', isError: true);
+      _showMessage('测试已取消', isError: true);
     }
   }
 
@@ -260,7 +235,7 @@ class _SpeechRecognitionSettingsPageState
       _secretIdController.clear();
       _secretKeyController.clear();
       await _loadSettings();
-      if (mounted) _showMessage('腾讯云密钥已删除，高精度识别已关闭');
+      if (mounted) _showMessage('腾讯云密钥已删除，跟读需重新配置');
     } on Object {
       if (mounted) _showMessage('删除密钥失败，请稍后重试', isError: true);
     } finally {
@@ -362,34 +337,37 @@ class _SpeechRecognitionSettingsPageState
               ),
             ),
             const SizedBox(height: SpacingTokens.lg),
-            AppTile(
-              icon: Icons.cloud_done_outlined,
-              iconColor: settings.isVerified
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant,
-              title: '高精度云端识别',
-              subtitle: settings.highAccuracyEnabled
-                  ? '已开启 · 失败时自动回退离线识别'
-                  : settings.isVerified
-                      ? '测试已通过，当前未开启'
-                      : '完成真实录音测试后可开启',
-              trailing: Switch(
-                value: settings.highAccuracyEnabled,
-                onChanged: settings.isVerified &&
-                        !_loadingSettings &&
-                        !_busy &&
-                        !_recording
-                    ? _toggleHighAccuracy
-                    : null,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.md),
             ColoredCard(
               color: theme.colorScheme.primary,
               width: double.infinity,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  Row(
+                    children: [
+                      Icon(
+                        settings.isVerified
+                            ? Icons.check_circle_outline
+                            : Icons.info_outline,
+                        size: 20,
+                        color: settings.isVerified
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: SpacingTokens.xs),
+                      Expanded(
+                        child: Text(
+                          settings.isVerified
+                              ? '已配置 · 跟读评分可用'
+                              : settings.hasCredentials
+                                  ? '密钥已保存，完成真实录音测试后可用'
+                                  : '未配置 · 跟读功能需先填写密钥并通过测试',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: SpacingTokens.md),
                   Text(
                     '真实录音测试',
                     style: theme.textTheme.titleMedium?.copyWith(
@@ -403,14 +381,6 @@ class _SpeechRecognitionSettingsPageState
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: SpacingTokens.sm),
-                  if (_liveText.isNotEmpty)
-                    Text(
-                      _liveText,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
                   const SizedBox(height: SpacingTokens.md),
                   SizedBox(
                     width: double.infinity,

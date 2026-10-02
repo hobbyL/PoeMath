@@ -24,10 +24,9 @@ import 'package:poemath/data/repositories/learning_activity_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
-import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.dart';
-import 'package:poemath/core/services/speech/local_speech_recognizer.dart';
 import 'package:poemath/core/services/speech/speech_audio_recorder.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
+import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/services/haptic_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
@@ -140,9 +139,8 @@ final tencentAsrClientProvider = Provider<TencentAsrClient>((ref) {
 final speechRecognitionServiceProvider = Provider<SpeechRecognitionService>((
   ref,
 ) {
-  final service = HybridSpeechRecognitionService(
+  final service = TencentSpeechRecognitionService(
     recorder: RecordSpeechAudioRecorder(),
-    localRecognizer: SherpaLocalSpeechRecognizer(),
     tencentClient: ref.watch(tencentAsrClientProvider),
     settingsRepository: ref.watch(settingsRepositoryProvider),
   );

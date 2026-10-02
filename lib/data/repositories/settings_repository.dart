@@ -36,8 +36,6 @@ class SettingsRepository {
   static const String _keyTencentAsrCredentialFingerprint =
       'tencent_asr_credential_fingerprint';
   static const String _keyTencentAsrVerifiedAt = 'tencent_asr_verified_at';
-  static const String _keyTencentAsrHighAccuracyEnabled =
-      'tencent_asr_high_accuracy_enabled';
 
   // ============ 主题 ============
 
@@ -185,11 +183,6 @@ class SettingsRepository {
 
   // ============ 语音识别设置 ============
 
-  bool get tencentAsrHighAccuracyEnabled => HiveBoxes.settings.get(
-        _keyTencentAsrHighAccuracyEnabled,
-        defaultValue: false,
-      ) as bool;
-
   DateTime? get tencentAsrVerifiedAt {
     final value = HiveBoxes.settings.get(_keyTencentAsrVerifiedAt);
     if (value is! int) return null;
@@ -224,19 +217,10 @@ class SettingsRepository {
     final isVerified = credentials != null &&
         storedFingerprint == _credentialFingerprint(credentials) &&
         verifiedAt != null;
-    final requestedHighAccuracy = tencentAsrHighAccuracyEnabled;
-
-    if (requestedHighAccuracy && !isVerified) {
-      await HiveBoxes.settings.put(
-        _keyTencentAsrHighAccuracyEnabled,
-        false,
-      );
-    }
 
     return SpeechRecognitionSettingsState(
       hasCredentials: credentials != null,
       isVerified: isVerified,
-      highAccuracyEnabled: requestedHighAccuracy && isVerified,
       verifiedAt: isVerified ? verifiedAt : null,
     );
   }
@@ -284,24 +268,7 @@ class SettingsRepository {
     );
   }
 
-  Future<void> setTencentAsrHighAccuracyEnabled(bool enabled) async {
-    if (enabled) {
-      final state = await loadSpeechRecognitionSettings();
-      if (!state.isVerified) {
-        throw StateError('请先完成腾讯云真实录音测试');
-      }
-    }
-    await HiveBoxes.settings.put(
-      _keyTencentAsrHighAccuracyEnabled,
-      enabled,
-    );
-  }
-
   Future<void> invalidateTencentAsrVerification() async {
-    await HiveBoxes.settings.put(
-      _keyTencentAsrHighAccuracyEnabled,
-      false,
-    );
     await HiveBoxes.settings.delete(_keyTencentAsrCredentialFingerprint);
     await HiveBoxes.settings.delete(_keyTencentAsrVerifiedAt);
   }

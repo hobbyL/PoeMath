@@ -209,9 +209,7 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.record_voice_over_outlined,
                 iconColor: theme.colorScheme.primary,
                 title: '语音识别设置',
-                subtitle: settingsRepo.tencentAsrHighAccuracyEnabled
-                    ? '高精度云端识别已开启'
-                    : '默认使用离线识别',
+                subtitle: '腾讯云识别密钥与真实录音测试',
                 onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(

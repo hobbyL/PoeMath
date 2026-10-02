@@ -228,7 +228,7 @@ final class TencentAsrClient {
       );
     } on SocketException {
       throw const TencentAsrException(
-        '网络不可用，已使用离线识别',
+        '网络不可用，请检查网络后重试',
         kind: TencentAsrErrorKind.network,
       );
     } on http.ClientException {

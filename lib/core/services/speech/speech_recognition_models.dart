@@ -1,6 +1,6 @@
 // lib/core/services/speech/speech_recognition_models.dart
 //
-// Shared contracts for local and Tencent Cloud speech recognition.
+// Shared contracts for Tencent Cloud speech recognition.
 
 /// Tencent Cloud API credentials.
 ///
@@ -22,17 +22,18 @@ final class TencentAsrCredentials {
 }
 
 /// Effective speech-recognition settings after secure-storage validation.
+///
+/// [isVerified] is the single gate for read-along: credentials exist, the
+/// stored fingerprint matches them, and a real-recording test has passed.
 final class SpeechRecognitionSettingsState {
   const SpeechRecognitionSettingsState({
     required this.hasCredentials,
     required this.isVerified,
-    required this.highAccuracyEnabled,
     this.verifiedAt,
   });
 
   final bool hasCredentials;
   final bool isVerified;
-  final bool highAccuracyEnabled;
   final DateTime? verifiedAt;
 }
 
@@ -47,23 +48,11 @@ final class SpeechRecognitionSettingsSnapshot {
   final SpeechRecognitionSettingsState settings;
 }
 
-enum SpeechRecognitionSource { local, tencentCloud }
-
 /// Final result for one recorded utterance.
 final class SpeechRecognitionResult {
-  const SpeechRecognitionResult({
-    required this.text,
-    required this.localText,
-    required this.source,
-    this.fellBackFromCloud = false,
-  });
+  const SpeechRecognitionResult({required this.text});
 
   final String text;
-  final String localText;
-  final SpeechRecognitionSource source;
-  final bool fellBackFromCloud;
-
-  bool get usedTencentCloud => source == SpeechRecognitionSource.tencentCloud;
 }
 
 class SpeechRecognitionException implements Exception {

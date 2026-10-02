@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
+import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
@@ -14,7 +14,6 @@ import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 final class _FakeSettingsRepository extends SettingsRepository {
   TencentAsrCredentials? _credentials;
   bool _verified = false;
-  bool _highAccuracyEnabled = false;
   DateTime? _verifiedAt;
   Completer<void>? loadGate;
   Object? loadError;
@@ -64,7 +63,6 @@ final class _FakeSettingsRepository extends SettingsRepository {
     return SpeechRecognitionSettingsState(
       hasCredentials: _credentials != null,
       isVerified: _verified,
-      highAccuracyEnabled: _highAccuracyEnabled,
       verifiedAt: _verifiedAt,
     );
   }
@@ -83,15 +81,8 @@ final class _FakeSettingsRepository extends SettingsRepository {
   }
 
   @override
-  Future<void> setTencentAsrHighAccuracyEnabled(bool enabled) async {
-    if (enabled && !_verified) throw StateError('not verified');
-    _highAccuracyEnabled = enabled;
-  }
-
-  @override
   Future<void> invalidateTencentAsrVerification() async {
     _verified = false;
-    _highAccuracyEnabled = false;
     _verifiedAt = null;
   }
 
@@ -125,17 +116,14 @@ final class _FakeSpeechRecognitionService implements SpeechRecognitionService {
   }
 
   @override
-  Future<void> start({void Function(String text)? onPartialResult}) async {
+  Future<void> start() async {
     startCalls++;
     await startGate?.future;
     _recording = true;
-    onPartialResult?.call('床前明月光');
   }
 
   @override
-  Future<SpeechRecognitionResult> stop({
-    bool requireTencentCloud = false,
-  }) async {
+  Future<SpeechRecognitionResult> stop() async {
     stopCalls++;
     _recording = false;
     if (failCloud) {
@@ -144,11 +132,7 @@ final class _FakeSpeechRecognitionService implements SpeechRecognitionService {
         kind: TencentAsrErrorKind.authentication,
       );
     }
-    return const SpeechRecognitionResult(
-      text: '床前明月光',
-      localText: '床前明月光',
-      source: SpeechRecognitionSource.tencentCloud,
-    );
+    return const SpeechRecognitionResult(text: '床前明月光');
   }
 
   @override
@@ -235,6 +219,7 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(settings.snapshotLoadCalls, 1);
     expect(service.initializeCalls, 0);
+    expect(find.text('未配置 · 跟读功能需先填写密钥并通过测试'), findsOneWidget);
 
     gate.complete();
     await tester.pump();
@@ -258,7 +243,7 @@ void main() {
     expect(secretIdField.enabled, isTrue);
   });
 
-  testWidgets('真实录音测试成功后才能开启高精度识别', (tester) async {
+  testWidgets('真实录音测试通过后即标记已配置', (tester) async {
     final service = _FakeSpeechRecognitionService();
     await pumpPage(tester, service);
     await enterCredentialsAndStart(tester);
@@ -269,7 +254,6 @@ void main() {
     expect(service.startCalls, 1);
     expect(service.isRecording, isTrue);
     expect(find.text('结束并验证'), findsOneWidget);
-    expect(find.text('床前明月光'), findsWidgets);
 
     final endButton = find.widgetWithText(FilledButton, '结束并验证');
     await tester.ensureVisible(endButton);
@@ -286,24 +270,15 @@ void main() {
     expect(settings.tencentAsrVerifiedAt, isNotNull);
     final state = await settings.loadSpeechRecognitionSettings();
     expect(state.isVerified, isTrue);
-    expect(state.highAccuracyEnabled, isFalse);
-
-    final highAccuracySwitch = find.byType(Switch);
-    await tester.ensureVisible(highAccuracySwitch);
-    for (var attempt = 0; attempt < 20; attempt++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
-      );
-      await tester.pump(const Duration(milliseconds: 100));
-      if (tester.widget<Switch>(highAccuracySwitch).onChanged != null) break;
-    }
-    expect(tester.widget<Switch>(highAccuracySwitch).onChanged, isNotNull);
+    expect(find.text('已配置 · 跟读评分可用'), findsOneWidget);
+    expect(find.text('测试成功，跟读评分已可用'), findsOneWidget);
+    expect(find.byType(Switch), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 16));
   });
 
-  testWidgets('腾讯测试失败时撤销验证并保持离线模式', (tester) async {
+  testWidgets('腾讯测试失败时撤销验证并提示密钥状态', (tester) async {
     await pumpPage(
       tester,
       _FakeSpeechRecognitionService(failCloud: true),
@@ -323,7 +298,12 @@ void main() {
 
     final state = await settings.loadSpeechRecognitionSettings();
     expect(state.isVerified, isFalse);
-    expect(state.highAccuracyEnabled, isFalse);
+    expect(state.hasCredentials, isTrue);
+    expect(find.text('腾讯云密钥无效或没有识别权限'), findsOneWidget);
+    expect(
+      find.text('密钥已保存，完成真实录音测试后可用'),
+      findsOneWidget,
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 16));

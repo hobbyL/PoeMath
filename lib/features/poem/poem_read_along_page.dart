@@ -9,14 +9,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import 'package:poemath/core/services/speech/hybrid_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
+import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/read_along_voice_status_button.dart';
@@ -26,7 +28,7 @@ enum _ReadAlongPhase {
   /// 等待用户操作。
   idle,
 
-  /// 准备初始化模型、权限和录音。
+  /// 准备权限和录音。
   preparing,
 
   /// TTS 范读中。
@@ -35,7 +37,7 @@ enum _ReadAlongPhase {
   /// 语音录制中。
   recording,
 
-  /// 本地识别收尾及可选云端识别中。
+  /// 上传腾讯云识别中。
   processing,
 
   /// 显示本句得分。
@@ -64,10 +66,9 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
   late final SpeechRecognitionService _speech;
   late final TtsService _tts;
-  bool _speechAvailable = false;
+  bool _tencentConfigured = false;
   Timer? _recordingTimer;
   Future<void>? _speechInitialization;
-  SpeechRecognitionSource _recognitionSource = SpeechRecognitionSource.local;
 
   /// 诗句列表（按换行拆分）。
   List<String> _lines = [];
@@ -84,9 +85,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   /// 每行的准确率（0.0 ~ 1.0）。
   final List<double> _scores = [];
 
-  /// 当前实时识别文本。
-  String _liveText = '';
-
   /// 当前录音已持续秒数。
   int _recordingElapsedSeconds = 0;
 
@@ -98,9 +96,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     _tts = ref.read(ttsServiceProvider);
     unawaited(_initSpeech());
   }
-
-  /// 语音识别初始化失败的原因描述。
-  String _speechUnavailableReason = '';
 
   Future<void> _initSpeech() async {
     final existingInitialization = _speechInitialization;
@@ -120,24 +115,23 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     }
   }
 
+  /// 读取一次腾讯云配置状态（凭据 + 真实录音测试验证）。
   Future<void> _initializeSpeech() async {
+    var configured = false;
     try {
-      await _speech.initialize();
-      _speechAvailable = true;
-      _speechUnavailableReason = '';
-    } on SpeechRecognitionException catch (error) {
-      _speechAvailable = false;
-      _speechUnavailableReason = error.message;
+      // await 前取引用，避免页面退出后使用已销毁的 ref。
+      final repository = ref.read(settingsRepositoryProvider);
+      final settings = await repository.loadSpeechRecognitionSettings();
+      configured = settings.isVerified;
     } on Object catch (error, stackTrace) {
-      _speechAvailable = false;
-      _speechUnavailableReason = '离线语音模型初始化失败';
       AppLogger.e(
-        '离线语音模型初始化失败',
+        '读取腾讯云语音识别配置失败',
         tag: 'PoemReadAlong',
         error: error,
         stackTrace: stackTrace,
       );
     }
+    _tencentConfigured = configured;
     if (mounted) setState(() {});
   }
 
@@ -232,20 +226,18 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         (_phase != _ReadAlongPhase.idle && _phase != _ReadAlongPhase.scored)) {
       return;
     }
+
+    // 未配置腾讯云：弹引导，不发起录音。
+    if (!_tencentConfigured) {
+      _showTencentConfigDialog();
+      return;
+    }
+
     setState(() {
       _phase = _ReadAlongPhase.preparing;
-      _liveText = '';
       _recordingElapsedSeconds = 0;
     });
 
-    if (!_speechAvailable) {
-      await _initSpeech();
-      if (!_speechAvailable && mounted) {
-        setState(() => _phase = _ReadAlongPhase.idle);
-        _showSpeechUnavailableDialog();
-      }
-      if (!_speechAvailable) return;
-    }
     if (!mounted || _phase != _ReadAlongPhase.preparing) return;
 
     // 停止 TTS
@@ -272,15 +264,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     if (!mounted || _phase != _ReadAlongPhase.preparing) return;
 
     try {
-      await _speech.start(
-        onPartialResult: (text) {
-          if (mounted &&
-              (_phase == _ReadAlongPhase.preparing ||
-                  _phase == _ReadAlongPhase.recording)) {
-            setState(() => _liveText = text);
-          }
-        },
-      );
+      await _speech.start();
       if (!mounted) {
         await _speech.cancel();
         return;
@@ -293,11 +277,10 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       _startRecordingTimer();
     } on SpeechPermissionDeniedException {
       if (mounted) setState(() => _phase = _ReadAlongPhase.idle);
-      _speechUnavailableReason = '未获得麦克风权限';
-      if (mounted) _showSpeechUnavailableDialog();
+      if (mounted) _showSpeechUnavailableDialog('未获得麦克风权限');
     } on SpeechRecognitionException catch (error, stackTrace) {
       AppLogger.e(
-        '开始离线跟读失败',
+        '开始跟读录音失败',
         tag: 'PoemReadAlong',
         error: error,
         stackTrace: stackTrace,
@@ -343,7 +326,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     });
   }
 
-  void _showSpeechUnavailableDialog() {
+  void _showSpeechUnavailableDialog(String reason) {
     final theme = Theme.of(context);
     showDialog<void>(
       context: context,
@@ -359,42 +342,65 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
               size: 24,
             ),
             const SizedBox(width: SpacingTokens.sm),
-            const Text('语音识别不可用'),
+            const Text('跟读不可用'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _speechUnavailableReason,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            Text(
-              '请尝试以下操作：',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            Text(
-              '1. 确认已授予麦克风权限\n'
-              '2. 确认设备有足够的可用存储空间\n'
-              '3. 重新进入页面后重试',
-              style: theme.textTheme.bodySmall?.copyWith(
-                height: 1.6,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
+        content: Text(
+          '$reason\n\n请检查麦克风权限后重试。',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.6,
+          ),
         ),
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 未配置腾讯云时的引导弹窗：说明 + 跳转语音识别设置。
+  void _showTencentConfigDialog() {
+    final theme = Theme.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.cloud_off_outlined,
+              color: theme.colorScheme.primary,
+              size: 24,
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            const Text('需要配置语音识别'),
+          ],
+        ),
+        content: Text(
+          '跟读评分使用腾讯云语音识别。请家长在「声音与交互 → 语音识别设置」'
+          '中填写密钥，并通过真实录音测试后即可使用。',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.6,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.push(AppRoutes.speechRecognitionSettings);
+            },
+            child: const Text('去设置'),
           ),
         ],
       ),
@@ -409,7 +415,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     setState(() {
       _recognizedTexts.add(recognized);
       _scores.add(score);
-      _recognitionSource = result.source;
       _phase = _ReadAlongPhase.scored;
     });
 
@@ -443,12 +448,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       final result = await _speech.stop();
       if (!mounted) return;
       _applyRecognitionResult(result);
-      if (result.fellBackFromCloud) {
-        scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('高精度识别暂不可用，已使用离线结果')),
-        );
-      }
     } on SpeechRecognitionException catch (error, stackTrace) {
       AppLogger.e(
         '跟读识别失败',
@@ -576,7 +575,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       setState(() {
         _currentLine++;
         _phase = _ReadAlongPhase.idle;
-        _liveText = '';
       });
     } else {
       setState(() => _phase = _ReadAlongPhase.complete);
@@ -589,10 +587,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       _recognizedTexts.removeLast();
       _scores.removeLast();
     }
-    setState(() {
-      _phase = _ReadAlongPhase.idle;
-      _liveText = '';
-    });
+    setState(() => _phase = _ReadAlongPhase.idle);
   }
 
   double get _overallScore {
@@ -812,7 +807,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       return Column(
         children: [
           Text(
-            _liveText.isEmpty ? '请开始朗读…' : _liveText,
+            '正在聆听… $_recordingElapsedSeconds/$_maxRecordingDurationSeconds 秒',
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -826,7 +821,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       return Column(
         children: [
           Text(
-            '正在生成识别结果…',
+            '正在识别…',
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -886,9 +881,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _recognitionSource == SpeechRecognitionSource.tencentCloud
-                      ? '高精度识别结果'
-                      : '离线识别结果',
+                  '识别结果',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -966,9 +959,19 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
             const SizedBox(width: SpacingTokens.sm),
             Expanded(
               child: FilledButton.icon(
-                onPressed: _startRecording,
+                // 未配置腾讯云：按钮灰化外观，点击弹配置引导而非开始录音。
+                onPressed:
+                    _tencentConfigured ? _startRecording : _showTencentConfigDialog,
+                style: _tencentConfigured
+                    ? null
+                    : FilledButton.styleFrom(
+                        backgroundColor:
+                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 icon: const Icon(Icons.mic),
-                label: const Text('读一读'),
+                label: Text(_tencentConfigured ? '读一读' : '读一读（需配置）'),
               ),
             ),
           ],
@@ -1168,7 +1171,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                       _phase = _ReadAlongPhase.idle;
                       _recognizedTexts.clear();
                       _scores.clear();
-                      _liveText = '';
                     });
                   },
                   icon: const Icon(Icons.refresh),

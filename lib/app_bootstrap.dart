@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:poemath/app.dart';
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/services/notification_service.dart';
+import 'package:poemath/core/services/speech/legacy_speech_cleanup.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -23,6 +24,8 @@ Future<void> initializeCoreStorage() async {
 
 Future<void> initializeOptionalServices() async {
   await NotificationService.instance.initialize();
+  // 清理移除本地语音识别后的遗留模型与设置键；失败不影响启动。
+  await LegacySpeechCleanup.run();
 }
 
 /// 在 Flutter UI 启动后初始化核心存储，并为失败提供重试入口。
