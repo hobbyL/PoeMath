@@ -1,16 +1,15 @@
 // lib/features/profile/tts_settings_page.dart
 //
 // 层级：features/profile
-// 职责：TTS 音频设置子页面 — 音色选择 + 语速调节。
+// 职责：TTS 音频设置子页面 — 音色选择（系统 + 自建云端）+ 语速调节。
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
+import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -32,11 +31,30 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
   bool _loading = true;
   String? _loadError;
 
-  // ====== 云端朗读（腾讯云合成） ======
-  bool _tencentVerified = false;
+  // ====== 云端朗读（自建 Worker 合成） ======
+  bool _workerVerified = false;
   bool _cloudEnabled = false;
-  int _cloudVoiceType = kDefaultTencentVoiceType;
+  String _cloudVoice = kDefaultWorkerVoice;
+
+  /// 「保存并验证」/ 试听进行中。
   bool _cloudBusy = false;
+
+  /// 修改模式：已验证时重新展开输入表单。
+  bool _editingConfig = false;
+
+  /// 验证失败的行内提示（具体原因），下次保存时清除。
+  String? _verifyError;
+
+  /// 动态音色目录；null 表示尚未加载。
+  List<WorkerTtsVoice>? _cloudVoices;
+  bool _cloudVoicesLoading = false;
+
+  /// 拉取失败标志：展示内置精选 + 提示。
+  bool _cloudVoicesFailed = false;
+
+  late final TextEditingController _baseUrlController;
+  late final TextEditingController _apiKeyController;
+  bool _obscureApiKey = true;
 
   static const _previewText = '床前明月光，疑是地上霜。';
 
@@ -48,26 +66,37 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     _selectedVoice = settingsRepo.ttsVoice;
     _speed = settingsRepo.ttsSpeed;
     _cloudEnabled = settingsRepo.ttsCloudEnabled;
-    _cloudVoiceType = settingsRepo.ttsCloudVoiceType;
+    _cloudVoice = settingsRepo.ttsCloudVoice;
+    _baseUrlController =
+        TextEditingController(text: settingsRepo.ttsCloudBaseUrl);
+    _apiKeyController = TextEditingController();
     _loadVoices();
     _loadVerification();
   }
 
   Future<void> _loadVerification() async {
+    final settingsRepo = ref.read(settingsRepositoryProvider);
     try {
-      final settings =
-          await ref.read(settingsRepositoryProvider).loadSpeechRecognitionSettings();
-      if (mounted) {
-        setState(() => _tencentVerified = settings.isVerified);
+      final verified = await settingsRepo.isWorkerTtsVerified();
+      // 回填已保存的 API Key（安全存储，与 ASR 页回填模式一致）。
+      final config = await settingsRepo.readWorkerTtsConfig();
+      if (!mounted) return;
+      setState(() => _workerVerified = verified);
+      final savedKey = config?.apiKey ?? '';
+      if (savedKey.isNotEmpty) {
+        _apiKeyController.text = savedKey;
+      }
+      if (verified && _cloudEnabled) {
+        _loadCloudVoices();
       }
     } on Exception catch (error, stackTrace) {
       AppLogger.e(
-        '读取腾讯云验证状态失败',
+        '读取自建服务验证状态失败',
         tag: 'TtsSettings',
         error: error,
         stackTrace: stackTrace,
       );
-      if (mounted) setState(() => _tencentVerified = false);
+      if (mounted) setState(() => _workerVerified = false);
     }
   }
 
@@ -103,6 +132,8 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       }
     }
   }
+
+  // ====== 系统音色 ======
 
   Future<void> _selectVoice(Map<String, String>? voice) async {
     final scaffold = ScaffoldMessenger.of(context);
@@ -153,28 +184,163 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     await settingsRepo.setTtsSpeed(speed);
   }
 
-  // ====== 云端朗读（腾讯云合成） ======
+  // ====== 云端朗读（自建 Worker 合成） ======
 
   Future<void> _onCloudToggle(bool enabled) async {
     setState(() => _cloudEnabled = enabled);
     await ref.read(settingsRepositoryProvider).setTtsCloudEnabled(enabled);
+    if (enabled && _cloudVoices == null && !_cloudVoicesLoading) {
+      _loadCloudVoices();
+    }
   }
 
-  Future<void> _selectCloudVoice(TencentTtsVoice voice) async {
-    setState(() => _cloudVoiceType = voice.id);
-    await ref.read(settingsRepositoryProvider).setTtsCloudVoiceType(voice.id);
-    await _previewCloudVoice();
+  /// 拉取动态音色目录；失败回退内置精选并提示。
+  Future<void> _loadCloudVoices() async {
+    if (_cloudVoicesLoading) return;
+    setState(() {
+      _cloudVoicesLoading = true;
+      _cloudVoicesFailed = false;
+    });
+    try {
+      final voices = await _tts.listCloudVoices();
+      if (!mounted) return;
+      setState(() {
+        _cloudVoices = voices;
+        _cloudVoicesLoading = false;
+      });
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '获取在线音色失败',
+        tag: 'TtsSettings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (!mounted) return;
+      setState(() {
+        _cloudVoices = kWorkerFallbackVoices;
+        _cloudVoicesLoading = false;
+        _cloudVoicesFailed = true;
+      });
+    }
   }
 
-  /// 云端音色试听：不回退，失败显示具体原因（便于家长排障）。
-  Future<void> _previewCloudVoice() async {
+  /// 保存并验证：先零成本探测，通过后才持久化并标记已验证。
+  Future<void> _onSaveAndVerify() async {
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    final baseUrl = _baseUrlController.text.trim();
+    final apiKey = _apiKeyController.text.trim();
+    if (baseUrl.isEmpty || apiKey.isEmpty) {
+      setState(() => _verifyError = '服务地址与 API Key 均需填写');
+      return;
+    }
+
+    setState(() {
+      _cloudBusy = true;
+      _verifyError = null;
+    });
+    try {
+      // 先验证后落盘：无效 Key 不写入安全存储。
+      final config = WorkerTtsConfig(
+        base: WorkerTtsClient.normalizeBaseUrl(baseUrl),
+        apiKey: apiKey,
+      );
+      await _tts.verifyCloud(config);
+      await settingsRepo.saveWorkerTtsConfig(
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+      );
+      await settingsRepo.markWorkerTtsVerified();
+      if (mounted) {
+        setState(() {
+          _workerVerified = true;
+          _editingConfig = false;
+        });
+        AppLogger.d('自建语音服务验证成功', tag: 'TtsSettings');
+      }
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _verifyError = error.message);
+    } on WorkerTtsException catch (error) {
+      if (mounted) setState(() => _verifyError = error.message);
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '自建语音服务保存或验证失败',
+        tag: 'TtsSettings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) setState(() => _verifyError = '保存或验证失败，请稍后重试');
+    } finally {
+      if (mounted) setState(() => _cloudBusy = false);
+    }
+  }
+
+  /// 删除配置（确认对话框 → 删 Key + 指纹 + 设置并关闭云端开关）。
+  Future<void> _confirmDeleteConfig() async {
+    final scaffold = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除服务配置？'),
+        content: const Text('将删除已保存的服务地址与 API Key，并关闭云端朗读。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    try {
+      await settingsRepo.deleteWorkerTtsConfig();
+      if (!mounted) return;
+      setState(() {
+        _workerVerified = false;
+        _cloudEnabled = false;
+        _editingConfig = false;
+        _verifyError = null;
+        _cloudVoices = null;
+        _cloudVoicesFailed = false;
+      });
+      // 输入框回到默认地址，清除 Key 明文。
+      _baseUrlController.text = settingsRepo.ttsCloudBaseUrl;
+      _apiKeyController.clear();
+      AppLogger.d('自建语音服务配置已删除', tag: 'TtsSettings');
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '删除自建语音服务配置失败',
+        tag: 'TtsSettings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('配置删除失败，请稍后重试')),
+        );
+      }
+    }
+  }
+
+  /// 选择云端音色：持久化 voice + 最佳风格，随后试听（不回退，展示具体原因）。
+  Future<void> _selectCloudVoice(WorkerTtsVoice voice) async {
     if (_cloudBusy) return;
     setState(() => _cloudBusy = true);
+    final settingsRepo = ref.read(settingsRepositoryProvider);
     final scaffold = ScaffoldMessenger.of(context);
     try {
+      await settingsRepo.setTtsCloudVoice(voice.shortName);
+      await settingsRepo.setTtsCloudStyle(voice.bestStyle);
+      if (mounted) setState(() => _cloudVoice = voice.shortName);
       await _tts.stop();
       await _tts.previewCloud(_previewText);
-    } on TencentTtsException catch (error) {
+    } on WorkerTtsException catch (error) {
       if (mounted) {
         scaffold.clearSnackBars();
         scaffold.showSnackBar(SnackBar(content: Text(error.message)));
@@ -197,12 +363,6 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     }
   }
 
-  Future<void> _goToSpeechSettings() async {
-    await context.push(AppRoutes.speechRecognitionSettings);
-    // 返回后刷新验证状态（可能已完成配置并通过测试）。
-    await _loadVerification();
-  }
-
   @override
   void dispose() {
     // 离开页面停止试听
@@ -216,6 +376,8 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
             ),
           ),
     );
+    _baseUrlController.dispose();
+    _apiKeyController.dispose();
     super.dispose();
   }
 
@@ -320,7 +482,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
 
             const SizedBox(height: SpacingTokens.lg),
 
-            // ====== 云端朗读音色（腾讯云合成） ======
+            // ====== 云端朗读音色（自建 Worker 合成） ======
             _buildCloudCard(theme),
 
             const SizedBox(height: SpacingTokens.lg),
@@ -433,12 +595,12 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     );
   }
 
-  /// 云端朗读音色卡片：未验证时引导配置；已验证时开关 + 音色 + 试听。
+  /// 云端朗读音色卡片：未验证时配置表单；已验证时连接状态 + 开关 + 音色目录。
   Widget _buildCloudCard(ThemeData theme) {
-    final canEnable = _tencentVerified && !_cloudBusy;
-    final selectedVoice = kTencentPremiumVoices
-        .where((voice) => voice.id == _cloudVoiceType)
-        .firstOrNull;
+    final showForm = !_workerVerified || _editingConfig;
+    final canEnable = _workerVerified && !_cloudBusy;
+    final host = Uri.tryParse(_baseUrlController.text.trim())?.host ??
+        kDefaultWorkerBaseUrl;
 
     return ColoredCard(
       color: theme.colorScheme.primary,
@@ -455,7 +617,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
               const SizedBox(width: SpacingTokens.sm),
               Expanded(
                 child: Text(
-                  '云端朗读音色（腾讯云）',
+                  '云端朗读音色（自建服务）',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -468,67 +630,199 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
             ],
           ),
           const SizedBox(height: SpacingTokens.xs),
-          Text(
-            _tencentVerified
-                ? _cloudEnabled
-                    ? '朗读将使用云端合成，失败自动回退系统音色'
-                    : '开启后朗读使用更自然的云端音色'
-                : '需先在语音识别设置中配置密钥并通过真实录音测试',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (!_tencentVerified) ...[
-            const SizedBox(height: SpacingTokens.sm),
-            OutlinedButton.icon(
-              onPressed: _goToSpeechSettings,
-              icon: const Icon(Icons.key_outlined),
-              label: const Text('去配置密钥'),
-            ),
-          ],
-          if (_tencentVerified && _cloudEnabled) ...[
-            const SizedBox(height: SpacingTokens.sm),
-            ...kTencentPremiumVoices.map(
-              (voice) => Padding(
-                padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-                child: AppTile(
-                  icon: voice.id == _cloudVoiceType
-                      ? Icons.check_circle
-                      : Icons.graphic_eq,
-                  iconColor: voice.id == _cloudVoiceType
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.outline,
-                  title: voice.name,
-                  subtitle: voice.style,
-                  // AppTile 在 trailing 非空时忽略 onTap，
-                  // 与系统音色一致：点试听按钮即选择并试听。
-                  trailing: _cloudBusy && voice.id == _cloudVoiceType
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : IconButton(
-                          icon: Icon(
-                            Icons.play_circle_outline,
-                            color: theme.colorScheme.primary,
-                          ),
-                          tooltip: '试听',
-                          onPressed: _cloudBusy
-                              ? null
-                              : () => _selectCloudVoice(voice),
-                        ),
-                ),
-              ),
-            ),
+          if (showForm) ...[
             Text(
-              selectedVoice == null ? '' : '当前音色：${selectedVoice.name}',
+              _workerVerified
+                  ? '修改服务地址或 API Key 后需重新验证'
+                  : '填写自建语音服务地址与 API Key，验证通过后可开启云端朗读',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: SpacingTokens.sm),
+            TextField(
+              controller: _baseUrlController,
+              enabled: !_cloudBusy,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: '服务地址',
+                prefixIcon: Icon(Icons.language_outlined),
+                hintText: kDefaultWorkerBaseUrl,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            TextField(
+              controller: _apiKeyController,
+              enabled: !_cloudBusy,
+              obscureText: _obscureApiKey,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'API Key',
+                prefixIcon: const Icon(Icons.key_outlined),
+                suffixIcon: IconButton(
+                  onPressed: _cloudBusy
+                      ? null
+                      : () => setState(() => _obscureApiKey = !_obscureApiKey),
+                  icon: Icon(
+                    _obscureApiKey
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                  tooltip: _obscureApiKey ? '显示密钥' : '隐藏密钥',
+                ),
+              ),
+            ),
+            if (_verifyError != null) ...[
+              const SizedBox(height: SpacingTokens.sm),
+              Text(
+                _verifyError!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
+            const SizedBox(height: SpacingTokens.sm),
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: _cloudBusy ? null : _onSaveAndVerify,
+                  icon: _cloudBusy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cloud_done_outlined),
+                  label: const Text('保存并验证'),
+                ),
+                if (_workerVerified) ...[
+                  const SizedBox(width: SpacingTokens.md),
+                  TextButton(
+                    onPressed: _cloudBusy
+                        ? null
+                        : () => setState(() => _editingConfig = false),
+                    child: const Text('取消'),
+                  ),
+                ],
+              ],
+            ),
+          ] else ...[
+            Text(
+              '已连接 · $host',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            Text(
+              _cloudEnabled ? '朗读使用云端自然音色，失败自动回退系统音色' : '开启后朗读使用更自然的云端音色',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: _cloudBusy
+                      ? null
+                      : () => setState(() => _editingConfig = true),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('修改'),
+                ),
+                const SizedBox(width: SpacingTokens.md),
+                TextButton.icon(
+                  onPressed: _cloudBusy ? null : _confirmDeleteConfig,
+                  icon: const Icon(Icons.delete_outlined),
+                  label: const Text('删除配置'),
+                ),
+              ],
+            ),
+            if (_cloudEnabled) ..._buildCloudVoiceDirectory(theme),
           ],
         ],
+      ),
+    );
+  }
+
+  /// 动态音色目录：标准 Neural / DragonHD 高清分组，trailing 试听即选择。
+  List<Widget> _buildCloudVoiceDirectory(ThemeData theme) {
+    if (_cloudVoicesLoading) {
+      return const [
+        SizedBox(height: SpacingTokens.sm),
+        Center(child: CircularProgressIndicator()),
+      ];
+    }
+    final voices = _cloudVoices;
+    if (voices == null || voices.isEmpty) {
+      return const [];
+    }
+
+    final standard = voices.where((voice) => !voice.isDragonHd).toList()
+      ..sort((a, b) => a.localName.compareTo(b.localName));
+    final dragonHd = voices.where((voice) => voice.isDragonHd).toList()
+      ..sort((a, b) => a.localName.compareTo(b.localName));
+
+    return [
+      if (_cloudVoicesFailed)
+        Padding(
+          padding: const EdgeInsets.only(top: SpacingTokens.xs),
+          child: Text(
+            '在线音色获取失败，已展示内置精选',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      const SizedBox(height: SpacingTokens.sm),
+      Text(
+        '标准音色（Neural）',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      ...standard.map((voice) => _buildCloudVoiceTile(theme, voice)),
+      if (dragonHd.isNotEmpty) ...[
+        const SizedBox(height: SpacingTokens.sm),
+        Text(
+          '高清音色（DragonHD）',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        ...dragonHd.map((voice) => _buildCloudVoiceTile(theme, voice)),
+      ],
+    ];
+  }
+
+  Widget _buildCloudVoiceTile(ThemeData theme, WorkerTtsVoice voice) {
+    final isSelected = voice.shortName == _cloudVoice;
+    final subtitle =
+        '${workerGenderLabel(voice.gender)} · ${workerStyleLabel(voice.bestStyle)}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
+      child: AppTile(
+        icon: isSelected ? Icons.check_circle : Icons.graphic_eq,
+        iconColor:
+            isSelected ? theme.colorScheme.primary : theme.colorScheme.outline,
+        title: voice.localName,
+        subtitle: subtitle,
+        // AppTile 在 trailing 非空时忽略 onTap，交互由试听按钮承担。
+        trailing: _cloudBusy && isSelected
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : IconButton(
+                icon: Icon(
+                  Icons.play_circle_outline,
+                  color: theme.colorScheme.primary,
+                ),
+                tooltip: '试听',
+                onPressed: _cloudBusy ? null : () => _selectCloudVoice(voice),
+              ),
       ),
     );
   }

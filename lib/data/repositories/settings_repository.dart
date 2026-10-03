@@ -10,6 +10,7 @@ import 'package:crypto/crypto.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
+import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 
@@ -38,7 +39,11 @@ class SettingsRepository {
       'tencent_asr_credential_fingerprint';
   static const String _keyTencentAsrVerifiedAt = 'tencent_asr_verified_at';
   static const String _keyTtsCloudEnabled = 'tts_cloud_enabled';
-  static const String _keyTtsCloudVoiceType = 'tts_cloud_voice_type';
+  static const String _keyTtsCloudBaseUrl = 'tts_cloud_base_url';
+  static const String _keyTtsCloudVoice = 'tts_cloud_voice';
+  static const String _keyTtsCloudStyle = 'tts_cloud_style';
+  static const String _keyWorkerTtsVerifiedFingerprint =
+      'worker_tts_verified_fingerprint';
 
   // ============ 主题 ============
 
@@ -116,9 +121,9 @@ class SettingsRepository {
     }
   }
 
-  // ============ 腾讯云语音合成（可选） ============
+  // ============ 自建 Worker 云端朗读（可选） ============
 
-  /// 云端朗读开关，默认关闭；开启需腾讯云凭据已验证。
+  /// 云端朗读开关，默认关闭；开启需自建服务已验证。
   bool get ttsCloudEnabled =>
       HiveBoxes.settings.get(_keyTtsCloudEnabled, defaultValue: false) as bool;
 
@@ -126,14 +131,95 @@ class SettingsRepository {
     await HiveBoxes.settings.put(_keyTtsCloudEnabled, enabled);
   }
 
-  /// 云端朗读音色（腾讯云 VoiceType 编号），默认 101001 智瑜。
-  int get ttsCloudVoiceType => HiveBoxes.settings.get(
-        _keyTtsCloudVoiceType,
-        defaultValue: kDefaultTencentVoiceType,
-      ) as int;
+  /// 云端朗读服务地址（Hive 非敏感存储），默认自建 Worker 地址。
+  String get ttsCloudBaseUrl => HiveBoxes.settings.get(
+        _keyTtsCloudBaseUrl,
+        defaultValue: kDefaultWorkerBaseUrl,
+      ) as String;
 
-  Future<void> setTtsCloudVoiceType(int voiceType) async {
-    await HiveBoxes.settings.put(_keyTtsCloudVoiceType, voiceType);
+  Future<void> setTtsCloudBaseUrl(String baseUrl) async {
+    await HiveBoxes.settings.put(_keyTtsCloudBaseUrl, baseUrl);
+  }
+
+  /// 云端朗读音色（Worker shortName），默认晓晓。
+  String get ttsCloudVoice => HiveBoxes.settings.get(
+        _keyTtsCloudVoice,
+        defaultValue: kDefaultWorkerVoice,
+      ) as String;
+
+  Future<void> setTtsCloudVoice(String voice) async {
+    await HiveBoxes.settings.put(_keyTtsCloudVoice, voice);
+  }
+
+  /// 云端朗读风格，默认诗词范读。
+  String get ttsCloudStyle =>
+      HiveBoxes.settings.get(_keyTtsCloudStyle, defaultValue: 'poetry-reading')
+          as String;
+
+  Future<void> setTtsCloudStyle(String style) async {
+    await HiveBoxes.settings.put(_keyTtsCloudStyle, style);
+  }
+
+  /// 读取自建服务完整配置；API Key 缺失时返回 null。
+  Future<WorkerTtsConfig?> readWorkerTtsConfig() async {
+    final apiKey = await _credentialStore.readWorkerTtsApiKey();
+    if (apiKey == null || apiKey.isEmpty) return null;
+    final base = WorkerTtsClient.normalizeBaseUrl(ttsCloudBaseUrl);
+    return WorkerTtsConfig(base: base, apiKey: apiKey);
+  }
+
+  /// 保存服务配置（地址入 Hive、Key 入安全存储）并清除验证指纹（强制重验）。
+  Future<void> saveWorkerTtsConfig({
+    required String baseUrl,
+    required String apiKey,
+  }) async {
+    final normalized = WorkerTtsClient.normalizeBaseUrl(baseUrl);
+    final key = apiKey.trim();
+    if (key.isEmpty) {
+      throw ArgumentError('API Key 不能为空');
+    }
+    await _credentialStore.saveWorkerTtsApiKey(key);
+    await setTtsCloudBaseUrl(normalized.toString());
+    await HiveBoxes.settings.delete(_keyWorkerTtsVerifiedFingerprint);
+  }
+
+  /// 当前存储的配置是否已通过验证（指纹匹配）。
+  Future<bool> isWorkerTtsVerified() async {
+    final config = await readWorkerTtsConfig();
+    if (config == null) return false;
+    final stored =
+        HiveBoxes.settings.get(_keyWorkerTtsVerifiedFingerprint) as String?;
+    return stored == _workerTtsConfigFingerprint(config);
+  }
+
+  /// 标记当前配置已通过验证。
+  Future<void> markWorkerTtsVerified() async {
+    final config = await readWorkerTtsConfig();
+    if (config == null) {
+      throw StateError('尚未保存自建语音服务配置');
+    }
+    await HiveBoxes.settings.put(
+      _keyWorkerTtsVerifiedFingerprint,
+      _workerTtsConfigFingerprint(config),
+    );
+  }
+
+  /// 删除已保存的服务配置（Key + 指纹），并关闭云端朗读开关。
+  Future<void> deleteWorkerTtsConfig() async {
+    await _credentialStore.deleteWorkerTtsApiKey();
+    await HiveBoxes.settings.delete(_keyWorkerTtsVerifiedFingerprint);
+    await HiveBoxes.settings.delete(_keyTtsCloudBaseUrl);
+    await HiveBoxes.settings.delete(_keyTtsCloudVoice);
+    await HiveBoxes.settings.delete(_keyTtsCloudStyle);
+    await setTtsCloudEnabled(false);
+  }
+
+  static String _workerTtsConfigFingerprint(WorkerTtsConfig config) {
+    final canonical = jsonEncode(<String>[
+      config.base.toString(),
+      config.apiKey,
+    ]);
+    return sha256.convert(utf8.encode(canonical)).toString();
   }
 
   // ============ 拼音显示 ============

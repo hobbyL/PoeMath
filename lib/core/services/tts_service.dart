@@ -1,7 +1,7 @@
 // lib/core/services/tts_service.dart
 //
-// TTS 朗读服务：系统引擎（flutter_tts）+ 可选腾讯云合成。
-// 云端开启且凭据已验证时云优先，失败静默回退系统音色，朗读不中断。
+// TTS 朗读服务：系统引擎（flutter_tts）+ 可选自建 Worker 云端合成。
+// 云端开启且服务已验证时云优先，失败静默回退系统音色，朗读不中断。
 
 import 'dart:async';
 
@@ -9,9 +9,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_tts/flutter_tts.dart';
 
-import 'package:poemath/core/services/speech/speech_recognition_models.dart';
-import 'package:poemath/core/services/tts/tencent_tts_client.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
+import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
@@ -27,15 +26,15 @@ class TtsService {
 
   final FlutterTts _tts;
   final SettingsRepository _settings;
-  final TencentTtsClient? _cloudClient;
+  final WorkerTtsClient? _cloudClient;
 
   CloudAudioPlayer? _cloudPlayer;
   final Map<String, Uint8List> _cloudCache = <String, Uint8List>{};
 
-  TencentAsrCredentials? _cloudCredentials;
+  WorkerTtsConfig? _cloudConfig;
 
-  /// 额度/鉴权/服务未开通后置位：本次朗读整段降级系统音色，
-  /// 避免逐行重复撞额度；下次朗读入口重置。
+  /// 鉴权类错误（401）后置位：本次朗读整段降级系统音色，
+  /// 避免逐行重复撞错；下次朗读入口重置。
   bool _cloudSessionDisabled = false;
 
   bool _initialized = false;
@@ -49,7 +48,7 @@ class TtsService {
   TtsService(
     this._settings, {
     FlutterTts? flutterTts,
-    TencentTtsClient? cloudClient,
+    WorkerTtsClient? cloudClient,
     CloudAudioPlayer? cloudPlayer,
   })  : _tts = flutterTts ?? FlutterTts(),
         _cloudClient = cloudClient,
@@ -96,37 +95,32 @@ class TtsService {
     _initialized = true;
   }
 
-  /// 朗读会话入口：刷新云端可用状态（开关 + 凭据验证）。
+  /// 朗读会话入口：刷新云端可用状态（开关 + 自建服务验证）。
   Future<void> _refreshCloudState() async {
     _cloudSessionDisabled = false;
     if (_cloudClient == null || !_settings.ttsCloudEnabled) {
-      _cloudCredentials = null;
+      _cloudConfig = null;
       return;
     }
     try {
-      final state = await _settings.loadSpeechRecognitionSettings();
-      _cloudCredentials = state.isVerified
-          ? await _settings.readTencentAsrCredentials()
-          : null;
+      final verified = await _settings.isWorkerTtsVerified();
+      _cloudConfig = verified ? await _settings.readWorkerTtsConfig() : null;
     } on Object catch (error) {
-      AppLogger.w('读取云端朗读凭据失败，本次使用系统音色：$error', tag: _logTag);
-      _cloudCredentials = null;
+      AppLogger.w('读取云端朗读配置失败，本次使用系统音色：$error', tag: _logTag);
+      _cloudConfig = null;
     }
   }
 
   /// 本次会话是否走云端合成。
   bool get _cloudMode =>
-      _cloudClient != null && _cloudCredentials != null && !_cloudSessionDisabled;
-
-  /// 应用内语速 [0.1, 1.0]（0.5 = 系统正常语速）线性映射到腾讯云
-  /// Speed [0.2, 2.0]：0.5 → 1.0 对齐云端正常语速。
-  double _cloudSpeed() => (_settings.ttsSpeed * 2).clamp(0.5, 2.0);
+      _cloudClient != null && _cloudConfig != null && !_cloudSessionDisabled;
 
   /// 严格合成：命中缓存或请求云端，异常上抛。
   Future<Uint8List> _synthesizeStrict(String text) async {
-    final voiceType = _settings.ttsCloudVoiceType;
-    final speed = _cloudSpeed();
-    final cacheKey = '$voiceType|${speed.toStringAsFixed(2)}|$text';
+    final voice = _settings.ttsCloudVoice;
+    final style = _settings.ttsCloudStyle;
+    final rate = workerRateFor(_settings.ttsSpeed);
+    final cacheKey = '$voice|$style|$rate|$text';
     final cached = _cloudCache.remove(cacheKey);
     if (cached != null) {
       _cloudCache[cacheKey] = cached;
@@ -134,10 +128,11 @@ class TtsService {
     }
 
     final bytes = await _cloudClient!.synthesize(
+      config: _cloudConfig!,
       text: text,
-      credentials: _cloudCredentials!,
-      voiceType: voiceType,
-      speed: speed,
+      voice: voice,
+      style: style,
+      rate: rate,
     );
     _storeCache(cacheKey, bytes);
     return bytes;
@@ -145,21 +140,14 @@ class TtsService {
 
   /// 宽松合成：失败返回 null（调用方回退系统音色）。
   ///
-  /// 额度/鉴权/服务未开通类错误将本次朗读整段降级。
+  /// 鉴权类错误（401，key 被换/撤销）将本次朗读整段降级。
   Future<Uint8List?> _synthesizeCloud(String text) async {
     if (!_cloudMode) return null;
     try {
       return await _synthesizeStrict(text);
-    } on TencentTtsException catch (error) {
-      switch (error.kind) {
-        case TencentTtsErrorKind.quota:
-        case TencentTtsErrorKind.authentication:
-        case TencentTtsErrorKind.serviceNotEnabled:
-          _cloudSessionDisabled = true;
-        case TencentTtsErrorKind.request:
-        case TencentTtsErrorKind.network:
-        case TencentTtsErrorKind.response:
-          break;
+    } on WorkerTtsException catch (error) {
+      if (error.kind == WorkerTtsErrorKind.authentication) {
+        _cloudSessionDisabled = true;
       }
       AppLogger.w('云端合成失败，回退系统音色：${error.message}', tag: _logTag);
       return null;
@@ -284,14 +272,44 @@ class TtsService {
   /// 云端音色试听：强制走云合成，失败上抛具体原因（设置页展示）。
   Future<void> previewCloud(String text) async {
     await _refreshCloudState();
-    if (_cloudClient == null || _cloudCredentials == null) {
-      throw const TencentTtsException(
-        '请先配置腾讯云密钥并通过真实录音测试',
-        kind: TencentTtsErrorKind.authentication,
+    if (_cloudClient == null || _cloudConfig == null) {
+      throw const WorkerTtsException(
+        '请先保存并验证自建语音服务',
+        kind: WorkerTtsErrorKind.authentication,
       );
     }
     final bytes = await _synthesizeStrict(text);
     await _cloudPlayerResolved.play(bytes);
+  }
+
+  /// 验证自建服务配置（零成本空 text 探测，不产生真实合成）。
+  ///
+  /// 设置页专用入口：异常上抛由页面展示具体原因。
+  Future<void> verifyCloud(WorkerTtsConfig config) async {
+    final client = _cloudClient;
+    if (client == null) {
+      throw const WorkerTtsException(
+        '语音服务客户端不可用',
+        kind: WorkerTtsErrorKind.response,
+      );
+    }
+    await client.verify(config);
+  }
+
+  /// 拉取云端音色目录（voices 端点无需认证）。
+  ///
+  /// 地址取自已保存的设置；失败上抛，调用方回退内置精选。
+  Future<List<WorkerTtsVoice>> listCloudVoices() async {
+    final client = _cloudClient;
+    if (client == null) {
+      throw const WorkerTtsException(
+        '语音服务客户端不可用',
+        kind: WorkerTtsErrorKind.response,
+      );
+    }
+    return client.listVoices(
+      WorkerTtsClient.normalizeBaseUrl(_settings.ttsCloudBaseUrl),
+    );
   }
 
   /// 朗读文本（全文一次性读完）。

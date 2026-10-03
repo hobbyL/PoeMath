@@ -85,6 +85,23 @@ class SecureCredentialStore {
     await _storage.delete(key: _tencentSecretKeyKey);
   }
 
+  // ============ 自建 Worker TTS API Key ============
+
+  /// 保存自建 Worker 语音合成服务 API Key。
+  Future<void> saveWorkerTtsApiKey(String apiKey) async {
+    await _storage.write(key: _workerTtsApiKeyKey, value: apiKey);
+  }
+
+  /// 读取自建 Worker 语音合成服务 API Key，不存在返回 `null`。
+  Future<String?> readWorkerTtsApiKey() async {
+    return _storage.read(key: _workerTtsApiKeyKey);
+  }
+
+  /// 删除自建 Worker 语音合成服务 API Key。
+  Future<void> deleteWorkerTtsApiKey() async {
+    await _storage.delete(key: _workerTtsApiKeyKey);
+  }
+
   // ============ 内部 ============
 
   static String _usernameKey(String id) => 'webdav_${id}_username';
@@ -92,4 +109,5 @@ class SecureCredentialStore {
 
   static const String _tencentSecretIdKey = 'tencent_asr_secret_id';
   static const String _tencentSecretKeyKey = 'tencent_asr_secret_key';
+  static const String _workerTtsApiKeyKey = 'worker_tts_api_key';
 }

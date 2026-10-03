@@ -1,6 +1,6 @@
 // lib/core/services/tts/tts_models.dart
 //
-// 腾讯云语音合成模型：精选精品音色目录、错误类型与云端音频播放抽象。
+// 自建 Worker 语音合成模型：音色目录、错误类型、映射函数与云端音频播放抽象。
 
 import 'dart:async';
 
@@ -8,76 +8,191 @@ import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
 
-/// 腾讯云 TTS 错误分类。
-enum TencentTtsErrorKind {
-  /// 密钥无效或无权限。
+/// 自建 Worker TTS 错误分类。
+enum WorkerTtsErrorKind {
+  /// API Key 无效或未提供（401）。
   authentication,
 
-  /// 免费额度耗尽、资源包用尽或账户欠费。
-  quota,
-
-  /// 语音合成服务未开通。
-  serviceNotEnabled,
-
-  /// 请求参数不合法。
+  /// 请求参数不合法（400，服务端 message 透传）。
   request,
 
   /// 网络不可用或超时。
   network,
 
-  /// 服务返回数据无效。
+  /// 服务返回数据无效（5xx / 非 audio 响应）。
   response,
 }
 
-/// 腾讯云语音合成异常。
-final class TencentTtsException implements Exception {
-  const TencentTtsException(
+/// 自建 Worker 语音合成异常。
+///
+/// `toString()` 与 message 均不得包含 API Key。
+final class WorkerTtsException implements Exception {
+  const WorkerTtsException(
     this.message, {
     required this.kind,
-    this.code,
     this.statusCode,
   });
 
   final String message;
-  final TencentTtsErrorKind kind;
-  final String? code;
+  final WorkerTtsErrorKind kind;
   final int? statusCode;
 
   @override
-  String toString() => 'TencentTtsException: $message';
+  String toString() => 'WorkerTtsException: $message';
 }
 
-/// 精选腾讯云精品音色。
-///
-/// ID 来自腾讯云音色列表（基础/精品音色，免费额度 800 万字符）。
-final class TencentTtsVoice {
-  const TencentTtsVoice({
-    required this.id,
-    required this.name,
-    required this.style,
+/// Worker 音色（`/api/v1/voices` 响应条目）。
+final class WorkerTtsVoice {
+  const WorkerTtsVoice({
+    required this.shortName,
+    required this.localName,
+    required this.gender,
+    required this.styleList,
+    this.presetStyle,
   });
 
-  /// 腾讯云 VoiceType 编号。
-  final int id;
+  /// 音色标识（如 `zh-CN-XiaoxiaoNeural`）。
+  final String shortName;
 
-  /// 展示名。
-  final String name;
+  /// 展示名（如「晓晓」；DragonHD 音色可能为英文描述）。
+  final String localName;
 
-  /// 风格描述。
-  final String style;
+  /// `Female` / `Male`。
+  final String gender;
+
+  /// 支持的风格列表。
+  final List<String> styleList;
+
+  /// 内置精选目录的预设风格（动态列表为 null，选中时计算）。
+  final String? presetStyle;
+
+  /// shortName 含 `DragonHD` 即为新一代高清音色。
+  bool get isDragonHd => shortName.contains('DragonHD');
+
+  /// 该音色的最佳朗读风格：预设优先，否则按优先级从 styleList 匹配。
+  String get bestStyle =>
+      presetStyle ?? bestStyleFor(styleList, fallback: 'general');
 }
 
-/// 设置页可选的云端音色目录（硬编码精选，ID 稳定）。
-const List<TencentTtsVoice> kTencentPremiumVoices = <TencentTtsVoice>[
-  TencentTtsVoice(id: 101001, name: '智瑜', style: '温柔女声 · 适合诗词范读'),
-  TencentTtsVoice(id: 101002, name: '智灵', style: '亲切女声 · 通用朗读'),
-  TencentTtsVoice(id: 101004, name: '智芸', style: '温暖女声 · 讲故事'),
-  TencentTtsVoice(id: 101018, name: '智靖', style: '沉稳男声 · 朗诵'),
-  TencentTtsVoice(id: 101020, name: '智刚', style: '有力男声 · 朗读'),
+/// 自建 Worker 服务配置（地址 + API Key）。
+final class WorkerTtsConfig {
+  const WorkerTtsConfig({required this.base, required this.apiKey});
+
+  /// 服务根地址（已规范化，无尾斜杠）。
+  final Uri base;
+
+  /// API Key（仅存安全存储，不入 Hive / 备份 / 日志）。
+  final String apiKey;
+
+  bool get isComplete => base.host.isNotEmpty && apiKey.isNotEmpty;
+}
+
+/// 默认服务地址（家长自建 Worker，可修改）。
+const String kDefaultWorkerBaseUrl = 'https://tts.cloudm.cc';
+
+/// 默认云端音色：晓晓。
+const String kDefaultWorkerVoice = 'zh-CN-XiaoxiaoNeural';
+
+/// 音频格式：服务端格式表内、含 mp3 满足长文本分段合并、优于默认 48kbps。
+const String kWorkerAudioFormat = 'audio-24khz-96kbitrate-mono-mp3';
+
+/// 在线音色拉取失败时的内置精选目录（含预设风格）。
+const List<WorkerTtsVoice> kWorkerFallbackVoices = <WorkerTtsVoice>[
+  WorkerTtsVoice(
+    shortName: 'zh-CN-XiaoxiaoNeural',
+    localName: '晓晓',
+    gender: 'Female',
+    styleList: ['poetry-reading'],
+    presetStyle: 'poetry-reading',
+  ),
+  WorkerTtsVoice(
+    shortName: 'zh-CN-XiaoyiNeural',
+    localName: '晓伊',
+    gender: 'Female',
+    styleList: ['gentle'],
+    presetStyle: 'gentle',
+  ),
+  WorkerTtsVoice(
+    shortName: 'zh-CN-YunxiNeural',
+    localName: '云希',
+    gender: 'Male',
+    styleList: ['narration-relaxed'],
+    presetStyle: 'narration-relaxed',
+  ),
+  WorkerTtsVoice(
+    shortName: 'zh-CN-YunjianNeural',
+    localName: '云健',
+    gender: 'Male',
+    styleList: ['narration-relaxed'],
+    presetStyle: 'narration-relaxed',
+  ),
+  WorkerTtsVoice(
+    shortName: 'zh-CN-YunyangNeural',
+    localName: '云扬',
+    gender: 'Male',
+    styleList: ['narration-professional'],
+    presetStyle: 'narration-professional',
+  ),
 ];
 
-/// 默认云端音色：智瑜。
-const int kDefaultTencentVoiceType = 101001;
+/// 应用内语速 [0.1, 1.0]（0.5 = 正常）映射为 Worker 百分比 rate 字符串。
+///
+/// 分段线性：0.1 → `"-50"`、0.5 → `"0"`、1.0 → `"+100"`。
+/// 服务端 normalizePercent 接受 `+n` / `-n` / `n` 带符号整数字符串。
+String workerRateFor(double speed) {
+  final clamped = speed.clamp(0.1, 1.0);
+  final int percent;
+  if (clamped <= 0.5) {
+    // [0.1, 0.5] → [-50, 0]
+    percent = (-50 + (clamped - 0.1) / 0.4 * 50).round();
+  } else {
+    // (0.5, 1.0] → (0, 100]
+    percent = ((clamped - 0.5) / 0.5 * 100).round();
+  }
+  if (percent == 0) return '0';
+  final sign = percent > 0 ? '+' : '-';
+  return '$sign${percent.abs()}';
+}
+
+/// 从风格列表按优先级匹配最佳朗读风格：
+/// poetry-reading → gentle → narration-relaxed → narration-professional → chat。
+/// 全部缺失时返回 [fallback]（默认 `general`）。
+String bestStyleFor(
+  List<String> styleList, {
+  String fallback = 'general',
+}) {
+  const priority = <String>[
+    'poetry-reading',
+    'gentle',
+    'narration-relaxed',
+    'narration-professional',
+    'chat',
+  ];
+  for (final style in priority) {
+    if (styleList.contains(style)) return style;
+  }
+  return fallback;
+}
+
+/// 风格中文标签（设置页展示用）。
+String workerStyleLabel(String style) {
+  return switch (style) {
+    'poetry-reading' => '诗词范读',
+    'gentle' => '温柔',
+    'narration-relaxed' => '轻松讲述',
+    'narration-professional' => '专业播报',
+    'chat' => '对话',
+    'general' => '通用',
+    _ => style,
+  };
+}
+
+/// gender → 中文标签。
+String workerGenderLabel(String gender) {
+  if (gender.toLowerCase().startsWith('f')) return '女声';
+  if (gender.toLowerCase().startsWith('m')) return '男声';
+  return gender;
+}
 
 /// 云端合成音频播放抽象（便于测试替换）。
 abstract interface class CloudAudioPlayer {
@@ -98,7 +213,9 @@ final class AudioplayersCloudAudioPlayer implements CloudAudioPlayer {
   AudioplayersCloudAudioPlayer({AudioPlayer? player})
       : _player = player ?? AudioPlayer();
 
-  static const _completionTimeout = Duration(seconds: 90);
+  /// 全文合成时服务端按句分段、并发合成并合并 MP3，产生的长音频
+  /// 播放时长可超过 90 秒，因此超时上限取 300 秒。
+  static const _completionTimeout = Duration(seconds: 300);
 
   final AudioPlayer _player;
   Completer<void>? _session;
