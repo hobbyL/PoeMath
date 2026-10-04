@@ -1,14 +1,23 @@
 // lib/math_engine/generators/mixed_operation_gen.dart
 //
 // 混合运算生成器（3-4 年级）。
+//
+// 核心不变量：「题面显示语义 = 判分答案」。
+// withBrackets 题的 result 必须等于按显示语义（先算括号，括号内与
+// 括号外均先乘除后加减、同级从左到右）的精确求值结果；整数题的中间
+// 与最终结果必须为整数，否则确定性降级为 chain 形态产出（不递归重试）。
 
 import '../models/math_problem.dart';
 import '../models/number_value.dart';
+import '../validators/expression_evaluator.dart';
 import 'base_generator.dart';
 
 /// 混合运算生成器（两到三步运算）。
 class MixedOperationGen extends BaseGenerator {
   MixedOperationGen(super.config, {super.random});
+
+  /// 生成尝试上限（防御未来预设改动导致死循环）。
+  static const _maxAttempts = 200;
 
   @override
   MathProblem generate() {
@@ -17,50 +26,104 @@ class MixedOperationGen extends BaseGenerator {
   }
 
   MathProblem _twoStep() {
-    // 生成 a ○ b ○ c 形式，确保中间结果和最终结果合理
-    final ops = _pickOperators(2);
-    final values = _generateValidOperands(ops);
-    if (values == null) return _twoStep();
+    for (var attempt = 0; attempt < _maxAttempts; attempt++) {
+      final ops = _pickOperators(2);
+      final values = _generateValidOperands(ops);
+      if (values == null) continue;
 
-    final operands = values.map((v) => NumberValue.fromInt(v)).toList();
-    final result = _evaluate(values, ops);
+      final operands = values.map((v) => NumberValue.fromInt(v)).toList();
+      final result = ExpressionEvaluator.evaluate(operands, ops);
+      // 整数题：求值必须可用且结果为整数
+      if (result == null || !result.isInteger) continue;
+      final resultInt = result.asInteger;
+      if (resultInt < 0 || resultInt > config.maxResult) continue;
 
-    if (result < 0 || result > config.maxResult) return _twoStep();
-
-    final difficulty = scoreDifficulty(operands, ops);
-
-    return MathProblem(
-      operands: operands,
-      operators: ops,
-      result: NumberValue.fromInt(result),
-      mode: ProblemMode.chain,
-      grade: config.grade,
-      difficulty: difficulty,
-    );
+      return MathProblem(
+        operands: operands,
+        operators: ops,
+        result: NumberValue.fromInt(resultInt),
+        mode: ProblemMode.chain,
+        grade: config.grade,
+        difficulty: scoreDifficulty(operands, ops),
+      );
+    }
+    return _fallbackProblem();
   }
 
   MathProblem _threeStep() {
-    final ops = _pickOperators(3);
-    final values = _generateValidOperands(ops);
-    if (values == null) return _threeStep();
+    for (var attempt = 0; attempt < _maxAttempts; attempt++) {
+      final ops = _pickOperators(3);
+      final values = _generateValidOperands(ops);
+      if (values == null) continue;
 
-    final operands = values.map((v) => NumberValue.fromInt(v)).toList();
-    final result = _evaluate(values, ops);
+      final operands = values.map((v) => NumberValue.fromInt(v)).toList();
 
-    if (result < 0 || result > config.maxResult) return _threeStep();
+      // 无括号（chain）语义下的精确结果
+      final plainResult = ExpressionEvaluator.evaluate(operands, ops);
+      if (plainResult == null || !plainResult.isInteger) continue;
+      final plainInt = plainResult.asInteger;
+      if (plainInt < 0 || plainInt > config.maxResult) continue;
 
-    final difficulty = (scoreDifficulty(operands, ops) + 1).clamp(1, 5);
+      var mode = ProblemMode.chain;
+      (int, int)? bracketRange;
+      var resultValue = plainInt;
 
-    final usesBrackets = config.allowBrackets && randomInt(0, 2) == 0;
+      // 括号路径：按显示语义精确求值；非法组合确定性降级为 chain
+      if (config.allowBrackets && randomInt(0, 2) == 0) {
+        final trace = ExpressionEvaluator.evaluateWithSteps(
+          operands,
+          ops,
+          bracketRange: (0, 2),
+        );
+        final bracketInt = _validBracketResult(trace);
+        if (bracketInt != null) {
+          mode = ProblemMode.withBrackets;
+          bracketRange = (0, 2);
+          resultValue = bracketInt;
+        }
+      }
 
+      final difficulty = (scoreDifficulty(operands, ops) + 1).clamp(1, 5);
+
+      return MathProblem(
+        operands: operands,
+        operators: ops,
+        result: NumberValue.fromInt(resultValue),
+        mode: mode,
+        grade: config.grade,
+        difficulty: difficulty,
+        bracketRange: bracketRange,
+      );
+    }
+    return _fallbackProblem();
+  }
+
+  /// 括号语义结果合法性：可用、中间值全整数、最终整数、非负、不超上限。
+  /// 不合法返回 null（调用方降级为 chain，用无括号结果）。
+  int? _validBracketResult(EvaluationTrace? trace) {
+    if (trace == null) return null;
+    // 整数题要求括号内与括号外的中间值全部为整数
+    if (!trace.steps.every((s) => s.value.isInteger)) return null;
+    final value = trace.value;
+    if (!value.isInteger) return null;
+    final valueInt = value.asInteger;
+    if (valueInt < 0 || valueInt > config.maxResult) return null;
+    return valueInt;
+  }
+
+  /// 保底题：小操作数加法 chain（必过约束校验）。
+  MathProblem _fallbackProblem() {
+    final a = randomInt(1, 9);
+    final b = randomInt(1, 9);
+    final c = randomInt(1, 9);
+    final operands = [a, b, c].map((v) => NumberValue.fromInt(v)).toList();
     return MathProblem(
       operands: operands,
-      operators: ops,
-      result: NumberValue.fromInt(result),
-      mode: usesBrackets ? ProblemMode.withBrackets : ProblemMode.chain,
+      operators: [Operator.add, Operator.add],
+      result: NumberValue.fromInt(a + b + c),
+      mode: ProblemMode.chain,
       grade: config.grade,
-      difficulty: difficulty,
-      bracketRange: usesBrackets ? (0, 2) : null,
+      difficulty: 2,
     );
   }
 
@@ -108,40 +171,5 @@ class MixedOperationGen extends BaseGenerator {
     }
     factors.sort();
     return factors;
-  }
-
-  /// 按数学运算顺序（先乘除后加减）计算结果。
-  int _evaluate(List<int> values, List<Operator> ops) {
-    // 复制列表以避免修改原始数据
-    final vals = List<int>.from(values);
-    final opList = List<Operator>.from(ops);
-
-    // 先处理乘除
-    var i = 0;
-    while (i < opList.length) {
-      if (opList[i] == Operator.multiply || opList[i] == Operator.divide) {
-        if (opList[i] == Operator.multiply) {
-          vals[i] = vals[i] * vals[i + 1];
-        } else {
-          if (vals[i + 1] == 0) return -1;
-          vals[i] = vals[i] ~/ vals[i + 1];
-        }
-        vals.removeAt(i + 1);
-        opList.removeAt(i);
-      } else {
-        i++;
-      }
-    }
-
-    // 再处理加减
-    var result = vals[0];
-    for (i = 0; i < opList.length; i++) {
-      if (opList[i] == Operator.add) {
-        result += vals[i + 1];
-      } else {
-        result -= vals[i + 1];
-      }
-    }
-    return result;
   }
 }

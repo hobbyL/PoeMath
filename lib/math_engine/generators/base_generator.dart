@@ -51,6 +51,10 @@ abstract class BaseGenerator {
   }
 
   /// 生成 findMissing 模式题目。
+  ///
+  /// 注意：不透传 [MathProblem.displayText]（已知取舍）——模式转换后
+  /// 题面形态已变（如出现 ? 占位），覆盖文本不再匹配，按通用形态渲染，
+  /// 数学语义仍与内部结构一致。
   MathProblem toFindMissing(MathProblem problem) {
     if (problem.operands.length < 2) return problem;
     final missingIndex = _random.nextInt(problem.operands.length);
@@ -69,6 +73,9 @@ abstract class BaseGenerator {
   }
 
   /// 生成 compare 模式题目。
+  ///
+  /// 注意：不透传 [MathProblem.displayText]（取舍同 toFindMissing），
+  /// 转换后按通用形态渲染（如 80 × 0.3 ○ 24），数学仍正确。
   MathProblem toCompare(MathProblem problem) {
     final result = problem.result;
     final offset = randomInt(-3, 3);
@@ -95,6 +102,8 @@ abstract class BaseGenerator {
   }
 
   /// 生成竖式计算模式题目（仅适用于两操作数的加减乘法）。
+  ///
+  /// 注意：不透传 [MathProblem.displayText]（取舍同 toFindMissing）。
   MathProblem toVertical(MathProblem problem) {
     if (problem.operands.length != 2) return problem;
     final op = problem.operators.first;

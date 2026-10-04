@@ -64,9 +64,9 @@ class MathEngine {
       if (violation == null) return converted;
     }
 
-    // 兜底：返回最后一次生成的题目
-    final fallback = generator.generate();
-    return _applyMode(fallback, mode, config, generator) ?? fallback;
+    // 兜底：不再返回未校验题目，直接生成基础加减法题
+    // （加减法是全学期基础题型，天然满足约束，且不经过模式转换）。
+    return AdditionSubtractionGen(config, random: random).generate();
   }
 
   /// 将题目转换为指定模式。返回 null 表示不兼容需重试。
@@ -263,6 +263,24 @@ class MathEngine {
 
   static NumberValue _parseAnswer(String answer) {
     final trimmed = answer.trim();
+
+    // 带分数格式 "a b/c"（如 '1 1/2'，支持负数 '-1 1/2'）
+    final spaced = trimmed.split(RegExp(r'\s+'));
+    if (spaced.length == 2 && spaced[1].contains('/')) {
+      final whole = int.tryParse(spaced[0]);
+      final fracParts = spaced[1].split('/');
+      if (whole != null && fracParts.length == 2) {
+        final n = int.tryParse(fracParts[0]);
+        final d = int.tryParse(fracParts[1]);
+        if (n != null && d != null && d > 0 && n >= 0) {
+          final numerator = whole.abs() * d + n;
+          return NumberValue.fromFraction(
+            whole < 0 ? -numerator : numerator,
+            d,
+          );
+        }
+      }
+    }
 
     // 分数格式 "a/b"
     if (trimmed.contains('/')) {

@@ -188,7 +188,9 @@ class GradePresets {
       Operator.multiply,
       Operator.divide,
     },
-    allowedModes: _extendedModes,
+    // Mixed 生成器在本学期注册（grade >= 3 且 operators >= 3），
+    // chain 模式必须列入白名单，否则生成的 chain 题会被校验拒绝。
+    allowedModes: {..._extendedModes, ProblemMode.chain},
     minOperand: 0,
     maxOperand: 1000,
     maxResult: 100000,
@@ -227,16 +229,20 @@ class GradePresets {
       Operator.multiply,
       Operator.divide,
     },
-    allowedModes: _extendedModes,
+    // chain 补充原因见 grade5a；maxMultiplier/maxDividend 缺省时默认 9/81，
+    // 会导致多位数乘法恒为 10 × n、除法大量退化为 x ÷ x = 1。
+    allowedModes: {..._extendedModes, ProblemMode.chain},
     minOperand: 0,
     maxOperand: 100,
-    maxResult: 1000,
+    maxResult: 10000,
     allowCarry: true,
     allowBorrow: true,
     allowFraction: true,
     maxDenominator: 20,
     allowDecimal: true,
     maxDecimalPlaces: 2,
+    maxMultiplier: 99,
+    maxDividend: 999,
   );
 
   /// 六年级下：比例、正负数。
@@ -250,10 +256,10 @@ class GradePresets {
       Operator.multiply,
       Operator.divide,
     },
-    allowedModes: _extendedModes,
+    allowedModes: {..._extendedModes, ProblemMode.chain},
     minOperand: -100,
     maxOperand: 100,
-    maxResult: 1000,
+    maxResult: 10000,
     allowCarry: true,
     allowBorrow: true,
     allowNegative: true,
@@ -261,6 +267,8 @@ class GradePresets {
     maxDenominator: 20,
     allowDecimal: true,
     maxDecimalPlaces: 2,
+    maxMultiplier: 99,
+    maxDividend: 9999,
   );
 
   /// 所有 12 学期预设（有序列表）。

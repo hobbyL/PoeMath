@@ -53,16 +53,23 @@ class MultiDigitMulDivGen extends BaseGenerator {
 
   MathProblem _generateDivision() {
     final maxOp = config.maxOperand.round().clamp(10, 999999);
-    final maxDivisor = (config.semester == '上' ? 9 : 99).clamp(2, maxOp);
+    // 被除数有效上限：同时受 maxDividend 与 maxOperand（操作数上限）约束
+    final dividendCap = config.maxDividend < maxOp ? config.maxDividend : maxOp;
+    // 除数超过被除数上限一半时商恒为 1（x ÷ x = 1 退化题），
+    // 将除数上限压到被除数上限的一半，保证商可达 ≥ 2。
+    final divisorRawCap = config.semester == '上' ? 9 : 99;
+    final divisorHalfCap = dividendCap ~/ 2;
+    final maxDivisor =
+        (divisorRawCap < divisorHalfCap ? divisorRawCap : divisorHalfCap)
+            .clamp(2, maxOp);
     final b = randomInt(2, maxDivisor);
-    // 被除数 a 必须 ≤ maxOperand 且 ≤ maxDividend
-    final maxDividend = config.maxDividend.clamp(10, maxOp);
-    final maxQuotient = (maxDividend / b).floor().clamp(1, 999);
-    if (maxQuotient < 1) return _generateMultiplication();
-    final quotient = randomInt(1, maxQuotient);
+    final maxQuotient = (dividendCap / b).floor().clamp(1, 999);
+    if (maxQuotient < 2) return _generateMultiplication();
+    // 商从 2 起，避免 x ÷ x = 1 的退化题
+    final quotient = randomInt(2, maxQuotient);
     final a = b * quotient;
 
-    if (a > maxDividend || a > config.maxOperand || b > config.maxOperand) {
+    if (a > dividendCap || a > config.maxOperand || b > config.maxOperand) {
       return _generateMultiplication();
     }
 

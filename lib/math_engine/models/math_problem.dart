@@ -107,6 +107,11 @@ class MathProblem {
   /// 表示 [start, end) 的操作数索引区间。
   final (int, int)? bracketRange;
 
+  /// 题面显示覆盖（如 '80 × 30% = ?'、'3 : 4 = 24 : ?'、'1/2 + 1/3 = ?'）。
+  /// null 时按 mode 自动渲染。内部运算结构（operands/operators/result）不变，
+  /// 判分/讲解仍按内部结构运算（与显示语义数学等价）。
+  final String? displayText;
+
   const MathProblem({
     required this.operands,
     required this.operators,
@@ -121,10 +126,14 @@ class MathProblem {
     this.compareRelation,
     this.compareTarget,
     this.bracketRange,
+    this.displayText,
   });
 
   /// 生成题目文本。
   String get problemText {
+    // 显示覆盖优先（百分数/比例/分数等专题形态）
+    final override = displayText;
+    if (override != null) return override;
     switch (mode) {
       case ProblemMode.findResult:
       case ProblemMode.vertical:

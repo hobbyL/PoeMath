@@ -86,6 +86,147 @@ void main() {
     });
   });
 
+  group('ConstraintChecker 校验 6（模式白名单）', () {
+    test('越权模式被拒绝并返回中文原因', () {
+      // 一年级上不允许 chain 模式
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromInt(3),
+          NumberValue.fromInt(5),
+          NumberValue.fromInt(2),
+        ],
+        operators: [Operator.add, Operator.subtract],
+        result: NumberValue.fromInt(6),
+        mode: ProblemMode.chain,
+        grade: 1,
+      );
+      final violation = ConstraintChecker.check(p, GradePresets.grade1a);
+      expect(violation, isNotNull);
+      expect(violation, contains('题目模式未被允许'));
+      expect(violation, contains('chain'));
+    });
+
+    test('白名单内模式通过', () {
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromInt(3),
+          NumberValue.fromInt(5),
+          NumberValue.fromInt(2),
+        ],
+        operators: [Operator.add, Operator.subtract],
+        result: NumberValue.fromInt(6),
+        mode: ProblemMode.chain,
+        grade: 3,
+      );
+      expect(ConstraintChecker.check(p, GradePresets.grade3a), isNull);
+    });
+
+    test('5a/6a/6b 允许 chain（修复后不再越权）', () {
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromInt(3),
+          NumberValue.fromInt(5),
+          NumberValue.fromInt(2),
+        ],
+        operators: [Operator.add, Operator.subtract],
+        result: NumberValue.fromInt(6),
+        mode: ProblemMode.chain,
+        grade: 5,
+      );
+      expect(ConstraintChecker.check(p, GradePresets.grade5a), isNull);
+      expect(ConstraintChecker.check(p, GradePresets.grade6a), isNull);
+      expect(ConstraintChecker.check(p, GradePresets.grade6b), isNull);
+    });
+  });
+
+  group('ConstraintChecker 校验 7（括号一致性）', () {
+    test('括号题答案与显示语义不一致被拒绝', () {
+      // (71 + 10) × 7 × 4 数学正确 2268，构造错误 result 351（Bug A 实例）
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromInt(71),
+          NumberValue.fromInt(10),
+          NumberValue.fromInt(7),
+          NumberValue.fromInt(4),
+        ],
+        operators: [
+          Operator.add,
+          Operator.multiply,
+          Operator.multiply,
+        ],
+        result: NumberValue.fromInt(351),
+        mode: ProblemMode.withBrackets,
+        grade: 3,
+        bracketRange: (0, 2),
+      );
+      final violation = ConstraintChecker.check(p, GradePresets.grade3b);
+      expect(violation, isNotNull);
+      expect(violation, contains('括号题答案与显示语义不一致'));
+    });
+
+    test('括号语义正确的题通过', () {
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromInt(71),
+          NumberValue.fromInt(10),
+          NumberValue.fromInt(7),
+          NumberValue.fromInt(4),
+        ],
+        operators: [
+          Operator.add,
+          Operator.multiply,
+          Operator.multiply,
+        ],
+        result: NumberValue.fromInt(2268),
+        mode: ProblemMode.withBrackets,
+        grade: 3,
+        bracketRange: (0, 2),
+      );
+      expect(ConstraintChecker.check(p, GradePresets.grade3b), isNull);
+    });
+
+    test('整数操作数括号题求值非整数被拒绝', () {
+      // (70 ÷ 14) ÷ 2 = 5/2 非整数
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromInt(70),
+          NumberValue.fromInt(14),
+          NumberValue.fromInt(2),
+        ],
+        operators: [Operator.divide, Operator.divide],
+        result: NumberValue.fromFraction(5, 2),
+        mode: ProblemMode.withBrackets,
+        grade: 3,
+        bracketRange: (0, 2),
+      );
+      final violation = ConstraintChecker.check(p, GradePresets.grade3b);
+      expect(violation, contains('括号题答案与显示语义不一致'));
+    });
+
+    test('括号题除零被拒绝', () {
+      // 8 ÷ (3 - 3) + 2 无法求值
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromInt(8),
+          NumberValue.fromInt(3),
+          NumberValue.fromInt(3),
+          NumberValue.fromInt(2),
+        ],
+        operators: [
+          Operator.divide,
+          Operator.subtract,
+          Operator.add,
+        ],
+        result: NumberValue.fromInt(2),
+        mode: ProblemMode.withBrackets,
+        grade: 3,
+        bracketRange: (1, 3),
+      );
+      final violation = ConstraintChecker.check(p, GradePresets.grade3b);
+      expect(violation, isNotNull);
+    });
+  });
+
   group('DifficultyScorer', () {
     test('简单加法 - 难度 1-2', () {
       final p = MathProblem(

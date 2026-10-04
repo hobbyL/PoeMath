@@ -4,6 +4,7 @@
 
 import '../models/grade_config.dart';
 import '../models/math_problem.dart';
+import 'expression_evaluator.dart';
 
 /// 约束校验器。
 class ConstraintChecker {
@@ -47,6 +48,29 @@ class ConstraintChecker {
     for (final op in problem.operands) {
       if (op.asDouble < config.minOperand || op.asDouble > config.maxOperand) {
         return '操作数超出范围 [${config.minOperand}, ${config.maxOperand}]';
+      }
+    }
+
+    // 6. 模式白名单：生成器产出的模式必须在本学期允许列表内
+    if (!config.allowedModes.contains(problem.mode)) {
+      return '题目模式未被允许 (${problem.mode.name})';
+    }
+
+    // 7. 括号题显示语义一致性：按显示语义精确求值必须等于 result
+    if (problem.mode == ProblemMode.withBrackets &&
+        problem.bracketRange != null) {
+      final evaluated = ExpressionEvaluator.evaluate(
+        problem.operands,
+        problem.operators,
+        bracketRange: problem.bracketRange,
+      );
+      if (evaluated == null || evaluated != problem.result.asFraction) {
+        return '括号题答案与显示语义不一致';
+      }
+      // 整数操作数题额外要求求值结果为整数
+      if (problem.operands.every((o) => o.isInteger) &&
+          !evaluated.isInteger) {
+        return '括号题答案与显示语义不一致';
       }
     }
 

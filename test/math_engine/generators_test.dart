@@ -19,6 +19,98 @@ import 'package:poemath/math_engine/generators/percentage_gen.dart';
 import 'package:poemath/math_engine/generators/simple_equation_gen.dart';
 import 'package:poemath/math_engine/generators/ratio_proportion_gen.dart';
 import 'package:poemath/math_engine/generators/negative_number_gen.dart';
+import 'package:poemath/math_engine/math_engine.dart';
+import 'package:poemath/math_engine/models/number_value.dart';
+
+int _gcd(int a, int b) {
+  while (b != 0) {
+    final t = a % b;
+    a = b;
+    b = t;
+  }
+  return a;
+}
+
+// ============ 测试专用独立参考求值辅助（与生产实现分开编写） ============
+
+/// 按先乘除（从左到右）、后加减（从左到右）折叠，返回 null 表示除零。
+int? _foldIntByPriority(List<int> vals, List<Operator> ops) {
+  final v = List<int>.from(vals);
+  final o = List<Operator>.from(ops);
+  var i = 0;
+  while (i < o.length) {
+    if (o[i] == Operator.multiply || o[i] == Operator.divide) {
+      if (o[i] == Operator.divide && v[i + 1] == 0) return null;
+      v[i] = _applyInt(v[i], v[i + 1], o[i]);
+      v.removeAt(i + 1);
+      o.removeAt(i);
+    } else {
+      i++;
+    }
+  }
+  var result = v[0];
+  for (var k = 0; k < o.length; k++) {
+    result = _applyInt(result, v[k + 1], o[k]);
+  }
+  return result;
+}
+
+/// 整数折叠单步（除法调用方保证整除）。
+int _applyInt(int a, int b, Operator op) => switch (op) {
+      Operator.add => a + b,
+      Operator.subtract => a - b,
+      Operator.multiply => a * b,
+      Operator.divide => a ~/ b,
+    };
+
+/// 对整数序列按优先级折叠并断言每步除法整除。
+void _checkIntSteps(List<int> vals, List<Operator> ops, String label) {
+  final v = List<int>.from(vals);
+  final o = List<Operator>.from(ops);
+  var i = 0;
+  while (i < o.length) {
+    if (o[i] == Operator.multiply || o[i] == Operator.divide) {
+      if (o[i] == Operator.divide) {
+        expect(v[i] % v[i + 1], 0,
+            reason: '$label $v 除法步骤 ${v[i]} ÷ ${v[i + 1]} 不整除',);
+      }
+      v[i] = _applyInt(v[i], v[i + 1], o[i]);
+      v.removeAt(i + 1);
+      o.removeAt(i);
+    } else {
+      i++;
+    }
+  }
+}
+
+/// Fraction 版优先级折叠（供独立参考求值器使用）。
+int? _foldByPriority(
+  List<Fraction> vals,
+  List<Operator> ops,
+  Fraction? Function(Fraction, Fraction, Operator) apply,
+) {
+  final v = List<Fraction>.from(vals);
+  final o = List<Operator>.from(ops);
+  var i = 0;
+  while (i < o.length) {
+    if (o[i] == Operator.multiply || o[i] == Operator.divide) {
+      final r = apply(v[i], v[i + 1], o[i]);
+      if (r == null) return null;
+      v[i] = r;
+      v.removeAt(i + 1);
+      o.removeAt(i);
+    } else {
+      i++;
+    }
+  }
+  var acc = v[0];
+  for (var k = 0; k < o.length; k++) {
+    final r = apply(acc, v[k + 1], o[k]);
+    if (r == null) return null;
+    acc = r;
+  }
+  return acc.isInteger ? acc.asInteger : null;
+}
 
 void main() {
   group('AdditionSubtractionGen', () {
@@ -244,6 +336,129 @@ void main() {
         expect(p.operands.length, p.operators.length + 1);
       }
     });
+
+    test('500 seed 显示语义求值 == result（独立参考求值器互证）', () {
+      // 独立编写的参考实现：先括号内从左到右、括号外先乘除后加减，
+      // 与生产 ExpressionEvaluator 分开编写，互相验证。
+      int? refEvaluate(MathProblem p) {
+        final br = p.bracketRange;
+        final vals = p.operands.map((o) => o.asFraction).toList();
+        final ops = p.operators.toList();
+        Fraction? apply(Fraction a, Fraction b, Operator op) => switch (op) {
+              Operator.add => a + b,
+              Operator.subtract => a - b,
+              Operator.multiply => a * b,
+              Operator.divide =>
+                b.numerator == 0 ? null : Fraction(a.numerator * b.denominator,
+                    a.denominator * b.numerator,),
+            };
+        if (br != null) {
+          var inner = vals[br.$1];
+          for (var k = br.$1; k < br.$2 - 1; k++) {
+            final r = apply(inner, vals[k + 1], ops[k]);
+            if (r == null) return null;
+            inner = r;
+          }
+          final folded = [
+            ...vals.sublist(0, br.$1),
+            inner,
+            ...vals.sublist(br.$2),
+          ];
+          final restOps = [
+            ...ops.sublist(0, br.$1),
+            ...ops.sublist(br.$2 - 1),
+          ];
+          return _foldByPriority(folded, restOps, apply);
+        }
+        return _foldByPriority(vals, ops, apply);
+      }
+      var bracketCount = 0;
+      for (var seed = 0; seed < 500; seed++) {
+        final g = MixedOperationGen(GradePresets.grade3b, random: Random(seed));
+        final p = g.generate();
+        if (p.mode == ProblemMode.withBrackets) bracketCount++;
+        final expected = refEvaluate(p);
+        expect(expected, isNotNull, reason: 'seed=$seed ${p.problemText}');
+        expect(
+          expected,
+          p.result.asInteger,
+          reason: 'seed=$seed ${p.problemText} 显示语义=$expected '
+              '引擎判分=${p.answerText}',
+        );
+      }
+      // 3b 允许括号，500 seed 中应出现过带括号题（降级后仍应保留相当占比）
+      expect(bracketCount, greaterThan(50));
+    });
+
+    test('withBrackets 题逐步除法全整除', () {
+      for (var seed = 0; seed < 300; seed++) {
+        final g = MixedOperationGen(GradePresets.grade3b, random: Random(seed));
+        final p = g.generate();
+        if (p.mode != ProblemMode.withBrackets) continue;
+        final br = p.bracketRange!;
+        final vals = p.operands.map((o) => o.asInteger).toList();
+        final ops = p.operators;
+        // 括号内逐步
+        var inner = vals[br.$1];
+        for (var k = br.$1; k < br.$2 - 1; k++) {
+          if (ops[k] == Operator.divide) {
+            expect(inner % vals[k + 1], 0,
+                reason: 'seed=$seed 括号内 $inner ÷ ${vals[k + 1]} 不整除',);
+          }
+          inner = _applyInt(inner, vals[k + 1], ops[k]);
+        }
+        // 括号外：先乘除后加减逐步
+        final folded = <int>[inner, ...vals.sublist(br.$2)];
+        final restOps = [...ops.sublist(0, br.$1), ...ops.sublist(br.$2 - 1)];
+        _checkIntSteps(folded, restOps, 'seed=$seed 括号外');
+      }
+    });
+
+    test('4a 也满足显示语义一致（Bug A 高发学期）', () {
+      for (var seed = 0; seed < 200; seed++) {
+        final g = MixedOperationGen(GradePresets.grade4a, random: Random(seed));
+        final p = g.generate();
+        if (p.mode != ProblemMode.withBrackets) continue;
+        // 直接用显示语义人工复算
+        final br = p.bracketRange!;
+        final vals = p.operands.map((o) => o.asInteger).toList();
+        final ops = p.operators;
+        var inner = vals[br.$1];
+        for (var k = br.$1; k < br.$2 - 1; k++) {
+          inner = _applyInt(inner, vals[k + 1], ops[k]);
+        }
+        final folded = <int>[inner, ...vals.sublist(br.$2)];
+        final restOps = [...ops.sublist(0, br.$1), ...ops.sublist(br.$2 - 1)];
+        final expected = _foldIntByPriority(folded, restOps);
+        expect(expected, p.result.asInteger,
+            reason: 'seed=$seed ${p.problemText}',);
+      }
+    });
+
+    test('非法括号组合确定性降级为 chain', () {
+      // 3b 采样中所有 withBrackets 题必须满足括号语义整数性；
+      // 一旦括号语义出现非整数/超范围，该题必然以 chain 形态产出。
+      for (var seed = 0; seed < 500; seed++) {
+        final g = MixedOperationGen(GradePresets.grade3b, random: Random(seed));
+        final p = g.generate();
+        if (p.mode != ProblemMode.withBrackets) continue;
+        // 括号语义合法性的必要条件：折叠全程整数且结果在范围内
+        final br = p.bracketRange!;
+        final vals = p.operands.map((o) => o.asInteger).toList();
+        final ops = p.operators;
+        var inner = vals[br.$1];
+        var allInt = true;
+        for (var k = br.$1; k < br.$2 - 1; k++) {
+          if (ops[k] == Operator.divide && inner % vals[k + 1] != 0) {
+            allInt = false;
+            break;
+          }
+          inner = _applyInt(inner, vals[k + 1], ops[k]);
+        }
+        expect(allInt, isTrue, reason: 'seed=$seed ${p.problemText}');
+        expect(p.result.asInteger, inInclusiveRange(0, GradePresets.grade3b.maxResult));
+      }
+    });
   });
 
   group('LawOfOperationGen', () {
@@ -331,6 +546,25 @@ void main() {
       }
       expect(hasMulDiv, isTrue);
     });
+
+    test('题面操作数为分数形态（R5/AC5，不再显示小数）', () {
+      for (var i = 0; i < 40; i++) {
+        final p = gen.generate();
+        expect(p.problemText, contains('/'));
+        expect(p.problemText.contains(RegExp(r'\d\.\d')), isFalse,
+            reason: '题面混入小数形态: ${p.problemText}',);
+        expect(p.problemText.endsWith('= ?'), isTrue);
+      }
+    });
+
+    test('题面与 answerText 判分一致', () {
+      for (var i = 0; i < 20; i++) {
+        final p = gen.generate();
+        final j = MathEngine.judge(p, p.answerText);
+        expect(j.isCorrect, isTrue,
+            reason: '${p.problemText} ans=${p.answerText}',);
+      }
+    });
   });
 
   group('PercentageGen', () {
@@ -347,6 +581,39 @@ void main() {
       for (var i = 0; i < 20; i++) {
         final p = gen.generate();
         expect(p.result.isInteger, isTrue);
+      }
+    });
+
+    test('题面为百分数形态（R3/AC3）', () {
+      for (var i = 0; i < 30; i++) {
+        final p = gen.generate();
+        expect(p.problemText, contains('%'));
+        expect(
+          p.problemText,
+          matches(RegExp(r'^\d+ × \d+% = \?$')),
+          reason: '形态不符: ${p.problemText}',
+        );
+      }
+    });
+
+    test('answerText 为整数且判分正确', () {
+      for (var i = 0; i < 20; i++) {
+        final p = gen.generate();
+        expect(p.answerText, matches(RegExp(r'^\d+$')));
+        final j = MathEngine.judge(p, p.answerText);
+        expect(j.isCorrect, isTrue, reason: p.problemText);
+        // 错误答案给出诊断
+        final wrong = MathEngine.judge(p, (p.result.asInteger + 1).toString());
+        expect(wrong.isCorrect, isFalse);
+      }
+    });
+
+    test('内部结构数学正确：base × percent/100 = result', () {
+      for (var i = 0; i < 30; i++) {
+        final p = gen.generate();
+        final base = p.operands[0].asInteger;
+        final ratio = p.operands[1].asFraction;
+        expect(Fraction(base) * ratio, equals(p.result.asFraction));
       }
     });
   });
@@ -394,6 +661,35 @@ void main() {
       for (var i = 0; i < 20; i++) {
         final p = gen.generate();
         expect(p.result.asInteger, greaterThan(0));
+      }
+    });
+
+    test('题面为比例形态且 a:b 最简（R4/AC4）', () {
+      for (var i = 0; i < 30; i++) {
+        final p = gen.generate();
+        expect(p.problemText, contains(' : '));
+        final match =
+            RegExp(r'^(\d+) : (\d+) = (\d+) : \?$').firstMatch(p.problemText);
+        expect(match, isNotNull, reason: '形态不符: ${p.problemText}');
+        final a = int.parse(match!.group(1)!);
+        final b = int.parse(match.group(2)!);
+        final c = int.parse(match.group(3)!);
+        expect(_gcd(a, b), 1, reason: 'a:b 未约最简: ${p.problemText}');
+        // 比例语义：a : b = c : d → d = b × c / a
+        expect(b * c % a, 0);
+        expect(b * c ~/ a, p.result.asInteger,
+            reason: '${p.problemText} 答案应为 ${b * c ~/ a}',);
+      }
+    });
+
+    test('判分正确', () {
+      for (var i = 0; i < 20; i++) {
+        final p = gen.generate();
+        final j = MathEngine.judge(p, p.answerText);
+        expect(j.isCorrect, isTrue, reason: p.problemText);
+        final wrong =
+            MathEngine.judge(p, (p.result.asInteger + 1).toString());
+        expect(wrong.isCorrect, isFalse);
       }
     });
   });

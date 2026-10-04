@@ -52,6 +52,9 @@ class FractionGen extends BaseGenerator {
       grade: config.grade,
       difficulty: _fractionDifficulty(d1, d2),
       resultForm: ResultForm.fraction,
+      // 分数专题形态：操作数以分数（而非小数）显示
+      displayText:
+          '${a.toFractionString()} + ${b.toFractionString()} = ?',
     );
   }
 
@@ -85,6 +88,8 @@ class FractionGen extends BaseGenerator {
       grade: config.grade,
       difficulty: _fractionDifficulty(d1, d2),
       resultForm: ResultForm.fraction,
+      displayText:
+          '${a.toFractionString()} - ${b.toFractionString()} = ?',
     );
   }
 
@@ -110,6 +115,8 @@ class FractionGen extends BaseGenerator {
       grade: config.grade,
       difficulty: (_fractionDifficulty(d1, d2) + 1).clamp(1, 5),
       resultForm: ResultForm.fraction,
+      displayText:
+          '${a.toFractionString()} × ${b.toFractionString()} = ?',
     );
   }
 
@@ -137,6 +144,8 @@ class FractionGen extends BaseGenerator {
       grade: config.grade,
       difficulty: (_fractionDifficulty(d1, d2) + 1).clamp(1, 5),
       resultForm: ResultForm.fraction,
+      displayText:
+          '${a.toFractionString()} ÷ ${b.toFractionString()} = ?',
     );
   }
 

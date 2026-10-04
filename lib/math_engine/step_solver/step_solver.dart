@@ -4,6 +4,8 @@
 
 import '../models/answer_judgement.dart';
 import '../models/math_problem.dart';
+import '../models/number_value.dart';
+import '../validators/expression_evaluator.dart';
 
 /// 分步解答生成器。
 class StepSolver {
@@ -152,6 +154,8 @@ class StepSolver {
 
   static List<SolutionStep> _solveMultiOp(MathProblem problem) {
     final steps = <SolutionStep>[];
+    final isBracket = problem.mode == ProblemMode.withBrackets &&
+        problem.bracketRange != null;
     final hasHighPriority = problem.operators.any(
       (op) => op == Operator.multiply || op == Operator.divide,
     );
@@ -159,8 +163,7 @@ class StepSolver {
       (op) => op == Operator.add || op == Operator.subtract,
     );
 
-    if (problem.mode == ProblemMode.withBrackets &&
-        problem.bracketRange != null) {
+    if (isBracket) {
       steps.add(
         const SolutionStep(
           description: '先算括号里的',
@@ -176,22 +179,32 @@ class StepSolver {
       );
     }
 
-    // 逐步计算
-    final values = problem.operands.map((o) => o.asDouble).toList();
-    final ops = List<Operator>.from(problem.operators);
-
-    // 处理括号或优先级
-    if (problem.bracketRange != null) {
-      final br = problem.bracketRange!;
-      var bracketResult = values[br.$1];
-      for (var i = br.$1; i < br.$2 - 1 && i < ops.length; i++) {
-        bracketResult = _applyOp(bracketResult, values[i + 1], ops[i]);
-      }
+    // 逐步计算（复用 ExpressionEvaluator 的精确折叠序列，
+    // 中间值为 Fraction 精确数值，无 double 截断）
+    final trace = ExpressionEvaluator.evaluateWithSteps(
+      problem.operands,
+      problem.operators,
+      bracketRange: problem.bracketRange,
+    );
+    if (trace == null) {
+      // 除零等极端情况：至少给出最终结果
       steps.add(
         SolutionStep(
-          description: '括号内结果',
-          expression: '= ${_formatNum(bracketResult)}',
-          resultHint: _formatNum(bracketResult),
+          description: '最终结果',
+          expression: problem.problemText,
+          resultHint: problem.answerText,
+        ),
+      );
+      return steps;
+    }
+
+    for (final step in trace.steps) {
+      final text = _formatFraction(step.value);
+      steps.add(
+        SolutionStep(
+          description: '${step.expression} = $text',
+          expression: '${step.expression} = $text',
+          resultHint: text,
         ),
       );
     }
@@ -207,21 +220,7 @@ class StepSolver {
     return steps;
   }
 
-  static double _applyOp(double a, double b, Operator op) {
-    switch (op) {
-      case Operator.add:
-        return a + b;
-      case Operator.subtract:
-        return a - b;
-      case Operator.multiply:
-        return a * b;
-      case Operator.divide:
-        return b != 0 ? a / b : 0;
-    }
-  }
-
-  static String _formatNum(double n) {
-    if (n == n.roundToDouble()) return n.toInt().toString();
-    return n.toStringAsFixed(2);
-  }
+  /// 精确数值格式化：整数直接输出，分数用假分数形态。
+  static String _formatFraction(Fraction v) =>
+      v.isInteger ? v.asInteger.toString() : v.toImproperString();
 }

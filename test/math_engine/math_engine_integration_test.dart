@@ -206,6 +206,41 @@ void main() {
       expect(j.isCorrect, isTrue);
     });
 
+    test('假分数与带分数答案均可判对（AC5）', () {
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromFraction(1, 2),
+          NumberValue.fromInt(1),
+        ],
+        operators: [Operator.add],
+        result: NumberValue.fromFraction(3, 2),
+        mode: ProblemMode.findResult,
+        grade: 5,
+        resultForm: ResultForm.fraction,
+      );
+
+      expect(MathEngine.judge(p, '3/2').isCorrect, isTrue);
+      expect(MathEngine.judge(p, '1 1/2').isCorrect, isTrue);
+      expect(MathEngine.judge(p, '1½').isCorrect, isFalse); // 不支持的形式
+    });
+
+    test('负带分数答案解析', () {
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromFraction(1, 2),
+          NumberValue.fromInt(-2),
+        ],
+        operators: [Operator.add],
+        result: NumberValue.fromFraction(-3, 2),
+        mode: ProblemMode.findResult,
+        grade: 6,
+        resultForm: ResultForm.fraction,
+      );
+
+      expect(MathEngine.judge(p, '-3/2').isCorrect, isTrue);
+      expect(MathEngine.judge(p, '-1 1/2').isCorrect, isTrue);
+    });
+
     test('比较模式判定', () {
       final p = MathProblem(
         operands: [NumberValue.fromInt(3), NumberValue.fromInt(5)],

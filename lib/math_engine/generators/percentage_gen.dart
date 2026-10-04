@@ -1,6 +1,9 @@
 // lib/math_engine/generators/percentage_gen.dart
 //
-// 百分数生成器（6 年级）。
+// 百分数生成器（6 年级上）。
+//
+// 题面以 displayText 输出 'base × percent% = ?' 专题形态；
+// 内部结构保持 [base, percent/100] × 的通用乘法形式（判分/讲解不变）。
 
 import '../models/math_problem.dart';
 import '../models/number_value.dart';
@@ -12,56 +15,41 @@ class PercentageGen extends BaseGenerator {
 
   @override
   MathProblem generate() {
-    // 生成 a × p% = ? 或 a ÷ p% = ? 形式
-    final useDiv = randomInt(0, 1) == 0;
-
-    if (useDiv) {
-      return _generatePercentDiv();
-    }
-    return _generatePercentMul();
-  }
-
-  MathProblem _generatePercentMul() {
     final percent = randomInt(5, 95);
-    final base = randomInt(10, 1000);
-    final result = base * percent ~/ 100;
+    final maxBase = config.maxOperand.clamp(10, 100);
 
-    if (result <= 0 || base * percent % 100 != 0) return _generatePercentMul();
-
-    final operands = [
-      NumberValue.fromInt(base),
-      NumberValue.fromFraction(percent, 100),
-    ];
-    final operators = [Operator.multiply];
-
-    return MathProblem(
-      operands: operands,
-      operators: operators,
-      result: NumberValue.fromInt(result),
-      mode: ProblemMode.findResult,
-      grade: config.grade,
-      difficulty: 3,
-    );
+    // 循环挑选使 base × percent % 100 == 0 的 base（整除构造保证整数结果）
+    var base = 0;
+    for (var attempt = 0; attempt < 200; attempt++) {
+      final candidate = randomInt(10, maxBase);
+      if (candidate * percent % 100 == 0) {
+        base = candidate;
+        break;
+      }
+    }
+    if (base == 0) {
+      // 保底：取 100 的因数百分比，从结果反推 base（必然整除）
+      final easyPercent = randomChoice([10, 20, 25, 50]);
+      final resultMax = (maxBase * easyPercent ~/ 100).clamp(2, maxBase);
+      final result = randomInt(2, resultMax);
+      return _build(result * 100 ~/ easyPercent, easyPercent);
+    }
+    return _build(base, percent);
   }
 
-  MathProblem _generatePercentDiv() {
-    final percent = randomChoice([10, 20, 25, 50, 75]);
-    final result = randomInt(10, 200);
-    final base = result * 100 ~/ percent;
-
-    final operands = [
-      NumberValue.fromInt(base),
-      NumberValue.fromFraction(percent, 100),
-    ];
-    final operators = [Operator.multiply];
-
+  MathProblem _build(int base, int percent) {
+    final result = base * percent ~/ 100;
     return MathProblem(
-      operands: operands,
-      operators: operators,
+      operands: [
+        NumberValue.fromInt(base),
+        NumberValue.fromFraction(percent, 100),
+      ],
+      operators: [Operator.multiply],
       result: NumberValue.fromInt(result),
       mode: ProblemMode.findResult,
       grade: config.grade,
       difficulty: 3,
+      displayText: '$base × $percent% = ?',
     );
   }
 }

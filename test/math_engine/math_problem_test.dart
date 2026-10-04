@@ -1,8 +1,33 @@
 // test/math_engine/math_problem_test.dart
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/math_engine/generators/base_generator.dart';
+import 'package:poemath/math_engine/models/grade_config.dart';
 import 'package:poemath/math_engine/models/math_problem.dart';
 import 'package:poemath/math_engine/models/number_value.dart';
+
+/// 测试用最小生成器（仅用 to* 模式转换方法）。
+class _DummyGenerator extends BaseGenerator {
+  _DummyGenerator() : super(_testConfig);
+
+  @override
+  MathProblem generate() => throw UnimplementedError();
+}
+
+const _testConfig = GradeConfig(
+  grade: 6,
+  semester: '上',
+  label: '测试',
+  allowedOperators: {Operator.add, Operator.subtract, Operator.multiply},
+  allowedModes: {
+    ProblemMode.findResult,
+    ProblemMode.findMissing,
+    ProblemMode.compare,
+    ProblemMode.vertical,
+  },
+  maxOperand: 100,
+  maxResult: 10000,
+);
 
 void main() {
   group('MathProblem', () {
@@ -137,6 +162,69 @@ void main() {
         bracketRange: (0, 2),
       );
       expect(p.problemText, '(3 + 5) × 2 = ?');
+    });
+
+    test('displayText 覆盖渲染（百分数形态）', () {
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromInt(80),
+          NumberValue.fromFraction(3, 10),
+        ],
+        operators: [Operator.multiply],
+        result: NumberValue.fromInt(24),
+        mode: ProblemMode.findResult,
+        grade: 6,
+        displayText: '80 × 30% = ?',
+      );
+      expect(p.problemText, '80 × 30% = ?');
+      // 内部结构不受影响
+      expect(p.answerText, '24');
+    });
+
+    test('displayText 覆盖渲染（比例形态）', () {
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromInt(24),
+          NumberValue.fromFraction(4, 3),
+        ],
+        operators: [Operator.multiply],
+        result: NumberValue.fromInt(32),
+        mode: ProblemMode.findResult,
+        grade: 6,
+        displayText: '3 : 4 = 24 : ?',
+      );
+      expect(p.problemText, '3 : 4 = 24 : ?');
+      expect(p.answerText, '32');
+    });
+
+    test('displayText 为 null 时回退原有渲染', () {
+      final p = MathProblem(
+        operands: [NumberValue.fromInt(80), NumberValue.fromFraction(3, 10)],
+        operators: [Operator.multiply],
+        result: NumberValue.fromInt(24),
+        mode: ProblemMode.findResult,
+        grade: 6,
+      );
+      expect(p.problemText, '80 × 0.3 = ?');
+    });
+
+    test('模式转换后不携带 displayText（toFindMissing/toCompare/toVertical）',
+        () {
+      final base = MathProblem(
+        operands: [NumberValue.fromInt(80), NumberValue.fromFraction(3, 10)],
+        operators: [Operator.multiply],
+        result: NumberValue.fromInt(24),
+        mode: ProblemMode.findResult,
+        grade: 6,
+        displayText: '80 × 30% = ?',
+      );
+      final dummy = _DummyGenerator();
+      final missing = dummy.toFindMissing(base);
+      expect(missing.problemText.contains('%'), isFalse);
+      expect(missing.problemText, contains('='));
+      final compare = dummy.toCompare(base);
+      expect(compare.problemText.contains('%'), isFalse);
+      expect(compare.problemText, contains('○'));
     });
 
     test('toString 返回 problemText', () {
