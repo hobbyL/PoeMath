@@ -17,6 +17,7 @@ import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/webdav_config_page.dart';
+import 'package:poemath/features/profile/widgets/backup_passphrase_dialog.dart';
 
 class CloudSyncPage extends ConsumerStatefulWidget {
   const CloudSyncPage({
@@ -111,12 +112,19 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
           await settingsRepo.loadWebDavConfigWithCredentials(config);
       final backup = ref.read(backupServiceProvider);
       final webdav = ref.read(webDavServiceProvider);
-      final json = backup.exportToJson();
+      final passphrase = await ref
+          .read(secureCredentialStoreProvider)
+          .readBackupPassphrase();
+      final json = await backup.exportToJson(passphrase: passphrase);
       await webdav.upload(fullConfig, json);
 
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
-        const SnackBar(content: Text('上传成功 ✓')),
+        SnackBar(
+          content: Text(
+            passphrase == null ? '上传成功 ✓（未设置备份加密口令，本次备份不含凭据）' : '上传成功 ✓',
+          ),
+        ),
       );
     } on WebDavException catch (e) {
       scaffold.clearSnackBars();
@@ -172,7 +180,17 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       final fullConfig =
           await settingsRepo.loadWebDavConfigWithCredentials(config);
       final json = await webdav.download(fullConfig);
-      final count = await backup.restoreFromJson(json);
+
+      // 备份含加密凭据时先收口令；留空跳过凭据恢复。
+      final hasCredentials = BackupService.jsonHasCredentials(json);
+      String? passphrase;
+      if (hasCredentials) {
+        if (!mounted) return;
+        passphrase = await showBackupPassphraseInputDialog(context);
+        if (passphrase == null) return; // 用户取消
+      }
+
+      final count = await backup.restoreFromJson(json, passphrase: passphrase);
       final notificationsApplied =
           await notifications.reconcileWithStoredSettings();
       if (!mounted) return;
@@ -180,11 +198,18 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
       invalidateAllHiveProviders(ref.invalidate);
 
+      final credentialMessage = !hasCredentials
+          ? ''
+          : passphrase!.isNotEmpty
+              ? '，凭据已恢复'
+              : '，凭据未恢复（未输入口令）';
       final notificationMessage = notificationsApplied ? '' : '，但通知设置未完全应用';
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
         SnackBar(
-          content: Text('恢复成功，共恢复 $count 条记录$notificationMessage'),
+          content: Text(
+            '恢复成功，共恢复 $count 条记录$credentialMessage$notificationMessage',
+          ),
         ),
       );
     } on WebDavException catch (e) {

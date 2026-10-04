@@ -123,7 +123,7 @@ void defineAppJourneyTests({
 
     await HiveBoxes.settings.put('integration_marker', 'before-backup');
     final backup = BackupService();
-    final json = backup.exportToJson();
+    final json = await backup.exportToJson();
     await HiveBoxes.settings.clear();
     expect(HiveBoxes.settings.get('integration_marker'), isNull);
 

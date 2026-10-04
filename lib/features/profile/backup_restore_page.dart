@@ -2,8 +2,10 @@
 //
 // 层级：features/profile
 // 职责：备份与恢复子页面 — 导出备份文件或从备份恢复数据。
+//       备份加密口令的设置入口；凭据以口令加密随备份携带。
 
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -17,8 +19,9 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/features/profile/widgets/backup_passphrase_dialog.dart';
 
-class BackupRestorePage extends ConsumerWidget {
+class BackupRestorePage extends ConsumerStatefulWidget {
   const BackupRestorePage({
     super.key,
     this.notificationService,
@@ -27,7 +30,56 @@ class BackupRestorePage extends ConsumerWidget {
   final NotificationService? notificationService;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BackupRestorePage> createState() => _BackupRestorePageState();
+}
+
+class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
+  /// 备份加密口令是否已设置；`null` 表示尚未从安全存储加载完成。
+  bool? _hasPassphrase;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPassphraseState();
+  }
+
+  Future<void> _loadPassphraseState() async {
+    final passphrase =
+        await ref.read(secureCredentialStoreProvider).readBackupPassphrase();
+    if (mounted) {
+      setState(() => _hasPassphrase = passphrase != null);
+    }
+  }
+
+  Future<void> _configurePassphrase() async {
+    final hasExisting = _hasPassphrase ?? false;
+    final result = await showBackupPassphraseSetupDialog(
+      context,
+      hasExisting: hasExisting,
+    );
+    if (result == null) return;
+
+    final secureStore = ref.read(secureCredentialStoreProvider);
+    if (result.isEmpty) {
+      await secureStore.deleteBackupPassphrase();
+    } else {
+      await secureStore.saveBackupPassphrase(result);
+    }
+    await _loadPassphraseState();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result.isEmpty ? '备份加密口令已清除' : '备份加密口令已保存 ✓'),
+      ),
+    );
+  }
+
+  Future<String?> _readExportPassphrase() {
+    return ref.read(secureCredentialStoreProvider).readBackupPassphrase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -75,6 +127,20 @@ class BackupRestorePage extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+
+            const SizedBox(height: SpacingTokens.lg),
+            // 备份加密口令
+            AppTile(
+              icon: Icons.password_rounded,
+              iconColor: theme.colorScheme.primary,
+              title: '备份加密口令',
+              subtitle: switch (_hasPassphrase) {
+                true => '已设置，凭据将加密随备份携带',
+                false => '未设置，备份不包含凭据',
+                null => '用于加密备份中的腾讯云 AK/SK 与 TTS Key',
+              },
+              onTap: _configurePassphrase,
             ),
 
             const SizedBox(height: SpacingTokens.lg),
@@ -138,9 +204,10 @@ class BackupRestorePage extends ConsumerWidget {
 
     try {
       final backup = ref.read(backupServiceProvider);
+      final passphrase = await _readExportPassphrase();
 
       if (action == 'save') {
-        final json = backup.exportToJson();
+        final json = await backup.exportToJson(passphrase: passphrase);
         final timestamp = DateTime.now()
             .toIso8601String()
             .replaceAll(':', '-')
@@ -155,10 +222,14 @@ class BackupRestorePage extends ConsumerWidget {
         );
         if (path == null) return; // 用户取消
         scaffold.showSnackBar(
-          const SnackBar(content: Text('备份已保存 ✓')),
+          SnackBar(
+            content: Text(
+              passphrase == null ? '备份已保存 ✓（未设置口令，不含凭据）' : '备份已保存 ✓',
+            ),
+          ),
         );
       } else {
-        final filePath = await backup.exportToFile();
+        final filePath = await backup.exportToFile(passphrase: passphrase);
         await SharePlus.instance.share(
           ShareParams(files: [XFile(filePath)]),
         );
@@ -172,7 +243,8 @@ class BackupRestorePage extends ConsumerWidget {
 
   Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
     final scaffold = ScaffoldMessenger.of(context);
-    final notifications = notificationService ?? NotificationService.instance;
+    final notifications =
+        widget.notificationService ?? NotificationService.instance;
 
     // 确认对话框
     final confirmed = await showDialog<bool>(
@@ -208,7 +280,17 @@ class BackupRestorePage extends ConsumerWidget {
       final filePath = result.files.single.path;
       if (filePath == null) return;
 
-      final count = await backup.restoreFromFile(filePath);
+      // 备份含加密凭据时先收口令；留空跳过凭据恢复。
+      final fileJson = await File(filePath).readAsString();
+      final hasCredentials = BackupService.jsonHasCredentials(fileJson);
+      String? passphrase;
+      if (hasCredentials) {
+        if (!context.mounted) return;
+        passphrase = await showBackupPassphraseInputDialog(context);
+        if (passphrase == null) return; // 用户取消
+      }
+
+      final count = await backup.restoreFromFile(filePath, passphrase: passphrase);
       final notificationsApplied =
           await notifications.reconcileWithStoredSettings();
       if (!context.mounted) return;
@@ -216,10 +298,17 @@ class BackupRestorePage extends ConsumerWidget {
       // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
       invalidateAllHiveProviders(ref.invalidate);
 
+      final credentialMessage = !hasCredentials
+          ? ''
+          : passphrase!.isNotEmpty
+              ? '，凭据已恢复'
+              : '，凭据未恢复（未输入口令）';
       final notificationMessage = notificationsApplied ? '' : '，但通知设置未完全应用';
       scaffold.showSnackBar(
         SnackBar(
-          content: Text('恢复成功，共恢复 $count 条记录$notificationMessage'),
+          content: Text(
+            '恢复成功，共恢复 $count 条记录$credentialMessage$notificationMessage',
+          ),
         ),
       );
     } on FormatException catch (e) {

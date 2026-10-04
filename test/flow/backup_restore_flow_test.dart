@@ -35,8 +35,8 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  test('导出空数据库应生成合法 JSON', () {
-    final json = backupService.exportToJson();
+  test('导出空数据库应生成合法 JSON', () async {
+    final json = await backupService.exportToJson();
     expect(json, contains('"version"'));
     expect(json, contains('"exportedAt"'));
     expect(json, contains('"poemProgress": []'));
@@ -55,7 +55,7 @@ void main() {
     await HiveBoxes.poemProgress.put('default_poem_1', progress);
 
     // 导出
-    final json = backupService.exportToJson();
+    final json = await backupService.exportToJson();
 
     // 清空
     await HiveBoxes.poemProgress.clear();
@@ -89,7 +89,7 @@ void main() {
     );
     await HiveBoxes.userStats.put('default_stats', stats);
 
-    final json = backupService.exportToJson();
+    final json = await backupService.exportToJson();
 
     await HiveBoxes.userStats.clear();
     expect(HiveBoxes.userStats.isEmpty, isTrue);
@@ -124,7 +124,7 @@ void main() {
       activity,
     );
 
-    final json = backupService.exportToJson();
+    final json = await backupService.exportToJson();
     await HiveBoxes.learningActivities.clear();
     expect(await backupService.restoreFromJson(json), 1);
 
@@ -152,7 +152,7 @@ void main() {
       'completedAt': DateTime(2026, 7, 20).toIso8601String(),
     };
     final duplicateBackup =
-        jsonDecode(backupService.exportToJson()) as Map<String, dynamic>;
+        jsonDecode(await backupService.exportToJson()) as Map<String, dynamic>;
     duplicateBackup['learningActivities'] = [activity, activity];
 
     expect(
@@ -183,7 +183,7 @@ void main() {
       );
     }
     final expectedKeys = ActivitySettlementLedger.completedKeys;
-    final json = backupService.exportToJson();
+    final json = await backupService.exportToJson();
 
     await ActivitySettlementLedger.replaceCompletedKeys(
       const <String>[
@@ -197,7 +197,7 @@ void main() {
   });
 
   test('旧备份缺少活动结算字段时保留当前标记', () async {
-    final legacy = jsonDecode(backupService.exportToJson())
+    final legacy = jsonDecode(await backupService.exportToJson())
         as Map<String, dynamic>
       ..remove('activitySettlements');
     const currentKey =
@@ -218,7 +218,7 @@ void main() {
       status: LearningStatus.learning,
     );
     await HiveBoxes.poemProgress.put('default_existing', existing);
-    final invalid = jsonDecode(backupService.exportToJson())
+    final invalid = jsonDecode(await backupService.exportToJson())
         as Map<String, dynamic>
       ..['activitySettlements'] = <String>['device_meta'];
 
@@ -264,7 +264,7 @@ void main() {
       UserStats(profileId: 'default', totalStars: 15),
     );
 
-    final json = backupService.exportToJson();
+    final json = await backupService.exportToJson();
 
     // 清空所有
     await HiveBoxes.poemFavorites.clear();
@@ -356,7 +356,7 @@ void main() {
     await HiveBoxes.settings.put('tts_speed', 0.8);
     await HiveBoxes.settings.put('pinyin_visible', true);
 
-    final json = backupService.exportToJson();
+    final json = await backupService.exportToJson();
 
     // 清除设置
     await HiveBoxes.settings.clear();
@@ -491,7 +491,7 @@ void main() {
     );
     await HiveBoxes.challengeRecords.put('default_challenge', record);
 
-    final json = backupService.exportToJson();
+    final json = await backupService.exportToJson();
     await HiveBoxes.challengeRecords.clear();
     await backupService.restoreFromJson(json);
     expect(

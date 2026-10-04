@@ -111,7 +111,9 @@ final hapticServiceProvider = Provider<HapticService>((ref) {
 });
 
 final backupServiceProvider = Provider<BackupService>((ref) {
-  return BackupService();
+  return BackupService(
+    secureStore: ref.watch(secureCredentialStoreProvider),
+  );
 });
 
 final secureCredentialStoreProvider = Provider<SecureCredentialStore>((ref) {

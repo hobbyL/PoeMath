@@ -24,13 +24,24 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/core/services/backup_credentials_cipher.dart';
+import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 
 /// 备份数据版本号，用于兼容性检查。
 const int _backupVersion = 1;
 
 class BackupService {
+  BackupService({SecureCredentialStore? secureStore})
+      : _secureStore = secureStore ?? SecureCredentialStore();
+
+  final SecureCredentialStore _secureStore;
+
   /// 导出所有用户数据为 JSON 字符串。
-  String exportToJson() {
+  ///
+  /// [passphrase] 非空且安全存储中存在凭据时，凭据以
+  /// PBKDF2 + AES-256-GCM 加密写入 `credentials` 节；否则省略该节。
+  Future<String> exportToJson({String? passphrase}) async {
     final data = <String, dynamic>{
       'version': _backupVersion,
       'exportedAt': DateTime.now().toIso8601String(),
@@ -48,12 +59,39 @@ class BackupService {
       'activitySettlements': ActivitySettlementLedger.completedKeys,
       'settings': _exportSettings(),
     };
+    final credentials = await _exportCredentials(passphrase);
+    if (credentials != null) {
+      data['credentials'] = credentials;
+    }
     return const JsonEncoder.withIndent('  ').convert(data);
   }
 
+  /// 读取安全存储凭据并加密；无口令、无凭据或读取失败时返回 `null`
+  /// （导出静默降级为不含凭据节）。
+  Future<Map<String, dynamic>?> _exportCredentials(String? passphrase) async {
+    final normalized = passphrase?.trim() ?? '';
+    if (normalized.isEmpty) return null;
+    try {
+      final payload = <String, String>{};
+      final tencent = await _secureStore.readTencentAsrCredentials();
+      if (tencent != null) {
+        payload['tencent_asr_secret_id'] = tencent.secretId;
+        payload['tencent_asr_secret_key'] = tencent.secretKey;
+      }
+      final workerApiKey = await _secureStore.readWorkerTtsApiKey();
+      if (workerApiKey != null && workerApiKey.isNotEmpty) {
+        payload['worker_tts_api_key'] = workerApiKey;
+      }
+      if (payload.isEmpty) return null;
+      return await encryptCredentials(payload, normalized);
+    } on Object {
+      return null;
+    }
+  }
+
   /// 导出并保存到临时文件，返回文件路径。
-  Future<String> exportToFile() async {
-    final json = exportToJson();
+  Future<String> exportToFile({String? passphrase}) async {
+    final json = await exportToJson(passphrase: passphrase);
     final dir = await getTemporaryDirectory();
     final timestamp =
         DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
@@ -62,19 +100,49 @@ class BackupService {
     return file.path;
   }
 
+  /// 探测备份 JSON 是否含 `credentials` 节（决定导入/下载前是否弹口令框）。
+  static bool jsonHasCredentials(String jsonString) {
+    try {
+      final decoded = jsonDecode(jsonString);
+      return decoded is Map && decoded.containsKey('credentials');
+    } on FormatException {
+      return false;
+    }
+  }
+
   /// 从 JSON 字符串恢复数据。
   ///
   /// 返回恢复的记录总数。
   /// 如果版本不兼容，抛出 [FormatException]。
-  /// 恢复失败时自动回滚到恢复前的数据状态。
-  Future<int> restoreFromJson(String jsonString) async {
+  /// 备份含 `credentials` 节时：口令留空跳过凭据、口令错误在写入前
+  /// 抛 [FormatException]，均不影响其余数据；口令正确则在末尾把凭据
+  /// 写入安全存储。
+  /// 恢复失败时自动回滚到恢复前的数据状态（回滚只还原 Hive 数据，
+  /// 不触碰安全存储）。
+  Future<int> restoreFromJson(String jsonString, {String? passphrase}) async {
     final data = _decodeAndValidate(jsonString);
 
-    // 恢复前先快照当前数据，失败时用于回滚
-    final snapshot = exportToJson();
+    // 凭据解密在快照与任何写入之前完成：口令错误时数据零变更。
+    Map<String, String>? plainCredentials;
+    if (data.containsKey('credentials')) {
+      final normalized = passphrase?.trim() ?? '';
+      if (normalized.isNotEmpty) {
+        plainCredentials = await decryptCredentials(
+          data['credentials'] as Map<String, dynamic>,
+          normalized,
+        );
+      }
+    }
+
+    // 恢复前先快照当前数据（不含凭据节），失败时用于回滚
+    final snapshot = await exportToJson();
 
     try {
-      return await _doRestore(data);
+      final count = await _doRestore(data);
+      if (plainCredentials != null) {
+        await _restoreCredentials(plainCredentials);
+      }
+      return count;
     } on Object catch (error, stackTrace) {
       // 恢复失败，回滚到快照
       try {
@@ -88,6 +156,21 @@ class BackupService {
         );
       }
       Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  /// 把解密后的凭据写入安全存储（覆盖式）。
+  Future<void> _restoreCredentials(Map<String, String> credentials) async {
+    final secretId = credentials['tencent_asr_secret_id'];
+    final secretKey = credentials['tencent_asr_secret_key'];
+    if (secretId != null && secretKey != null) {
+      await _secureStore.saveTencentAsrCredentials(
+        TencentAsrCredentials(secretId: secretId, secretKey: secretKey),
+      );
+    }
+    final apiKey = credentials['worker_tts_api_key'];
+    if (apiKey != null && apiKey.isNotEmpty) {
+      await _secureStore.saveWorkerTtsApiKey(apiKey);
     }
   }
 
@@ -141,13 +224,13 @@ class BackupService {
   }
 
   /// 从文件路径恢复。
-  Future<int> restoreFromFile(String filePath) async {
+  Future<int> restoreFromFile(String filePath, {String? passphrase}) async {
     final file = File(filePath);
     if (!file.existsSync()) {
       throw const FormatException('备份文件不存在');
     }
     final json = await file.readAsString();
-    return restoreFromJson(json);
+    return restoreFromJson(json, passphrase: passphrase);
   }
 
   // ============ 导出 ============
@@ -622,6 +705,13 @@ class BackupService {
         _invalidField('settings', '必须是 JSON 对象');
       }
       _validateJsonObject(settings, 'settings');
+    }
+
+    if (data.containsKey('credentials')) {
+      final credentials = data['credentials'];
+      if (credentials is! Map<Object?, Object?>) {
+        _invalidField('credentials', '必须是 JSON 对象');
+      }
     }
 
     return data;

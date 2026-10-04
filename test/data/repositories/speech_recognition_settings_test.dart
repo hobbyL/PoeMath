@@ -119,7 +119,7 @@ void main() {
       ),
     );
     final backup = BackupService();
-    final json = backup.exportToJson();
+    final json = await backup.exportToJson();
 
     expect(json, isNot(contains('AKID-private')));
     expect(json, isNot(contains('SK-private')));

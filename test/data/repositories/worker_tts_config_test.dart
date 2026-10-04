@@ -57,7 +57,7 @@ void main() {
     }
     // JSON 备份导出同样不得包含 Key。
     final backup = BackupService();
-    expect(backup.exportToJson(), isNot(contains('worker-key-private')));
+    expect(await backup.exportToJson(), isNot(contains('worker-key-private')));
   });
 
   test('保存配置规范化地址并强制重新验证', () async {
@@ -125,7 +125,7 @@ void main() {
       apiKey: 'worker-key-private',
     );
     final backup = BackupService();
-    final json = backup.exportToJson();
+    final json = await backup.exportToJson();
 
     credentialStore.workerApiKey = null;
     await backup.restoreFromJson(json);

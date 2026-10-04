@@ -4,7 +4,6 @@
 // 学习页与跟读页的当前句由 AutoFitLine 包裹（缩放契约由组件测试钉死）。
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

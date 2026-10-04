@@ -8,14 +8,17 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 
-/// WebDAV and Tencent ASR credentials backed by platform secure storage.
+/// WebDAV / Tencent ASR / Worker TTS / 备份口令等敏感凭据，
+/// 统一由平台安全存储（iOS Keychain / Android 加密偏好）管理，
+/// 替代 Hive 明文存储。
 ///
 /// 密钥格式：`webdav_{configId}_username` / `webdav_{configId}_password`。
 class SecureCredentialStore {
-  SecureCredentialStore()
-      : _storage = const FlutterSecureStorage(
-          aOptions: AndroidOptions(encryptedSharedPreferences: true),
-        );
+  SecureCredentialStore({FlutterSecureStorage? storage})
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            );
 
   final FlutterSecureStorage _storage;
 
@@ -102,6 +105,23 @@ class SecureCredentialStore {
     await _storage.delete(key: _workerTtsApiKeyKey);
   }
 
+  // ============ 备份加密口令 ============
+
+  /// 保存备份加密口令（本地导出与 WebDAV 上传共用）。
+  Future<void> saveBackupPassphrase(String passphrase) async {
+    await _storage.write(key: _backupPassphraseKey, value: passphrase);
+  }
+
+  /// 读取备份加密口令，未设置返回 `null`。
+  Future<String?> readBackupPassphrase() {
+    return _storage.read(key: _backupPassphraseKey);
+  }
+
+  /// 删除备份加密口令（此后导出不再携带凭据）。
+  Future<void> deleteBackupPassphrase() async {
+    await _storage.delete(key: _backupPassphraseKey);
+  }
+
   // ============ 内部 ============
 
   static String _usernameKey(String id) => 'webdav_${id}_username';
@@ -110,4 +130,5 @@ class SecureCredentialStore {
   static const String _tencentSecretIdKey = 'tencent_asr_secret_id';
   static const String _tencentSecretKeyKey = 'tencent_asr_secret_key';
   static const String _workerTtsApiKeyKey = 'worker_tts_api_key';
+  static const String _backupPassphraseKey = 'backup_passphrase';
 }

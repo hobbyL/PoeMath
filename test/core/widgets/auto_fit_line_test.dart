@@ -28,7 +28,7 @@ void main() {
         maxWidth: 120,
         child: const AutoFitLine(
           child: Text('春江潮水连海平海上明月共潮生',
-              maxLines: 1, style: _style),
+              maxLines: 1, style: _style,),
         ),
       ),
     );
@@ -50,7 +50,7 @@ void main() {
         maxWidth: 800,
         child: const AutoFitLine(
           child: Text('春江潮水连海平海上明月共潮生',
-              maxLines: 1, style: _style),
+              maxLines: 1, style: _style,),
         ),
       ),
     );
