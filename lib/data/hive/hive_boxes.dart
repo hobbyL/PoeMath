@@ -22,6 +22,7 @@ import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/learning_activity.dart';
+import 'package:poemath/data/models/llm_problem.dart';
 
 class HiveBoxes {
   const HiveBoxes._();
@@ -43,6 +44,7 @@ class HiveBoxes {
   static late Box<UserStats> userStats;
   static late Box<ChallengeRecord> challengeRecords;
   static late Box<LearningActivity> learningActivities;
+  static late Box<LlmProblem> llmProblems;
 
   // ============ KV Box ============
   static late Box<dynamic> settings;
@@ -70,6 +72,7 @@ class HiveBoxes {
         await Hive.openBox<ChallengeRecord>(HiveKeys.challengeRecordBox);
     learningActivities =
         await Hive.openBox<LearningActivity>(HiveKeys.learningActivityBox);
+    llmProblems = await Hive.openBox<LlmProblem>(HiveKeys.llmProblemBox);
 
     // KV
     settings = await Hive.openBox(HiveKeys.settingsBox);

@@ -23,6 +23,7 @@ import 'package:poemath/features/profile/notification_settings_page.dart';
 import 'package:poemath/features/profile/practice_settings_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 import 'package:poemath/features/profile/tts_settings_page.dart';
+import 'package:poemath/features/profile/llm_settings_page.dart';
 
 enum _SettingsSection { hub, appearance, sound, learning, data }
 
@@ -273,6 +274,25 @@ class SettingsPage extends ConsumerWidget {
             // 通知设置（学习提醒 + 周报推送 → 子页面）
             if (_section == _SettingsSection.learning)
               _buildNotificationSettings(context),
+            if (_section == _SettingsSection.learning)
+              const SizedBox(height: SpacingTokens.sm),
+
+            // 应用题 AI 出题（LLM 服务配置 → 子页面）
+            if (_section == _SettingsSection.learning)
+              AppTile(
+                icon: Icons.smart_toy_outlined,
+                iconColor: theme.colorScheme.tertiary,
+                title: '应用题 AI 出题',
+                subtitle: settingsRepo.llmModel.trim().isEmpty
+                    ? '未配置'
+                    : settingsRepo.llmModel,
+                onTap: () => Navigator.push<void>(
+                  context,
+                  fadeSlideRoute(
+                    builder: (_) => const LlmSettingsPage(),
+                  ),
+                ),
+              ),
             if (_section == _SettingsSection.learning)
               const SizedBox(height: SpacingTokens.md),
 

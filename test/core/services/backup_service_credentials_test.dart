@@ -55,6 +55,22 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   Future<void> deleteWorkerTtsApiKey() async {
     workerApiKey = null;
   }
+
+  // LLM Key 同步走内存（真实 FlutterSecureStorage 在测试环境不可用）。
+  String? llmApiKey;
+
+  @override
+  Future<void> saveLlmApiKey(String apiKey) async {
+    llmApiKey = apiKey;
+  }
+
+  @override
+  Future<String?> readLlmApiKey() => Future.value(llmApiKey);
+
+  @override
+  Future<void> deleteLlmApiKey() async {
+    llmApiKey = null;
+  }
 }
 
 void main() {

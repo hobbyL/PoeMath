@@ -33,6 +33,12 @@ class AppRoutes {
   static const String mathMistakeDetail = '/math/mistake/detail';
   static const String challengeHistory = '/math/challenge/history';
 
+  // ============ 应用题（AI 出题） ============
+  static const String wordProblemGenerate = '/word-problem/generate';
+  static const String wordProblemPreview = '/word-problem/preview';
+  static const String wordProblemLibrary = '/word-problem/library';
+  static const String wordProblemPractice = '/word-problem/practice';
+
   // ============ 公式 ============
   static const String formulaDetail = '/formula/detail/:id';
 
@@ -42,6 +48,7 @@ class AppRoutes {
   static const String settings = '/profile/settings';
   static const String speechRecognitionSettings =
       '/profile/settings/speech-recognition';
+  static const String llmSettings = '/profile/settings/llm';
   static const String learningStats = '/profile/stats';
   static const String learningCalendar = '/profile/calendar';
   static const String achievements = '/profile/achievements';

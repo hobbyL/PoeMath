@@ -309,12 +309,14 @@ class _ActionButtons extends ConsumerWidget {
           onTap: () => _repractice(context, ref),
           color: theme.colorScheme.primary,
         ),
-        _buildActionButton(
-          icon: Icons.auto_awesome,
-          label: '同类新题',
-          onTap: () => _generateSimilar(context, ref),
-          color: theme.colorScheme.primary,
-        ),
+        // 「同类新题」按错因映射口算出题；应用题错题无对应映射，隐藏。
+        if (mistake.problemType != 'llm_word_problem')
+          _buildActionButton(
+            icon: Icons.auto_awesome,
+            label: '同类新题',
+            onTap: () => _generateSimilar(context, ref),
+            color: theme.colorScheme.primary,
+          ),
         if (!mistake.isResolved)
           _buildActionButton(
             icon: Icons.check,

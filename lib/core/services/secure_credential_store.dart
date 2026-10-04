@@ -105,6 +105,23 @@ class SecureCredentialStore {
     await _storage.delete(key: _workerTtsApiKeyKey);
   }
 
+  // ============ LLM API Key（应用题生成） ============
+
+  /// 保存 LLM 服务 API Key。
+  Future<void> saveLlmApiKey(String apiKey) async {
+    await _storage.write(key: _llmApiKeyKey, value: apiKey);
+  }
+
+  /// 读取 LLM 服务 API Key，不存在返回 `null`。
+  Future<String?> readLlmApiKey() {
+    return _storage.read(key: _llmApiKeyKey);
+  }
+
+  /// 删除 LLM 服务 API Key。
+  Future<void> deleteLlmApiKey() async {
+    await _storage.delete(key: _llmApiKeyKey);
+  }
+
   // ============ 备份加密口令 ============
 
   /// 保存备份加密口令（本地导出与 WebDAV 上传共用）。
@@ -130,5 +147,6 @@ class SecureCredentialStore {
   static const String _tencentSecretIdKey = 'tencent_asr_secret_id';
   static const String _tencentSecretKeyKey = 'tencent_asr_secret_key';
   static const String _workerTtsApiKeyKey = 'worker_tts_api_key';
+  static const String _llmApiKeyKey = 'llm_api_key';
   static const String _backupPassphraseKey = 'backup_passphrase';
 }

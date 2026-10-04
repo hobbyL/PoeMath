@@ -13,6 +13,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/learning_activity.dart';
+import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/user_stats.dart';
@@ -509,5 +510,129 @@ void main() {
       HiveBoxes.challengeRecords.get('default_challenge')!.starsEarned,
       0,
     );
+  });
+
+  test('备份并恢复 LLM 应用题，保留讲解与做题状态', () async {
+    final createdAt = DateTime(2026, 10, 1, 9);
+    final lastDoneAt = DateTime(2026, 10, 2, 18, 30);
+    final problem = LlmProblem(
+      id: 'p1',
+      profileId: 'default',
+      questionText: '小明买了 12 个苹果，吃了 4 个，还剩几个？',
+      unit: '个',
+      operands: const [12, 4],
+      operators: const ['-'],
+      answer: 8,
+      explanation: '12 - 4 = 8，还剩 8 个。',
+      batchId: 'batch_20261001',
+      createdAt: createdAt,
+      grade: 2,
+      semester: '上',
+      topic: 'subtraction',
+      difficulty: 2,
+      done: true,
+      attempts: 3,
+      correctCount: 2,
+      lastDoneAt: lastDoneAt,
+    );
+    await HiveBoxes.llmProblems.put('default_p1', problem);
+
+    final json = await backupService.exportToJson();
+    await HiveBoxes.llmProblems.clear();
+    expect(HiveBoxes.llmProblems.isEmpty, isTrue);
+
+    expect(await backupService.restoreFromJson(json), greaterThan(0));
+
+    final restored = HiveBoxes.llmProblems.get('default_p1');
+    expect(restored, isNotNull);
+    expect(restored!.questionText, contains('12'));
+    expect(restored.unit, equals('个'));
+    expect(restored.operands, equals(const [12, 4]));
+    expect(restored.operators, equals(const ['-']));
+    expect(restored.answer, equals(8));
+    expect(restored.explanation, equals('12 - 4 = 8，还剩 8 个。'));
+    expect(restored.batchId, equals('batch_20261001'));
+    expect(restored.createdAt, equals(createdAt));
+    expect(restored.grade, equals(2));
+    expect(restored.semester, equals('上'));
+    expect(restored.topic, equals('subtraction'));
+    expect(restored.difficulty, equals(2));
+    expect(restored.done, isTrue);
+    expect(restored.attempts, equals(3));
+    expect(restored.correctCount, equals(2));
+    expect(restored.lastDoneAt, equals(lastDoneAt));
+    expect(restored.expressionText, equals('12 - 4'));
+  });
+
+  test('旧备份缺少 llmProblems 键时恢复为空且不报错', () async {
+    final problem = LlmProblem(
+      id: 'p1',
+      profileId: 'default',
+      questionText: '题面',
+      unit: '个',
+      operands: const [3, 1],
+      operators: const ['×'],
+      answer: 3,
+      explanation: '',
+      batchId: 'batch_1',
+      createdAt: DateTime(2026, 10, 1),
+      grade: 1,
+      semester: '上',
+      topic: 'multiplication',
+      difficulty: 1,
+    );
+    await HiveBoxes.llmProblems.put('default_p1', problem);
+
+    final legacy = jsonDecode(await backupService.exportToJson())
+        as Map<String, dynamic>;
+    expect(legacy.containsKey('llmProblems'), isTrue);
+    legacy.remove('llmProblems');
+
+    // 恢复是全量替换：缺键视为空题库（与 learningActivities 语义一致）。
+    await backupService.restoreFromJson(jsonEncode(legacy));
+
+    expect(HiveBoxes.llmProblems, isEmpty);
+  });
+
+  test('非法 LLM 题目在清空 Box 前被拒绝', () async {
+    final existing = LlmProblem(
+      id: 'existing',
+      profileId: 'default',
+      questionText: '题面',
+      unit: '个',
+      operands: const [5, 3],
+      operators: const ['+'],
+      answer: 8,
+      explanation: '',
+      batchId: 'batch_1',
+      createdAt: DateTime(2026, 10, 1),
+      grade: 1,
+      semester: '上',
+      topic: 'addition',
+      difficulty: 1,
+    );
+    await HiveBoxes.llmProblems.put('default_existing', existing);
+
+    final invalid = jsonEncode({
+      'version': 1,
+      'llmProblems': [
+        <String, dynamic>{
+          'id': 'broken',
+          'profileId': 'default',
+          'questionText': '题面缺字段',
+          // 缺 unit/operands/operators/batchId 等必填字段
+          'answer': 8,
+          'grade': 1,
+        },
+      ],
+    });
+
+    await expectLater(
+      backupService.restoreFromJson(invalid),
+      throwsA(isA<FormatException>()),
+    );
+
+    expect(HiveBoxes.llmProblems.get('default_existing'), isNotNull);
+    expect(HiveBoxes.llmProblems.get('default_broken'), isNull);
   });
 }

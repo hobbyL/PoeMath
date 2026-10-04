@@ -9,3 +9,4 @@ export 'presets/grade_presets.dart';
 export 'diagnostics/mistake_rule.dart';
 export 'step_solver/step_solver.dart';
 export 'validators/constraint_checker.dart';
+export 'word_problem_skeleton.dart';

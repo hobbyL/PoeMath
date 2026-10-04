@@ -18,6 +18,7 @@ const List<String> kBackupCredentialKeys = [
   'tencent_asr_secret_id',
   'tencent_asr_secret_key',
   'worker_tts_api_key',
+  'llm_api_key',
 ];
 
 /// 用口令加密凭据明文，产出备份 `credentials` 节的 JSON 结构。

@@ -17,6 +17,7 @@ import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/learning_activity.dart';
+import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
@@ -56,6 +57,7 @@ class BackupService {
       'userStats': _exportUserStats(),
       'challengeRecords': _exportChallengeRecords(),
       'learningActivities': _exportLearningActivities(),
+      'llmProblems': _exportLlmProblems(),
       'activitySettlements': ActivitySettlementLedger.completedKeys,
       'settings': _exportSettings(),
     };
@@ -81,6 +83,10 @@ class BackupService {
       final workerApiKey = await _secureStore.readWorkerTtsApiKey();
       if (workerApiKey != null && workerApiKey.isNotEmpty) {
         payload['worker_tts_api_key'] = workerApiKey;
+      }
+      final llmApiKey = await _secureStore.readLlmApiKey();
+      if (llmApiKey != null && llmApiKey.isNotEmpty) {
+        payload['llm_api_key'] = llmApiKey;
       }
       if (payload.isEmpty) return null;
       return await encryptCredentials(payload, normalized);
@@ -172,6 +178,11 @@ class BackupService {
     if (apiKey != null && apiKey.isNotEmpty) {
       await _secureStore.saveWorkerTtsApiKey(apiKey);
     }
+    // legacy 备份无 llm_api_key 字段 → null，跳过（不覆盖现有值）。
+    final llmApiKey = credentials['llm_api_key'];
+    if (llmApiKey != null && llmApiKey.isNotEmpty) {
+      await _secureStore.saveLlmApiKey(llmApiKey);
+    }
   }
 
   /// 执行实际的数据恢复，返回记录总数。
@@ -210,6 +221,9 @@ class BackupService {
     );
     count += await _restoreLearningActivities(
       data['learningActivities'] as List<dynamic>? ?? [],
+    );
+    count += await _restoreLlmProblems(
+      data['llmProblems'] as List<dynamic>? ?? [],
     );
     if (data.containsKey('activitySettlements')) {
       await ActivitySettlementLedger.replaceCompletedKeys(
@@ -403,6 +417,31 @@ class BackupService {
         'starsEarned': activity.starsEarned,
         'durationSeconds': activity.durationSeconds,
         'completedAt': activity.completedAt.toIso8601String(),
+      };
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _exportLlmProblems() {
+    return HiveBoxes.llmProblems.values.map((p) {
+      return <String, dynamic>{
+        'id': p.id,
+        'profileId': p.profileId,
+        'questionText': p.questionText,
+        'unit': p.unit,
+        'operands': p.operands,
+        'operators': p.operators,
+        'answer': p.answer,
+        'explanation': p.explanation,
+        'batchId': p.batchId,
+        'createdAt': p.createdAt.toIso8601String(),
+        'grade': p.grade,
+        'semester': p.semester,
+        'topic': p.topic,
+        'difficulty': p.difficulty,
+        'done': p.done,
+        'attempts': p.attempts,
+        'correctCount': p.correctCount,
+        'lastDoneAt': p.lastDoneAt?.toIso8601String(),
       };
     }).toList();
   }
@@ -645,6 +684,36 @@ class BackupService {
     return items.length;
   }
 
+  Future<int> _restoreLlmProblems(List<dynamic> items) async {
+    final box = HiveBoxes.llmProblems;
+    await box.clear();
+    for (final item in items) {
+      final m = item as Map<String, dynamic>;
+      final obj = LlmProblem(
+        id: m['id'] as String,
+        profileId: m['profileId'] as String,
+        questionText: m['questionText'] as String,
+        unit: m['unit'] as String,
+        operands: (m['operands'] as List<dynamic>).cast<int>(),
+        operators: (m['operators'] as List<dynamic>).cast<String>(),
+        answer: m['answer'] as int,
+        explanation: m['explanation'] as String? ?? '',
+        batchId: m['batchId'] as String,
+        createdAt: _parseDateTime(m['createdAt']) ?? DateTime.now(),
+        grade: m['grade'] as int,
+        semester: m['semester'] as String,
+        topic: m['topic'] as String,
+        difficulty: m['difficulty'] as int,
+        done: m['done'] as bool? ?? false,
+        attempts: m['attempts'] as int? ?? 0,
+        correctCount: m['correctCount'] as int? ?? 0,
+        lastDoneAt: _parseDateTime(m['lastDoneAt']),
+      );
+      await box.put('${obj.profileId}_${obj.id}', obj);
+    }
+    return items.length;
+  }
+
   Future<void> _restoreSettings(Map<String, dynamic> items) async {
     final box = HiveBoxes.settings;
     // 备份包含完整 settings 时替换旧键，确保恢复和回滚都是精确快照。
@@ -696,6 +765,7 @@ class BackupService {
     _validateList(data, 'userStats', _validateUserStats);
     _validateList(data, 'challengeRecords', _validateChallengeRecord);
     _validateList(data, 'learningActivities', _validateLearningActivity);
+    _validateList(data, 'llmProblems', _validateLlmProblem);
     _validateUniqueLearningActivityIds(data);
     _validateActivitySettlements(data);
 
@@ -997,6 +1067,41 @@ class BackupService {
     final completedAt = item['completedAt'];
     if (completedAt is! String || DateTime.tryParse(completedAt) == null) {
       _invalidField('$path.completedAt', '必须是有效的 ISO 日期字符串');
+    }
+  }
+
+  void _validateLlmProblem(Map<String, dynamic> item, String path) {
+    for (final key in <String>[
+      'id',
+      'profileId',
+      'questionText',
+      'unit',
+      'batchId',
+      'semester',
+      'topic',
+    ]) {
+      _requiredString(item, key, path);
+    }
+    _requiredInt(item, 'answer', path);
+    _requiredInt(item, 'grade', path);
+    _requiredInt(item, 'difficulty', path);
+    _optionalNonNegativeInt(item, 'attempts', path);
+    _optionalNonNegativeInt(item, 'correctCount', path);
+    _optionalBool(item, 'done', path);
+    _validateOptionalDate(item, 'createdAt', path);
+    _validateOptionalDate(item, 'lastDoneAt', path);
+
+    // 运算符白名单（与 LlmProblem 注释约定一致）
+    final operators = item['operators'];
+    if (operators is! List<Object?> ||
+        operators.any((op) => op is! String || op.isEmpty)) {
+      _invalidField('$path.operators', '必须是非空字符串数组');
+    }
+    // 操作数非负整数
+    final operands = item['operands'];
+    if (operands is! List<Object?> ||
+        operands.any((v) => v is! int || v < 0)) {
+      _invalidField('$path.operands', '必须是非负整数数组');
     }
   }
 

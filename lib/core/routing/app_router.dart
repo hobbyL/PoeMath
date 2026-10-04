@@ -12,6 +12,7 @@ import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
@@ -26,6 +27,10 @@ import 'package:poemath/features/math/math_practice_page.dart';
 import 'package:poemath/features/math/math_mistake_detail_page.dart';
 import 'package:poemath/features/math/math_session_detail_page.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
+import 'package:poemath/features/math/word_problem/word_problem_generate_page.dart';
+import 'package:poemath/features/math/word_problem/word_problem_library_page.dart';
+import 'package:poemath/features/math/word_problem/word_problem_practice_page.dart';
+import 'package:poemath/features/math/word_problem/word_problem_preview_page.dart';
 import 'package:poemath/features/poem/poem_detail_page.dart';
 import 'package:poemath/features/poem/poem_favorites_page.dart';
 import 'package:poemath/features/poem/poem_learning_path_page.dart';
@@ -39,6 +44,7 @@ import 'package:poemath/features/poem/poem_tab_page.dart';
 import 'package:poemath/features/profile/about_page.dart';
 import 'package:poemath/features/profile/achievement_page.dart';
 import 'package:poemath/features/profile/learning_stats_page.dart';
+import 'package:poemath/features/profile/llm_settings_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
@@ -213,6 +219,41 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // ============ 应用题 AI 出题（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.wordProblemGenerate,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const WordProblemGeneratePage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.wordProblemPreview,
+        pageBuilder: (context, state) {
+          final data = state.extra! as WordProblemPreviewData;
+          return fadeSlideTransitionPage(
+            state: state,
+            child: WordProblemPreviewPage(data: data),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.wordProblemLibrary,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const WordProblemLibraryPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.wordProblemPractice,
+        pageBuilder: (context, state) {
+          final problems = state.extra! as List<LlmProblem>;
+          return fadeSlideTransitionPage(
+            state: state,
+            child: WordProblemPracticePage(problems: problems),
+          );
+        },
+      ),
       // ============ 公式详情（非 Shell 子路由，全屏） ============
       GoRoute(
         path: AppRoutes.formulaDetail,
@@ -236,6 +277,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const SpeechRecognitionSettingsPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.llmSettings,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const LlmSettingsPage(),
         ),
       ),
       // ============ 学习报告（非 Shell 子路由，全屏） ============

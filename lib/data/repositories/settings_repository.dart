@@ -7,6 +7,8 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
+import 'package:poemath/core/services/llm/llm_client.dart';
+import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
@@ -44,6 +46,8 @@ class SettingsRepository {
   static const String _keyTtsCloudStyle = 'tts_cloud_style';
   static const String _keyWorkerTtsVerifiedFingerprint =
       'worker_tts_verified_fingerprint';
+  static const String _keyLlmBaseUrl = 'llm_base_url';
+  static const String _keyLlmModel = 'llm_model';
 
   // ============ 主题 ============
 
@@ -220,6 +224,59 @@ class SettingsRepository {
       config.apiKey,
     ]);
     return sha256.convert(utf8.encode(canonical)).toString();
+  }
+
+  // ============ LLM 应用题生成设置（可选） ============
+
+  /// LLM 服务地址（Hive 非敏感存储）；未配置返回空串。
+  String get llmBaseUrl =>
+      HiveBoxes.settings.get(_keyLlmBaseUrl, defaultValue: '') as String;
+
+  Future<void> setLlmBaseUrl(String baseUrl) async {
+    await HiveBoxes.settings.put(_keyLlmBaseUrl, baseUrl);
+  }
+
+  /// LLM 模型名；未配置返回空串。
+  String get llmModel =>
+      HiveBoxes.settings.get(_keyLlmModel, defaultValue: '') as String;
+
+  Future<void> setLlmModel(String model) async {
+    await HiveBoxes.settings.put(_keyLlmModel, model);
+  }
+
+  /// 读取 LLM 完整配置；地址或模型未配置时返回 null（Key 允许为空，
+  /// 对应 Ollama 等无鉴权服务）。
+  Future<LlmConfig?> readLlmConfig() async {
+    final base = llmBaseUrl.trim();
+    final model = llmModel.trim();
+    if (base.isEmpty || model.isEmpty) return null;
+    final apiKey = await _credentialStore.readLlmApiKey();
+    return LlmConfig(baseUrl: base, apiKey: apiKey ?? '', model: model);
+  }
+
+  /// 保存 LLM 配置（地址/模型入 Hive、Key 入安全存储）。
+  Future<void> saveLlmConfig({
+    required String baseUrl,
+    required String model,
+    required String apiKey,
+  }) async {
+    // 先校验地址合法（非法抛 FormatException，不落盘）。
+    LlmClient.normalizeBaseUrl(baseUrl);
+    final key = apiKey.trim();
+    if (key.isEmpty) {
+      await _credentialStore.deleteLlmApiKey();
+    } else {
+      await _credentialStore.saveLlmApiKey(key);
+    }
+    await setLlmBaseUrl(baseUrl.trim());
+    await setLlmModel(model.trim());
+  }
+
+  /// 删除 LLM 配置（Key + 地址 + 模型）。
+  Future<void> deleteLlmConfig() async {
+    await _credentialStore.deleteLlmApiKey();
+    await HiveBoxes.settings.delete(_keyLlmBaseUrl);
+    await HiveBoxes.settings.delete(_keyLlmModel);
   }
 
   // ============ 拼音显示 ============

@@ -50,6 +50,9 @@ class HiveKeys {
   /// 逐次学习活动事件 Box
   static const String learningActivityBox = 'learning_activities';
 
+  /// LLM 应用题 Box
+  static const String llmProblemBox = 'llm_problems';
+
   /// 设置 Box（KV 存储）
   static const String settingsBox = 'settings';
 
