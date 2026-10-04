@@ -393,15 +393,18 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
           ),
-          child: Text(
-            lines[i],
-            style: isActive
-                ? baseStyle?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  )
-                : baseStyle,
-            textAlign: TextAlign.center,
+          child: AutoFitLine(
+            child: Text(
+              lines[i],
+              maxLines: 1,
+              style: isActive
+                  ? baseStyle?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    )
+                  : baseStyle,
+              textAlign: TextAlign.center,
+            ),
           ),
         );
       }),

@@ -11,6 +11,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -561,14 +562,17 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
           // ── 上一句（灰色回顾） ──
           if (_currentLineIndex > 0)
-            Text(
-              _lines[_currentLineIndex - 1],
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-                letterSpacing: 2,
-                fontFamilyFallback: TypographyTokens.serifFallback,
+            AutoFitLine(
+              child: Text(
+                _lines[_currentLineIndex - 1],
+                maxLines: 1,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  letterSpacing: 2,
+                  fontFamilyFallback: TypographyTokens.serifFallback,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ).animate().fadeIn(duration: 300.ms),
 
           const Spacer(),
@@ -823,13 +827,15 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
           );
     }
 
-    // 换句入场动画
+    // 换句入场动画；AutoFitLine 保证窄屏下整行（含填字槽）单行缩小
     return KeyedSubtree(
       key: ValueKey(_lineAnimKey),
-      child: lineWidget
-          .animate()
-          .fadeIn(duration: 400.ms)
-          .slideX(begin: 0.15, end: 0, duration: 400.ms, curve: Curves.easeOut),
+      child: AutoFitLine(
+        child: lineWidget
+            .animate()
+            .fadeIn(duration: 400.ms)
+            .slideX(begin: 0.15, end: 0, duration: 400.ms, curve: Curves.easeOut),
+      ),
     );
   }
 

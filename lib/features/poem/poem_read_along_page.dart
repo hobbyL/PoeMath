@@ -744,17 +744,20 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       child: Column(
         children: [
           if (_phase == _ReadAlongPhase.scored)
-            _buildColoredLine(theme)
+            AutoFitLine(child: _buildColoredLine(theme))
           else
-            Text(
-              line,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                height: 1.8,
-                letterSpacing: 2,
-                color: isActive ? theme.colorScheme.primary : null,
+            AutoFitLine(
+              child: Text(
+                line,
+                maxLines: 1,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  height: 1.8,
+                  letterSpacing: 2,
+                  color: isActive ? theme.colorScheme.primary : null,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
         ],
       ),
