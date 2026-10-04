@@ -104,34 +104,23 @@ final class WorkerTtsClient {
     return _parseAudioResponse(response);
   }
 
-  /// 零成本验证：携带 Key 发送空 `text` 探测。
+  /// 验证探测文本：一次两个字的真实合成，成本可忽略。
+  static const String _verifyProbeText = '你好';
+
+  /// 验证服务连通性与 API Key：发送一次短文本真实合成。
   ///
-  /// 服务端 requireAuth 先于参数校验：
-  /// - `400 必须提供文本参数` → Key 正确，验证通过；
-  /// - `401` → Key 错误或未提供，抛 [WorkerTtsErrorKind.authentication]。
-  /// 不产生任何真实语音合成。
+  /// 收到有效音频即验证通过（Key 有效 + 服务可用 + 产出音频，完整链路）。
+  /// 不要改回「空 text 探测等 400」——那依赖服务端「鉴权先于参数校验」的
+  /// 实现细节，服务端版本变化即失效（线上曾对空 text 抛未捕获异常返回
+  /// 500）。失败分类沿用 synthesize：401 → authentication、网络 → network、
+  /// 其他 → response。
   Future<void> verify(WorkerTtsConfig config) async {
-    _validateConfig(config);
-    final body = jsonEncode(<String, Object>{'text': ''});
-    final response = await _send(
-      uri: config.base.resolve(_ttsPath),
-      body: body,
-      apiKey: config.apiKey,
-      timeout: _probeTimeout,
-      timeoutMessage: '验证请求超时',
-    );
-    if (response.statusCode == 400) return;
-    if (response.statusCode == 401) {
-      throw WorkerTtsException(
-        _messageForStatus(response),
-        kind: WorkerTtsErrorKind.authentication,
-        statusCode: 401,
-      );
-    }
-    throw WorkerTtsException(
-      _messageForStatus(response),
-      kind: WorkerTtsErrorKind.response,
-      statusCode: response.statusCode,
+    await synthesize(
+      config: config,
+      text: _verifyProbeText,
+      voice: kDefaultWorkerVoice,
+      style: 'general',
+      rate: '0',
     );
   }
 

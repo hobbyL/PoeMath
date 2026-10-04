@@ -222,20 +222,46 @@ void main() {
     );
   });
 
-  test('verify 空 text 探测：400 视为通过且不校验音频', () async {
+  test('verify 短文本真实合成：200 + audio 视为通过', () async {
     late http.Request captured;
     final client = WorkerTtsClient(
       httpClient: MockClient((request) async {
         captured = request;
-        return _jsonError('必须提供文本参数', 400);
+        return _audioResponse();
       }),
     );
 
     await client.verify(_config);
 
+    // 验证即一次完整合成：Key 进认证头、短文本 + 完整参数进 body。
     final body = jsonDecode(captured.body) as Map<String, dynamic>;
-    expect(body['text'], '');
+    expect(body['text'], '你好');
+    expect(body['voice'], kDefaultWorkerVoice);
+    expect(body['rate'], '0');
+    expect(body['pitch'], '0');
+    expect(body['style'], 'general');
+    expect(body['format'], kWorkerAudioFormat);
     expect(captured.headers['authorization'], 'Bearer $_apiKey');
+    expect(captured.body, isNot(contains(_apiKey)));
+  });
+
+  test('verify 网络异常映射为 network（沿用 synthesize 分类）', () async {
+    final client = WorkerTtsClient(
+      httpClient: MockClient(
+        (_) async => throw const SocketException('offline'),
+      ),
+    );
+
+    await expectLater(
+      client.verify(_config),
+      throwsA(
+        isA<WorkerTtsException>().having(
+          (error) => error.kind,
+          'kind',
+          WorkerTtsErrorKind.network,
+        ),
+      ),
+    );
   });
 
   test('verify 401 映射为 authentication', () async {
