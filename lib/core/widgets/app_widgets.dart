@@ -10,5 +10,6 @@ export 'package:poemath/core/widgets/animated_favorite_button.dart';
 export 'package:poemath/core/widgets/animated_page_body.dart';
 export 'package:poemath/core/widgets/app_tile.dart';
 export 'package:poemath/core/widgets/auto_fit_line.dart';
+export 'package:poemath/core/widgets/auto_fit_text.dart';
 export 'package:poemath/core/widgets/colored_card.dart';
 export 'package:poemath/core/widgets/startup_failure_view.dart';

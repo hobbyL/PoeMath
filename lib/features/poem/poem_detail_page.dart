@@ -376,7 +376,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         theme.textTheme.bodyLarge?.copyWith(
           height: 2,
           letterSpacing: 1.5,
-        );
+        ) ??
+        TypographyTokens.poemContentStyle();
 
     return Column(
       children: List.generate(lines.length, (i) {
@@ -393,18 +394,17 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
           ),
-          child: AutoFitLine(
-            child: Text(
-              lines[i],
-              maxLines: 1,
-              style: isActive
-                  ? baseStyle?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    )
-                  : baseStyle,
-              textAlign: TextAlign.center,
-            ),
+          // 诗句行单行自适应：只缩不放，缩到正文字号下限仍放不下则换行。
+          child: AutoFitText(
+            text: lines[i],
+            style: isActive
+                ? baseStyle.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  )
+                : baseStyle,
+            minFontSize:
+                theme.textTheme.bodyMedium?.fontSize ?? TypographyTokens.fsBody,
           ),
         );
       }),
