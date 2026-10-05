@@ -328,7 +328,7 @@ class _UpdatePageState extends State<UpdatePage> {
       if (!mounted || token != _requestToken) return;
       setState(() {
         _phase = _UpdatePhase.error;
-        _message = _friendlyError(error, fallback: '检查更新失败，请稍后重试。');
+        _message = friendlyUpdateError(error, fallback: '检查更新失败，请稍后重试。');
       });
     }
   }
@@ -375,7 +375,7 @@ class _UpdatePageState extends State<UpdatePage> {
 
       final apkInfo = await widget.updateInstaller.inspectApk(file.path);
       if (!mounted || token != _requestToken) return;
-      final compatibilityError = _apkCompatibilityError(
+      final compatibilityError = apkCompatibilityError(
         latest: latest,
         current: current,
         apk: apkInfo,
@@ -397,7 +397,7 @@ class _UpdatePageState extends State<UpdatePage> {
       } else {
         setState(() {
           _phase = _UpdatePhase.error;
-          _message = _friendlyError(error, fallback: '下载更新失败，请稍后重试。');
+          _message = friendlyUpdateError(error, fallback: '下载更新失败，请稍后重试。');
         });
       }
     } finally {
@@ -436,7 +436,7 @@ class _UpdatePageState extends State<UpdatePage> {
       if (!mounted || token != _requestToken) return;
       setState(() {
         _phase = _UpdatePhase.error;
-        _message = _friendlyError(error, fallback: '打开安装器失败，请稍后重试。');
+        _message = friendlyUpdateError(error, fallback: '打开安装器失败，请稍后重试。');
       });
     }
   }
@@ -452,7 +452,7 @@ class _UpdatePageState extends State<UpdatePage> {
       if (!mounted) return;
       setState(() {
         _phase = _UpdatePhase.error;
-        _message = _friendlyError(error, fallback: '无法打开安装权限设置。');
+        _message = friendlyUpdateError(error, fallback: '无法打开安装权限设置。');
       });
     }
   }
@@ -462,39 +462,6 @@ class _UpdatePageState extends State<UpdatePage> {
   }
 
   // ---------- 辅助方法 ----------
-
-  String? _apkCompatibilityError({
-    required AppUpdateInfo latest,
-    required AppVersionInfo current,
-    required AppVersionInfo? apk,
-  }) {
-    if (apk == null) return '无法读取安装包信息，已阻止安装。';
-    if (apk.packageName != current.packageName) {
-      return '安装包名 ${apk.packageName} 与当前应用 ${current.packageName} 不一致。';
-    }
-    if (apk.packageName != latest.packageName) {
-      return '安装包名 ${apk.packageName} 与更新信息 ${latest.packageName} 不一致。';
-    }
-    if (apk.versionCode != latest.versionCode) {
-      return '安装包版本号 ${apk.versionCode} 与更新信息 ${latest.versionCode} 不一致。';
-    }
-    if (apk.versionCode <= current.versionCode) {
-      return '安装包版本不高于当前版本，已阻止安装。';
-    }
-    return null;
-  }
-
-  String _friendlyError(Object error, {required String fallback}) {
-    if (error is UpdateConfigurationException) return '当前安装包未配置更新检查地址。';
-    if (error is UpdateException) {
-      if (error.statusCode == 404) return '更新信息不存在，请确认发布配置。';
-      if (error.statusCode == 429) return '请求过于频繁，请稍后重试。';
-      if ((error.statusCode ?? 0) >= 500) return '更新服务暂时不可用，请稍后重试。';
-      if (error.message.isNotEmpty) return error.message;
-    }
-    if (error is UpdateInstallException) return error.message;
-    return fallback;
-  }
 
   String get _phaseTitle => switch (_phase) {
         _UpdatePhase.checking => '正在检查',
