@@ -437,4 +437,31 @@ void main() {
       expect(error, isNull);
     });
   });
+
+  group('讲解长度检查（W3）', () {
+    test('讲解超过 300 字被拒', () {
+      // 309 个「讲」字：无数字无符号，只触发长度检查
+      final long = '讲' * 309;
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '小明有12支铅笔，妈妈又买了4支，现在有多少支？',
+          explanation: long,
+        ),
+        skeleton: additionSkeleton,
+      );
+      expect(error, contains('300'));
+    });
+
+    test('讲解恰好 300 字通过', () {
+      final ok = '讲' * 300;
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '小明有12支铅笔，妈妈又买了4支，现在有多少支？',
+          explanation: ok,
+        ),
+        skeleton: additionSkeleton,
+      );
+      expect(error, isNull);
+    });
+  });
 }

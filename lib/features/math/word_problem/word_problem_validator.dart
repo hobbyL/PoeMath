@@ -122,6 +122,9 @@ class WordProblemValidator {
 
     // ---- explanation 数字检查 ----
     if (explanation.trim().isNotEmpty) {
+      // 讲解长度上限：题面限 120 字而讲解原不限——LLM 超长讲解会
+      // 撑爆预览/练习页讲解区并长期占存储。
+      if (explanation.trim().length > 300) return '讲解超过 300 字';
       if (_decimalPattern.hasMatch(explanation)) {
         return '讲解包含非整数数字';
       }

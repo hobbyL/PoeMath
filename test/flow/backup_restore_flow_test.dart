@@ -24,6 +24,40 @@ import '../helpers/hive_test_helper.dart';
 
 class _MockPoemFavoriteBox extends Mock implements Box<PoemFavorite> {}
 
+/// 构造一条合法的 LLM 应用题 JSON（18 字段齐全，12 - 4 = 8）。
+/// 语义校验用例通过可选参数覆盖 operands/operators/answer 制造脏数据。
+Map<String, dynamic> _llmProblemJson({
+  List<Object?>? operands,
+  List<Object?>? operators,
+  Object? answer,
+}) =>
+    <String, dynamic>{
+      'id': 'p1',
+      'profileId': 'default',
+      'questionText': '小明买了 12 个苹果，吃了 4 个，还剩几个？',
+      'unit': '个',
+      'operands': operands ?? const [12, 4],
+      'operators': operators ?? const ['-'],
+      'answer': answer ?? 8,
+      'explanation': '12 - 4 = 8，还剩 8 个。',
+      'batchId': 'batch_1',
+      'createdAt': DateTime(2026, 10, 1).toIso8601String(),
+      'grade': 2,
+      'semester': '上',
+      'topic': 'subtraction',
+      'difficulty': 2,
+      'done': true,
+      'attempts': 3,
+      'correctCount': 2,
+      'lastDoneAt': DateTime(2026, 10, 2).toIso8601String(),
+    };
+
+/// 只含单条 llmProblems 记录的备份 JSON（其余集合缺省 = legacy 空集）。
+String _llmBackupJson(Map<String, dynamic> problem) => jsonEncode({
+      'version': 1,
+      'llmProblems': [problem],
+    });
+
 void main() {
   late BackupService backupService;
 
@@ -634,5 +668,105 @@ void main() {
 
     expect(HiveBoxes.llmProblems.get('default_existing'), isNotNull);
     expect(HiveBoxes.llmProblems.get('default_broken'), isNull);
+  });
+
+  group('llmProblems 语义校验（W1）', () {
+    // 种一条旧数据：校验失败必须发生在任何 Box clear 之前，旧数据原样保留。
+    Future<void> seedExisting() async {
+      final existing = LlmProblem(
+        id: 'existing',
+        profileId: 'default',
+        questionText: '题面',
+        unit: '个',
+        operands: const [5, 3],
+        operators: const ['+'],
+        answer: 8,
+        explanation: '',
+        batchId: 'batch_1',
+        createdAt: DateTime(2026, 10, 1),
+        grade: 1,
+        semester: '上',
+        topic: 'addition',
+        difficulty: 1,
+      );
+      await HiveBoxes.llmProblems.put('default_existing', existing);
+    }
+
+    test('运算符不在白名单被拒且不清空 Box（W1a）', () async {
+      await seedExisting();
+
+      await expectLater(
+        backupService.restoreFromJson(
+          _llmBackupJson(_llmProblemJson(operators: const ['xyz'])),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+
+      expect(HiveBoxes.llmProblems.get('default_existing'), isNotNull);
+    });
+
+    test('operands 为空数组或与运算符数量不匹配被拒（W1b）', () async {
+      await seedExisting();
+
+      await expectLater(
+        backupService.restoreFromJson(
+          _llmBackupJson(
+            _llmProblemJson(operands: const [], operators: const ['-']),
+          ),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+
+      // [3] + ['+','×']：2 个运算符需要 3 个操作数
+      await expectLater(
+        backupService.restoreFromJson(
+          _llmBackupJson(
+            _llmProblemJson(
+              operands: const [3],
+              operators: const ['+', '×'],
+            ),
+          ),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+
+      expect(HiveBoxes.llmProblems.get('default_existing'), isNotNull);
+    });
+
+    test('answer 为负数被拒（W1c）', () async {
+      await seedExisting();
+
+      await expectLater(
+        backupService.restoreFromJson(_llmBackupJson(_llmProblemJson(answer: -5))),
+        throwsA(isA<FormatException>()),
+      );
+
+      expect(HiveBoxes.llmProblems.get('default_existing'), isNotNull);
+    });
+
+    test('answer 与算式求值不一致被拒，一致则正常恢复（W1d）', () async {
+      await seedExisting();
+
+      // 12 - 4 求值为 8 ≠ 9
+      await expectLater(
+        backupService.restoreFromJson(_llmBackupJson(_llmProblemJson(answer: 9))),
+        throwsA(isA<FormatException>()),
+      );
+      expect(HiveBoxes.llmProblems.get('default_existing'), isNotNull);
+
+      // answer 8 与求值一致：正常恢复，18 字段 round-trip
+      final count = await backupService.restoreFromJson(
+        _llmBackupJson(_llmProblemJson()),
+      );
+      expect(count, equals(1));
+      final restored = HiveBoxes.llmProblems.get('default_p1');
+      expect(restored, isNotNull);
+      expect(restored!.operands, equals(const [12, 4]));
+      expect(restored.operators, equals(const ['-']));
+      expect(restored.answer, equals(8));
+      expect(restored.done, isTrue);
+      expect(restored.attempts, equals(3));
+      expect(restored.lastDoneAt, equals(DateTime(2026, 10, 2)));
+    });
   });
 }

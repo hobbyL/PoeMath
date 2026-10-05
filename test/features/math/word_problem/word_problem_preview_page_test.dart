@@ -11,10 +11,21 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/llm_problem.dart';
+import 'package:poemath/data/repositories/llm_problem_repository.dart';
 import 'package:poemath/features/math/word_problem/word_problem_preview_page.dart';
+import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../../helpers/hive_test_helper.dart';
+
+/// addAll 恒抛异常的假仓储（模拟磁盘满/Box 损坏），W2 防护测试注入。
+class _FailingLlmProblemRepository extends LlmProblemRepository {
+  @override
+  Future<void> addAll(List<LlmProblem> problems) async {
+    throw Exception('disk full');
+  }
+}
 
 ProblemSkeleton _skeleton({
   List<int> operands = const [12, 4],
@@ -39,7 +50,7 @@ WordProblemPreviewData _previewData(List<WordProblemPreviewItem> items) {
   );
 }
 
-Widget _wrap(Widget child) {
+Widget _wrap(Widget child, {List<Override> overrides = const []}) {
   final router = GoRouter(
     initialLocation: '/',
     routes: [
@@ -53,7 +64,10 @@ Widget _wrap(Widget child) {
       ),
     ],
   );
-  return ProviderScope(child: MaterialApp.router(routerConfig: router));
+  return ProviderScope(
+    overrides: overrides,
+    child: MaterialApp.router(routerConfig: router),
+  );
 }
 
 void main() {
@@ -235,5 +249,58 @@ void main() {
     expect(RegExp(r'^\d{16}$').hasMatch(firstBatch), isTrue);
     expect(RegExp(r'^\d{16}$').hasMatch(secondBatch), isTrue);
     expect(secondBatch, isNot(firstBatch));
+  });
+
+  testWidgets('addAll 失败时提示入库失败、按钮恢复可点击（W2）', (tester) async {
+    final item = WordProblemPreviewItem(
+      skeleton: _skeleton(),
+      draft: const LlmWordProblemDraft(
+        index: 1,
+        text: '小明有 12 个苹果，吃了 4 个，还剩几个？',
+        unit: '个',
+        explanation: '',
+      ),
+      rejectReason: null,
+    );
+
+    // 注入 addAll 恒抛异常的假仓储：交互链在微任务内完成，
+    // 无真实 Hive 写入，不需要 runAsync。
+    await tester.pumpWidget(
+      _wrap(
+        WordProblemPreviewPage(data: _previewData([item])),
+        overrides: [
+          llmProblemRepositoryProvider.overrideWithValue(
+            _FailingLlmProblemRepository(),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('确认入库 1 题'));
+    await tester.pump();
+
+    // 失败提示出现，异常被 _confirm 捕获（不成为 unhandled exception）
+    expect(find.text('入库失败，请重试'), findsOneWidget);
+    // 未导航离开预览页，Hive 零写入
+    expect(find.text('家长预览'), findsOneWidget);
+    expect(HiveBoxes.llmProblems, isEmpty);
+    // _saving 已恢复：确认按钮重新可点击
+    final button = tester.widget<FilledButton>(find.byType(FilledButton));
+    expect(button.onPressed, isNotNull);
+
+    // SnackBar 退场：4 秒定时器从前向动画完成那一帧才起算，一帧大步
+    // 跳变会让定时器晚启动——先推进 1 秒让入场动画完成、再推进 5 秒
+    // 覆盖定时器与退出动画，最后 settle 清掉移除帧，按钮不再被遮挡。
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.text('入库失败，请重试'), findsNothing);
+
+    // 第二次点击：可重试，异常再次被吞
+    await tester.tap(find.text('确认入库 1 题'));
+    await tester.pump();
+    expect(find.text('入库失败，请重试'), findsOneWidget);
+    expect(HiveBoxes.llmProblems, isEmpty);
   });
 }

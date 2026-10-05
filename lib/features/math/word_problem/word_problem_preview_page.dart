@@ -121,7 +121,20 @@ class _WordProblemPreviewPageState
       );
     }
 
-    await ref.read(llmProblemRepositoryProvider).addAll(problems);
+    try {
+      await ref.read(llmProblemRepositoryProvider).addAll(problems);
+    } on Object catch (_) {
+      // addAll 是 Hive 循环 put、不吞异常（磁盘满/Box 损坏会抛出）：
+      // 不加防护时 _saving 永久为 true，确认按钮永久禁用。
+      // Hive 无事务：部分写入不回滚，重试会以新 id 重新入库（接受该取舍）。
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('入库失败，请重试')),
+        );
+        setState(() => _saving = false);
+      }
+      return;
+    }
     ref.read(llmLibraryVersionProvider.notifier).state++;
 
     if (!mounted) return;

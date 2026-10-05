@@ -28,6 +28,8 @@ import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/math_engine/validators/expression_evaluator.dart';
 
 /// 备份数据版本号，用于兼容性检查。
 const int _backupVersion = 1;
@@ -1082,7 +1084,7 @@ class BackupService {
     ]) {
       _requiredString(item, key, path);
     }
-    _requiredInt(item, 'answer', path);
+    final answer = _requiredInt(item, 'answer', path);
     _requiredInt(item, 'grade', path);
     _requiredInt(item, 'difficulty', path);
     _optionalNonNegativeInt(item, 'attempts', path);
@@ -1091,17 +1093,55 @@ class BackupService {
     _validateOptionalDate(item, 'createdAt', path);
     _validateOptionalDate(item, 'lastDoneAt', path);
 
-    // 运算符白名单（与 LlmProblem 注释约定一致）
+    // 运算符类型检查：非空字符串数组
     final operators = item['operators'];
     if (operators is! List<Object?> ||
         operators.any((op) => op is! String || op.isEmpty)) {
       _invalidField('$path.operators', '必须是非空字符串数组');
     }
-    // 操作数非负整数
+    // 操作数类型检查：非负整数
     final operands = item['operands'];
     if (operands is! List<Object?> ||
         operands.any((v) => v is! int || v < 0)) {
       _invalidField('$path.operands', '必须是非负整数数组');
+    }
+
+    // ---- 语义校验：与生成侧 WordProblemValidator 同一信任标准 ----
+    // 校验失败抛 FormatException，发生在任何 Box clear 之前。
+    // 运算符白名单：symbol → Operator 映射，白名单即 Operator.symbol
+    //（+、-、×、÷），映射不到即拒。
+    final bySymbol = <String, Operator>{
+      for (final op in Operator.values) op.symbol: op,
+    };
+    final mappedOperators = <Operator>[];
+    for (final symbol in operators.cast<String>()) {
+      final mapped = bySymbol[symbol];
+      if (mapped == null) {
+        _invalidField('$path.operators', '包含未知运算符: $symbol');
+      }
+      mappedOperators.add(mapped);
+    }
+    // 结构约束：operands 非空且数量 = 运算符数 + 1
+    //（消除 expressionText 直接取 operands.first/[i+1] 的越界数据面风险）。
+    final operandValues = operands.cast<int>();
+    if (operandValues.isEmpty ||
+        operandValues.length != mappedOperators.length + 1) {
+      _invalidField('$path.operands', '与运算符数量不匹配');
+    }
+    // answer 非负：骨架全为非负整数，负 answer 是脏数据
+    //（如 [4,12] + '-' 求值恰为 -8，仅靠求值一致性拦不住显式负数）。
+    if (answer < 0) {
+      _invalidField('$path.answer', '不能为负数');
+    }
+    // 求值一致性：ExpressionEvaluator 复算必须等于 answer（整数结果）。
+    final evaluated = ExpressionEvaluator.evaluate(
+      operandValues.map(NumberValue.fromInt).toList(),
+      mappedOperators,
+    );
+    if (evaluated == null ||
+        !evaluated.isInteger ||
+        evaluated.asInteger != answer) {
+      _invalidField('$path.answer', '与算式求值不一致');
     }
   }
 
