@@ -271,6 +271,126 @@ void main() {
       expect(error, contains('运算符号'));
     });
 
+    test('题面含 ASCII 减号算式「12 - 4」被拒（V1a）', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '树上原来有20个苹果，摘走了8个，算式是 12 - 4，还剩几个？',
+          unit: '个',
+        ),
+        skeleton: subtractionSkeleton,
+      );
+      expect(error, contains('运算符号'));
+    });
+
+    test('题面含 ASCII 星号「3 * 5」被拒（V1a）', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '每朵花有6片花瓣，即 3 * 5，这样的7朵花一共有多少片花瓣？',
+          unit: '朵',
+        ),
+        skeleton: multiplicationSkeleton,
+      );
+      expect(error, contains('运算符号'));
+    });
+
+    test('题面含 ASCII 斜杠「12 / 4」被拒（V1a）', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '36瓶水平均分给4个小组，即 12 / 4，每组分到多少瓶水？',
+          unit: '瓶',
+        ),
+        skeleton: divisionSkeleton,
+      );
+      expect(error, contains('运算符号'));
+    });
+
+    test('题面含全角等号「12 ＝ 4」被拒（V1a）', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(text: '小明有12支铅笔，妈妈又买了4支，即 12 ＝ 4，现在有多少支？'),
+        skeleton: additionSkeleton,
+      );
+      expect(error, contains('运算符号'));
+    });
+
+    test('原有全角符号用例不回归（＋ － ＊ ／ × ÷）', () {
+      for (final symbol in ['＋', '－', '＊', '／', '×', '÷']) {
+        final error = WordProblemValidator.validate(
+          draft: _draft(text: '小明有12支铅笔，妈妈又买了4支，即 12$symbol 4，现在有多少支？'),
+          skeleton: additionSkeleton,
+        );
+        expect(error, contains('运算符号'), reason: '符号 $symbol 应被拒绝');
+      }
+    });
+
+    test('题面含全角数字（还剩８个）被拒（V1b）', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '树上原来有20个苹果，摘走了8个，还剩８个，对吗？',
+          unit: '个',
+        ),
+        skeleton: subtractionSkeleton,
+      );
+      expect(error, contains('非阿拉伯数字'));
+    });
+
+    test('讲解含全角数字被拒（V1b）', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '树上原来有20个苹果，摘走了8个，还剩几个苹果？',
+          unit: '个',
+          explanation: '20减8等于１２个。',
+        ),
+        skeleton: subtractionSkeleton,
+      );
+      expect(error, contains('非阿拉伯数字'));
+    });
+
+    test('answer=8 非操作数、题面含「八个」被拒（V1c）', () {
+      // 12 - 4 = 8：答案 8 不是操作数，汉字表述即为答案泄露。
+      const skeleton = ProblemSkeleton(
+        operands: [12, 4],
+        operators: [Operator.subtract],
+        answer: 8,
+        unitHint: '个',
+        difficulty: 1,
+      );
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '树上原来有12个苹果，摘走了4个，是不是还剩八个？',
+          unit: '个',
+        ),
+        skeleton: skeleton,
+      );
+      expect(error, contains('汉字表述'));
+    });
+
+    test('answer=8 是操作数（64÷8=8）、题面含「八」不误杀（V1c 豁免）', () {
+      const skeleton = ProblemSkeleton(
+        operands: [64, 8],
+        operators: [Operator.divide],
+        answer: 8,
+        unitHint: '个',
+        difficulty: 1,
+      );
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '64个松果平均分给8只松鼠，八只松鼠每只分到几个松果？',
+          unit: '个',
+        ),
+        skeleton: skeleton,
+      );
+      expect(error, isNull);
+    });
+
+    test('answer>10 的汉字组合表述不做检测（家长预览兜底）', () {
+      // 12 + 4 = 16：题面写「十六」不触发本地检测（设计取舍）。
+      final error = WordProblemValidator.validate(
+        draft: _draft(text: '小明有12支铅笔，妈妈又买了4支，是不是一共有十六支？'),
+        skeleton: additionSkeleton,
+      );
+      expect(error, isNull);
+    });
+
     test('单位与骨架不一致被拒', () {
       final error = WordProblemValidator.validate(
         draft: _draft(

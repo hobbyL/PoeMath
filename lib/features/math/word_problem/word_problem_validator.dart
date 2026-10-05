@@ -1,7 +1,8 @@
 // lib/features/math/word_problem/word_problem_validator.dart
 //
 // 应用题草稿四重校验器（design §3.3）：LLM 输出不可信，入库前必须通过：
-// 1) 数字一致性（多重集合与 operands 完全相等，题面不得出现答案）
+// 1) 数字一致性（多重集合与 operands 完全相等，题面不得出现答案，
+//    含全角数字拒绝与小答案汉字表述泄露检测）
 // 2) 语义一致（运算用词与运算类型不冲突）
 // 3) 数学正确（ExpressionEvaluator 复算 == 答案）
 // 4) 形态约束（长度、无运算符号、单位一致）
@@ -26,8 +27,24 @@ const List<String> kSubtractionConflictWords = [
 const List<String> kAdditionConflictWords = ['一共', '总共'];
 
 /// 题面中禁止出现的符号（LLM 不得把算式写进题面）。
+///
+/// 覆盖 ASCII 与全角两套：ASCII `+ - * / = ( )`、数学减号 U+2212 `−`、
+/// 乘除号 `×÷`、全角 `＝＋－＊／（）`。ASCII `-`、`*`、`/` 与全角 `＝`
+/// 曾缺失，导致题面「算式是 12 - 4」可绕过铁律 3。
 final RegExp kForbiddenSymbolPattern =
-    RegExp(r'[+−×÷=()＋－＊／（）]');
+    RegExp(r'[+\-*/−×÷=()＝＋－＊／（）]');
+
+/// 全角数字（U+FF10–FF19）。铁律 7 要求数字用（半角）阿拉伯数字；
+/// 全角数字还会绕过 `\d` 提取使答案泄露检测失明，出现即拒绝。
+final RegExp _fullWidthDigitPattern = RegExp(r'[０-９]');
+
+/// 汉字数字表（索引即数值）：answer ≤ 10 且非操作数时，
+/// 题面含对应汉字（如「还剩八个」）视为答案泄露。
+/// answer > 10 的汉字组合（如「十六」）表述复杂且泄露概率低，
+/// 由家长预览兜底，不做检测。
+const List<String> kChineseDigitWords = [
+  '零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+];
 
 /// 非整数数字（应用题骨架全为整数，出现小数即违规）。
 final RegExp _decimalPattern = RegExp(r'\d+\.\d+');
@@ -61,6 +78,10 @@ class WordProblemValidator {
     if (_decimalPattern.hasMatch(text)) {
       return '题面包含非整数数字';
     }
+    // 全角数字（如「还剩８个」）绕过 \d 提取使泄露检测失明，直接拒绝。
+    if (_fullWidthDigitPattern.hasMatch(text)) {
+      return '题面包含非阿拉伯数字字符';
+    }
     final textNumbers = _extractNumbers(text);
     final expectedNumbers = List<int>.from(skeleton.operands);
     // 答案泄露：答案不等于任何操作数时，题面不得出现答案。
@@ -69,6 +90,14 @@ class WordProblemValidator {
         skeleton.operands.contains(skeleton.answer);
     if (!answerIsOperand && textNumbers.contains(skeleton.answer)) {
       return '题面中出现了答案 ${skeleton.answer}';
+    }
+    // 汉字数字泄露：小答案（≤ 10）用汉字写出（如「还剩八个」）同样算泄露；
+    // 答案是操作数时豁免（题面可能合法地用汉字提及其他操作数语义）。
+    if (!answerIsOperand &&
+        skeleton.answer >= 0 &&
+        skeleton.answer <= kChineseDigitWords.length - 1 &&
+        text.contains(kChineseDigitWords[skeleton.answer])) {
+      return '题面中出现了答案的汉字表述';
     }
     if (!_multisetEquals(textNumbers, expectedNumbers)) {
       return '题面数字与骨架不一致：应为 ${expectedNumbers.join('、')}，'
@@ -95,6 +124,9 @@ class WordProblemValidator {
     if (explanation.trim().isNotEmpty) {
       if (_decimalPattern.hasMatch(explanation)) {
         return '讲解包含非整数数字';
+      }
+      if (_fullWidthDigitPattern.hasMatch(explanation)) {
+        return '讲解包含非阿拉伯数字字符';
       }
       final explanationNumbers = _extractNumbers(explanation);
       final allowed = List<int>.from(skeleton.operands)

@@ -53,6 +53,22 @@ final class LlmClient {
   /// 字符集校验拦截此类输入。
   static final RegExp _validHostPattern = RegExp(r'^[a-zA-Z0-9.-]+$');
 
+  /// 回环 IPv4 段（127.0.0.0/8）。必须四段点分数字：
+  /// 简单的 `startsWith('127.')` 会放行 `127.evil.com` 这类公网子域名。
+  /// 段值合法性（0-255）由 socket 层兜底。
+  static final RegExp _loopbackIpv4Pattern =
+      RegExp(r'^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
+
+  /// 本地回环 host：http 明文 Bearer 仅放行这些地址（Ollama 等本地服务）。
+  ///
+  /// IPv6 字面量在 `uri.host` 中不带方括号（`[::1]` → `::1`），
+  /// 两种形式都接受以防万一。
+  static bool _isLoopbackHost(String host) =>
+      host == 'localhost' ||
+      _loopbackIpv4Pattern.hasMatch(host) ||
+      host == '::1' ||
+      host == '[::1]';
+
   /// 规范化服务地址：补 `https://` 前缀、去尾斜杠、末尾无 `/v1` 则补、
   /// 校验 scheme 与 host。非法输入抛 [FormatException]。
   static Uri normalizeBaseUrl(String raw) {
@@ -69,10 +85,15 @@ final class LlmClient {
     final uri = Uri.tryParse(trimmed);
     if (uri == null ||
         uri.host.isEmpty ||
-        !_validHostPattern.hasMatch(uri.host)) {
+        !(_validHostPattern.hasMatch(uri.host) || _isLoopbackHost(uri.host))) {
       throw const FormatException('服务地址格式无效');
     }
-    if (uri.scheme != 'http' && uri.scheme != 'https') {
+    if (uri.scheme == 'http') {
+      // 公网 host 走 http 会导致 API Key 明文传输，强制 https。
+      if (!_isLoopbackHost(uri.host)) {
+        throw const FormatException('公网地址必须使用 https，请检查服务地址');
+      }
+    } else if (uri.scheme != 'https') {
       throw const FormatException('服务地址仅支持 http/https');
     }
     // 末尾无 /v1 则补（OpenAI 兼容服务约定路径前缀）。
@@ -178,10 +199,13 @@ final class LlmClient {
         }
       } else if (decoded is List<Object?>) {
         // 少数实现直接返回数组（如某些代理）。
+        // 仅保留 Map 的 id 与 String 元素；数字/布尔等垃圾条目丢弃。
         final models = decoded
             .map((item) => item is Map<Object?, Object?>
                 ? item['id']?.toString()
-                : item?.toString(),)
+                : item is String
+                    ? item
+                    : null,)
             .whereType<String>()
             .where((id) => id.isNotEmpty)
             .toList()
@@ -272,6 +296,9 @@ final class LlmClient {
         {'role': 'user', 'content': userPrompt.toString()},
       ],
       'temperature': 0.8,
+      // 按题数线性放大输出上限，防止大批次（20 题）被服务端默认
+      // 输出上限截断 → JSON 不完整 → 整批重试再截断。
+      'max_tokens': skeletons.length * 220 + 400,
     });
   }
 
@@ -383,10 +410,19 @@ final class LlmClient {
       final text = item['text']?.toString();
       final unit = item['unit']?.toString();
       final explanation = item['explanation']?.toString();
-      if (index is! int) continue;
+      // index 兼容 int 与数字字符串（LLM 常见瑕疵 "index":"1"）；
+      // 越界（含 < 1）的条目由下方与 skeleton 对齐时自然丢弃。
+      final int parsedIndex;
+      if (index is int) {
+        parsedIndex = index;
+      } else if (index is String && int.tryParse(index) != null) {
+        parsedIndex = int.parse(index);
+      } else {
+        continue;
+      }
       if (text == null || text.trim().isEmpty) continue;
-      draftsByIndex[index] = LlmWordProblemDraft(
-        index: index,
+      draftsByIndex[parsedIndex] = LlmWordProblemDraft(
+        index: parsedIndex,
         text: text.trim(),
         unit: unit?.trim() ?? '',
         explanation: explanation?.trim() ?? '',

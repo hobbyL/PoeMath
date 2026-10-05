@@ -2,6 +2,8 @@
 //
 // 预览页 widget 测试：勾选/取消与入库数量一致、丢弃题不入库且显示原因。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -168,5 +170,70 @@ void main() {
       HiveBoxes.llmProblems.values.single.questionText,
       contains('苹果'),
     );
+  });
+
+  testWidgets('batchId 使用微秒时间戳，连续两批入库不同', (tester) async {
+    // 同一测试内两次入库：第一次确认后页面替换为题库页，
+    // 经 router 重新进入预览页再入一批，比对两批 batchId。
+    final item = WordProblemPreviewItem(
+      skeleton: _skeleton(),
+      draft: const LlmWordProblemDraft(
+        index: 1,
+        text: '小明有 12 个苹果，吃了 4 个，还剩几个？',
+        unit: '个',
+        explanation: '',
+      ),
+      rejectReason: null,
+    );
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => WordProblemPreviewPage(
+            data: _previewData([item]),
+          ),
+        ),
+        GoRoute(
+          path: '/word-problem/library',
+          builder: (_, __) => const Scaffold(body: SizedBox()),
+        ),
+      ],
+    );
+
+    Future<void> confirmOnce() async {
+      await tester.runAsync(() async {
+        await tester.tap(find.text('确认入库 1 题'));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    await tester.pumpWidget(
+      ProviderScope(child: MaterialApp.router(routerConfig: router)),
+    );
+    await tester.pumpAndSettle();
+
+    // 第一批入库
+    await confirmOnce();
+    final firstBatch = HiveBoxes.llmProblems.values.single.batchId;
+
+    // 重新进入预览页，第二批入库
+    //（router.push 返回的 Future 在路由 pop 时才 resolve，不可 await）。
+    unawaited(router.push('/'));
+    await tester.pumpAndSettle();
+    // 第一批的「已入库」SnackBar（默认 4 秒）覆盖底部按钮且其定时器
+    // 不产生帧、pumpAndSettle 不会等它：推进时间让 SnackBar 退场。
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await confirmOnce();
+    expect(HiveBoxes.llmProblems.length, equals(2));
+    final secondBatch = HiveBoxes.llmProblems.values.last.batchId;
+
+    // 微秒时间戳（2026 年为 16 位数字；毫秒仅 13 位），两批必然不同。
+    expect(RegExp(r'^\d{16}$').hasMatch(firstBatch), isTrue);
+    expect(RegExp(r'^\d{16}$').hasMatch(secondBatch), isTrue);
+    expect(secondBatch, isNot(firstBatch));
   });
 }

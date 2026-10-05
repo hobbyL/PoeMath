@@ -9,6 +9,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/llm_problem_repository.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
+
+/// 骨架生成函数签名（与 [WordProblemSkeletonGenerator.generate] 一致，
+/// 省略可选 random）。
+typedef WordProblemSkeletonGeneratorFn = List<ProblemSkeleton> Function({
+  required int grade,
+  required String semester,
+  required String topic,
+  required int count,
+});
+
+/// 应用题骨架生成器（生成页经此调用；测试可注入失败场景）。
+final wordProblemSkeletonProvider =
+    Provider<WordProblemSkeletonGeneratorFn>((ref) {
+  return WordProblemSkeletonGenerator.generate;
+});
 
 /// 应用题题库 repository。
 final llmProblemRepositoryProvider = Provider<LlmProblemRepository>((ref) {

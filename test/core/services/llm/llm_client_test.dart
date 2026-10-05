@@ -39,6 +39,15 @@ List<ProblemSkeleton> _skeletons() => [
       ),
     ];
 
+/// 第三个测试用骨架：36 ÷ 4 = 9（除法）。
+ProblemSkeleton _divisionSkeleton() => const ProblemSkeleton(
+      operands: [36, 4],
+      operators: [Operator.divide],
+      answer: 9,
+      unitHint: '瓶',
+      difficulty: 1,
+    );
+
 http.Response _chatResponse(String content) => http.Response.bytes(
       utf8.encode(jsonEncode({
         'choices': [
@@ -89,6 +98,40 @@ void main() {
       expect(
         () => LlmClient.normalizeBaseUrl('ftp://x.com'),
         throwsFormatException,
+      );
+    });
+
+    test('http 本地回环地址放行（Ollama 等本地服务）', () {
+      expect(
+        LlmClient.normalizeBaseUrl('http://localhost:11434').toString(),
+        'http://localhost:11434/v1',
+      );
+      expect(
+        LlmClient.normalizeBaseUrl('http://127.0.0.1:8080/v1').toString(),
+        'http://127.0.0.1:8080/v1',
+      );
+      expect(
+        LlmClient.normalizeBaseUrl('http://[::1]:11434').toString(),
+        'http://[::1]:11434/v1',
+      );
+    });
+
+    test('http 公网地址抛 FormatException（防 API Key 明文传输）', () {
+      expect(
+        () => LlmClient.normalizeBaseUrl('http://api.example.com'),
+        throwsFormatException,
+      );
+      // 以 "127." 开头的公网子域名不是回环地址，同样拒绝。
+      expect(
+        () => LlmClient.normalizeBaseUrl('http://127.evil.com/v1'),
+        throwsFormatException,
+      );
+    });
+
+    test('https 任意 host 不受影响', () {
+      expect(
+        LlmClient.normalizeBaseUrl('https://api.example.com').toString(),
+        'https://api.example.com/v1',
       );
     });
   });
@@ -177,6 +220,77 @@ void main() {
 
       expect(result.drafts, hasLength(1));
       expect(result.drafts[0].index, 1);
+    });
+
+    test('生成请求含 max_tokens 且随题数线性增长', () async {
+      final captured = <http.Request>[];
+      final client = LlmClient(
+        httpClient: MockClient((request) async {
+          captured.add(request);
+          return _chatResponse(_normalArray);
+        }),
+      );
+
+      List<ProblemSkeleton> skeletonsOf(int count) => List.generate(
+            count,
+            (i) => ProblemSkeleton(
+              operands: [i + 1, 2],
+              operators: const [Operator.multiply],
+              answer: (i + 1) * 2,
+              unitHint: '个',
+              difficulty: 1,
+            ),
+          );
+
+      // 10 题 = 10 * 220 + 400 = 2600；20 题 = 20 * 220 + 400 = 4800。
+      await client.generateWordProblems(
+        config: _config,
+        skeletons: skeletonsOf(10),
+        grade: 3,
+        semester: '上',
+        topic: 'addition',
+      );
+      await client.generateWordProblems(
+        config: _config,
+        skeletons: skeletonsOf(20),
+        grade: 3,
+        semester: '上',
+        topic: 'addition',
+      );
+
+      expect(captured, hasLength(2));
+      final firstBody =
+          jsonDecode(captured[0].body) as Map<String, dynamic>;
+      final secondBody =
+          jsonDecode(captured[1].body) as Map<String, dynamic>;
+      expect(firstBody['max_tokens'], 2600);
+      expect(secondBody['max_tokens'], 4800);
+    });
+
+    test('index 为数字字符串也能对齐（"index":"3"）', () async {
+      const content =
+          '[{"index":"1","text":"小明有12支铅笔，妈妈又买了4支，一共有多少支铅笔？",'
+          '"unit":"支","explanation":"12加4等于16。"},'
+          '{"index":"3","text":"36瓶水平均分给4个小组，每组分到多少瓶水？",'
+          '"unit":"瓶","explanation":"36除以4等于9。"}]';
+      final client = LlmClient(
+        httpClient: MockClient((_) async => _chatResponse(content)),
+      );
+
+      final skeletons = [..._skeletons(), _divisionSkeleton()];
+      final result = await client.generateWordProblems(
+        config: _config,
+        skeletons: skeletons,
+        grade: 3,
+        semester: '上',
+        topic: 'addition',
+      );
+
+      // 仅第 1、3 个骨架有草稿，字符串 index 正确对齐。
+      expect(result.drafts, hasLength(2));
+      expect(result.drafts[0].index, 1);
+      expect(result.drafts[1].index, 3);
+      expect(result.drafts[1].text, contains('36瓶水'));
     });
 
     test('JSON 解析失败整批重试，第 2 次成功', () async {
@@ -354,6 +468,26 @@ void main() {
         client.listModels(_config),
         throwsA(isA<LlmModelsUnavailable>()),
       );
+    });
+
+    test('顶层为数组时仅保留 Map.id 与 String 元素（垃圾条目丢弃）', () async {
+      final client = LlmClient(
+        httpClient: MockClient((_) async {
+          return http.Response.bytes(
+            utf8.encode(jsonEncode([
+                  {'id': 'a'},
+                  42,
+                  true,
+                  null,
+                  'b',
+                ],),),
+            200,
+          );
+        }),
+      );
+
+      final models = await client.listModels(_config);
+      expect(models, ['a', 'b']);
     });
   });
 

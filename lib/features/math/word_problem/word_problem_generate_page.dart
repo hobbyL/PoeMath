@@ -56,7 +56,8 @@ class _WordProblemGeneratePageState
 
     final client = LlmClient();
     try {
-      final skeletons = WordProblemSkeletonGenerator.generate(
+      // 经 provider 调用（测试可注入失败场景，如骨架重试耗尽的 StateError）。
+      final skeletons = ref.read(wordProblemSkeletonProvider)(
         grade: _grade,
         semester: _semester,
         topic: _topic.name,
@@ -115,6 +116,11 @@ class _WordProblemGeneratePageState
     } on ArgumentError catch (e) {
       // 学期未学习所选知识点等参数错误，直接展示中文原因。
       if (mounted) setState(() => _errorMessage = '${e.message}');
+    } on StateError {
+      // 骨架生成重试耗尽等结构生成失败，转中文提示（避免英文堆栈吓到家长）。
+      if (mounted) {
+        setState(() => _errorMessage = '题目结构生成失败，请重试或更换年级/知识点');
+      }
     } on FormatException catch (e) {
       if (mounted) {
         setState(() => _errorMessage = '服务地址无效：${e.message}');

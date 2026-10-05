@@ -89,7 +89,9 @@ class _WordProblemPreviewPageState
     setState(() => _saving = true);
 
     final now = DateTime.now();
-    final batchId = now.millisecondsSinceEpoch.toString();
+    // 用微秒时间戳：同毫秒连续确认两批会合并批次，按批删除/筛选混淆。
+    // 与下方 id（已用微秒）保持一致；存量毫秒 batchId 天然是不同 key，无需迁移。
+    final batchId = now.microsecondsSinceEpoch.toString();
     final profileId = ProfileScope.currentId;
 
     final problems = <LlmProblem>[];
