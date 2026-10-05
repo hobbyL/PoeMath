@@ -85,12 +85,17 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     super.dispose();
   }
 
-  /// 可关闭态：available / error / ready（back 键与按钮均可关闭）；
-  /// downloading / verifying / installing 必须通过「取消下载」显式取消或等待完成。
+  /// 可关闭态：available / error / ready / permissionRequired（back 键或
+  /// 「取消/关闭/暂不安装」按钮）；downloading / verifying / installing 必须
+  /// 通过「取消下载」显式取消或等待完成。
+  ///
+  /// permissionRequired 必须可关闭：否则未授权用户会被锁死在权限引导
+  /// （继续安装→仍无权限→回到引导 的循环），唯一出路只剩杀应用。
   bool get _canDismiss =>
       _phase == _UpdateDialogPhase.available ||
       _phase == _UpdateDialogPhase.error ||
-      _phase == _UpdateDialogPhase.ready;
+      _phase == _UpdateDialogPhase.ready ||
+      _phase == _UpdateDialogPhase.permissionRequired;
 
   @override
   Widget build(BuildContext context) {
@@ -257,6 +262,8 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         ];
       case _UpdateDialogPhase.permissionRequired:
         return [
+          // 放弃出口：未授权用户可随时暂不安装（曾下载 → pop(true)）。
+          TextButton(onPressed: _close, child: const Text('暂不安装')),
           TextButton(
             onPressed: () => unawaited(_installUpdate()),
             child: const Text('继续安装'),

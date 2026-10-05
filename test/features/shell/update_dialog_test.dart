@@ -284,4 +284,30 @@ void main() {
     expect(find.text('继续安装'), findsOneWidget);
     expect(calls, isNot(contains('installApk')));
   });
+
+  // 回归：权限引导态必须可退出，否则未授权用户被锁死在
+  // 「继续安装→仍无权限→回到引导」循环，唯一出路只剩杀应用。
+  testWidgets('权限引导态可暂不安装并关闭弹窗（曾下载 → 返回 true）', (tester) async {
+    _installChannelHandler(canInstall: false);
+    final client = _FakeUpdateClient(digest: 'a' * 64);
+
+    final dialogFuture = await _openDialog(
+      tester,
+      client: client,
+      installer: _installer(),
+    );
+
+    await tester.tap(find.text('下载更新'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('立即安装'));
+    await tester.pumpAndSettle();
+    expect(find.text('需要安装权限'), findsOneWidget);
+
+    await tester.tap(find.text('暂不安装'));
+    await tester.pumpAndSettle();
+
+    // 弹窗已关闭；曾进入下载 → true（下次前台恢复可再提醒）。
+    expect(find.text('需要安装权限'), findsNothing);
+    expect(await dialogFuture, isTrue);
+  });
 }

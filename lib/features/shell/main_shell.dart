@@ -19,13 +19,18 @@ import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/core/services/update/update_models.dart';
 import 'package:poemath/features/shell/update_dialog.dart';
 
+/// controller 构造工厂：MainShell 传入自己的 onAvailable 包装后构造，
+/// 保证注入路径与生产路径同构（抑制分支等 MainShell 链路可被测试覆盖）。
+typedef UpdateCheckControllerFactory =
+    UpdateCheckController Function(UpdateAvailableCallback onAvailable);
+
 class MainShell extends ConsumerStatefulWidget {
-  const MainShell({super.key, required this.child, this.updateCheckController});
+  const MainShell({super.key, required this.child, this.updateControllerFactory});
 
   final Widget child;
 
-  /// 自动更新检测控制器（测试注入 seam；生产不传，走真实依赖）。
-  final UpdateCheckController? updateCheckController;
+  /// 自动更新检测控制器工厂（测试注入 seam；生产不传，走真实依赖）。
+  final UpdateCheckControllerFactory? updateControllerFactory;
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -47,7 +52,7 @@ class _MainShellState extends ConsumerState<MainShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    final controller = widget.updateCheckController ?? _buildRealController();
+    final controller = _buildController();
     _updateController = controller;
     // 首帧后触发冷启动静默检测，不阻塞首屏渲染。
     WidgetsBinding.instance.addPostFrameCallback(
@@ -68,16 +73,26 @@ class _MainShellState extends ConsumerState<MainShell>
     }
   }
 
-  UpdateCheckController _buildRealController() {
+  /// 统一构造：工厂（测试注入）或真实依赖，onAvailable 一律挂 MainShell
+  /// 的弹窗-抑制包装，保证两条路径同构。
+  UpdateCheckController _buildController() {
+    final factory =
+        widget.updateControllerFactory ?? _realControllerFactory;
     late final UpdateCheckController controller;
-    controller = UpdateCheckController(
-      updateCheckConfigured: AppConfig.hasUpdateCheckUrl,
-      client: UpdateClient(updateUrl: AppConfig.updateCheckUrl),
-      installer: AndroidUpdateInstaller(),
-      onAvailable: (update, current) =>
+    controller = factory(
+      (update, current) =>
           unawaited(_onUpdateAvailable(controller, update, current)),
     );
     return controller;
+  }
+
+  UpdateCheckController _realControllerFactory(UpdateAvailableCallback onAvailable) {
+    return UpdateCheckController(
+      updateCheckConfigured: AppConfig.hasUpdateCheckUrl,
+      client: UpdateClient(updateUrl: AppConfig.updateCheckUrl),
+      installer: AndroidUpdateInstaller(),
+      onAvailable: onAvailable,
+    );
   }
 
   Future<void> _onUpdateAvailable(
