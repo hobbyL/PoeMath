@@ -11,6 +11,7 @@ import 'package:poemath/app.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
 
+import '../helpers/day_key_override.dart';
 import '../helpers/hive_test_helper.dart';
 
 /// 等待 splash 结束并消耗所有 flutter_animate 入场动画计时器。
@@ -35,7 +36,9 @@ void main() {
   });
 
   testWidgets('点击底部 tab 应切换页面，主题保持不变', (tester) async {
-    final container = ProviderContainer();
+    // dayKey override 为静态值：跳过 DayKeyNotifier 的 30s 轮询 Timer，
+    // 避免外部 container 在 pending timer 检查后 dispose 报错。
+    final container = ProviderContainer(overrides: [staticDayKeyOverride()]);
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -68,7 +71,9 @@ void main() {
   });
 
   testWidgets('手动设置 activeSubject 应改变主题', (tester) async {
-    final container = ProviderContainer();
+    // dayKey override 为静态值：跳过 DayKeyNotifier 的 30s 轮询 Timer，
+    // 避免外部 container 在 pending timer 检查后 dispose 报错。
+    final container = ProviderContainer(overrides: [staticDayKeyOverride()]);
     addTearDown(container.dispose);
 
     await tester.pumpWidget(

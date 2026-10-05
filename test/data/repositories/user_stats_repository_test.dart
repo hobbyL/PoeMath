@@ -1,10 +1,48 @@
 // test/data/repositories/user_stats_repository_test.dart
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
+
+/// 模拟旧版本（mathBestStreak 字段加入前）的 UserStats 序列化：
+/// 只写 10 个字段，不写字段 10。用于构造真实落盘的旧格式帧。
+class _LegacyUserStatsAdapter extends TypeAdapter<UserStats> {
+  @override
+  final typeId = 13;
+
+  @override
+  void write(BinaryWriter writer, UserStats obj) {
+    writer
+      ..writeByte(10) // 旧版本字段数（索引 0..9）
+      ..writeByte(0)
+      ..write(obj.profileId)
+      ..writeByte(1)
+      ..write(obj.totalStars)
+      ..writeByte(2)
+      ..write(obj.currentStreak)
+      ..writeByte(3)
+      ..write(obj.longestStreak)
+      ..writeByte(4)
+      ..write(obj.poemsLearned)
+      ..writeByte(5)
+      ..write(obj.poemsMastered)
+      ..writeByte(6)
+      ..write(obj.mathTotalProblems)
+      ..writeByte(7)
+      ..write(obj.mathTotalCorrect)
+      ..writeByte(8)
+      ..write(obj.level)
+      ..writeByte(9)
+      ..write(obj.createdAt);
+  }
+
+  @override
+  UserStats read(BinaryReader reader) => throw UnimplementedError();
+}
 
 void main() {
   late UserStatsRepository repo;
@@ -212,6 +250,66 @@ void main() {
 
       expect(repo.get().mathTotalProblems, 10);
       expect(repo.get().totalStars, 2);
+    });
+  });
+
+  group('UserStats 旧记录兼容（R8）', () {
+    const compatBoxName = 'user_stats_compat_test';
+
+    /// 用旧版 adapter 真实落盘一条缺 fields[10] 的记录。
+    Future<void> writeLegacyRecord(UserStats stats) async {
+      Hive.registerAdapter(_LegacyUserStatsAdapter(), override: true);
+      final box = await Hive.openBox<UserStats>(compatBoxName);
+      await box.put('legacy', stats);
+      await box.close();
+      // 立即恢复新 adapter，避免影响后续测试
+      Hive.registerAdapter(UserStatsAdapter(), override: true);
+    }
+
+    test('缺 fields[10] 的旧版记录读取不抛异常且 mathBestStreak 回落为 0',
+        () async {
+      await writeLegacyRecord(
+        UserStats(
+          profileId: 'default',
+          totalStars: 5,
+          currentStreak: 3,
+          longestStreak: 9,
+          poemsLearned: 10,
+          poemsMastered: 4,
+          mathTotalProblems: 100,
+          mathTotalCorrect: 90,
+          level: 2,
+          createdAt: DateTime(2024, 1, 1),
+        ),
+      );
+
+      // 用当前（新）adapter 重开 box 读取旧格式记录
+      final box = await Hive.openBox<UserStats>(compatBoxName);
+      addTearDown(box.close);
+      final stats = box.get('legacy');
+
+      expect(stats, isNotNull);
+      expect(stats!.profileId, 'default');
+      expect(stats.mathBestStreak, 0, reason: '缺字段必须回落 defaultValue 0');
+      expect(stats.mathTotalProblems, 100);
+      expect(stats.mathTotalCorrect, 90);
+      expect(stats.level, 2);
+      expect(stats.totalStars, 5);
+      expect(stats.createdAt, DateTime(2024, 1, 1));
+    });
+
+    test('新记录含 fields[10] 时正常读取', () async {
+      await Hive.deleteBoxFromDisk(compatBoxName);
+      final repoBox = await Hive.openBox<UserStats>(compatBoxName);
+      await repoBox.put(
+        'modern',
+        UserStats(profileId: 'default', mathBestStreak: 7),
+      );
+      await repoBox.close();
+
+      final box = await Hive.openBox<UserStats>(compatBoxName);
+      addTearDown(box.close);
+      expect(box.get('modern')!.mathBestStreak, 7);
     });
   });
 }

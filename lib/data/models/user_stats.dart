@@ -50,7 +50,10 @@ class UserStats extends HiveObject {
   final DateTime createdAt;
 
   /// 口算单次练习最佳连续答对数
-  @HiveField(10)
+  ///
+  /// defaultValue 必须保留：旧版本记录缺少 fields[10] 时，
+  /// 反序列化回落为 0 而不是抛 type cast 异常。
+  @HiveField(10, defaultValue: 0)
   int mathBestStreak;
 
   UserStats({

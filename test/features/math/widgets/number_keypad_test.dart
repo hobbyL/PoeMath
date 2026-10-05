@@ -306,5 +306,173 @@ void main() {
 
       expect(submitPressed, isTrue);
     });
+
+    testWidgets('showNegative=true 时应该显示负号键', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NumberKeypad(
+              onNumberTap: (_) {},
+              onBackspace: () {},
+              onSubmit: () {},
+              showNegative: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('-'), findsOneWidget);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    });
+
+    testWidgets('showSlash=true 时应该显示分数线键', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NumberKeypad(
+              onNumberTap: (_) {},
+              onBackspace: () {},
+              onSubmit: () {},
+              showSlash: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('/'), findsOneWidget);
+      expect(find.text('.'), findsNothing);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    });
+
+    testWidgets('负分数模式（showSlash + showNegative）两键同现且保留提交键', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NumberKeypad(
+              onNumberTap: (_) {},
+              onBackspace: () {},
+              onSubmit: () {},
+              showSlash: true,
+              showNegative: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('/'), findsOneWidget);
+      expect(find.text('-'), findsOneWidget);
+      expect(find.text('.'), findsNothing);
+      expect(find.text('…'), findsNothing);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    });
+
+    testWidgets('默认（整数题）不显示负号与分数线，保持 4 键布局', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NumberKeypad(
+              onNumberTap: (_) {},
+              onBackspace: () {},
+              onSubmit: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('-'), findsNothing);
+      expect(find.text('/'), findsNothing);
+      expect(find.text('.'), findsNothing);
+      expect(find.text('…'), findsNothing);
+    });
+
+    testWidgets('点击负号/分数线键应该触发 onNumberTap', (tester) async {
+      final tapped = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NumberKeypad(
+              onNumberTap: tapped.add,
+              onBackspace: () {},
+              onSubmit: () {},
+              showSlash: true,
+              showNegative: true,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('-'));
+      await tester.pump();
+      await tester.tap(find.text('/'));
+      await tester.pump();
+
+      expect(tapped, ['-', '/']);
+    });
+
+    testWidgets('负分数模式的按钮高度也应该 ≥56pt', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NumberKeypad(
+              onNumberTap: (_) {},
+              onBackspace: () {},
+              onSubmit: () {},
+              showSlash: true,
+              showNegative: true,
+            ),
+          ),
+        ),
+      );
+
+      final containers = tester.widgetList<Container>(
+        find.descendant(
+          of: find.byType(InkWell),
+          matching: find.byType(Container),
+        ),
+      );
+
+      for (final container in containers) {
+        final height = container.constraints?.minHeight ?? 0;
+        expect(
+          height,
+          greaterThanOrEqualTo(56),
+          reason: '键盘按钮高度应 ≥56pt',
+        );
+      }
+    });
+  });
+
+  group('NumberKeypad.canAppend 特殊键合法性校验', () {
+    test('负号仅允许出现在空串开头', () {
+      expect(NumberKeypad.canAppend('', '-'), isTrue);
+      expect(NumberKeypad.canAppend('1', '-'), isFalse);
+      expect(NumberKeypad.canAppend('15', '-'), isFalse);
+    });
+
+    test('分数线至多出现一次', () {
+      expect(NumberKeypad.canAppend('5', '/'), isTrue);
+      expect(NumberKeypad.canAppend('5/', '/'), isFalse);
+      expect(NumberKeypad.canAppend('5/6', '/'), isFalse);
+    });
+
+    test('小数点至多一次且不出现在分数线之后', () {
+      expect(NumberKeypad.canAppend('0', '.'), isTrue);
+      expect(NumberKeypad.canAppend('0.', '.'), isFalse);
+      expect(NumberKeypad.canAppend('5/', '.'), isFalse);
+      expect(NumberKeypad.canAppend('5/6', '.'), isFalse);
+    });
+
+    test('省略号至多出现一次', () {
+      expect(NumberKeypad.canAppend('3', '…'), isTrue);
+      expect(NumberKeypad.canAppend('3…', '…'), isFalse);
+      expect(NumberKeypad.canAppend('3…2', '…'), isFalse);
+    });
+
+    test('数字键始终可追加', () {
+      expect(NumberKeypad.canAppend('', '5'), isTrue);
+      expect(NumberKeypad.canAppend('12', '3'), isTrue);
+      expect(NumberKeypad.canAppend('3…', '2'), isTrue);
+      expect(NumberKeypad.canAppend('-', '1'), isTrue);
+    });
   });
 }

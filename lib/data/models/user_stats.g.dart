@@ -26,7 +26,7 @@ class UserStatsAdapter extends TypeAdapter<UserStats> {
       mathTotalProblems: fields[6] as int,
       mathTotalCorrect: fields[7] as int,
       level: fields[8] as int,
-      mathBestStreak: fields[10] as int,
+      mathBestStreak: fields[10] == null ? 0 : fields[10] as int,
       createdAt: fields[9] as DateTime?,
     );
   }

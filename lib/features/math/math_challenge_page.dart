@@ -711,7 +711,13 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
               child: TextField(
                 controller: _controller,
                 focusNode: _focusNode,
-                keyboardType: TextInputType.number,
+                // 挑战页年级覆盖 1-6 全 resultForm，含小数/分数/负数题；
+                // TextInputType.number 在 Android 上无小数点与负号，
+                // 必须显式开启 decimal + signed。
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineMedium,
                 autofocus: true,

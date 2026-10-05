@@ -74,30 +74,49 @@ abstract class BaseGenerator {
 
   /// 生成 compare 模式题目。
   ///
+  /// 比较基准取表达式值：findMissing 源题的 [MathProblem.result] 是缺失项
+  /// 答案（x）而非表达式值，必须用 [MathProblem.expressionResult]；
+  /// findResult 源题无 expressionResult，result 即表达式值。
+  ///
+  /// 非整数基准（分数/小数）只取非负 offset，避免五年级分数题产出
+  /// 「5/6 ○ 负数」这类超纲负数比较；整数基准保持 [-3, 3] 全范围
+  /// （六下负数比较是已学考点）。
+  ///
+  /// 目标值用 [NumberValue] 分数精确加法构造（5/6 + 3 = 23/6），
+  /// 杜绝 asInteger 截断（5/6 截断为 0 会产出 5/6 = 0 的错题）。
+  ///
   /// 注意：不透传 [MathProblem.displayText]（取舍同 toFindMissing），
   /// 转换后按通用形态渲染（如 80 × 0.3 ○ 24），数学仍正确。
   MathProblem toCompare(MathProblem problem) {
-    final result = problem.result;
-    final offset = randomInt(-3, 3);
-    final targetValue = NumberValue.fromInt(result.asInteger + offset);
-    final CompareRelation relation;
-    if (offset > 0) {
-      relation = CompareRelation.lessThan;
-    } else if (offset < 0) {
-      relation = CompareRelation.greaterThan;
-    } else {
-      relation = CompareRelation.equal;
-    }
+    final base = problem.expressionResult ?? problem.result;
+
+    final isWhole = base.isInteger;
+    final offset = isWhole ? randomInt(-3, 3) : randomInt(0, 3);
+
+    // 精确构造：offset=0 时 target 即 base（任意 resultForm 精确相等）；
+    // 否则用分数加法（如 5/6 + 3 = 23/6）。
+    final target = offset == 0
+        ? base
+        : base + NumberValue.fromInt(offset);
+
+    final CompareRelation relation = offset > 0
+        ? CompareRelation.lessThan
+        : offset < 0
+            ? CompareRelation.greaterThan
+            : CompareRelation.equal;
+
     return MathProblem(
       operands: problem.operands,
       operators: problem.operators,
-      result: result,
+      // compare 模式下 result 语义 = 左边表达式的值（约束检查 #2 与
+      // StepSolver 均按此求解），findMissing 源题转换后必须换基准。
+      result: base,
       mode: ProblemMode.compare,
       grade: problem.grade,
       difficulty: problem.difficulty,
       resultForm: problem.resultForm,
       compareRelation: relation,
-      compareTarget: targetValue,
+      compareTarget: target,
     );
   }
 

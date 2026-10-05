@@ -26,7 +26,9 @@ class ConstraintChecker {
     if (problem.resultForm != ResultForm.withRemainder) {
       for (var i = 0; i < problem.operators.length; i++) {
         if (problem.operators[i] == Operator.divide) {
-          final divisor = problem.operands[i + 1].asInteger;
+          // 用精确 double 判零：分数除数（如 3/4）经 asInteger 会截断为 0，
+          // 被误报「除数为零」，导致六上分数除法题全部被拒。
+          final divisor = problem.operands[i + 1].asDouble;
           if (divisor == 0) return '除数为零';
         }
       }

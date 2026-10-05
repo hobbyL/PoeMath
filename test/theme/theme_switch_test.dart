@@ -14,6 +14,7 @@ import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
 
+import '../helpers/day_key_override.dart';
 import '../helpers/hive_test_helper.dart';
 
 void main() {
@@ -79,7 +80,11 @@ void main() {
     });
 
     testWidgets('切换 activeSubject 时派生的 lightTheme 应随之变化', (tester) async {
-      final container = ProviderContainer();
+      // dayKey override 为静态值：跳过 DayKeyNotifier 的 30s 轮询 Timer，
+      // 避免外部 container 在 pending timer 检查后 dispose 报错。
+      final container = ProviderContainer(
+        overrides: [staticDayKeyOverride()],
+      );
       addTearDown(container.dispose);
 
       await tester.pumpWidget(

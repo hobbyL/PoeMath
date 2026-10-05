@@ -84,6 +84,9 @@ class MathEngine {
     switch (mode) {
       case ProblemMode.compare:
         if (!config.allowedModes.contains(ProblemMode.compare)) return null;
+        // 余数题答案为「商…余」混合格式，比较/挖空模式无法表达，
+        // 不兼容返回 null 重试（与 vertical 仅支持 findResult 的先例同构）。
+        if (problem.resultForm == ResultForm.withRemainder) return null;
         return generator.toCompare(problem);
       case ProblemMode.vertical:
         if (!config.allowedModes.contains(ProblemMode.vertical)) return null;
@@ -92,6 +95,9 @@ class MathEngine {
         return generator.toVertical(problem);
       case ProblemMode.findMissing:
         if (!config.allowedModes.contains(ProblemMode.findMissing)) return null;
+        // 同 compare：余数题转 findMissing 后答案变成「缺失项…余数」
+        // 混合格式（如 38…2），孩子无法作答。
+        if (problem.resultForm == ResultForm.withRemainder) return null;
         return generator.toFindMissing(problem);
       default:
         return problem;

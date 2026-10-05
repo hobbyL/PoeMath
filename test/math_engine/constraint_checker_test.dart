@@ -84,6 +84,47 @@ void main() {
       final violation = ConstraintChecker.check(pOver, GradePresets.grade1a);
       expect(violation, isNotNull);
     });
+
+    test('分数除数不再被误报除数为零', () {
+      // 3/4 ÷ 3/10 = 5/2：分数除数 3/10 经 asInteger 截断为 0 会误报
+      final p = MathProblem(
+        operands: [
+          NumberValue.fromFraction(3, 4),
+          NumberValue.fromFraction(3, 10),
+        ],
+        operators: [Operator.divide],
+        result: NumberValue.fromFraction(5, 2),
+        mode: ProblemMode.findResult,
+        grade: 6,
+        resultForm: ResultForm.fraction,
+      );
+      expect(ConstraintChecker.check(p, GradePresets.grade6a), isNull);
+    });
+
+    test('真 0 除数（整数）仍被拒绝', () {
+      final p = MathProblem(
+        operands: [NumberValue.fromInt(8), NumberValue.fromInt(0)],
+        operators: [Operator.divide],
+        result: NumberValue.fromInt(4),
+        mode: ProblemMode.findResult,
+        grade: 3,
+      );
+      final violation = ConstraintChecker.check(p, GradePresets.grade3a);
+      expect(violation, '除数为零');
+    });
+
+    test('真 0 除数（0/5 分数）仍被拒绝', () {
+      final p = MathProblem(
+        operands: [NumberValue.fromFraction(1, 2), NumberValue.fromFraction(0, 5)],
+        operators: [Operator.divide],
+        result: NumberValue.fromInt(1),
+        mode: ProblemMode.findResult,
+        grade: 6,
+        resultForm: ResultForm.fraction,
+      );
+      final violation = ConstraintChecker.check(p, GradePresets.grade6a);
+      expect(violation, '除数为零');
+    });
   });
 
   group('ConstraintChecker 校验 6（模式白名单）', () {

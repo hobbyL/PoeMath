@@ -807,7 +807,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         NumberKeypad(
           onNumberTap: (digit) {
             setState(() {
-              _answerController.text += digit;
+              // 特殊键合法性校验（'-' 仅空串开头、'/' 与 '.' 与 '…' 至多一次）
+              if (NumberKeypad.canAppend(_answerController.text, digit)) {
+                _answerController.text += digit;
+              }
             });
           },
           onBackspace: () {
@@ -824,6 +827,11 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           submitEnabled: _answerController.text.isNotEmpty,
           showDecimal: problem?.resultForm == ResultForm.decimal,
           showEllipsis: isRemainder,
+          // 分数题（五/六年级 FractionGen，答案如 5/6）需要分数线
+          showSlash: problem?.resultForm == ResultForm.fraction,
+          // 当前题结果为负（六下 NegativeNumberGen）时才显示负号，
+          // 正整数题显示 '-' 反而诱导误输
+          showNegative: problem?.result.isNegative ?? false,
         ),
       ],
     );

@@ -283,4 +283,97 @@ void main() {
       }
     });
   });
+
+  group('余数题模式转换防护（R4）', () {
+    test('请求 findMissing 不产出「余数 + 挖空」混合模式', () {
+      for (var seed = 0; seed < 50; seed++) {
+        final p = MathEngine.generate(
+          grade: 2,
+          semester: '下',
+          mode: ProblemMode.findMissing,
+          random: Random(seed * 13 + 5),
+        );
+        expect(
+          p.resultForm == ResultForm.withRemainder &&
+              p.mode != ProblemMode.findResult,
+          isFalse,
+          reason:
+              '余数题被转成 ${p.mode.name}：${p.problemText} = ${p.answerText}',
+        );
+        // 转换成功或回退的题都必须可判定正确
+        expect(
+          MathEngine.judge(p, p.answerText).isCorrect,
+          isTrue,
+          reason: '${p.problemText} = ${p.answerText}',
+        );
+      }
+    });
+
+    test('请求 compare 不产出「余数 + 比较」混合模式', () {
+      for (var seed = 0; seed < 50; seed++) {
+        final p = MathEngine.generate(
+          grade: 2,
+          semester: '下',
+          mode: ProblemMode.compare,
+          random: Random(seed * 17 + 3),
+        );
+        expect(
+          p.resultForm == ResultForm.withRemainder &&
+              p.mode != ProblemMode.findResult,
+          isFalse,
+          reason:
+              '余数题被转成 ${p.mode.name}：${p.problemText} = ${p.answerText}',
+        );
+      }
+    });
+
+    test('余数题 findResult 模式（商…余 输入路径）行为不变', () {
+      var remainderCount = 0;
+      for (var seed = 0; seed < 100; seed++) {
+        final p = MathEngine.generate(
+          grade: 2,
+          semester: '下',
+          random: Random(300 + seed),
+        );
+        if (p.resultForm == ResultForm.withRemainder) {
+          remainderCount++;
+          expect(p.mode, ProblemMode.findResult);
+          expect(p.answerText, matches(RegExp(r'^\d+…\d+$')));
+          expect(MathEngine.judge(p, p.answerText).isCorrect, isTrue);
+        }
+      }
+      expect(remainderCount, greaterThan(0), reason: '二年级下应能出余数题');
+    });
+  });
+
+  group('六上分数除法恢复出题（R3）', () {
+    test('真分数作为除数的除法题可稳定生成且判定正确', () {
+      var fractionDivCount = 0;
+      for (var seed = 0; seed < 300; seed++) {
+        final p = MathEngine.generate(
+          grade: 6,
+          semester: '上',
+          random: Random(seed),
+        );
+        final isFractionDiv = p.resultForm == ResultForm.fraction &&
+            p.operators.length == 1 &&
+            p.operators.first == Operator.divide &&
+            !p.operands[1].isInteger;
+        if (isFractionDiv) {
+          fractionDivCount++;
+          // 分数除法核心考点：不再被「除数为零」误拒，且答案可判对
+          expect(
+            MathEngine.judge(p, p.answerText).isCorrect,
+            isTrue,
+            reason: '${p.problemText} = ${p.answerText}',
+          );
+        }
+      }
+      expect(
+        fractionDivCount,
+        greaterThan(0),
+        reason: '300 个种子中应出现真分数除数的分数除法题（修复前为 0）',
+      );
+    });
+  });
 }
