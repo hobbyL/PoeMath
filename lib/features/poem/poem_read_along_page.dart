@@ -20,6 +20,8 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/read_along_voice_status_button.dart';
 
@@ -88,13 +90,29 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   /// 当前录音已持续秒数。
   int _recordingElapsedSeconds = 0;
 
+  /// 本次跟读会话的活动 ID（每次进入页面生成；「再练一次」换新）。
+  late String _activityId;
+
+  /// 本次会话开始时间（结算用时）。
+  DateTime _startTime = DateTime.now();
+
+  /// R6 完成结算防重入：「查看结果」连点只结算一次；
+  /// 「再练一次」换新 activityId 后重置。
+  bool _settlementStarted = false;
+
   @override
   void initState() {
     super.initState();
+    _activityId = _newActivityId();
     _speech = widget.speechRecognitionService ??
         ref.read(speechRecognitionServiceProvider);
     _tts = ref.read(ttsServiceProvider);
     unawaited(_initSpeech());
+  }
+
+  String _newActivityId() {
+    return 'read_along:${widget.poemId}:'
+        '${DateTime.now().microsecondsSinceEpoch}';
   }
 
   Future<void> _initSpeech() async {
@@ -577,8 +595,65 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         _phase = _ReadAlongPhase.idle;
       });
     } else {
+      // 最后一行「查看结果」：_scores 已齐，进结果展示前触发一次完成结算。
+      unawaited(_settleCompletion());
       setState(() => _phase = _ReadAlongPhase.complete);
     }
+  }
+
+  /// R6 跟读完成结算：activity（readAlong）+ 星星 + 今日打卡汇总。
+  ///
+  /// 与背诵页同款「先捕获后结算」模式：首个 await 前同步捕获 repo，
+  /// 结算途中退出页面数据仍完整落库；UI 失效移入 mounted 守卫后。
+  /// 幂等：同一 activityId 重复触发（连点「查看结果」）只结算一次。
+  Future<void> _settleCompletion() async {
+    if (_settlementStarted) return;
+    _settlementStarted = true;
+
+    // 达标句阈值与音效反馈一致（>= 0.6）。
+    final total = _lines.length;
+    final qualified = _scores.where((s) => s >= 0.6).length;
+    final completedAt = DateTime.now();
+    final duration = completedAt.difference(_startTime).inSeconds;
+    // readAlong 星级由 LearningRewardCalculator 策略统一裁决
+    // （当前策略明确为 0 星，见 quality-guidelines 奖励策略）。
+    final stars = LearningRewardCalculator.calculateStars(
+      activityType: LearningActivityType.readAlong,
+      totalItems: total,
+      successfulItems: qualified,
+    );
+    final activityId = _activityId;
+    final poemId = widget.poemId;
+
+    final activityRepo = ref.read(learningActivityRepositoryProvider);
+    final statsRepo = ref.read(userStatsRepoProvider);
+    final checkInRepo = ref.read(checkInRepoProvider);
+
+    await activityRepo.record(
+      id: activityId,
+      activityType: LearningActivityType.readAlong,
+      totalItems: total,
+      successfulItems: qualified,
+      poemId: poemId,
+      starsEarned: stars,
+      durationSeconds: duration,
+      completedAt: completedAt,
+    );
+    if (stars > 0) {
+      await statsRepo.addStars(stars, activityId: activityId);
+    }
+    await checkInRepo.updateToday(
+      activityId: activityId,
+      addPoems: 1,
+      addStars: stars,
+      addDuration: duration,
+    );
+
+    // —— 数据结算完毕；以下 UI 部分要求页面仍挂载 ——
+    if (!mounted) return;
+    ref.invalidate(userStatsProvider);
+    ref.invalidate(todayPoemCountProvider);
+    ref.invalidate(todayCheckInProvider);
   }
 
   void _retryLine() {
@@ -1174,6 +1249,9 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                       _phase = _ReadAlongPhase.idle;
                       _recognizedTexts.clear();
                       _scores.clear();
+                      _startTime = DateTime.now();
+                      _activityId = _newActivityId();
+                      _settlementStarted = false; // 新一轮允许再次结算
                     });
                   },
                   icon: const Icon(Icons.refresh),

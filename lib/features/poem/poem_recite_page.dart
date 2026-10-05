@@ -139,6 +139,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   DateTime _startTime = DateTime.now();
   late String _activityId;
 
+  /// R1 结算防重入：`_onAllLinesComplete` 只结算一次；
+  /// `_restart`/`_changeLevel` 换新 activityId 后重置。
+  bool _settlementStarted = false;
+
   // ── 默写模式 ──
   bool _showDictDiff = false;
   bool _allowResultPop = false;
@@ -269,6 +273,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     }
 
     final blankPos = _blankPositions[_currentBlankIdx];
+    // R4 冷却期守卫：正确作答后 350ms 延迟推进期间，当前空已填对，
+    // 重复点击（含错字）直接忽略——不重复填字、不误计错误。
+    if (_filledChars.containsKey(blankPos)) return;
     final correctChar = _lines[_currentLineIndex].characters.toList()[blankPos];
 
     if (char == correctChar) {
@@ -342,40 +349,46 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   }
 
   Future<void> _onAllLinesComplete() async {
+    // R1：逐句完成与默写提交共用本入口，防重入须统一在此生效
+    // （连点提交时第二次调用直接返回，repo 层不双记、不触发
+    // LearningActivityRepository 的同 ID 异 payload StateError）。
+    if (_settlementStarted) return;
+    _settlementStarted = true;
+
     final completedAt = DateTime.now();
     final duration = completedAt.difference(_startTime).inSeconds;
     final maxQualityPoints = _maxQualityPoints;
     final qualityPoints = _totalStars.clamp(0, maxQualityPoints);
     final rewardStars = _calculateRewardStars();
     final activityId = _activityId;
+    final poemId = widget.poemId;
+    final masteryLevel = _level.masteryLevel;
 
-    // 记录学习
+    // R2「先捕获后结算」：首个 await 前同步捕获全部 repo 依赖，
+    // 之后 await 链只触 repo —— 结算途中退出页面，数据结算仍完整执行。
     final progressRepo = ref.read(poemProgressRepoProvider);
-    await progressRepo.recordRecitation(
-      widget.poemId,
-      level: _level.masteryLevel,
-    );
-    ref.invalidate(poemProgressProvider(widget.poemId));
-
     final statsRepo = ref.read(userStatsRepoProvider);
+    final activityRepo = ref.read(learningActivityRepositoryProvider);
+    final checkInRepo = ref.read(checkInRepoProvider);
+
+    await progressRepo.recordRecitation(poemId, level: masteryLevel);
     await statsRepo.updatePoemStats(learned: progressRepo.learnedCount);
-    await ref.read(learningActivityRepositoryProvider).record(
-          id: activityId,
-          activityType: LearningActivityType.poemRecitation,
-          totalItems: maxQualityPoints,
-          successfulItems: qualityPoints,
-          poemId: widget.poemId,
-          starsEarned: rewardStars,
-          durationSeconds: duration,
-          completedAt: completedAt,
-        );
+    await activityRepo.record(
+      id: activityId,
+      activityType: LearningActivityType.poemRecitation,
+      totalItems: maxQualityPoints,
+      successfulItems: qualityPoints,
+      poemId: poemId,
+      starsEarned: rewardStars,
+      durationSeconds: duration,
+      completedAt: completedAt,
+    );
 
     // 记录星星到全局统计
     if (rewardStars > 0) {
       await statsRepo.addStars(rewardStars, activityId: activityId);
     }
 
-    final checkInRepo = ref.read(checkInRepoProvider);
     await checkInRepo.updateToday(
       activityId: activityId,
       addPoems: 1,
@@ -383,16 +396,22 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       addDuration: duration,
     );
 
+    // —— 数据结算完毕；以下 UI 部分要求页面仍挂载 ——
+    if (!mounted) return;
+
+    ref.invalidate(poemProgressProvider(poemId));
     ref.invalidate(learnedCountProvider);
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayPoemCountProvider);
     ref.invalidate(todayCheckInProvider);
+    // R5：学习状态筛选下 filteredPoemsProvider 读了进度，
+    // 完成后失效，返回列表时状态及时刷新。
+    ref.invalidate(filteredPoemsProvider);
 
-    // 成就自动检查
+    // 成就自动检查（内部 await 后同样必须守卫 mounted 再触 ref）
     final newlyUnlocked = await checkAchievements(ref);
-    ref.invalidate(unlockedAchievementsCountProvider);
-
     if (!mounted) return;
+    ref.invalidate(unlockedAchievementsCountProvider);
 
     // 成就解锁庆祝（撒花 + 弹窗，在背诵完成撒花之前展示）
     if (newlyUnlocked.isNotEmpty) {
@@ -436,6 +455,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _dictController.clear();
       _startTime = DateTime.now();
       _activityId = _newActivityId();
+      _settlementStarted = false; // 新一轮换新 activityId，允许再次结算
       _setupLine(0);
     });
   }
@@ -450,6 +470,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _dictController.clear();
       _startTime = DateTime.now();
       _activityId = _newActivityId();
+      _settlementStarted = false; // 新一轮换新 activityId，允许再次结算
       _setupLine(0);
     });
   }
@@ -486,12 +507,11 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
   void _exitWithResult() {
     if (_allowResultPop) return;
-    setState(() => _allowResultPop = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Navigator.of(context).pop(PoemPracticeResult.recitationCompleted);
-      }
-    });
+    // R3：同步 pop（调用点均为按钮 onPressed / PopScope.onPopInvoked 的
+    // 非 build 期安全时机），即刻拆除路由，消除 postFrameCallback 帧间隙内
+    // canPop 已翻 true 导致第二击 pop(null) 丢失结果的竞态。
+    _allowResultPop = true;
+    Navigator.of(context).pop(PoemPracticeResult.recitationCompleted);
   }
 
   // ─────────────────────────────────────────────────────────────

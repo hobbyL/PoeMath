@@ -233,6 +233,9 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       ref.invalidate(userStatsProvider);
       ref.invalidate(todayPoemCountProvider);
       ref.invalidate(todayCheckInProvider);
+      // R5：学习状态筛选下 filteredPoemsProvider 读了进度，
+      // 完成后失效，返回列表时状态及时刷新。
+      ref.invalidate(filteredPoemsProvider);
 
       // 通过时更新掌握等级、状态和复习计划
       if (session.isPassed) {
@@ -286,13 +289,14 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final session = _session;
     if (session == null || !session.isFinished) return;
 
-    setState(() => _allowResultPop = true);
+    // R3：同步 pop，消除 postFrameCallback 帧间隙内 canPop 已翻 true
+    // 导致第二击 pop(null) 丢失结果的竞态。pop 本身触发路由移除，
+    // 无需 setState 通知 canPop。
+    _allowResultPop = true;
     final result = session.isPassed
         ? PoemPracticeResult.quizPassed
         : PoemPracticeResult.quizFailed;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) Navigator.of(context).pop(result);
-    });
+    Navigator.of(context).pop(result);
   }
 
   @override

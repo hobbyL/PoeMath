@@ -20,6 +20,7 @@ import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_quiz_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
@@ -296,6 +297,104 @@ void main() {
     expect(activity.successfulItems, 1);
     expect(activity.starsEarned, 3);
     expect(find.text('获得 3 颗星星'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  testWidgets('完成页双击完成：仅 pop 一次且结果为 quizPassed', (tester) async {
+    // R3 同步 pop 回归：旧实现经 postFrameCallback 延迟一帧 pop，
+    // 双击的第二次 canPop 已恢复，会再 pop(null) 丢结果/误弹上级路由。
+    final poem = Poem(
+      id: 'quiz_back_double',
+      title: '双击返回测试诗',
+      author: '测试作者',
+      dynasty: '唐',
+      content: '第一句长长',
+      pinyin: '',
+      layer: 'core',
+      grade: 1,
+    );
+    await tester.runAsync(() async {
+      await HiveBoxes.settings.put('sound_enabled', false);
+      await HiveBoxes.settings.put('haptic_enabled', false);
+    });
+
+    final popResults = <PoemPracticeResult?>[];
+    final recorderHome = Builder(
+      builder: (context) => TextButton(
+        onPressed: () {
+          unawaited(
+            Navigator.of(context)
+                .push<PoemPracticeResult>(
+                  MaterialPageRoute(
+                    builder: (_) => const PoemQuizPage(
+                      poemId: 'quiz_back_double',
+                      quizType: QuizType.chooseDynasty,
+                    ),
+                  ),
+                )
+                .then((result) => popResults.add(result)),
+          );
+        },
+        child: const Text('开始测验'),
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          poemByIdProvider('quiz_back_double').overrideWith((ref) => poem),
+          poemProgressRepoProvider.overrideWith(
+            (ref) => _ImmediatePoemProgressRepository(),
+          ),
+          reviewRepoProvider.overrideWith(
+            (ref) => _ExistingReviewRepository(),
+          ),
+          checkInRepoProvider.overrideWith(
+            (ref) => _ImmediateCheckInRepository(),
+          ),
+          userStatsRepoProvider.overrideWith(
+            (ref) => _ImmediateStatsRepository(),
+          ),
+          learningActivityRepositoryProvider.overrideWith(
+            (ref) => _ImmediateLearningActivityRepository(),
+          ),
+          achievementRepoProvider.overrideWith(
+            (ref) => _AlreadyUnlockedAchievementRepository(),
+          ),
+        ],
+        child: MaterialApp(home: recorderHome),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('开始测验'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    // 答对唯一一题（朝代选择题正确项为 '唐'）。
+    await tester.tap(find.text('唐'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    await tester.tap(find.text('查看结果'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+
+    final doneButton = find.text('完成');
+    expect(doneButton, findsOneWidget);
+    // 双击完成：第一次同步 pop 即刻拆路由（第二击甚至不再命中活动按钮）。
+    await tester.tap(doneButton);
+    await tester.tap(doneButton, warnIfMissed: false);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(popResults, hasLength(1));
+    expect(popResults.single, PoemPracticeResult.quizPassed);
+    expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

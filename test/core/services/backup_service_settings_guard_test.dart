@@ -51,6 +51,11 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       'math_difficulty': 'hard',
       'math_practice_mode': 'addition',
       'has_onboarded': true,
+      // 通知设置（notification_service 直读写，随备份迁移）。
+      'reminder_enabled': true,
+      'reminder_hour': 7,
+      'reminder_minute': 30,
+      'weekly_report_enabled': true,
     };
 
 void main() {
@@ -87,7 +92,8 @@ void main() {
         },
       ]),
     );
-    await HiveBoxes.settings.put('llm_base_url', 'https://llm.local.example.com');
+    await HiveBoxes.settings
+        .put('llm_base_url', 'https://llm.local.example.com');
     await HiveBoxes.settings.put(
       'tts_cloud_base_url',
       'https://tts.cloudm.cc',
@@ -108,10 +114,14 @@ void main() {
 
     // 本机原值保留，恶意注入未生效。
     expect(HiveBoxes.settings.get('webdav_configs'), before['webdav_configs']);
-    expect(jsonEncode(HiveBoxes.settings.get('webdav_configs') ?? ''),
-        isNot(contains('attacker.example.com')),);
-    expect(jsonEncode(HiveBoxes.settings.get('webdav_configs') ?? ''),
-        isNot(contains('injected-password')),);
+    expect(
+      jsonEncode(HiveBoxes.settings.get('webdav_configs') ?? ''),
+      isNot(contains('attacker.example.com')),
+    );
+    expect(
+      jsonEncode(HiveBoxes.settings.get('webdav_configs') ?? ''),
+      isNot(contains('injected-password')),
+    );
     expect(
       HiveBoxes.settings.get('llm_base_url'),
       before['llm_base_url'],
@@ -148,11 +158,14 @@ void main() {
     expect(HiveBoxes.settings.get('pinyin_visible'), isNull);
     expect(HiveBoxes.settings.get('selected_grade'), isNull);
     // tts_speed int 1 规范化为 double 1.0。
-    expect(HiveBoxes.settings.get('tts_speed'), isA<double>().having(
-      (v) => v,
-      'value',
-      1.0,
-    ),);
+    expect(
+      HiveBoxes.settings.get('tts_speed'),
+      isA<double>().having(
+        (v) => v,
+        'value',
+        1.0,
+      ),
+    );
     expect(HiveBoxes.settings.get('sound_enabled'), isFalse);
   });
 
@@ -184,7 +197,8 @@ void main() {
         },
       ]),
     );
-    await HiveBoxes.settings.put('llm_base_url', 'https://llm.local.example.com');
+    await HiveBoxes.settings
+        .put('llm_base_url', 'https://llm.local.example.com');
     await HiveBoxes.settings.put('llm_model', 'gpt-test');
     await HiveBoxes.settings.put('tts_cloud_base_url', 'https://tts.cloudm.cc');
     await HiveBoxes.settings.put('tts_cloud_enabled', true);
@@ -198,8 +212,8 @@ void main() {
     await HiveBoxes.settings.put('theme_mode', 'light');
 
     final json = await backupService.exportToJson();
-    final settings =
-        (jsonDecode(json) as Map<String, dynamic>)['settings'] as Map<String, dynamic>;
+    final settings = (jsonDecode(json) as Map<String, dynamic>)['settings']
+        as Map<String, dynamic>;
 
     expect(settings.keys, contains('theme_mode'));
     const excluded = <String>{
@@ -245,7 +259,10 @@ void main() {
     expect(HiveBoxes.settings.get('haptic_enabled'), isTrue);
     expect(HiveBoxes.settings.get('selected_grade'), 3);
     expect(HiveBoxes.settings.get('tts_speed'), 0.8);
-    expect(HiveBoxes.settings.get('tts_voice'), '{"name":"Xiaoxiao","locale":"zh-CN"}');
+    expect(
+      HiveBoxes.settings.get('tts_voice'),
+      '{"name":"Xiaoxiao","locale":"zh-CN"}',
+    );
     expect(HiveBoxes.settings.get('pinyin_visible'), isFalse);
     expect(HiveBoxes.settings.get('daily_poem_goal'), 5);
     expect(HiveBoxes.settings.get('daily_math_goal'), 30);
@@ -253,6 +270,11 @@ void main() {
     expect(HiveBoxes.settings.get('math_difficulty'), 'hard');
     expect(HiveBoxes.settings.get('math_practice_mode'), 'addition');
     expect(HiveBoxes.settings.get('has_onboarded'), isTrue);
+    // 通知设置 4 个白名单 key 还原（AC7 round-trip）。
+    expect(HiveBoxes.settings.get('reminder_enabled'), isTrue);
+    expect(HiveBoxes.settings.get('reminder_hour'), 7);
+    expect(HiveBoxes.settings.get('reminder_minute'), 30);
+    expect(HiveBoxes.settings.get('weekly_report_enabled'), isTrue);
     // 排除 key 跳过。
     expect(HiveBoxes.settings.get('llm_base_url'), isNull);
   });
@@ -278,5 +300,24 @@ void main() {
         expect(HiveBoxes.settings.get(entry.key), entry.value);
       }
     }
+  });
+
+  test('AC7 类型测试：通知 key 类型不符时跳过不落盘', () async {
+    final poisoned = _fullWhitelistSettings()
+      // hour/minute 期望 int，double 应跳过（防 JSON 数值漂移注入）。
+      ..['reminder_hour'] = 7.5
+      ..['reminder_minute'] = 30.0
+      // reminder_enabled 期望 bool，字符串应跳过。
+      ..['reminder_enabled'] = 'yes';
+
+    await backupService.restoreFromJson(
+      await backupWithSettings(poisoned),
+    );
+
+    expect(HiveBoxes.settings.get('reminder_hour'), isNull);
+    expect(HiveBoxes.settings.get('reminder_minute'), isNull);
+    expect(HiveBoxes.settings.get('reminder_enabled'), isNull);
+    // 同备份中类型正确的通知 key 正常还原。
+    expect(HiveBoxes.settings.get('weekly_report_enabled'), isTrue);
   });
 }

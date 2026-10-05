@@ -13,6 +13,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/routing/app_router.dart';
+import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_check_controller.dart';
 import 'package:poemath/core/services/update/update_client.dart';
@@ -58,10 +60,19 @@ class _MainShellState extends ConsumerState<MainShell>
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => unawaited(controller.maybeCheck()),
     );
+    _wireNotificationTap();
   }
 
   @override
   void dispose() {
+    // 撤销通知点击回调注册，避免 service 持有已 dispose State 的闭包
+    // （identical 防止清掉测试中后续 shell 注册的新回调）。
+    if (identical(
+      NotificationService.instance.onNotificationTap,
+      _onNotificationTap,
+    )) {
+      NotificationService.instance.onNotificationTap = null;
+    }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -116,6 +127,34 @@ class _MainShellState extends ConsumerState<MainShell>
     } else {
       controller.markDialogClosed();
     }
+  }
+
+  /// R8 通知点击跳转接线：注册前台点击回调 + 首帧后消费冷启动 payload。
+  ///
+  /// NotificationService 保持纯 Dart（不 import GoRouter），跳转经
+  /// 回调注入；service 若尚未初始化完成，[consumePendingLaunchPayload]
+  /// 内部会等待初始化后再返回。
+  void _wireNotificationTap() {
+    NotificationService.instance.onNotificationTap = _onNotificationTap;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(_consumeNotificationLaunchPayload()),
+    );
+  }
+
+  /// 已知通知 payload（每日提醒/周报）跳转复习页。
+  void _onNotificationTap(String payload) {
+    if (!mounted) return;
+    if (payload == NotificationService.payloadDailyReminder ||
+        payload == NotificationService.payloadWeeklyReport) {
+      ref.read(appRouterProvider).push(AppRoutes.poemReview);
+    }
+  }
+
+  Future<void> _consumeNotificationLaunchPayload() async {
+    final payload =
+        await NotificationService.instance.consumePendingLaunchPayload();
+    if (payload == null || !mounted) return;
+    _onNotificationTap(payload);
   }
 
   /// 根据当前路由推导 tab index。

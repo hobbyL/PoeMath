@@ -64,6 +64,11 @@ const Map<String, String> _settingsValueType = <String, String>{
   'math_difficulty': 'string', // 练习难度 easy/medium/hard
   'math_practice_mode': 'string', // 练习模式（综合或 ProblemMode.name）
   'has_onboarded': 'bool', // 是否完成引导
+  // 通知设置（notification_service 直读写，随备份迁移，见其 key 常量区）。
+  'reminder_enabled': 'bool', // 每日提醒开关
+  'reminder_hour': 'int', // 每日提醒小时（24h 制）
+  'reminder_minute': 'int', // 每日提醒分钟
+  'weekly_report_enabled': 'bool', // 周报开关
 };
 
 class BackupService {

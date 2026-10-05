@@ -15,6 +15,10 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 
 typedef LocalTimeZoneIdentifierResolver = Future<String> Function();
 
+/// 通知点击回调：payload 为调度时写入的通知载荷
+/// （见 [NotificationService.payloadDailyReminder] 等）。
+typedef NotificationTapCallback = void Function(String payload);
+
 Future<String> _resolveLocalTimeZoneIdentifier() async {
   final timeZone = await FlutterTimezone.getLocalTimezone();
   return timeZone.identifier;
@@ -33,6 +37,7 @@ class NotificationService {
   NotificationService.forTesting({
     required FlutterLocalNotificationsPlugin plugin,
     required LocalTimeZoneIdentifierResolver localTimeZoneIdentifierResolver,
+    this.onNotificationTap,
   })  : _plugin = plugin,
         _localTimeZoneIdentifierResolver = localTimeZoneIdentifierResolver;
 
@@ -44,7 +49,22 @@ class NotificationService {
   bool _initialized = false;
   bool _lastReconciliationSucceeded = true;
 
+  /// 冷启动（terminated 状态点击通知拉起应用）时捕获的通知载荷。
+  ///
+  /// 由 [consumePendingLaunchPayload] 消费一次后清空。
+  String? _pendingLaunchPayload;
+
+  /// 通知点击回调。service 保持纯 Dart 不依赖路由：前台点击通知时由
+  /// `onDidReceiveNotificationResponse` 透传 payload；跳转实现（如
+  /// `appRouter.push(AppRoutes.poemReview)`）由 MainShell 启动时注入，
+  /// 运行期可更换或置空。
+  NotificationTapCallback? onNotificationTap;
+
   // ============ Hive 持久化键 ============
+  // 以下 4 个通知设置 key 已登记备份白名单
+  // （backup_service.dart 的 _settingsValueType，14+4=18 个），
+  // 新增需要随备份迁移的 key 时必须同步登记，否则换机后不迁移；
+  // 指向外部服务或绑定凭据的 key 一律不得入白名单。
 
   static const String _keyReminderEnabled = 'reminder_enabled';
   static const String _keyReminderHour = 'reminder_hour';
@@ -61,6 +81,14 @@ class NotificationService {
   static const String _weeklyChannelDescription = '每周日推送本周学习数据汇总';
 
   static const String _keyWeeklyEnabled = 'weekly_report_enabled';
+
+  // ============ 通知载荷契约 ============
+
+  /// 每日提醒通知的点击 payload（跳转复习页）。
+  static const String payloadDailyReminder = 'daily_reminder';
+
+  /// 周报通知的点击 payload（跳转复习页）。
+  static const String payloadWeeklyReport = 'weekly_report';
 
   // ============ 鼓励文案池 ============
 
@@ -115,9 +143,57 @@ class NotificationService {
       macOS: darwinSettings,
     );
 
-    await _plugin.initialize(settings);
+    await _plugin.initialize(
+      settings,
+      onDidReceiveNotificationResponse: _onDidReceiveNotificationResponse,
+    );
     _lastReconciliationSucceeded = await _reconcileStoredSchedules();
     _initialized = true;
+    await _capturePendingLaunchPayload();
+  }
+
+  /// 前台/后台点击通知：透传 payload 给注入的回调。
+  void _onDidReceiveNotificationResponse(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+    onNotificationTap?.call(payload);
+  }
+
+  /// 冷启动检查：应用由 terminated 状态被通知点击拉起时，
+  /// 记录启动通知的 payload，等待 UI 就绪后由
+  /// [consumePendingLaunchPayload] 消费。失败只记日志，不影响初始化。
+  Future<void> _capturePendingLaunchPayload() async {
+    try {
+      final details = await _plugin.getNotificationAppLaunchDetails();
+      final response = details?.notificationResponse;
+      final payload = response?.payload;
+      if ((details?.didNotificationLaunchApp ?? false) &&
+          payload != null &&
+          payload.isNotEmpty) {
+        _pendingLaunchPayload = payload;
+      }
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '读取通知冷启动载荷失败',
+        tag: 'Notify',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  /// 消费冷启动（terminated 状态点击通知拉起）的通知 payload，一次性取走。
+  ///
+  /// 确保 [initialize] 完成后返回；初始化失败或无载荷返回 null。
+  Future<String?> consumePendingLaunchPayload() async {
+    try {
+      await initialize();
+    } on Exception {
+      return null;
+    }
+    final payload = _pendingLaunchPayload;
+    _pendingLaunchPayload = null;
+    return payload;
   }
 
   /// 根据 Hive 中的设置重新调度或取消设备通知。
@@ -256,6 +332,7 @@ class NotificationService {
         ),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
+        payload: payloadDailyReminder,
       );
     } on Exception catch (error) {
       AppLogger.e(
@@ -325,6 +402,7 @@ class NotificationService {
         ),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: payloadWeeklyReport,
       );
     } on Exception catch (error) {
       AppLogger.e(
