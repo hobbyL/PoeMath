@@ -364,9 +364,19 @@ void main() {
       WorkerTtsClient.normalizeBaseUrl('https://tts.cloudm.cc///').toString(),
       'https://tts.cloudm.cc',
     );
+    // 回环地址 http 放行（本地调试服务）。
     expect(
-      WorkerTtsClient.normalizeBaseUrl('http://192.168.1.5:8787').toString(),
-      'http://192.168.1.5:8787',
+      WorkerTtsClient.normalizeBaseUrl('http://127.0.0.1:8080').toString(),
+      'http://127.0.0.1:8080',
+    );
+    expect(
+      WorkerTtsClient.normalizeBaseUrl('http://localhost').toString(),
+      'http://localhost',
+    );
+    // https 公网地址放行。
+    expect(
+      WorkerTtsClient.normalizeBaseUrl('https://a.b.c').toString(),
+      'https://a.b.c',
     );
     expect(
       () => WorkerTtsClient.normalizeBaseUrl(''),
@@ -379,6 +389,30 @@ void main() {
     expect(
       () => WorkerTtsClient.normalizeBaseUrl('not a url at all'),
       throwsFormatException,
+    );
+  });
+
+  test('normalizeBaseUrl 公网 http 拒绝（API Key 明文传输防护）', () {
+    // 公网 host 走 http 会导致 Bearer API Key 明文传输，强制 https。
+    // 注意：新契约下 `http://192.168.1.5:8787` 已被拒绝（192.168.x 非回环）。
+    expect(
+      () => WorkerTtsClient.normalizeBaseUrl('http://192.168.1.5'),
+      throwsA(
+        isA<FormatException>().having(
+          (e) => e.message,
+          'message',
+          '公网地址必须使用 https，请检查服务地址',
+        ),
+      ),
+    );
+    expect(
+      () => WorkerTtsClient.normalizeBaseUrl('http://tts.cloudm.cc'),
+      throwsFormatException,
+    );
+    // http 伪装为 https 子路径绕过的场景不涉及；补充回环 IPv6 字面量。
+    expect(
+      WorkerTtsClient.normalizeBaseUrl('http://[::1]:8787').toString(),
+      'http://[::1]:8787',
     );
   });
 

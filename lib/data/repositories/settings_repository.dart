@@ -20,6 +20,10 @@ class SettingsRepository {
   SettingsRepository({SecureCredentialStore? credentialStore})
       : _credentialStore = credentialStore ?? SecureCredentialStore();
   // ============ KV 键名 ============
+  // 注意：新增需要随备份迁移的 settings key 时，必须同步登记到
+  // backup_service.dart 的 _settingsValueType 白名单（并注明类型），
+  // 否则该 key 不会随备份导出/恢复；指向外部服务或绑定凭据的 key
+  // 一律不得加入白名单（设备绑定，换机重配）。
   static const String _keyThemeMode =
       'theme_mode'; // 'system' | 'light' | 'dark'
   static const String _keyActiveSubject = 'active_subject'; // 'poem' | 'math'

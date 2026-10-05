@@ -34,6 +34,38 @@ import 'package:poemath/math_engine/validators/expression_evaluator.dart';
 /// 备份数据版本号，用于兼容性检查。
 const int _backupVersion = 1;
 
+/// 允许随备份迁移的 settings key 及其类型契约（key → 期望类型标签）。
+///
+/// 导出只写白名单内的 key；恢复只删/写白名单内的 key，白名单外一律跳过、
+/// 类型不符跳过该 key（不毁整个恢复）。恢复不再 `box.clear()`：本机的
+/// 排除 key（如 webdav_configs）原值保留，防止攻击者借恶意备份清空设备配置。
+///
+/// 排除项及理由（设备绑定、换机重配，与凭据不随备份明文迁移的既有设计一致）：
+/// - webdav_configs / llm_base_url / llm_model / tts_cloud_base_url /
+///   tts_cloud_enabled / tts_cloud_voice / tts_cloud_style：
+///   指向外部服务的端点或开关，注入即成为凭据外泄端点（P1）；
+/// - tencent_asr_credential_fingerprint / tencent_asr_verified_at /
+///   worker_tts_verified_fingerprint：与凭据绑定的验证状态，凭据不随备份
+///   走，指纹/时间戳单独迁移会误导验证状态。
+///
+/// 新增 settings key 时必须同步登记本白名单（并注明类型），否则不会随备份迁移。
+const Map<String, String> _settingsValueType = <String, String>{
+  'theme_mode': 'string', // 外观模式 system/light/dark
+  'active_subject': 'string', // 当前主题 poem/math
+  'sound_enabled': 'bool', // 音效开关
+  'haptic_enabled': 'bool', // 触觉反馈开关
+  'selected_grade': 'int', // 选中年级
+  'tts_speed': 'double', // TTS 语速
+  'tts_voice': 'string', // TTS 音色 JSON 字符串
+  'pinyin_visible': 'bool', // 拼音显示开关
+  'daily_poem_goal': 'int', // 每日诗词背诵目标
+  'daily_math_goal': 'int', // 每日口算做题目标
+  'math_batch_size': 'int', // 每组题目数量
+  'math_difficulty': 'string', // 练习难度 easy/medium/hard
+  'math_practice_mode': 'string', // 练习模式（综合或 ProblemMode.name）
+  'has_onboarded': 'bool', // 是否完成引导
+};
+
 class BackupService {
   BackupService({SecureCredentialStore? secureStore})
       : _secureStore = secureStore ?? SecureCredentialStore();
@@ -451,8 +483,12 @@ class BackupService {
   Map<String, dynamic> _exportSettings() {
     final box = HiveBoxes.settings;
     final result = <String, dynamic>{};
+    // 只导白名单 key：排除 key（外部服务端点、凭据绑定状态）留在本机，
+    // 备份文件干净且不误导「配置会同步」。
     for (final key in box.keys) {
-      result[key.toString()] = box.get(key);
+      final name = key.toString();
+      if (!_settingsValueType.containsKey(name)) continue;
+      result[name] = box.get(key);
     }
     return result;
   }
@@ -718,11 +754,38 @@ class BackupService {
 
   Future<void> _restoreSettings(Map<String, dynamic> items) async {
     final box = HiveBoxes.settings;
-    // 备份包含完整 settings 时替换旧键，确保恢复和回滚都是精确快照。
-    await box.clear();
-    for (final entry in items.entries) {
-      await box.put(entry.key, entry.value);
+    // 只删并重写白名单 key：排除 key（如本机 webdav_configs）原值保留，
+    // 恶意备份既不能注入外部服务端点，也不能借恢复清空设备配置。
+    for (final key in _settingsValueType.keys) {
+      await box.delete(key);
     }
+    for (final entry in items.entries) {
+      final expected = _settingsValueType[entry.key];
+      if (expected == null) continue; // 白名单外：跳过
+      final value = _normalizeSettingValue(entry.value, expected);
+      if (value == null) continue; // 类型不符：跳过该 key，不毁整个恢复
+      await box.put(entry.key, value);
+    }
+  }
+
+  /// 按白名单类型契约规范化 settings 值；类型不符返回 null（跳过该 key）。
+  ///
+  /// - 'string'：仅接受 String；
+  /// - 'bool'：仅接受 bool；
+  /// - 'int'：仅接受 int（JSON 的 1.5 解出 double → 拒绝）；
+  /// - 'double'：接受任意 num 并 `toDouble()`（JSON 整数 1 合法化为 1.0）。
+  Object? _normalizeSettingValue(Object? value, String expected) {
+    switch (expected) {
+      case 'string':
+        return value is String ? value : null;
+      case 'bool':
+        return value is bool ? value : null;
+      case 'int':
+        return value is int ? value : null;
+      case 'double':
+        return value is num ? value.toDouble() : null;
+    }
+    return null;
   }
 
   // ============ 工具 ============

@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -66,12 +67,17 @@ class UpdateDownloadCancelToken {
 
 /// 更新检查客户端。
 class UpdateClient {
+  /// APK 下载大小硬上限（默认 512 MB），防止更新源被劫持后磁盘被写爆。
+  static const int _defaultMaxDownloadBytes = 512 * 1024 * 1024;
+
   UpdateClient({
     required String updateUrl,
     http.Client? client,
     Duration requestTimeout = const Duration(seconds: 30),
     TemporaryDirectoryProvider? temporaryDirectoryProvider,
-  })  : _updateUrl = updateUrl.trim(),
+    int maxDownloadBytes = _defaultMaxDownloadBytes,
+  })  : maxDownloadBytes = maxDownloadBytes,
+        _updateUrl = updateUrl.trim(),
         _client = client ?? http.Client(),
         _requestTimeout = requestTimeout,
         _temporaryDirectoryProvider =
@@ -83,12 +89,23 @@ class UpdateClient {
         '必须大于零',
       );
     }
+    if (maxDownloadBytes <= 0) {
+      throw ArgumentError.value(
+        maxDownloadBytes,
+        'maxDownloadBytes',
+        '必须大于零',
+      );
+    }
   }
 
   final String _updateUrl;
   final http.Client _client;
   final Duration _requestTimeout;
   final TemporaryDirectoryProvider _temporaryDirectoryProvider;
+
+  /// 下载大小上限；测试注入小上限验证超限中断路径（@visibleForTesting 语义）。
+  @visibleForTesting
+  final int maxDownloadBytes;
 
   /// 更新 URL 是否有效。
   bool get isConfigured {
@@ -188,8 +205,15 @@ class UpdateClient {
     if (!await updateDirectory.exists()) {
       await updateDirectory.create(recursive: true);
     }
+    // versionName 来自更新源（不可信输入），文件名拼接前做字符白名单消毒，
+    // 防止 `../evil` 之类的路径遍历写出下载目录；不命中白名单用 'app' 兜底。
+    // versionCode 是已验证 >0 的 int，天然安全。
+    final safeVersionName =
+        RegExp(r'^[A-Za-z0-9._-]{1,64}$').hasMatch(update.versionName)
+            ? update.versionName
+            : 'app';
     final file = File(
-      '${updateDirectory.path}/poemath-${update.versionName}+${update.versionCode}.apk',
+      '${updateDirectory.path}/poemath-$safeVersionName+${update.versionCode}.apk',
     );
 
     final responseLength = response.contentLength;
@@ -214,6 +238,11 @@ class UpdateClient {
         cancelToken?.throwIfCancelled();
         sink.add(chunk);
         received += chunk.length;
+        // 大小硬上限：更新源被劫持前提下的磁盘耗尽纵深防御，
+        // 超限中断下载并清理半成品文件。
+        if (received > maxDownloadBytes) {
+          throw const UpdateException('安装包超出大小上限，已中止下载');
+        }
         onProgress?.call(received, total > 0 ? total : null);
       }
       cancelToken?.throwIfCancelled();

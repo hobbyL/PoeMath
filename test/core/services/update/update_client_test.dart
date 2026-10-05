@@ -280,6 +280,92 @@ void main() {
     await responseController.close();
     expect(await _downloadFile(temporaryDirectory).exists(), isFalse);
   });
+
+  test('versionName 路径遍历时文件仍落在下载目录内', () async {
+    // AppUpdateInfo 无 copyWith，直接构造恶意 versionName。
+    final evilUpdate = AppUpdateInfo(
+      packageName: _updateInfo().packageName,
+      versionName: '../evil',
+      versionCode: _updateInfo().versionCode,
+      tagName: _updateInfo().tagName,
+      channel: _updateInfo().channel,
+      apkUrl: _updateInfo().apkUrl,
+      apkSha256: _updateInfo().apkSha256,
+      apkSize: _updateInfo().apkSize,
+      mandatory: _updateInfo().mandatory,
+      notes: _updateInfo().notes,
+    );
+    final client = UpdateClient(
+      updateUrl: 'https://updates.example.com/latest.json',
+      temporaryDirectoryProvider: () async => temporaryDirectory,
+      client: MockClient.streaming((request, bodyStream) async {
+        return http.StreamedResponse(
+          Stream.value([1, 2, 3, 4]),
+          200,
+          contentLength: 4,
+        );
+      }),
+    );
+
+    final file = await client.downloadApk(evilUpdate);
+
+    // 消毒后文件名兜底为 'app'，仍在 poemath_update 目录内。
+    final updateDirectory = Directory('${temporaryDirectory.path}/poemath_update');
+    expect(file.path, startsWith(updateDirectory.path));
+    expect(file.path, contains('poemath-app+2.apk'));
+    // 目录外没有写出任何文件。
+    final parentEntries = await temporaryDirectory.list().toList();
+    for (final entry in parentEntries) {
+      if (entry is Directory) {
+        expect(entry.path, updateDirectory.path);
+      }
+    }
+  });
+
+  test('下载超过大小上限时中断并清理半成品文件', () async {
+    final client = UpdateClient(
+      updateUrl: 'https://updates.example.com/latest.json',
+      temporaryDirectoryProvider: () async => temporaryDirectory,
+      maxDownloadBytes: 1024,
+      client: MockClient.streaming((request, bodyStream) async {
+        return http.StreamedResponse(
+          Stream.fromIterable([
+            List<int>.filled(512, 1),
+            List<int>.filled(512, 1),
+            List<int>.filled(512, 1), // 累计 1536 > 1024
+          ]),
+          200,
+        );
+      }),
+    );
+
+    await expectLater(
+      client.downloadApk(_updateInfo()),
+      throwsA(
+        isA<UpdateException>().having(
+          (error) => error.message,
+          'message',
+          '安装包超出大小上限，已中止下载',
+        ),
+      ),
+    );
+    // 半成品文件被清理。
+    final updateDirectory = Directory('${temporaryDirectory.path}/poemath_update');
+    final entries = await updateDirectory.exists()
+        ? await updateDirectory.list().toList()
+        : const <FileSystemEntity>[];
+    expect(entries, isEmpty);
+  });
+
+  test('maxDownloadBytes 必须大于零', () {
+    expect(
+      () => UpdateClient(
+        updateUrl: 'https://updates.example.com/latest.json',
+        maxDownloadBytes: 0,
+      ),
+      throwsArgumentError,
+    );
+  });
 }
 
 File _downloadFile(Directory temporaryDirectory) {

@@ -42,9 +42,28 @@ final class WorkerTtsClient {
   /// `not%20a%20url`），因此需要显式字符集校验拦截此类输入。
   static final RegExp _validHostPattern = RegExp(r'^[a-zA-Z0-9.-]+$');
 
+  /// 回环 IPv4 段（127.0.0.0/8）。必须四段点分数字：
+  /// 简单的 `startsWith('127.')` 会放行 `127.evil.com` 这类公网子域名。
+  /// 段值合法性（0-255）由 socket 层兜底。
+  static final RegExp _loopbackIpv4Pattern =
+      RegExp(r'^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
+
+  /// 本地回环 host：http 明文 Bearer 仅放行这些地址（本地调试服务）。
+  ///
+  /// 语义对齐 `LlmClient._isLoopbackHost`（本地私有函数，不跨文件共享，
+  /// 避免 services 内部耦合）。IPv6 字面量在 `uri.host` 中不带方括号
+  /// （`[::1]` → `::1`），两种形式都接受以防万一。
+  static bool _isLoopbackHost(String host) =>
+      host == 'localhost' ||
+      _loopbackIpv4Pattern.hasMatch(host) ||
+      host == '::1' ||
+      host == '[::1]';
+
   /// 规范化服务地址：补 `https://` 前缀、去尾斜杠、校验 scheme 与 host。
   ///
-  /// 非法输入（无 host、非 http/https scheme）抛出 [FormatException]。
+  /// 非法输入（无 host、非 http/https scheme）抛出 [FormatException]；
+  /// http 仅放行回环地址，公网 host 必须使用 https（API Key 明文传输防护，
+  /// 对齐 LlmClient 既有契约）。
   static Uri normalizeBaseUrl(String raw) {
     var trimmed = raw.trim();
     if (trimmed.isEmpty) {
@@ -59,10 +78,15 @@ final class WorkerTtsClient {
     final uri = Uri.tryParse(trimmed);
     if (uri == null ||
         uri.host.isEmpty ||
-        !_validHostPattern.hasMatch(uri.host)) {
+        !(_validHostPattern.hasMatch(uri.host) || _isLoopbackHost(uri.host))) {
       throw const FormatException('服务地址格式无效');
     }
-    if (uri.scheme != 'http' && uri.scheme != 'https') {
+    if (uri.scheme == 'http') {
+      // 公网 host 走 http 会导致 API Key 明文传输，强制 https。
+      if (!_isLoopbackHost(uri.host)) {
+        throw const FormatException('公网地址必须使用 https，请检查服务地址');
+      }
+    } else if (uri.scheme != 'https') {
       throw const FormatException('服务地址仅支持 http/https');
     }
     return uri;
