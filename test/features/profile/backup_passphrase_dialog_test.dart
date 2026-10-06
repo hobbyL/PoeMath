@@ -78,6 +78,23 @@ void main() {
       await tester.pump();
       expect(result.value, isNull);
     });
+
+    testWidgets('描述文案补全 LLM API Key 并说明服务配置不同步', (tester) async {
+      await pumpAndOpen(tester, showBackupPassphraseInputDialog);
+      final description = find.textContaining('LLM API Key');
+      expect(description, findsOneWidget);
+      expect(find.textContaining('不随备份同步'), findsOneWidget);
+    });
+
+    testWidgets('受限视口下渲染无溢出', (tester) async {
+      tester.view.physicalSize = const Size(800, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await pumpAndOpen(tester, showBackupPassphraseInputDialog);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('设置对话框', () {
@@ -157,6 +174,30 @@ void main() {
       expect(find.text('清除口令'), findsNothing);
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('描述文案补全 LLM API Key 并说明服务配置不同步', (tester) async {
+      await pumpAndOpen(
+        tester,
+        (context) =>
+            showBackupPassphraseSetupDialog(context, hasExisting: false),
+      );
+      expect(find.textContaining('LLM API Key'), findsOneWidget);
+      expect(find.textContaining('不随备份同步'), findsOneWidget);
+    });
+
+    testWidgets('受限视口下渲染无溢出', (tester) async {
+      tester.view.physicalSize = const Size(800, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await pumpAndOpen(
+        tester,
+        (context) =>
+            showBackupPassphraseSetupDialog(context, hasExisting: true),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
     });
   });
 }

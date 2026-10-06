@@ -52,27 +52,32 @@ class _PassphraseInputDialogState extends State<_PassphraseInputDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('输入备份加密口令'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: '备份加密口令',
-              border: OutlineInputBorder(),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: '备份加密口令',
+                border: OutlineInputBorder(),
+              ),
             ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          Text(
-            '该备份包含加密的凭据（腾讯云 AK/SK、TTS API Key）。\n'
-            '留空将跳过凭据恢复，其余数据正常恢复。',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ],
+            const SizedBox(height: SpacingTokens.sm),
+            Text(
+              '该备份包含加密的凭据\n'
+              '（腾讯云 AK/SK、TTS API Key、LLM API Key）。\n'
+              'TTS/大模型服务地址等配置不随备份同步，'
+              '新设备需重新填写。\n'
+              '留空将跳过凭据恢复，其余数据正常恢复。',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -152,38 +157,43 @@ class _PassphraseSetupDialogState extends State<_PassphraseSetupDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.hasExisting ? '修改备份加密口令' : '设置备份加密口令'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _firstController,
-            autofocus: true,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: '口令',
-              border: OutlineInputBorder(),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _firstController,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: '口令',
+                border: OutlineInputBorder(),
+              ),
             ),
-          ),
-          const SizedBox(height: SpacingTokens.md),
-          TextField(
-            controller: _secondController,
-            obscureText: true,
-            onSubmitted: (_) => _submit(),
-            decoration: InputDecoration(
-              labelText: '再次输入确认',
-              errorText: _errorText,
-              border: const OutlineInputBorder(),
+            const SizedBox(height: SpacingTokens.md),
+            TextField(
+              controller: _secondController,
+              obscureText: true,
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                labelText: '再次输入确认',
+                errorText: _errorText,
+                border: const OutlineInputBorder(),
+              ),
             ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          Text(
-            '口令用于加密备份中的腾讯云 AK/SK 与 TTS API Key。\n'
-            '忘记口令 = 凭据无法恢复，重新填写即可。',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ],
+            const SizedBox(height: SpacingTokens.sm),
+            Text(
+              '口令用于加密备份中的腾讯云 AK/SK、'
+              'TTS API Key 与 LLM API Key。\n'
+              'TTS/大模型服务地址等配置不随备份同步，'
+              '新设备需重新填写。\n'
+              '忘记口令 = 凭据无法恢复，重新填写即可。',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
       ),
       actions: [
         if (widget.hasExisting)
