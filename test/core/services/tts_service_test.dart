@@ -228,26 +228,45 @@ void main() {
     expect(service.isSpeaking, isFalse);
   });
 
-  test('系统路径 onReady 在首行 speak 成功后触发一次', () async {
+  test('系统路径 onReady 在首行 speak 发起前触发一次', () async {
+    final first = Completer<dynamic>();
+    engine.controlledSpeaks.add(first);
     var readyCount = 0;
-    await service.speakLines(
+
+    final speaking = service.speakLines(
       const <String>['第一行', '第二行'],
       onReady: () => readyCount++,
     );
+    await _flushMicrotasks();
 
-    expect(engine.spokenTexts, const <String>['第一行', '第二行']);
+    // 首行 speak 仍挂起（音频未播完），onReady 已在播放动作发起时触发。
+    expect(engine.spokenTexts, const <String>['第一行']);
+    expect(readyCount, 1);
+    expect(service.isSpeaking, isTrue);
+
+    first.complete(1);
+    await speaking;
     expect(readyCount, 1);
   });
 
-  test('speak 的 onReady 在系统朗读成功后触发', () async {
+  test('speak 的 onReady 在播放动作发起时触发（speak 未完成前）', () async {
+    final gate = Completer<dynamic>();
+    engine.controlledSpeaks.add(gate);
     var readyCount = 0;
-    await service.speak('单句', onReady: () => readyCount++);
 
+    final speaking = service.speak('单句', onReady: () => readyCount++);
+    await _flushMicrotasks();
+
+    // speak 仍挂起，onReady 已触发——遮罩在出声前解除。
     expect(engine.spokenTexts, const <String>['单句']);
     expect(readyCount, 1);
+
+    gate.complete(1);
+    await speaking;
+    expect(readyCount, 1);
   });
 
-  test('speakSentences 的 onReady 在首句成功后触发一次', () async {
+  test('speakSentences 的 onReady 在首句播放动作发起时触发一次', () async {
     var readyCount = 0;
     await service.speakSentences(
       '第一句。第二句！',
@@ -258,7 +277,7 @@ void main() {
     expect(readyCount, 1);
   });
 
-  test('首行朗读异常时 onReady 不触发', () async {
+  test('首行朗读异常时状态恢复（onReady 已在发起时触发，不锁遮罩）', () async {
     engine.failSpeakAt = 0;
     var readyCount = 0;
 
@@ -270,11 +289,13 @@ void main() {
       throwsA(isA<TtsException>()),
     );
 
-    expect(readyCount, 0);
+    // 新契约：onReady 在 speak 发起前触发；speak 随后抛错由调用方
+    // 异常路径 finally 兜底清理，遮罩不锁死。
+    expect(readyCount, 1);
     expect(service.isSpeaking, isFalse);
   });
 
-  test('stop 抢跑中断首段时 onReady 不触发', () async {
+  test('首段播出中 stop：onReady 已在发起时触发（出声期间遮罩可解除）', () async {
     final first = Completer<dynamic>();
     engine.controlledSpeaks.add(first);
     var readyCount = 0;
@@ -285,15 +306,31 @@ void main() {
     );
     await _flushMicrotasks();
     expect(engine.spokenTexts, const <String>['第一行']);
+    // 旧缺陷：onReady 等整句播完才触发，出声期间遮罩锁死且无法停止。
+    // 新契约：发起时已触发，用户在出声期间即可点击停止。
+    expect(readyCount, 1);
 
-    // 首段仍在播（speak 挂起）时用户 stop：
-    // _stopRequested 先置位，随后放行挂起的 speak。
     await service.stop();
     await speaking;
 
-    // 首段被中断、第二行被跳过 → onReady 不触发（无有效首段播放）。
     expect(engine.spokenTexts, const <String>['第一行']);
+    expect(readyCount, 1);
+    expect(service.isSpeaking, isFalse);
+  });
+
+  test('stop 在首段播放发起前抢跑时 onReady 不触发', () async {
+    var readyCount = 0;
+
+    await service.speakLines(
+      const <String>['第一行', '第二行'],
+      // onLineStart 在合成 await 之前回调：在触发点之前抢跑 stop。
+      onLineStart: (_) => service.stop(),
+      onReady: () => readyCount++,
+    );
+
+    // 触发时 _stopRequested 已置位 → 不触发；循环也不再继续。
     expect(readyCount, 0);
+    expect(engine.spokenTexts, const <String>['第一行']);
     expect(service.isSpeaking, isFalse);
   });
 

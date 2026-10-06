@@ -168,9 +168,12 @@ class TtsService {
 
   /// 单段朗读统一入口：云端优先，失败回退系统引擎完成当段。
   ///
-  /// [onFirstReady]：该段为本次朗读首段且播放动作成功时触发一次
-  /// （云端 play 成功后 / 系统 speak 成功后）；异常路径不触发。
-  /// 播放完成时若已请求停止（stop 抢跑/中断），视为无音频在播，不触发。
+  /// [onFirstReady]：该段为本次朗读首段时，在播放动作**发起前**触发一次
+  /// （云端在 `play(bytes)` 之前、系统在 `speak(text)` 之前）——语义是
+  /// 「首段音频就绪、播放即将开始」，页面遮罩在出声前解除；云端 play
+  /// 抛错走「跳过该句」的分支同样已触发（后续行会继续播放，遮罩不允许
+  /// 锁死整个会话）。合成/引擎准备异常路径不触发；触发时若已请求停止
+  /// （stop 抢跑）不触发。
   Future<void> _speakSegmentBestEffort(
     String text, {
     void Function()? onFirstReady,
@@ -178,9 +181,11 @@ class TtsService {
     if (_cloudMode) {
       final bytes = await _synthesizeCloud(text);
       if (bytes != null) {
+        // 首段就绪：在播放动作发起前触发，遮罩在出声前解除；
+        // play 抛错跳句的分支也已触发，遮罩不会锁死整个会话。
+        if (!_stopRequested) onFirstReady?.call();
         try {
           await _cloudPlayerResolved.play(bytes);
-          if (!_stopRequested) onFirstReady?.call();
           return;
         } on Object catch (error) {
           // 播放失败不回退系统朗读，避免同一句双读。
@@ -191,10 +196,11 @@ class TtsService {
     }
     await _runEngineOperation('朗读失败', () async {
       await _tts.setSpeechRate(_settings.ttsSpeed);
+      // 播放动作发起前触发（紧随 setSpeechRate、speak 之前）。
+      if (!_stopRequested) onFirstReady?.call();
       await _tts.speak(text);
       _throwIfEngineReportedError();
     });
-    if (!_stopRequested) onFirstReady?.call();
   }
 
   Future<T> _runEngineOperation<T>(
@@ -323,8 +329,8 @@ class TtsService {
 
   /// 朗读文本（全文一次性读完）。
   ///
-  /// [onReady] 在首段音频开始播放后触发一次（缓存命中/系统 TTS 也保证触发）；
-  /// 朗读异常路径不触发。
+  /// [onReady] 在首段播放动作发起时触发一次（合成成功后、play/speak 之前，
+  /// 缓存命中/系统 TTS 也保证触发）；合成异常或已请求停止时不触发。
   Future<void> speak(String text, {void Function()? onReady}) async {
     await _ensureInitialized();
     await _refreshCloudState();
@@ -342,7 +348,8 @@ class TtsService {
   /// 逐句朗读：按句号、问号、感叹号、逗号、换行分割，依次朗读。
   ///
   /// [onSentenceStart] 回调：传入当前朗读的句子索引。
-  /// [onReady] 在首句音频开始播放后触发一次；异常路径不触发。
+  /// [onReady] 在首句播放动作发起时触发一次（speak 之前）；合成异常或
+  /// 已请求停止时不触发。
   /// [onComplete] 在全部朗读完毕时调用。
   Future<void> speakSentences(
     String text, {
@@ -384,7 +391,8 @@ class TtsService {
   /// 逐行朗读：调用方提供已拆分的行列表，确保索引与视觉行一一对应。
   ///
   /// [onLineStart] 回调：传入当前朗读的行索引（合成 await 之前触发）。
-  /// [onReady] 在首行音频开始播放后触发一次；异常路径不触发。
+  /// [onReady] 在首行播放动作发起时触发一次（合成成功后、播放之前）；
+  /// 合成异常或已请求停止时不触发。
   /// [onComplete] 在全部朗读完毕时调用。
   Future<void> speakLines(
     List<String> lines, {

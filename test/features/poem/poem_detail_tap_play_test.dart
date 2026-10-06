@@ -5,6 +5,8 @@
 // - 折叠区展开后点击内容播放该区域文本
 // - 云端合成期间 loading 遮罩拦截重复点击，首段就绪后解除
 // - 播放中点击语义：同区域停止 / 跨区域切换
+// - 审查修复（任务 10-06-tap-play-review-fix）：stop 失败不切换（无双读）、
+//   切换窗口期连点仅启动一次新朗读
 
 import 'dart:async';
 
@@ -262,6 +264,99 @@ void main() {
       ),
     ).captured;
     expect(captured.first, _poem.translation);
+
+    // 收尾：放行挂起的朗读 Future，避免残留 pending 状态。
+    contentScript.signalFinish();
+    translationScript
+      ..signalReady()
+      ..signalFinish();
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('停止失败时点击其他区域：提示且不启动新朗读（无双读）', (tester) async {
+    final contentScript = _stubSpeakLines(tts, autoComplete: false);
+    _stubSpeakSentences(tts);
+
+    await _pumpPage(tester, tts);
+
+    // 展开译文折叠区。
+    await tester.tap(find.text('译文'));
+    await tester.pumpAndSettle();
+
+    // 正文朗读中（首段就绪，朗读挂起）。
+    await tester.tap(find.text('床前明月光，'));
+    await tester.pump();
+    contentScript.signalReady();
+    await tester.pump();
+
+    // stop 抛异常：切换分支必须放弃，不允许新旧会话双读（R2）。
+    when(() => tts.stop()).thenThrow(const TtsException('停止失败'));
+
+    await tester.tap(find.text(_poem.translation));
+    await tester.pump();
+
+    expect(find.text('停止朗读失败，请稍后重试'), findsOneWidget);
+    expect(find.text('语音合成中…'), findsNothing);
+    // 新朗读未启动：speakSentences 零调用，speakLines 仍只有正文那一次。
+    verifyNever(
+      () => tts.speakSentences(any<String>(), onReady: any(named: 'onReady')),
+    );
+    verify(
+      () => tts.speakLines(
+        any<List<String>>(),
+        onLineStart: any(named: 'onLineStart'),
+        onReady: any(named: 'onReady'),
+      ),
+    ).called(1);
+
+    // 收尾：恢复 stop stub 并放行挂起的朗读 Future。
+    when(() => tts.stop()).thenAnswer((_) async {});
+    contentScript.signalFinish();
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('切换窗口期连点两次仅启动一次新朗读', (tester) async {
+    final contentScript = _stubSpeakLines(tts, autoComplete: false);
+    final translationScript = _stubSpeakSentences(tts, autoComplete: false);
+    // stop 挂起：制造「先置遮罩 → await stop」的切换窗口期（R3）。
+    final stopGate = Completer<void>();
+    when(() => tts.stop()).thenAnswer((_) => stopGate.future);
+
+    await _pumpPage(tester, tts);
+
+    // 展开译文折叠区。
+    await tester.tap(find.text('译文'));
+    await tester.pumpAndSettle();
+
+    // 正文朗读中（首段就绪，朗读挂起）。
+    await tester.tap(find.text('床前明月光，'));
+    await tester.pump();
+    contentScript.signalReady();
+    await tester.pump();
+
+    // 第一次点击译文内容：进入切换窗口期，遮罩立即出现。
+    await tester.tap(find.text(_poem.translation));
+    await tester.pump();
+    expect(find.text('语音合成中…'), findsOneWidget);
+
+    // 窗口期第二次点击：遮罩 + _isPreparing 守卫双保险拦截。
+    await tester.tap(find.text(_poem.translation), warnIfMissed: false);
+    await tester.pump();
+
+    // stop 放行 → 仅启动一次新朗读，stop 也只被调用一次。
+    stopGate.complete();
+    await tester.pump();
+
+    verify(() => tts.stop()).called(1);
+    verify(
+      () => tts.speakSentences(any<String>(), onReady: any(named: 'onReady')),
+    ).called(1);
 
     // 收尾：放行挂起的朗读 Future，避免残留 pending 状态。
     contentScript.signalFinish();

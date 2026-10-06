@@ -28,15 +28,17 @@ final class _FakeCloudAudioPlayer implements CloudAudioPlayer {
   int stopCalls = 0;
   bool holdPlayback = false;
 
-  /// 播放抛错（模拟底层音频失败）：记录次数但不抛出前仍统计 played。
+  /// 播放抛错（模拟底层音频失败）：
+  /// [throwOnPlay] 所有播放均抛错；[throwOnPlayLimit] 仅前 N 次抛错。
   bool throwOnPlay = false;
+  int throwOnPlayLimit = 0;
   int playFailures = 0;
 
   @override
   Future<void> play(Uint8List bytes) async {
     played.add(bytes);
     events?.add('play');
-    if (throwOnPlay) {
+    if (throwOnPlay || playFailures < throwOnPlayLimit) {
       playFailures++;
       throw Exception('audioplayers failure');
     }
@@ -265,25 +267,36 @@ void main() {
     expect(counter.value, 3);
   });
 
-  test('云端路径 onReady 在首段播放成功后触发一次', () async {
+  test('云端路径 onReady 在首段播放发起前触发一次', () async {
     final counter = _RequestCounter();
+    final player = _FakeCloudAudioPlayer(holdPlayback: true);
     final service = TtsService(
       _stubSettings(cloudEnabled: true),
       flutterTts: _FakeFlutterTts(),
       cloudClient: _client(counter),
-      cloudPlayer: _FakeCloudAudioPlayer(),
+      cloudPlayer: player,
     );
     var readyCount = 0;
 
-    await service.speakLines(
+    final task = service.speakLines(
       ['床前明月光', '疑是地上霜'],
       onReady: () => readyCount++,
     );
+    // 等第一行播放挂起。
+    await Future<void>.delayed(Duration.zero);
 
+    // 首段 play 仍挂起（未播完），onReady 已在播放动作发起前触发——
+    // 音频出声期间遮罩即解除（旧缺陷：play 播完才触发，遮罩锁死）。
+    expect(player.played.length, 1);
+    expect(readyCount, 1);
+    expect(service.isSpeaking, isTrue);
+
+    await service.stop();
+    await task;
     expect(readyCount, 1);
   });
 
-  test('云端合成失败回退系统后 onReady 在系统首段成功后触发', () async {
+  test('云端合成失败回退系统后 onReady 在系统播放发起时触发', () async {
     final counter = _RequestCounter();
     final tts = _FakeFlutterTts();
     final service = TtsService(
@@ -297,12 +310,12 @@ void main() {
 
     await service.speak('床前明月光', onReady: () => readyCount++);
 
-    // 云合成失败 → 系统朗读兜底成功 → onReady 仍触发（遮罩语义覆盖回退过程）。
+    // 云合成失败 → 系统朗读兜底发起 → onReady 仍触发（遮罩语义覆盖回退过程）。
     expect(tts.spokenTexts, ['床前明月光']);
     expect(readyCount, 1);
   });
 
-  test('云端播放抛错时 onReady 不触发', () async {
+  test('云端播放抛错跳过该句时 onReady 仍触发（遮罩不锁死）', () async {
     final counter = _RequestCounter();
     final player = _FakeCloudAudioPlayer()..throwOnPlay = true;
     final service = TtsService(
@@ -315,8 +328,35 @@ void main() {
 
     await service.speak('床前明月光', onReady: () => readyCount++);
 
+    // 旧缺陷：play 抛错走「跳过该句」return，onReady 永不触发 → 遮罩
+    // 锁死整个会话。新契约：发起前已触发。
     expect(player.playFailures, 1);
-    expect(readyCount, 0);
+    expect(readyCount, 1);
+  });
+
+  test('云端首段 play 抛错跳句后：onReady 已触发且后续行继续播放', () async {
+    final counter = _RequestCounter();
+    final tts = _FakeFlutterTts();
+    final player = _FakeCloudAudioPlayer()..throwOnPlayLimit = 1;
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: tts,
+      cloudClient: _client(counter),
+      cloudPlayer: player,
+    );
+    var readyCount = 0;
+
+    await service.speakLines(
+      ['床前明月光', '疑是地上霜'],
+      onReady: () => readyCount++,
+    );
+
+    // 第一行 play 抛错被跳过，第二行正常播放；系统引擎不补读（无双读）。
+    expect(player.playFailures, 1);
+    expect(player.played.length, 2);
+    expect(tts.spokenTexts, isEmpty);
+    // 回归：跳句分支 onReady 已触发，整个会话不锁遮罩。
+    expect(readyCount, 1);
   });
 
   test('语速映射为 Worker rate 并写入请求体', () async {

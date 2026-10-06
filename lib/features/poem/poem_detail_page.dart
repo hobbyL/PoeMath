@@ -100,7 +100,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   /// 语义（PRD R2/R3）：
   /// - 遮罩期点击：直接忽略（遮罩本身也拦截，此处双保险）
   /// - 点击正在朗读的区域：仅停止
-  /// - 朗读中点击其他区域：停止当前并播放新区域
+  /// - 朗读中点击其他区域：先置遮罩再停止当前并播放新区域——遮罩挡住
+  ///   停止窗口期的连点（R3）；stop 失败则提示并放弃切换，不启动新朗读，
+  ///   避免新旧会话在同一引擎上双读（R2）
   /// - 空闲点击：播放该区域
   Future<void> _onTapSection(int section, String text) async {
     if (_isPreparing) return;
@@ -109,14 +111,25 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       return;
     }
     if (_isSpeaking) {
-      await _stopSpeaking();
+      // 先置遮罩再 await stop：挡住停止窗口期的二次点击（R3），
+      // 避免 stop 未完成时并发启动第二个朗读会话。
+      setState(() => _isPreparing = true);
+      final stopped = await _stopSpeaking();
+      if (!stopped) {
+        // stop 失败：SnackBar 已在 _stopSpeaking 内弹出，放弃切换（R2）。
+        if (mounted) setState(() => _isPreparing = false);
+        return;
+      }
     }
     if (!mounted) return;
     await _startSpeak(section, text);
   }
 
   /// 停止当前朗读并清理全部播放态。
-  Future<void> _stopSpeaking() async {
+  ///
+  /// 返回 stop 是否成功；失败时已弹出 SnackBar 提示，调用方不得启动
+  /// 新朗读（否则新旧会话双读）。
+  Future<bool> _stopSpeaking() async {
     _speakGeneration++; // 使旧会话的回调全部失效
     final scaffold = ScaffoldMessenger.of(context);
     try {
@@ -134,6 +147,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           const SnackBar(content: Text('停止朗读失败，请稍后重试')),
         );
       }
+      return false;
     } finally {
       if (mounted) {
         setState(() {
@@ -143,6 +157,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         });
       }
     }
+    return true;
   }
 
   /// 播放指定区域：正文（section 0）逐行朗读 + 当前行高亮；
@@ -333,13 +348,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   title: '译文',
                   section: _sectionTranslation,
                   playText: poem.translation,
-                  child: _buildPlayableChild(
-                    _sectionTranslation,
+                  child: Text(
                     poem.translation,
-                    Text(
-                      poem.translation,
-                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
-                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
                   ),
                 ),
               ],
@@ -353,11 +364,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   title: '注释',
                   section: _sectionAnnotations,
                   playText: annotationsText,
-                  child: _buildPlayableChild(
-                    _sectionAnnotations,
-                    annotationsText,
-                    _buildAnnotationsList(context, poem),
-                  ),
+                  child: _buildAnnotationsList(context, poem),
                 ),
               ],
 
@@ -370,13 +377,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   title: '赏析',
                   section: _sectionAppreciation,
                   playText: poem.appreciation,
-                  child: _buildPlayableChild(
-                    _sectionAppreciation,
+                  child: Text(
                     poem.appreciation,
-                    Text(
-                      poem.appreciation,
-                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
-                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
                   ),
                 ),
               ],
@@ -390,13 +393,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   title: '创作背景',
                   section: _sectionBackground,
                   playText: poem.background,
-                  child: _buildPlayableChild(
-                    _sectionBackground,
+                  child: Text(
                     poem.background,
-                    Text(
-                      poem.background,
-                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
-                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
                   ),
                 ),
               ],
@@ -647,13 +646,20 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           ),
           shape: const Border(),
           collapsedShape: const Border(),
-          children: [child],
+          // 展开内容可点击播放：section/playText 非空时在此统一包裹，
+          // 调用点只传一次参数（R4），指示图标与播放文本永不错位。
+          children: [
+            if (section != null && playText != null)
+              _buildPlayableChild(section, playText, child)
+            else
+              child,
+          ],
         ),
       ),
     );
   }
 
-  /// 折叠区展开内容：包裹 InkWell 使内容区域可点击播放。
+  /// 折叠区展开内容的播放包裹（[_buildCollapsibleSection] 内部实现细节）。
   ///
   /// 仅包内容 child，不包标题行——折叠态点击标题仍走展开/收起。
   Widget _buildPlayableChild(int section, String playText, Widget child) {
@@ -709,35 +715,31 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       title: '名句',
       section: _sectionFamousLines,
       playText: playText,
-      child: _buildPlayableChild(
-        _sectionFamousLines,
-        playText,
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: lines.map((line) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.format_quote,
-                    size: 16,
-                    color: theme.semantic.caution,
-                  ),
-                  const SizedBox(width: SpacingTokens.xs),
-                  Expanded(
-                    child: Text(
-                      line,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontStyle: FontStyle.italic,
-                      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: lines.map((line) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.format_quote,
+                  size: 16,
+                  color: theme.semantic.caution,
+                ),
+                const SizedBox(width: SpacingTokens.xs),
+                Expanded(
+                  child: Text(
+                    line,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
