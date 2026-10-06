@@ -265,6 +265,60 @@ void main() {
     expect(counter.value, 3);
   });
 
+  test('云端路径 onReady 在首段播放成功后触发一次', () async {
+    final counter = _RequestCounter();
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: _FakeFlutterTts(),
+      cloudClient: _client(counter),
+      cloudPlayer: _FakeCloudAudioPlayer(),
+    );
+    var readyCount = 0;
+
+    await service.speakLines(
+      ['床前明月光', '疑是地上霜'],
+      onReady: () => readyCount++,
+    );
+
+    expect(readyCount, 1);
+  });
+
+  test('云端合成失败回退系统后 onReady 在系统首段成功后触发', () async {
+    final counter = _RequestCounter();
+    final tts = _FakeFlutterTts();
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: tts,
+      cloudClient:
+          _client(counter, failKind: WorkerTtsErrorKind.network),
+      cloudPlayer: _FakeCloudAudioPlayer(),
+    );
+    var readyCount = 0;
+
+    await service.speak('床前明月光', onReady: () => readyCount++);
+
+    // 云合成失败 → 系统朗读兜底成功 → onReady 仍触发（遮罩语义覆盖回退过程）。
+    expect(tts.spokenTexts, ['床前明月光']);
+    expect(readyCount, 1);
+  });
+
+  test('云端播放抛错时 onReady 不触发', () async {
+    final counter = _RequestCounter();
+    final player = _FakeCloudAudioPlayer()..throwOnPlay = true;
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: _FakeFlutterTts(),
+      cloudClient: _client(counter),
+      cloudPlayer: player,
+    );
+    var readyCount = 0;
+
+    await service.speak('床前明月光', onReady: () => readyCount++);
+
+    expect(player.playFailures, 1);
+    expect(readyCount, 0);
+  });
+
   test('语速映射为 Worker rate 并写入请求体', () async {
     final counter = _RequestCounter();
     final scripted = _ScriptedHttpClient(counter: counter);

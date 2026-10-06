@@ -228,6 +228,75 @@ void main() {
     expect(service.isSpeaking, isFalse);
   });
 
+  test('系统路径 onReady 在首行 speak 成功后触发一次', () async {
+    var readyCount = 0;
+    await service.speakLines(
+      const <String>['第一行', '第二行'],
+      onReady: () => readyCount++,
+    );
+
+    expect(engine.spokenTexts, const <String>['第一行', '第二行']);
+    expect(readyCount, 1);
+  });
+
+  test('speak 的 onReady 在系统朗读成功后触发', () async {
+    var readyCount = 0;
+    await service.speak('单句', onReady: () => readyCount++);
+
+    expect(engine.spokenTexts, const <String>['单句']);
+    expect(readyCount, 1);
+  });
+
+  test('speakSentences 的 onReady 在首句成功后触发一次', () async {
+    var readyCount = 0;
+    await service.speakSentences(
+      '第一句。第二句！',
+      onReady: () => readyCount++,
+    );
+
+    expect(engine.spokenTexts, const <String>['第一句', '第二句']);
+    expect(readyCount, 1);
+  });
+
+  test('首行朗读异常时 onReady 不触发', () async {
+    engine.failSpeakAt = 0;
+    var readyCount = 0;
+
+    await expectLater(
+      service.speakLines(
+        const <String>['第一行', '第二行'],
+        onReady: () => readyCount++,
+      ),
+      throwsA(isA<TtsException>()),
+    );
+
+    expect(readyCount, 0);
+    expect(service.isSpeaking, isFalse);
+  });
+
+  test('stop 抢跑中断首段时 onReady 不触发', () async {
+    final first = Completer<dynamic>();
+    engine.controlledSpeaks.add(first);
+    var readyCount = 0;
+
+    final speaking = service.speakLines(
+      const <String>['第一行', '第二行'],
+      onReady: () => readyCount++,
+    );
+    await _flushMicrotasks();
+    expect(engine.spokenTexts, const <String>['第一行']);
+
+    // 首段仍在播（speak 挂起）时用户 stop：
+    // _stopRequested 先置位，随后放行挂起的 speak。
+    await service.stop();
+    await speaking;
+
+    // 首段被中断、第二行被跳过 → onReady 不触发（无有效首段播放）。
+    expect(engine.spokenTexts, const <String>['第一行']);
+    expect(readyCount, 0);
+    expect(service.isSpeaking, isFalse);
+  });
+
   test('未初始化时停止朗读不会调用平台引擎', () async {
     await service.stop();
 

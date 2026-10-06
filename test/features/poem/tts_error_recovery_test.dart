@@ -56,6 +56,7 @@ void main() {
       () => tts.speakLines(
         any<List<String>>(),
         onLineStart: any(named: 'onLineStart'),
+        onReady: any(named: 'onReady'),
       ),
     ).thenThrow(const TtsException('引擎不可用'));
 
@@ -74,12 +75,14 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
-    await tester.tap(find.byTooltip('朗读全文'));
+    // 朗读入口已改为正文区域点击（AppBar 播放按钮已移除）。
+    await tester.tap(find.text('床前明月光，'));
     await tester.pump();
 
-    expect(find.byTooltip('朗读全文'), findsOneWidget);
-    expect(find.byTooltip('停止朗读'), findsNothing);
+    // 失败路径：遮罩解除 + SnackBar 提示。
+    expect(find.text('语音合成中…'), findsNothing);
     expect(find.text('朗读失败，请检查系统语音服务后重试'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());

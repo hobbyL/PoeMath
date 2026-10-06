@@ -167,12 +167,20 @@ class TtsService {
   }
 
   /// 单段朗读统一入口：云端优先，失败回退系统引擎完成当段。
-  Future<void> _speakSegmentBestEffort(String text) async {
+  ///
+  /// [onFirstReady]：该段为本次朗读首段且播放动作成功时触发一次
+  /// （云端 play 成功后 / 系统 speak 成功后）；异常路径不触发。
+  /// 播放完成时若已请求停止（stop 抢跑/中断），视为无音频在播，不触发。
+  Future<void> _speakSegmentBestEffort(
+    String text, {
+    void Function()? onFirstReady,
+  }) async {
     if (_cloudMode) {
       final bytes = await _synthesizeCloud(text);
       if (bytes != null) {
         try {
           await _cloudPlayerResolved.play(bytes);
+          if (!_stopRequested) onFirstReady?.call();
           return;
         } on Object catch (error) {
           // 播放失败不回退系统朗读，避免同一句双读。
@@ -186,6 +194,7 @@ class TtsService {
       await _tts.speak(text);
       _throwIfEngineReportedError();
     });
+    if (!_stopRequested) onFirstReady?.call();
   }
 
   Future<T> _runEngineOperation<T>(
@@ -313,7 +322,10 @@ class TtsService {
   }
 
   /// 朗读文本（全文一次性读完）。
-  Future<void> speak(String text) async {
+  ///
+  /// [onReady] 在首段音频开始播放后触发一次（缓存命中/系统 TTS 也保证触发）；
+  /// 朗读异常路径不触发。
+  Future<void> speak(String text, {void Function()? onReady}) async {
     await _ensureInitialized();
     await _refreshCloudState();
     _isSpeaking = true;
@@ -321,7 +333,7 @@ class TtsService {
     _engineErrorMessage = null;
 
     try {
-      await _speakSegmentBestEffort(text);
+      await _speakSegmentBestEffort(text, onFirstReady: onReady);
     } finally {
       _isSpeaking = false;
     }
@@ -330,10 +342,12 @@ class TtsService {
   /// 逐句朗读：按句号、问号、感叹号、逗号、换行分割，依次朗读。
   ///
   /// [onSentenceStart] 回调：传入当前朗读的句子索引。
+  /// [onReady] 在首句音频开始播放后触发一次；异常路径不触发。
   /// [onComplete] 在全部朗读完毕时调用。
   Future<void> speakSentences(
     String text, {
     void Function(int index)? onSentenceStart,
+    void Function()? onReady,
     void Function()? onComplete,
   }) async {
     await _ensureInitialized();
@@ -354,7 +368,10 @@ class TtsService {
       for (var i = 0; i < sentences.length; i++) {
         if (_stopRequested) break;
         onSentenceStart?.call(i);
-        await _speakSegmentBestEffort(sentences[i]);
+        await _speakSegmentBestEffort(
+          sentences[i],
+          onFirstReady: i == 0 ? onReady : null,
+        );
       }
       completed = !_stopRequested;
     } finally {
@@ -366,11 +383,13 @@ class TtsService {
 
   /// 逐行朗读：调用方提供已拆分的行列表，确保索引与视觉行一一对应。
   ///
-  /// [onLineStart] 回调：传入当前朗读的行索引。
+  /// [onLineStart] 回调：传入当前朗读的行索引（合成 await 之前触发）。
+  /// [onReady] 在首行音频开始播放后触发一次；异常路径不触发。
   /// [onComplete] 在全部朗读完毕时调用。
   Future<void> speakLines(
     List<String> lines, {
     void Function(int index)? onLineStart,
+    void Function()? onReady,
     void Function()? onComplete,
   }) async {
     await _ensureInitialized();
@@ -384,7 +403,10 @@ class TtsService {
       for (var i = 0; i < lines.length; i++) {
         if (_stopRequested) break;
         onLineStart?.call(i);
-        await _speakSegmentBestEffort(lines[i]);
+        await _speakSegmentBestEffort(
+          lines[i],
+          onFirstReady: i == 0 ? onReady : null,
+        );
       }
       completed = !_stopRequested;
     } finally {
