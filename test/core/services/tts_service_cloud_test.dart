@@ -115,11 +115,15 @@ class _ScriptedHttpClient extends http.BaseClient {
     required this.counter,
     this.failKind,
     this.failFirstOnly = false,
+    this.synthGate,
   });
 
   final _RequestCounter counter;
   final WorkerTtsErrorKind? failKind;
   final bool failFirstOnly;
+
+  /// 合成闸门：非空时每个请求先挂起直到闸门完成（模拟合成 await 窗口）。
+  final Completer<void>? synthGate;
 
   final List<Map<String, dynamic>> bodies = <Map<String, dynamic>>[];
 
@@ -131,6 +135,8 @@ class _ScriptedHttpClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final gate = synthGate;
+    if (gate != null) await gate.future;
     counter.value++;
     final body = await request.finalize().bytesToString();
     bodies.add(jsonDecode(body) as Map<String, dynamic>);
@@ -180,12 +186,14 @@ WorkerTtsClient _client(
   _RequestCounter counter, {
   WorkerTtsErrorKind? failKind,
   bool failFirstOnly = false,
+  Completer<void>? synthGate,
 }) {
   return WorkerTtsClient(
     httpClient: _ScriptedHttpClient(
       counter: counter,
       failKind: failKind,
       failFirstOnly: failFirstOnly,
+      synthGate: synthGate,
     ),
   );
 }
@@ -315,7 +323,36 @@ void main() {
     expect(readyCount, 1);
   });
 
-  test('云端播放抛错跳过该句时 onReady 仍触发（遮罩不锁死）', () async {
+  test('云端合成挂起期间 stop：合成返回后不播放且不触发 onReady（AC2）', () async {
+    final counter = _RequestCounter();
+    final synthGate = Completer<void>();
+    final tts = _FakeFlutterTts();
+    final player = _FakeCloudAudioPlayer(events: <String>[]);
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: tts,
+      cloudClient: _client(counter, synthGate: synthGate),
+      cloudPlayer: player,
+    );
+    var readyCount = 0;
+
+    final task = service.speak('床前明月光', onReady: () => readyCount++);
+    // 等待进入合成 await 窗口。
+    await Future<void>.delayed(Duration.zero);
+    expect(player.played, isEmpty);
+
+    // 合成挂起期间用户请求停止，随后合成才返回字节。
+    await service.stop();
+    synthGate.complete();
+    await task;
+
+    // 孤儿音频消除：不发起播放、不触发 onReady、不回退系统朗读。
+    expect(player.played, isEmpty);
+    expect(readyCount, 0);
+    expect(tts.spokenTexts, isEmpty);
+  });
+
+  test('云端播放抛错跳过该句时 onReady 仍触发且会话上抛（AC4）', () async {
     final counter = _RequestCounter();
     final player = _FakeCloudAudioPlayer()..throwOnPlay = true;
     final service = TtsService(
@@ -326,9 +363,20 @@ void main() {
     );
     var readyCount = 0;
 
-    await service.speak('床前明月光', onReady: () => readyCount++);
+    // R3：单段会话「合成成功但播放失败」= 全跳句 → 上抛 TtsException，
+    // 页面按朗读失败提示，不再静默会话。
+    await expectLater(
+      service.speak('床前明月光', onReady: () => readyCount++),
+      throwsA(
+        isA<TtsException>().having(
+          (error) => error.message,
+          'message',
+          contains('云端音频播放失败'),
+        ),
+      ),
+    );
 
-    // 旧缺陷：play 抛错走「跳过该句」return，onReady 永不触发 → 遮罩
+    // 旧缺陷一：play 抛错走「跳过该句」return，onReady 永不触发 → 遮罩
     // 锁死整个会话。新契约：发起前已触发。
     expect(player.playFailures, 1);
     expect(readyCount, 1);
@@ -432,7 +480,7 @@ void main() {
     expect(tts.spokenTexts, ['床前明月光', '疑是地上霜', '举头望明月']);
   });
 
-  test('云端播放抛错时跳过该行且不回退系统朗读（无双读）', () async {
+  test('云端播放抛错时跳过该行且不回退系统朗读，全跳句上抛（AC4）', () async {
     final counter = _RequestCounter();
     final tts = _FakeFlutterTts();
     final player = _FakeCloudAudioPlayer()..throwOnPlay = true;
@@ -443,13 +491,40 @@ void main() {
       cloudPlayer: player,
     );
 
-    await service.speakLines(['床前明月光', '疑是地上霜']);
+    // 两行均合成并尝试播放，播放失败仅跳过该行；所有段全跳句 →
+    // R3：会话结束上抛（静默会话缺陷修复）。
+    await expectLater(
+      service.speakLines(['床前明月光', '疑是地上霜']),
+      throwsA(isA<TtsException>()),
+    );
 
-    // 两行均合成并尝试播放，播放失败仅跳过该行。
     expect(counter.value, 2);
     expect(player.playFailures, 2);
     // 系统引擎不得补读，避免同一句被读两遍。
     expect(tts.spokenTexts, isEmpty);
+  });
+
+  test('云端部分行播放成功：跳句保持静默续播不上抛（AC4）', () async {
+    final counter = _RequestCounter();
+    final tts = _FakeFlutterTts();
+    final player = _FakeCloudAudioPlayer()..throwOnPlayLimit = 1;
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: tts,
+      cloudClient: _client(counter),
+      cloudPlayer: player,
+    );
+    var completed = false;
+
+    await service.speakLines(
+      ['床前明月光', '疑是地上霜'],
+      onComplete: () => completed = true,
+    );
+
+    // 第一行跳句、第二行播成：部分成功 → 不上抛、完成回调正常。
+    expect(player.playFailures, 1);
+    expect(player.played.length, 2);
+    expect(completed, isTrue);
   });
 
   test('同一句重复朗读命中缓存不重复请求', () async {

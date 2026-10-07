@@ -318,7 +318,7 @@ void main() {
     expect(service.isSpeaking, isFalse);
   });
 
-  test('stop 在首段播放发起前抢跑时 onReady 不触发', () async {
+  test('stop 在首段播放发起前抢跑时 onReady 不触发且不发起播放', () async {
     var readyCount = 0;
 
     await service.speakLines(
@@ -329,8 +329,48 @@ void main() {
     );
 
     // 触发时 _stopRequested 已置位 → 不触发；循环也不再继续。
+    // 缺陷 2 修复后段发起有停止守卫：该句连系统 speak 都不发起
+    // （旧断言 ['第一行'] 固化了「孤儿音频」缺陷，现翻转为空）。
     expect(readyCount, 0);
-    expect(engine.spokenTexts, const <String>['第一行']);
+    expect(engine.spokenTexts, const <String>[]);
+    expect(service.isSpeaking, isFalse);
+  });
+
+  test('旧会话挂起中开新会话：旧会话剩余行不再播放（会话令牌，AC1）', () async {
+    final firstLine = Completer<dynamic>();
+    final newLine = Completer<dynamic>();
+    engine.controlledSpeaks.addAll(<Completer<dynamic>>[firstLine, newLine]);
+    final oldStarted = <int>[];
+    var oldCompleted = false;
+
+    // 旧会话：两行，首行挂起中。
+    final oldSession = service.speakLines(
+      const <String>['旧行一', '旧行二'],
+      onLineStart: oldStarted.add,
+      onComplete: () => oldCompleted = true,
+    );
+    await _flushMicrotasks();
+    expect(engine.spokenTexts, const <String>['旧行一']);
+
+    // 旧会话首行仍挂起时直接开新会话（stop 失败后页面直达新朗读的
+    // 等价时序：新入口会复位 _stopRequested，但旧会话必须按代际退出）。
+    final newSession = service.speakLines(const <String>['新行一']);
+    await _flushMicrotasks();
+    expect(engine.spokenTexts, const <String>['旧行一', '新行一']);
+
+    // 放行旧会话挂起的 speak：代际失配 → 旧会话不读「旧行二」、
+    // 不触发 onComplete；新会话不受影响。
+    firstLine.complete(1);
+    await _flushMicrotasks();
+    expect(engine.spokenTexts, const <String>['旧行一', '新行一']);
+    expect(oldStarted, const <int>[0]);
+    expect(oldCompleted, isFalse);
+
+    newLine.complete(1);
+    await oldSession;
+    await newSession;
+    expect(engine.spokenTexts, const <String>['旧行一', '新行一']);
+    expect(oldCompleted, isFalse);
     expect(service.isSpeaking, isFalse);
   });
 

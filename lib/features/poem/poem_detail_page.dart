@@ -26,6 +26,13 @@ final _pinyinVisibleProvider = StateProvider<bool>((ref) {
   return settings.pinyinVisible;
 });
 
+/// 可播放区域目标：区域编号 + 播放文本。
+///
+/// 以单一 record 参数在折叠区构建与点击入口之间传递（R5），
+/// 编译期保证两者同进同出——只传其一会失去可播性的旧双参数
+/// 形态不再存在。
+typedef _PlayTarget = ({int section, String playText});
+
 class PoemDetailPage extends ConsumerStatefulWidget {
   const PoemDetailPage({super.key, required this.poemId});
 
@@ -99,15 +106,22 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   ///
   /// 语义（PRD R2/R3）：
   /// - 遮罩期点击：直接忽略（遮罩本身也拦截，此处双保险）
-  /// - 点击正在朗读的区域：仅停止
+  /// - 点击正在朗读的区域：仅停止——同样先置遮罩再 stop，挡住停止
+  ///   挂起期的连点（缺陷 3：第二次点击被 `_isPreparing` 代码守卫拦截，
+  ///   不会二次 stop）
   /// - 朗读中点击其他区域：先置遮罩再停止当前并播放新区域——遮罩挡住
   ///   停止窗口期的连点（R3）；stop 失败则提示并放弃切换，不启动新朗读，
   ///   避免新旧会话在同一引擎上双读（R2）
   /// - 空闲点击：播放该区域
-  Future<void> _onTapSection(int section, String text) async {
+  Future<void> _onTapSection(_PlayTarget target) async {
     if (_isPreparing) return;
-    if (_isSpeaking && _activeSection == section) {
+    if (_isSpeaking && _activeSection == target.section) {
+      // 同区停止同样进入遮罩：与切换分支一致的重入守卫（缺陷 3）。
+      setState(() => _isPreparing = true);
       await _stopSpeaking();
+      // 成败均复位遮罩；stop 失败时 `_isSpeaking` 由 `_stopSpeaking`
+      // 保留（音频可能仍在播），遮罩不允许挂死。
+      if (mounted) setState(() => _isPreparing = false);
       return;
     }
     if (_isSpeaking) {
@@ -122,13 +136,18 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       }
     }
     if (!mounted) return;
-    await _startSpeak(section, text);
+    await _startSpeak(target.section, target.playText);
   }
 
   /// 停止当前朗读并清理全部播放态。
   ///
   /// 返回 stop 是否成功；失败时已弹出 SnackBar 提示，调用方不得启动
   /// 新朗读（否则新旧会话双读）。
+  ///
+  /// 状态语义（缺陷 1）：stop 失败时引擎音频可能仍在播——**保留**
+  /// `_isSpeaking` / `_activeSection` / `_currentLineIndex`（页面不得
+  /// 显示空闲，否则再点任意区域会绕过停止直达新朗读），让后续点击
+  /// 继续走停止路由；仅成功路径清态。
   Future<bool> _stopSpeaking() async {
     _speakGeneration++; // 使旧会话的回调全部失效
     final scaffold = ScaffoldMessenger.of(context);
@@ -147,15 +166,16 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           const SnackBar(content: Text('停止朗读失败，请稍后重试')),
         );
       }
+      // 失败保留播放态：音频确实还在播，页面不得显示空闲（缺陷 1）。
       return false;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSpeaking = false;
-          _currentLineIndex = -1;
-          _activeSection = -1;
-        });
-      }
+    }
+    // 仅成功路径清态（原 finally 无条件清态是缺陷 1 的 UI 半边）。
+    if (mounted) {
+      setState(() {
+        _isSpeaking = false;
+        _currentLineIndex = -1;
+        _activeSection = -1;
+      });
     }
     return true;
   }
@@ -325,7 +345,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               // 正文（整块可点击朗读，逐行显示，朗读时当前行高亮）
               _buildSection(
                 context,
-                onTap: () => _onTapSection(_sectionContent, poem.content),
+                onTap: () => _onTapSection(
+                  (section: _sectionContent, playText: poem.content),
+                ),
                 child: Center(
                   child: _buildContentLines(poem, theme),
                 ),
@@ -346,8 +368,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   context,
                   icon: Icons.translate,
                   title: '译文',
-                  section: _sectionTranslation,
-                  playText: poem.translation,
+                  playTarget: (
+                    section: _sectionTranslation,
+                    playText: poem.translation,
+                  ),
                   child: Text(
                     poem.translation,
                     style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
@@ -362,8 +386,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   context,
                   icon: Icons.edit_note,
                   title: '注释',
-                  section: _sectionAnnotations,
-                  playText: annotationsText,
+                  playTarget: (
+                    section: _sectionAnnotations,
+                    playText: annotationsText,
+                  ),
                   child: _buildAnnotationsList(context, poem),
                 ),
               ],
@@ -375,8 +401,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   context,
                   icon: Icons.local_florist_outlined,
                   title: '赏析',
-                  section: _sectionAppreciation,
-                  playText: poem.appreciation,
+                  playTarget: (
+                    section: _sectionAppreciation,
+                    playText: poem.appreciation,
+                  ),
                   child: Text(
                     poem.appreciation,
                     style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
@@ -391,8 +419,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   context,
                   icon: Icons.history_edu_outlined,
                   title: '创作背景',
-                  section: _sectionBackground,
-                  playText: poem.background,
+                  playTarget: (
+                    section: _sectionBackground,
+                    playText: poem.background,
+                  ),
                   child: Text(
                     poem.background,
                     style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
@@ -588,20 +618,19 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
 
   /// 通用折叠区块：图标 + 标题 + 可展开内容，使用 ColoredCard 包裹。
   ///
-  /// [section] / [playText] 提供时，展开后的内容区域可点击播放该文本，
+  /// [playTarget] 提供时，展开后的内容区域可点击播放该目标文本，
   /// 播放中在标题旁显示 graphic_eq 小图标（不参与点击的作者简介等不传）。
   Widget _buildCollapsibleSection(
     BuildContext context, {
     required IconData icon,
     required String title,
     required Widget child,
-    int? section,
-    String? playText,
+    _PlayTarget? playTarget,
   }) {
     final theme = Theme.of(context);
-    final playing = section != null &&
+    final playing = playTarget != null &&
         _isSpeaking &&
-        _activeSection == section;
+        _activeSection == playTarget.section;
     return ColoredCard(
       color: theme.colorScheme.primary,
       backgroundOpacity: 0.06,
@@ -646,11 +675,11 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           ),
           shape: const Border(),
           collapsedShape: const Border(),
-          // 展开内容可点击播放：section/playText 非空时在此统一包裹，
-          // 调用点只传一次参数（R4），指示图标与播放文本永不错位。
+          // 展开内容可点击播放：playTarget 非空时在此统一包裹，
+          // 调用点只传单一目标参数（R5），指示图标与播放文本永不错位。
           children: [
-            if (section != null && playText != null)
-              _buildPlayableChild(section, playText, child)
+            if (playTarget != null)
+              _buildPlayableChild(playTarget, child)
             else
               child,
           ],
@@ -662,9 +691,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   /// 折叠区展开内容的播放包裹（[_buildCollapsibleSection] 内部实现细节）。
   ///
   /// 仅包内容 child，不包标题行——折叠态点击标题仍走展开/收起。
-  Widget _buildPlayableChild(int section, String playText, Widget child) {
+  Widget _buildPlayableChild(_PlayTarget target, Widget child) {
     return InkWell(
-      onTap: () => _onTapSection(section, playText),
+      onTap: () => _onTapSection(target),
       child: Align(
         alignment: Alignment.centerLeft,
         child: child,
@@ -713,8 +742,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       context,
       icon: Icons.format_quote,
       title: '名句',
-      section: _sectionFamousLines,
-      playText: playText,
+      playTarget: (section: _sectionFamousLines, playText: playText),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: lines.map((line) {

@@ -14,6 +14,21 @@ import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
+/// 单段朗读结果（云端全跳句检测）。
+enum _SegmentPlayResult {
+  /// 云端合成成功并完成播放。
+  playedCloud,
+
+  /// 系统引擎完成当段（含云端合成失败回退）。
+  playedSystem,
+
+  /// 云端合成成功但播放失败，跳过该句（不回退系统，避免双读）。
+  skippedCloudPlay,
+
+  /// 未发起播放（stop 抢跑或会话已被新会话接管）。
+  notStarted,
+}
+
 /// TTS 朗读服务。
 ///
 /// 支持全文朗读、逐句/逐行朗读与音色选择；云端模式逐段合成、
@@ -23,6 +38,9 @@ class TtsService {
 
   /// 云端合成内存 LRU 容量（行级 mp3，< 2MB）。
   static const int _cloudCacheCapacity = 32;
+
+  /// 云端全跳句（所有段合成成功但播放均失败）时上抛的异常消息。
+  static const String _cloudAllPlaySkippedMessage = '云端音频播放失败，请稍后重试';
 
   final FlutterTts _tts;
   final SettingsRepository _settings;
@@ -44,6 +62,14 @@ class TtsService {
   /// 用户主动停止标志，仅 [stop] 方法设置，
   /// 避免 completionHandler 干扰 [speakLines] 循环。
   bool _stopRequested = false;
+
+  /// 会话代际令牌：新朗读入口 / [stop] / [dispose] 均递增。
+  ///
+  /// 在途会话持有入口捕获的代际，在循环迭代与段发起（onReady 触发、
+  /// `play(bytes)` / `speak(text)` 发起）前校验，失配即退出——根治
+  /// 「stop 失败后旧循环复活双读」与「停止后合成返回仍出声的孤儿音频」
+  /// 两类竞态，不再依赖事件循环时序运气。
+  int _sessionGeneration = 0;
 
   TtsService(
     this._settings, {
@@ -168,40 +194,75 @@ class TtsService {
 
   /// 单段朗读统一入口：云端优先，失败回退系统引擎完成当段。
   ///
+  /// [generation] 为本次朗读会话的代际令牌：在触发 [onFirstReady] 与
+  /// 发起 `play(bytes)` / `speak(text)` **之前**校验（合成 await 返回后、
+  /// 引擎准备完成后各校验一次），失配或已请求停止则返回
+  /// [_SegmentPlayResult.notStarted]——不触发回调、不发起播放，
+  /// 消灭「用户已请求停止后合成返回仍完整播出」的孤儿音频。
+  ///
   /// [onFirstReady]：该段为本次朗读首段时，在播放动作**发起前**触发一次
   /// （云端在 `play(bytes)` 之前、系统在 `speak(text)` 之前）——语义是
   /// 「首段音频就绪、播放即将开始」，页面遮罩在出声前解除；云端 play
   /// 抛错走「跳过该句」的分支同样已触发（后续行会继续播放，遮罩不允许
   /// 锁死整个会话）。合成/引擎准备异常路径不触发；触发时若已请求停止
-  /// （stop 抢跑）不触发。
-  Future<void> _speakSegmentBestEffort(
+  /// （stop 抢跑）或会话已过期不触发。
+  Future<_SegmentPlayResult> _speakSegmentBestEffort(
     String text, {
+    required int generation,
     void Function()? onFirstReady,
   }) async {
+    if (_stopRequested || generation != _sessionGeneration) {
+      return _SegmentPlayResult.notStarted;
+    }
     if (_cloudMode) {
       final bytes = await _synthesizeCloud(text);
       if (bytes != null) {
+        // 合成 await 是长窗口：返回后再次校验代际，stop 抢跑或新会话
+        // 接管均不再发起播放（孤儿音频根治点）。
+        if (_stopRequested || generation != _sessionGeneration) {
+          return _SegmentPlayResult.notStarted;
+        }
         // 首段就绪：在播放动作发起前触发，遮罩在出声前解除；
         // play 抛错跳句的分支也已触发，遮罩不会锁死整个会话。
-        if (!_stopRequested) onFirstReady?.call();
+        onFirstReady?.call();
         try {
           await _cloudPlayerResolved.play(bytes);
-          return;
+          return _SegmentPlayResult.playedCloud;
         } on Object catch (error) {
           // 播放失败不回退系统朗读，避免同一句双读。
           AppLogger.w('云端音频播放失败，跳过该句：$error', tag: _logTag);
-          return;
+          return _SegmentPlayResult.skippedCloudPlay;
         }
       }
     }
+    var initiated = false;
     await _runEngineOperation('朗读失败', () async {
       await _tts.setSpeechRate(_settings.ttsSpeed);
-      // 播放动作发起前触发（紧随 setSpeechRate、speak 之前）。
-      if (!_stopRequested) onFirstReady?.call();
+      // 播放动作发起前触发（紧随 setSpeechRate、speak 之前）；
+      // stop 抢跑或代际失配则整段不发起（含系统路径的孤儿音频守卫）。
+      if (_stopRequested || generation != _sessionGeneration) return;
+      initiated = true;
+      onFirstReady?.call();
       await _tts.speak(text);
       _throwIfEngineReportedError();
     });
+    return initiated
+        ? _SegmentPlayResult.playedSystem
+        : _SegmentPlayResult.notStarted;
   }
+
+  /// 会话是否完整跑完（未被 stop 打断、未被新会话接管）。
+  bool _sessionCompleted(int generation) =>
+      !_stopRequested && generation == _sessionGeneration;
+
+  /// 云端模式下所有段均「合成成功但播放失败」且段数 > 0。
+  ///
+  /// `skippedCloudPlay` 只在云路径产生，等价于「云端模式全跳句」；
+  /// 部分成功（任一段 playedCloud / playedSystem）保持静默——
+  /// 单句跳过是既有容错语义。
+  bool _isCloudAllSkipped(List<_SegmentPlayResult> results) =>
+      results.isNotEmpty &&
+      results.every((result) => result == _SegmentPlayResult.skippedCloudPlay);
 
   Future<T> _runEngineOperation<T>(
     String failureMessage,
@@ -331,17 +392,33 @@ class TtsService {
   ///
   /// [onReady] 在首段播放动作发起时触发一次（合成成功后、play/speak 之前，
   /// 缓存命中/系统 TTS 也保证触发）；合成异常或已请求停止时不触发。
+  ///
+  /// 云端模式下该段「合成成功但播放失败」（全跳句）时上抛 [TtsException]，
+  /// 页面按朗读失败提示，不再静默（缺陷 4）。
   Future<void> speak(String text, {void Function()? onReady}) async {
     await _ensureInitialized();
     await _refreshCloudState();
+    // 新会话令牌：使所有旧会话失效（旧循环与在途段发起按代际退出）。
+    // 停止标志同时复位——新会话自身需在「先 stop 再 speak」流程
+    // （如跟读范读切换）后正常运行；旧会话不再因复位而复活。
+    final generation = ++_sessionGeneration;
     _isSpeaking = true;
     _stopRequested = false;
     _engineErrorMessage = null;
 
     try {
-      await _speakSegmentBestEffort(text, onFirstReady: onReady);
+      final result = await _speakSegmentBestEffort(
+        text,
+        generation: generation,
+        onFirstReady: onReady,
+      );
+      if (_sessionCompleted(generation) &&
+          _isCloudAllSkipped(<_SegmentPlayResult>[result])) {
+        throw const TtsException(_cloudAllPlaySkippedMessage);
+      }
     } finally {
-      _isSpeaking = false;
+      // 过期会话不清位（新会话正持有 _isSpeaking），仅当前会话清零。
+      if (generation == _sessionGeneration) _isSpeaking = false;
     }
   }
 
@@ -351,6 +428,9 @@ class TtsService {
   /// [onReady] 在首句播放动作发起时触发一次（speak 之前）；合成异常或
   /// 已请求停止时不触发。
   /// [onComplete] 在全部朗读完毕时调用。
+  ///
+  /// 云端模式下所有句均「合成成功但播放失败」（全跳句）时上抛
+  /// [TtsException]（缺陷 4）；部分成功保持静默续播。
   Future<void> speakSentences(
     String text, {
     void Function(int index)? onSentenceStart,
@@ -359,6 +439,8 @@ class TtsService {
   }) async {
     await _ensureInitialized();
     await _refreshCloudState();
+    // 新会话令牌：使所有旧会话失效；停止标志复位供本会话运行。
+    final generation = ++_sessionGeneration;
     _stopRequested = false;
     _engineErrorMessage = null;
 
@@ -370,22 +452,31 @@ class TtsService {
         .toList();
 
     var completed = false;
+    final results = <_SegmentPlayResult>[];
     _isSpeaking = true;
     try {
       for (var i = 0; i < sentences.length; i++) {
-        if (_stopRequested) break;
+        if (_stopRequested || generation != _sessionGeneration) break;
         onSentenceStart?.call(i);
-        await _speakSegmentBestEffort(
-          sentences[i],
-          onFirstReady: i == 0 ? onReady : null,
+        results.add(
+          await _speakSegmentBestEffort(
+            sentences[i],
+            generation: generation,
+            onFirstReady: i == 0 ? onReady : null,
+          ),
         );
       }
-      completed = !_stopRequested;
+      completed = _sessionCompleted(generation);
     } finally {
-      _isSpeaking = false;
+      // 过期会话不清位（新会话正持有 _isSpeaking），仅当前会话清零。
+      if (generation == _sessionGeneration) _isSpeaking = false;
     }
 
-    if (completed) onComplete?.call();
+    final allSkipped = _isCloudAllSkipped(results);
+    if (completed && !allSkipped) onComplete?.call();
+    if (completed && allSkipped) {
+      throw const TtsException(_cloudAllPlaySkippedMessage);
+    }
   }
 
   /// 逐行朗读：调用方提供已拆分的行列表，确保索引与视觉行一一对应。
@@ -394,6 +485,9 @@ class TtsService {
   /// [onReady] 在首行播放动作发起时触发一次（合成成功后、播放之前）；
   /// 合成异常或已请求停止时不触发。
   /// [onComplete] 在全部朗读完毕时调用。
+  ///
+  /// 云端模式下所有行均「合成成功但播放失败」（全跳句）时上抛
+  /// [TtsException]（缺陷 4）；部分成功保持静默续播。
   Future<void> speakLines(
     List<String> lines, {
     void Function(int index)? onLineStart,
@@ -402,31 +496,46 @@ class TtsService {
   }) async {
     await _ensureInitialized();
     await _refreshCloudState();
+    // 新会话令牌：使所有旧会话失效；停止标志复位供本会话运行。
+    final generation = ++_sessionGeneration;
     _stopRequested = false;
     _engineErrorMessage = null;
 
     var completed = false;
+    final results = <_SegmentPlayResult>[];
     _isSpeaking = true;
     try {
       for (var i = 0; i < lines.length; i++) {
-        if (_stopRequested) break;
+        if (_stopRequested || generation != _sessionGeneration) break;
         onLineStart?.call(i);
-        await _speakSegmentBestEffort(
-          lines[i],
-          onFirstReady: i == 0 ? onReady : null,
+        results.add(
+          await _speakSegmentBestEffort(
+            lines[i],
+            generation: generation,
+            onFirstReady: i == 0 ? onReady : null,
+          ),
         );
       }
-      completed = !_stopRequested;
+      completed = _sessionCompleted(generation);
     } finally {
-      _isSpeaking = false;
+      // 过期会话不清位（新会话正持有 _isSpeaking），仅当前会话清零。
+      if (generation == _sessionGeneration) _isSpeaking = false;
     }
 
-    if (completed) onComplete?.call();
+    final allSkipped = _isCloudAllSkipped(results);
+    if (completed && !allSkipped) onComplete?.call();
+    if (completed && allSkipped) {
+      throw const TtsException(_cloudAllPlaySkippedMessage);
+    }
   }
 
   /// 停止朗读（云端与系统引擎均停止）。
   Future<void> stop() async {
     _stopRequested = true;
+    // 会话令牌递增：所有在途会话（含引擎 stop 失败后仍挂起的旧循环）
+    // 在下一次迭代 / 段发起前按代际退出——即使后续新入口复位
+    // `_stopRequested`，旧会话也不会复活（缺陷 1 根治点）。
+    _sessionGeneration++;
     _isSpeaking = false;
     final player = _cloudPlayer;
     if (player != null) {
@@ -444,6 +553,7 @@ class TtsService {
   /// 释放资源。
   void dispose() {
     _stopRequested = true;
+    _sessionGeneration++; // 使所有在途会话失效。
     _isSpeaking = false;
     final player = _cloudPlayer;
     if (player != null) {
