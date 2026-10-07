@@ -5,10 +5,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
+
+/// stop() 挂在闸门上的假云端播放器（AC3：制造 stop 的平台调用窗口）。
+class _HoldingStopCloudPlayer implements CloudAudioPlayer {
+  _HoldingStopCloudPlayer(this.gate);
+
+  final Completer<void> gate;
+  int stopCalls = 0;
+
+  @override
+  Future<void> play(Uint8List bytes) async {}
+
+  @override
+  Future<void> stop() async {
+    stopCalls++;
+    await gate.future;
+  }
+
+  @override
+  Future<void> dispose() async {}
+}
 
 class _FakeFlutterTts extends Fake implements FlutterTts {
   final List<String> calls = <String>[];
@@ -18,7 +39,12 @@ class _FakeFlutterTts extends Fake implements FlutterTts {
   Object? awaitCompletionError;
   int? failSpeakAt;
   int awaitCompletionCallCount = 0;
+  int stopCallCount = 0;
   int _speakCallCount = 0;
+
+  /// 初始化闸门：非空时 awaitSpeakCompletion 先挂起（模拟冷启动初始化
+  /// 的真实异步窗口，AC1）。
+  Completer<void>? initGate;
 
   @override
   VoidCallback? cancelHandler;
@@ -60,6 +86,8 @@ class _FakeFlutterTts extends Fake implements FlutterTts {
   Future<dynamic> awaitSpeakCompletion(bool awaitCompletion) async {
     calls.add('awaitSpeakCompletion:$awaitCompletion');
     awaitCompletionCallCount++;
+    final gate = initGate;
+    if (gate != null) await gate.future;
     final error = awaitCompletionError;
     if (error != null) throw error;
     return 1;
@@ -94,6 +122,7 @@ class _FakeFlutterTts extends Fake implements FlutterTts {
   @override
   Future<dynamic> stop() async {
     calls.add('stop');
+    stopCallCount++;
     for (final completer in controlledSpeaks) {
       if (!completer.isCompleted) {
         completer.complete(1);
@@ -199,7 +228,16 @@ void main() {
         onLineStart: started.add,
         onComplete: () => completed = true,
       ),
-      throwsA(isA<TtsException>()),
+      // message 会被页面拼接前缀（如「朗读失败：${message}」），其自身
+      // 不得再含前缀字样——否则拼出「朗读失败：朗读失败」式重复文案
+      // （缺陷 2 复核补断言）。
+      throwsA(
+        isA<TtsException>().having(
+          (error) => error.message,
+          'message',
+          isNot(contains('朗读失败')),
+        ),
+      ),
     );
 
     expect(engine.spokenTexts, const <String>['第一行', '第二行']);
@@ -378,5 +416,117 @@ void main() {
     await service.stop();
 
     expect(engine.calls, isEmpty);
+  });
+
+  test('入口初始化挂起期间 stop：resume 后零播放零回调（AC1，缺陷 1）', () async {
+    final initGate = Completer<void>();
+    engine.initGate = initGate;
+    final lineStarts = <int>[];
+    var readyCount = 0;
+    var completeCount = 0;
+
+    final task = service.speakLines(
+      const <String>['第一行', '第二行'],
+      onLineStart: lineStarts.add,
+      onReady: () => readyCount++,
+      onComplete: () => completeCount++,
+    );
+    await _flushMicrotasks();
+    // 初始化挂起窗口：引擎尚未播放任何内容。
+    expect(engine.spokenTexts, isEmpty);
+
+    // 窗口内 stop（页面 dispose 的等价时序）：旧实现在 resume 后自成
+    // 最新代并复位停止标志 → 整首照播；新实现入口已捕获令牌，
+    // 首个循环检查即死。
+    await service.stop();
+    initGate.complete();
+    await task;
+
+    expect(engine.spokenTexts, isEmpty);
+    expect(lineStarts, isEmpty);
+    expect(readyCount, 0);
+    expect(completeCount, 0);
+    expect(service.isSpeaking, isFalse);
+  });
+
+  test('入口初始化挂起期间 dispose：resume 后零播放零回调（AC1，缺陷 1）', () async {
+    final initGate = Completer<void>();
+    engine.initGate = initGate;
+    final lineStarts = <int>[];
+    var readyCount = 0;
+    var completeCount = 0;
+
+    final task = service.speakLines(
+      const <String>['第一行', '第二行'],
+      onLineStart: lineStarts.add,
+      onReady: () => readyCount++,
+      onComplete: () => completeCount++,
+    );
+    await _flushMicrotasks();
+    expect(engine.spokenTexts, isEmpty);
+
+    // 窗口内 dispose：递增代际使本会话失效——页面已销毁整首不照播。
+    service.dispose();
+    initGate.complete();
+    await task;
+
+    expect(engine.spokenTexts, isEmpty);
+    expect(lineStarts, isEmpty);
+    expect(readyCount, 0);
+    expect(completeCount, 0);
+    expect(service.isSpeaking, isFalse);
+  });
+
+  test('stop 挂在云端播放器 stop 期间新会话朗读：晚到的引擎 stop 不取消新会话（AC3，缺陷 3）', () async {
+    final stopGate = Completer<void>();
+    final player = _HoldingStopCloudPlayer(stopGate);
+    final cloudService = TtsService(
+      settings,
+      flutterTts: engine,
+      cloudPlayer: player,
+    );
+
+    // 预热：完成引擎初始化，后续 stop 才会走引擎分支。
+    await cloudService.speak('预热');
+    expect(engine.spokenTexts, const <String>['预热']);
+    expect(engine.stopCallCount, 0);
+
+    // 旧 stop：挂在 player.stop()（数百 ms 的平台调用窗口）。
+    final stopTask = cloudService.stop();
+    await Future<void>.delayed(Duration.zero);
+    expect(player.stopCalls, 1);
+
+    // 挂起期间新会话入口并开始播放首行（系统路径，受控挂起证明在播）。
+    // 预热已消耗 speak 调用序号 0，占位使新会话两行落在序号 1、2。
+    final line1Gate = Completer<dynamic>();
+    final line2Gate = Completer<dynamic>();
+    engine.controlledSpeaks.addAll(<Completer<dynamic>>[
+      Completer<dynamic>(), // 序号 0 占位（预热时列表为空，实际不会使用）
+      line1Gate,
+      line2Gate,
+    ]);
+    final newSession = cloudService.speakLines(
+      const <String>['新行一', '新行二'],
+    );
+    await _flushMicrotasks();
+    expect(engine.spokenTexts, const <String>['预热', '新行一']);
+
+    // 放行旧 stop：挂起期间新会话入口已递增代际 → 晚到的引擎 stop
+    // 被代际重校验跳过，不再取消新会话当前句。
+    stopGate.complete();
+    await stopTask;
+    await _flushMicrotasks();
+    expect(engine.stopCallCount, 0);
+    // 新会话首行未被晚到 stop 打断（仍挂起等待自然播完）。
+    expect(engine.spokenTexts, const <String>['预热', '新行一']);
+
+    // 新会话完整跑完：首行自然播完后第二行继续发起并自然播完。
+    line1Gate.complete(1);
+    await _flushMicrotasks();
+    expect(engine.spokenTexts, const <String>['预热', '新行一', '新行二']);
+    line2Gate.complete(1);
+    await newSession;
+    expect(engine.spokenTexts, const <String>['预热', '新行一', '新行二']);
+    expect(cloudService.isSpeaking, isFalse);
   });
 }

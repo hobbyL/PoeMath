@@ -49,6 +49,13 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   /// 点击可播区域后 → 首段音频就绪前的遮罩期，拦截一切重复点击。
   bool _isPreparing = false;
 
+  /// 遮罩期语义：true = 停止中（遮罩文案「正在停止…」），
+  /// false = 合成中（遮罩文案「语音合成中…」）。
+  ///
+  /// 同区停止与切换停止先置遮罩再 await stop，挂起窗口期实际处于
+  /// 「停止中」而非「合成中」，文案需要区分（缺陷 7）。
+  bool _isStopping = false;
+
   /// 当前播放区域：-1 无 / 0 正文 / 1..5 折叠区（见 _Section 常量）。
   int _activeSection = -1;
 
@@ -117,21 +124,39 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     if (_isPreparing) return;
     if (_isSpeaking && _activeSection == target.section) {
       // 同区停止同样进入遮罩：与切换分支一致的重入守卫（缺陷 3）。
-      setState(() => _isPreparing = true);
+      // 遮罩文案为停止语义（缺陷 7）。
+      setState(() {
+        _isPreparing = true;
+        _isStopping = true;
+      });
       await _stopSpeaking();
       // 成败均复位遮罩；stop 失败时 `_isSpeaking` 由 `_stopSpeaking`
       // 保留（音频可能仍在播），遮罩不允许挂死。
-      if (mounted) setState(() => _isPreparing = false);
+      if (mounted) {
+        setState(() {
+          _isPreparing = false;
+          _isStopping = false;
+        });
+      }
       return;
     }
     if (_isSpeaking) {
       // 先置遮罩再 await stop：挡住停止窗口期的二次点击（R3），
-      // 避免 stop 未完成时并发启动第二个朗读会话。
-      setState(() => _isPreparing = true);
+      // 避免 stop 未完成时并发启动第二个朗读会话。遮罩文案为停止
+      // 语义（缺陷 7）。
+      setState(() {
+        _isPreparing = true;
+        _isStopping = true;
+      });
       final stopped = await _stopSpeaking();
       if (!stopped) {
         // stop 失败：SnackBar 已在 _stopSpeaking 内弹出，放弃切换（R2）。
-        if (mounted) setState(() => _isPreparing = false);
+        if (mounted) {
+          setState(() {
+            _isPreparing = false;
+            _isStopping = false;
+          });
+        }
         return;
       }
     }
@@ -188,6 +213,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     final scaffold = ScaffoldMessenger.of(context);
     setState(() {
       _isPreparing = true;
+      _isStopping = false; // 新朗读遮罩回到合成语义。
       _isSpeaking = true;
       _activeSection = section;
     });
@@ -225,10 +251,17 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         stackTrace: stackTrace,
       );
       if (mounted && generation == _speakGeneration) {
+        // TtsException.message 已是面向用户的中文文案（如云端全跳句的
+        // 「云端音频播放失败，请稍后重试」），直接透传；其他异常保留
+        // 通用兜底——云端播放失败不再被误导为系统引擎问题（缺陷 2）。
         scaffold.clearSnackBars();
         scaffold.showSnackBar(
-          const SnackBar(
-            content: Text('朗读失败，请检查系统语音服务后重试'),
+          SnackBar(
+            content: Text(
+              error is TtsException
+                  ? '朗读失败：${error.message}'
+                  : '朗读失败，请检查系统语音服务后重试',
+            ),
           ),
         );
       }
@@ -476,8 +509,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   children: [
                     const CircularProgressIndicator(),
                     const SizedBox(height: SpacingTokens.md),
+                    // 遮罩文案区分语义：合成期「语音合成中…」、停止挂起期
+                    // 「正在停止…」（缺陷 7：停止窗口期显示合成文案误导）。
                     Text(
-                      '语音合成中…',
+                      _isStopping ? '正在停止…' : '语音合成中…',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurface,
                       ),

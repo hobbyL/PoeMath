@@ -429,9 +429,11 @@ void main() {
     await tester.pump();
 
     // 第一次点击译文内容：进入切换窗口期，遮罩立即出现。
+    // 停止窗口期遮罩文案为停止语义（缺陷 7）。
     await tester.tap(find.text(_poem.translation));
     await tester.pump();
-    expect(find.text('语音合成中…'), findsOneWidget);
+    expect(find.text('正在停止…'), findsOneWidget);
+    expect(find.text('语音合成中…'), findsNothing);
 
     // 窗口期第二次点击（遮罩吸收）：Container 命中测试拦截手势。
     await tester.tap(find.text(_poem.translation), warnIfMissed: false);
@@ -520,10 +522,11 @@ void main() {
     await tester.pump();
 
     // 第一次点击同区域：进入停止窗口期，遮罩立即出现（R2：同区停止
-    // 分支与切换分支一致的重入守卫）。
+    // 分支与切换分支一致的重入守卫）；文案为停止语义（缺陷 7 / AC5）。
     await tester.tap(find.text('床前明月光，'));
     await tester.pump();
-    expect(find.text('语音合成中…'), findsOneWidget);
+    expect(find.text('正在停止…'), findsOneWidget);
+    expect(find.text('语音合成中…'), findsNothing);
 
     // 窗口期连点：遮罩吸收 + 绕过遮罩直接调用正文 InkWell onTap
     // 验证 `_isPreparing` 代码守卫（缺陷 5：删守卫此用例必须红）。
@@ -535,6 +538,7 @@ void main() {
     await tester.pump();
     verify(() => tts.stop()).called(1);
     expect(find.text('语音合成中…'), findsNothing);
+    expect(find.text('正在停止…'), findsNothing);
 
     // 收尾：放行挂起的朗读 Future。
     script.signalFinish();
@@ -615,7 +619,9 @@ void main() {
     // 两行均「合成成功但播放失败」→ 不再是遮罩闪一下的静默会话。
     expect(player.playFailures, 2);
     expect(engine.spokenTexts, isEmpty); // 不回退系统双读
-    expect(find.text('朗读失败，请检查系统语音服务后重试'), findsOneWidget);
+    // R2：服务文案（云端音频播放失败）透传到 SnackBar，不再被硬编码
+    // 「请检查系统语音服务」误导排查方向。
+    expect(find.text('朗读失败：云端音频播放失败，请稍后重试'), findsOneWidget);
     expect(find.text('语音合成中…'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());

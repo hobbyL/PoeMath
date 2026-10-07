@@ -200,9 +200,16 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
+        // TtsException.message 已是面向用户的中文文案，直接透传；
+        // 其他异常保留通用兜底——云端播放失败不再被误导为系统引擎
+        // 问题（缺陷 2）。
         scaffold.showSnackBar(
-          const SnackBar(
-            content: Text('范读失败，请检查系统语音服务后重试'),
+          SnackBar(
+            content: Text(
+              error is TtsException
+                  ? '范读失败：${error.message}'
+                  : '范读失败，请检查系统语音服务后重试',
+            ),
           ),
         );
       }

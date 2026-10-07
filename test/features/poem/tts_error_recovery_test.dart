@@ -81,9 +81,9 @@ void main() {
     await tester.tap(find.text('床前明月光，'));
     await tester.pump();
 
-    // 失败路径：遮罩解除 + SnackBar 提示。
+    // 失败路径：遮罩解除 + SnackBar 提示（R2：TtsException 文案透传）。
     expect(find.text('语音合成中…'), findsNothing);
-    expect(find.text('朗读失败，请检查系统语音服务后重试'), findsOneWidget);
+    expect(find.text('朗读失败：引擎不可用'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));
@@ -117,7 +117,45 @@ void main() {
 
     expect(find.text('听一听'), findsOneWidget);
     expect(find.text('停止播放'), findsNothing);
-    expect(find.text('范读失败，请检查系统语音服务后重试'), findsOneWidget);
+    // R2：TtsException 文案透传（范读失败：引擎不可用）。
+    expect(find.text('范读失败：引擎不可用'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('跟读范读云端全跳句失败：SnackBar 透传云端文案而非系统引擎误导（AC2）', (tester) async {
+    // 云端全跳句（合成成功但播放均失败）时服务上抛的面向用户文案；
+    // 页面必须透传——显示「请检查系统语音服务」会把云端播放失败
+    // 误导为系统引擎问题（缺陷 2）。
+    when(() => tts.speak(any<String>()))
+        .thenThrow(const TtsException('云端音频播放失败，请稍后重试'));
+    final settings = _MockSettingsRepository();
+    when(() => settings.loadSpeechRecognitionSettings())
+        .thenAnswer((_) async => _verifiedSettings);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsRepositoryProvider.overrideWithValue(settings),
+          ttsServiceProvider.overrideWithValue(tts),
+          poemByIdProvider(_poemId).overrideWith((ref) => _poem),
+        ],
+        child: MaterialApp(
+          home: PoemReadAlongPage(
+            poemId: _poemId,
+            speechRecognitionService: speech,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('听一听'));
+    await tester.pump();
+
+    expect(find.text('范读失败：云端音频播放失败，请稍后重试'), findsOneWidget);
+    expect(find.textContaining('请检查系统语音服务'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));

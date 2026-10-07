@@ -171,8 +171,16 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
+        // TtsException.message 已是面向用户的中文文案，直接透传；
+        // 其他异常保留通用兜底（缺陷 2：云端播放失败不误导为系统引擎问题）。
         scaffold.showSnackBar(
-          const SnackBar(content: Text('音色已保存，但试听失败')),
+          SnackBar(
+            content: Text(
+              error is TtsException
+                  ? '音色已保存，但试听失败：${error.message}'
+                  : '音色已保存，但试听失败',
+            ),
+          ),
         );
       }
     }
