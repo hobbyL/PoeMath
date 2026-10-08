@@ -7,6 +7,9 @@
 // - 同区再点停止 / 跨区先 stop 再播且仅一次 speakSentences
 // - 合成期遮罩可见且点击不触发第二次朗读；onReady 后遮罩解除
 // - TtsException → SnackBar 含 message
+// - 关联公式导航三段语义：朗读中先停止且成功才导航（AC1）、stop 失败
+//   留在本页（AC2）、空闲直接导航不调 stop（AC3）
+// - 公式区播放中显示 graphic_eq 角标指示，切走后消失（AC4）
 //
 // mock 时序与诗词页同一模式（_SessionIds / _SpeakScript）：
 // mock 必须同构复刻真服务的会话代际令牌语义，否则过期会话的晚到回调
@@ -20,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:poemath/core/services/tts_service.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/formula.dart';
 import 'package:poemath/data/models/formula_param.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -29,6 +33,18 @@ import 'package:poemath/features/formula/providers/formula_providers.dart';
 class _MockTtsService extends Mock implements TtsService {}
 
 const _formulaId = 'tap-play-formula';
+const _relatedFormulaId = 'related-id';
+
+/// 关联公式导航目标（镜像用例 9 的 related 构造）。
+final _relatedFormula = Formula(
+  id: _relatedFormulaId,
+  category: '图形',
+  name: '长方形面积',
+  formulaText: 'S = a × b',
+  formulaLatex: '',
+  grade: 3,
+  relatedFormulas: const [],
+);
 
 final _formula = Formula(
   id: _formulaId,
@@ -151,6 +167,64 @@ Future<void> _pumpPage(WidgetTester tester, TtsService tts) async {
   );
   // 等待 AnimatedPageBody 入场动画完成。
   await tester.pump(const Duration(milliseconds: 500));
+}
+
+/// 带关联公式的测试公式：[relatedFormulas] 指向 [relatedFormula]。
+Formula _formulaWithRelated() => Formula(
+      id: _formulaId,
+      category: _formula.category,
+      name: _formula.name,
+      formulaText: _formula.formulaText,
+      formulaLatex: '',
+      grade: _formula.grade,
+      params: _formula.params,
+      memoryTip: _formula.memoryTip,
+      example: _formula.example,
+      relatedFormulas: const [_relatedFormulaId],
+    );
+
+/// 关联公式导航目标的 pump 结构（用例 9 同一组 provider 覆写）。
+///
+/// 关联公式区在视口外（AnimatedPageBody 是 ListView 懒构建），
+/// 须先滚动到可见。返回后需 `await tester.pumpAndSettle()` 收尾入场动画。
+Future<void> _pumpPageWithRelated(WidgetTester tester, TtsService tts) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        ttsServiceProvider.overrideWithValue(tts),
+        formulaByIdProvider(_formulaId).overrideWith((ref) {
+          return _formulaWithRelated();
+        }),
+        formulaByIdProvider(_relatedFormulaId).overrideWith(
+          (ref) => _relatedFormula,
+        ),
+        // 点击关联公式标签会导航到新 FormulaDetailPage(_relatedFormulaId)，
+        // 其收藏 provider 也需覆写（否则真 provider 触 Hive 未初始化）。
+        isFormulaFavoriteProvider(_relatedFormulaId).overrideWith((ref) => false),
+        isFormulaFavoriteProvider(_formulaId).overrideWith((ref) => false),
+      ],
+      child: const MaterialApp(
+        home: FormulaDetailPage(formulaId: _formulaId),
+      ),
+    ),
+  );
+  // 等待 AnimatedPageBody 入场动画完成。
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
+/// 滚动到关联公式标签并点击，并 pump 一帧让点击处理器 setState 生效。
+///
+/// 注意不在此处 pumpAndSettle：朗读中点击的遮罩 / SnackBar 需要在
+/// stop 结果揭晓前被断言，调用方自行控制后续时序。
+Future<void> _tapRelatedChip(WidgetTester tester) async {
+  await tester.scrollUntilVisible(
+    find.text(_relatedFormula.name),
+    100.0,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(_relatedFormula.name));
+  await tester.pump();
 }
 
 void main() {
@@ -475,6 +549,182 @@ void main() {
     );
     verifyNever(() => tts.stop());
 
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('AC1：朗读中点关联公式 → stop 成功后导航到新详情页', (tester) async {
+    final scripts = _SpeakScriptRecorder(tts, sessions);
+    // stop 挂起（真服务的 stop 耗时数百毫秒）：让「正在停止…」遮罩
+    // 窗口可观察，并控制导航发生在 stop 完成之后。
+    final stopDone = Completer<void>();
+    when(() => tts.stop()).thenAnswer((_) async {
+      sessions.next();
+      await stopDone.future;
+    });
+
+    await _pumpPageWithRelated(tester, tts);
+
+    // 记忆技巧朗读挂起中（首段就绪，朗读未结束）。
+    await tester.tap(find.text('记忆技巧'));
+    await tester.pump();
+    scripts.scripts[0].signalReady();
+    await tester.pump();
+    expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
+
+    // 朗读中点击关联公式标签：先停止（「正在停止…」遮罩），stop 尚未
+    // 完成前不导航（新页 AppBar 标题缺席）。
+    await _tapRelatedChip(tester);
+    expect(find.text('正在停止…'), findsOneWidget);
+    verify(() => tts.stop()).called(1);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text(_relatedFormula.name),
+      ),
+      findsNothing,
+    );
+
+    // stop 完成 → 遮罩清除、导航发生。新页以 400ms 转场滑入，
+    // pumpAndSettle 等转场走完；「长方形面积」的查找限定 AppBar 内，
+    // 排除旧页 body 里的同名 ActionChip 标签。
+    stopDone.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('正在停止…'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text(_relatedFormula.name),
+      ),
+      findsOneWidget,
+    );
+
+    // 收尾：放行挂起的朗读 Future，销毁页面。
+    scripts.scripts[0].signalFinish();
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('AC2：朗读中点关联公式 stop 抛错 → SnackBar、不导航、播放态保留',
+      (tester) async {
+    final scripts = _SpeakScriptRecorder(tts, sessions);
+    // setUp 已注册 stop 的 thenAnswer；同 matcher 后注册整体覆盖前者
+    // （spec recorder 模式条款的反向应用：需要差异行为时重新注册）。
+    when(() => tts.stop()).thenThrow(const TtsException('引擎停止失败'));
+
+    await _pumpPageWithRelated(tester, tts);
+
+    // 记忆技巧朗读挂起中。
+    await tester.tap(find.text('记忆技巧'));
+    await tester.pump();
+    scripts.scripts[0].signalReady();
+    await tester.pump();
+    expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
+
+    // 朗读中点击关联公式标签：stop 抛错 → SnackBar、留在本页。
+    await _tapRelatedChip(tester);
+
+    expect(find.text('停止朗读失败，请稍后重试'), findsOneWidget);
+    // 断言「不导航」前先 settle：导航（若发生）在 stop Future 失败后
+    // 的异步续段里执行，tap 后单帧 pump 不保证续段已被调度——恒导航
+    // 变异体曾在单帧断言下存活（10-08 变异验证实证，测试假绿）。
+    // settle 排空微任务与转场动效，对「晚一拍的导航」同样有咬合力。
+    await tester.pumpAndSettle();
+
+    // 新页未出现（AppBar 标题缺席）。
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text(_relatedFormula.name),
+      ),
+      findsNothing,
+    );
+    // 播放态保留：指示图标仍在（音频可能仍在播）。
+    expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
+    expect(find.text('正在停止…'), findsNothing);
+
+    // 收尾：放行挂起的朗读 Future，销毁页面。
+    scripts.scripts[0].signalFinish();
+    await tester.pump();
+    // stop 抛错的覆盖仅限本用例主流程；收尾销毁页面前恢复成功
+    // stop：mock 的 thenThrow 在方法调用点同步抛出，而 dispose 的
+    // unawaited(_tts.stop().onError(...)) 只能吞 Future 异步失败，
+    // 同步抛会击穿到 tree finalize 阶段炸测试。生产无此隐患——真
+    // TtsService.stop 是 async 函数（语言语义保证同步段抛错也会包装
+    // 进 Future 失败），失败只会走 onError 被吞并记日志。
+    when(() => tts.stop()).thenAnswer((_) async {
+      sessions.next();
+    });
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('AC3：空闲时点关联公式 → 直接导航且不调 stop', (tester) async {
+    _stubSpeakSentences(tts, sessions);
+
+    await _pumpPageWithRelated(tester, tts);
+
+    await _tapRelatedChip(tester);
+    await tester.pumpAndSettle();
+
+    verifyNever(() => tts.stop());
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text(_relatedFormula.name),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('AC4：公式区朗读中显示角标指示，切走后消失', (tester) async {
+    final scripts = _SpeakScriptRecorder(tts, sessions);
+
+    await _pumpPage(tester, tts);
+
+    // 播放前无指示图标。
+    expect(find.byIcon(Icons.graphic_eq), findsNothing);
+
+    // 公式区朗读挂起中：首段就绪后出现指示（F2 修复——公式区此前
+    // 无任何播放反馈）。
+    await tester.tap(find.text(_formula.formulaText));
+    await tester.pump();
+    scripts.scripts[0].signalReady();
+    await tester.pump();
+    expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
+
+    // 切到记忆技巧：公式区指示消失，由记忆技巧区的指示取而代之
+    // （同图标的另一种位置，数量不变）。
+    await tester.tap(find.text('记忆技巧'));
+    await tester.pump();
+    scripts.scripts[1].signalReady();
+    await tester.pump();
+    expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
+
+    // 公式区指示判定：切走后「公式区播放中」不再成立 → 其卡片内
+    // 不应渲染任何指示图标（记忆技巧区标题行持有那一个）。
+    final formulaCard = find
+        .ancestor(
+          of: find.text(_formula.formulaText),
+          matching: find.byType(ColoredCard),
+        )
+        .first;
+    expect(
+      find.descendant(
+        of: formulaCard,
+        matching: find.byIcon(Icons.graphic_eq),
+      ),
+      findsNothing,
+    );
+
+    // 收尾：放行两个挂起的朗读 Future，销毁页面。
+    scripts.scripts[0].signalFinish();
+    scripts.scripts[1].signalFinish();
+    await tester.pump();
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));
   });

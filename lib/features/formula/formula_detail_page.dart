@@ -66,7 +66,9 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
 
   @override
   void dispose() {
-    // 退出页面时停止朗读（含关联公式导航到新详情页时旧页销毁）。
+    // 页面销毁时停止朗读（返回退出等销毁场景）。注意：关联公式导航走
+    // Navigator.push，旧页仅压栈不销毁——导航前停止由
+    // [_onTapRelatedFormula] 负责（10-08 修复）。
     unawaited(
       _tts.stop().onError(
             (error, stackTrace) => AppLogger.e(
@@ -121,6 +123,36 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
     }
     if (!mounted) return;
     await _startSpeak(target.section, target.playText);
+  }
+
+  /// 关联公式导航入口，镜像 [_onTapSection] 的停止语义（10-08 F1 修复）：
+  /// push 不销毁旧页——若带着在播音频导航，新页空闲态无停止入口，
+  /// 旧朗读会在新页下继续播放。故与跨区切换同语义：朗读中先停止，
+  /// **stop 成功才导航**；失败则提示（SnackBar 由 [_stopSpeaking] 弹）并
+  /// 留在本页，播放态保留。
+  Future<void> _onTapRelatedFormula(String id) async {
+    if (_isPreparing) return;
+    if (_isSpeaking) {
+      // 先置遮罩再 await stop：挡住停止窗口期的连点。
+      setState(() {
+        _isPreparing = true;
+        _isStopping = true;
+      });
+      final stopped = await _stopSpeaking();
+      if (mounted) {
+        setState(() {
+          _isPreparing = false;
+          _isStopping = false;
+        });
+      }
+      if (!stopped) return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).push(
+      fadeSlideRoute<void>(
+        builder: (_) => FormulaDetailPage(formulaId: id),
+      ),
+    );
   }
 
   /// 停止当前朗读并清理播放态。
@@ -274,37 +306,56 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
 
               // 公式展示（LaTeX 渲染，解析失败时降级为纯文本）。
               // 点击朗读「公式名 + 参数释义」（符号串不朗读，既定决策）。
+              // 播放指示（10-08 F2 修复）：公式区无标题行，指示以角落
+              // 叠加方式渲染——Stack 不改变 LaTeX 居中排版，指示出现/
+              // 消失也不扰动卡片高度（ListView 内避免布局跳动）。
               _buildSection(
                 context,
                 section: _sectionFormula,
                 playText: formulaSpeakText(formula),
-                child: Center(
-                  child: formula.formulaLatex.isNotEmpty
-                      ? Math.tex(
-                          formula.formulaLatex,
-                          textStyle: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
-                          onErrorFallback: (_) => Text(
-                            formula.formulaText,
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.primary,
-                              letterSpacing: 1.5,
+                child: Stack(
+                  children: [
+                    Center(
+                      child: formula.formulaLatex.isNotEmpty
+                          ? Math.tex(
+                              formula.formulaLatex,
+                              textStyle:
+                                  theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                              onErrorFallback: (_) => Text(
+                                formula.formulaText,
+                                style:
+                                    theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.primary,
+                                  letterSpacing: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : Text(
+                              formula.formulaText,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                                letterSpacing: 1.5,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      : Text(
-                          formula.formulaText,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                            letterSpacing: 1.5,
-                          ),
-                          textAlign: TextAlign.center,
+                    ),
+                    if (_isSectionPlaying(_sectionFormula))
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Icon(
+                          Icons.graphic_eq,
+                          size: 16,
+                          color: theme.colorScheme.primary,
                         ),
+                      ),
+                  ],
                 ),
               ),
 
@@ -390,15 +441,7 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
                       return ActionChip(
                         label: Text(related?.name ?? id),
                         onPressed: related != null
-                            ? () {
-                                // 导航到关联公式
-                                Navigator.of(context).push(
-                                  fadeSlideRoute<void>(
-                                    builder: (_) =>
-                                        FormulaDetailPage(formulaId: id),
-                                  ),
-                                );
-                              }
+                            ? () => _onTapRelatedFormula(id)
                             : null,
                       );
                     }).toList(),
@@ -459,6 +502,10 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
     );
   }
 
+  /// 该区域当前是否处于播放中（三区域指示共用判定）。
+  bool _isSectionPlaying(int section) =>
+      _isSpeaking && _activeSection == section;
+
   /// 可播放区域卡片：[section] 非空时点击朗读，播放中标题旁显示
   /// `graphic_eq` 指示图标；[playText] 为朗读文本（section 非空时必传）。
   Widget _buildSection(
@@ -493,7 +540,7 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
     required Widget child,
   }) {
     final theme = Theme.of(context);
-    final playing = section != null && _isSpeaking && _activeSection == section;
+    final playing = section != null && _isSectionPlaying(section);
     return _buildSection(
       context,
       section: section,
