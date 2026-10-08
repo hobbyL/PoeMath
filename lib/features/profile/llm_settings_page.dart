@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
@@ -13,6 +14,15 @@ import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+
+/// 页面内 LlmClient 的 http.Client 注入口：默认按 ProviderScope 缓存
+/// 单个 client（onDispose 时关闭，复用连接池），测试覆写为 MockClient
+/// 拦截网络层。LlmClient 注入后不持有所有权，close() 不会关闭它。
+final llmSettingsHttpClientProvider = Provider<http.Client>((ref) {
+  final client = http.Client();
+  ref.onDispose(client.close);
+  return client;
+});
 
 /// 连接测试的行内反馈状态。
 enum _TestState { idle, loading, success, failure }
@@ -25,6 +35,7 @@ class LlmSettingsPage extends ConsumerStatefulWidget {
 }
 
 class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
+  final _providerNameController = TextEditingController();
   final _baseUrlController = TextEditingController();
   final _modelController = TextEditingController();
   final _apiKeyController = TextEditingController();
@@ -33,8 +44,8 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   /// 是否已存 API Key（决定占位提示文案；不回显明文）。
   bool _hasStoredKey = false;
 
-  /// 模型下拉候选；null = 拉取失败或为空，退化手填。
-  List<String>? _modelOptions;
+  /// 模型拉取状态（防重入 + suffixIcon 加载态）。
+  bool _fetchingModels = false;
 
   _TestState _testState = _TestState.idle;
   String? _testMessage;
@@ -43,14 +54,15 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   void initState() {
     super.initState();
     final settingsRepo = ref.read(settingsRepositoryProvider);
+    _providerNameController.text = settingsRepo.llmProviderName;
     _baseUrlController.text = settingsRepo.llmBaseUrl;
     _modelController.text = settingsRepo.llmModel;
     _loadStoredKey();
-    _loadModels();
   }
 
   @override
   void dispose() {
+    _providerNameController.dispose();
     _baseUrlController.dispose();
     _modelController.dispose();
     _apiKeyController.dispose();
@@ -64,33 +76,132 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
     }
   }
 
-  Future<void> _loadModels() async {
-    final config = await ref.read(settingsRepositoryProvider).readLlmConfig();
-    if (config == null) return;
-    final client = LlmClient();
-    try {
-      final models = await client.listModels(config);
-      if (mounted) {
-        setState(() => _modelOptions = models.isEmpty ? null : models);
-      }
-    } on LlmException {
-      // 拉取失败退化手填，不打断页面。
-      if (mounted) setState(() => _modelOptions = null);
-    } finally {
-      client.close();
-    }
-  }
-
-  /// 用当前表单值构造配置（测试连接用；Key 留空时不含已存 Key，
-  /// 由 [_testConnection] 单独补齐，不写存储）。
-  LlmConfig? _buildConfigFromForm() {
+  /// 用当前表单值构造配置。modelEmpty 时放宽为仅校验服务地址
+  /// （模型拉取场景不依赖 model）。
+  LlmConfig? _buildConfigFromForm({bool modelEmpty = false}) {
     final base = _baseUrlController.text.trim();
     final model = _modelController.text.trim();
-    if (base.isEmpty || model.isEmpty) return null;
+    if (base.isEmpty) return null;
+    if (!modelEmpty && model.isEmpty) return null;
     return LlmConfig(
       baseUrl: base,
       apiKey: _apiKeyController.text.trim(),
       model: model,
+    );
+  }
+
+  /// 点击拉取按钮：用表单 url/key（Key 空时回退已存 Key）请求模型列表，
+  /// 成功弹底部列表供选择，失败提示继续手填。
+  Future<void> _fetchModels() async {
+    if (_fetchingModels) return;
+    final config = _buildConfigFromForm(modelEmpty: true);
+    if (config == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先填写服务地址')),
+      );
+      return;
+    }
+    // 加载态先于任何 await：回退已存 Key 要读安全存储（平台通道在低端
+    // 设备上有可感知耗时），读取期间按钮同样不可再点——防重入覆盖
+    // 整个拉取周期，而不是仅网络请求阶段。
+    setState(() => _fetchingModels = true);
+    final client = LlmClient(
+      httpClient: ref.read(llmSettingsHttpClientProvider),
+    );
+    List<String> models;
+    try {
+      var configToFetch = config;
+      if (_apiKeyController.text.trim().isEmpty && _hasStoredKey) {
+        final stored =
+            await ref.read(secureCredentialStoreProvider).readLlmApiKey();
+        configToFetch = LlmConfig(
+          baseUrl: config.baseUrl,
+          apiKey: stored ?? '',
+          model: config.model,
+        );
+      }
+      models = await client.listModels(configToFetch);
+    } on LlmException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('拉取模型失败：${e.message}，可手动填写')),
+        );
+      }
+      return;
+    } on FormatException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('服务地址无效：${e.message}')),
+        );
+      }
+      return;
+    } finally {
+      client.close();
+      // 网络阶段结束（含失败）即停加载态：按钮区不能停留在
+      // 无限转圈的 CircularProgressIndicator 上（弹层选择期间与测试
+      // pumpAndSettle 都要求无持续动画）。
+      if (mounted) setState(() => _fetchingModels = false);
+    }
+    if (!mounted) return;
+    if (models.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('服务未返回模型，请手动填写')),
+      );
+      return;
+    }
+    final selected = await _pickModelSheet(models);
+    if (selected != null && mounted) {
+      setState(() => _modelController.text = selected);
+    }
+  }
+
+  /// 底部弹层模型列表；返回选中模型名，取消返回 null。
+  Future<String?> _pickModelSheet(List<String> models) {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  child: Text(
+                    '选择模型',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.only(
+                      bottom: SpacingTokens.md,
+                    ),
+                    children: [
+                      for (final model in models)
+                        ListTile(
+                          title: Text(model),
+                          selected:
+                              model == _modelController.text.trim(),
+                          selectedColor: theme.colorScheme.primary,
+                          onTap: () => Navigator.pop(sheetContext, model),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -118,7 +229,9 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
       _testState = _TestState.loading;
       _testMessage = null;
     });
-    final client = LlmClient();
+    final client = LlmClient(
+      httpClient: ref.read(llmSettingsHttpClientProvider),
+    );
     try {
       await client.testConnection(configToTest);
       if (mounted) {
@@ -163,6 +276,7 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
         baseUrl: _baseUrlController.text.trim(),
         model: _modelController.text.trim(),
         apiKey: apiKey,
+        providerName: _providerNameController.text.trim(),
       );
     } on FormatException catch (e) {
       if (mounted) {
@@ -187,7 +301,7 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('删除 LLM 配置'),
-        content: const Text('将删除服务地址、模型名与已保存的 API Key，'
+        content: const Text('将删除供应商名称、服务地址、模型名与已保存的 API Key，'
             '应用题生成功能将不可用。题库中已有的题目不受影响。'),
         actions: [
           TextButton(
@@ -206,11 +320,11 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
     await ref.read(settingsRepositoryProvider).deleteLlmConfig();
     if (!mounted) return;
     setState(() {
+      _providerNameController.clear();
       _baseUrlController.clear();
       _modelController.clear();
       _apiKeyController.clear();
       _hasStoredKey = false;
-      _modelOptions = null;
     });
     ref.invalidate(settingsRepositoryProvider);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -258,6 +372,17 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
             const SizedBox(height: SpacingTokens.md),
 
             TextFormField(
+              controller: _providerNameController,
+              decoration: const InputDecoration(
+                labelText: '供应商名称（可选）',
+                hintText: '例如 DeepSeek、通义千问',
+                prefixIcon: Icon(Icons.business_outlined),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.md),
+
+            TextFormField(
               controller: _baseUrlController,
               decoration: const InputDecoration(
                 labelText: '服务地址（Base URL）',
@@ -273,43 +398,6 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
             ),
             const SizedBox(height: SpacingTokens.md),
 
-            // 模型：下拉可用时选择，否则手填
-            if (_modelOptions != null)
-              DropdownButtonFormField<String>(
-                initialValue: _modelController.text.trim().isEmpty ||
-                        !_modelOptions!.contains(_modelController.text.trim())
-                    ? null
-                    : _modelController.text.trim(),
-                decoration: const InputDecoration(
-                  labelText: '模型',
-                  prefixIcon: Icon(Icons.model_training_outlined),
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final model in _modelOptions!)
-                    DropdownMenuItem(value: model, child: Text(model)),
-                ],
-                onChanged: (value) {
-                  setState(() => _modelController.text = value ?? '');
-                },
-              )
-            else
-              TextFormField(
-                controller: _modelController,
-                decoration: const InputDecoration(
-                  labelText: '模型名',
-                  hintText: '服务未返回模型列表，请手动填写',
-                  prefixIcon: Icon(Icons.model_training_outlined),
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (_) => setState(() {}),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) return '请填写模型名';
-                  return null;
-                },
-              ),
-            const SizedBox(height: SpacingTokens.md),
-
             TextFormField(
               controller: _apiKeyController,
               obscureText: true,
@@ -320,25 +408,65 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
                 border: const OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: SpacingTokens.md),
+
+            TextFormField(
+              controller: _modelController,
+              decoration: InputDecoration(
+                labelText: '模型',
+                hintText: '可手动填写，或点击右侧按钮拉取',
+                prefixIcon: const Icon(Icons.model_training_outlined),
+                border: const OutlineInputBorder(),
+                suffixIcon: _fetchingModels
+                    ? const Padding(
+                        padding:
+                            EdgeInsets.all(SpacingTokens.sm + SpacingTokens.xs),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.download_outlined),
+                        tooltip: '从服务拉取模型列表',
+                        onPressed: _fetchModels,
+                      ),
+              ),
+              onChanged: (_) => setState(() {}),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) return '请填写模型名';
+                return null;
+              },
+            ),
             const SizedBox(height: SpacingTokens.lg),
 
-            FilledButton.icon(
-              onPressed: _save,
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('保存配置'),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-
-            OutlinedButton.icon(
-              onPressed: _testState == _TestState.loading ? null : _testConnection,
-              icon: _testState == _TestState.loading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.wifi_tethering_outlined),
-              label: const Text('测试连接'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _testState == _TestState.loading
+                        ? null
+                        : _testConnection,
+                    icon: _testState == _TestState.loading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.wifi_tethering_outlined),
+                    label: const Text('测试连接'),
+                  ),
+                ),
+                const SizedBox(width: SpacingTokens.sm),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _save,
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('保存配置'),
+                  ),
+                ),
+              ],
             ),
 
             // 连接测试行内反馈

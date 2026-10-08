@@ -52,6 +52,7 @@ class SettingsRepository {
       'worker_tts_verified_fingerprint';
   static const String _keyLlmBaseUrl = 'llm_base_url';
   static const String _keyLlmModel = 'llm_model';
+  static const String _keyLlmProviderName = 'llm_provider_name';
 
   // ============ 主题 ============
 
@@ -232,6 +233,14 @@ class SettingsRepository {
 
   // ============ LLM 应用题生成设置（可选） ============
 
+  /// LLM 供应商名称（纯展示，非敏感）；未配置返回空串。
+  String get llmProviderName =>
+      HiveBoxes.settings.get(_keyLlmProviderName, defaultValue: '') as String;
+
+  Future<void> setLlmProviderName(String name) async {
+    await HiveBoxes.settings.put(_keyLlmProviderName, name);
+  }
+
   /// LLM 服务地址（Hive 非敏感存储）；未配置返回空串。
   String get llmBaseUrl =>
       HiveBoxes.settings.get(_keyLlmBaseUrl, defaultValue: '') as String;
@@ -258,11 +267,12 @@ class SettingsRepository {
     return LlmConfig(baseUrl: base, apiKey: apiKey ?? '', model: model);
   }
 
-  /// 保存 LLM 配置（地址/模型入 Hive、Key 入安全存储）。
+  /// 保存 LLM 配置（供应商名称/地址/模型入 Hive、Key 入安全存储）。
   Future<void> saveLlmConfig({
     required String baseUrl,
     required String model,
     required String apiKey,
+    String? providerName,
   }) async {
     // 先校验地址合法（非法抛 FormatException，不落盘）。
     LlmClient.normalizeBaseUrl(baseUrl);
@@ -274,13 +284,15 @@ class SettingsRepository {
     }
     await setLlmBaseUrl(baseUrl.trim());
     await setLlmModel(model.trim());
+    await setLlmProviderName(providerName?.trim() ?? '');
   }
 
-  /// 删除 LLM 配置（Key + 地址 + 模型）。
+  /// 删除 LLM 配置（Key + 供应商名称 + 地址 + 模型）。
   Future<void> deleteLlmConfig() async {
     await _credentialStore.deleteLlmApiKey();
     await HiveBoxes.settings.delete(_keyLlmBaseUrl);
     await HiveBoxes.settings.delete(_keyLlmModel);
+    await HiveBoxes.settings.delete(_keyLlmProviderName);
   }
 
   // ============ 拼音显示 ============

@@ -3,6 +3,8 @@
 // LLM 配置存储测试：Key 只进安全存储、地址/模型入 Hive、
 // readLlmConfig 组装、deleteLlmConfig 清理与备份导出不含 Key。
 
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
@@ -58,27 +60,30 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  test('saveLlmConfig：Key 进安全存储、地址/模型进 Hive，备份不含 Key', () async {
+  test('saveLlmConfig：Key 进安全存储、地址/模型/供应商名称进 Hive，'
+      '备份导出含 llm_provider_name、不含 Key', () async {
     await repository.saveLlmConfig(
       baseUrl: 'https://api.example.com',
       model: 'gpt-4o-mini',
       apiKey: 'llm-key-private',
+      providerName: 'DeepSeek',
     );
 
     expect(credentialStore.llmApiKey, 'llm-key-private');
     expect(repository.llmBaseUrl, 'https://api.example.com');
     expect(repository.llmModel, 'gpt-4o-mini');
+    expect(repository.llmProviderName, 'DeepSeek');
 
     // Hive 任何值不得包含 Key。
     for (final value in HiveBoxes.settings.values) {
       expect('$value', isNot(contains('llm-key-private')));
     }
-    // 备份导出同样不含 Key 明文。
+    // 备份导出：供应商名称随白名单迁移，Key 明文不外泄。
     final backup = BackupService();
-    expect(
-      await backup.exportToJson(),
-      isNot(contains('llm-key-private')),
-    );
+    final exported = await backup.exportToJson();
+    expect(exported, isNot(contains('llm-key-private')));
+    expect(exported, contains('llm_provider_name'));
+    expect(exported, contains('DeepSeek'));
   });
 
   test('readLlmConfig 组装完整配置；空 Key 保留空串（Ollama）', () async {
@@ -118,19 +123,44 @@ void main() {
     expect(credentialStore.llmApiKey, isNull);
   });
 
-  test('deleteLlmConfig 清空地址/模型与 Key', () async {
+  test('deleteLlmConfig 清空地址/模型/供应商名称与 Key', () async {
     await repository.saveLlmConfig(
       baseUrl: 'https://api.example.com',
       model: 'gpt-4o-mini',
       apiKey: 'llm-key-private',
+      providerName: 'DeepSeek',
     );
 
     await repository.deleteLlmConfig();
 
     expect(repository.llmBaseUrl, '');
     expect(repository.llmModel, '');
+    expect(repository.llmProviderName, '');
     expect(credentialStore.llmApiKey, isNull);
     expect(await repository.readLlmConfig(), isNull);
+  });
+
+  test('旧备份恢复兼容：无 llm_provider_name 的 settings 节不报错，'
+      '有则随白名单还原', () async {
+    final backup = BackupService();
+    // 模拟旧版本备份：settings 节只有既有 key，无 llm_provider_name。
+    final legacyJson = jsonEncode(<String, dynamic>{
+      'version': 1,
+      'settings': <String, dynamic>{'theme_mode': 'light'},
+    });
+    await backup.restoreFromJson(legacyJson);
+    expect(repository.llmProviderName, '');
+
+    // 新版本备份：llm_provider_name 随白名单还原。
+    final newJson = jsonEncode(<String, dynamic>{
+      'version': 1,
+      'settings': <String, dynamic>{
+        'theme_mode': 'dark',
+        'llm_provider_name': '通义千问',
+      },
+    });
+    await backup.restoreFromJson(newJson);
+    expect(repository.llmProviderName, '通义千问');
   });
 
   test('备份凭据白名单包含 llm_api_key（随口令加密同步）', () {

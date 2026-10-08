@@ -50,6 +50,7 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       'math_batch_size': 20,
       'math_difficulty': 'hard',
       'math_practice_mode': 'addition',
+      'llm_provider_name': 'DeepSeek', // LLM 供应商名称（纯展示，非敏感）
       'has_onboarded': true,
       // 通知设置（notification_service 直读写，随备份迁移）。
       'reminder_enabled': true,
@@ -269,6 +270,7 @@ void main() {
     expect(HiveBoxes.settings.get('math_batch_size'), 20);
     expect(HiveBoxes.settings.get('math_difficulty'), 'hard');
     expect(HiveBoxes.settings.get('math_practice_mode'), 'addition');
+    expect(HiveBoxes.settings.get('llm_provider_name'), 'DeepSeek');
     expect(HiveBoxes.settings.get('has_onboarded'), isTrue);
     // 通知设置 4 个白名单 key 还原（AC7 round-trip）。
     expect(HiveBoxes.settings.get('reminder_enabled'), isTrue);

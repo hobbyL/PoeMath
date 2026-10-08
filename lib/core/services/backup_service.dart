@@ -63,6 +63,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   'math_batch_size': 'int', // 每组题目数量
   'math_difficulty': 'string', // 练习难度 easy/medium/hard
   'math_practice_mode': 'string', // 练习模式（综合或 ProblemMode.name）
+  'llm_provider_name': 'string', // LLM 供应商名称（纯展示，非敏感）
   'has_onboarded': 'bool', // 是否完成引导
   // 通知设置（notification_service 直读写，随备份迁移，见其 key 常量区）。
   'reminder_enabled': 'bool', // 每日提醒开关
