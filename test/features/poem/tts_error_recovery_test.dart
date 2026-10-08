@@ -45,6 +45,8 @@ void main() {
     tts = _MockTtsService();
     speech = _MockSpeechRecognitionService();
     when(() => tts.stop()).thenAnswer((_) async {});
+    // 回调携带会话身份后页面读取该令牌判断回调归属（任务 R3）。
+    when(() => tts.currentSessionId).thenReturn(1);
     when(() => speech.initialize()).thenAnswer((_) async {});
     when(() => speech.cancel()).thenAnswer((_) async {});
   });

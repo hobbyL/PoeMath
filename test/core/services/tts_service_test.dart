@@ -173,8 +173,8 @@ void main() {
 
     final speaking = service.speakLines(
       const <String>['第一行', '第二行'],
-      onLineStart: started.add,
-      onComplete: () => completeCount++,
+      onLineStart: (index, _) => started.add(index),
+      onComplete: (_) => completeCount++,
     );
     await _flushMicrotasks();
 
@@ -225,8 +225,8 @@ void main() {
     await expectLater(
       service.speakLines(
         const <String>['第一行', '第二行', '第三行'],
-        onLineStart: started.add,
-        onComplete: () => completed = true,
+        onLineStart: (index, _) => started.add(index),
+        onComplete: (_) => completed = true,
       ),
       // message 会被页面拼接前缀（如「朗读失败：${message}」），其自身
       // 不得再含前缀字样——否则拼出「朗读失败：朗读失败」式重复文案
@@ -253,7 +253,7 @@ void main() {
 
     final speaking = service.speakLines(
       const <String>['第一行', '第二行'],
-      onComplete: () => completed = true,
+      onComplete: (_) => completed = true,
     );
     await _flushMicrotasks();
     expect(engine.spokenTexts, const <String>['第一行']);
@@ -273,7 +273,7 @@ void main() {
 
     final speaking = service.speakLines(
       const <String>['第一行', '第二行'],
-      onReady: () => readyCount++,
+      onReady: (_) => readyCount++,
     );
     await _flushMicrotasks();
 
@@ -292,7 +292,7 @@ void main() {
     engine.controlledSpeaks.add(gate);
     var readyCount = 0;
 
-    final speaking = service.speak('单句', onReady: () => readyCount++);
+    final speaking = service.speak('单句', onReady: (_) => readyCount++);
     await _flushMicrotasks();
 
     // speak 仍挂起，onReady 已触发——遮罩在出声前解除。
@@ -308,7 +308,7 @@ void main() {
     var readyCount = 0;
     await service.speakSentences(
       '第一句。第二句！',
-      onReady: () => readyCount++,
+      onReady: (_) => readyCount++,
     );
 
     expect(engine.spokenTexts, const <String>['第一句', '第二句']);
@@ -322,7 +322,7 @@ void main() {
     await expectLater(
       service.speakLines(
         const <String>['第一行', '第二行'],
-        onReady: () => readyCount++,
+        onReady: (_) => readyCount++,
       ),
       throwsA(isA<TtsException>()),
     );
@@ -340,7 +340,7 @@ void main() {
 
     final speaking = service.speakLines(
       const <String>['第一行', '第二行'],
-      onReady: () => readyCount++,
+      onReady: (_) => readyCount++,
     );
     await _flushMicrotasks();
     expect(engine.spokenTexts, const <String>['第一行']);
@@ -362,8 +362,8 @@ void main() {
     await service.speakLines(
       const <String>['第一行', '第二行'],
       // onLineStart 在合成 await 之前回调：在触发点之前抢跑 stop。
-      onLineStart: (_) => service.stop(),
-      onReady: () => readyCount++,
+      onLineStart: (_, __) => service.stop(),
+      onReady: (_) => readyCount++,
     );
 
     // 触发时 _stopRequested 已置位 → 不触发；循环也不再继续。
@@ -384,8 +384,8 @@ void main() {
     // 旧会话：两行，首行挂起中。
     final oldSession = service.speakLines(
       const <String>['旧行一', '旧行二'],
-      onLineStart: oldStarted.add,
-      onComplete: () => oldCompleted = true,
+      onLineStart: (index, _) => oldStarted.add(index),
+      onComplete: (_) => oldCompleted = true,
     );
     await _flushMicrotasks();
     expect(engine.spokenTexts, const <String>['旧行一']);
@@ -427,9 +427,9 @@ void main() {
 
     final task = service.speakLines(
       const <String>['第一行', '第二行'],
-      onLineStart: lineStarts.add,
-      onReady: () => readyCount++,
-      onComplete: () => completeCount++,
+      onLineStart: (index, _) => lineStarts.add(index),
+      onReady: (_) => readyCount++,
+      onComplete: (_) => completeCount++,
     );
     await _flushMicrotasks();
     // 初始化挂起窗口：引擎尚未播放任何内容。
@@ -458,9 +458,9 @@ void main() {
 
     final task = service.speakLines(
       const <String>['第一行', '第二行'],
-      onLineStart: lineStarts.add,
-      onReady: () => readyCount++,
-      onComplete: () => completeCount++,
+      onLineStart: (index, _) => lineStarts.add(index),
+      onReady: (_) => readyCount++,
+      onComplete: (_) => completeCount++,
     );
     await _flushMicrotasks();
     expect(engine.spokenTexts, isEmpty);
@@ -528,5 +528,205 @@ void main() {
     await newSession;
     expect(engine.spokenTexts, const <String>['预热', '新行一', '新行二']);
     expect(cloudService.isSpeaking, isFalse);
+  });
+
+  group('回调携带会话身份（挂账 R3）', () {
+    test('三个回调携带的 sessionId 一致且等于 currentSessionId', () async {
+      final lineSessions = <int>[];
+      int? readySession;
+      int? completeSession;
+
+      await service.speakLines(
+        const <String>['第一行', '第二行'],
+        onLineStart: (_, sessionId) => lineSessions.add(sessionId),
+        onReady: (sessionId) => readySession = sessionId,
+        onComplete: (sessionId) => completeSession = sessionId,
+      );
+
+      final id = service.currentSessionId;
+      expect(lineSessions, <int>[id, id]);
+      expect(readySession, id);
+      expect(completeSession, id);
+    });
+
+    test('后开会话的 sessionId 严格大于先开会话（次序可比对）', () async {
+      int? firstSession;
+      int? secondSession;
+
+      await service.speakSentences(
+        '第一次会话。',
+        onReady: (sessionId) => firstSession = sessionId,
+      );
+      await service.speakSentences(
+        '第二次会话。',
+        onReady: (sessionId) => secondSession = sessionId,
+      );
+
+      expect(firstSession, isNotNull);
+      expect(secondSession, greaterThan(firstSession!));
+    });
+
+    test('旧会话回调携带的是旧 id，与新会话 currentSessionId 失配', () async {
+      final firstLine = Completer<dynamic>();
+      final newLine = Completer<dynamic>();
+      engine.controlledSpeaks.addAll(<Completer<dynamic>>[firstLine, newLine]);
+      final oldLineSessions = <int>[];
+
+      // 旧会话首行挂起中。
+      final oldSession = service.speakLines(
+        const <String>['旧行一', '旧行二'],
+        onLineStart: (_, sessionId) => oldLineSessions.add(sessionId),
+      );
+      await _flushMicrotasks();
+      final oldId = service.currentSessionId;
+      expect(oldLineSessions, <int>[oldId]);
+
+      // 新会话接管：currentSessionId 前移，旧回调携带的 id 不再等于它
+      // ——页面据此判定「这不是当前会话」，正是 R3 替代页面自有计数器
+      // 的身份依据。
+      final newSession = service.speakLines(const <String>['新行一']);
+      await _flushMicrotasks();
+      expect(service.currentSessionId, greaterThan(oldId));
+      expect(oldLineSessions.single, isNot(service.currentSessionId));
+
+      firstLine.complete(1);
+      newLine.complete(1);
+      await oldSession;
+      await newSession;
+    });
+
+    test('stop 后 currentSessionId 前移：旧会话回调身份自动失配', () async {
+      final first = Completer<dynamic>();
+      engine.controlledSpeaks.add(first);
+      int? readySession;
+
+      final task = service.speakLines(
+        const <String>['第一行', '第二行'],
+        onReady: (sessionId) => readySession = sessionId,
+      );
+      await _flushMicrotasks();
+      expect(readySession, isNotNull);
+      expect(readySession, service.currentSessionId);
+
+      // 页面不再自增代际：stop 自身的递增即让旧回调身份失配（R3）。
+      // 假引擎 stop() 会放行挂起的 speak，无需再手动 complete。
+      await service.stop();
+      expect(service.currentSessionId, greaterThan(readySession!));
+
+      await task;
+      expect(first.isCompleted, isTrue);
+    });
+  });
+
+  group('引擎层停止源递增会话令牌（挂账 R2）', () {
+    test('播放中 errorHandler 触发：在途会话终止且不再播后续行', () async {
+      final first = Completer<dynamic>();
+      engine.controlledSpeaks.add(first);
+      final lineStarts = <int>[];
+      var completeCount = 0;
+
+      final task = service.speakLines(
+        const <String>['第一行', '第二行', '第三行'],
+        onLineStart: (index, _) => lineStarts.add(index),
+        onComplete: (_) => completeCount++,
+      );
+      await _flushMicrotasks();
+      expect(engine.spokenTexts, const <String>['第一行']);
+      expect(service.isSpeaking, isTrue);
+
+      // 引擎上报错误（播放中）：令牌递增使在途会话失效。
+      engine.errorHandler!('engine blew up');
+      first.complete(1);
+      await task.then<void>((_) {}, onError: (Object _) {});
+
+      // 循环按代际退出：后续行不播、不触发完成回调。
+      expect(engine.spokenTexts, const <String>['第一行']);
+      expect(lineStarts, const <int>[0]);
+      expect(completeCount, 0);
+      // handler 直接置位兜底：被杀会话的 finally 因代际失配不清位，
+      // 播放态仍必须回到空闲（不允许卡死在「朗读中」）。
+      expect(service.isSpeaking, isFalse);
+    });
+
+    test('播放中 cancelHandler 触发：在途会话终止且播放态归零', () async {
+      final first = Completer<dynamic>();
+      engine.controlledSpeaks.add(first);
+      final lineStarts = <int>[];
+      var completeCount = 0;
+
+      final task = service.speakLines(
+        const <String>['第一行', '第二行'],
+        onLineStart: (index, _) => lineStarts.add(index),
+        onComplete: (_) => completeCount++,
+      );
+      await _flushMicrotasks();
+      expect(engine.spokenTexts, const <String>['第一行']);
+
+      engine.cancelHandler!();
+      first.complete(1);
+      await task;
+
+      expect(engine.spokenTexts, const <String>['第一行']);
+      expect(lineStarts, const <int>[0]);
+      expect(completeCount, 0);
+      expect(service.isSpeaking, isFalse);
+    });
+
+    test('引擎停止源递增后新会话仍可正常朗读（停止标志不粘滞）', () async {
+      final first = Completer<dynamic>();
+      engine.controlledSpeaks.add(first);
+
+      final killed = service.speakLines(const <String>['旧行一', '旧行二']);
+      await _flushMicrotasks();
+      engine.cancelHandler!();
+      first.complete(1);
+      await killed;
+      expect(engine.spokenTexts, const <String>['旧行一']);
+
+      // 新入口复位停止标志并自成最新代际：引擎层杀会话不留后遗症。
+      await service.speakLines(const <String>['新行一', '新行二']);
+
+      expect(engine.spokenTexts, const <String>['旧行一', '新行一', '新行二']);
+      expect(service.isSpeaking, isFalse);
+    });
+  });
+
+  group('分句规则（挂账 R1）', () {
+    test('中文逗号参与分句', () async {
+      await service.speakSentences('床前明月光，疑是地上霜。');
+
+      expect(engine.spokenTexts, const <String>['床前明月光', '疑是地上霜']);
+    });
+
+    test('纯句号/问号/感叹号文本行为不变', () async {
+      await service.speakSentences('第一句。第二句？第三句！');
+
+      expect(engine.spokenTexts, const <String>['第一句', '第二句', '第三句']);
+    });
+
+    test('顿号不拆分：词组内停顿会破坏语义', () async {
+      await service.speakSentences('唐代诗人有李白、杜甫、白居易。');
+
+      expect(engine.spokenTexts, const <String>['唐代诗人有李白、杜甫、白居易']);
+    });
+
+    test('长散文按逗号拆成短句（译文/赏析的真实形态）', () async {
+      await service.speakSentences(
+        '这首诗写于李白客居他乡时，描绘了秋夜的清冷月色，'
+        '抒发了诗人深切的思乡之情。',
+      );
+
+      expect(engine.spokenTexts, const <String>[
+        '这首诗写于李白客居他乡时',
+        '描绘了秋夜的清冷月色',
+        '抒发了诗人深切的思乡之情',
+      ]);
+    });
+
+    test('连续标点不产生空句', () async {
+      await service.speakSentences('真的吗？！太好了，，走吧。');
+
+      expect(engine.spokenTexts, const <String>['真的吗', '太好了', '走吧']);
+    });
   });
 }

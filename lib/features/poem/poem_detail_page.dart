@@ -62,13 +62,20 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   /// 当前正在朗读的行索引，-1 表示未朗读。
   int _currentLineIndex = -1;
 
-  /// 播放会话代际令牌（竞态防护）。
+  /// 当前持有页面播放态的会话 id，-1 表示无（空闲 / 已停止）。
   ///
   /// 场景：切换区域时「先 stop 再播」——旧朗读的 Future 可能在新区域
   /// 已开始播放后才被引擎唤醒，其 finally/onLineStart 会把新区域的
-  /// 播放态错误复位。每次 stop / 新播放都递增代际，过期会话的回调
-  /// 不再触碰页面状态。
-  int _speakGeneration = 0;
+  /// 播放态错误复位。
+  ///
+  /// 身份来源是 [TtsService.currentSessionId]（服务唯一权威），页面不再
+  /// 自建代际计数器与服务 lockstep 维护——旧的页面自增代际方案在任何
+  /// 绕过 `_stopSpeaking` 的 stop（如 dispose）处会与服务漂移
+  /// （挂账 R3）。本字段只是「当前屏幕归谁」的记录，不是第二个计数器。
+  int _activeSessionId = -1;
+
+  /// 该回调 / 该次 await 是否仍属于当前持有页面播放态的会话。
+  bool _isCurrentSession(int sessionId) => sessionId == _activeSessionId;
 
   /// 区域编号常量：正文为 0，折叠区 1..5。
   static const int _sectionContent = 0;
@@ -174,7 +181,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   /// 显示空闲，否则再点任意区域会绕过停止直达新朗读），让后续点击
   /// 继续走停止路由；仅成功路径清态。
   Future<bool> _stopSpeaking() async {
-    _speakGeneration++; // 使旧会话的回调全部失效
+    // 页面不再递增自有令牌：`_tts.stop()` 在其同步段即递增服务令牌，
+    // 旧会话的后续回调天然失配（挂账 R3）。
     final scaffold = ScaffoldMessenger.of(context);
     try {
       await _tts.stop();
@@ -195,6 +203,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       return false;
     }
     // 仅成功路径清态（原 finally 无条件清态是缺陷 1 的 UI 半边）。
+    // 交还播放态归属：此后旧会话的任何晚到回调都不再匹配（R3）。
+    _activeSessionId = -1;
     if (mounted) {
       setState(() {
         _isSpeaking = false;
@@ -208,8 +218,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   /// 播放指定区域：正文（section 0）逐行朗读 + 当前行高亮；
   /// 折叠区按标点分句朗读，不做逐行高亮。
   Future<void> _startSpeak(int section, String text) async {
-    _speakGeneration++;
-    final generation = _speakGeneration;
     final scaffold = ScaffoldMessenger.of(context);
     setState(() {
       _isPreparing = true;
@@ -217,32 +225,46 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       _isSpeaking = true;
       _activeSection = section;
     });
-    try {
+    // 回调内比对的是「发起时捕获的会话 id」，闭包在调用时才读
+    // `_activeSessionId`，而回调最早只能在服务首个 await 之后触发
+    // （朗读入口的同步段不触发任何回调）——因此下方捕获赋值一定先于
+    // 任何回调执行。
+    //
+    // `Future.sync` 包裹：把发起时的同步抛错归一为 Future 失败，使
+    // 「捕获会话 id」一定先于异常被观察到——否则同步抛错会越过捕获
+    // 与下方 catch/finally，遮罩卡死且无失败提示。
+    final speaking = Future.sync(() {
       if (section == _sectionContent) {
         final lines = _splitLines(text);
-        await _tts.speakLines(
+        return _tts.speakLines(
           lines,
-          onLineStart: (index) {
-            if (mounted && generation == _speakGeneration) {
+          onLineStart: (index, sessionId) {
+            if (mounted && _isCurrentSession(sessionId)) {
               setState(() => _currentLineIndex = index);
             }
           },
-          onReady: () {
-            if (mounted && generation == _speakGeneration) {
-              setState(() => _isPreparing = false);
-            }
-          },
-        );
-      } else {
-        await _tts.speakSentences(
-          text,
-          onReady: () {
-            if (mounted && generation == _speakGeneration) {
+          onReady: (sessionId) {
+            if (mounted && _isCurrentSession(sessionId)) {
               setState(() => _isPreparing = false);
             }
           },
         );
       }
+      return _tts.speakSentences(
+        text,
+        onReady: (sessionId) {
+          if (mounted && _isCurrentSession(sessionId)) {
+            setState(() => _isPreparing = false);
+          }
+        },
+      );
+    });
+    // 会话 id 在入口同步段之后立即读取：朗读入口在任何 await 之前递增
+    // 服务令牌，发起与读取之间没有挂起点，读到的即本次会话 id（R3）。
+    final sessionId = _tts.currentSessionId;
+    _activeSessionId = sessionId;
+    try {
+      await speaking;
     } on Exception catch (error, stackTrace) {
       AppLogger.e(
         '诗词朗读失败',
@@ -250,7 +272,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         error: error,
         stackTrace: stackTrace,
       );
-      if (mounted && generation == _speakGeneration) {
+      if (mounted && _isCurrentSession(sessionId)) {
         // TtsException.message 已是面向用户的中文文案（如云端全跳句的
         // 「云端音频播放失败，请稍后重试」），直接透传；其他异常保留
         // 通用兜底——云端播放失败不再被误导为系统引擎问题（缺陷 2）。
@@ -267,14 +289,17 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       }
     } finally {
       // 兜底清理：异常路径下 onReady 可能未触发，遮罩不允许卡死。
-      // 过期代际（已被 stop/新会话接管）不清理，避免复位新会话的状态。
-      if (mounted && generation == _speakGeneration) {
-        setState(() {
-          _isPreparing = false;
-          _isSpeaking = false;
-          _currentLineIndex = -1;
-          _activeSection = -1;
-        });
+      // 过期会话（已被 stop/新会话接管）不清理，避免复位新会话的状态。
+      if (_isCurrentSession(sessionId)) {
+        _activeSessionId = -1;
+        if (mounted) {
+          setState(() {
+            _isPreparing = false;
+            _isSpeaking = false;
+            _currentLineIndex = -1;
+            _activeSection = -1;
+          });
+        }
       }
     }
   }

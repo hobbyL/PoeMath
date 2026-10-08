@@ -53,6 +53,21 @@ final _poem = Poem(
 
 const _contentLines = <String>['床前明月光，', '疑是地上霜。'];
 
+/// 会话身份模拟器：复刻 TtsService 的会话代际令牌语义。
+///
+/// 真服务在朗读入口的**同步段**（任何 await 之前）递增令牌，回调携带
+/// 该 id，`currentSessionId` 返回最新值。mock 必须同构，否则：
+/// 恒返回常量时，过期会话的晚到回调会与新会话 id 相等而被误判为
+/// 「当前会话」——正是 R3 要防的那个 bug，测试会假绿。
+class _SessionIds {
+  int _current = 0;
+
+  int get current => _current;
+
+  /// 新会话诞生：递增并返回本次会话 id（对应真服务入口同步段）。
+  int next() => ++_current;
+}
+
 /// 可控朗读脚本：模拟 speakLines/speakSentences 的两阶段时序。
 ///
 /// - 阶段一（合成期）：Future 挂起，对应页面遮罩期
@@ -63,12 +78,27 @@ class _SpeakScript {
   final Completer<void> _ready = Completer<void>();
   final Completer<void> _finish = Completer<void>();
 
+  /// 本次会话 id 与 onLineStart 回调，供 [signalLine] 手动投递行回调。
+  int? _sessionId;
+  void Function(int index, int sessionId)? _onLineStart;
+
   void signalReady() => _ready.complete();
   void signalFinish() => _finish.complete();
 
-  Future<void> run(void Function()? onReady) async {
+  /// 手动投递一次 onLineStart（模拟行推进；可在会话过期后投递，
+  /// 用于验证页面的会话身份判定）。
+  void signalLine(int index) => _onLineStart?.call(index, _sessionId!);
+
+  /// [sessionId] 为本次会话 id，随回调回传（与真服务一致）。
+  Future<void> run(
+    void Function(int sessionId)? onReady,
+    int sessionId, {
+    void Function(int index, int sessionId)? onLineStart,
+  }) async {
+    _sessionId = sessionId;
+    _onLineStart = onLineStart;
     await _ready.future;
-    onReady?.call();
+    onReady?.call(sessionId);
     await _finish.future;
   }
 }
@@ -77,7 +107,8 @@ class _SpeakScript {
 ///
 /// [autoComplete] 为 true 时立即走完两个阶段（瞬时朗读，页面直接回空闲）。
 _SpeakScript _stubSpeakLines(
-  _MockTtsService tts, {
+  _MockTtsService tts,
+  _SessionIds sessions, {
   bool autoComplete = true,
 }) {
   final script = _SpeakScript();
@@ -88,9 +119,14 @@ _SpeakScript _stubSpeakLines(
       onReady: any(named: 'onReady'),
     ),
   ).thenAnswer((invocation) async {
+    // thenAnswer 体的同步段等价于真服务入口同步段：在首个 await 之前
+    // 递增令牌，页面随后读 currentSessionId 即得本次会话 id。
+    final sessionId = sessions.next();
     final onReady =
-        invocation.namedArguments[#onReady] as void Function()?;
-    await script.run(onReady);
+        invocation.namedArguments[#onReady] as void Function(int)?;
+    final onLineStart =
+        invocation.namedArguments[#onLineStart] as void Function(int, int)?;
+    await script.run(onReady, sessionId, onLineStart: onLineStart);
   });
   if (autoComplete) {
     script
@@ -102,7 +138,8 @@ _SpeakScript _stubSpeakLines(
 
 /// mock speakSentences 并返回可控脚本（时序语义同上）。
 _SpeakScript _stubSpeakSentences(
-  _MockTtsService tts, {
+  _MockTtsService tts,
+  _SessionIds sessions, {
   bool autoComplete = true,
 }) {
   final script = _SpeakScript();
@@ -112,9 +149,10 @@ _SpeakScript _stubSpeakSentences(
       onReady: any(named: 'onReady'),
     ),
   ).thenAnswer((invocation) async {
+    final sessionId = sessions.next();
     final onReady =
-        invocation.namedArguments[#onReady] as void Function()?;
-    await script.run(onReady);
+        invocation.namedArguments[#onReady] as void Function(int)?;
+    await script.run(onReady, sessionId);
   });
   if (autoComplete) {
     script
@@ -122,6 +160,27 @@ _SpeakScript _stubSpeakSentences(
       ..signalFinish();
   }
   return script;
+}
+
+/// 当前被高亮的正文行文本（行高亮 = AnimatedContainer 背景非透明）。
+///
+/// 正文行高亮由 `_isSpeaking && i == _currentLineIndex` 决定，是「行回调
+/// 归属判定」的可观测产物。
+List<String> _highlightedLines(WidgetTester tester) {
+  final highlighted = <String>[];
+  for (final line in _contentLines) {
+    final finder = find.ancestor(
+      of: find.text(line),
+      matching: find.byType(AnimatedContainer),
+    );
+    if (finder.evaluate().isEmpty) continue;
+    final container = tester.widget<AnimatedContainer>(finder.first);
+    final decoration = container.decoration as BoxDecoration?;
+    if (decoration?.color != null && decoration!.color != Colors.transparent) {
+      highlighted.add(line);
+    }
+  }
+  return highlighted;
 }
 
 Future<void> _pumpPage(WidgetTester tester, TtsService tts) async {
@@ -226,14 +285,23 @@ class _RecordingFlutterTts extends Fake implements FlutterTts {
 
 void main() {
   late _MockTtsService tts;
+  late _SessionIds sessions;
 
   setUp(() {
     tts = _MockTtsService();
-    when(() => tts.stop()).thenAnswer((_) async {});
+    sessions = _SessionIds();
+    // 惰性求值：每次读取返回当前最新令牌（thenReturn 会固化为常量）。
+    when(() => tts.currentSessionId).thenAnswer((_) => sessions.current);
+    // 真服务 stop() 同步段即递增令牌；部分用例会覆盖本 stub 为抛错/挂起
+    // 以制造失败与窗口期，那些覆盖不递增也不影响断言——会话 id 只需
+    // 「每个新会话互不相同」，而递增由朗读入口保证。
+    when(() => tts.stop()).thenAnswer((_) async {
+      sessions.next();
+    });
   });
 
   testWidgets('AppBar 无播放按钮，点击正文朗读全文', (tester) async {
-    _stubSpeakLines(tts);
+    _stubSpeakLines(tts, sessions);
 
     await _pumpPage(tester, tts);
 
@@ -257,7 +325,7 @@ void main() {
   });
 
   testWidgets('合成挂起期间遮罩可见且重复点击不二次请求', (tester) async {
-    final script = _stubSpeakLines(tts, autoComplete: false);
+    final script = _stubSpeakLines(tts, sessions, autoComplete: false);
 
     await _pumpPage(tester, tts);
 
@@ -294,7 +362,7 @@ void main() {
   });
 
   testWidgets('播放中点击正文停止朗读', (tester) async {
-    final script = _stubSpeakLines(tts, autoComplete: false);
+    final script = _stubSpeakLines(tts, sessions, autoComplete: false);
 
     await _pumpPage(tester, tts);
 
@@ -320,8 +388,9 @@ void main() {
   });
 
   testWidgets('播放中点击展开的译文内容：停止当前并播放译文', (tester) async {
-    final contentScript = _stubSpeakLines(tts, autoComplete: false);
-    final translationScript = _stubSpeakSentences(tts, autoComplete: false);
+    final contentScript = _stubSpeakLines(tts, sessions, autoComplete: false);
+    final translationScript =
+        _stubSpeakSentences(tts, sessions, autoComplete: false);
 
     await _pumpPage(tester, tts);
 
@@ -364,8 +433,8 @@ void main() {
   });
 
   testWidgets('停止失败时点击其他区域：提示且不启动新朗读（无双读）', (tester) async {
-    final contentScript = _stubSpeakLines(tts, autoComplete: false);
-    _stubSpeakSentences(tts);
+    final contentScript = _stubSpeakLines(tts, sessions, autoComplete: false);
+    _stubSpeakSentences(tts, sessions);
 
     await _pumpPage(tester, tts);
 
@@ -409,8 +478,9 @@ void main() {
   });
 
   testWidgets('切换窗口期连点两次仅启动一次新朗读', (tester) async {
-    final contentScript = _stubSpeakLines(tts, autoComplete: false);
-    final translationScript = _stubSpeakSentences(tts, autoComplete: false);
+    final contentScript = _stubSpeakLines(tts, sessions, autoComplete: false);
+    final translationScript =
+        _stubSpeakSentences(tts, sessions, autoComplete: false);
     // stop 挂起：制造「先置遮罩 → await stop」的切换窗口期（R3）。
     final stopGate = Completer<void>();
     when(() => tts.stop()).thenAnswer((_) => stopGate.future);
@@ -466,7 +536,7 @@ void main() {
   });
 
   testWidgets('stop 失败保留播放态：再点同区域再次走停止路由（AC1）', (tester) async {
-    final script = _stubSpeakLines(tts, autoComplete: false);
+    final script = _stubSpeakLines(tts, sessions, autoComplete: false);
 
     await _pumpPage(tester, tts);
 
@@ -509,7 +579,7 @@ void main() {
   });
 
   testWidgets('同区停止挂起期连点：stop 恰好一次且遮罩及时解除（AC3）', (tester) async {
-    final script = _stubSpeakLines(tts, autoComplete: false);
+    final script = _stubSpeakLines(tts, sessions, autoComplete: false);
     // stop 挂起：制造同区停止窗口期。
     final stopGate = Completer<void>();
     when(() => tts.stop()).thenAnswer((_) => stopGate.future);
@@ -549,7 +619,7 @@ void main() {
   });
 
   testWidgets('同区停止连点后 stop 失败：仅一次提示不误报（AC3）', (tester) async {
-    final script = _stubSpeakLines(tts, autoComplete: false);
+    final script = _stubSpeakLines(tts, sessions, autoComplete: false);
     final stopGate = Completer<void>();
     when(() => tts.stop()).thenAnswer((_) => stopGate.future);
 
@@ -629,8 +699,8 @@ void main() {
   });
 
   testWidgets('折叠态点击译文标题仅展开不触发任何朗读', (tester) async {
-    _stubSpeakLines(tts);
-    _stubSpeakSentences(tts);
+    _stubSpeakLines(tts, sessions);
+    _stubSpeakSentences(tts, sessions);
 
     await _pumpPage(tester, tts);
 
@@ -651,7 +721,7 @@ void main() {
   });
 
   testWidgets('空闲点击展开的译文内容播放该区域文本', (tester) async {
-    _stubSpeakSentences(tts);
+    _stubSpeakSentences(tts, sessions);
 
     await _pumpPage(tester, tts);
 
@@ -674,8 +744,90 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
+  testWidgets('过期会话的晚到 onLineStart 不移动新会话高亮（R3 身份判定）', (tester) async {
+    // 旧会话（正文逐行）的行回调在新会话（译文）启动后才到达，模拟
+    // 「stop 已发出但旧 Future 尚未终结，旧回调晚到」的真实时序。
+    // 把 `_isCurrentSession` 改成恒真时此用例必须红：旧会话的行索引会
+    // 把正文行高亮点亮，而当前播放的是译文区。
+    final contentScript = _stubSpeakLines(tts, sessions, autoComplete: false);
+    final translationScript =
+        _stubSpeakSentences(tts, sessions, autoComplete: false);
+
+    await _pumpPage(tester, tts);
+
+    await tester.tap(find.text('译文'));
+    await tester.pumpAndSettle();
+
+    // 旧会话：首段就绪并推进到第 0 行（正文首行高亮）。
+    await tester.tap(find.text('床前明月光，'));
+    await tester.pump();
+    contentScript.signalReady();
+    contentScript.signalLine(0);
+    await tester.pump();
+    expect(_highlightedLines(tester), const <String>['床前明月光，']);
+
+    // 切到译文：stop 成功 → 正文高亮清空，新会话进入朗读中。
+    await tester.tap(find.text(_poem.translation));
+    await tester.pump();
+    translationScript.signalReady();
+    await tester.pump();
+    expect(_highlightedLines(tester), isEmpty);
+
+    // 旧会话的行回调此刻才到达（携带旧 sessionId）：必须被判定为过期，
+    // 不得点亮正文行——当前播放的是译文区。
+    contentScript.signalLine(1);
+    await tester.pump();
+    expect(_highlightedLines(tester), isEmpty);
+
+    // 收尾：放行两个挂起的朗读 Future。
+    contentScript.signalFinish();
+    translationScript.signalFinish();
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('过期会话的晚到 finally 不复位新会话播放态（R3 身份判定）', (tester) async {
+    final contentScript = _stubSpeakLines(tts, sessions, autoComplete: false);
+    final translationScript =
+        _stubSpeakSentences(tts, sessions, autoComplete: false);
+
+    await _pumpPage(tester, tts);
+
+    await tester.tap(find.text('译文'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('床前明月光，'));
+    await tester.pump();
+    contentScript.signalReady();
+    await tester.pump();
+
+    // 切到译文并让新会话进入「朗读中」（遮罩已解除）。
+    await tester.tap(find.text(_poem.translation));
+    await tester.pump();
+    translationScript.signalReady();
+    await tester.pump();
+    expect(find.text('语音合成中…'), findsNothing);
+    expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
+
+    // 旧会话的 Future 此刻才终结：其 finally 携带旧 sessionId，不得把
+    // 新会话的播放态清成空闲（守卫恒真时播放指示会消失）。
+    contentScript.signalFinish();
+    await tester.pump();
+    expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
+
+    // 新会话自然结束 → 播放态正常归零。
+    translationScript.signalFinish();
+    await tester.pump();
+    expect(find.byIcon(Icons.graphic_eq), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
   testWidgets('播放中折叠区标题显示播放指示图标', (tester) async {
-    final script = _stubSpeakSentences(tts, autoComplete: false);
+    final script = _stubSpeakSentences(tts, sessions, autoComplete: false);
 
     await _pumpPage(tester, tts);
 

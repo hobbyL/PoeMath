@@ -264,7 +264,7 @@ void main() {
 
     await service.speakLines(
       ['床前明月光', '疑是地上霜', '举头望明月'],
-      onLineStart: lineStarts.add,
+      onLineStart: (index, _) => lineStarts.add(index),
     );
 
     expect(lineStarts, [0, 1, 2]);
@@ -288,7 +288,7 @@ void main() {
 
     final task = service.speakLines(
       ['床前明月光', '疑是地上霜'],
-      onReady: () => readyCount++,
+      onReady: (_) => readyCount++,
     );
     // 等第一行播放挂起。
     await Future<void>.delayed(Duration.zero);
@@ -316,7 +316,7 @@ void main() {
     );
     var readyCount = 0;
 
-    await service.speak('床前明月光', onReady: () => readyCount++);
+    await service.speak('床前明月光', onReady: (_) => readyCount++);
 
     // 云合成失败 → 系统朗读兜底发起 → onReady 仍触发（遮罩语义覆盖回退过程）。
     expect(tts.spokenTexts, ['床前明月光']);
@@ -336,7 +336,7 @@ void main() {
     );
     var readyCount = 0;
 
-    final task = service.speak('床前明月光', onReady: () => readyCount++);
+    final task = service.speak('床前明月光', onReady: (_) => readyCount++);
     // 等待进入合成 await 窗口。
     await Future<void>.delayed(Duration.zero);
     expect(player.played, isEmpty);
@@ -366,7 +366,7 @@ void main() {
     // R3：单段会话「合成成功但播放失败」= 全跳句 → 上抛 TtsException，
     // 页面按朗读失败提示，不再静默会话。
     await expectLater(
-      service.speak('床前明月光', onReady: () => readyCount++),
+      service.speak('床前明月光', onReady: (_) => readyCount++),
       throwsA(
         isA<TtsException>().having(
           (error) => error.message,
@@ -396,7 +396,7 @@ void main() {
 
     await service.speakLines(
       ['床前明月光', '疑是地上霜'],
-      onReady: () => readyCount++,
+      onReady: (_) => readyCount++,
     );
 
     // 第一行 play 抛错被跳过，第二行正常播放；系统引擎不补读（无双读）。
@@ -518,7 +518,7 @@ void main() {
 
     await service.speakLines(
       ['床前明月光', '疑是地上霜'],
-      onComplete: () => completed = true,
+      onComplete: (_) => completed = true,
     );
 
     // 第一行跳句、第二行播成：部分成功 → 不上抛、完成回调正常。
@@ -555,7 +555,7 @@ void main() {
     var completed = false;
     final task = service.speakLines(
       ['床前明月光', '疑是地上霜'],
-      onComplete: () => completed = true,
+      onComplete: (_) => completed = true,
     );
     // 等第一行播放挂起。
     await Future<void>.delayed(Duration.zero);
