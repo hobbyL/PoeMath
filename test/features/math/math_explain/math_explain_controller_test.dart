@@ -311,6 +311,53 @@ void main() {
     expect(body['model'], 'qwen-plus');
   });
 
+  test('设置页自定义提示词覆盖进入请求体（AC2）', () async {
+    await seedProviders();
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.setMathExplainPrompt('我的自定义口算解析风格');
+
+    late http.Request captured;
+    final container = containerWith(MockClient((request) async {
+      captured = request;
+      return _chatResponse('解析内容。');
+    }),);
+
+    await container.read(mathExplainProvider.notifier).generate(
+          problemText: '1 + 1 = ?',
+          correctAnswer: '2',
+        );
+
+    final body = jsonDecode(captured.body) as Map<String, dynamic>;
+    final messages = body['messages'] as List<dynamic>;
+    expect((messages[0] as Map<String, dynamic>)['role'], 'system');
+    expect((messages[0] as Map<String, dynamic>)['content'],
+        '我的自定义口算解析风格',);
+    // user prompt 不受覆盖影响（隐私载荷最小化契约保持）。
+    final userPrompt = messages[1]['content'] as String;
+    expect(userPrompt, contains('题目：1 + 1 = ?'));
+  });
+
+  test('未自定义时请求体 system prompt 为内置出厂默认（AC2 对照）', () async {
+    await seedProviders();
+    late http.Request captured;
+    final container = containerWith(MockClient((request) async {
+      captured = request;
+      return _chatResponse('解析内容。');
+    }),);
+
+    await container.read(mathExplainProvider.notifier).generate(
+          problemText: '1 + 1 = ?',
+          correctAnswer: '2',
+        );
+
+    final body = jsonDecode(captured.body) as Map<String, dynamic>;
+    final messages = body['messages'] as List<dynamic>;
+    expect(
+      (messages[0] as Map<String, dynamic>)['content'],
+      kMathExplainSystemPrompt,
+    );
+  });
+
   test('错因标签表覆盖诊断器全部权威键', () {
     // 单一来源表：键集与诊断器规则 name 的一致性由
     // test/math_engine/diagnostics/error_cause_labels_test.dart 守卫，

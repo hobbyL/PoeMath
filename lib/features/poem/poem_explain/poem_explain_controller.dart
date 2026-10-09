@@ -60,7 +60,10 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
       client = LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
       final result = await client.explain(
         config: config,
-        systemPrompt: kPoemExplainSystemPrompt,
+        // 用户自定义覆盖优先（设置页可编辑），否则内置出厂默认。
+        systemPrompt:
+            ref.read(settingsRepositoryProvider).poemExplainPromptOverride ??
+                kPoemExplainSystemPrompt,
         userPrompt: buildPoemExplainUserPrompt(poem),
         maxTokens: kPoemExplainMaxTokens,
       );

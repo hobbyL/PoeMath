@@ -7,19 +7,12 @@
 // 不含年级、题型、历史记录等任何其他用户数据（见 prd.md AC5）。
 // 错因 category → 中文标签的单一来源在
 // math_engine/diagnostics/error_cause_labels.dart（kErrorCauseLabels）。
+//
+// 默认 system prompt 常量迁至 core/prompts/explain_prompt_defaults.dart
+// （设置页与 controller 共享的出厂默认）；此处 re-export 保持既有
+// import 路径兼容。
 
-/// 解析风格与铁律（固定常量）。
-const String kMathExplainSystemPrompt = '''
-你是一位给小学生讲口算题的数学老师。用普通话口语、短句讲解。
-
-铁律（违反任何一条都算失败）：
-1. 正确答案以我给出的为准，绝对不得改写、质疑或重新计算出别的答案；
-2. 先一句话说清这道题怎么想，再分 2-3 步写清计算过程；
-3. 如果我给了孩子的错误答案和错误原因，要点出错在哪一步、下次怎么避免；
-4. 输出纯文本 3-5 小段，每段 1-2 句；
-5. 不要使用 markdown 标题、加粗、列表符号、表情符号；
-6. 不要出题、不要布置作业、不要说多余的鼓励套话。
-''';
+export 'package:poemath/core/prompts/explain_prompt_defaults.dart';
 
 /// 构造用户侧 Prompt。
 ///

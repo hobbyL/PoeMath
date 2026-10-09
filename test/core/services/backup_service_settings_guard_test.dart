@@ -71,6 +71,9 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       'reminder_hour': 7,
       'reminder_minute': 30,
       'weekly_report_enabled': true,
+      // AI 讲解提示词覆盖（随备份迁移的个性化内容）。
+      'llm_poem_explain_prompt': '自定义诗词讲解提示词',
+      'llm_math_explain_prompt': '自定义口算解析提示词',
     };
 
 void main() {

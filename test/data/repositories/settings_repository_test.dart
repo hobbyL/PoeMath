@@ -1,6 +1,7 @@
 // test/data/repositories/settings_repository_test.dart
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
@@ -84,6 +85,54 @@ void main() {
       test('setPinyinVisible 保存并读取', () async {
         await repo.setPinyinVisible(false);
         expect(repo.pinyinVisible, isFalse);
+      });
+    });
+
+    group('AI 讲解提示词覆盖', () {
+      test('poemExplainPromptOverride 默认 null（未自定义）', () {
+        expect(repo.poemExplainPromptOverride, isNull);
+      });
+
+      test('mathExplainPromptOverride 默认 null（未自定义）', () {
+        expect(repo.mathExplainPromptOverride, isNull);
+      });
+
+      test('setPoemExplainPrompt 保存后读取 roundtrip（trim 保留）', () async {
+        await repo.setPoemExplainPrompt('  自定义诗词提示  ');
+        expect(repo.poemExplainPromptOverride, '自定义诗词提示');
+        expect(
+          HiveBoxes.settings.get('llm_poem_explain_prompt'),
+          '自定义诗词提示',
+        );
+      });
+
+      test('setMathExplainPrompt 保存后读取 roundtrip（trim 保留）', () async {
+        await repo.setMathExplainPrompt('自定义口算提示');
+        expect(repo.mathExplainPromptOverride, '自定义口算提示');
+        expect(
+          HiveBoxes.settings.get('llm_math_explain_prompt'),
+          '自定义口算提示',
+        );
+      });
+
+      test('set 空串 / 纯空白 = 删 key（恢复默认）', () async {
+        await repo.setPoemExplainPrompt('先有自定义');
+        await repo.setPoemExplainPrompt('   ');
+        expect(repo.poemExplainPromptOverride, isNull);
+        expect(HiveBoxes.settings.get('llm_poem_explain_prompt'), isNull);
+      });
+
+      test('reset 删除覆盖 key，getter 回落 null', () async {
+        await repo.setMathExplainPrompt('先有自定义');
+        await repo.resetMathExplainPrompt();
+        expect(repo.mathExplainPromptOverride, isNull);
+        expect(HiveBoxes.settings.get('llm_math_explain_prompt'), isNull);
+      });
+
+      test('历史脏数据：空串防御性读作 null', () async {
+        await HiveBoxes.settings.put('llm_poem_explain_prompt', '');
+        expect(repo.poemExplainPromptOverride, isNull);
+        // 脏数据不被清除（getter 只做读取防御），但语义上视为未自定义。
       });
     });
   });

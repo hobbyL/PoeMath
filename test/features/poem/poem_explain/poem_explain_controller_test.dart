@@ -282,6 +282,47 @@ void main() {
     expect(captured.headers['authorization'], 'Bearer key-p1');
   });
 
+  test('设置页自定义提示词覆盖进入请求体（AC2）', () async {
+    await seedProviders();
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.setPoemExplainPrompt('我的自定义诗词讲解风格');
+
+    late http.Request captured;
+    final container = containerWith(MockClient((request) async {
+      captured = request;
+      return _chatResponse('讲解内容。');
+    }),);
+
+    await container.read(poemExplainProvider.notifier).generate(_poem());
+
+    final body = jsonDecode(captured.body) as Map<String, dynamic>;
+    final messages = body['messages'] as List<dynamic>;
+    expect((messages[0] as Map<String, dynamic>)['role'], 'system');
+    expect((messages[0] as Map<String, dynamic>)['content'],
+        '我的自定义诗词讲解风格',);
+    // user prompt 不受覆盖影响（隐私载荷最小化契约保持）。
+    final userPrompt = messages[1]['content'] as String;
+    expect(userPrompt, contains('静夜思'));
+  });
+
+  test('未自定义时请求体 system prompt 为内置出厂默认（AC2 对照）', () async {
+    await seedProviders();
+    late http.Request captured;
+    final container = containerWith(MockClient((request) async {
+      captured = request;
+      return _chatResponse('讲解内容。');
+    }),);
+
+    await container.read(poemExplainProvider.notifier).generate(_poem());
+
+    final body = jsonDecode(captured.body) as Map<String, dynamic>;
+    final messages = body['messages'] as List<dynamic>;
+    expect(
+      (messages[0] as Map<String, dynamic>)['content'],
+      kPoemExplainSystemPrompt,
+    );
+  });
+
   group('buildPoemExplainUserPrompt', () {
     test('负载只含标题/作者/朝代/正文，不含译文赏析背景等其他数据', () {
       final prompt = buildPoemExplainUserPrompt(_poem());

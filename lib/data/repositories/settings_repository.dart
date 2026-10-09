@@ -65,6 +65,12 @@ class SettingsRepository {
   // llm_provider_math_explain。值为 llm_providers 中某条配置的 id，
   // 与 llm_active_provider_id 同类（依赖本机配置列表存在，跨机迁移
   // 必然悬空），一律不入备份白名单。
+  // AI 讲解 system prompt 用户自定义覆盖（string，入备份白名单——
+  // 纯文本、非凭据、不指向外部服务，随备份迁移换机不丢）：
+  // 空/缺失 = 用内置默认常量（core/prompts/explain_prompt_defaults.dart）；
+  // 恢复默认 = 删除 key（不写常量副本，升级改进默认后自动享受新版）。
+  static const String _keyPoemExplainPrompt = 'llm_poem_explain_prompt';
+  static const String _keyMathExplainPrompt = 'llm_math_explain_prompt';
 
   // ============ 主题 ============
 
@@ -459,6 +465,53 @@ class SettingsRepository {
     await HiveBoxes.settings.delete(_keyLlmBaseUrl);
     await HiveBoxes.settings.delete(_keyLlmModel);
     await HiveBoxes.settings.delete(_keyLlmProviderName);
+  }
+
+  // ============ AI 讲解提示词（可编辑，覆盖 ?? 内置默认） ============
+
+  /// 诗词讲解 system prompt 用户覆盖值；null = 未自定义（用内置默认）。
+  /// 空串/空白串防御性读作 null（历史脏数据不留隐患）。
+  String? get poemExplainPromptOverride {
+    final raw = HiveBoxes.settings.get(_keyPoemExplainPrompt) as String?;
+    if (raw == null || raw.trim().isEmpty) return null;
+    return raw;
+  }
+
+  /// 保存诗词讲解覆盖值；[value] trim 后为空 → 删除 key（恢复默认）。
+  Future<void> setPoemExplainPrompt(String value) async {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      await HiveBoxes.settings.delete(_keyPoemExplainPrompt);
+      return;
+    }
+    await HiveBoxes.settings.put(_keyPoemExplainPrompt, trimmed);
+  }
+
+  /// 一键恢复内置默认：删除覆盖 key，运行时回落编译期常量。
+  Future<void> resetPoemExplainPrompt() async {
+    await HiveBoxes.settings.delete(_keyPoemExplainPrompt);
+  }
+
+  /// 口算解析 system prompt 用户覆盖值；null = 未自定义（用内置默认）。
+  String? get mathExplainPromptOverride {
+    final raw = HiveBoxes.settings.get(_keyMathExplainPrompt) as String?;
+    if (raw == null || raw.trim().isEmpty) return null;
+    return raw;
+  }
+
+  /// 保存口算解析覆盖值；[value] trim 后为空 → 删除 key（恢复默认）。
+  Future<void> setMathExplainPrompt(String value) async {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      await HiveBoxes.settings.delete(_keyMathExplainPrompt);
+      return;
+    }
+    await HiveBoxes.settings.put(_keyMathExplainPrompt, trimmed);
+  }
+
+  /// 一键恢复内置默认：删除覆盖 key，运行时回落编译期常量。
+  Future<void> resetMathExplainPrompt() async {
+    await HiveBoxes.settings.delete(_keyMathExplainPrompt);
   }
 
   // ============ 拼音显示 ============

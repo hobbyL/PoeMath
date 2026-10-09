@@ -67,7 +67,10 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
       client = LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
       final result = await client.explain(
         config: config,
-        systemPrompt: kMathExplainSystemPrompt,
+        // 用户自定义覆盖优先（设置页可编辑），否则内置出厂默认。
+        systemPrompt:
+            ref.read(settingsRepositoryProvider).mathExplainPromptOverride ??
+                kMathExplainSystemPrompt,
         userPrompt: buildMathExplainUserPrompt(
           problemText: problemText,
           correctAnswer: correctAnswer,

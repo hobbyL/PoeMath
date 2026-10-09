@@ -75,6 +75,10 @@ const Map<String, String> _settingsValueType = <String, String>{
   'reminder_hour': 'int', // 每日提醒小时（24h 制）
   'reminder_minute': 'int', // 每日提醒分钟
   'weekly_report_enabled': 'bool', // 周报开关
+  // AI 讲解提示词用户覆盖（纯文本、非凭据、不指向外部服务，随备份迁移
+  // 换机不丢；与设备绑定的 llm_providers / 场景绑定 key 不同类）。
+  'llm_poem_explain_prompt': 'string', // 诗词讲解 system prompt 覆盖
+  'llm_math_explain_prompt': 'string', // 口算解析 system prompt 覆盖
 };
 
 class BackupService {
