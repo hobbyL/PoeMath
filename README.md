@@ -130,7 +130,7 @@ flutter build apk --release --target-platform android-arm64
 第三方插件传递引入的其它 ABI 的 JNI 库，保证安装包只含 `arm64-v8a`。32 位 ARM
 设备和 x86_64 模拟器不在正式发布包的支持范围内，Debug 构建不受此限制。
 
-当前代码基线最近一次本地质量门禁已通过 `flutter analyze` 和全部 1163 项
+当前代码基线最近一次本地质量门禁已通过 `flutter analyze` 和全部 1215 项
 `flutter test`。该结果来自本地 FVM 命令；文档同步不包含 Android/iOS 打包或
 真机录音验证。
 
@@ -243,6 +243,7 @@ cat keystore.b64 | pbcopy
 | 复习计划 | 艾宾浩斯 5 轮复习，一键复习今日全部 | `poem_review_page` |
 | 分享 | 格式化诗词文本分享（share_plus）| `poem_detail_page` |
 | TTS 朗读 | 全文语音朗读，逐句高亮，可调语速；云端音色逐行合成+回退；译文/注释/赏析/背景区域点击朗读 | `poem_detail_page` |
+| AI 讲解 | 家长自配大模型后，一键生成这首诗的儿童口语化讲解（分段展示、可朗读、可重新生成）；未配置时引导去设置 | `poem_detail_page` |
 
 ### 口算模块
 
@@ -255,6 +256,7 @@ cat keystore.b64 | pbcopy
 | 题量快捷选择 | SegmentedButton 10/20/50 题 |
 | 年级适配 | 1-6 年级 12 个学期独立配置，难度递进 |
 | 错题诊断 | 6 类错因规则 + 分步解题过程 |
+| AI 解析 | 练习页讲解区与错题详情「AI 帮我讲」弹层讲解本题（含错因标签、可重新生成）；未配置时引导去设置 | `math_ai_explain_sheet` |
 | 错题本 | 多维筛选（年级/状态），记录错题、重做、标记已掌握 |
 | 限时挑战 | 固定时间模式 / 续命模式，挑战记录持久化 |
 

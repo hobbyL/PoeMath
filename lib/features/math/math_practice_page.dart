@@ -25,6 +25,7 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/math_ai_explain_sheet.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/widgets/session_result_dialog.dart';
@@ -553,6 +554,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                                 const SizedBox(height: SpacingTokens.md),
                                 if (_judgement!.correctSteps.isNotEmpty)
                                   _buildStepsSection(context),
+                                _buildAiExplainButton(context),
                               ],
                             ],
                           ),
@@ -717,6 +719,32 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           ),
       ],
     );
+  }
+
+  /// AI 解析入口：只做讲解展示，不参与判分/错题/统计。
+  Widget _buildAiExplainButton(BuildContext context) {
+    final problem = ref.read(currentProblemProvider);
+    final judgement = _judgement;
+    if (problem == null || judgement == null) return const SizedBox.shrink();
+    return TextButton.icon(
+      onPressed: () => showMathAiExplainSheet(
+        context,
+        problemText: problem.problemText,
+        correctAnswer: problem.answerText,
+        userAnswer: judgement.isCorrect ? null : _userAnswerOf(problem),
+        diagnosisCategory: judgement.diagnosis?.category,
+      ),
+      icon: const Icon(Icons.auto_awesome, size: 18),
+      label: const Text('AI 帮我讲'),
+    );
+  }
+
+  /// 从本次会话记录中回查该题作答（只读，不改动记录链路）。
+  String? _userAnswerOf(MathProblem problem) {
+    for (final record in _problemRecords.reversed) {
+      if (record.problemText == problem.problemText) return record.userAnswer;
+    }
+    return null;
   }
 
   Widget _buildAnswerInput(BuildContext context) {

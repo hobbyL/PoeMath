@@ -34,6 +34,17 @@ class LlmBatchResult {
   final List<LlmWordProblemDraft> drafts;
 }
 
+/// 自由文本讲解结果（诗词讲解 / 算数题解析共用）。
+///
+/// 内容为模型原样输出的纯文本（已 trim），不做结构解析：讲解类输出
+/// 无需 JSON 校验，直接呈现给用户。
+class LlmExplainResult {
+  const LlmExplainResult({required this.text});
+
+  /// 讲解正文。保证非空（空输出在客户端抛 [LlmResponseFormatError]）。
+  final String text;
+}
+
 /// LLM 服务异常基类。所有子类 message 不得包含 apiKey。
 sealed class LlmException implements Exception {
   const LlmException(this.message);

@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
+import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -32,6 +33,26 @@ final llmSettingsHttpClientProvider = Provider<http.Client>((ref) {
 
 /// 连接测试的行内反馈状态。
 enum _TestState { idle, loading, success, failure }
+
+/// 场景选择弹层「跟随默认」选项的哨兵值（RadioGroup 不接受 null 选项值）。
+const String _followDefaultValue = '__follow_default__';
+
+/// 场景选择弹层的返回值。用包装类区分「取消」（返回 null）与
+/// 「选中跟随默认」（返回 id 为 null 的实例）。
+final class _ScenarioPick {
+  const _ScenarioPick(this.id);
+
+  /// 选中的配置 id；null = 跟随默认。
+  final String? id;
+}
+
+/// 场景行图标。
+const Map<LlmScenario, IconData> _scenarioIcons = {
+  LlmScenario.wordProblem: Icons.edit_note_outlined,
+  LlmScenario.poemExplain: Icons.menu_book_outlined,
+  LlmScenario.mathExplain: Icons.calculate_outlined,
+};
+
 
 class LlmSettingsPage extends ConsumerStatefulWidget {
   const LlmSettingsPage({super.key});
@@ -455,6 +476,115 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
     );
   }
 
+  /// 点场景行：选择该场景使用的厂商（null = 跟随默认），点选即持久化。
+  Future<void> _setScenarioProvider(LlmScenario scenario, String? id) async {
+    try {
+      await ref
+          .read(settingsRepositoryProvider)
+          .setProviderIdForScenario(scenario, id);
+    } on ArgumentError catch (e) {
+      // 竞态：列表在读取后被外部改写。刷新列表即可。
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('配置不存在：${e.message ?? e}')),
+        );
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// 底部弹层：为 [scenario] 选择厂商。返回 null 表示取消。
+  Future<void> _pickScenarioProvider(
+    LlmScenario scenario,
+    List<LlmProviderConfig> providers,
+    String? currentId,
+  ) async {
+    final selection = await showModalBottomSheet<_ScenarioPick>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  child: Text(
+                    '${scenario.label}使用厂商',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+                    children: [
+                      RadioGroup<String>(
+                        groupValue: currentId ?? _followDefaultValue,
+                        onChanged: (value) {
+                          Navigator.pop(
+                            sheetContext,
+                            _ScenarioPick(
+                              value == _followDefaultValue ? null : value,
+                            ),
+                          );
+                        },
+                        child: Column(
+                          children: [
+                            const RadioListTile<String>(
+                              value: _followDefaultValue,
+                              title: Text('跟随默认'),
+                              controlAffinity:
+                                  ListTileControlAffinity.leading,
+                            ),
+                            for (final (index, config) in providers.indexed)
+                              RadioListTile<String>(
+                                value: config.id,
+                                title: Text(_displayName(index, config)),
+                                subtitle: Text(_hostSummary(config.baseUrl)),
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selection == null) return;
+    await _setScenarioProvider(scenario, selection.id);
+  }
+
+  /// 场景行副标题：已绑定显示厂商名，未绑定显示「跟随默认（厂商名）」。
+  String _scenarioSummary(
+    List<LlmProviderConfig> providers,
+    String? scenarioId,
+    String? activeId,
+  ) {
+    if (scenarioId != null) {
+      final index = providers.indexWhere((p) => p.id == scenarioId);
+      if (index >= 0) return _displayName(index, providers[index]);
+    }
+    final activeIndex = providers.indexWhere((p) => p.id == activeId);
+    if (activeIndex >= 0) {
+      return '跟随默认（${_displayName(activeIndex, providers[activeIndex])}）';
+    }
+    return '跟随默认';
+  }
+
   /// 列表行显示名：空名兜底「配置 N」（N 为序号，不回写存储）。
   String _displayName(int index, LlmProviderConfig config) {
     final name = config.name.trim();
@@ -577,6 +707,44 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
               label: const Text('新增配置'),
             ),
             const SizedBox(height: SpacingTokens.lg),
+
+            // ============ 场景使用厂商区 ============
+            // 无配置时整区隐藏（没有可选项，展示只会造成困惑）。
+            if (providers.isNotEmpty) ...[
+              Text(
+                '场景使用厂商',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.xs),
+              Text(
+                '为不同功能指定厂商；未指定的场景跟随上方生效配置。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              for (final scenario in LlmScenario.values) ...[
+                AppTile(
+                  icon: _scenarioIcons[scenario]!,
+                  iconColor: theme.colorScheme.secondary,
+                  title: scenario.label,
+                  subtitle: _scenarioSummary(
+                    providers,
+                    settingsRepo.providerIdForScenario(scenario),
+                    activeId,
+                  ),
+                  onTap: () => _pickScenarioProvider(
+                    scenario,
+                    providers,
+                    settingsRepo.providerIdForScenario(scenario),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+              ],
+              const SizedBox(height: SpacingTokens.md),
+            ],
 
             // ============ 编辑区 ============
             Text(

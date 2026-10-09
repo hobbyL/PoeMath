@@ -38,6 +38,11 @@ Map<String, dynamic> _maliciousSettings() => <String, dynamic>{
         },
       ]),
       'llm_active_provider_id': 'evil-p1',
+      // 场景级厂商绑定 key（LlmScenario.settingsKey）：值为
+      // llm_providers 条目 id，跨机迁移必然悬空，同样不应落盘。
+      'llm_provider_word_problem': 'evil-p1',
+      'llm_provider_poem_explain': 'evil-p1',
+      'llm_provider_math_explain': 'evil-p1',
       'tts_cloud_base_url': 'http://attacker-tts.example.com',
       'tts_cloud_enabled': true,
       'tencent_asr_verified_at': DateTime(2030, 1, 1).toIso8601String(),
@@ -117,6 +122,12 @@ void main() {
     );
     await HiveBoxes.settings.put('llm_active_provider_id', 'local-p1');
     await HiveBoxes.settings.put(
+      'llm_provider_word_problem',
+      'local-p1',
+    );
+    await HiveBoxes.settings.put('llm_provider_poem_explain', 'local-p1');
+    await HiveBoxes.settings.put('llm_provider_math_explain', 'local-p1');
+    await HiveBoxes.settings.put(
       'tts_cloud_base_url',
       'https://tts.cloudm.cc',
     );
@@ -128,6 +139,12 @@ void main() {
       'llm_providers': HiveBoxes.settings.get('llm_providers'),
       'llm_active_provider_id':
           HiveBoxes.settings.get('llm_active_provider_id'),
+      'llm_provider_word_problem':
+          HiveBoxes.settings.get('llm_provider_word_problem'),
+      'llm_provider_poem_explain':
+          HiveBoxes.settings.get('llm_provider_poem_explain'),
+      'llm_provider_math_explain':
+          HiveBoxes.settings.get('llm_provider_math_explain'),
       'tts_cloud_base_url': HiveBoxes.settings.get('tts_cloud_base_url'),
       'tencent_asr_verified_at':
           HiveBoxes.settings.get('tencent_asr_verified_at'),
@@ -151,6 +168,20 @@ void main() {
     expect(
       HiveBoxes.settings.get('llm_active_provider_id'),
       isNot('evil-p1'),
+    );
+
+    // 场景级厂商绑定 key：本机原值保留，恶意 id 不生效。
+    expect(
+      HiveBoxes.settings.get('llm_provider_word_problem'),
+      before['llm_provider_word_problem'],
+    );
+    expect(
+      HiveBoxes.settings.get('llm_provider_poem_explain'),
+      before['llm_provider_poem_explain'],
+    );
+    expect(
+      HiveBoxes.settings.get('llm_provider_math_explain'),
+      before['llm_provider_math_explain'],
     );
 
     // 本机原值保留，恶意注入未生效。
@@ -263,6 +294,9 @@ void main() {
       ]),
     );
     await HiveBoxes.settings.put('llm_active_provider_id', 'p1');
+    await HiveBoxes.settings.put('llm_provider_word_problem', 'p1');
+    await HiveBoxes.settings.put('llm_provider_poem_explain', 'p1');
+    await HiveBoxes.settings.put('llm_provider_math_explain', 'p1');
 
     final json = await backupService.exportToJson();
     final settings = (jsonDecode(json) as Map<String, dynamic>)['settings']
@@ -273,6 +307,9 @@ void main() {
       'webdav_configs',
       'llm_providers',
       'llm_active_provider_id',
+      'llm_provider_word_problem',
+      'llm_provider_poem_explain',
+      'llm_provider_math_explain',
       'llm_base_url',
       'llm_model',
       'tts_cloud_base_url',

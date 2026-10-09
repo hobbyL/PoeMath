@@ -14,6 +14,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/math_ai_explain_sheet.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 import 'package:poemath/math_engine/models/math_problem.dart';
@@ -187,6 +188,24 @@ class MathMistakeDetailPage extends ConsumerWidget {
                     delay: 200.ms,
                     duration: 300.ms,
                   ),
+
+            const SizedBox(height: SpacingTokens.md),
+
+            // AI 解析入口（只做讲解展示，不参与判分与错题状态）。
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => showMathAiExplainSheet(
+                  context,
+                  problemText: mistake.problemText,
+                  correctAnswer: mistake.correctAnswer,
+                  userAnswer: mistake.userAnswer,
+                  diagnosisCategory: mistake.errorType,
+                ),
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: const Text('AI 帮我讲'),
+              ),
+            ),
 
             const SizedBox(height: SpacingTokens.lg),
 

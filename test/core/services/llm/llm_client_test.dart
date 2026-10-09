@@ -1,7 +1,8 @@
 // test/core/services/llm/llm_client_test.dart
 //
 // OpenAI 兼容 LLM 客户端测试：URL 规范化、请求头、prompt 结构、
-// 容错 JSON 解析、index 对齐、格式重试与错误分类（mock http）。
+// 容错 JSON 解析、index 对齐、格式重试与错误分类（mock http）；
+// explain 讲解接口的请求契约、空输出与错误分类。
 
 import 'dart:convert';
 
@@ -529,6 +530,163 @@ void main() {
 
       expect(captured.url.toString(),
           'http://localhost:11434/v1/chat/completions',);
+      expect(captured.headers.containsKey('authorization'), isFalse);
+    });
+  });
+
+  group('explain', () {
+    test('返回讲解文本（trim）；请求契约为 chat/completions + Bearer 头', () async {
+      late http.Request captured;
+      final client = LlmClient(
+        httpClient: MockClient((request) async {
+          captured = request;
+          return _chatResponse('  第一段讲解。\n第二段讲解。  ');
+        }),
+      );
+
+      final result = await client.explain(
+        config: _config,
+        systemPrompt: '你是老师',
+        userPrompt: '讲讲《静夜思》',
+      );
+
+      expect(result.text, '第一段讲解。\n第二段讲解。');
+
+      expect(captured.method, 'POST');
+      expect(
+        captured.url.toString(),
+        'https://api.example.com/v1/chat/completions',
+      );
+      expect(captured.headers['authorization'], 'Bearer $_apiKey');
+      final body = jsonDecode(captured.body) as Map<String, dynamic>;
+      expect(body['model'], 'gpt-4o-mini');
+      expect(body['max_tokens'], 800);
+      final messages = body['messages'] as List<dynamic>;
+      expect(messages, hasLength(2));
+      expect(messages[0]['role'], 'system');
+      expect(messages[0]['content'], '你是老师');
+      expect(messages[1]['role'], 'user');
+      expect(messages[1]['content'], '讲讲《静夜思》');
+      // API Key 只走 Authorization 头，不入请求体。
+      expect(captured.body, isNot(contains(_apiKey)));
+    });
+
+    test('maxTokens 可覆盖', () async {
+      late http.Request captured;
+      final client = LlmClient(
+        httpClient: MockClient((request) async {
+          captured = request;
+          return _chatResponse('ok');
+        }),
+      );
+
+      await client.explain(
+        config: _config,
+        systemPrompt: 's',
+        userPrompt: 'u',
+        maxTokens: 500,
+      );
+
+      final body = jsonDecode(captured.body) as Map<String, dynamic>;
+      expect(body['max_tokens'], 500);
+    });
+
+    test('content 为空白抛 LlmResponseFormatError 且不重试', () async {
+      var calls = 0;
+      final client = LlmClient(
+        httpClient: MockClient((_) async {
+          calls++;
+          return _chatResponse('   \n  ');
+        }),
+      );
+
+      await expectLater(
+        client.explain(config: _config, systemPrompt: 's', userPrompt: 'u'),
+        throwsA(
+          isA<LlmResponseFormatError>().having(
+            (error) => error.toString(),
+            '不暴露 API Key',
+            allOf(isNot(contains(_apiKey)), isNot(contains('llm-secret'))),
+          ),
+        ),
+      );
+      // 讲解不做格式重试（失败即交 UI 重试）。
+      expect(calls, 1);
+    });
+
+    test('401 映射为 LlmAuthError 且不重试', () async {
+      var calls = 0;
+      final client = LlmClient(
+        httpClient: MockClient((_) async {
+          calls++;
+          return http.Response.bytes(
+            utf8.encode(jsonEncode({'error': {'message': 'invalid key'}})),
+            401,
+            headers: const {
+              'content-type': 'application/json; charset=utf-8',
+            },
+          );
+        }),
+      );
+
+      await expectLater(
+        client.explain(config: _config, systemPrompt: 's', userPrompt: 'u'),
+        throwsA(isA<LlmAuthError>()),
+      );
+      expect(calls, 1);
+    });
+
+    test('5xx 映射为 LlmServerError', () async {
+      final client = LlmClient(
+        httpClient: MockClient(
+          (_) async => http.Response.bytes(const [], 503),
+        ),
+      );
+
+      await expectLater(
+        client.explain(config: _config, systemPrompt: 's', userPrompt: 'u'),
+        throwsA(isA<LlmServerError>()),
+      );
+    });
+
+    test('超时映射为 LlmNetworkError（explainTimeout 独立于出题）', () async {
+      final client = LlmClient(
+        httpClient: MockClient(
+          (_) async => Future.delayed(
+            const Duration(seconds: 5),
+            () => _chatResponse('慢'),
+          ),
+        ),
+        explainTimeout: const Duration(milliseconds: 50),
+      );
+
+      await expectLater(
+        client.explain(config: _config, systemPrompt: 's', userPrompt: 'u'),
+        throwsA(isA<LlmNetworkError>()),
+      );
+    });
+
+    test('空 Key（Ollama）省略 Authorization 头', () async {
+      late http.Request captured;
+      final client = LlmClient(
+        httpClient: MockClient((request) async {
+          captured = request;
+          return _chatResponse('讲解内容');
+        }),
+      );
+
+      const ollamaConfig = LlmConfig(
+        baseUrl: 'http://localhost:11434',
+        apiKey: '',
+        model: 'qwen2.5:7b',
+      );
+      final result = await client.explain(
+        config: ollamaConfig,
+        systemPrompt: 's',
+        userPrompt: 'u',
+      );
+
+      expect(result.text, '讲解内容');
       expect(captured.headers.containsKey('authorization'), isFalse);
     });
   });

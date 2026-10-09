@@ -26,15 +26,18 @@ final class LlmClient {
     http.Client? httpClient,
     Duration generateTimeout = const Duration(seconds: 60),
     Duration probeTimeout = const Duration(seconds: 15),
+    Duration explainTimeout = const Duration(seconds: 60),
   })  : _httpClient = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _generateTimeout = generateTimeout,
-        _probeTimeout = probeTimeout;
+        _probeTimeout = probeTimeout,
+        _explainTimeout = explainTimeout;
 
   final http.Client _httpClient;
   final bool _ownsHttpClient;
   final Duration _generateTimeout;
   final Duration _probeTimeout;
+  final Duration _explainTimeout;
 
   static const String _chatPath = '/chat/completions';
   static const String _modelsPath = '/models';
@@ -239,6 +242,43 @@ final class LlmClient {
       timeout: _probeTimeout,
       timeoutMessage: '连接测试超时',
     );
+  }
+
+  /// 自由文本讲解：单次请求、不重试，返回模型输出的纯文本。
+  ///
+  /// 与 [generateWordProblems] 的差别：输出无结构约束，因此没有格式
+  /// 重试（重试只对「可校验的结构化输出」有意义；讲解失败重试由用户
+  /// 在 UI 上手动触发）。
+  ///
+  /// 模型输出为空（trim 后）抛 [LlmResponseFormatError]；网络/鉴权/
+  /// 服务端错误沿用 [LlmException] 家族分类。
+  Future<LlmExplainResult> explain({
+    required LlmConfig config,
+    required String systemPrompt,
+    required String userPrompt,
+    int maxTokens = 800,
+  }) async {
+    final base = normalizeBaseUrl(config.baseUrl);
+    final body = jsonEncode(<String, Object>{
+      'model': config.model,
+      'messages': <Map<String, String>>[
+        {'role': 'system', 'content': systemPrompt},
+        {'role': 'user', 'content': userPrompt},
+      ],
+      'max_tokens': maxTokens,
+    });
+    final response = await _send(
+      uri: _join(base, _chatPath),
+      body: body,
+      apiKey: config.apiKey,
+      timeout: _explainTimeout,
+      timeoutMessage: 'AI 讲解生成超时，请稍后重试',
+    );
+    final content = _extractAssistantContent(response).trim();
+    if (content.isEmpty) {
+      throw const LlmResponseFormatError('模型输出内容为空');
+    }
+    return LlmExplainResult(text: content);
   }
 
   void close() {

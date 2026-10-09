@@ -1,8 +1,8 @@
 // test/data/repositories/llm_settings_test.dart
 //
 // LLM 多厂商配置存储测试：多配置 CRUD、生效切换、Key 按配置独立
-// 存取与空串保留、旧单配置迁移、readLlmConfig 组装、删除清理与
-// 备份导出不含配置列表/Key 明文。
+// 存取与空串保留、旧单配置迁移、readLlmConfig 组装、场景级厂商绑定、
+// 删除清理与备份导出不含配置列表/Key 明文。
 
 import 'dart:convert';
 
@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
@@ -358,6 +359,151 @@ void main() {
       await repository.migrateLegacyLlmConfigIfNeeded();
       expect(repository.llmProviders.length, 2);
       expect(HiveBoxes.settings.get('llm_base_url'), 'https://old.example.com');
+    });
+  });
+
+  group('场景级厂商绑定', () {
+    test('三场景默认 null（跟随默认 active）', () async {
+      await saveTwo();
+      for (final scenario in LlmScenario.values) {
+        expect(repository.providerIdForScenario(scenario), isNull);
+      }
+      // 未绑定时按 active 组装。
+      final config =
+          await repository.readLlmConfigForScenario(LlmScenario.poemExplain);
+      expect(config!.model, 'deepseek-chat');
+    });
+
+    test('set/get 往返并持久化；各场景互不干扰', () async {
+      await saveTwo();
+
+      await repository.setProviderIdForScenario(LlmScenario.poemExplain, 'p2');
+      expect(repository.providerIdForScenario(LlmScenario.poemExplain), 'p2');
+      // 其他场景不受影响。
+      expect(repository.providerIdForScenario(LlmScenario.mathExplain), isNull);
+      expect(repository.providerIdForScenario(LlmScenario.wordProblem), isNull);
+
+      // 持久化：新仓储实例重读同一 Hive box。
+      final repo2 = SettingsRepository(credentialStore: credentialStore);
+      expect(repo2.providerIdForScenario(LlmScenario.poemExplain), 'p2');
+
+      // 场景配置参与组装：诗词走 p2，默认 active 仍是 p1。
+      final poemConfig =
+          await repository.readLlmConfigForScenario(LlmScenario.poemExplain);
+      expect(poemConfig!.model, 'qwen-plus');
+      expect(poemConfig.apiKey, 'key-p2');
+      final mathConfig =
+          await repository.readLlmConfigForScenario(LlmScenario.mathExplain);
+      expect(mathConfig!.model, 'deepseek-chat');
+      expect((await repository.readLlmConfig())!.model, 'deepseek-chat');
+    });
+
+    test('null 清除绑定 → 回落跟随默认', () async {
+      await saveTwo();
+      await repository.setProviderIdForScenario(LlmScenario.mathExplain, 'p2');
+      expect(repository.providerIdForScenario(LlmScenario.mathExplain), 'p2');
+
+      await repository.setProviderIdForScenario(LlmScenario.mathExplain, null);
+      expect(repository.providerIdForScenario(LlmScenario.mathExplain), isNull);
+      expect(
+        HiveBoxes.settings.get('llm_provider_math_explain'),
+        isNull,
+      );
+      final config =
+          await repository.readLlmConfigForScenario(LlmScenario.mathExplain);
+      expect(config!.model, 'deepseek-chat');
+    });
+
+    test('悬空绑定读时回落 null 且不写回 Hive', () async {
+      await saveTwo();
+      // 手工注入悬空绑定（模拟手工删 Hive key 后的残留）。
+      await HiveBoxes.settings.put('llm_provider_poem_explain', 'gone');
+
+      expect(repository.providerIdForScenario(LlmScenario.poemExplain), isNull);
+      // 读时不自愈写回（与 active 的自愈策略不同）。
+      expect(HiveBoxes.settings.get('llm_provider_poem_explain'), 'gone');
+      // 组装回落到默认 active。
+      final config =
+          await repository.readLlmConfigForScenario(LlmScenario.poemExplain);
+      expect(config!.model, 'deepseek-chat');
+    });
+
+    test('非法 id set 抛 ArgumentError 且不落盘', () async {
+      await saveTwo();
+      expect(
+        () => repository.setProviderIdForScenario(
+          LlmScenario.wordProblem,
+          'nope',
+        ),
+        throwsArgumentError,
+      );
+      expect(HiveBoxes.settings.get('llm_provider_word_problem'), isNull);
+      expect(repository.providerIdForScenario(LlmScenario.wordProblem), isNull);
+    });
+
+    test('删除配置联动清理指向它的场景绑定；其他场景绑定保留', () async {
+      await saveTwo();
+      await repository.setProviderIdForScenario(LlmScenario.poemExplain, 'p1');
+      await repository.setProviderIdForScenario(LlmScenario.mathExplain, 'p2');
+
+      await repository.deleteLlmProviderConfig('p1');
+
+      // 指向被删 id 的绑定 key 被物理清理（不只是读时回落）。
+      expect(HiveBoxes.settings.get('llm_provider_poem_explain'), isNull);
+      expect(repository.providerIdForScenario(LlmScenario.poemExplain), isNull);
+      // 未受影响的绑定保留。
+      expect(repository.providerIdForScenario(LlmScenario.mathExplain), 'p2');
+      // 诗词场景回落到剩余 active（p2）。
+      final config =
+          await repository.readLlmConfigForScenario(LlmScenario.poemExplain);
+      expect(config!.model, 'qwen-plus');
+    });
+
+    test('无任何配置时场景组装返回 null', () async {
+      final config =
+          await repository.readLlmConfigForScenario(LlmScenario.mathExplain);
+      expect(config, isNull);
+    });
+
+    test('场景绑定不随备份导出（设备绑定）', () async {
+      await saveTwo();
+      await repository.setProviderIdForScenario(LlmScenario.poemExplain, 'p2');
+      await repository.setProviderIdForScenario(LlmScenario.mathExplain, 'p1');
+      await repository.setProviderIdForScenario(LlmScenario.wordProblem, 'p1');
+
+      final exported =
+          await BackupService(secureStore: credentialStore).exportToJson();
+      final settingsNode = (jsonDecode(exported)
+          as Map<String, dynamic>)['settings'] as Map<String, dynamic>;
+      for (final scenario in LlmScenario.values) {
+        expect(
+          settingsNode.containsKey(scenario.settingsKey),
+          isFalse,
+          reason: '场景 key 不应导出: ${scenario.settingsKey}',
+        );
+      }
+    });
+
+    test('readLlmConfig 委托 word_problem 场景：绑定后返回绑定配置（非 active）', () async {
+      await saveTwo();
+      await repository.setProviderIdForScenario(LlmScenario.wordProblem, 'p2');
+
+      final config = await repository.readLlmConfig();
+      expect(config!.model, 'qwen-plus');
+      expect(config.apiKey, 'key-p2');
+      // 默认 active 不因场景绑定而改变。
+      expect(repository.llmActiveProviderId, 'p1');
+    });
+
+    test('readLlmConfig 无绑定时仍读默认 active（委托等价回归）', () async {
+      await saveTwo();
+
+      // 默认 active = p1。
+      expect((await repository.readLlmConfig())!.model, 'deepseek-chat');
+
+      // 切换 active 后随 active 组装（无场景绑定不改变该行为）。
+      await repository.setLlmActiveProvider('p2');
+      expect((await repository.readLlmConfig())!.model, 'qwen-plus');
     });
   });
 

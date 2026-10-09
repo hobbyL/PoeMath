@@ -46,6 +46,9 @@ const int _backupVersion = 1;
 ///   tts_cloud_enabled / tts_cloud_voice / tts_cloud_style：
 ///   指向外部服务的端点或开关（llm_providers 含 baseUrl/model，
 ///   llm_active_provider_id 依赖其存在），注入即成为凭据外泄端点（P1）；
+/// - llm_provider_word_problem / llm_provider_poem_explain /
+///   llm_provider_math_explain：场景级厂商绑定（LlmScenario.settingsKey），
+///   值为 llm_providers 条目 id，跨机迁移必然悬空；
 /// - tencent_asr_credential_fingerprint / tencent_asr_verified_at /
 ///   worker_tts_verified_fingerprint：与凭据绑定的验证状态，凭据不随备份
 ///   走，指纹/时间戳单独迁移会误导验证状态。

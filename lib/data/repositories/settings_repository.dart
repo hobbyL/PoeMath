@@ -9,6 +9,7 @@ import 'package:crypto/crypto.dart';
 
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
+import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
@@ -59,6 +60,11 @@ class SettingsRepository {
   // llm_active_provider_id 依赖 llm_providers 存在，单独迁移无意义。
   static const String _keyLlmProviders = 'llm_providers';
   static const String _keyLlmActiveProviderId = 'llm_active_provider_id';
+  // 场景级厂商绑定 key（见 LlmScenario.settingsKey，共 3 个）：
+  // llm_provider_word_problem / llm_provider_poem_explain /
+  // llm_provider_math_explain。值为 llm_providers 中某条配置的 id，
+  // 与 llm_active_provider_id 同类（依赖本机配置列表存在，跨机迁移
+  // 必然悬空），一律不入备份白名单。
 
   // ============ 主题 ============
 
@@ -269,20 +275,68 @@ class SettingsRepository {
     await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
   }
 
-  /// 读取 LLM 完整配置（当前生效配置组装）；语义与旧版一致：
-  /// 生效配置缺失（列表空/字段空）返回 null（Key 允许为空，
-  /// 对应 Ollama 等无鉴权服务）。
-  Future<LlmConfig?> readLlmConfig() async {
+  /// 读取 LLM 完整配置（应用题生成链路入口）：委托
+  /// [readLlmConfigForScenario] 的 word_problem 场景，使出题场景
+  /// 绑定生效。无绑定（或绑定悬空）时回落默认生效配置，与旧
+  /// 「读 active」语义等价（迁移行为亦一致：两者先走
+  /// [migrateLegacyLlmConfigIfNeeded]）。生效配置缺失（列表空/
+  /// 字段空）返回 null（Key 允许为空，对应 Ollama 等无鉴权服务）。
+  Future<LlmConfig?> readLlmConfig() {
+    return readLlmConfigForScenario(LlmScenario.wordProblem);
+  }
+
+  /// 读取指定场景生效的 LLM 配置：
+  /// 场景已绑定且绑定有效 → 用该配置；否则回落默认生效配置。
+  ///
+  /// 返回 null 的条件与 [readLlmConfig] 一致（无可用配置/字段为空）。
+  Future<LlmConfig?> readLlmConfigForScenario(LlmScenario scenario) async {
     await migrateLegacyLlmConfigIfNeeded();
-    final activeId = llmActiveProviderId;
-    if (activeId == null) return null;
+    final scenarioId = providerIdForScenario(scenario);
+    final targetId = scenarioId ?? llmActiveProviderId;
+    if (targetId == null) return null;
+    return _assembleLlmConfig(targetId);
+  }
+
+  /// 读取场景绑定的配置 id；未绑定或绑定已悬空（配置被删）返回 null。
+  ///
+  /// 读时不写回 Hive（与 [llmActiveProviderId] 的自愈策略不同）：
+  /// 场景绑定缺省语义为「跟随默认」，悬空静默回落即可。
+  String? providerIdForScenario(LlmScenario scenario) {
+    final stored = HiveBoxes.settings.get(scenario.settingsKey);
+    if (stored is! String || stored.isEmpty) return null;
+    if (!llmProviders.any((p) => p.id == stored)) return null;
+    return stored;
+  }
+
+  /// 设置场景绑定的配置 id；[id] 为 null 表示清除绑定（跟随默认）。
+  ///
+  /// id 不在配置列表中抛 [ArgumentError]（不落盘）。
+  Future<void> setProviderIdForScenario(
+    LlmScenario scenario,
+    String? id,
+  ) async {
+    if (id == null) {
+      await HiveBoxes.settings.delete(scenario.settingsKey);
+      return;
+    }
+    if (!llmProviders.any((p) => p.id == id)) {
+      throw ArgumentError('LLM 配置不存在：$id');
+    }
+    await HiveBoxes.settings.put(scenario.settingsKey, id);
+  }
+
+  /// 按配置 id 组装 [LlmConfig]（[readLlmConfig] 与
+  /// [readLlmConfigForScenario] 共用尾段）。
+  ///
+  /// 配置不存在或 baseUrl/model 为空返回 null；Key 允许为空。
+  Future<LlmConfig?> _assembleLlmConfig(String id) async {
     final providers = llmProviders;
-    if (!providers.any((p) => p.id == activeId)) return null;
-    final active = providers.firstWhere((p) => p.id == activeId);
-    final base = active.baseUrl.trim();
-    final model = active.model.trim();
+    if (!providers.any((p) => p.id == id)) return null;
+    final target = providers.firstWhere((p) => p.id == id);
+    final base = target.baseUrl.trim();
+    final model = target.model.trim();
     if (base.isEmpty || model.isEmpty) return null;
-    final apiKey = await _credentialStore.readLlmApiKeyFor(activeId);
+    final apiKey = await _credentialStore.readLlmApiKeyFor(id);
     return LlmConfig(baseUrl: base, apiKey: apiKey ?? '', model: model);
   }
 
@@ -337,8 +391,15 @@ class SettingsRepository {
   /// 删除一条 LLM 厂商配置及其安全存储 Key。
   ///
   /// 若删除的是生效配置，active 自动切到剩余第一条；无剩余清空 active。
+  /// 指向被删配置的场景绑定一并清理（防悬空残留）。
   Future<void> deleteLlmProviderConfig(String id) async {
     await _credentialStore.deleteLlmApiKeyFor(id);
+    // 先按原始存储值清理场景绑定（列表写回后无法再判断悬空归属）。
+    for (final scenario in LlmScenario.values) {
+      if (HiveBoxes.settings.get(scenario.settingsKey) == id) {
+        await HiveBoxes.settings.delete(scenario.settingsKey);
+      }
+    }
     final list = llmProviders..removeWhere((c) => c.id == id);
     await HiveBoxes.settings.put(
       _keyLlmProviders,

@@ -18,6 +18,8 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/poem_author_bios.dart';
+import 'package:poemath/features/poem/poem_explain/poem_explain_controller.dart';
+import 'package:poemath/features/poem/poem_explain/poem_explain_models.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 /// 拼音显隐状态 Provider（读取 SettingsRepository 的持久化值）。
@@ -85,14 +87,32 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   static const int _sectionBackground = 4;
   static const int _sectionFamousLines = 5;
 
+  /// AI 讲解区（可朗读，复用同一套朗读会话纪律）。
+  static const int _sectionAiExplain = 6;
+
+  /// AI 讲解控制器：dispose 时仍可安全调用（只令牌失效，不写状态），
+  /// ref 在 dispose 阶段不可用，故在 initState 捕获 notifier。
+  late final PoemExplainNotifier _explainNotifier;
+
   @override
   void initState() {
     super.initState();
     _tts = ref.read(ttsServiceProvider);
+    _explainNotifier = ref.read(poemExplainProvider.notifier);
+    // 进入页面时复位上一首遗留的讲解状态。postFrame：不在 build
+    // 阶段写 provider 状态（同步通知其它已挂载的监听元素会触发
+    // markNeedsBuild during build 断言）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _explainNotifier.reset();
+    });
   }
 
   @override
   void dispose() {
+    // 退出页面：仅令牌失效，丢弃在途请求的晚到回调。不在此写
+    // provider 状态——退页元素在 unmount 期间仍订阅该 provider，
+    // 同步状态写会通知 defunct element 触发断言。
+    _explainNotifier.discardPending();
     // 退出页面时停止朗读
     unawaited(
       _tts.stop().onError(
@@ -512,12 +532,15 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                 ),
               ],
 
+              // AI 讲解
+              const SizedBox(height: SpacingTokens.md),
+              _buildAiExplainSection(context, poem),
+
               // 学习状态
               if (progress != null) ...[
                 const SizedBox(height: SpacingTokens.md),
                 _buildProgressInfo(context, progress.studyCount),
               ],
-
               const SizedBox(height: SpacingTokens.xl),
             ],
           ),
@@ -830,6 +853,159 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         }).toList(),
       ),
     );
+  }
+
+  /// AI 讲解区：四态卡片（未生成 / 生成中 / 已就绪 / 失败 / 未配置）。
+  ///
+  /// 生成中不放无限动画（纯文案提示），请求结束由控制器切态复位。
+  Widget _buildAiExplainSection(BuildContext context, Poem poem) {
+    final theme = Theme.of(context);
+    final raw = ref.watch(poemExplainProvider);
+    // 只认当前诗词的结果：切诗后旧内容不得闪现。
+    final state = (raw.poemId == null || raw.poemId == poem.id)
+        ? raw
+        : const PoemExplainState();
+
+    return ColoredCard(
+      color: theme.colorScheme.tertiary,
+      backgroundOpacity: 0.06,
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome_outlined,
+                size: 18,
+                color: theme.colorScheme.tertiary,
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              Text(
+                'AI 讲解',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              _buildAiBadge(theme),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          ..._buildAiExplainBody(context, theme, poem, state),
+        ],
+      ),
+    );
+  }
+
+  /// 「AI 生成」角标：内容由模型生成，需明确标识。
+  ///
+  /// 行内徽标（非信息卡片/容器），与 AppTile 内 40×40 图标容器同类，
+  /// 沿用 BoxDecoration + 设计令牌，不套 ColoredCard。
+  Widget _buildAiBadge(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.xs,
+        vertical: 1,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+      ),
+      child: Text(
+        'AI 生成',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.tertiary,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildAiExplainBody(
+    BuildContext context,
+    ThemeData theme,
+    Poem poem,
+    PoemExplainState state,
+  ) {
+    final hintStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    switch (state.status) {
+      case PoemExplainStatus.idle:
+        return [
+          Text('让 AI 用小朋友能听懂的话讲讲这首诗。', style: hintStyle),
+          const SizedBox(height: SpacingTokens.sm),
+          OutlinedButton.icon(
+            onPressed: () => _explainNotifier.generate(poem),
+            icon: const Icon(Icons.auto_awesome, size: 18),
+            label: const Text('生成讲解'),
+          ),
+        ];
+      case PoemExplainStatus.loading:
+        return [
+          Text('AI 正在准备讲解，请稍候…', style: hintStyle),
+        ];
+      case PoemExplainStatus.ready:
+        return [
+          for (final paragraph in state.paragraphs) ...[
+            Text(
+              paragraph,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () => _onTapSection(
+                  (section: _sectionAiExplain, playText: state.fullText),
+                ),
+                icon: Icon(
+                  _activeSection == _sectionAiExplain && _isSpeaking
+                      ? Icons.stop_circle_outlined
+                      : Icons.volume_up_outlined,
+                  size: 18,
+                ),
+                label: const Text('朗读讲解'),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              TextButton.icon(
+                onPressed: () => _explainNotifier.generate(poem),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('重新生成'),
+              ),
+            ],
+          ),
+        ];
+      case PoemExplainStatus.error:
+        return [
+          Text(
+            state.message ?? 'AI 讲解生成失败，请稍后重试。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          OutlinedButton.icon(
+            onPressed: () => _explainNotifier.generate(poem),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('重新生成'),
+          ),
+        ];
+      case PoemExplainStatus.unconfigured:
+        return [
+          Text(
+            state.message ?? '还没有配置 AI 服务，配置后即可使用 AI 讲解。',
+            style: hintStyle,
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          OutlinedButton.icon(
+            onPressed: () => context.push(AppRoutes.llmSettings),
+            icon: const Icon(Icons.settings_outlined, size: 18),
+            label: const Text('去设置'),
+          ),
+        ];
+    }
   }
 
   Widget _buildProgressInfo(BuildContext context, int studyCount) {

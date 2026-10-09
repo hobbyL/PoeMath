@@ -2,7 +2,8 @@
 //
 // AI 出题设置页 widget 测试（多配置版）：配置列表与编辑区、空态引导、
 // 新增保存、点行切换生效、编辑载入/Key 留空保留、删除确认与生效切换、
-// 迁移场景、拉取模型弹层回填、拉取失败手填、拉取/连接防重入。
+// 迁移场景、拉取模型弹层回填、拉取失败手填、拉取/连接防重入、
+// 场景使用厂商区（隐藏/点选/清除/删除联动）。
 //
 // 测试环境无平台安全存储通道，凭据与 LLM 网络均注入内存/HTTP mock。
 
@@ -14,7 +15,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
@@ -576,4 +579,176 @@ void main() {
     final repo = _repoOf(tester);
     expect(repo.llmActiveProviderId, 'p1');
   });
+
+  group('场景使用厂商区', () {
+    testWidgets('空配置时整区隐藏', (tester) async {
+      await _pumpPage(tester);
+
+      expect(find.text('场景使用厂商'), findsNothing);
+      for (final scenario in LlmScenario.values) {
+        expect(find.text(scenario.label), findsNothing);
+      }
+    });
+
+    testWidgets('有配置时三行均显示「跟随默认（生效配置名）」', (tester) async {
+      final store = _MemoryCredentialStore();
+      await _seedTwo(tester, store);
+      await _pumpPage(tester, credentialStore: store);
+
+      expect(find.text('场景使用厂商'), findsOneWidget);
+      expect(find.text('AI 出题'), findsOneWidget);
+      expect(find.text('诗词讲解'), findsOneWidget);
+      expect(find.text('口算解析'), findsOneWidget);
+      // 三场景默认未绑定 → 跟随 active（p1 = DeepSeek）。
+      expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(3));
+    });
+
+    testWidgets('点行弹层点选厂商：持久化、副标题更新、重进页面保持', (tester) async {
+      final store = _MemoryCredentialStore();
+      await _seedTwo(tester, store);
+      await _pumpPage(tester, credentialStore: store);
+
+      await _openScenarioSheet(tester, '诗词讲解');
+
+      // 弹层标题与选项（「跟随默认」+ 两条配置，p2 空名兜底「配置 2」）。
+      expect(find.text('诗词讲解使用厂商'), findsOneWidget);
+      expect(_sheetTile('跟随默认'), findsOneWidget);
+      expect(_sheetTile('DeepSeek'), findsOneWidget);
+      expect(_sheetTile('配置 2'), findsOneWidget);
+
+      // 点选即持久化并关闭。弹层打开已在 _openScenarioSheet 的真实区
+      // 完成，点选 tap 同样包 runAsync：pop → sheet future → Hive 写链
+      // → setState 整链留在真实区；pump 回 FakeAsync 区推帧拿最终 UI
+      //（本仓既有结论：FakeAsync 区 Hive 写入会挂起）。
+      await tester.runAsync(() async {
+        await tester.tap(_sheetTile('配置 2'));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.text('诗词讲解使用厂商'), findsNothing);
+      var repo = _repoOf(tester);
+      expect(repo.providerIdForScenario(LlmScenario.poemExplain), 'p2');
+      // 其他场景不受影响。
+      expect(repo.providerIdForScenario(LlmScenario.mathExplain), isNull);
+      expect(repo.providerIdForScenario(LlmScenario.wordProblem), isNull);
+      // 该行副标题切为厂商名，其余两行仍跟随默认。
+      expect(
+        find.descendant(
+          of: find.widgetWithText(AppTile, '诗词讲解'),
+          matching: find.text('配置 2'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(2));
+
+      // 重进页面保持。
+      await _pumpPage(tester, credentialStore: store);
+      repo = _repoOf(tester);
+      expect(repo.providerIdForScenario(LlmScenario.poemExplain), 'p2');
+      expect(
+        find.descendant(
+          of: find.widgetWithText(AppTile, '诗词讲解'),
+          matching: find.text('配置 2'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('已绑定行选「跟随默认」清除绑定', (tester) async {
+      final store = _MemoryCredentialStore();
+      await _seedTwo(tester, store);
+      await tester.runAsync(() async {
+        await SettingsRepository(credentialStore: store)
+            .setProviderIdForScenario(LlmScenario.mathExplain, 'p2');
+      });
+      await _pumpPage(tester, credentialStore: store);
+
+      expect(
+        find.descendant(
+          of: find.widgetWithText(AppTile, '口算解析'),
+          matching: find.text('配置 2'),
+        ),
+        findsOneWidget,
+      );
+
+      await _openScenarioSheet(tester, '口算解析');
+      await tester.runAsync(() async {
+        await tester.tap(_sheetTile('跟随默认'));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      final repo = _repoOf(tester);
+      expect(repo.providerIdForScenario(LlmScenario.mathExplain), isNull);
+      expect(HiveBoxes.settings.get('llm_provider_math_explain'), isNull);
+      expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(3));
+    });
+
+    testWidgets('删除配置后指向它的场景绑定回落跟随默认', (tester) async {
+      final store = _MemoryCredentialStore();
+      await _seedTwo(tester, store);
+      await tester.runAsync(() async {
+        await SettingsRepository(credentialStore: store)
+            .setProviderIdForScenario(LlmScenario.poemExplain, 'p1');
+      });
+      await _pumpPage(tester, credentialStore: store);
+
+      expect(
+        find.descendant(
+          of: find.widgetWithText(AppTile, '诗词讲解'),
+          matching: find.text('DeepSeek'),
+        ),
+        findsOneWidget,
+      );
+
+      // 删除 p1（默认编辑生效配置 p1）。
+      final deleteBtnFinder = find.widgetWithText(TextButton, '删除此配置');
+      await tester.ensureVisible(deleteBtnFinder);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.runAsync(() async {
+        await tester.tap(deleteBtnFinder.hitTestable());
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.runAsync(() async {
+        await tester.tap(find.widgetWithText(FilledButton, '删除'));
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      final repo = _repoOf(tester);
+      expect(repo.providerIdForScenario(LlmScenario.poemExplain), isNull);
+      expect(HiveBoxes.settings.get('llm_provider_poem_explain'), isNull);
+      // 回落到剩余 active（p2 空名 → 配置 1）。
+      expect(find.text('跟随默认（配置 1）'), findsNWidgets(3));
+    });
+  });
+}
+
+/// 场景选择弹层内的选项（页面配置列表同样用 RadioListTile，须限定弹层内）。
+Finder _sheetTile(String title) => find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.widgetWithText(RadioListTile<String>, title),
+    );
+
+/// 点场景行打开选择弹层。
+/// 打开 tap 也须在 runAsync 真实区：`await showModalBottomSheet` 的
+/// 续体（点选后的 Hive 写链 + setState）注册在打开 tap 所在 zone，
+/// 若在 FakeAsync 区打开，写链会落回 FakeAsync 区挂起（对齐删除
+/// 确认弹窗的既有范式：弹层的打开与确认 tap 各包一个 runAsync）。
+Future<void> _openScenarioSheet(WidgetTester tester, String label) async {
+  final row = find.text(label);
+  await tester.ensureVisible(row);
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.runAsync(() async {
+    await tester.tap(row);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  });
+  await tester.pump();
+  await tester.pumpAndSettle();
 }
