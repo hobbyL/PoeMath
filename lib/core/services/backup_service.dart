@@ -18,6 +18,7 @@ import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/llm_problem.dart';
+import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
@@ -136,6 +137,10 @@ class BackupService {
       final llmApiKey = await _readActiveLlmApiKey();
       if (llmApiKey != null && llmApiKey.isNotEmpty) {
         payload['llm_api_key'] = llmApiKey;
+        // 归属提示（host|model，非敏感）：恢复端凭它在本机 llm_providers
+        // 中找回 key 的归属配置，防止导出后本机切换 active 导致 key 写
+        // 进错误槽位。只进加密凭据节，明文备份任何位置不得出现。
+        payload['llm_api_key_hint'] = _activeLlmKeyHint();
       }
       if (payload.isEmpty) return null;
       return await encryptCredentials(payload, normalized);
@@ -228,17 +233,70 @@ class BackupService {
       await _secureStore.saveWorkerTtsApiKey(apiKey);
     }
     // legacy 备份无 llm_api_key 字段 → null，跳过（不覆盖现有值）。
-    // LLM 配置设备绑定：条目写入本机当前生效配置的键位
-    // （llm_api_key_{activeId}）；本机无生效配置则丢弃（与
-    // url/model 不迁移的既有纪律一致）。
+    // LLM 配置设备绑定（url/model 不随备份迁移），key 必须找到本机的
+    // 归属配置才能落到正确槽位（llm_api_key_{configId}）：
+    // - 有 llm_api_key_hint（新备份）：按 host|model 在本机 llm_providers
+    //   中匹配，key 写回**匹配配置**的槽位——防止导出后本机切换 active
+    //   造成「A 的 key 写进 B 槽位」；本机无匹配配置则丢弃（与
+    //   url/model 不迁移纪律一致）。
+    // - 无 hint（旧备份）：维持现行为——写本机当前生效配置的键位；
+    //   本机无生效配置则丢弃（兼容不倒退）。
     final llmApiKey = credentials['llm_api_key'];
     if (llmApiKey != null && llmApiKey.isNotEmpty) {
-      final activeId = HiveBoxes.settings.get('llm_active_provider_id')
-          as String?;
-      if (activeId != null && activeId.isNotEmpty) {
-        await _secureStore.saveLlmApiKeyFor(activeId, llmApiKey);
+      final hint = credentials['llm_api_key_hint'];
+      if (hint != null && hint.isNotEmpty) {
+        final matchedId = _matchLlmProviderByHint(hint);
+        if (matchedId != null) {
+          await _secureStore.saveLlmApiKeyFor(matchedId, llmApiKey);
+        }
+      } else {
+        final activeId = HiveBoxes.settings.get('llm_active_provider_id')
+            as String?;
+        if (activeId != null && activeId.isNotEmpty) {
+          await _secureStore.saveLlmApiKeyFor(activeId, llmApiKey);
+        }
       }
     }
+  }
+
+  /// 在本机 llm_providers 中按 hint（host|model）匹配配置；
+  /// 找不到返回 null（恢复时丢弃该 key）。同 host+model 多条取第一条
+  /// （同址同模型的 key 可互换，无实害）。
+  String? _matchLlmProviderByHint(String hint) {
+    final providers = LlmProviderConfig.decodeList(
+      HiveBoxes.settings.get('llm_providers') as String?,
+    );
+    for (final config in providers) {
+      if (_llmKeyHintOf(config.baseUrl, config.model) == hint) {
+        return config.id;
+      }
+    }
+    return null;
+  }
+
+  /// 当前生效 LLM 配置的 key 归属提示（host|model）；无生效配置返回
+  /// 空串（导出端与 active key 同时判断，空串不会写入凭据节）。
+  String _activeLlmKeyHint() {
+    final activeId =
+        HiveBoxes.settings.get('llm_active_provider_id') as String?;
+    if (activeId == null || activeId.isEmpty) return '';
+    final providers = LlmProviderConfig.decodeList(
+      HiveBoxes.settings.get('llm_providers') as String?,
+    );
+    for (final config in providers) {
+      if (config.id == activeId) {
+        return _llmKeyHintOf(config.baseUrl, config.model);
+      }
+    }
+    return '';
+  }
+
+  /// 配置的归属提示：host 取 baseUrl 解析出的 host（解析失败回退原串），
+  /// 与 model 以「|」连接。非敏感（加密节内已含各 API key，host|model
+  /// 不新增暴露面）。
+  static String _llmKeyHintOf(String baseUrl, String model) {
+    final host = Uri.tryParse(baseUrl)?.host ?? '';
+    return '${host.isEmpty ? baseUrl : host}|$model';
   }
 
   /// 读取当前生效 LLM 配置的 API Key（llm_api_key_{activeId}）；

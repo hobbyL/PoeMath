@@ -12,6 +12,7 @@ import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
@@ -20,6 +21,8 @@ import '../../helpers/hive_test_helper.dart';
 /// 测试环境无平台安全存储通道，覆写为内存实现。
 /// 按 configId 存 Key（对齐真实存储键 `llm_api_key_{configId}`）；
 /// 旧单键 llmApiKey 保留，供迁移用例与真实迁移逻辑读写。
+/// Tencent / Worker 读方法覆写为内存（返回 null）：BackupService 导出
+/// 链先读这两类凭据，不覆写会落到平台通道抛异常，使凭据节整体降级为空。
 final class _MemoryCredentialStore extends SecureCredentialStore {
   final Map<String, String> llmApiKeysByConfigId = {};
   String? llmApiKey;
@@ -50,6 +53,12 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   Future<void> deleteLlmApiKey() async {
     llmApiKey = null;
   }
+
+  @override
+  Future<TencentAsrCredentials?> readTencentAsrCredentials() async => null;
+
+  @override
+  Future<String?> readWorkerTtsApiKey() async => null;
 }
 
 void main() {
@@ -295,6 +304,70 @@ void main() {
     expect(repository.llmActiveProviderId, isNull);
   });
 
+  test(
+    '追加时 active 判断走原始存储值：首条追加设 active、'
+    '有效 active 下追加不变、悬空 active 被修复',
+    () async {
+      // 首条追加：原始存储无 active → 新配置设为生效。
+      await repository.saveLlmProviderConfig(
+        id: 'first',
+        name: 'First',
+        baseUrl: 'https://first.example.com',
+        model: 'm1',
+        apiKey: 'key-first',
+      );
+      expect(
+        HiveBoxes.settings.get('llm_active_provider_id'),
+        'first',
+        reason: '首条追加应直接写原始存储 active',
+      );
+
+      // 已有有效 active 下追加：保持不变。
+      await repository.saveLlmProviderConfig(
+        id: 'second',
+        name: 'Second',
+        baseUrl: 'https://second.example.com',
+        model: 'm2',
+        apiKey: 'key-second',
+      );
+      expect(HiveBoxes.settings.get('llm_active_provider_id'), 'first');
+
+      // 悬空 active（配置被删后残留）下追加：新配置接管生效。
+      await HiveBoxes.settings.put('llm_active_provider_id', 'gone');
+      await repository.saveLlmProviderConfig(
+        id: 'third',
+        name: 'Third',
+        baseUrl: 'https://third.example.com',
+        model: 'm3',
+        apiKey: '',
+      );
+      expect(HiveBoxes.settings.get('llm_active_provider_id'), 'third');
+    },
+  );
+
+  test(
+    'clearLlmApiKey：删除指定配置的 Key，配置本身与 active 不受影响；'
+    '无已存 Key 时调用无副作用',
+    () async {
+      await saveTwo();
+
+      // 清除 p1 的 Key。
+      await repository.clearLlmApiKey('p1');
+      expect(await repository.readLlmApiKeyFor('p1'), isNull);
+      // 其他配置的 Key 不受影响。
+      expect(await repository.readLlmApiKeyFor('p2'), 'key-p2');
+      // 配置本身保留，active 不受影响。
+      expect(repository.llmProviders.length, 2);
+      expect(repository.llmActiveProviderId, 'p1');
+
+      // 无已存 Key 时调用无副作用（不抛、不产生任何变化）。
+      await repository.clearLlmApiKey('p1');
+      await repository.clearLlmApiKey('never-saved');
+      expect(await repository.readLlmApiKeyFor('p1'), isNull);
+      expect(repository.llmProviders.length, 2);
+    },
+  );
+
   group('旧单配置迁移 migrateLegacyLlmConfigIfNeeded', () {
     test('旧三 key + llm_api_key → 第一条配置：Key 复制、旧 key 清除、幂等', () async {
       // 模拟旧版落盘状态。
@@ -351,6 +424,43 @@ void main() {
       expect(repository.llmProviders, isEmpty);
       expect(HiveBoxes.settings.get('llm_providers'), isNull);
     });
+
+    test(
+      '并发去重：Future.wait 两次迁移只跑一遍，无孤儿 llm_api_key_{id}',
+      () async {
+        // 模拟旧版落盘状态。
+        await HiveBoxes.settings.put('llm_base_url', 'https://old.example.com');
+        await HiveBoxes.settings.put('llm_model', 'old-model');
+        await HiveBoxes.settings.put('llm_provider_name', '旧厂商');
+        credentialStore.llmApiKey = 'legacy-key';
+
+        // 两场景并发首启（如 readLlmConfig 与设置页 initState 同时
+        // 调用）：共享同一 in-flight Future，只执行一次迁移。
+        await Future.wait([
+          repository.migrateLegacyLlmConfigIfNeeded(),
+          repository.migrateLegacyLlmConfigIfNeeded(),
+        ]);
+
+        // 配置列表只写一份。
+        final providers = repository.llmProviders;
+        expect(providers.length, 1);
+        expect(providers[0].baseUrl, 'https://old.example.com');
+        // 安全存储只留一个配置键位（无第一份孤儿 Key）。
+        expect(credentialStore.llmApiKeysByConfigId.length, 1);
+        expect(
+          credentialStore.llmApiKeysByConfigId[providers[0].id],
+          'legacy-key',
+        );
+        // 旧单 Key 已被清除（迁移完成语义不因去重打折）。
+        expect(credentialStore.llmApiKey, isNull);
+        // active 指向迁移出的唯一配置。
+        expect(repository.llmActiveProviderId, providers[0].id);
+
+        // in-flight 已清空：后续再调用是幂等空操作（非复用旧 Future）。
+        await repository.migrateLegacyLlmConfigIfNeeded();
+        expect(repository.llmProviders.length, 1);
+      },
+    );
 
     test('已有列表：即使残留旧三 key 也不迁移（列表优先）', () async {
       await saveTwo();
@@ -524,6 +634,8 @@ void main() {
 
     // 凭据加密节维持单 llm_api_key 条目语义。
     expect(kBackupCredentialKeys, contains('llm_api_key'));
+    // 归属提示（host|model，非敏感）只进加密节。
+    expect(kBackupCredentialKeys, contains('llm_api_key_hint'));
   });
 
   test(
@@ -559,6 +671,88 @@ void main() {
     );
     expect(freshStore.llmApiKeysByConfigId, isEmpty);
   });
+
+  test('备份导出：active key 伴随 llm_api_key_hint（host|model）', () async {
+    await saveTwo();
+
+    final exported = await BackupService(secureStore: credentialStore)
+        .exportToJson(passphrase: 'pw');
+    final credentialsNode = (jsonDecode(exported)
+        as Map<String, dynamic>)['credentials'] as Map<String, dynamic>?;
+    // p1 带 Key：凭据节必存在。
+    expect(credentialsNode, isNotNull);
+    final payload = await decryptCredentials(credentialsNode!, 'pw');
+
+    // p1 为 active：host|model 对应 p1（末尾斜杠已 normalize）。
+    expect(payload['llm_api_key'], 'key-p1');
+    expect(payload['llm_api_key_hint'], 'api.deepseek.com|deepseek-chat');
+  });
+
+  test(
+    '备份恢复（hint 匹配）：key 写回匹配配置槽位；'
+    '换 active 后恢复不错位（A 的 key 不进 B 槽位）', () async {
+    // 导出机：p1（DeepSeek）为 active 且带 key。
+    await saveTwo();
+    final exported = await BackupService(secureStore: credentialStore)
+        .exportToJson(passphrase: 'pw');
+
+    // 本机导出后切 active 到 p2（错位场景的触发条件）。
+    await repository.setLlmActiveProvider('p2');
+    expect(await repository.readLlmApiKeyFor('p1'), 'key-p1');
+    expect(await repository.readLlmApiKeyFor('p2'), 'key-p2');
+
+    await BackupService(secureStore: credentialStore)
+        .restoreFromJson(exported, passphrase: 'pw');
+
+    // hint 匹配 p1：key 写回 p1 槽位（而非当时 active 的 p2）。
+    expect(await repository.readLlmApiKeyFor('p1'), 'key-p1');
+    expect(await repository.readLlmApiKeyFor('p2'), 'key-p2');
+  });
+
+  test('备份恢复（hint 匹配）：本机无匹配配置时 key 丢弃', () async {
+    // 导出机：p1（DeepSeek）为 active 且带 key。
+    await saveTwo();
+    final exported = await BackupService(secureStore: credentialStore)
+        .exportToJson(passphrase: 'pw');
+
+    // 恢复到「无匹配配置」机：只有地址/模型不同的 p9，active 指向它。
+    await tearDownHiveForTesting();
+    await setUpHiveForTesting();
+    final freshStore = _MemoryCredentialStore();
+    final freshRepo = SettingsRepository(credentialStore: freshStore);
+    await freshRepo.saveLlmProviderConfig(
+      id: 'p9',
+      name: 'Other',
+      baseUrl: 'https://other.example.com',
+      model: 'other-model',
+      apiKey: '',
+    );
+
+    await BackupService(secureStore: freshStore)
+        .restoreFromJson(exported, passphrase: 'pw');
+
+    // hint 匹配不到任何本机配置：key 丢弃，p9 的 Key 不被污染。
+    expect(freshStore.llmApiKeysByConfigId['p9'], isNull);
+    expect(freshStore.llmApiKeysByConfigId.length, 0);
+  });
+
+  test(
+    '备份恢复（旧备份无 hint）：维持现行为写本机 active 槽位',
+    () async {
+      // 本机已有 p1/p2，active = p2。
+      await saveTwo();
+      await repository.setLlmActiveProvider('p2');
+
+      // 旧备份：加密节只含 llm_api_key、无 hint。
+      final legacyJson = await _buildBackupWithLlmKey('pw', 'key-legacy');
+      await BackupService(secureStore: credentialStore)
+          .restoreFromJson(legacyJson, passphrase: 'pw');
+
+      // 无 hint → 写本机 active（p2）槽位。
+      expect(await repository.readLlmApiKeyFor('p2'), 'key-legacy');
+      expect(await repository.readLlmApiKeyFor('p1'), 'key-p1');
+    },
+  );
 }
 
 /// 构造带加密 llm_api_key 凭据节的备份 JSON。

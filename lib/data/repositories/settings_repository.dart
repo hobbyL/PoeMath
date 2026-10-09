@@ -21,6 +21,11 @@ import 'package:poemath/data/models/webdav_config.dart';
 class SettingsRepository {
   SettingsRepository({SecureCredentialStore? credentialStore})
       : _credentialStore = credentialStore ?? SecureCredentialStore();
+
+  /// 迁移并发去重的 in-flight Future（R5）；repo 由 Provider 缓存为
+  /// 单例，实例级去重覆盖全部并发面。失败时 whenComplete 清空，
+  /// 后续调用允许重试。
+  Future<void>? _legacyMigrationInFlight;
   // ============ KV 键名 ============
   // 注意：新增需要随备份迁移的 settings key 时，必须同步登记到
   // backup_service.dart 的 _settingsValueType 白名单（并注明类型），
@@ -384,11 +389,16 @@ class SettingsRepository {
       LlmProviderConfig.encodeList(list),
     );
     // 追加且无有效 active 时自动设为生效。
+    //
+    // 读「原始存储值」而非 llmActiveProviderId getter：getter 自带
+    // 回落写回的自愈副作用（列表非空时永不返回 null），用它判断会让
+    // 本分支语义隐性且条件不可达。
     if (index < 0) {
-      final activeId = llmActiveProviderId;
-      if (activeId == null || activeId != id && !llmProviders.any(
-            (p) => p.id == activeId,
-          )) {
+      final storedActive =
+          HiveBoxes.settings.get(_keyLlmActiveProviderId) as String?;
+      final hasValidActive =
+          storedActive != null && list.any((c) => c.id == storedActive);
+      if (!hasValidActive) {
         await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
       }
     }
@@ -429,6 +439,12 @@ class SettingsRepository {
     return _credentialStore.readLlmApiKeyFor(id);
   }
 
+  /// 清除指定配置已保存的 API Key（如从有鉴权服务切到无鉴权服务）；
+  /// 不触碰配置本身。无已存 Key 时调用无副作用。
+  Future<void> clearLlmApiKey(String id) {
+    return _credentialStore.deleteLlmApiKeyFor(id);
+  }
+
   /// 旧单配置（llm_base_url/llm_model/llm_provider_name + llm_api_key）
   /// → 多配置迁移（幂等）：
   ///
@@ -436,8 +452,18 @@ class SettingsRepository {
   /// llm_api_key → `llm_api_key_{id}`、删旧 llm_api_key、删旧三 key、
   /// active 指向新配置。
   ///
-  /// readLlmConfig 与设置页 initState 均调用（幂等，双保险）。
-  Future<void> migrateLegacyLlmConfigIfNeeded() async {
+  /// readLlmConfig 与设置页 initState 均调用。并发调用由实例级
+  /// in-flight Future 去重（幂等检查存在 await 窗口，两场景并发首启
+  /// 若各自完整跑一遍会双写：第二份配置覆盖第一份、第一份的
+  /// `llm_api_key_{id}` 泄留安全存储成为孤儿 Key）。
+  Future<void> migrateLegacyLlmConfigIfNeeded() {
+    final inFlight = _legacyMigrationInFlight;
+    if (inFlight != null) return inFlight;
+    return _legacyMigrationInFlight = _doMigrateLegacyLlmConfig()
+        .whenComplete(() => _legacyMigrationInFlight = null);
+  }
+
+  Future<void> _doMigrateLegacyLlmConfig() async {
     final providers = llmProviders;
     final legacyBase =
         HiveBoxes.settings.get(_keyLlmBaseUrl, defaultValue: '') as String;

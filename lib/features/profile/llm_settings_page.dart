@@ -71,6 +71,13 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   /// 正在编辑的配置 id；null = 新增表单。
   String? _editingId;
 
+  /// 编辑代序号令牌（竞态防护）：_startEdit 捕获，await 返回后校验；
+  /// _startCreate / 后续 _startEdit 递增使在途编辑续体失效。
+  /// 与讲解控制器的 _sessionToken 同一模式（晚到续体作废）——防
+  /// 「点编辑（Key 读取未返回）→ 点新增」后编辑续体把空表单覆盖回
+  /// 旧配置并静默覆盖保存。
+  int _editSeq = 0;
+
   /// 当前编辑配置是否已存 API Key（决定占位提示文案；不回显明文）。
   bool _hasStoredKey = false;
 
@@ -128,11 +135,15 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
     // 不得发起重复读取（state-management.md「Loading Guard Must
     // Precede the First await」）。
     if (_loadingStoredKey) return;
+    // 捕获本次编辑代号：await 期间若点「新增配置」或发起另一次编辑，
+    // _editSeq 递增使本续体失效，不得把已清空的表单覆盖回旧配置
+    // （R2 竞态——否则用户以为在新建，保存实则静默覆盖旧配置）。
+    final seq = ++_editSeq;
     setState(() => _loadingStoredKey = true);
     final settingsRepo = ref.read(settingsRepositoryProvider);
     try {
       final stored = await settingsRepo.readLlmApiKeyFor(config.id);
-      if (!mounted) return;
+      if (!mounted || seq != _editSeq) return;
       setState(() {
         _editingId = config.id;
         _providerNameController.text = config.name;
@@ -151,6 +162,9 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   /// 「新增配置」：编辑区重置为空表单（编辑对象与生效选择互相独立，
   /// 不触碰 active）。
   void _startCreate() {
+    // 递增编辑代号：使任何在途 _startEdit 续体失效（点编辑 Key 读取
+    // 未返回时点新增 → 旧续体不得覆盖本次清空的表单）。
+    ++_editSeq;
     setState(() {
       _editingId = null;
       _providerNameController.clear();
@@ -426,6 +440,42 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
 
   Future<void> _delete() {
     return _deleteEditing();
+  }
+
+  /// 清除当前编辑配置已保存的 API Key（R7：如从有鉴权服务切到无鉴权
+  /// 服务）：确认弹层 → repo.clearLlmApiKey → _hasStoredKey=false，占位
+  /// 提示回退到「无鉴权服务可留空」。配置的服务地址与模型保留；保存路径
+  /// 「留空 = 保留旧 Key」语义不变（清除后无已存 Key，留空即不带 Key）。
+  Future<void> _clearStoredKey() async {
+    final editingId = _editingId;
+    if (editingId == null || !_hasStoredKey) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清除已保存的 Key'),
+        content: const Text(
+          '清除后该配置将不带 Key 请求（适合无鉴权服务）；配置的服务地址'
+          '与模型保留。可随时重新填写 Key 并保存恢复。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('清除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(settingsRepositoryProvider).clearLlmApiKey(editingId);
+    if (!mounted) return;
+    setState(() => _hasStoredKey = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已清除保存的 API Key')),
+    );
   }
 
   /// 删除当前编辑的配置（确认弹窗）；删的是 _editingId 则表单重置新增态。
@@ -794,6 +844,16 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
                 border: const OutlineInputBorder(),
               ),
             ),
+            // 清除已存 Key 入口：仅编辑已有存 Key 的配置时出现（R7）。
+            if (_editingId != null && _hasStoredKey)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _clearStoredKey,
+                  icon: const Icon(Icons.key_off_outlined),
+                  label: const Text('清除已保存的 Key'),
+                ),
+              ),
             const SizedBox(height: SpacingTokens.md),
 
             TextFormField(

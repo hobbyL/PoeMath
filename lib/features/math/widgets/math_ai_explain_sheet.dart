@@ -67,7 +67,13 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
     super.initState();
     _notifier = ref.read(mathExplainProvider.notifier);
     // 打开即生成（入口按钮本身就是用户的生成意图）。
-    WidgetsBinding.instance.addPostFrameCallback((_) => _generate());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 上一个弹层关闭时在途请求被 discardPending 废弃，state 可能残留
+      // loading——先复位（idle + 废令牌）再生成，否则 generate 的
+      // isLoading 守卫拦截且无任何自愈路径（loading 分支无按钮）。
+      _notifier.reset();
+      _generate();
+    });
   }
 
   @override

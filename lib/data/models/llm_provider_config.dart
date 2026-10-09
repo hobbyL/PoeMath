@@ -56,7 +56,8 @@ class LlmProviderConfig {
     return jsonEncode(configs.map((c) => c.toJson()).toList());
   }
 
-  /// 从 JSON 字符串反序列化配置列表；坏 JSON 返回空列表。
+  /// 从 JSON 字符串反序列化配置列表；坏 JSON 或坏条目（非对象、
+  /// 缺字段、字段类型错）一律返回空列表，不向调用方抛出。
   static List<LlmProviderConfig> decodeList(String? jsonString) {
     if (jsonString == null || jsonString.isEmpty) return [];
     try {
@@ -64,7 +65,10 @@ class LlmProviderConfig {
       return list
           .map((e) => LlmProviderConfig.fromJson(e as Map<String, dynamic>))
           .toList();
-    } on Exception {
+    } on Object {
+      // TypeError 是 Error 不是 Exception，`on Exception` 捕不住硬 cast
+      // 失败——须捕 Object 兜全，坏数据回退空列表（注释承诺），
+      // 不得穿出 llmProviders getter。
       return [];
     }
   }

@@ -328,6 +328,38 @@ void main() {
     }
   });
 
+  test('AC3 补充：导出 JSON 明文任何位置不含 llm_api_key_hint', () async {
+    // 预置带 Key 的 LLM 配置（导出端写 hint 的前提条件）。
+    await HiveBoxes.settings.put(
+      'llm_providers',
+      jsonEncode([
+        <String, dynamic>{
+          'id': 'p1',
+          'name': '本地LLM',
+          'baseUrl': 'https://llm.local.example.com',
+          'model': 'gpt-test',
+        },
+      ]),
+    );
+    await HiveBoxes.settings.put('llm_active_provider_id', 'p1');
+
+    // 该测试的 BackupService 用真实 SecureCredentialStore（测试环境无
+    // 平台通道），改为只断言明文 JSON 层：无论凭据节是否存在，
+    // llm_api_key_hint 作为凭据白名单键只允许出现在加密载荷内，
+    // 明文 JSON 文本不得含该键名（settings 白名单外的 key 不导出，
+    // 顶层亦无此键）。
+    final json = await backupService.exportToJson(passphrase: 'pw');
+    final node = jsonDecode(json) as Map<String, dynamic>;
+
+    // 顶层无此键。
+    expect(node.containsKey('llm_api_key_hint'), isFalse);
+    // settings 白名单外 key 不导出。
+    final settings = node['settings'] as Map<String, dynamic>?;
+    expect(settings?.containsKey('llm_api_key_hint') ?? false, isFalse);
+    // 明文序列化文本（缩进美化后字段名均可见）不含该键名。
+    expect(json, isNot(contains('llm_api_key_hint')));
+  });
+
   test('AC4 兼容测试：含排除 key 的正常旧备份恢复成功，白名单 key 全部还原', () async {
     // 模拟旧版本导出的备份：白名单 key 与排除 key 混杂。
     final legacySettings = _fullWhitelistSettings()

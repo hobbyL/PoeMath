@@ -32,14 +32,22 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   final Map<String, String> llmApiKeysByConfigId = {};
   String? llmApiKey;
 
+  /// 可选读闸门：非 null 时 readLlmApiKeyFor 挂起直到其完成，用于构造
+  /// 「点编辑（Key 读取 await 未返回）→ 点新增」竞态窗口（R2/AC2）。
+  /// 默认 null 时行为等价立即返回，既有用例不受影响。
+  Completer<void>? readGate;
+
   @override
   Future<void> saveLlmApiKeyFor(String configId, String apiKey) async {
     llmApiKeysByConfigId[configId] = apiKey;
   }
 
   @override
-  Future<String?> readLlmApiKeyFor(String configId) =>
-      Future.value(llmApiKeysByConfigId[configId]);
+  Future<String?> readLlmApiKeyFor(String configId) async {
+    final gate = readGate;
+    if (gate != null) await gate.future;
+    return llmApiKeysByConfigId[configId];
+  }
 
   @override
   Future<void> deleteLlmApiKeyFor(String configId) async {
@@ -727,6 +735,108 @@ void main() {
       // 回落到剩余 active（p2 空名 → 配置 1）。
       expect(find.text('跟随默认（配置 1）'), findsNWidgets(3));
     });
+  });
+
+  testWidgets(
+      'R2 竞态：编辑 Key 读取未返回时点「新增配置」→ 表单保持空，'
+      '保存产生新配置而非静默覆盖旧配置', (tester) async {
+    final store = _MemoryCredentialStore();
+    await _seedTwo(tester, store);
+    await _pumpPage(tester, credentialStore: store);
+
+    // bootstrap 默认编辑生效配置 p1（readGate 未装，立即返回）。
+    expect(find.text('编辑：DeepSeek'), findsOneWidget);
+
+    // 装读闸门：下一次 _startEdit 的 Key 读取挂起，制造在途窗口。
+    store.readGate = Completer<void>();
+
+    // 点 p1 行编辑按钮 → _startEdit 进入在途（seq=2，挂在闸门上）。
+    final editP1 = find.byTooltip('编辑此配置').first;
+    await tester.ensureVisible(editP1);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(editP1);
+    await tester.pump();
+
+    // await 未返回时点「新增配置」→ _startCreate 清空表单、editingId=null、
+    // _editSeq 递增（seq=3）使在途编辑续体失效。
+    await tester.tap(find.widgetWithText(OutlinedButton, '新增配置'));
+    await tester.pump();
+    expect(find.text('编辑：DeepSeek'), findsNothing);
+    // 放行闸门：在途 _startEdit 续体恢复，但 seq 2≠3 → 提前返回，
+    // 不得把已清空的表单覆盖回 p1。
+    store.readGate!.complete();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('编辑：DeepSeek'), findsNothing);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.widgetWithText(TextFormField, '服务地址（Base URL）'),
+          )
+          .controller
+          ?.text,
+      '',
+    );
+
+    // 填新表单保存 → 第三条配置，p1 原值与 Key 不受污染。
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '服务地址（Base URL）'),
+      'https://api.new.com',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, '模型'),
+      'new-model',
+    );
+    await tester.pump();
+    await _tapReal(tester, find.text('保存配置'));
+
+    final repo = _repoOf(tester);
+    expect(repo.llmProviders.length, 3);
+    expect(repo.llmProviders[0].id, 'p1');
+    expect(repo.llmProviders[0].model, 'deepseek-chat');
+    expect(store.llmApiKeysByConfigId['p1'], 'key-p1');
+    expect(repo.llmProviders[2].model, 'new-model');
+  });
+  testWidgets(
+      'R7 清除 Key：编辑有存 Key 配置显示清除入口；确认后删除 Key、'
+      '占位提示回退、配置本身保留', (tester) async {
+    final store = _MemoryCredentialStore();
+    await _seedTwo(tester, store);
+    await _pumpPage(tester, credentialStore: store);
+
+    // bootstrap 编辑 p1（已存 key-p1）→ 清除入口与「已设置」占位出现。
+    expect(find.text('编辑：DeepSeek'), findsOneWidget);
+    final clearBtn = find.widgetWithText(TextButton, '清除已保存的 Key');
+    expect(clearBtn, findsOneWidget);
+    expect(find.text('已设置，留空保持不变'), findsOneWidget);
+
+    // 打开确认弹层（弹层打开 tap 入 runAsync 真实区——对齐删除确认范式）。
+    await tester.ensureVisible(clearBtn);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.runAsync(() async {
+      await tester.tap(clearBtn.hitTestable());
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.textContaining('不带 Key 请求'), findsOneWidget);
+
+    // 确认清除（确认 tap 入 runAsync 真实区）。
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(FilledButton, '清除'));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    // Key 删除、占位回退、入口消失；配置与 active 保留。
+    expect(store.llmApiKeysByConfigId['p1'], isNull);
+    expect(find.text('无鉴权服务可留空'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '清除已保存的 Key'), findsNothing);
+    final repo = _repoOf(tester);
+    expect(repo.llmProviders.length, 2);
+    expect(repo.llmActiveProviderId, 'p1');
+    expect(find.text('已清除保存的 API Key'), findsOneWidget);
   });
 }
 

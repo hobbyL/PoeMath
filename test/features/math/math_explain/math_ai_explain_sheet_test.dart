@@ -268,6 +268,49 @@ void main() {
     expect(find.text('AI 解析'), findsNothing);
   });
 
+  testWidgets(
+      'R1 死锁回归：loading 中关弹层 → 再开新弹层 → 第二次请求发出且到达终态',
+      (tester) async {
+    var calls = 0;
+    final firstGate = Completer<http.Response>();
+    await pumpSheet(
+      tester,
+      settings: configuredRepo(),
+      client: MockClient((request) async {
+        calls++;
+        // 第一次请求挂起（模拟慢请求在途），弹层停在 loading。
+        if (calls == 1) return firstGate.future;
+        // 第二次请求立即成功。
+        return _chatResponse('第二个弹层的解析内容。');
+      }),
+    );
+
+    // 弹层一停在 loading（请求已发出但未返回）。
+    expect(find.text('AI 正在准备解析，请稍候…'), findsOneWidget);
+    expect(calls, 1);
+
+    // loading 中关闭：discardPending 废令牌，但 provider state 仍残留
+    // loading（dispose 不写状态）。
+    await tester.tap(find.byTooltip('关闭'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI 解析'), findsNothing);
+
+    // 再开新弹层：initState 先 reset()（清残留 loading + 废令牌）再
+    // generate()，否则 isLoading 守卫拦截第二次请求 → 永久卡 loading。
+    await tester.tap(find.text('打开 AI 解析'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    // 第二次请求已发出且到达 ready 终态（修复前：calls 仍为 1、卡 loading）。
+    expect(calls, 2);
+    expect(find.text('第二个弹层的解析内容。'), findsOneWidget);
+    expect(find.text('AI 正在准备解析，请稍候…'), findsNothing);
+
+    // 收尾：放行第一次请求（令牌已废，续体空转不写状态），避免悬挂 future。
+    firstGate.complete(_chatResponse('late'));
+    await tester.pumpAndSettle();
+  });
+
   group('错题详情页入口', () {
     testWidgets('「AI 帮我讲」存在且点击弹出解析弹层（题面/答案入 prompt）',
         (tester) async {
