@@ -3,6 +3,8 @@
 // 生成页 widget 测试：未配置 LLM 时显示引导态；
 // 骨架生成失败（StateError）时展示中文提示而非英文堆栈。
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,11 +18,16 @@ import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 import '../../../helpers/hive_test_helper.dart';
 
 /// 测试环境无平台安全存储通道，覆写为内存实现。
+/// 多配置版按 configId 读 Key（readLlmConfig 走 readLlmApiKeyFor）。
 final class _MemoryCredentialStore extends SecureCredentialStore {
-  String? llmApiKey;
+  final Map<String, String> _keysByConfigId = {};
 
   @override
-  Future<String?> readLlmApiKey() => Future.value(llmApiKey);
+  Future<String?> readLlmApiKey() => Future.value(null);
+
+  @override
+  Future<String?> readLlmApiKeyFor(String configId) =>
+      Future.value(_keysByConfigId[configId]);
 }
 
 void main() {
@@ -51,9 +58,23 @@ void main() {
   testWidgets('骨架生成失败（StateError）展示中文提示，不出现英文堆栈', (tester) async {
     // 播种 LLM 配置（Hive 写入在 testWidgets 的 FakeAsync 区无法落盘，
     // 按 spec 先例放入 runAsync 在真实异步区完成）。
+    // 多配置版：llmConfigProvider 经 readLlmConfig → 迁移旧 key →
+    // llm_providers + active 组装，两条路径的 Hive 写链都在此完成。
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_base_url', 'http://localhost:11434');
       await HiveBoxes.settings.put('llm_model', 'qwen2.5:7b');
+      await HiveBoxes.settings.put(
+        'llm_providers',
+        jsonEncode([
+          <String, dynamic>{
+            'id': 'seed-p1',
+            'name': 'Ollama',
+            'baseUrl': 'http://localhost:11434',
+            'model': 'qwen2.5:7b',
+          },
+        ]),
+      );
+      await HiveBoxes.settings.put('llm_active_provider_id', 'seed-p1');
     });
 
     await tester.pumpWidget(

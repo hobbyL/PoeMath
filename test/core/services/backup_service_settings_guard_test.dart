@@ -29,6 +29,15 @@ Map<String, dynamic> _maliciousSettings() => <String, dynamic>{
       ]),
       'llm_base_url': 'https://attacker-llm.example.com',
       'llm_model': 'evil-model',
+      'llm_providers': jsonEncode([
+        <String, dynamic>{
+          'id': 'evil-p1',
+          'name': '攻击者LLM',
+          'baseUrl': 'https://attacker-llm.example.com',
+          'model': 'evil-model',
+        },
+      ]),
+      'llm_active_provider_id': 'evil-p1',
       'tts_cloud_base_url': 'http://attacker-tts.example.com',
       'tts_cloud_enabled': true,
       'tencent_asr_verified_at': DateTime(2030, 1, 1).toIso8601String(),
@@ -96,6 +105,18 @@ void main() {
     await HiveBoxes.settings
         .put('llm_base_url', 'https://llm.local.example.com');
     await HiveBoxes.settings.put(
+      'llm_providers',
+      jsonEncode([
+        <String, dynamic>{
+          'id': 'local-p1',
+          'name': '本地LLM',
+          'baseUrl': 'https://llm.local.example.com',
+          'model': 'local-model',
+        },
+      ]),
+    );
+    await HiveBoxes.settings.put('llm_active_provider_id', 'local-p1');
+    await HiveBoxes.settings.put(
       'tts_cloud_base_url',
       'https://tts.cloudm.cc',
     );
@@ -104,6 +125,9 @@ void main() {
     final before = {
       'webdav_configs': HiveBoxes.settings.get('webdav_configs'),
       'llm_base_url': HiveBoxes.settings.get('llm_base_url'),
+      'llm_providers': HiveBoxes.settings.get('llm_providers'),
+      'llm_active_provider_id':
+          HiveBoxes.settings.get('llm_active_provider_id'),
       'tts_cloud_base_url': HiveBoxes.settings.get('tts_cloud_base_url'),
       'tencent_asr_verified_at':
           HiveBoxes.settings.get('tencent_asr_verified_at'),
@@ -111,6 +135,22 @@ void main() {
 
     await backupService.restoreFromJson(
       await backupWithSettings(_maliciousSettings()),
+    );
+
+    // LLM 多配置 key 同样不落盘：本机 llm_providers / active id 原样
+    // 保留，恶意注入不生效（evil-p1 / attacker-llm 均未写入）。
+    expect(HiveBoxes.settings.get('llm_providers'), before['llm_providers']);
+    expect(
+      HiveBoxes.settings.get('llm_active_provider_id'),
+      before['llm_active_provider_id'],
+    );
+    expect(
+      HiveBoxes.settings.get('llm_providers') ?? '',
+      isNot(contains('evil-p1')),
+    );
+    expect(
+      HiveBoxes.settings.get('llm_active_provider_id'),
+      isNot('evil-p1'),
     );
 
     // 本机原值保留，恶意注入未生效。
@@ -211,6 +251,18 @@ void main() {
     await HiveBoxes.settings
         .put('worker_tts_verified_fingerprint', 'fp-worker');
     await HiveBoxes.settings.put('theme_mode', 'light');
+    await HiveBoxes.settings.put(
+      'llm_providers',
+      jsonEncode([
+        <String, dynamic>{
+          'id': 'p1',
+          'name': '本地LLM',
+          'baseUrl': 'https://llm.local.example.com',
+          'model': 'gpt-test',
+        },
+      ]),
+    );
+    await HiveBoxes.settings.put('llm_active_provider_id', 'p1');
 
     final json = await backupService.exportToJson();
     final settings = (jsonDecode(json) as Map<String, dynamic>)['settings']
@@ -219,6 +271,8 @@ void main() {
     expect(settings.keys, contains('theme_mode'));
     const excluded = <String>{
       'webdav_configs',
+      'llm_providers',
+      'llm_active_provider_id',
       'llm_base_url',
       'llm_model',
       'tts_cloud_base_url',

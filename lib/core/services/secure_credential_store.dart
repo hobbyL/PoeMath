@@ -107,7 +107,7 @@ class SecureCredentialStore {
 
   // ============ LLM API Key（应用题生成） ============
 
-  /// 保存 LLM 服务 API Key。
+  /// 保存 LLM 服务 API Key（旧单配置；只读迁移与兼容读用）。
   Future<void> saveLlmApiKey(String apiKey) async {
     await _storage.write(key: _llmApiKeyKey, value: apiKey);
   }
@@ -120,6 +120,21 @@ class SecureCredentialStore {
   /// 删除 LLM 服务 API Key。
   Future<void> deleteLlmApiKey() async {
     await _storage.delete(key: _llmApiKeyKey);
+  }
+
+  /// 保存指定 LLM 厂商配置的 API Key（键 `llm_api_key_{configId}`）。
+  Future<void> saveLlmApiKeyFor(String configId, String apiKey) async {
+    await _storage.write(key: _llmApiKeyKeyFor(configId), value: apiKey);
+  }
+
+  /// 读取指定 LLM 厂商配置的 API Key，不存在返回 `null`。
+  Future<String?> readLlmApiKeyFor(String configId) {
+    return _storage.read(key: _llmApiKeyKeyFor(configId));
+  }
+
+  /// 删除指定 LLM 厂商配置的 API Key。
+  Future<void> deleteLlmApiKeyFor(String configId) async {
+    await _storage.delete(key: _llmApiKeyKeyFor(configId));
   }
 
   // ============ 备份加密口令 ============
@@ -143,6 +158,8 @@ class SecureCredentialStore {
 
   static String _usernameKey(String id) => 'webdav_${id}_username';
   static String _passwordKey(String id) => 'webdav_${id}_password';
+
+  static String _llmApiKeyKeyFor(String id) => 'llm_api_key_$id';
 
   static const String _tencentSecretIdKey = 'tencent_asr_secret_id';
   static const String _tencentSecretKeyKey = 'tencent_asr_secret_key';

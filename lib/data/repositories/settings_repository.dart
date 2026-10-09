@@ -14,6 +14,7 @@ import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 
 class SettingsRepository {
@@ -53,6 +54,11 @@ class SettingsRepository {
   static const String _keyLlmBaseUrl = 'llm_base_url';
   static const String _keyLlmModel = 'llm_model';
   static const String _keyLlmProviderName = 'llm_provider_name';
+  // LLM 多厂商配置（设备绑定，不入备份白名单，见 backup_service.dart）：
+  // llm_providers 含 baseUrl/model 指向外部服务，与 webdav_configs 同类；
+  // llm_active_provider_id 依赖 llm_providers 存在，单独迁移无意义。
+  static const String _keyLlmProviders = 'llm_providers';
+  static const String _keyLlmActiveProviderId = 'llm_active_provider_id';
 
   // ============ 主题 ============
 
@@ -231,65 +237,164 @@ class SettingsRepository {
     return sha256.convert(utf8.encode(canonical)).toString();
   }
 
-  // ============ LLM 应用题生成设置（可选） ============
+  // ============ LLM 应用题生成设置（可选，多厂商配置） ============
 
-  /// LLM 供应商名称（纯展示，非敏感）；未配置返回空串。
-  String get llmProviderName =>
-      HiveBoxes.settings.get(_keyLlmProviderName, defaultValue: '') as String;
-
-  Future<void> setLlmProviderName(String name) async {
-    await HiveBoxes.settings.put(_keyLlmProviderName, name);
+  /// 全部 LLM 厂商配置（Hive JSON 解码；无则空列表）。
+  List<LlmProviderConfig> get llmProviders {
+    final json = HiveBoxes.settings.get(_keyLlmProviders) as String?;
+    return LlmProviderConfig.decodeList(json);
   }
 
-  /// LLM 服务地址（Hive 非敏感存储）；未配置返回空串。
-  String get llmBaseUrl =>
-      HiveBoxes.settings.get(_keyLlmBaseUrl, defaultValue: '') as String;
-
-  Future<void> setLlmBaseUrl(String baseUrl) async {
-    await HiveBoxes.settings.put(_keyLlmBaseUrl, baseUrl);
+  /// 当前生效配置 id；列表为空返回 null。
+  ///
+  /// getter 内自愈：active id 不在列表中时回落第一条并写回，
+  /// 防手工删 Hive key 造成的悬空导致 UI 卡死。
+  String? get llmActiveProviderId {
+    final providers = llmProviders;
+    if (providers.isEmpty) return null;
+    final stored =
+        HiveBoxes.settings.get(_keyLlmActiveProviderId) as String?;
+    if (providers.any((p) => p.id == stored)) return stored;
+    final fallback = providers.first.id;
+    HiveBoxes.settings.put(_keyLlmActiveProviderId, fallback);
+    return fallback;
   }
 
-  /// LLM 模型名；未配置返回空串。
-  String get llmModel =>
-      HiveBoxes.settings.get(_keyLlmModel, defaultValue: '') as String;
-
-  Future<void> setLlmModel(String model) async {
-    await HiveBoxes.settings.put(_keyLlmModel, model);
+  /// 设置生效配置；id 不在列表中抛 [ArgumentError]。
+  Future<void> setLlmActiveProvider(String id) async {
+    final providers = llmProviders;
+    if (!providers.any((p) => p.id == id)) {
+      throw ArgumentError('LLM 配置不存在：$id');
+    }
+    await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
   }
 
-  /// 读取 LLM 完整配置；地址或模型未配置时返回 null（Key 允许为空，
+  /// 读取 LLM 完整配置（当前生效配置组装）；语义与旧版一致：
+  /// 生效配置缺失（列表空/字段空）返回 null（Key 允许为空，
   /// 对应 Ollama 等无鉴权服务）。
   Future<LlmConfig?> readLlmConfig() async {
-    final base = llmBaseUrl.trim();
-    final model = llmModel.trim();
+    await migrateLegacyLlmConfigIfNeeded();
+    final activeId = llmActiveProviderId;
+    if (activeId == null) return null;
+    final providers = llmProviders;
+    if (!providers.any((p) => p.id == activeId)) return null;
+    final active = providers.firstWhere((p) => p.id == activeId);
+    final base = active.baseUrl.trim();
+    final model = active.model.trim();
     if (base.isEmpty || model.isEmpty) return null;
-    final apiKey = await _credentialStore.readLlmApiKey();
+    final apiKey = await _credentialStore.readLlmApiKeyFor(activeId);
     return LlmConfig(baseUrl: base, apiKey: apiKey ?? '', model: model);
   }
 
-  /// 保存 LLM 配置（供应商名称/地址/模型入 Hive、Key 入安全存储）。
-  Future<void> saveLlmConfig({
+  /// 保存（新增或更新）一条 LLM 厂商配置。
+  ///
+  /// - baseUrl 先经 [LlmClient.normalizeBaseUrl] 校验（非法抛
+  ///   [FormatException]，不落盘）；
+  /// - apiKey 空串 = 保留该配置旧 Key；非空写入 `llm_api_key_{id}`；
+  /// - 追加且当前无 active（或 active 已失效）时自动设为生效。
+  Future<void> saveLlmProviderConfig({
+    required String id,
+    required String name,
     required String baseUrl,
     required String model,
     required String apiKey,
-    String? providerName,
   }) async {
     // 先校验地址合法（非法抛 FormatException，不落盘）。
-    LlmClient.normalizeBaseUrl(baseUrl);
+    final normalized = LlmClient.normalizeBaseUrl(baseUrl);
     final key = apiKey.trim();
-    if (key.isEmpty) {
-      await _credentialStore.deleteLlmApiKey();
-    } else {
-      await _credentialStore.saveLlmApiKey(key);
+    if (key.isNotEmpty) {
+      await _credentialStore.saveLlmApiKeyFor(id, key);
     }
-    await setLlmBaseUrl(baseUrl.trim());
-    await setLlmModel(model.trim());
-    await setLlmProviderName(providerName?.trim() ?? '');
+
+    final list = llmProviders;
+    final config = LlmProviderConfig(
+      id: id,
+      name: name.trim(),
+      baseUrl: normalized.toString(),
+      model: model.trim(),
+    );
+    final index = list.indexWhere((c) => c.id == id);
+    if (index >= 0) {
+      list[index] = config;
+    } else {
+      list.add(config);
+    }
+    await HiveBoxes.settings.put(
+      _keyLlmProviders,
+      LlmProviderConfig.encodeList(list),
+    );
+    // 追加且无有效 active 时自动设为生效。
+    if (index < 0) {
+      final activeId = llmActiveProviderId;
+      if (activeId == null || activeId != id && !llmProviders.any(
+            (p) => p.id == activeId,
+          )) {
+        await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
+      }
+    }
   }
 
-  /// 删除 LLM 配置（Key + 供应商名称 + 地址 + 模型）。
-  Future<void> deleteLlmConfig() async {
-    await _credentialStore.deleteLlmApiKey();
+  /// 删除一条 LLM 厂商配置及其安全存储 Key。
+  ///
+  /// 若删除的是生效配置，active 自动切到剩余第一条；无剩余清空 active。
+  Future<void> deleteLlmProviderConfig(String id) async {
+    await _credentialStore.deleteLlmApiKeyFor(id);
+    final list = llmProviders..removeWhere((c) => c.id == id);
+    await HiveBoxes.settings.put(
+      _keyLlmProviders,
+      LlmProviderConfig.encodeList(list),
+    );
+    if (list.isEmpty) {
+      await HiveBoxes.settings.delete(_keyLlmActiveProviderId);
+      return;
+    }
+    final activeId = llmActiveProviderId;
+    if (activeId == null || activeId == id || !list.any((c) => c.id == activeId)) {
+      await HiveBoxes.settings.put(
+        _keyLlmActiveProviderId,
+        list.first.id,
+      );
+    }
+  }
+
+  /// 读取指定配置的已存 Key（页面回退判断用）。
+  Future<String?> readLlmApiKeyFor(String id) {
+    return _credentialStore.readLlmApiKeyFor(id);
+  }
+
+  /// 旧单配置（llm_base_url/llm_model/llm_provider_name + llm_api_key）
+  /// → 多配置迁移（幂等）：
+  ///
+  /// llm_providers 为空 && llm_base_url 非空 → 生成 id、复制
+  /// llm_api_key → `llm_api_key_{id}`、删旧 llm_api_key、删旧三 key、
+  /// active 指向新配置。
+  ///
+  /// readLlmConfig 与设置页 initState 均调用（幂等，双保险）。
+  Future<void> migrateLegacyLlmConfigIfNeeded() async {
+    final providers = llmProviders;
+    final legacyBase =
+        HiveBoxes.settings.get(_keyLlmBaseUrl, defaultValue: '') as String;
+    if (providers.isNotEmpty || legacyBase.trim().isEmpty) return;
+
+    final id = LlmProviderConfig.generateId();
+    // 旧 Key 复制到新键位；旧单 Key（无 Key 服务）允许为空。
+    final legacyKey = await _credentialStore.readLlmApiKey();
+    if (legacyKey != null && legacyKey.isNotEmpty) {
+      await _credentialStore.saveLlmApiKeyFor(id, legacyKey);
+      await _credentialStore.deleteLlmApiKey();
+    }
+    final config = LlmProviderConfig(
+      id: id,
+      name: HiveBoxes.settings.get(_keyLlmProviderName, defaultValue: '')
+          as String,
+      baseUrl: legacyBase.trim(),
+      model: HiveBoxes.settings.get(_keyLlmModel, defaultValue: '') as String,
+    );
+    await HiveBoxes.settings.put(
+      _keyLlmProviders,
+      LlmProviderConfig.encodeList([config]),
+    );
+    await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
     await HiveBoxes.settings.delete(_keyLlmBaseUrl);
     await HiveBoxes.settings.delete(_keyLlmModel);
     await HiveBoxes.settings.delete(_keyLlmProviderName);

@@ -1,8 +1,12 @@
 // lib/features/profile/llm_settings_page.dart
 //
 // 层级：features/profile
-// 职责：应用题 AI 出题的 LLM 服务设置页（OpenAI 兼容）。
-//       API Key 只进系统安全存储，页面不回显明文；留空保存 = 保留旧 Key。
+// 职责：应用题 AI 出题的 LLM 服务设置页（OpenAI 兼容，多厂商配置）。
+//       页面上半部为「我的配置」列表（点行切换生效），下半部为编辑区
+//       （新增 / 编辑当前选中条目）。API Key 只进系统安全存储，
+//       页面不回显明文；编辑已有配置时 Key 留空 = 保留该配置旧 Key。
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +16,9 @@ import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 
 /// 页面内 LlmClient 的 http.Client 注入口：默认按 ProviderScope 缓存
@@ -41,8 +47,17 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   final _apiKeyController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  /// 是否已存 API Key（决定占位提示文案；不回显明文）。
+  /// 正在编辑的配置 id；null = 新增表单。
+  String? _editingId;
+
+  /// 当前编辑配置是否已存 API Key（决定占位提示文案；不回显明文）。
   bool _hasStoredKey = false;
+
+  /// 正在读取编辑配置的已存 Key（_startEdit 防重入）。
+  bool _loadingStoredKey = false;
+
+  /// 保存中（_save 防重入）。
+  bool _saving = false;
 
   /// 模型拉取状态（防重入 + suffixIcon 加载态）。
   bool _fetchingModels = false;
@@ -53,11 +68,10 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   @override
   void initState() {
     super.initState();
-    final settingsRepo = ref.read(settingsRepositoryProvider);
-    _providerNameController.text = settingsRepo.llmProviderName;
-    _baseUrlController.text = settingsRepo.llmBaseUrl;
-    _modelController.text = settingsRepo.llmModel;
-    _loadStoredKey();
+    // 迁移与初始装载走异步：initState 内不得 await（FakeAsync 下 Hive
+    // 写链会挂起，且 setState-in-initState 会触发框架断言），参照
+    // speech_recognition_settings_page 的 unawaited 先例。
+    unawaited(_bootstrap());
   }
 
   @override
@@ -69,11 +83,78 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
     super.dispose();
   }
 
-  Future<void> _loadStoredKey() async {
-    final key = await ref.read(secureCredentialStoreProvider).readLlmApiKey();
-    if (mounted) {
-      setState(() => _hasStoredKey = key != null && key.trim().isNotEmpty);
+  /// 迁移旧单配置 → 载入列表；有配置时默认编辑生效配置，
+  /// 无配置为新增空表单。
+  Future<void> _bootstrap() async {
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    try {
+      await settingsRepo.migrateLegacyLlmConfigIfNeeded();
+      final providers = settingsRepo.llmProviders;
+      if (providers.isNotEmpty) {
+        // 默认编辑生效配置（新用户首选项）。
+        final activeId = settingsRepo.llmActiveProviderId;
+        final target = providers.where((p) => p.id == activeId).firstOrNull;
+        await _startEdit(target ?? providers.first);
+      }
+    } on Object catch (error) {
+      AppLogger.e('LLM 设置页初始化失败', tag: 'LlmSettings', error: error);
     }
+  }
+
+  /// 载入指定配置到编辑区（点编辑按钮 / 初始化默认编辑）。
+  Future<void> _startEdit(LlmProviderConfig config) async {
+    // 防重入守卫先于任何 await（含安全存储读取）：读取期间二次点击
+    // 不得发起重复读取（state-management.md「Loading Guard Must
+    // Precede the First await」）。
+    if (_loadingStoredKey) return;
+    setState(() => _loadingStoredKey = true);
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    try {
+      final stored = await settingsRepo.readLlmApiKeyFor(config.id);
+      if (!mounted) return;
+      setState(() {
+        _editingId = config.id;
+        _providerNameController.text = config.name;
+        _baseUrlController.text = config.baseUrl;
+        _modelController.text = config.model;
+        _apiKeyController.clear();
+        _hasStoredKey = stored != null && stored.trim().isNotEmpty;
+        _testState = _TestState.idle;
+        _testMessage = null;
+      });
+    } finally {
+      if (mounted) setState(() => _loadingStoredKey = false);
+    }
+  }
+
+  /// 「新增配置」：编辑区重置为空表单（编辑对象与生效选择互相独立，
+  /// 不触碰 active）。
+  void _startCreate() {
+    setState(() {
+      _editingId = null;
+      _providerNameController.clear();
+      _baseUrlController.clear();
+      _modelController.clear();
+      _apiKeyController.clear();
+      _hasStoredKey = false;
+      _testState = _TestState.idle;
+      _testMessage = null;
+    });
+  }
+
+  /// 点列表行：切换生效配置（立即持久化，无需保存按钮）。
+  Future<void> _setActive(String id) async {
+    try {
+      await ref.read(settingsRepositoryProvider).setLlmActiveProvider(id);
+    } on ArgumentError catch (e) {
+      // 竞态：列表在读取后被外部改写。刷新列表即可。
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('配置不存在：${e.message ?? e}')),
+        );
+      }
+    }
+    if (mounted) setState(() {});
   }
 
   /// 用当前表单值构造配置。modelEmpty 时放宽为仅校验服务地址
@@ -88,6 +169,17 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
       apiKey: _apiKeyController.text.trim(),
       model: model,
     );
+  }
+
+  /// Key 留空时回退当前编辑配置的已存 Key（仅编辑已存配置时）。
+  Future<String?> _fallbackStoredKey() async {
+    final editingId = _editingId;
+    if (editingId == null) return null;
+    final stored = await ref
+        .read(settingsRepositoryProvider)
+        .readLlmApiKeyFor(editingId);
+    if (stored == null || stored.trim().isEmpty) return null;
+    return stored;
   }
 
   /// 点击拉取按钮：用表单 url/key（Key 空时回退已存 Key）请求模型列表，
@@ -112,8 +204,7 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
     try {
       var configToFetch = config;
       if (_apiKeyController.text.trim().isEmpty && _hasStoredKey) {
-        final stored =
-            await ref.read(secureCredentialStoreProvider).readLlmApiKey();
+        final stored = await _fallbackStoredKey();
         configToFetch = LlmConfig(
           baseUrl: config.baseUrl,
           apiKey: stored ?? '',
@@ -206,6 +297,7 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   }
 
   Future<void> _testConnection() async {
+    if (_testState == _TestState.loading) return;
     final config = _buildConfigFromForm();
     if (config == null) {
       setState(() {
@@ -214,21 +306,21 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
       });
       return;
     }
-    // 测试连接需要已存的 Key 时从安全存储读取。
+    // 加载态先于任何 await：回退已存 Key 要读安全存储（平台通道在
+    // 低端设备上有可感知耗时），读取期间按钮同样不可再点。
+    setState(() {
+      _testState = _TestState.loading;
+      _testMessage = null;
+    });
     var configToTest = config;
     if (_apiKeyController.text.trim().isEmpty && _hasStoredKey) {
-      final stored =
-          await ref.read(secureCredentialStoreProvider).readLlmApiKey();
+      final stored = await _fallbackStoredKey();
       configToTest = LlmConfig(
         baseUrl: config.baseUrl,
         apiKey: stored ?? '',
         model: config.model,
       );
     }
-    setState(() {
-      _testState = _TestState.loading;
-      _testMessage = null;
-    });
     final client = LlmClient(
       httpClient: ref.read(llmSettingsHttpClientProvider),
     );
@@ -262,21 +354,20 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    // 留空保存 = 保留旧 Key：显式读回安全存储中的 Key。
-    var apiKey = _apiKeyController.text.trim();
-    if (apiKey.isEmpty && _hasStoredKey) {
-      final stored =
-          await ref.read(secureCredentialStoreProvider).readLlmApiKey();
-      apiKey = stored ?? '';
-    }
-
+    // 防重入守卫先于任何 await（Key 回退读取要过平台通道）。
+    if (_saving) return;
+    setState(() => _saving = true);
     final settingsRepo = ref.read(settingsRepositoryProvider);
+    final id = _editingId ?? LlmProviderConfig.generateId();
     try {
-      await settingsRepo.saveLlmConfig(
+      // 留空保存 = 保留旧 Key：仓储侧 apiKey 空串即保留语义，
+      // 页面无须读回明文。
+      await settingsRepo.saveLlmProviderConfig(
+        id: id,
+        name: _providerNameController.text.trim(),
         baseUrl: _baseUrlController.text.trim(),
         model: _modelController.text.trim(),
-        apiKey: apiKey,
-        providerName: _providerNameController.text.trim(),
+        apiKey: _apiKeyController.text.trim(),
       );
     } on FormatException catch (e) {
       if (mounted) {
@@ -285,24 +376,51 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
         );
       }
       return;
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
 
     if (!mounted) return;
-    setState(() => _hasStoredKey = apiKey.isNotEmpty);
-    _apiKeyController.clear();
+    setState(() {
+      // 新增后切到新 id，便于直接继续编辑/删除。
+      _editingId = id;
+      _apiKeyController.clear();
+    });
+    await _refreshStoredKeyFlag(id);
+    if (!mounted) return;
     ref.invalidate(settingsRepositoryProvider);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('LLM 服务配置已保存')),
     );
   }
 
-  Future<void> _delete() async {
+  /// 保存后重读当前编辑配置的已存 Key 标志（不回显明文）。
+  Future<void> _refreshStoredKeyFlag(String id) async {
+    final stored =
+        await ref.read(settingsRepositoryProvider).readLlmApiKeyFor(id);
+    if (mounted) {
+      setState(() => _hasStoredKey = stored != null && stored.trim().isNotEmpty);
+    }
+  }
+
+  Future<void> _delete() {
+    return _deleteEditing();
+  }
+
+  /// 删除当前编辑的配置（确认弹窗）；删的是 _editingId 则表单重置新增态。
+  Future<void> _deleteEditing() async {
+    final editingId = _editingId;
+    if (editingId == null) return;
+    final name = _providerNameController.text.trim();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除 LLM 配置'),
-        content: const Text('将删除供应商名称、服务地址、模型名与已保存的 API Key，'
-            '应用题生成功能将不可用。题库中已有的题目不受影响。'),
+        title: const Text('删除此配置'),
+        content: Text(
+          '将删除「${name.isEmpty ? '未命名配置' : name}」的服务地址、模型名与'
+          '已保存的 API Key。删除的是生效配置时，生效自动切换到剩余'
+          '第一条。题库中已有的题目不受影响。',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -317,14 +435,19 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
     );
     if (confirmed != true) return;
 
-    await ref.read(settingsRepositoryProvider).deleteLlmConfig();
+    await ref.read(settingsRepositoryProvider).deleteLlmProviderConfig(
+          editingId,
+        );
     if (!mounted) return;
     setState(() {
+      _editingId = null;
       _providerNameController.clear();
       _baseUrlController.clear();
       _modelController.clear();
       _apiKeyController.clear();
       _hasStoredKey = false;
+      _testState = _TestState.idle;
+      _testMessage = null;
     });
     ref.invalidate(settingsRepositoryProvider);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -332,12 +455,29 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
     );
   }
 
+  /// 列表行显示名：空名兜底「配置 N」（N 为序号，不回写存储）。
+  String _displayName(int index, LlmProviderConfig config) {
+    final name = config.name.trim();
+    if (name.isNotEmpty) return name;
+    return '配置 ${index + 1}';
+  }
+
+  /// baseUrl 宿主名摘要（列表副标题；解析失败回退原串）。
+  String _hostSummary(String baseUrl) {
+    final uri = Uri.tryParse(baseUrl);
+    final host = uri?.host ?? '';
+    if (host.isNotEmpty) return host;
+    return baseUrl;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final configured =
-        _baseUrlController.text.trim().isNotEmpty &&
-        _modelController.text.trim().isNotEmpty;
+    final settingsRepo = ref.watch(settingsRepositoryProvider);
+    final providers = settingsRepo.llmProviders;
+    final activeId = settingsRepo.llmActiveProviderId;
+    final editing =
+        providers.where((p) => p.id == _editingId).firstOrNull;
 
     return Scaffold(
       appBar: AppBar(title: const Text('AI 出题设置')),
@@ -367,6 +507,84 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.lg),
+
+            // ============ 配置列表区 ============
+            Text(
+              '我的配置',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            if (providers.isEmpty)
+              ColoredCard(
+                color: theme.colorScheme.secondary,
+                width: double.infinity,
+                child: Text(
+                  '还没有 LLM 配置。在下方填写供应商信息并点击「保存配置」，'
+                  '即可添加第一个配置；也可以同时保存多个厂商配置，'
+                  '在列表中点选切换生效。',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else
+              ColoredCard(
+                color: theme.colorScheme.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.xs,
+                  vertical: SpacingTokens.xs,
+                ),
+                width: double.infinity,
+                // ListTile 在最近的 Material 祖先上绘制背景与水波纹，
+                // ColoredCard 的 DecoratedBox 会遮挡；插入透明 Material
+                // 让点击反馈落在卡片内部。
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+                  child: RadioGroup<String>(
+                    groupValue: activeId,
+                    onChanged: (value) {
+                      if (value != null) _setActive(value);
+                    },
+                    child: Column(
+                      children: [
+                        for (final (index, config) in providers.indexed)
+                          RadioListTile<String>(
+                            value: config.id,
+                            title: Text(_displayName(index, config)),
+                            subtitle: Text(_hostSummary(config.baseUrl)),
+                            controlAffinity: ListTileControlAffinity.leading,
+                            secondary: IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              tooltip: '编辑此配置',
+                              onPressed: () => _startEdit(config),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: SpacingTokens.sm),
+            OutlinedButton.icon(
+              onPressed: _startCreate,
+              icon: const Icon(Icons.add_outlined),
+              label: const Text('新增配置'),
+            ),
+            const SizedBox(height: SpacingTokens.lg),
+
+            // ============ 编辑区 ============
+            Text(
+              editing != null
+                  ? '编辑：${_displayName(providers.indexOf(editing), editing)}'
+                  : '新增配置',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: SpacingTokens.md),
@@ -461,8 +679,14 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
                 const SizedBox(width: SpacingTokens.sm),
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _save,
-                    icon: const Icon(Icons.save_outlined),
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined),
                     label: const Text('保存配置'),
                   ),
                 ),
@@ -498,7 +722,7 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
               ),
             ],
 
-            if (configured) ...[
+            if (editing != null) ...[
               const SizedBox(height: SpacingTokens.xl),
               TextButton.icon(
                 onPressed: _delete,
@@ -507,7 +731,7 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
                   color: theme.colorScheme.error,
                 ),
                 label: Text(
-                  '删除配置',
+                  '删除此配置',
                   style: TextStyle(color: theme.colorScheme.error),
                 ),
               ),

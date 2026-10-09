@@ -1,7 +1,8 @@
 // test/data/repositories/llm_settings_test.dart
 //
-// LLM 配置存储测试：Key 只进安全存储、地址/模型入 Hive、
-// readLlmConfig 组装、deleteLlmConfig 清理与备份导出不含 Key。
+// LLM 多厂商配置存储测试：多配置 CRUD、生效切换、Key 按配置独立
+// 存取与空串保留、旧单配置迁移、readLlmConfig 组装、删除清理与
+// 备份导出不含配置列表/Key 明文。
 
 import 'dart:convert';
 
@@ -15,21 +16,25 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
+/// 测试环境无平台安全存储通道，覆写为内存实现。
+/// 按 configId 存 Key（对齐真实存储键 `llm_api_key_{configId}`）；
+/// 旧单键 llmApiKey 保留，供迁移用例与真实迁移逻辑读写。
 final class _MemoryCredentialStore extends SecureCredentialStore {
-  String? workerApiKey;
+  final Map<String, String> llmApiKeysByConfigId = {};
   String? llmApiKey;
 
   @override
-  Future<void> saveWorkerTtsApiKey(String apiKey) async {
-    workerApiKey = apiKey;
+  Future<void> saveLlmApiKeyFor(String configId, String apiKey) async {
+    llmApiKeysByConfigId[configId] = apiKey;
   }
 
   @override
-  Future<String?> readWorkerTtsApiKey() => Future.value(workerApiKey);
+  Future<String?> readLlmApiKeyFor(String configId) =>
+      Future.value(llmApiKeysByConfigId[configId]);
 
   @override
-  Future<void> deleteWorkerTtsApiKey() async {
-    workerApiKey = null;
+  Future<void> deleteLlmApiKeyFor(String configId) async {
+    llmApiKeysByConfigId.remove(configId);
   }
 
   @override
@@ -60,110 +65,368 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  test('saveLlmConfig：Key 进安全存储、地址/模型/供应商名称进 Hive，'
-      '备份导出含 llm_provider_name、不含 Key', () async {
-    await repository.saveLlmConfig(
-      baseUrl: 'https://api.example.com',
-      model: 'gpt-4o-mini',
-      apiKey: 'llm-key-private',
-      providerName: 'DeepSeek',
+  Future<void> saveTwo() async {
+    await repository.saveLlmProviderConfig(
+      id: 'p1',
+      name: 'DeepSeek',
+      baseUrl: 'https://api.deepseek.com/v1/',
+      model: 'deepseek-chat',
+      apiKey: 'key-p1',
     );
+    await repository.saveLlmProviderConfig(
+      id: 'p2',
+      name: '通义千问',
+      baseUrl: 'https://dashscope.example.com',
+      model: 'qwen-plus',
+      apiKey: 'key-p2',
+    );
+  }
 
-    expect(credentialStore.llmApiKey, 'llm-key-private');
-    expect(repository.llmBaseUrl, 'https://api.example.com');
-    expect(repository.llmModel, 'gpt-4o-mini');
-    expect(repository.llmProviderName, 'DeepSeek');
+  test('新增两条配置：列表顺序持久化、Key 按配置独立、第一条自动生效', () async {
+    await saveTwo();
 
-    // Hive 任何值不得包含 Key。
+    final providers = repository.llmProviders;
+    expect(providers.length, 2);
+    expect(providers[0].id, 'p1');
+    expect(providers[0].name, 'DeepSeek');
+    // 末尾斜杠被 normalize 去掉。
+    expect(providers[0].baseUrl, 'https://api.deepseek.com/v1');
+    expect(providers[0].model, 'deepseek-chat');
+    expect(providers[1].id, 'p2');
+    expect(providers[1].model, 'qwen-plus');
+
+    // Key 按配置独立存安全存储，互不覆盖。
+    expect(credentialStore.llmApiKeysByConfigId['p1'], 'key-p1');
+    expect(credentialStore.llmApiKeysByConfigId['p2'], 'key-p2');
+    expect(await repository.readLlmApiKeyFor('p1'), 'key-p1');
+    expect(await repository.readLlmApiKeyFor('p2'), 'key-p2');
+
+    // 第一条追加时无 active，自动生效。
+    expect(repository.llmActiveProviderId, 'p1');
+
+    // Hive 任何值不得包含 Key 明文。
     for (final value in HiveBoxes.settings.values) {
-      expect('$value', isNot(contains('llm-key-private')));
+      expect('$value', isNot(contains('key-p1')));
+      expect('$value', isNot(contains('key-p2')));
     }
-    // 备份导出：供应商名称随白名单迁移，Key 明文不外泄。
-    final backup = BackupService();
-    final exported = await backup.exportToJson();
-    expect(exported, isNot(contains('llm-key-private')));
-    expect(exported, contains('llm_provider_name'));
-    expect(exported, contains('DeepSeek'));
   });
 
-  test('readLlmConfig 组装完整配置；空 Key 保留空串（Ollama）', () async {
-    await repository.saveLlmConfig(
+  test('setLlmActiveProvider 切换生效并持久化；未知 id 抛 ArgumentError', () async {
+    await saveTwo();
+
+    await repository.setLlmActiveProvider('p2');
+    expect(repository.llmActiveProviderId, 'p2');
+
+    // 持久化：新仓储实例重读同一 Hive box。
+    final repo2 = SettingsRepository(credentialStore: credentialStore);
+    expect(repo2.llmActiveProviderId, 'p2');
+
+    expect(
+      () => repository.setLlmActiveProvider('nope'),
+      throwsArgumentError,
+    );
+    // 失败的切换不破坏原值。
+    expect(repository.llmActiveProviderId, 'p2');
+  });
+
+  test('readLlmConfig 返回当前生效配置；切换生效后随 active 组装', () async {
+    await saveTwo();
+    // saveTwo 后 active 为 p1。
+    var config = await repository.readLlmConfig();
+    expect(config, isNotNull);
+    expect(config!.baseUrl, 'https://api.deepseek.com/v1');
+    expect(config.model, 'deepseek-chat');
+    expect(config.apiKey, 'key-p1');
+
+    await repository.setLlmActiveProvider('p2');
+    config = await repository.readLlmConfig();
+    expect(config!.model, 'qwen-plus');
+    expect(config.apiKey, 'key-p2');
+  });
+
+  test('空 Key 配置（Ollama）：保存与组装均为空串 Key', () async {
+    await repository.saveLlmProviderConfig(
+      id: 'local',
+      name: 'Ollama',
       baseUrl: 'http://localhost:11434',
       model: 'qwen2.5:7b',
       apiKey: '',
     );
 
+    expect(await repository.readLlmApiKeyFor('local'), isNull);
     final config = await repository.readLlmConfig();
     expect(config, isNotNull);
-    expect(config!.baseUrl, 'http://localhost:11434');
-    expect(config.model, 'qwen2.5:7b');
-    expect(config.hasApiKey, isFalse);
+    expect(config!.hasApiKey, isFalse);
   });
 
-  test('未配置地址或模型时 readLlmConfig 返回 null', () async {
+  test('编辑已有配置：Key 留空保留旧 Key；非空覆盖；其他字段更新', () async {
+    await saveTwo();
+
+    // Key 留空 = 保留 p1 旧 Key。
+    await repository.saveLlmProviderConfig(
+      id: 'p1',
+      name: 'DeepSeek V3',
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-reasoner',
+      apiKey: '',
+    );
+    expect(await repository.readLlmApiKeyFor('p1'), 'key-p1');
+    final providers = repository.llmProviders;
+    expect(providers.length, 2); // 更新不追加。
+    expect(providers[0].name, 'DeepSeek V3');
+    expect(providers[0].model, 'deepseek-reasoner');
+
+    // Key 非空 = 覆盖。
+    await repository.saveLlmProviderConfig(
+      id: 'p1',
+      name: 'DeepSeek V3',
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-reasoner',
+      apiKey: 'key-p1-new',
+    );
+    expect(await repository.readLlmApiKeyFor('p1'), 'key-p1-new');
+  });
+
+  test('编辑追加不改变 active：仅新增且无有效 active 时自动生效', () async {
+    await saveTwo();
+    await repository.setLlmActiveProvider('p2');
+
+    // 更新 p1 不改变 active。
+    await repository.saveLlmProviderConfig(
+      id: 'p1',
+      name: 'DeepSeek',
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat',
+      apiKey: 'key-p1',
+    );
+    expect(repository.llmActiveProviderId, 'p2');
+
+    // 新增 p3：已有有效 active（p2），不抢占生效。
+    await repository.saveLlmProviderConfig(
+      id: 'p3',
+      name: '',
+      baseUrl: 'https://third.example.com/v1',
+      model: 'm3',
+      apiKey: 'key-p3',
+    );
+    expect(repository.llmActiveProviderId, 'p2');
+    // 空名保存为空串（展示层兜底「配置 N」）。
+    expect(repository.llmProviders[2].name, '');
+  });
+
+  test(
+      '删除非生效配置：active 不变；删除生效配置：切到剩余第一条；'
+      '全删后 active 清空、readLlmConfig 返回 null', () async {
+    await saveTwo();
+    await repository.setLlmActiveProvider('p2');
+
+    // 删除非生效 p1。
+    await repository.deleteLlmProviderConfig('p1');
+    expect(repository.llmProviders.length, 1);
+    expect(repository.llmActiveProviderId, 'p2');
+    expect(await repository.readLlmApiKeyFor('p1'), isNull);
+
+    // 删除生效 p2：无剩余 → active 清空。
+    await repository.deleteLlmProviderConfig('p2');
+    expect(repository.llmProviders, isEmpty);
+    expect(HiveBoxes.settings.get('llm_active_provider_id'), isNull);
+    expect(credentialStore.llmApiKeysByConfigId, isEmpty);
     expect(await repository.readLlmConfig(), isNull);
 
-    await repository.setLlmBaseUrl('https://api.example.com');
-    expect(await repository.readLlmConfig(), isNull); // 缺模型
-
-    await repository.setLlmModel('gpt-4o-mini');
-    expect(await repository.readLlmConfig(), isNotNull);
+    // 删光后重新新增第一条 → 自动生效（active 已清空分支）。
+    await repository.saveLlmProviderConfig(
+      id: 'p4',
+      name: '',
+      baseUrl: 'https://fourth.example.com',
+      model: 'm4',
+      apiKey: '',
+    );
+    expect(repository.llmActiveProviderId, 'p4');
   });
 
-  test('saveLlmConfig 非法地址抛 FormatException 且不落盘', () async {
+  test('删除生效配置后切到剩余第一条（三条场景）', () async {
+    await saveTwo();
+    await repository.saveLlmProviderConfig(
+      id: 'p3',
+      name: '',
+      baseUrl: 'https://third.example.com',
+      model: 'm3',
+      apiKey: 'key-p3',
+    );
+    await repository.setLlmActiveProvider('p1');
+
+    await repository.deleteLlmProviderConfig('p1');
+    expect(repository.llmActiveProviderId, 'p2');
+    final config = await repository.readLlmConfig();
+    expect(config!.model, 'qwen-plus');
+  });
+
+  test('非法地址抛 FormatException 且不落盘', () async {
     expect(
-      () => repository.saveLlmConfig(
+      () => repository.saveLlmProviderConfig(
+        id: 'bad',
+        name: '',
         baseUrl: 'not a url',
-        model: 'gpt-4o-mini',
+        model: 'm',
         apiKey: 'k',
       ),
       throwsFormatException,
     );
-    expect(repository.llmBaseUrl, '');
-    expect(credentialStore.llmApiKey, isNull);
+    expect(repository.llmProviders, isEmpty);
+    expect(await repository.readLlmApiKeyFor('bad'), isNull);
   });
 
-  test('deleteLlmConfig 清空地址/模型/供应商名称与 Key', () async {
-    await repository.saveLlmConfig(
-      baseUrl: 'https://api.example.com',
-      model: 'gpt-4o-mini',
-      apiKey: 'llm-key-private',
-      providerName: 'DeepSeek',
-    );
-
-    await repository.deleteLlmConfig();
-
-    expect(repository.llmBaseUrl, '');
-    expect(repository.llmModel, '');
-    expect(repository.llmProviderName, '');
-    expect(credentialStore.llmApiKey, isNull);
-    expect(await repository.readLlmConfig(), isNull);
+  test('llmActiveProviderId 自愈：悬空 active 回落第一条并写回', () async {
+    await saveTwo();
+    // 手工注入悬空 active（模拟手工删 Hive key 后的残留）。
+    await HiveBoxes.settings.put('llm_active_provider_id', 'gone');
+    // getter 触发自愈：回落 p1 并写回 Hive。
+    expect(repository.llmActiveProviderId, 'p1');
+    expect(HiveBoxes.settings.get('llm_active_provider_id'), 'p1');
+    // 新实例重读自愈后的值。
+    final repo2 = SettingsRepository(credentialStore: credentialStore);
+    expect(repo2.llmActiveProviderId, 'p1');
   });
 
-  test('旧备份恢复兼容：无 llm_provider_name 的 settings 节不报错，'
-      '有则随白名单还原', () async {
-    final backup = BackupService();
-    // 模拟旧版本备份：settings 节只有既有 key，无 llm_provider_name。
+  test('坏 JSON 列表解码为空（decodeList 防御）', () async {
+    await HiveBoxes.settings.put('llm_providers', 'not-json');
+    expect(repository.llmProviders, isEmpty);
+    expect(repository.llmActiveProviderId, isNull);
+  });
+
+  group('旧单配置迁移 migrateLegacyLlmConfigIfNeeded', () {
+    test('旧三 key + llm_api_key → 第一条配置：Key 复制、旧 key 清除、幂等', () async {
+      // 模拟旧版落盘状态。
+      await HiveBoxes.settings.put('llm_base_url', 'https://old.example.com');
+      await HiveBoxes.settings.put('llm_model', 'old-model');
+      await HiveBoxes.settings.put('llm_provider_name', '旧厂商');
+      credentialStore.llmApiKey = 'legacy-key';
+
+      await repository.migrateLegacyLlmConfigIfNeeded();
+
+      final providers = repository.llmProviders;
+      expect(providers.length, 1);
+      expect(providers[0].baseUrl, 'https://old.example.com');
+      expect(providers[0].model, 'old-model');
+      expect(providers[0].name, '旧厂商');
+      expect(repository.llmActiveProviderId, providers[0].id);
+      // 旧 Key 复制到新键位，旧单 Key 删除。
+      expect(
+        await repository.readLlmApiKeyFor(providers[0].id),
+        'legacy-key',
+      );
+      expect(credentialStore.llmApiKey, isNull);
+      // 旧三 key 清除。
+      expect(HiveBoxes.settings.get('llm_base_url'), isNull);
+      expect(HiveBoxes.settings.get('llm_model'), isNull);
+      expect(HiveBoxes.settings.get('llm_provider_name'), isNull);
+
+      // 幂等：再跑一次不产生第二条配置。
+      await repository.migrateLegacyLlmConfigIfNeeded();
+      expect(repository.llmProviders.length, 1);
+
+      // readLlmConfig 迁移后组装成功。
+      final config = await repository.readLlmConfig();
+      expect(config!.apiKey, 'legacy-key');
+      expect(config.model, 'old-model');
+    });
+
+    test('旧配置无 Key（Ollama）：迁移不写 Key、旧 key 仍被清除', () async {
+      await HiveBoxes.settings.put('llm_base_url', 'http://localhost:11434');
+      await HiveBoxes.settings.put('llm_model', 'qwen2.5:7b');
+
+      await repository.migrateLegacyLlmConfigIfNeeded();
+
+      final providers = repository.llmProviders;
+      expect(providers.length, 1);
+      expect(await repository.readLlmApiKeyFor(providers[0].id), isNull);
+      expect(HiveBoxes.settings.get('llm_base_url'), isNull);
+      final config = await repository.readLlmConfig();
+      expect(config!.hasApiKey, isFalse);
+    });
+
+    test('未配置旧地址：迁移为空操作，不生成配置', () async {
+      await repository.migrateLegacyLlmConfigIfNeeded();
+      expect(repository.llmProviders, isEmpty);
+      expect(HiveBoxes.settings.get('llm_providers'), isNull);
+    });
+
+    test('已有列表：即使残留旧三 key 也不迁移（列表优先）', () async {
+      await saveTwo();
+      await HiveBoxes.settings.put('llm_base_url', 'https://old.example.com');
+
+      await repository.migrateLegacyLlmConfigIfNeeded();
+      expect(repository.llmProviders.length, 2);
+      expect(HiveBoxes.settings.get('llm_base_url'), 'https://old.example.com');
+    });
+  });
+
+  test(
+      '备份导出：不含 llm_providers / active id / Key 明文；'
+      '凭据白名单维持单 llm_api_key', () async {
+    await saveTwo();
+
+    final backup = BackupService(secureStore: credentialStore);
+    final exported = await backup.exportToJson(passphrase: 'pw');
+
+    expect(exported, isNot(contains('key-p1')));
+    expect(exported, isNot(contains('key-p2')));
+    final settingsNode = (jsonDecode(exported)
+        as Map<String, dynamic>)['settings'] as Map<String, dynamic>;
+    expect(settingsNode.containsKey('llm_providers'), isFalse);
+    expect(settingsNode.containsKey('llm_active_provider_id'), isFalse);
+
+    // 凭据加密节维持单 llm_api_key 条目语义。
+    expect(kBackupCredentialKeys, contains('llm_api_key'));
+  });
+
+  test(
+      '备份恢复凭据：llm_api_key 写入本机 active 配置位；'
+      '无 active 则丢弃不报错', () async {
+    // 本机已有 active=p1。
+    await saveTwo();
+
+    // 无凭据节旧备份：不报错、Key 不变。
     final legacyJson = jsonEncode(<String, dynamic>{
       'version': 1,
       'settings': <String, dynamic>{'theme_mode': 'light'},
     });
-    await backup.restoreFromJson(legacyJson);
-    expect(repository.llmProviderName, '');
+    await BackupService(secureStore: credentialStore)
+        .restoreFromJson(legacyJson);
+    expect(await repository.readLlmApiKeyFor('p1'), 'key-p1');
 
-    // 新版本备份：llm_provider_name 随白名单还原。
-    final newJson = jsonEncode(<String, dynamic>{
-      'version': 1,
-      'settings': <String, dynamic>{
-        'theme_mode': 'dark',
-        'llm_provider_name': '通义千问',
-      },
-    });
-    await backup.restoreFromJson(newJson);
-    expect(repository.llmProviderName, '通义千问');
+    // 含 llm_api_key 的备份：恢复写入本机 active 位置（覆盖）。
+    final cipher = BackupService(secureStore: credentialStore);
+    final restoredJson = await _buildBackupWithLlmKey('pw', 'key-from-backup');
+    await cipher.restoreFromJson(restoredJson, passphrase: 'pw');
+    expect(await repository.readLlmApiKeyFor('p1'), 'key-from-backup');
+
+    // 无 active 机器恢复含 Key 备份：丢弃、不报错（全新 Hive + 全新
+    // 凭据 Store，避免上面恢复写入的条目残留干扰断言）。
+    await tearDownHiveForTesting();
+    await setUpHiveForTesting();
+    final freshStore = _MemoryCredentialStore();
+    final fresh = BackupService(secureStore: freshStore);
+    await fresh.restoreFromJson(
+      await _buildBackupWithLlmKey('pw', 'key-again'),
+      passphrase: 'pw',
+    );
+    expect(freshStore.llmApiKeysByConfigId, isEmpty);
   });
+}
 
-  test('备份凭据白名单包含 llm_api_key（随口令加密同步）', () {
-    expect(kBackupCredentialKeys, contains('llm_api_key'));
+/// 构造带加密 llm_api_key 凭据节的备份 JSON。
+Future<String> _buildBackupWithLlmKey(
+  String passphrase,
+  String llmApiKey,
+) async {
+  final credentials = await encryptCredentials(
+    <String, String>{'llm_api_key': llmApiKey},
+    passphrase,
+  );
+  return jsonEncode(<String, dynamic>{
+    'version': 1,
+    'settings': <String, dynamic>{'theme_mode': 'light'},
+    'credentials': credentials,
   });
 }

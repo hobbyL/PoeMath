@@ -283,9 +283,9 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.smart_toy_outlined,
                 iconColor: theme.colorScheme.tertiary,
                 title: '应用题 AI 出题',
-                subtitle: settingsRepo.llmModel.trim().isEmpty
+                subtitle: settingsRepo.llmProviders.isEmpty
                     ? '未配置'
-                    : settingsRepo.llmModel,
+                    : '已配置 ${settingsRepo.llmProviders.length} 个服务',
                 onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(

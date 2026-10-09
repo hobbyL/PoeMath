@@ -41,9 +41,11 @@ const int _backupVersion = 1;
 /// 排除 key（如 webdav_configs）原值保留，防止攻击者借恶意备份清空设备配置。
 ///
 /// 排除项及理由（设备绑定、换机重配，与凭据不随备份明文迁移的既有设计一致）：
-/// - webdav_configs / llm_base_url / llm_model / tts_cloud_base_url /
+/// - webdav_configs / llm_providers / llm_active_provider_id /
+///   llm_base_url / llm_model / tts_cloud_base_url /
 ///   tts_cloud_enabled / tts_cloud_voice / tts_cloud_style：
-///   指向外部服务的端点或开关，注入即成为凭据外泄端点（P1）；
+///   指向外部服务的端点或开关（llm_providers 含 baseUrl/model，
+///   llm_active_provider_id 依赖其存在），注入即成为凭据外泄端点（P1）；
 /// - tencent_asr_credential_fingerprint / tencent_asr_verified_at /
 ///   worker_tts_verified_fingerprint：与凭据绑定的验证状态，凭据不随备份
 ///   走，指纹/时间戳单独迁移会误导验证状态。
@@ -124,7 +126,7 @@ class BackupService {
       if (workerApiKey != null && workerApiKey.isNotEmpty) {
         payload['worker_tts_api_key'] = workerApiKey;
       }
-      final llmApiKey = await _secureStore.readLlmApiKey();
+      final llmApiKey = await _readActiveLlmApiKey();
       if (llmApiKey != null && llmApiKey.isNotEmpty) {
         payload['llm_api_key'] = llmApiKey;
       }
@@ -219,10 +221,26 @@ class BackupService {
       await _secureStore.saveWorkerTtsApiKey(apiKey);
     }
     // legacy 备份无 llm_api_key 字段 → null，跳过（不覆盖现有值）。
+    // LLM 配置设备绑定：条目写入本机当前生效配置的键位
+    // （llm_api_key_{activeId}）；本机无生效配置则丢弃（与
+    // url/model 不迁移的既有纪律一致）。
     final llmApiKey = credentials['llm_api_key'];
     if (llmApiKey != null && llmApiKey.isNotEmpty) {
-      await _secureStore.saveLlmApiKey(llmApiKey);
+      final activeId = HiveBoxes.settings.get('llm_active_provider_id')
+          as String?;
+      if (activeId != null && activeId.isNotEmpty) {
+        await _secureStore.saveLlmApiKeyFor(activeId, llmApiKey);
+      }
     }
+  }
+
+  /// 读取当前生效 LLM 配置的 API Key（llm_api_key_{activeId}）；
+  /// 无生效配置返回 null。
+  Future<String?> _readActiveLlmApiKey() async {
+    final activeId =
+        HiveBoxes.settings.get('llm_active_provider_id') as String?;
+    if (activeId == null || activeId.isEmpty) return null;
+    return _secureStore.readLlmApiKeyFor(activeId);
   }
 
   /// 执行实际的数据恢复，返回记录总数。
