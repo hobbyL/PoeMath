@@ -19,6 +19,7 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/math/math_explain/math_explain_models.dart';
 import 'package:poemath/features/math/math_explain/math_explain_prompts.dart';
+import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
 
 /// 解析输出的 token 上限（3-5 小段中文）。
 const int kMathExplainMaxTokens = 500;
@@ -73,7 +74,9 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
           userAnswer: userAnswer,
           errorCauseLabel: diagnosisCategory == null
               ? null
-              : kMathErrorCauseLabels[diagnosisCategory],
+              // 用 map 查找而非 errorCauseLabel()：未收录键不下发
+              // 英文原键（llm 铁律），保持 prompt 省略该行的现状。
+              : kErrorCauseLabels[diagnosisCategory],
         ),
         maxTokens: kMathExplainMaxTokens,
       );

@@ -130,7 +130,7 @@ flutter build apk --release --target-platform android-arm64
 第三方插件传递引入的其它 ABI 的 JNI 库，保证安装包只含 `arm64-v8a`。32 位 ARM
 设备和 x86_64 模拟器不在正式发布包的支持范围内，Debug 构建不受此限制。
 
-当前代码基线最近一次本地质量门禁已通过 `flutter analyze` 和全部 1215 项
+当前代码基线最近一次本地质量门禁已通过 `flutter analyze` 和全部 1221 项
 `flutter test`。该结果来自本地 FVM 命令；文档同步不包含 Android/iOS 打包或
 真机录音验证。
 

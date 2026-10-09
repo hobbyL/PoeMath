@@ -6,6 +6,7 @@
 export 'math_engine.dart';
 export 'models/models.dart';
 export 'presets/grade_presets.dart';
+export 'diagnostics/error_cause_labels.dart';
 export 'diagnostics/mistake_rule.dart';
 export 'step_solver/step_solver.dart';
 export 'validators/constraint_checker.dart';

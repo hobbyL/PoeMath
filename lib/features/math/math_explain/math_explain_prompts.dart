@@ -1,22 +1,12 @@
 // lib/features/math/math_explain/math_explain_prompts.dart
 //
 // 层级：features/math/math_explain
-// 职责：算数题 AI 解析的 Prompt 构造与错因中文标签。纯 Dart。
+// 职责：算数题 AI 解析的 Prompt 构造。纯 Dart。
 //
 // 隐私边界：userPrompt 只含题面、学生答案、正确答案与错因标签四项，
 // 不含年级、题型、历史记录等任何其他用户数据（见 prd.md AC5）。
-
-/// 错因 category → 中文标签（本地维护，不传诊断模板原文）。
-///
-/// key 对齐 math_engine 诊断器输出的 category。
-const Map<String, String> kMathErrorCauseLabels = {
-  'carry_omission': '进位遗漏',
-  'borrow_omission': '退位遗漏',
-  'multiplication_table': '口诀错误',
-  'operation_order': '运算顺序错误',
-  'remainder_mistake': '余数错误',
-  'decimal_alignment': '小数对位错误',
-};
+// 错因 category → 中文标签的单一来源在
+// math_engine/diagnostics/error_cause_labels.dart（kErrorCauseLabels）。
 
 /// 解析风格与铁律（固定常量）。
 const String kMathExplainSystemPrompt = '''

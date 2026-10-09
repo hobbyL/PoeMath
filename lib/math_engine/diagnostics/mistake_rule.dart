@@ -224,6 +224,13 @@ class MistakeDiagnoser {
 
   const MistakeDiagnoser._();
 
+  /// 全部错因规则的权威键集合（规则实例的 name）。
+  ///
+  /// 标签表 kErrorCauseLabels（error_cause_labels.dart）的键集
+  /// 必须与本集合完全一致，由
+  /// test/math_engine/diagnostics/error_cause_labels_test.dart 守卫。
+  static Iterable<String> get categoryNames => _rules.map((r) => r.name);
+
   /// 诊断错误原因。
   static MistakeDiagnosis? diagnose(
     MathProblem problem,

@@ -20,6 +20,8 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/math/math_explain/math_explain_controller.dart';
 import 'package:poemath/features/math/math_explain/math_explain_models.dart';
 import 'package:poemath/features/math/math_explain/math_explain_prompts.dart';
+import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
+import 'package:poemath/math_engine/diagnostics/mistake_rule.dart';
 
 import '../../../helpers/hive_test_helper.dart';
 
@@ -309,16 +311,15 @@ void main() {
     expect(body['model'], 'qwen-plus');
   });
 
-  test('错因标签表覆盖诊断器 6 类键名', () {
-    expect(kMathErrorCauseLabels.keys, containsAll(<String>[
-      'carry_omission',
-      'borrow_omission',
-      'multiplication_table',
-      'operation_order',
-      'remainder_mistake',
-      'decimal_alignment',
-    ]),);
-    expect(kMathErrorCauseLabels.length, 6);
+  test('错因标签表覆盖诊断器全部权威键', () {
+    // 单一来源表：键集与诊断器规则 name 的一致性由
+    // test/math_engine/diagnostics/error_cause_labels_test.dart 守卫，
+    // 这里确认控制器消费的正是该表。
+    expect(
+      kErrorCauseLabels.keys,
+      containsAll(MistakeDiagnoser.categoryNames),
+    );
+    expect(kErrorCauseLabels.length, MistakeDiagnoser.categoryNames.length);
   });
 
   test('system prompt 固定「正确答案以给出为准」铁律', () {

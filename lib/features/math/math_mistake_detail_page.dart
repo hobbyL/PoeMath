@@ -17,6 +17,7 @@ import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_ai_explain_sheet.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
+import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
 import 'package:poemath/math_engine/models/math_problem.dart';
 
 class MathMistakeDetailPage extends ConsumerWidget {
@@ -24,20 +25,6 @@ class MathMistakeDetailPage extends ConsumerWidget {
 
   /// 错题 ID，用于从仓库实时读取最新状态。
   final String mistakeId;
-
-  // 错因标签键名必须与诊断器权威键对齐：
-  // lib/math_engine/diagnostics/mistake_rule.dart 中 6 类规则的 name
-  // （carry_omission / borrow_omission / multiplication_table /
-  // operation_order / remainder_mistake / decimal_alignment）。
-  // 键名漂移会导致标签回退显示英文原键。
-  static const _errorTypeLabels = <String, String>{
-    'carry_omission': '进位遗漏',
-    'borrow_omission': '退位遗漏',
-    'multiplication_table': '口诀错误',
-    'operation_order': '运算顺序错误',
-    'remainder_mistake': '余数错误',
-    'decimal_alignment': '小数对位错误',
-  };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -158,7 +145,9 @@ class MathMistakeDetailPage extends ConsumerWidget {
                     ),
                     const SizedBox(width: SpacingTokens.sm),
                     Text(
-                      '错因：${_errorTypeLabels[mistake.errorType] ?? mistake.errorType!}',
+                      // 标签单一来源：math_engine kErrorCauseLabels；
+                      // 未收录键回退显示英文原键（守卫内 errorType 非空）。
+                      '错因：${errorCauseLabel(mistake.errorType)}',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.error,
                         fontWeight: FontWeight.w600,
@@ -462,7 +451,7 @@ class _ActionButtons extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '已生成针对「${_errorTypeLabel(errorType)}」的练习题',
+            '已生成针对「${errorCauseLabel(errorType)}」的练习题',
           ),
           duration: const Duration(seconds: 2),
         ),
@@ -470,17 +459,5 @@ class _ActionButtons extends ConsumerWidget {
     }
 
     context.push(AppRoutes.mathPractice);
-  }
-
-  static String _errorTypeLabel(String errorType) {
-    return switch (errorType) {
-      'carry_omission' => '进位遗漏',
-      'borrow_omission' => '退位遗漏',
-      'multiplication_table' => '口诀错误',
-      'operation_order' => '运算顺序',
-      'remainder_mistake' => '余数错误',
-      'decimal_alignment' => '小数对位',
-      _ => errorType,
-    };
   }
 }

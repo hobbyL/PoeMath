@@ -15,6 +15,7 @@ import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
+import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
 
 class MathMistakePage extends ConsumerWidget {
   const MathMistakePage({super.key});
@@ -461,20 +462,6 @@ class _MistakeCard extends StatelessWidget {
 
   final MathMistake mistake;
 
-  // 错因标签键名必须与诊断器权威键对齐：
-  // lib/math_engine/diagnostics/mistake_rule.dart 中 6 类规则的 name
-  // （carry_omission / borrow_omission / multiplication_table /
-  // operation_order / remainder_mistake / decimal_alignment）。
-  // 键名漂移会导致标签回退显示英文原键。
-  static const _errorTypeLabels = <String, String>{
-    'carry_omission': '进位遗漏',
-    'borrow_omission': '退位遗漏',
-    'multiplication_table': '口诀错误',
-    'operation_order': '运算顺序错误',
-    'remainder_mistake': '余数错误',
-    'decimal_alignment': '小数对位错误',
-  };
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -528,8 +515,9 @@ class _MistakeCard extends StatelessWidget {
                         BorderRadius.circular(SpacingTokens.radiusSmall),
                   ),
                   child: Text(
-                    _errorTypeLabels[mistake.errorType] ??
-                        mistake.errorType!,
+                    // 标签单一来源：math_engine kErrorCauseLabels；
+                    // 未收录键回退显示英文原键（守卫内 errorType 非空）。
+                    errorCauseLabel(mistake.errorType)!,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.secondary,
                       fontWeight: FontWeight.w600,
