@@ -19,6 +19,7 @@ import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_check_controller.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/core/services/update/update_models.dart';
+import 'package:poemath/features/assistant/widgets/draggable_assistant_bubble.dart';
 import 'package:poemath/features/shell/update_dialog.dart';
 
 /// controller 构造工厂：MainShell 传入自己的 onAvailable 包装后构造，
@@ -175,7 +176,12 @@ class _MainShellState extends ConsumerState<MainShell>
     final currentIndex = _indexFromRoute(context);
 
     return Scaffold(
-      body: widget.child,
+      body: Stack(
+        children: <Widget>[
+          widget.child,
+          const DraggableAssistantBubble(),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: _switch,
