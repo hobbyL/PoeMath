@@ -56,13 +56,14 @@ class MathMistakeDetailPage extends ConsumerWidget {
           if (isWide)
             TextButton.icon(
               onPressed: openAiExplain,
-              icon: const Icon(Icons.auto_awesome, size: 18),
+              icon: const Icon(Icons.auto_awesome_outlined, size: 18),
               label: const Text('AI 帮我讲'),
             )
           else
             IconButton(
               onPressed: openAiExplain,
-              icon: const Icon(Icons.auto_awesome),
+              // 与宽屏按钮同尺寸（18）：默认 24 的实心图标在仅图标态下偏大。
+              icon: const Icon(Icons.auto_awesome_outlined, size: 18),
               tooltip: 'AI 帮我讲',
             ),
         ],
