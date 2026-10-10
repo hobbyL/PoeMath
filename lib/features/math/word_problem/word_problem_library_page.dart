@@ -343,7 +343,7 @@ class _WordProblemLibraryPageState
                       title: _summarize(problem.questionText),
                       subtitle: problem.done
                           ? '已做 ${problem.attempts} 次 · 答对 ${problem.correctCount} 次'
-                          : '未做',
+                          : null,
                       onTap: () => _startPractice([problem]),
                     ),
                   ),

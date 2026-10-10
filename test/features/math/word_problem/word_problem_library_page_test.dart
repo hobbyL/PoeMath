@@ -139,13 +139,13 @@ void main() {
     expect(find.textContaining('苹果'), findsOneWidget);
     expect(find.textContaining('蝴蝶'), findsOneWidget);
     expect(find.textContaining('已做 2 次'), findsOneWidget);
-    // 未做题副标题现仅为「未做」
-    expect(find.text('未做'), findsOneWidget);
+    // 未做题已移除副标题（状态由前置图标表达），正文不再出现「未做」
+    expect(find.text('未做'), findsNothing);
 
     // 打开筛选弹窗 → 选「未做」→ 完成关闭
     await tester.tap(find.byTooltip('筛选'));
     await tester.pumpAndSettle();
-    // 弹窗内「未做」为 FilterChip（正文行副标题亦含「未做」，故按类型定位）
+    // 弹窗内「未做」为 FilterChip（按类型定位，避免与其它文本混淆）
     await tester.tap(find.widgetWithText(FilterChip, '未做'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('完成'));
