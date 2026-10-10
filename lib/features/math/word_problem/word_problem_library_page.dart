@@ -184,8 +184,6 @@ class _WordProblemLibraryPageState
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('筛选', style: theme.textTheme.titleMedium),
-                    const SizedBox(height: SpacingTokens.md),
                     Text('知识点', style: labelStyle),
                     const SizedBox(height: SpacingTokens.xs),
                     Wrap(
@@ -329,30 +327,52 @@ class _WordProblemLibraryPageState
           for (final problem in problems)
             Padding(
               padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-              // 点击整行 → 单题练习；删除改由右侧独立按钮触发。
-              child: Row(
-                children: [
-                  Expanded(
-                    child: AppTile(
-                      icon: problem.done
-                          ? Icons.task_alt_outlined
-                          : Icons.radio_button_unchecked,
-                      iconColor: problem.done
-                          ? theme.semantic.success
-                          : theme.colorScheme.primary,
-                      title: _summarize(problem.questionText),
-                      subtitle: problem.done
-                          ? '已做 ${problem.attempts} 次 · 答对 ${problem.correctCount} 次'
-                          : null,
-                      onTap: () => _startPractice([problem]),
+              // 点击卡片 → 单题练习；删除按钮内置于卡片右侧。
+              // 该行需「正文可点击 + 卡内操作按钮 + 无前置图标」，超出 AppTile
+              // 契约（trailing 非空即禁用 onTap、且图标必填），故直接用
+              // ColoredCard（AppTile 的同款基底）组合。
+              child: ColoredCard(
+                color: theme.colorScheme.primary,
+                onTap: () => _startPractice([problem]),
+                padding: const EdgeInsets.fromLTRB(
+                  SpacingTokens.md,
+                  SpacingTokens.sm,
+                  SpacingTokens.sm,
+                  SpacingTokens.sm,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _summarize(problem.questionText),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (problem.done) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '已做 ${problem.attempts} 次 · 答对 ${problem.correctCount} 次',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                    tooltip: '删除此题',
-                    onPressed: () => _confirmDelete(context, problem),
-                  ),
-                ],
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                      tooltip: '删除此题',
+                      onPressed: () => _confirmDelete(context, problem),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
               ),
             ),
         ],

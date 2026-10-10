@@ -31,7 +31,7 @@ class AppTile extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.title,
-    this.subtitle,
+    required this.subtitle,
     this.onTap,
     this.trailing,
   });
@@ -45,8 +45,8 @@ class AppTile extends StatelessWidget {
   /// 标题文本。
   final String title;
 
-  /// 副标题文本；为 null 时不渲染副标题行（仅显示标题）。
-  final String? subtitle;
+  /// 副标题文本。
+  final String subtitle;
 
   /// 点击回调；若 [trailing] 不为空则忽略（由 trailing 自行处理交互）。
   final VoidCallback? onTap;
@@ -92,15 +92,13 @@ class AppTile extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (subtitle != null) ...<Widget>[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                ],
+                ),
               ],
             ),
           ),
