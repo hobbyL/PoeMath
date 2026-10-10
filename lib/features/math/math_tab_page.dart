@@ -10,7 +10,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
-import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/grade_semester_card.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -29,6 +28,8 @@ class MathTabPage extends ConsumerWidget {
     final mistakeCount = ref.watch(mistakeCountProvider);
     final theme = Theme.of(context);
     final isWide = MediaQuery.sizeOf(context).width >= 420;
+    final gradeLabel =
+        GradePresets.get(selectedGrade, selectedSemester).label;
 
     return Scaffold(
       appBar: AppBar(
@@ -231,63 +232,6 @@ class MathTabPage extends ConsumerWidget {
                                 ),
                               ),
                             ],
-
-                            // 应用题（AI 出题）入口卡
-                            const SizedBox(height: SpacingTokens.md),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: SpacingTokens.md,
-                              ),
-                              child: ColoredCard(
-                                color: theme.colorScheme.tertiary,
-                                width: double.infinity,
-                                // 入口落到题库（中枢）：家长先看已存题 / 直接练习，
-                                // 生成新题由题库页 AppBar 的「生成新题」发起。
-                                onTap: () => context.push(
-                                  AppRoutes.wordProblemLibrary,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.auto_awesome_outlined,
-                                      color: theme.colorScheme.tertiary,
-                                    ),
-                                    const SizedBox(width: SpacingTokens.sm),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '应用题 · AI 出题',
-                                            style: theme.textTheme.titleSmall
-                                                ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                            height: SpacingTokens.xs,
-                                          ),
-                                          Text(
-                                            '家长生成并确认后练习，计入每日目标',
-                                            style: theme.textTheme.bodySmall
-                                                ?.copyWith(
-                                              color: theme.colorScheme
-                                                  .onSurfaceVariant,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.chevron_right_rounded,
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -312,7 +256,11 @@ class MathTabPage extends ConsumerWidget {
                             context.push(AppRoutes.mathPractice),
                         icon: const Icon(Icons.play_arrow_rounded),
                         label: Text(
-                          '开始练习 · ${GradePresets.get(selectedGrade, selectedSemester).label}',
+                          isWide
+                              ? '开始练习 · $gradeLabel'
+                              : '练习 · ${gradeLabel.replaceAll('年级', '')}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
@@ -322,6 +270,13 @@ class MathTabPage extends ConsumerWidget {
                           context.push(AppRoutes.mathChallenge),
                       icon: const Icon(Icons.timer_rounded),
                       label: const Text('挑战'),
+                    ),
+                    const SizedBox(width: SpacingTokens.sm),
+                    FilledButton.tonalIcon(
+                      onPressed: () =>
+                          context.push(AppRoutes.wordProblemLibrary),
+                      icon: const Icon(Icons.auto_awesome_outlined),
+                      label: const Text('应用题'),
                     ),
                   ],
                 ),
