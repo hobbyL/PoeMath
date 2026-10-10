@@ -33,6 +33,7 @@ class _WordProblemLibraryPageState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isWide = MediaQuery.sizeOf(context).width >= 420;
     final stats = ref.watch(llmLibraryStatsProvider);
     final all = ref.watch(llmProblemListProvider);
 
@@ -52,7 +53,25 @@ class _WordProblemLibraryPageState
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('应用题题库')),
+      appBar: AppBar(
+        title: const Text('应用题题库'),
+        // 「生成新题」常驻入口：宽屏图标+文案 / 窄屏仅图标（文案进 tooltip），
+        // 与全 App 响应式 AppBar 按钮约定一致（阈值 420）。空题库引导态另有大按钮。
+        actions: [
+          if (isWide)
+            TextButton.icon(
+              onPressed: () => context.push(AppRoutes.wordProblemGenerate),
+              icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+              label: const Text('生成新题'),
+            )
+          else
+            IconButton(
+              onPressed: () => context.push(AppRoutes.wordProblemGenerate),
+              icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+              tooltip: '生成新题',
+            ),
+        ],
+      ),
       body: all.isEmpty
           ? _buildEmptyState(context)
           : Column(

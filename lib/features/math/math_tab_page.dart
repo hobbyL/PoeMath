@@ -241,8 +241,10 @@ class MathTabPage extends ConsumerWidget {
                               child: ColoredCard(
                                 color: theme.colorScheme.tertiary,
                                 width: double.infinity,
+                                // 入口落到题库（中枢）：家长先看已存题 / 直接练习，
+                                // 生成新题由题库页 AppBar 的「生成新题」发起。
                                 onTap: () => context.push(
-                                  AppRoutes.wordProblemGenerate,
+                                  AppRoutes.wordProblemLibrary,
                                 ),
                                 child: Row(
                                   children: [
