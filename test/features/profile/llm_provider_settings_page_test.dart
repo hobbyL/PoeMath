@@ -217,8 +217,8 @@ void main() {
   });
 
   testWidgets(
-    '编辑已有配置：点行编辑按钮打开全屏弹窗载入字段；保存更新；'
-    'Key 留空保留旧 Key；Key 不回显',
+    '编辑已有配置：载入字段并回显 Key（默认密文，眼睛切明文）；'
+    '保存更新；Key 原样保留',
     (tester) async {
       final store = _MemoryCredentialStore();
       await _seedTwo(tester, store);
@@ -239,19 +239,27 @@ void main() {
             ?.text,
         'https://api.deepseek.com/v1',
       );
-      // Key 不回显，但占位提示为「已设置」。
+      // Key 回显为已存值；默认密文，点眼睛切明文、再点回密文。
+      final keyField = find.widgetWithText(TextFormField, 'API Key（可选）');
       expect(
-        (tester
-                .widget<TextFormField>(
-                  find.widgetWithText(TextFormField, 'API Key（可选）'),
-                )
-                .controller)
-            ?.text,
-        '',
+        (tester.widget<TextFormField>(keyField).controller)?.text,
+        'key-p1',
       );
-      expect(find.text('已设置，留空保持不变'), findsOneWidget);
+      EditableText keyEditable() => tester.widget<EditableText>(
+            find.descendant(
+              of: keyField,
+              matching: find.byType(EditableText),
+            ),
+          );
+      expect(keyEditable().obscureText, isTrue);
+      await tester.tap(find.byTooltip('显示 API Key'));
+      await tester.pump();
+      expect(keyEditable().obscureText, isFalse);
+      await tester.tap(find.byTooltip('隐藏 API Key'));
+      await tester.pump();
+      expect(keyEditable().obscureText, isTrue);
 
-      // 修改模型名，Key 留空保存。
+      // 修改模型名，Key 原样（回显值）保存。
       await tester.enterText(
         find.widgetWithText(TextFormField, '模型'),
         'deepseek-reasoner',
@@ -262,13 +270,13 @@ void main() {
       final repo = _repoOf(tester);
       expect(repo.llmProviders.length, 2); // 更新不追加。
       expect(repo.llmProviders[0].model, 'deepseek-reasoner');
-      // Key 留空保留旧 Key。
+      // Key 原样回显并保存，仍为旧值。
       expect(store.llmApiKeysByConfigId['p1'], 'key-p1');
       expect(find.text('LLM 服务配置已保存'), findsOneWidget);
     },
   );
 
-  testWidgets('编辑已存配置拉取模型：Key 留空回退已存 Key（Authorization 头）',
+  testWidgets('编辑已存配置拉取模型：用回显的已存 Key（Authorization 头）',
       (tester) async {
     final store = _MemoryCredentialStore();
     await _seedTwo(tester, store);
@@ -291,7 +299,7 @@ void main() {
     expect(find.text('选择模型'), findsOneWidget);
   });
 
-  testWidgets('测试连接：Key 留空且已存 Key 时用已存 Key 请求 chat 接口',
+  testWidgets('测试连接：用回显的已存 Key 请求 chat 接口',
       (tester) async {
     final store = _MemoryCredentialStore();
     await _seedTwo(tester, store);
@@ -529,13 +537,21 @@ void main() {
       await _seedTwo(tester, store);
       await _pumpPage(tester, credentialStore: store);
 
-      // 打开 p1 编辑弹窗（已存 key-p1）→ 清除入口与「已设置」占位出现。
+      // 打开 p1 编辑弹窗（已存 key-p1）→ 清除入口出现、Key 回显。
       await tester.tap(find.byTooltip('编辑此配置').first);
       await tester.pumpAndSettle();
       expect(find.text('编辑：DeepSeek'), findsOneWidget);
       final clearBtn = find.widgetWithText(TextButton, '清除已保存的 Key');
       expect(clearBtn, findsOneWidget);
-      expect(find.text('已设置，留空保持不变'), findsOneWidget);
+      expect(
+        (tester
+                .widget<TextFormField>(
+                  find.widgetWithText(TextFormField, 'API Key（可选）'),
+                )
+                .controller)
+            ?.text,
+        'key-p1',
+      );
 
       // 打开确认弹层（弹层打开 tap 入 runAsync 真实区——对齐删除确认范式）。
       await tester.runAsync(() async {
@@ -554,8 +570,17 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
 
-      // Key 删除、占位回退、入口消失；配置与 active 保留。
+      // Key 删除、输入框回显清空、占位回退、入口消失；配置与 active 保留。
       expect(store.llmApiKeysByConfigId['p1'], isNull);
+      expect(
+        (tester
+                .widget<TextFormField>(
+                  find.widgetWithText(TextFormField, 'API Key（可选）'),
+                )
+                .controller)
+            ?.text,
+        '',
+      );
       expect(find.text('无鉴权服务可留空'), findsOneWidget);
       expect(find.widgetWithText(TextButton, '清除已保存的 Key'), findsNothing);
       final repo = _repoOf(tester);
@@ -564,4 +589,13 @@ void main() {
       expect(find.text('已清除保存的 API Key'), findsOneWidget);
     },
   );
+
+  testWidgets('多配置之间以分割线隔开（2 条配置 → 1 条分割线）', (tester) async {
+    final store = _MemoryCredentialStore();
+    await _seedTwo(tester, store);
+    await _pumpPage(tester, credentialStore: store);
+
+    // 两条配置之间恰有一条分割线（首项前不插）。
+    expect(find.byType(Divider), findsOneWidget);
+  });
 }

@@ -5,9 +5,10 @@
 //       「新增配置」与每行编辑按钮唤起（替代原页面底部内联表单）。
 //       承载表单字段、模型拉取、连接测试、保存、清除 Key 与删除。
 //
-// API Key 纪律（与仓储一致）：只进系统安全存储，页面不回显明文；
-// 编辑时留空 = 保留旧 Key；readLlmApiKeyFor 仅用于「是否已存」标志
-// 与测试/拉取时的回退，不展示其值。
+// API Key 纪律（与仓储一致）：只进系统安全存储，不写 Hive / 日志 / 异常
+// message。编辑时回显已存 Key（默认密文，点输入框右侧「眼睛」切换明文）便于
+// 家长核对；字段清空后保存 = 保留旧 Key（仓储语义），彻底移除走「清除已保存
+// 的 Key」。readLlmApiKeyFor 用于回显、「是否已存」标志与测试/拉取时的回退。
 //
 // 反馈分流：弹窗内提示（校验/拉取/测试/清除）走弹窗局部
 // ScaffoldMessenger（否则 SnackBar 落在被全屏弹窗遮挡的底层页）；
@@ -86,8 +87,11 @@ class _LlmProviderEditDialogState
   /// 故无需原页面的 _editSeq 竞态令牌。
   String? get _editingId => widget.config?.id;
 
-  /// 编辑态是否已存在 Key（只决定占位提示文案，不回显明文）。
+  /// 编辑态是否已存在 Key（决定「清除已保存的 Key」入口与 Key 空回退）。
   bool _hasStoredKey = false;
+
+  /// API Key 输入框明/密文切换（默认密文，点眼睛查看）。
+  bool _apiKeyVisible = false;
   bool _saving = false;
   bool _fetchingModels = false;
   _TestState _testState = _TestState.idle;
@@ -101,7 +105,7 @@ class _LlmProviderEditDialogState
       _providerNameController.text = config.name;
       _baseUrlController.text = config.baseUrl;
       _modelController.text = config.model;
-      unawaited(_loadStoredKeyFlag(config.id));
+      unawaited(_loadStoredKey(config.id));
     }
   }
 
@@ -114,12 +118,17 @@ class _LlmProviderEditDialogState
     super.dispose();
   }
 
-  /// 编辑态初始读取「是否已存 Key」标志（只决定占位提示，不回显明文）。
-  Future<void> _loadStoredKeyFlag(String id) async {
+  /// 编辑态读取已存 Key：回显到输入框（默认密文）并置「已存」标志
+  /// （后者决定清除入口与 Key 空回退）。
+  Future<void> _loadStoredKey(String id) async {
     final stored =
         await ref.read(settingsRepositoryProvider).readLlmApiKeyFor(id);
     if (!mounted) return;
-    setState(() => _hasStoredKey = stored != null && stored.trim().isNotEmpty);
+    final hasKey = stored != null && stored.trim().isNotEmpty;
+    setState(() {
+      _hasStoredKey = hasKey;
+      if (hasKey) _apiKeyController.text = stored;
+    });
   }
 
   /// 用当前表单值构造配置。modelEmpty 时放宽为仅校验服务地址
@@ -345,9 +354,9 @@ class _LlmProviderEditDialogState
   }
 
   /// 清除当前编辑配置已保存的 API Key（如从有鉴权服务切到无鉴权服务）：
-  /// 确认弹层 → repo.clearLlmApiKey → _hasStoredKey=false，占位提示回退到
-  /// 「无鉴权服务可留空」。服务地址与模型保留；「留空 = 保留旧 Key」语义不变
-  /// （清除后无已存 Key，留空即不带 Key）。
+  /// 确认弹层 → repo.clearLlmApiKey → _hasStoredKey=false，输入框一并清空、
+  /// 占位提示回退到「无鉴权服务可留空」。服务地址与模型保留；「留空 = 保留
+  /// 旧 Key」语义不变（清除后无已存 Key，留空即不带 Key）。
   Future<void> _clearStoredKey() async {
     final editingId = _editingId;
     if (editingId == null || !_hasStoredKey) return;
@@ -374,7 +383,12 @@ class _LlmProviderEditDialogState
     if (confirmed != true) return;
     await ref.read(settingsRepositoryProvider).clearLlmApiKey(editingId);
     if (!mounted) return;
-    setState(() => _hasStoredKey = false);
+    setState(() {
+      _hasStoredKey = false;
+      // 回显的 Key 一并抹掉，避免清除后输入框仍留明文旧值。
+      _apiKeyController.clear();
+      _apiKeyVisible = false;
+    });
     _messengerKey.currentState?.showSnackBar(
       const SnackBar(content: Text('已清除保存的 API Key')),
     );
@@ -473,13 +487,23 @@ class _LlmProviderEditDialogState
 
               TextFormField(
                 controller: _apiKeyController,
-                obscureText: true,
+                obscureText: !_apiKeyVisible,
                 decoration: InputDecoration(
                   labelText: 'API Key（可选）',
-                  hintText:
-                      _hasStoredKey ? '已设置，留空保持不变' : '无鉴权服务可留空',
+                  hintText: '无鉴权服务可留空',
                   prefixIcon: const Icon(Icons.key_outlined),
                   border: const OutlineInputBorder(),
+                  // 输入框右侧「眼睛」：切换明/密文查看（默认密文）。
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _apiKeyVisible
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                    tooltip: _apiKeyVisible ? '隐藏 API Key' : '显示 API Key',
+                    onPressed: () =>
+                        setState(() => _apiKeyVisible = !_apiKeyVisible),
+                  ),
                 ),
               ),
               // 清除已存 Key 入口：仅编辑已存 Key 的配置时出现。

@@ -167,7 +167,14 @@ class _LlmProviderSettingsPageState
                   },
                   child: Column(
                     children: [
-                      for (final (index, config) in providers.indexed)
+                      // 多配置之间插入分割线隔开（仅相邻两项之间，不含首项前）。
+                      for (final (index, config) in providers.indexed) ...[
+                        if (index > 0)
+                          const Divider(
+                            height: SpacingTokens.sm,
+                            indent: SpacingTokens.sm,
+                            endIndent: SpacingTokens.sm,
+                          ),
                         RadioListTile<String>(
                           value: config.id,
                           title: Text(providerDisplayName(index, config)),
@@ -180,6 +187,7 @@ class _LlmProviderSettingsPageState
                             onPressed: () => _openEditDialog(config),
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
