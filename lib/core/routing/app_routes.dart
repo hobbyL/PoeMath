@@ -42,6 +42,9 @@ class AppRoutes {
   // ============ 公式 ============
   static const String formulaDetail = '/formula/detail/:id';
 
+  // ============ AI 助手 ============
+  static const String assistant = '/assistant';
+
   // ============ 启动 & 设置 ============
   static const String splash = '/splash';
   static const String onboarding = '/onboarding';

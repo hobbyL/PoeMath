@@ -158,6 +158,16 @@ class ProfilePage extends ConsumerWidget {
               subtitle: '查看本周学习汇总与趋势',
               onTap: () => context.push(AppRoutes.weeklyReport),
             ),
+            const SizedBox(height: SpacingTokens.sm),
+
+            // AI 助手（临时入口，正式入口为全局悬浮气泡，见子任务 4）。
+            AppTile(
+              icon: Icons.smart_toy_outlined,
+              iconColor: theme.colorScheme.secondary,
+              title: 'AI 助手',
+              subtitle: '对话答疑 · 数学与古诗词',
+              onTap: () => context.push(AppRoutes.assistant),
+            ),
             const SizedBox(height: SpacingTokens.md),
           ],
         ),

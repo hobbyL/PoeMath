@@ -15,6 +15,7 @@ import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_client.dart';
+import 'package:poemath/features/assistant/assistant_page.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
@@ -262,6 +263,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           child: FormulaDetailPage(
             formulaId: state.pathParameters['id']!,
           ),
+        ),
+      ),
+      // ============ AI 助手（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.assistant,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const AssistantPage(),
         ),
       ),
       // ============ 设置（非 Shell 子路由，全屏） ============

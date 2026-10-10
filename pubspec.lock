@@ -551,6 +551,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "14.8.1"
+  gpt_markdown:
+    dependency: "direct main"
+    description:
+      name: gpt_markdown
+      sha256: "77f5af4bef165cb61fb295a2e2a383a43a8c5363ac094570743b903580edc584"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.4"
   graphs:
     dependency: transitive
     description:
@@ -1281,6 +1289,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.5.3"
+  val_highlight:
+    dependency: transitive
+    description:
+      name: val_highlight
+      sha256: cad3d16fb04f30f608d2216d4a4ef9a6df43e9e2f17e0905716d58198532b92f
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.0"
+  val_highlight_flutter:
+    dependency: transitive
+    description:
+      name: val_highlight_flutter
+      sha256: "132f1f4e658b4275cea92fb68358b83e0371e2e01d99bd5ae243d05eef0f4cf5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.0"
+  val_latex:
+    dependency: transitive
+    description:
+      name: val_latex
+      sha256: "8367dcfb8fda70e3b2fa8c9ca840fb4ea1c1eccc6ca9a9448c561bc4fd4a4bdf"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.2"
+  val_latex_flutter:
+    dependency: transitive
+    description:
+      name: val_latex_flutter
+      sha256: "754ef095f3bcc2519d1ae705588b64600a1f4b1c1c9e3e7b7952b3c48691a956"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.3"
   vector_graphics:
     dependency: transitive
     description:
