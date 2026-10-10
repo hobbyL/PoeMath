@@ -14,3 +14,4 @@ export 'package:poemath/core/widgets/auto_fit_line.dart';
 export 'package:poemath/core/widgets/auto_fit_text.dart';
 export 'package:poemath/core/widgets/colored_card.dart';
 export 'package:poemath/core/widgets/startup_failure_view.dart';
+export 'package:poemath/core/widgets/stat_overview_card.dart';

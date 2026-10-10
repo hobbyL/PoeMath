@@ -70,74 +70,33 @@ class _WordProblemLibraryPageState
               icon: const Icon(Icons.auto_awesome_outlined, size: 18),
               tooltip: '生成新题',
             ),
+          // 筛选入口：有题目时才出现；选中任一筛选条件时图标高亮（实心）。
+          if (all.isNotEmpty)
+            IconButton(
+              onPressed: _openFilterSheet,
+              icon: Icon(
+                _topicFilter != null || _doneFilter != null
+                    ? Icons.filter_alt
+                    : Icons.filter_alt_outlined,
+              ),
+              tooltip: '筛选',
+            ),
         ],
       ),
       body: all.isEmpty
           ? _buildEmptyState(context)
           : Column(
               children: [
-                // 统计卡
-                Padding(
-                  padding: const EdgeInsets.all(SpacingTokens.md),
-                  child: ColoredCard(
-                    color: theme.colorScheme.primary,
-                    width: double.infinity,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildStat(
-                          context,
-                          '${stats.total}',
-                          '总题数',
-                        ),
-                        _buildStat(
-                          context,
-                          '${stats.done}',
-                          '已做',
-                        ),
-                        _buildStat(
-                          context,
-                          '${(stats.accuracy * 100).toStringAsFixed(0)}%',
-                          '正确率',
-                        ),
-                      ],
+                // 统计卡（与口算练习页统计卡同款：共用 StatOverviewCard）
+                StatOverviewCard(
+                  items: [
+                    StatOverviewItem(value: '${stats.total}', label: '总题数'),
+                    StatOverviewItem(value: '${stats.done}', label: '已做'),
+                    StatOverviewItem(
+                      value: '${(stats.accuracy * 100).toStringAsFixed(0)}%',
+                      label: '正确率',
                     ),
-                  ),
-                ),
-
-                // 筛选 chips
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpacingTokens.md,
-                  ),
-                  child: Wrap(
-                    spacing: SpacingTokens.xs,
-                    runSpacing: SpacingTokens.xs,
-                    children: [
-                      for (final topic in WordProblemTopic.values)
-                        FilterChip(
-                          label: Text(topic.label),
-                          selected: _topicFilter == topic,
-                          onSelected: (selected) => setState(() {
-                            _topicFilter = selected ? topic : null;
-                          }),
-                        ),
-                      FilterChip(
-                        label: const Text('未做'),
-                        selected: _doneFilter == false,
-                        onSelected: (selected) => setState(() {
-                          _doneFilter = selected ? false : null;
-                        }),
-                      ),
-                      FilterChip(
-                        label: const Text('已做'),
-                        selected: _doneFilter == true,
-                        onSelected: (selected) => setState(() {
-                          _doneFilter = selected ? true : null;
-                        }),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
 
                 // 批次分组列表
@@ -199,26 +158,99 @@ class _WordProblemLibraryPageState
     );
   }
 
-  Widget _buildStat(BuildContext context, String value, String label) {
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: SpacingTokens.xs),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
+  /// 打开筛选弹窗：知识点 + 做题状态，实时应用到列表，「完成」关闭。
+  void _openFilterSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      // 内容按内容高度自适应；isScrollControlled 解除默认 9/16 高度上限，
+      // 避免知识点 Chip 换行后在矮屏/测试面上溢出（RenderFlex overflow）。
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final labelStyle = theme.textTheme.labelLarge?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        );
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            void apply(VoidCallback fn) {
+              setState(fn);
+              setSheetState(() {});
+            }
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(SpacingTokens.md),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('筛选', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: SpacingTokens.md),
+                    Text('知识点', style: labelStyle),
+                    const SizedBox(height: SpacingTokens.xs),
+                    Wrap(
+                      spacing: SpacingTokens.xs,
+                      runSpacing: SpacingTokens.xs,
+                      children: [
+                        for (final topic in WordProblemTopic.values)
+                          FilterChip(
+                            label: Text(topic.label),
+                            selected: _topicFilter == topic,
+                            onSelected: (s) => apply(
+                              () => _topicFilter = s ? topic : null,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: SpacingTokens.md),
+                    Text('状态', style: labelStyle),
+                    const SizedBox(height: SpacingTokens.xs),
+                    Wrap(
+                      spacing: SpacingTokens.xs,
+                      children: [
+                        FilterChip(
+                          label: const Text('未做'),
+                          selected: _doneFilter == false,
+                          onSelected: (s) => apply(
+                            () => _doneFilter = s ? false : null,
+                          ),
+                        ),
+                        FilterChip(
+                          label: const Text('已做'),
+                          selected: _doneFilter == true,
+                          onSelected: (s) => apply(
+                            () => _doneFilter = s ? true : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: SpacingTokens.lg),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed:
+                              _topicFilter == null && _doneFilter == null
+                                  ? null
+                                  : () => apply(() {
+                                        _topicFilter = null;
+                                        _doneFilter = null;
+                                      }),
+                          child: const Text('重置'),
+                        ),
+                        const Spacer(),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          child: const Text('完成'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -280,7 +312,7 @@ class _WordProblemLibraryPageState
                 Expanded(
                   child: Text(
                     '${first.grade} 年级${first.semester}学期 · $topicLabel · '
-                    '批次 ${_formatDate(first.createdAt)}',
+                    '共 ${problems.length} 题 · ${_formatDate(first.createdAt)}',
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -297,18 +329,30 @@ class _WordProblemLibraryPageState
           for (final problem in problems)
             Padding(
               padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-              child: AppTile(
-                icon: problem.done
-                    ? Icons.task_alt_outlined
-                    : Icons.help_outline_rounded,
-                iconColor: problem.done
-                    ? theme.semantic.success
-                    : theme.colorScheme.primary,
-                title: _summarize(problem.questionText),
-                subtitle: problem.done
-                    ? '已做 ${problem.attempts} 次 · 答对 ${problem.correctCount} 次'
-                    : '未做 · ${_formatDate(problem.createdAt)}',
-                onTap: () => _confirmDelete(context, problem),
+              // 点击整行 → 单题练习；删除改由右侧独立按钮触发。
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AppTile(
+                      icon: problem.done
+                          ? Icons.task_alt_outlined
+                          : Icons.radio_button_unchecked,
+                      iconColor: problem.done
+                          ? theme.semantic.success
+                          : theme.colorScheme.primary,
+                      title: _summarize(problem.questionText),
+                      subtitle: problem.done
+                          ? '已做 ${problem.attempts} 次 · 答对 ${problem.correctCount} 次'
+                          : '未做',
+                      onTap: () => _startPractice([problem]),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                    tooltip: '删除此题',
+                    onPressed: () => _confirmDelete(context, problem),
+                  ),
+                ],
               ),
             ),
         ],
@@ -321,7 +365,7 @@ class _WordProblemLibraryPageState
   }
 
   String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}';
+    return '${date.month}月${date.day}日';
   }
 
   void _startPractice(List<LlmProblem> problems) {

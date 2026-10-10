@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/grade_semester_card.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -26,7 +27,6 @@ class MathTabPage extends ConsumerWidget {
     final totalProblems = ref.watch(totalProblemsCountProvider);
     final accuracy = ref.watch(overallAccuracyProvider);
     final mistakeCount = ref.watch(mistakeCountProvider);
-    final theme = Theme.of(context);
     final isWide = MediaQuery.sizeOf(context).width >= 420;
     final gradeLabel =
         GradePresets.get(selectedGrade, selectedSemester).label;
@@ -119,67 +119,23 @@ class MathTabPage extends ConsumerWidget {
                     children: [
                       // 统计概览
                       if (totalProblems > 0)
-                        Container(
-                          margin:
-                              const EdgeInsets.all(SpacingTokens.md),
-                          padding:
-                              const EdgeInsets.all(SpacingTokens.md),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                theme.colorScheme.primary
-                                    .withValues(alpha: 0.15),
-                                theme.colorScheme.secondary
-                                    .withValues(alpha: 0.1),
-                              ],
+                        StatOverviewCard(
+                          items: [
+                            StatOverviewItem(
+                              value: '$totalProblems',
+                              label: '已做题',
                             ),
-                            borderRadius: BorderRadius.circular(
-                              SpacingTokens.radiusMedium,
+                            StatOverviewItem(
+                              value:
+                                  '${(accuracy * 100).toStringAsFixed(0)}%',
+                              label: '正确率',
                             ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceAround,
-                            children: [
-                              _buildStat(
-                                context,
-                                '$totalProblems',
-                                '已做题',
-                              ),
-                              Container(
-                                width: 1,
-                                height: 30,
-                                color: theme
-                                    .colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.2),
-                              ),
-                              _buildStat(
-                                context,
-                                '${(accuracy * 100).toStringAsFixed(0)}%',
-                                '正确率',
-                              ),
-                              Container(
-                                width: 1,
-                                height: 30,
-                                color: theme
-                                    .colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.2),
-                              ),
-                              _buildStat(
-                                context,
-                                '$mistakeCount',
-                                '错题',
-                              ),
-                            ],
-                          ),
-                        )
-                            .animate()
-                            .fadeIn(duration: 400.ms)
-                            .slideY(
-                              begin: 0.1,
-                              end: 0,
-                              duration: 400.ms,
+                            StatOverviewItem(
+                              value: '$mistakeCount',
+                              label: '错题',
                             ),
+                          ],
+                        ),
 
                       // 年级网格
                       Padding(
@@ -285,29 +241,6 @@ class MathTabPage extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStat(BuildContext context, String value, String label) {
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: SpacingTokens.xs),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
     );
   }
 

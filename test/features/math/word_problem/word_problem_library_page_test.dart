@@ -78,7 +78,9 @@ Widget _wrap(_MemoryLlmProblemRepository repo) {
       ),
       GoRoute(
         path: '/word-problem/practice',
-        builder: (_, __) => const Scaffold(body: SizedBox()),
+        builder: (_, __) => const Scaffold(
+          body: Center(child: Text('练习占位')),
+        ),
       ),
     ],
   );
@@ -122,27 +124,37 @@ void main() {
     await tester.pumpWidget(_wrap(repo));
     await tester.pumpAndSettle();
 
-    // 统计卡
+    // 统计卡（总题数 / 已做 / 正确率）
     expect(find.text('总题数'), findsOneWidget);
     expect(find.text('2'), findsWidgets);
-    // 统计卡与筛选 Chip 各一个「已做」
-    expect(find.text('已做'), findsWidgets);
+    // 筛选已移入弹窗，正文仅统计卡含「已做」标签
+    expect(find.text('已做'), findsOneWidget);
     expect(find.text('50%'), findsOneWidget);
+
+    // 批次头显示真实题数与无歧义日期（修复「10/10」误读为题数）
+    expect(find.textContaining('共 2 题'), findsOneWidget);
+    expect(find.textContaining('10月1日'), findsOneWidget);
 
     // 两题均在列表
     expect(find.textContaining('苹果'), findsOneWidget);
     expect(find.textContaining('蝴蝶'), findsOneWidget);
     expect(find.textContaining('已做 2 次'), findsOneWidget);
-    expect(find.textContaining('未做 · 10/1'), findsOneWidget);
+    // 未做题副标题现仅为「未做」
+    expect(find.text('未做'), findsOneWidget);
 
-    // 筛选未做
-    await tester.tap(find.text('未做'));
+    // 打开筛选弹窗 → 选「未做」→ 完成关闭
+    await tester.tap(find.byTooltip('筛选'));
+    await tester.pumpAndSettle();
+    // 弹窗内「未做」为 FilterChip（正文行副标题亦含「未做」，故按类型定位）
+    await tester.tap(find.widgetWithText(FilterChip, '未做'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('完成'));
     await tester.pumpAndSettle();
     expect(find.textContaining('蝴蝶'), findsOneWidget);
     expect(find.textContaining('苹果'), findsNothing);
   });
 
-  testWidgets('点击题目行弹出确认并可删除单题', (tester) async {
+  testWidgets('点击题目行跳转练习页（不再弹删除确认）', (tester) async {
     final repo = _MemoryLlmProblemRepository()
       ..store['default_p1'] = _problem(
         id: 'p1',
@@ -153,6 +165,25 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('苹果'));
+    await tester.pumpAndSettle();
+
+    // 行点击进入练习页，而非弹出删除确认
+    expect(find.text('练习占位'), findsOneWidget);
+    expect(find.text('删除该题'), findsNothing);
+  });
+
+  testWidgets('点击单题删除按钮弹确认并删除该题', (tester) async {
+    final repo = _MemoryLlmProblemRepository()
+      ..store['default_p1'] = _problem(
+        id: 'p1',
+        questionText: '小明有 12 个苹果，吃了 4 个，还剩几个？',
+      );
+
+    await tester.pumpWidget(_wrap(repo));
+    await tester.pumpAndSettle();
+
+    // 行尾独立删除按钮（与「删除该批次」同图标，按 tooltip 区分）
+    await tester.tap(find.byTooltip('删除此题'));
     await tester.pumpAndSettle();
 
     expect(find.text('删除该题'), findsOneWidget);
