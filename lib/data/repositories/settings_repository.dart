@@ -76,6 +76,7 @@ class SettingsRepository {
   // 恢复默认 = 删除 key（不写常量副本，升级改进默认后自动享受新版）。
   static const String _keyPoemExplainPrompt = 'llm_poem_explain_prompt';
   static const String _keyMathExplainPrompt = 'llm_math_explain_prompt';
+  static const String _keyAssistantPrompt = 'llm_assistant_prompt';
 
   // ============ 主题 ============
 
@@ -538,6 +539,28 @@ class SettingsRepository {
   /// 一键恢复内置默认：删除覆盖 key，运行时回落编译期常量。
   Future<void> resetMathExplainPrompt() async {
     await HiveBoxes.settings.delete(_keyMathExplainPrompt);
+  }
+
+  /// AI 助手 system prompt 用户覆盖值；null = 未自定义（用内置默认）。
+  String? get assistantPromptOverride {
+    final raw = HiveBoxes.settings.get(_keyAssistantPrompt) as String?;
+    if (raw == null || raw.trim().isEmpty) return null;
+    return raw;
+  }
+
+  /// 保存 AI 助手覆盖值；[value] trim 后为空 → 删除 key（恢复默认）。
+  Future<void> setAssistantPrompt(String value) async {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      await HiveBoxes.settings.delete(_keyAssistantPrompt);
+      return;
+    }
+    await HiveBoxes.settings.put(_keyAssistantPrompt, trimmed);
+  }
+
+  /// 一键恢复内置默认：删除覆盖 key，运行时回落编译期常量。
+  Future<void> resetAssistantPrompt() async {
+    await HiveBoxes.settings.delete(_keyAssistantPrompt);
   }
 
   // ============ 拼音显示 ============

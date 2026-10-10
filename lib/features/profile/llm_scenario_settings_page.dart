@@ -33,6 +33,7 @@ const Map<LlmScenario, IconData> _scenarioIcons = {
   LlmScenario.wordProblem: Icons.edit_note_outlined,
   LlmScenario.poemExplain: Icons.menu_book_outlined,
   LlmScenario.mathExplain: Icons.calculate_outlined,
+  LlmScenario.assistant: Icons.smart_toy_outlined,
 };
 
 class LlmScenarioSettingsPage extends ConsumerStatefulWidget {

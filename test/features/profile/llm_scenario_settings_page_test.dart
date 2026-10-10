@@ -1,6 +1,6 @@
 // test/features/profile/llm_scenario_settings_page_test.dart
 //
-// 使用场景设置页 widget 测试：三场景行展示与「跟随默认」摘要、
+// 使用场景设置页 widget 测试：四场景行展示与「跟随默认」摘要、
 // 点行弹层点选厂商持久化、清除绑定、空配置引导。
 // （供应商增删的联动回落由仓储层 providerIdForScenario 悬空回落保证，
 // 仓储测试已覆盖；本页不再重复删除联动用例。）
@@ -132,7 +132,7 @@ void main() {
     }
   });
 
-  testWidgets('有配置时三行均显示「跟随默认（生效配置名）」', (tester) async {
+  testWidgets('有配置时四行均显示「跟随默认（生效配置名）」', (tester) async {
     final store = _MemoryCredentialStore();
     await tester.runAsync(() => _seedTwo(store));
     await _pumpPage(tester, credentialStore: store);
@@ -140,8 +140,9 @@ void main() {
     expect(find.text('AI 出题'), findsOneWidget);
     expect(find.text('诗词讲解'), findsOneWidget);
     expect(find.text('口算解析'), findsOneWidget);
-    // 三场景默认未绑定 → 跟随 active（p1 = DeepSeek）。
-    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(3));
+    expect(find.text('AI 助手'), findsOneWidget);
+    // 四场景默认未绑定 → 跟随 active（p1 = DeepSeek）。
+    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(4));
   });
 
   testWidgets('点行弹层点选厂商：持久化、副标题更新、重进页面保持',
@@ -175,7 +176,8 @@ void main() {
     // 其他场景不受影响。
     expect(repo.providerIdForScenario(LlmScenario.mathExplain), isNull);
     expect(repo.providerIdForScenario(LlmScenario.wordProblem), isNull);
-    // 该行副标题切为厂商名，其余两行仍跟随默认。
+    expect(repo.providerIdForScenario(LlmScenario.assistant), isNull);
+    // 该行副标题切为厂商名，其余三行仍跟随默认。
     expect(
       find.descendant(
         of: find.widgetWithText(AppTile, '诗词讲解'),
@@ -183,7 +185,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(2));
+    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(3));
 
     // 重进页面保持。
     await _pumpPage(tester, credentialStore: store);
@@ -226,6 +228,6 @@ void main() {
     final repo = _repoOf(tester);
     expect(repo.providerIdForScenario(LlmScenario.mathExplain), isNull);
     expect(HiveBoxes.settings.get('llm_provider_math_explain'), isNull);
-    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(3));
+    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(4));
   });
 }

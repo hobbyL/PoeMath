@@ -80,6 +80,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   // 换机不丢；与设备绑定的 llm_providers / 场景绑定 key 不同类）。
   'llm_poem_explain_prompt': 'string', // 诗词讲解 system prompt 覆盖
   'llm_math_explain_prompt': 'string', // 口算解析 system prompt 覆盖
+  'llm_assistant_prompt': 'string', // AI 助手 system prompt 覆盖
 };
 
 class BackupService {

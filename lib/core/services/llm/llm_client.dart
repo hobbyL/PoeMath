@@ -14,6 +14,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -27,17 +28,23 @@ final class LlmClient {
     Duration generateTimeout = const Duration(seconds: 60),
     Duration probeTimeout = const Duration(seconds: 15),
     Duration explainTimeout = const Duration(seconds: 60),
+    Duration chatTimeout = const Duration(seconds: 90),
   })  : _httpClient = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _generateTimeout = generateTimeout,
         _probeTimeout = probeTimeout,
-        _explainTimeout = explainTimeout;
+        _explainTimeout = explainTimeout,
+        _chatTimeout = chatTimeout;
 
   final http.Client _httpClient;
   final bool _ownsHttpClient;
   final Duration _generateTimeout;
   final Duration _probeTimeout;
   final Duration _explainTimeout;
+
+  /// 对话档位超时：略长于 [_explainTimeout]，容忍多轮上下文下更长的
+  /// 首字节等待与整体生成时间。作用于 SSE 字节流的「两事件间隔」。
+  final Duration _chatTimeout;
 
   static const String _chatPath = '/chat/completions';
   static const String _modelsPath = '/models';
@@ -342,6 +349,81 @@ final class LlmClient {
       }
     } on TimeoutException {
       throw const LlmNetworkError('AI 讲解生成超时，请稍后重试');
+    } on SocketException {
+      throw const LlmNetworkError('网络不可用，请检查网络后重试');
+    } on http.ClientException {
+      throw const LlmNetworkError('网络请求失败');
+    }
+
+    if (!emitted) {
+      throw const LlmResponseFormatError('模型输出内容为空');
+    }
+  }
+
+  /// 多轮流式对话：OpenAI 兼容 SSE（`stream: true`），逐片 yield 增量文本。
+  ///
+  /// 与 [explainStream] 同传输层、同错误分类，差别仅在消息组装——这里把
+  /// [messages]（仅会话轮次 user/assistant/tool，不含 system）接在 system
+  /// 之后，支持多轮上下文。端点 `/chat/completions`、Bearer 头（空 Key
+  /// 省略）、401/403 → [LlmAuthError]、5xx → [LlmServerError]、网络/超时 →
+  /// [LlmNetworkError]。
+  ///
+  /// 全程无 content（流结束仍未产出）抛 [LlmResponseFormatError]。
+  /// 容错：keep-alive 注释行 / 空行 / 单行 parse 失败均跳过。
+  ///
+  /// 超时用对话档位 [_chatTimeout]（略长于讲解档）。
+  Stream<String> chatStream({
+    required LlmConfig config,
+    required String systemPrompt,
+    required List<ChatMessage> messages,
+    int maxTokens = 1024,
+  }) async* {
+    final base = normalizeBaseUrl(config.baseUrl);
+    final body = jsonEncode(<String, Object>{
+      'model': config.model,
+      'messages': <Map<String, Object?>>[
+        {'role': 'system', 'content': systemPrompt},
+        for (final message in messages) message.toJson(),
+      ],
+      'max_tokens': maxTokens,
+      'stream': true,
+    });
+    final response = await _sendStream(
+      uri: _join(base, _chatPath),
+      body: body,
+      apiKey: config.apiKey,
+      timeout: _chatTimeout,
+      timeoutMessage: 'AI 助手响应超时，请稍后重试',
+    );
+
+    var emitted = false;
+    // 同 explainStream：transform(utf8.decoder) 保留跨 chunk 的多字节尾
+    // 字节，中文不乱码；.timeout 作用于字节流，两事件间隔超时即报错。
+    final lines = response.stream
+        .timeout(
+          _chatTimeout,
+          onTimeout: (sink) => sink.addError(
+            TimeoutException('AI 助手响应超时，请稍后重试'),
+          ),
+        )
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    try {
+      await for (final line in lines) {
+        final trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue; // 注释/空行跳过
+        final payload = trimmed.substring(5).trim();
+        if (payload == '[DONE]') break;
+        if (payload.isEmpty) continue;
+        final content = _extractDeltaContent(payload);
+        if (content != null && content.isNotEmpty) {
+          emitted = true;
+          yield content;
+        }
+      }
+    } on TimeoutException {
+      throw const LlmNetworkError('AI 助手响应超时，请稍后重试');
     } on SocketException {
       throw const LlmNetworkError('网络不可用，请检查网络后重试');
     } on http.ClientException {

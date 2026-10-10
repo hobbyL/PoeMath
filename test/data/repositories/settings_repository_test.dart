@@ -134,6 +134,33 @@ void main() {
         expect(repo.poemExplainPromptOverride, isNull);
         // 脏数据不被清除（getter 只做读取防御），但语义上视为未自定义。
       });
+
+      test('assistantPromptOverride 默认 null（未自定义）', () {
+        expect(repo.assistantPromptOverride, isNull);
+      });
+
+      test('setAssistantPrompt 保存后读取 roundtrip（trim 保留）', () async {
+        await repo.setAssistantPrompt('  我的助手人设  ');
+        expect(repo.assistantPromptOverride, '我的助手人设');
+        expect(
+          HiveBoxes.settings.get('llm_assistant_prompt'),
+          '我的助手人设',
+        );
+      });
+
+      test('setAssistantPrompt 空串 / 纯空白 = 删 key（恢复默认）', () async {
+        await repo.setAssistantPrompt('先有自定义');
+        await repo.setAssistantPrompt('   ');
+        expect(repo.assistantPromptOverride, isNull);
+        expect(HiveBoxes.settings.get('llm_assistant_prompt'), isNull);
+      });
+
+      test('resetAssistantPrompt 删除覆盖 key，getter 回落 null', () async {
+        await repo.setAssistantPrompt('先有自定义');
+        await repo.resetAssistantPrompt();
+        expect(repo.assistantPromptOverride, isNull);
+        expect(HiveBoxes.settings.get('llm_assistant_prompt'), isNull);
+      });
     });
   });
 }

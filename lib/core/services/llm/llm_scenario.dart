@@ -18,7 +18,10 @@ enum LlmScenario {
   poemExplain('llm_provider_poem_explain', '诗词讲解'),
 
   /// 算数题 AI 解析。
-  mathExplain('llm_provider_math_explain', '口算解析');
+  mathExplain('llm_provider_math_explain', '口算解析'),
+
+  /// AI 助手（App 内对话助手）。
+  assistant('llm_provider_assistant', 'AI 助手');
 
   const LlmScenario(this.settingsKey, this.label);
 
