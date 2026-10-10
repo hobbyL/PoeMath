@@ -53,6 +53,12 @@ class HiveKeys {
   /// LLM 应用题 Box
   static const String llmProblemBox = 'llm_problems';
 
+  /// AI 助手会话 Box
+  static const String conversationBox = 'assistant_conversations';
+
+  /// AI 助手消息 Box
+  static const String messageBox = 'assistant_messages';
+
   /// 设置 Box（KV 存储）
   static const String settingsBox = 'settings';
 

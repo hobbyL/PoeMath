@@ -23,6 +23,8 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/llm_problem.dart';
+import 'package:poemath/data/models/assistant_conversation.dart';
+import 'package:poemath/data/models/assistant_message.dart';
 
 bool _adaptersRegistered = false;
 
@@ -50,7 +52,10 @@ void registerHiveAdapters() {
   Hive.registerAdapter(ChallengeRecordAdapter());     // typeId: 14
   Hive.registerAdapter(LearningActivityAdapter());    // typeId: 15
   Hive.registerAdapter(LlmProblemAdapter());          // typeId: 16
+  Hive.registerAdapter(ConversationAdapter());        // typeId: 17
+  Hive.registerAdapter(MessageAdapter());             // typeId: 18
 
   // 枚举 Adapter
   Hive.registerAdapter(LearningStatusAdapter());      // typeId: 20
+  Hive.registerAdapter(MessageRoleAdapter());         // typeId: 19
 }

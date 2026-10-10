@@ -21,6 +21,7 @@ import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/data/repositories/learning_activity_repository.dart';
+import 'package:poemath/data/repositories/assistant_conversation_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
@@ -89,6 +90,11 @@ final userStatsRepositoryProvider = Provider<UserStatsRepository>((ref) {
 final learningActivityRepositoryProvider =
     Provider<LearningActivityRepository>((ref) {
   return LearningActivityRepository();
+});
+
+final conversationRepositoryProvider =
+    Provider<ConversationRepository>((ref) {
+  return ConversationRepository();
 });
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
