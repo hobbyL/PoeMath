@@ -71,6 +71,41 @@ class WordProblemSkeletonGenerator {
     );
   }
 
+  /// 判定某学期配置下指定知识点是否可生成（镜像 [generate] 各分支的学期守卫）。
+  ///
+  /// 规则与下方各 `_generate*` 的 [ArgumentError] 守卫严格一致：
+  /// - 加/减/乘/除：对应运算符在 `config.allowedOperators` 中
+  /// - 混合运算：`grade >= 3` 且 `allowedOperators.length >= 3`
+  ///
+  /// UI 据此隐藏当前学期不学的知识点，避免用户选中后生成才报错。
+  static bool isTopicAvailable(GradeConfig config, WordProblemTopic topic) {
+    switch (topic) {
+      case WordProblemTopic.addition:
+        return config.allowedOperators.contains(Operator.add);
+      case WordProblemTopic.subtraction:
+        return config.allowedOperators.contains(Operator.subtract);
+      case WordProblemTopic.multiplication:
+        return config.allowedOperators.contains(Operator.multiply);
+      case WordProblemTopic.division:
+        return config.allowedOperators.contains(Operator.divide);
+      case WordProblemTopic.mixed:
+        return config.grade >= 3 && config.allowedOperators.length >= 3;
+    }
+  }
+
+  /// 返回「年级+学期」下可生成的知识点（保持 [WordProblemTopic.values] 顺序）。
+  ///
+  /// 加法/减法在全部 12 个学期预设中恒存在，返回列表不会为空。
+  static List<WordProblemTopic> availableTopics({
+    required int grade,
+    required String semester,
+  }) {
+    final config = GradePresets.get(grade, semester);
+    return WordProblemTopic.values
+        .where((topic) => isTopicAvailable(config, topic))
+        .toList();
+  }
+
   static ProblemSkeleton _generateOne(
     GradeConfig config,
     WordProblemTopic topic,

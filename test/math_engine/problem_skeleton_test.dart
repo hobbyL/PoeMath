@@ -205,6 +205,96 @@ void main() {
       expect(a, equals(b));
     });
   });
+
+  group('WordProblemSkeletonGenerator.availableTopics / isTopicAvailable', () {
+    test('二年级上：加/减/乘，隐藏除法与混合运算', () {
+      expect(
+        WordProblemSkeletonGenerator.availableTopics(grade: 2, semester: '上'),
+        const [
+          WordProblemTopic.addition,
+          WordProblemTopic.subtraction,
+          WordProblemTopic.multiplication,
+        ],
+      );
+    });
+
+    test('二年级下：出现除法，仍无混合运算', () {
+      final topics = WordProblemSkeletonGenerator.availableTopics(
+        grade: 2,
+        semester: '下',
+      );
+      expect(topics, contains(WordProblemTopic.division));
+      expect(topics, isNot(contains(WordProblemTopic.mixed)));
+    });
+
+    test('三年级上：五个知识点全部可用（含混合运算）', () {
+      expect(
+        WordProblemSkeletonGenerator.availableTopics(grade: 3, semester: '上'),
+        WordProblemTopic.values,
+      );
+    });
+
+    test('四年级下 / 五年级下：仅加减（小数 / 分数加减学期）', () {
+      const addSub = [WordProblemTopic.addition, WordProblemTopic.subtraction];
+      expect(
+        WordProblemSkeletonGenerator.availableTopics(grade: 4, semester: '下'),
+        addSub,
+      );
+      expect(
+        WordProblemSkeletonGenerator.availableTopics(grade: 5, semester: '下'),
+        addSub,
+      );
+    });
+
+    test('可用列表恒非空且保持 WordProblemTopic.values 顺序', () {
+      for (final config in GradePresets.all) {
+        final topics = WordProblemSkeletonGenerator.availableTopics(
+          grade: config.grade,
+          semester: config.semester,
+        );
+        expect(topics, isNotEmpty, reason: '${config.label} 可用知识点不应为空');
+        final ordered =
+            WordProblemTopic.values.where(topics.contains).toList();
+        expect(topics, ordered, reason: '${config.label} 顺序应与枚举一致');
+      }
+    });
+
+    test('isTopicAvailable 与 generate 守卫一致：不可用必抛 ArgumentError、可用必能生成',
+        () {
+      for (final config in GradePresets.all) {
+        for (final topic in WordProblemTopic.values) {
+          final available =
+              WordProblemSkeletonGenerator.isTopicAvailable(config, topic);
+          if (available) {
+            final skeletons = WordProblemSkeletonGenerator.generate(
+              grade: config.grade,
+              semester: config.semester,
+              topic: topic.name,
+              count: 1,
+              random: Random(2026),
+            );
+            expect(
+              skeletons,
+              hasLength(1),
+              reason: '${config.label} ${topic.label} 判定可用却生成失败',
+            );
+          } else {
+            expect(
+              () => WordProblemSkeletonGenerator.generate(
+                grade: config.grade,
+                semester: config.semester,
+                topic: topic.name,
+                count: 1,
+                random: Random(2026),
+              ),
+              throwsArgumentError,
+              reason: '${config.label} ${topic.label} 判定不可用却未抛 ArgumentError',
+            );
+          }
+        }
+      }
+    });
+  });
 }
 
 /// 骨架核心不变量：操作数/答案非负整数、答案 ≤ maxResult、

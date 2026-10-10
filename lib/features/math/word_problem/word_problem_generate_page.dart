@@ -39,6 +39,18 @@ class _WordProblemGeneratePageState
   bool _generating = false;
   String? _errorMessage;
 
+  /// 年级/学期变更后，若当前知识点在新学期不教授，回退到首个可用项。
+  /// 加法/减法在全部预设中恒存在，可用列表不会为空。调用方须自行置于 setState 内。
+  void _ensureTopicAvailable() {
+    final topics = WordProblemSkeletonGenerator.availableTopics(
+      grade: _grade,
+      semester: _semester,
+    );
+    if (!topics.contains(_topic)) {
+      _topic = topics.first;
+    }
+  }
+
   Future<void> _generate() async {
     if (_generating) return;
 
@@ -263,7 +275,10 @@ class _WordProblemGeneratePageState
                 ChoiceChip(
                   label: Text('$grade 年级'),
                   selected: _grade == grade,
-                  onSelected: (_) => setState(() => _grade = grade),
+                  onSelected: (_) => setState(() {
+                    _grade = grade;
+                    _ensureTopicAvailable();
+                  }),
                 ),
               ],
             ],
@@ -285,15 +300,22 @@ class _WordProblemGeneratePageState
             ButtonSegment(value: '下', label: Text('下学期')),
           ],
           selected: {_semester},
-          onSelectionChanged: (selection) =>
-              setState(() => _semester = selection.first),
+          onSelectionChanged: (selection) => setState(() {
+            _semester = selection.first;
+            _ensureTopicAvailable();
+          }),
         ),
       ],
     );
   }
 
   Widget _buildTopicSelector(ThemeData theme) {
-    final topics = WordProblemTopic.values;
+    // 只渲染当前「年级+学期」实际教授的知识点，不学的直接隐藏，
+    // 避免用户选中一个随后无法生成的知识点（如二年级上的除法）。
+    final topics = WordProblemSkeletonGenerator.availableTopics(
+      grade: _grade,
+      semester: _semester,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
