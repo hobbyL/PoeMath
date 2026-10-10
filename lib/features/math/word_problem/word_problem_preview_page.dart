@@ -3,6 +3,10 @@
 // 层级：features/math/word_problem
 // 职责：家长预览页 —— 展示 LLM 草稿与本地校验结果，通过项默认全选，
 //       家长确认后入库（batchId 此刻落定）；不自动补生成被丢弃的题。
+//
+// 布局约定：概要统计卡与底部整宽按钮不展示——确认按钮收敛到 AppBar 右上角
+//（窄屏图标 / 宽屏图标+「确认入库 N 题」，与全 App 响应式 AppBar 按钮一致）；
+// 题卡内勾选框靠右，「解题讲解」展开按钮跟在算式行尾。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -80,8 +84,6 @@ class _WordProblemPreviewPageState
     };
   }
 
-  int get _acceptedCount => _selected.length;
-
   int get _selectedCount => _selected.values.where((v) => v).length;
 
   Future<void> _confirm() async {
@@ -147,78 +149,67 @@ class _WordProblemPreviewPageState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final items = widget.data.items;
-    final discardedCount = items.length - _acceptedCount;
+
+    // 布局约定：概要卡片与底部整宽按钮已移除——确认按钮收敛到 AppBar
+    // 右上角（窄屏图标 / 宽屏图标+文案），题目列表占满正文。
+    final isWide = MediaQuery.sizeOf(context).width >= 420;
+    final confirmLabel = '确认入库 $_selectedCount 题';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('家长预览')),
-      body: Column(
-        children: [
-          // 概要：生成/通过/丢弃
-          Padding(
-            padding: const EdgeInsets.all(SpacingTokens.md),
-            child: ColoredCard(
-              color: discardedCount > 0
-                  ? theme.semantic.caution
-                  : theme.semantic.success,
-              width: double.infinity,
-              child: Text(
-                '生成 ${items.length} 题，通过校验 $_acceptedCount 题'
-                '${discardedCount > 0 ? '，丢弃 $discardedCount 题' : ''}。'
-                '请检查题面与算式是否匹配，确认后入库。',
-                style: theme.textTheme.bodyMedium,
-              ),
+      appBar: AppBar(
+        title: const Text('家长预览'),
+        actions: [
+          if (isWide)
+            TextButton.icon(
+              onPressed: _saving || _selectedCount == 0 ? null : _confirm,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.library_add_check_outlined,
+                      size: 18,
+                    ),
+              label: Text(confirmLabel),
+            )
+          else
+            IconButton(
+              onPressed: _saving || _selectedCount == 0 ? null : _confirm,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.library_add_check_outlined,
+                      size: 18,
+                    ),
+              tooltip: confirmLabel,
             ),
-          ),
-
-          // 题目列表
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(
-                horizontal: SpacingTokens.md,
-              ),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
-                  child: _buildItemCard(context, index, item),
-                );
-              },
-            ),
-          ),
-
-          // 底部入库按钮
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _saving || _selectedCount == 0 ? null : _confirm,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.library_add_check_outlined),
-                  label: Text('确认入库 $_selectedCount 题'),
-                ),
-              ),
-            ),
-          ),
         ],
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+            child: _buildItemCard(context, index: index, item: items[index]),
+          );
+        },
       ),
     );
   }
 
   Widget _buildItemCard(
-    BuildContext context,
-    int index,
-    WordProblemPreviewItem item,
-  ) {
+    BuildContext context, {
+    required int index,
+    required WordProblemPreviewItem item,
+  }) {
     final theme = Theme.of(context);
     final skeleton = item.skeleton;
     // 骨架自带算式组装（"12 + 4"），此处仅拼答案与单位。
@@ -272,6 +263,7 @@ class _WordProblemPreviewPageState
     }
 
     final draft = item.draft!;
+    final expanded = _explanationExpanded[index] ?? false;
     return ColoredCard(
       color: theme.colorScheme.primary,
       width: double.infinity,
@@ -280,57 +272,94 @@ class _WordProblemPreviewPageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Checkbox(
-                value: _selected[index] ?? true,
-                onChanged: (value) =>
-                    setState(() => _selected[index] = value ?? false),
-              ),
               Expanded(
                 child: Text(
                   draft.text,
                   style: theme.textTheme.bodyMedium,
                 ),
               ),
+              // 勾选框靠右：整卡可点切换，勾选框本体也响应。
+              Checkbox(
+                value: _selected[index] ?? true,
+                onChanged: (value) =>
+                    setState(() => _selected[index] = value ?? false),
+              ),
             ],
           ),
           const SizedBox(height: SpacingTokens.xs),
-          Text(
-            '算式：$expressionText${skeleton.unitHint}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (draft.explanation.trim().isNotEmpty) ...[
-            const SizedBox(height: SpacingTokens.xs),
-            TextButton.icon(
-              onPressed: () => setState(
-                () => _explanationExpanded[index] =
-                    !(_explanationExpanded[index] ?? false),
-              ),
-              icon: Icon(
-                (_explanationExpanded[index] ?? false)
-                    ? Icons.expand_less
-                    : Icons.expand_more,
-              ),
-              label: Text(
-                (_explanationExpanded[index] ?? false) ? '收起讲解' : '解题讲解',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            if (_explanationExpanded[index] ?? false)
-              Align(
-                alignment: Alignment.centerLeft,
+          Row(
+            children: [
+              Expanded(
                 child: Text(
-                  draft.explanation,
-                  style: theme.textTheme.bodySmall,
+                  '算式：$expressionText${skeleton.unitHint}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
+              // 「解题讲解」展开按钮跟在算式行尾（explanation 为空则无此按钮）。
+              if (draft.explanation.trim().isNotEmpty)
+                _InlineIconButton(
+                  icon: expanded ? Icons.expand_less : Icons.expand_more,
+                  label: expanded ? '收起讲解' : '解题讲解',
+                  onPressed: () => setState(
+                    () => _explanationExpanded[index] = !expanded,
+                  ),
+                ),
+            ],
+          ),
+          if (draft.explanation.trim().isNotEmpty && expanded) ...[
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              draft.explanation,
+              style: theme.textTheme.bodySmall,
+            ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 算式行尾的紧凑讲解展开按钮：无按钮水波纹占位感，视觉近似文字链接。
+class _InlineIconButton extends StatelessWidget {
+  const _InlineIconButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+      onTap: onPressed,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.xs,
+          vertical: SpacingTokens.xs / 2,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 2),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

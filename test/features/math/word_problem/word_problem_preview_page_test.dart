@@ -108,11 +108,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 概要：2 题全部通过
-    expect(find.textContaining('通过校验 2 题'), findsOneWidget);
+    // 概要统计文案已移除（家长自行看列表勾选）
+    expect(find.textContaining('通过校验'), findsNothing);
+    // 确认按钮在 AppBar 右上角，宽屏（测试默认 800x600）显示图标+文案
     expect(find.text('确认入库 2 题'), findsOneWidget);
 
-    // 取消第一题
+    // 取消第一题（勾选框现靠右）
     await tester.tap(find.byType(Checkbox).first);
     await tester.pumpAndSettle();
     expect(find.text('确认入库 1 题'), findsOneWidget);
@@ -163,8 +164,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 显示丢弃数与原因
-    expect(find.textContaining('丢弃 1 题'), findsOneWidget);
+    // 概要统计文案已移除，丢弃信息只体现在列表卡片上
+    //（「丢弃原因：」在卡片内属预期展示，概要的「丢弃 N 题」不得再出现）。
+    expect(find.textContaining('丢弃 '), findsNothing);
     expect(find.text('已丢弃'), findsOneWidget);
     expect(find.textContaining('单位与骨架不一致'), findsOneWidget);
     // 丢弃题无勾选框
@@ -285,8 +287,13 @@ void main() {
     // 未导航离开预览页，Hive 零写入
     expect(find.text('家长预览'), findsOneWidget);
     expect(HiveBoxes.llmProblems, isEmpty);
-    // _saving 已恢复：确认按钮重新可点击
-    final button = tester.widget<FilledButton>(find.byType(FilledButton));
+    // _saving 已恢复：AppBar 右上角确认按钮重新可点击
+    final button = tester.widget<TextButton>(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byType(TextButton),
+      ),
+    );
     expect(button.onPressed, isNotNull);
 
     // SnackBar 退场：4 秒定时器从前向动画完成那一帧才起算，一帧大步
