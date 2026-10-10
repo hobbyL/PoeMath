@@ -3,6 +3,7 @@
 // 诗词详情页 AI 讲解区 widget 测试（任务 10-09-ai-explain-scenario-provider）：
 // - 未配置：点「生成讲解」tag 进入引导态（提示 + 去设置 tag）
 // - 成功：讲解内容清洗 markdown 后分段渲染，附重新生成 tag 与点击朗读提示
+// - 流式：生成中渐显已到达段落（无朗读入口），收尾转就绪可朗读
 // - 失败：错误文案展示（不含 API Key），点「重新生成」可恢复成功
 // - 切诗防护：讲解状态带 poemId，非当前诗词的结果不得闪现
 //
@@ -12,6 +13,7 @@
 // actionTag——AI 卡位于列表尾部（交错延迟 ~960ms），动画未完成时卡片整体
 // 右偏 10%，tag 会落到 800px 测试视口外导致 tap hit test 落空、生成从未触发。
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -57,17 +59,42 @@ Poem _poemOf(String id, String title) => Poem(
 final _poem = _poemOf(_poemId, '静夜思');
 final _poem2 = _poemOf(_poemId2, '望庐山瀑布');
 
-http.Response _chatResponse(String content) => http.Response.bytes(
-      utf8.encode(jsonEncode({
-        'choices': [
-          {
-            'message': {'role': 'assistant', 'content': content},
-          },
-        ],
-      }),),
+/// 单条 SSE data 行（含结尾空行），content 包进 choices[0].delta.content。
+String _sseData(String content) {
+  final json = jsonEncode({
+    'choices': [
+      {
+        'delta': {'content': content},
+      },
+    ],
+  });
+  return 'data: $json\n\n';
+}
+
+/// 整段讲解包装成「单片 + [DONE]」的 OpenAI 兼容 SSE 响应。
+///
+/// 控制器已切流式（explainStream），mock 必须回 `text/event-stream`；
+/// 经 MockClient.send 以单 chunk 字节流交付，收尾直达 ready 终态。
+http.Response _sseResponse(String content) => http.Response.bytes(
+      utf8.encode('${_sseData(content)}data: [DONE]\n\n'),
       200,
-      headers: const {'content-type': 'application/json; charset=utf-8'},
+      headers: const {'content-type': 'text/event-stream; charset=utf-8'},
     );
+
+/// 把 explainStream 的真实异步 SSE 流推进到终态并稳定界面。
+///
+/// explainStream 读 http 响应流；其「流读完/关闭」事件不在 fake-async 的微任务
+/// 队列里，pumpAndSettle 单独驱动不了——控制器会一直卡在 streaming、标题右侧
+/// busy 转圈（CircularProgressIndicator）永不 settle 直至超时。先用 runAsync 给
+/// 真实事件循环一点时间把流读完、让控制器落到 ready/error 终态（busy 转圈卸下），
+/// 再 pumpAndSettle 应用重建。生成须已在调用前触发（tap「生成讲解」同步进入
+/// loading）。
+Future<void> settleSse(WidgetTester tester) async {
+  await tester.runAsync(() async {
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  });
+  await tester.pumpAndSettle();
+}
 
 void main() {
   late _MockTtsService tts;
@@ -140,7 +167,7 @@ void main() {
       settings: settings,
       client: MockClient((_) async {
         requests++;
-        return _chatResponse('不该被调用');
+        return _sseResponse('不该被调用');
       }),
     );
 
@@ -175,7 +202,7 @@ void main() {
       settings: configuredRepo(),
       client: MockClient((request) async {
         captured = request;
-        return _chatResponse(
+        return _sseResponse(
           '## 这首诗在说什么\n'
           '诗人晚上睡不着，看到**明亮的月光**。\n'
           '\n'
@@ -185,7 +212,7 @@ void main() {
     );
 
     await tester.tap(find.text('生成讲解'));
-    await tester.pumpAndSettle();
+    await settleSse(tester);
 
     // markdown 残留（## / ** / - ）被清洗，分段渲染。
     expect(find.text('这首诗在说什么'), findsOneWidget);
@@ -205,6 +232,41 @@ void main() {
     expect(captured.headers['authorization'], 'Bearer secret-key-poem');
   });
 
+  testWidgets('streaming：渐显已到达段落、无朗读入口，收尾转可朗读', (tester) async {
+    final sse = StreamController<List<int>>();
+    await pumpPage(
+      tester,
+      settings: configuredRepo(),
+      client: MockClient.streaming(
+        (request, bodyStream) async => http.StreamedResponse(sse.stream, 200),
+      ),
+    );
+
+    await tester.tap(find.text('生成讲解'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // 首片到达：streaming 态渐显首段 + 「逐句生成」提示，无朗读入口。
+    sse.add(utf8.encode(_sseData('月光洒在床前。\n')));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('月光洒在床前。'), findsOneWidget);
+    expect(find.text('AI 正在逐句生成…'), findsOneWidget);
+    expect(find.widgetWithText(AiActionTag, '生成中…'), findsOneWidget);
+    expect(find.text('点击内容可朗读，再次点击停止。'), findsNothing);
+    expect(find.widgetWithText(AiActionTag, '重新生成'), findsNothing);
+
+    // 续片 + [DONE]：收尾转 ready，段落累积完整、朗读入口出现。
+    sse.add(utf8.encode(_sseData('他抬头思念故乡。')));
+    sse.add(utf8.encode('data: [DONE]\n\n'));
+    await sse.close();
+    await settleSse(tester);
+
+    expect(find.text('月光洒在床前。'), findsOneWidget);
+    expect(find.text('他抬头思念故乡。'), findsOneWidget);
+    expect(find.text('点击内容可朗读，再次点击停止。'), findsOneWidget);
+    expect(find.widgetWithText(AiActionTag, '重新生成'), findsOneWidget);
+  });
+
   testWidgets('失败：错误文案不含 Key，点「重新生成」可恢复成功', (tester) async {
     var calls = 0;
     late http.Request captured;
@@ -215,7 +277,7 @@ void main() {
         calls++;
         if (calls == 1) return http.Response.bytes(const [], 401);
         captured = request;
-        return _chatResponse('第二次成功的讲解内容。');
+        return _sseResponse('第二次成功的讲解内容。');
       }),
     );
 
@@ -228,7 +290,7 @@ void main() {
 
     // 点「重新生成」恢复成功。
     await tester.tap(find.widgetWithText(AiActionTag, '重新生成'));
-    await tester.pumpAndSettle();
+    await settleSse(tester);
     expect(find.text('第二次成功的讲解内容。'), findsOneWidget);
     expect(calls, 2);
     expect(captured.headers['authorization'], 'Bearer secret-key-poem');
@@ -252,7 +314,7 @@ void main() {
             llmExplainHttpClientProvider.overrideWithValue(
               MockClient((_) async {
                 calls++;
-                return _chatResponse('静夜思的讲解内容。');
+                return _sseResponse('静夜思的讲解内容。');
               }),
             ),
           ],
@@ -263,7 +325,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 900));
     await tester.tap(find.text('生成讲解'));
-    await tester.pumpAndSettle();
+    await settleSse(tester);
     expect(find.text('静夜思的讲解内容。'), findsOneWidget);
 
     // 切到另一首诗：AI 区回到 idle 态，旧讲解不闪现。

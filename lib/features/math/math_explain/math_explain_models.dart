@@ -6,7 +6,7 @@
 // 分段工具见 core/services/llm/llm_explain_text.dart（与诗词侧共用）。
 
 /// 解析状态机（与诗词侧同构）。
-enum MathExplainStatus { idle, loading, ready, error, unconfigured }
+enum MathExplainStatus { idle, loading, streaming, ready, error, unconfigured }
 
 /// 算数题 AI 解析状态。
 class MathExplainState {
@@ -30,6 +30,7 @@ class MathExplainState {
 
   bool get isIdle => status == MathExplainStatus.idle;
   bool get isLoading => status == MathExplainStatus.loading;
+  bool get isStreaming => status == MathExplainStatus.streaming;
   bool get isReady => status == MathExplainStatus.ready;
 
   /// 朗读文本：按段落换行拼接（与诗词侧 PoemExplainState.fullText 同义）。

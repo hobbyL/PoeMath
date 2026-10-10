@@ -10,8 +10,11 @@ enum PoemExplainStatus {
   /// 未请求过（卡片不展示正文）。
   idle,
 
-  /// 请求中。
+  /// 请求中（已发起，首片未到）。
   loading,
+
+  /// 流式接收中（已有部分内容，持续追加，paragraphs 实时增长）。
+  streaming,
 
   /// 讲解就绪。
   ready,
@@ -45,6 +48,7 @@ class PoemExplainState {
 
   bool get isIdle => status == PoemExplainStatus.idle;
   bool get isLoading => status == PoemExplainStatus.loading;
+  bool get isStreaming => status == PoemExplainStatus.streaming;
   bool get isReady => status == PoemExplainStatus.ready;
 
   /// 朗读 / 分享用的完整文本。

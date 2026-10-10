@@ -2,6 +2,7 @@
 //
 // 口算 AI 解析弹层 widget 测试（任务 10-09-ai-explain-scenario-provider）：
 // - loading：打开即生成，纯文案提示；关闭弹层丢弃在途请求（不崩溃）
+// - streaming：生成中渐显已到达段落（无朗读入口），收尾转可朗读
 // - ready：markdown 清洗分段渲染 + 重新生成；请求走 mathExplain 场景配置
 // - error：错误文案不含 API Key，点「重新生成」可恢复成功
 // - unconfigured：引导文案 + 「去设置」tag 跳转 llmSettings 路由
@@ -85,17 +86,41 @@ class _SheetHost extends StatelessWidget {
   }
 }
 
-http.Response _chatResponse(String content) => http.Response.bytes(
-      utf8.encode(jsonEncode({
-        'choices': [
-          {
-            'message': {'role': 'assistant', 'content': content},
-          },
-        ],
-      }),),
+/// 单条 SSE data 行（含结尾空行），content 包进 choices[0].delta.content。
+String _sseData(String content) {
+  final json = jsonEncode({
+    'choices': [
+      {
+        'delta': {'content': content},
+      },
+    ],
+  });
+  return 'data: $json\n\n';
+}
+
+/// 整段讲解包装成「单片 + [DONE]」的 OpenAI 兼容 SSE 响应。
+///
+/// 控制器已切流式（explainStream），mock 必须回 `text/event-stream`；
+/// 经 MockClient.send 以单 chunk 字节流交付，收尾直达 ready 终态。
+http.Response _sseResponse(String content) => http.Response.bytes(
+      utf8.encode('${_sseData(content)}data: [DONE]\n\n'),
       200,
-      headers: const {'content-type': 'application/json; charset=utf-8'},
+      headers: const {'content-type': 'text/event-stream; charset=utf-8'},
     );
+
+/// 把 explainStream 的真实异步 SSE 流推进到终态并稳定界面。
+///
+/// explainStream 读 http 响应流；其「流读完/关闭」事件不在 fake-async 的微任务
+/// 队列里，pumpAndSettle 单独驱动不了——控制器会一直卡在 streaming、标题右侧
+/// busy 转圈（CircularProgressIndicator）永不 settle 直至超时。先用 runAsync 给
+/// 真实事件循环一点时间把流读完、让控制器落到 ready/error 终态（busy 转圈卸下），
+/// 再 pumpAndSettle 应用重建。生成须已在此前的 pump 中启动（见 pumpSheet）。
+Future<void> settleSse(WidgetTester tester) async {
+  await tester.runAsync(() async {
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  });
+  await tester.pumpAndSettle();
+}
 
 void main() {
   setUpAll(() {
@@ -151,7 +176,11 @@ void main() {
     await tester.tap(find.text('打开 AI 解析'));
     await tester.pump();
     if (settle) {
-      await tester.pumpAndSettle();
+      // 入场动画推进后，explainStream 的真实异步流需 runAsync 驱动到终态
+      // （流关闭事件不走 fake-async 微任务），再 pumpAndSettle 应用 ready/error
+      // 终态重建、卸下 busy 转圈。见 [settleSse]。
+      await tester.pump(const Duration(milliseconds: 400));
+      await settleSse(tester);
     } else {
       // 弹层入场动画 ~300ms；busy 转圈持续，只推固定时长。
       await tester.pump(const Duration(milliseconds: 400));
@@ -171,7 +200,7 @@ void main() {
       settle: false,
       client: MockClient((_) async {
         requests++;
-        return _chatResponse('不该被请求');
+        return _sseResponse('不该被请求');
       }),
     );
 
@@ -208,7 +237,7 @@ void main() {
       settings: configuredRepo(),
       client: MockClient((request) async {
         captured = request;
-        return _chatResponse(
+        return _sseResponse(
           '## 竖式计算\n'
           '先算 **12 + 34**。\n'
           '\n'
@@ -238,6 +267,38 @@ void main() {
     expect(find.text('AI 解析'), findsNothing);
   });
 
+  testWidgets('streaming：渐显已到达段落、无朗读入口，收尾转可朗读', (tester) async {
+    final sse = StreamController<List<int>>();
+    await pumpSheet(
+      tester,
+      settings: configuredRepo(),
+      settle: false,
+      client: MockClient.streaming(
+        (request, bodyStream) async => http.StreamedResponse(sse.stream, 200),
+      ),
+    );
+
+    // 首片到达：streaming 态渐显首段 + 「逐句生成」提示，无朗读入口。
+    sse.add(utf8.encode(_sseData('先算个位。\n')));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('先算个位。'), findsOneWidget);
+    expect(find.text('AI 正在逐句生成…'), findsOneWidget);
+    expect(find.widgetWithText(AiActionTag, '生成中…'), findsOneWidget);
+    expect(find.text('点击内容可朗读，再次点击停止。'), findsNothing);
+    expect(find.text('重新生成'), findsNothing);
+
+    // 续片 + [DONE]：收尾转 ready，段落累积完整、朗读入口出现。
+    sse.add(utf8.encode(_sseData('再算十位。')));
+    sse.add(utf8.encode('data: [DONE]\n\n'));
+    await sse.close();
+    await settleSse(tester);
+
+    expect(find.text('先算个位。'), findsOneWidget);
+    expect(find.text('再算十位。'), findsOneWidget);
+    expect(find.text('点击内容可朗读，再次点击停止。'), findsOneWidget);
+    expect(find.widgetWithText(AiActionTag, '重新生成'), findsOneWidget);
+  });
+
   testWidgets('error：错误文案不含 Key，点「重新生成」可恢复成功', (tester) async {
     var calls = 0;
     await pumpSheet(
@@ -246,7 +307,7 @@ void main() {
       client: MockClient((request) async {
         calls++;
         if (calls == 1) return http.Response.bytes(const [], 401);
-        return _chatResponse('第二次成功的解析内容。');
+        return _sseResponse('第二次成功的解析内容。');
       }),
     );
 
@@ -256,7 +317,7 @@ void main() {
 
     // 点「重新生成」恢复成功。
     await tester.tap(find.text('重新生成'));
-    await tester.pumpAndSettle();
+    await settleSse(tester);
     expect(find.text('第二次成功的解析内容。'), findsOneWidget);
     expect(calls, 2);
   });
@@ -271,7 +332,7 @@ void main() {
       settings: settings,
       client: MockClient((_) async {
         requests++;
-        return _chatResponse('不该被请求');
+        return _sseResponse('不该被请求');
       }),
     );
 
@@ -303,7 +364,7 @@ void main() {
         // 第一次请求挂起（模拟慢请求在途），弹层停在 loading。
         if (calls == 1) return firstGate.future;
         // 第二次请求立即成功。
-        return _chatResponse('第二个弹层的解析内容。');
+        return _sseResponse('第二个弹层的解析内容。');
       }),
     );
 
@@ -324,6 +385,8 @@ void main() {
     await tester.tap(find.text('打开 AI 解析'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    // 第二次请求的单片 SSE 流需 runAsync 驱动到 ready 终态。
+    await settleSse(tester);
 
     // 第二次请求已发出且到达 ready 终态（修复前：calls 仍为 1、卡 loading）。
     expect(calls, 2);
@@ -331,9 +394,10 @@ void main() {
     expect(find.text('AI 正在准备解析，请稍候…'), findsNothing);
 
     // 收尾：放行第一次请求（令牌已废，续体空转不写状态），避免悬挂 future。
-    // 第二个弹层已到 ready 终态（busy 转圈已卸下），可 settle。
-    firstGate.complete(_chatResponse('late'));
-    await tester.pumpAndSettle();
+    // runAsync 给被废弃的首个流一点时间读到首片即因代际令牌 return、取消
+    // 订阅并清掉 .timeout 定时器，避免 teardown 残留 Timer 报错。
+    firstGate.complete(_sseResponse('late'));
+    await settleSse(tester);
   });
 
   group('错题详情页入口', () {
@@ -360,7 +424,7 @@ void main() {
             llmExplainHttpClientProvider.overrideWithValue(
               MockClient((request) async {
                 captured = request;
-                return _chatResponse('这道题考查乘法口诀。三五十五，得 15。');
+                return _sseResponse('这道题考查乘法口诀。三五十五，得 15。');
               }),
             ),
           ],
@@ -375,7 +439,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('AI 帮我讲'));
       await tester.pump();
-      await tester.pumpAndSettle();
+      await settleSse(tester);
 
       // 弹层打开并完成生成，讲解内容渲染。
       expect(find.text('AI 解析'), findsOneWidget);

@@ -35,7 +35,8 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
   /// 为 [poem] 生成讲解。重复调用在请求中被守卫拦截。
   Future<void> generate(Poem poem) async {
     // 守卫先于任何 await（含 Hive + 安全存储读取）。
-    if (state.isLoading) return;
+    // 流式期状态为 streaming（非 loading），一并纳入防重入。
+    if (state.isLoading || state.isStreaming) return;
     final token = ++_sessionToken;
     state = PoemExplainState(
       status: PoemExplainStatus.loading,
@@ -58,7 +59,8 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
       }
 
       client = LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
-      final result = await client.explain(
+      final buffer = StringBuffer();
+      await for (final chunk in client.explainStream(
         config: config,
         // 用户自定义覆盖优先（设置页可编辑），否则内置出厂默认。
         systemPrompt:
@@ -66,10 +68,22 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
                 kPoemExplainSystemPrompt,
         userPrompt: buildPoemExplainUserPrompt(poem),
         maxTokens: kPoemExplainMaxTokens,
-      );
+      )) {
+        // 每片校验令牌：切诗 / 退页后立即丢弃在途流。
+        if (token != _sessionToken) return;
+        buffer.write(chunk);
+        final paras = splitExplainParagraphs(buffer.toString());
+        if (paras.isNotEmpty) {
+          state = PoemExplainState(
+            status: PoemExplainStatus.streaming,
+            paragraphs: paras,
+            poemId: poem.id,
+          );
+        }
+      }
       if (token != _sessionToken) return;
 
-      final paragraphs = splitExplainParagraphs(result.text);
+      final paragraphs = splitExplainParagraphs(buffer.toString());
       if (paragraphs.isEmpty) {
         state = PoemExplainState(
           status: PoemExplainStatus.error,

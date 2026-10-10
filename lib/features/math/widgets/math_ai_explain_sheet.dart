@@ -139,7 +139,8 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
     // 弹层打开即自动生成，idle 仅为瞬时态，与 loading 同样显示「生成中…」。
     final actionTag = switch (state.status) {
       MathExplainStatus.idle ||
-      MathExplainStatus.loading =>
+      MathExplainStatus.loading ||
+      MathExplainStatus.streaming =>
         const AiActionTag(label: '生成中…', busy: true),
       MathExplainStatus.ready => AiActionTag(
           label: '重新生成',
@@ -234,6 +235,18 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
       case MathExplainStatus.loading:
         return [
           Text('AI 正在准备解析，请稍候…', style: hintStyle),
+        ];
+      case MathExplainStatus.streaming:
+        // 流式接收中：实时渲染已到达段落，不含朗读入口（半截文本不朗读）。
+        return [
+          for (final paragraph in state.paragraphs) ...[
+            Text(
+              paragraph,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.7),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
+          Text('AI 正在逐句生成…', style: hintStyle),
         ];
       case MathExplainStatus.ready:
         return [

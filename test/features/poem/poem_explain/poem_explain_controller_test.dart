@@ -1,6 +1,6 @@
 // test/features/poem/poem_explain/poem_explain_controller_test.dart
 //
-// 诗词 AI 讲解控制器测试：成功分段、未配置引导、错误分类映射、
+// 诗词 AI 讲解控制器测试：成功分段、流式中途可见、未配置引导、错误分类映射、
 // 连点防重入、reset 废弃在途结果、场景厂商选择生效、prompt 负载边界。
 //
 // 测试环境无平台安全存储通道与真实网络，凭据与 http 均注入内存/mock。
@@ -63,16 +63,26 @@ Poem _poem() => Poem(
       difficulty: 1,
     );
 
-http.Response _chatResponse(String content) => http.Response.bytes(
-      utf8.encode(jsonEncode({
-        'choices': [
-          {
-            'message': {'role': 'assistant', 'content': content},
-          },
-        ],
-      }),),
+/// 单条 SSE data 行（含结尾空行），content 包进 choices[0].delta.content。
+String _sseData(String content) {
+  final json = jsonEncode({
+    'choices': [
+      {
+        'delta': {'content': content},
+      },
+    ],
+  });
+  return 'data: $json\n\n';
+}
+
+/// 把整段讲解内容包装成「单片 + [DONE]」的 OpenAI 兼容 SSE 响应。
+///
+/// 控制器已切流式（explainStream），mock 必须回 `text/event-stream` 而非
+/// chat JSON；经 MockClient.send 以单 chunk 字节流交付，LineSplitter 照常解析。
+http.Response _sseResponse(String content) => http.Response.bytes(
+      utf8.encode('${_sseData(content)}data: [DONE]\n\n'),
       200,
-      headers: const {'content-type': 'application/json; charset=utf-8'},
+      headers: const {'content-type': 'text/event-stream; charset=utf-8'},
     );
 
 void main() {
@@ -121,7 +131,7 @@ void main() {
     await seedProviders();
     final container = containerWith(
       MockClient(
-        (_) async => _chatResponse(
+        (_) async => _sseResponse(
           '```\n'
           '## 这首诗在说什么\n'
           '- **夜里**睡不着的李白看见了月光。\n'
@@ -147,11 +157,43 @@ void main() {
     expect(state.fullText, contains('夜里睡不着'));
   });
 
+  test('流式：中途 streaming 态可见、paragraphs 实时增长，收尾转 ready',
+      () async {
+    await seedProviders();
+    final sse = StreamController<List<int>>();
+    final container = containerWith(
+      MockClient.streaming(
+        (request, bodyStream) async => http.StreamedResponse(sse.stream, 200),
+      ),
+    );
+    final notifier = container.read(poemExplainProvider.notifier);
+
+    final done = notifier.generate(_poem());
+
+    // 首片到达：进入 streaming，仅渲染已到达段落。
+    sse.add(utf8.encode(_sseData('月光洒在床前。\n')));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final mid = container.read(poemExplainProvider);
+    expect(mid.status, PoemExplainStatus.streaming);
+    expect(mid.paragraphs, ['月光洒在床前。']);
+    expect(mid.poemId, 'poem-1');
+
+    // 续片 + [DONE]：收尾转 ready，段落累积完整。
+    sse.add(utf8.encode(_sseData('他抬头思念故乡。')));
+    sse.add(utf8.encode('data: [DONE]\n\n'));
+    await sse.close();
+    await done;
+
+    final state = container.read(poemExplainProvider);
+    expect(state.status, PoemExplainStatus.ready);
+    expect(state.paragraphs, ['月光洒在床前。', '他抬头思念故乡。']);
+  });
+
   test('未配置：unconfigured 引导态且不发请求', () async {
     var requests = 0;
     final container = containerWith(MockClient((_) async {
       requests++;
-      return _chatResponse('不该被调用');
+      return _sseResponse('不该被调用');
     }),);
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
@@ -186,7 +228,7 @@ void main() {
   test('模型输出空白：error 态提示重新生成', () async {
     await seedProviders();
     final container = containerWith(
-      MockClient((_) async => _chatResponse('   \n  ')),
+      MockClient((_) async => _sseResponse('   \n  ')),
     );
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
@@ -214,7 +256,7 @@ void main() {
     await notifier.generate(_poem()); // 被守卫拦截，立即返回。
     expect(requests, 1);
 
-    completer.complete(_chatResponse('讲解内容。'));
+    completer.complete(_sseResponse('讲解内容。'));
     await first;
     expect(container.read(poemExplainProvider).status, PoemExplainStatus.ready);
     expect(requests, 1);
@@ -236,7 +278,7 @@ void main() {
     notifier.reset();
     expect(container.read(poemExplainProvider).isIdle, isTrue);
 
-    completer.complete(_chatResponse('晚到的讲解。'));
+    completer.complete(_sseResponse('晚到的讲解。'));
     await pending;
     // 晚到结果被丢弃，仍为 idle。
     expect(container.read(poemExplainProvider).isIdle, isTrue);
@@ -251,7 +293,7 @@ void main() {
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('讲解内容。');
+      return _sseResponse('讲解内容。');
     }),);
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
@@ -272,7 +314,7 @@ void main() {
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('讲解内容。');
+      return _sseResponse('讲解内容。');
     }),);
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
@@ -290,7 +332,7 @@ void main() {
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('讲解内容。');
+      return _sseResponse('讲解内容。');
     }),);
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
@@ -310,7 +352,7 @@ void main() {
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('讲解内容。');
+      return _sseResponse('讲解内容。');
     }),);
 
     await container.read(poemExplainProvider.notifier).generate(_poem());

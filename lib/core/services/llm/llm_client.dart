@@ -281,6 +281,78 @@ final class LlmClient {
     return LlmExplainResult(text: content);
   }
 
+  /// 流式讲解：OpenAI 兼容 SSE（`stream: true`），逐片 yield 增量文本。
+  ///
+  /// 与 [explain]（非流式、保留作 fallback / 契约测试）同契约、同错误分类：
+  /// 端点 `/chat/completions`、Bearer 头（空 Key 省略）、401/403 →
+  /// [LlmAuthError]、5xx → [LlmServerError]、网络/超时 → [LlmNetworkError]。
+  ///
+  /// 全程无 content（流结束仍未产出）抛 [LlmResponseFormatError]。
+  /// 容错：keep-alive 注释行 / 空行 / 单行 parse 失败均跳过。
+  Stream<String> explainStream({
+    required LlmConfig config,
+    required String systemPrompt,
+    required String userPrompt,
+    int maxTokens = 800,
+  }) async* {
+    final base = normalizeBaseUrl(config.baseUrl);
+    final body = jsonEncode(<String, Object>{
+      'model': config.model,
+      'messages': <Map<String, String>>[
+        {'role': 'system', 'content': systemPrompt},
+        {'role': 'user', 'content': userPrompt},
+      ],
+      'max_tokens': maxTokens,
+      'stream': true,
+    });
+    final response = await _sendStream(
+      uri: _join(base, _chatPath),
+      body: body,
+      apiKey: config.apiKey,
+      timeout: _explainTimeout,
+      timeoutMessage: 'AI 讲解生成超时，请稍后重试',
+    );
+
+    var emitted = false;
+    // stream.transform(utf8.decoder) 在 chunk 边界保留不完整多字节尾字节，
+    // 中文跨分片不乱码；逐 chunk utf8.decode 则会乱码。
+    // .timeout 作用于字节流：两事件间隔超 timeout → TimeoutException。
+    final lines = response.stream
+        .timeout(
+          _explainTimeout,
+          onTimeout: (sink) => sink.addError(
+            TimeoutException('AI 讲解生成超时，请稍后重试'),
+          ),
+        )
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    try {
+      await for (final line in lines) {
+        final trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue; // 注释/空行跳过
+        final payload = trimmed.substring(5).trim();
+        if (payload == '[DONE]') break;
+        if (payload.isEmpty) continue;
+        final content = _extractDeltaContent(payload);
+        if (content != null && content.isNotEmpty) {
+          emitted = true;
+          yield content;
+        }
+      }
+    } on TimeoutException {
+      throw const LlmNetworkError('AI 讲解生成超时，请稍后重试');
+    } on SocketException {
+      throw const LlmNetworkError('网络不可用，请检查网络后重试');
+    } on http.ClientException {
+      throw const LlmNetworkError('网络请求失败');
+    }
+
+    if (!emitted) {
+      throw const LlmResponseFormatError('模型输出内容为空');
+    }
+  }
+
   void close() {
     if (_ownsHttpClient) _httpClient.close();
   }
@@ -392,6 +464,41 @@ final class LlmClient {
     return response;
   }
 
+  /// 流式 POST：返回 [http.StreamedResponse] 供调用方消费 `.stream`。
+  /// 状态码 / 异常分类与 [_send] 对齐，且在消费 body 前即校验状态码。
+  Future<http.StreamedResponse> _sendStream({
+    required Uri uri,
+    required String body,
+    required String apiKey,
+    required Duration timeout,
+    required String timeoutMessage,
+  }) async {
+    http.StreamedResponse response;
+    try {
+      final request = http.Request('POST', uri)
+        ..headers.addAll(_headersFor(apiKey))
+        ..body = body;
+      response = await _httpClient.send(request).timeout(timeout);
+    } on TimeoutException {
+      throw LlmNetworkError(timeoutMessage);
+    } on SocketException {
+      throw const LlmNetworkError('网络不可用，请检查网络后重试');
+    } on http.ClientException {
+      throw const LlmNetworkError('网络请求失败');
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw LlmAuthError('API Key 无效或未授权（HTTP ${response.statusCode}）');
+    }
+    if (response.statusCode >= 500) {
+      throw LlmServerError('LLM 服务暂时不可用（HTTP ${response.statusCode}）');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw LlmServerError('LLM 服务请求失败（HTTP ${response.statusCode}）');
+    }
+    return response;
+  }
+
   /// 提取 `choices[0].message.content`；缺失或非 200 结构抛格式错误。
   String _extractAssistantContent(http.Response response) {
     Object? decoded;
@@ -424,6 +531,27 @@ final class LlmClient {
       throw const LlmResponseFormatError('模型输出内容为空');
     }
     return content;
+  }
+
+  /// 从单条 SSE data payload 提取 `choices[0].delta.content`。
+  /// 非 JSON / 结构不符 / 无 content 一律返回 null（调用方跳过该行，
+  /// 不中断整个流——容忍 keep-alive 心跳与个别格式瑕疵）。
+  static String? _extractDeltaContent(String payload) {
+    Object? decoded;
+    try {
+      decoded = jsonDecode(payload);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map<String, dynamic>) return null;
+    final choices = decoded['choices'];
+    if (choices is! List<Object?> || choices.isEmpty) return null;
+    final choice = choices.first;
+    if (choice is! Map<Object?, Object?>) return null;
+    final delta = choice['delta'];
+    if (delta is! Map<Object?, Object?>) return null;
+    final content = delta['content'];
+    return content is String ? content : null;
   }
 
   /// 容错解析草稿：剥 markdown code fence、截取首个 `[` 到末个 `]`，

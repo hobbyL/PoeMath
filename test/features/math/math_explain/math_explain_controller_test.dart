@@ -47,16 +47,26 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   Future<String?> readLlmApiKey() => Future.value(null);
 }
 
-http.Response _chatResponse(String content) => http.Response.bytes(
-      utf8.encode(jsonEncode({
-        'choices': [
-          {
-            'message': {'role': 'assistant', 'content': content},
-          },
-        ],
-      }),),
+/// 单条 SSE data 行（含结尾空行），content 包进 choices[0].delta.content。
+String _sseData(String content) {
+  final json = jsonEncode({
+    'choices': [
+      {
+        'delta': {'content': content},
+      },
+    ],
+  });
+  return 'data: $json\n\n';
+}
+
+/// 把整段讲解内容包装成「单片 + [DONE]」的 OpenAI 兼容 SSE 响应。
+///
+/// 控制器已切流式（explainStream），mock 必须回 `text/event-stream` 而非
+/// chat JSON；经 MockClient.send 以单 chunk 字节流交付，LineSplitter 照常解析。
+http.Response _sseResponse(String content) => http.Response.bytes(
+      utf8.encode('${_sseData(content)}data: [DONE]\n\n'),
       200,
-      headers: const {'content-type': 'application/json; charset=utf-8'},
+      headers: const {'content-type': 'text/event-stream; charset=utf-8'},
     );
 
 void main() {
@@ -105,7 +115,7 @@ void main() {
     await seedProviders();
     final container = containerWith(
       MockClient(
-        (_) async => _chatResponse(
+        (_) async => _sseResponse(
           '1. 先算个位：**7 + 5 = 12**，写 2 进 1。\n'
           '\n'
           '- 再算十位：2 + 3 + 1 = 6。\n'
@@ -129,12 +139,47 @@ void main() {
     expect(state.problemText, '27 + 35 = ?');
   });
 
+  test('流式：中途 streaming 态可见、paragraphs 实时增长，收尾转 ready',
+      () async {
+    await seedProviders();
+    final sse = StreamController<List<int>>();
+    final container = containerWith(
+      MockClient.streaming(
+        (request, bodyStream) async => http.StreamedResponse(sse.stream, 200),
+      ),
+    );
+    final notifier = container.read(mathExplainProvider.notifier);
+
+    final done = notifier.generate(
+      problemText: '27 + 35 = ?',
+      correctAnswer: '62',
+    );
+
+    // 首片到达：进入 streaming，仅渲染已到达段落。
+    sse.add(utf8.encode(_sseData('先算个位。\n')));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final mid = container.read(mathExplainProvider);
+    expect(mid.status, MathExplainStatus.streaming);
+    expect(mid.paragraphs, ['先算个位。']);
+    expect(mid.problemText, '27 + 35 = ?');
+
+    // 续片 + [DONE]：收尾转 ready，段落累积完整。
+    sse.add(utf8.encode(_sseData('再算十位。')));
+    sse.add(utf8.encode('data: [DONE]\n\n'));
+    await sse.close();
+    await done;
+
+    final state = container.read(mathExplainProvider);
+    expect(state.status, MathExplainStatus.ready);
+    expect(state.paragraphs, ['先算个位。', '再算十位。']);
+  });
+
   test('答错分支：prompt 含孩子答案与错因中文标签', () async {
     await seedProviders();
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('讲解内容。');
+      return _sseResponse('讲解内容。');
     }),);
 
     await container.read(mathExplainProvider.notifier).generate(
@@ -162,7 +207,7 @@ void main() {
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('讲解内容。');
+      return _sseResponse('讲解内容。');
     }),);
 
     await container.read(mathExplainProvider.notifier).generate(
@@ -182,7 +227,7 @@ void main() {
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('讲解内容。');
+      return _sseResponse('讲解内容。');
     }),);
 
     await container.read(mathExplainProvider.notifier).generate(
@@ -204,7 +249,7 @@ void main() {
     var requests = 0;
     final container = containerWith(MockClient((_) async {
       requests++;
-      return _chatResponse('不该被调用');
+      return _sseResponse('不该被调用');
     }),);
 
     await container.read(mathExplainProvider.notifier).generate(
@@ -255,7 +300,7 @@ void main() {
     await notifier.generate(problemText: '1 + 1 = ?', correctAnswer: '2');
     expect(requests, 1);
 
-    completer.complete(_chatResponse('解析内容。'));
+    completer.complete(_sseResponse('解析内容。'));
     await first;
     expect(container.read(mathExplainProvider).isReady, isTrue);
     expect(requests, 1);
@@ -279,7 +324,7 @@ void main() {
     notifier.reset();
     expect(container.read(mathExplainProvider).isIdle, isTrue);
 
-    completer.complete(_chatResponse('晚到的解析。'));
+    completer.complete(_sseResponse('晚到的解析。'));
     await pending;
     expect(container.read(mathExplainProvider).isIdle, isTrue);
     expect(container.read(mathExplainProvider).paragraphs, isEmpty);
@@ -293,7 +338,7 @@ void main() {
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('解析内容。');
+      return _sseResponse('解析内容。');
     }),);
 
     await container.read(mathExplainProvider.notifier).generate(
@@ -319,7 +364,7 @@ void main() {
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('解析内容。');
+      return _sseResponse('解析内容。');
     }),);
 
     await container.read(mathExplainProvider.notifier).generate(
@@ -342,7 +387,7 @@ void main() {
     late http.Request captured;
     final container = containerWith(MockClient((request) async {
       captured = request;
-      return _chatResponse('解析内容。');
+      return _sseResponse('解析内容。');
     }),);
 
     await container.read(mathExplainProvider.notifier).generate(

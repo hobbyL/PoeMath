@@ -61,6 +61,26 @@ http.Response _chatResponse(String content) => http.Response.bytes(
       headers: const {'content-type': 'application/json; charset=utf-8'},
     );
 
+/// 把若干 SSE 文本片段包装成「分片到达」的流式响应。
+http.StreamedResponse _sse(List<String> chunks, {int statusCode = 200}) =>
+    http.StreamedResponse(
+      Stream<List<int>>.fromIterable(chunks.map(utf8.encode)),
+      statusCode,
+      headers: const {'content-type': 'text/event-stream; charset=utf-8'},
+    );
+
+/// 单条 SSE data 行（含结尾空行），content 包进 choices[0].delta.content。
+String _sseData(String content) {
+  final json = jsonEncode({
+    'choices': [
+      {
+        'delta': {'content': content},
+      },
+    ],
+  });
+  return 'data: $json\n\n';
+}
+
 const _normalArray =
     '[{"index":1,"text":"小明有12支铅笔，妈妈又买了4支，小明一共有多少支铅笔？",'
     '"unit":"支","explanation":"先算 12+4，一共有16支。"},'
@@ -688,6 +708,181 @@ void main() {
 
       expect(result.text, '讲解内容');
       expect(captured.headers.containsKey('authorization'), isFalse);
+    });
+  });
+
+  group('explainStream', () {
+    test('逐片 yield 增量并拼接；请求含 stream:true + Bearer 头', () async {
+      late String capturedBody;
+      late Map<String, String> capturedHeaders;
+      late String capturedUrl;
+      final client = LlmClient(
+        httpClient: MockClient.streaming((request, bodyStream) async {
+          capturedHeaders = request.headers;
+          capturedUrl = request.url.toString();
+          capturedBody = await bodyStream.bytesToString();
+          return _sse([
+            _sseData('第一段。'),
+            _sseData('第二段。'),
+            'data: [DONE]\n\n',
+          ]);
+        }),
+      );
+
+      final chunks = await client
+          .explainStream(
+            config: _config,
+            systemPrompt: '你是老师',
+            userPrompt: '讲讲',
+          )
+          .toList();
+
+      expect(chunks.join(), '第一段。第二段。');
+      expect(capturedUrl, 'https://api.example.com/v1/chat/completions');
+      expect(capturedHeaders['authorization'], 'Bearer $_apiKey');
+      final body = jsonDecode(capturedBody) as Map<String, dynamic>;
+      expect(body['stream'], true);
+      expect(body['model'], 'gpt-4o-mini');
+      expect(body['max_tokens'], 800);
+      final messages = body['messages'] as List<dynamic>;
+      expect(messages, hasLength(2));
+      expect(messages[0]['role'], 'system');
+      expect(messages[1]['role'], 'user');
+      expect(capturedBody, isNot(contains(_apiKey)));
+    });
+
+    test('中文多字节字符跨分片边界不乱码', () async {
+      // 把一条含中文的 SSE 行的 UTF-8 字节从中间切断成两片。
+      final bytes = utf8.encode(_sseData('你好世界，床前明月光'));
+      final mid = bytes.length ~/ 2;
+      final client = LlmClient(
+        httpClient: MockClient.streaming(
+          (request, bodyStream) async => http.StreamedResponse(
+            Stream<List<int>>.fromIterable([
+              bytes.sublist(0, mid),
+              bytes.sublist(mid),
+              utf8.encode('data: [DONE]\n\n'),
+            ]),
+            200,
+          ),
+        ),
+      );
+
+      final text = (await client
+              .explainStream(config: _config, systemPrompt: 's', userPrompt: 'u')
+              .toList())
+          .join();
+      expect(text, '你好世界，床前明月光');
+    });
+
+    test('全程无 content（仅 [DONE]）抛 LlmResponseFormatError', () async {
+      final client = LlmClient(
+        httpClient: MockClient.streaming(
+          (request, bodyStream) async => _sse(['data: [DONE]\n\n']),
+        ),
+      );
+
+      await expectLater(
+        client
+            .explainStream(config: _config, systemPrompt: 's', userPrompt: 'u')
+            .toList(),
+        throwsA(isA<LlmResponseFormatError>()),
+      );
+    });
+
+    test('keep-alive 注释行 / 空行 / 坏 JSON 行跳过不中断', () async {
+      final client = LlmClient(
+        httpClient: MockClient.streaming(
+          (request, bodyStream) async => _sse([
+            ': keep-alive\n\n',
+            '\n',
+            'data: not-json\n\n',
+            _sseData('有效内容'),
+            'data: [DONE]\n\n',
+          ]),
+        ),
+      );
+
+      final text = (await client
+              .explainStream(config: _config, systemPrompt: 's', userPrompt: 'u')
+              .toList())
+          .join();
+      expect(text, '有效内容');
+    });
+
+    test('401 映射为 LlmAuthError', () async {
+      final client = LlmClient(
+        httpClient: MockClient.streaming(
+          (request, bodyStream) async => _sse(const [], statusCode: 401),
+        ),
+      );
+
+      await expectLater(
+        client
+            .explainStream(config: _config, systemPrompt: 's', userPrompt: 'u')
+            .toList(),
+        throwsA(isA<LlmAuthError>()),
+      );
+    });
+
+    test('5xx 映射为 LlmServerError', () async {
+      final client = LlmClient(
+        httpClient: MockClient.streaming(
+          (request, bodyStream) async => _sse(const [], statusCode: 503),
+        ),
+      );
+
+      await expectLater(
+        client
+            .explainStream(config: _config, systemPrompt: 's', userPrompt: 'u')
+            .toList(),
+        throwsA(isA<LlmServerError>()),
+      );
+    });
+
+    test('事件间隔超时映射为 LlmNetworkError', () async {
+      final client = LlmClient(
+        httpClient: MockClient.streaming(
+          (request, bodyStream) async => http.StreamedResponse(
+            Stream<List<int>>.fromFuture(
+              Future.delayed(
+                const Duration(milliseconds: 300),
+                () => utf8.encode(_sseData('迟到')),
+              ),
+            ),
+            200,
+          ),
+        ),
+        explainTimeout: const Duration(milliseconds: 50),
+      );
+
+      await expectLater(
+        client
+            .explainStream(config: _config, systemPrompt: 's', userPrompt: 'u')
+            .toList(),
+        throwsA(isA<LlmNetworkError>()),
+      );
+    });
+
+    test('空 Key（Ollama）省略 Authorization 头', () async {
+      late Map<String, String> capturedHeaders;
+      final client = LlmClient(
+        httpClient: MockClient.streaming((request, bodyStream) async {
+          capturedHeaders = request.headers;
+          return _sse([_sseData('内容'), 'data: [DONE]\n\n']);
+        }),
+      );
+
+      const ollamaConfig = LlmConfig(
+        baseUrl: 'http://localhost:11434',
+        apiKey: '',
+        model: 'qwen2.5:7b',
+      );
+      await client
+          .explainStream(config: ollamaConfig, systemPrompt: 's', userPrompt: 'u')
+          .toList();
+
+      expect(capturedHeaders.containsKey('authorization'), isFalse);
     });
   });
 }

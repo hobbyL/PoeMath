@@ -873,7 +873,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
           label: '生成讲解',
           onTap: () => _explainNotifier.generate(poem),
         ),
-      PoemExplainStatus.loading => const AiActionTag(
+      PoemExplainStatus.loading ||
+      PoemExplainStatus.streaming =>
+        const AiActionTag(
           label: '生成中…',
           busy: true,
         ),
@@ -949,6 +951,18 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       case PoemExplainStatus.loading:
         return [
           Text('AI 正在准备讲解，请稍候…', style: hintStyle),
+        ];
+      case PoemExplainStatus.streaming:
+        // 流式接收中：实时渲染已到达段落，不含朗读入口（半截文本不朗读）。
+        return [
+          for (final paragraph in state.paragraphs) ...[
+            Text(
+              paragraph,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
+          Text('AI 正在逐句生成…', style: hintStyle),
         ];
       case PoemExplainStatus.ready:
         return [
