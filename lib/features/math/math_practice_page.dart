@@ -458,6 +458,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       appBar: AppBar(
         title: Text('${currentIndex + 1} / ${problems.length}'),
         actions: [
+          _buildAiExplainAction(context),
           Padding(
             padding: const EdgeInsets.only(right: SpacingTokens.md),
             child: Center(
@@ -554,7 +555,6 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                                 const SizedBox(height: SpacingTokens.md),
                                 if (_judgement!.correctSteps.isNotEmpty)
                                   _buildStepsSection(context),
-                                _buildAiExplainButton(context),
                               ],
                             ],
                           ),
@@ -721,22 +721,31 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     );
   }
 
-  /// AI 解析入口：只做讲解展示，不参与判分/错题/统计。
-  Widget _buildAiExplainButton(BuildContext context) {
+  /// AppBar 的 AI 解析入口：宽屏图标+文字，窄屏仅图标（参考口算页顶部导航）。
+  /// 只做讲解展示，不参与判分/错题/统计；未判分时不显示。
+  Widget _buildAiExplainAction(BuildContext context) {
     final problem = ref.read(currentProblemProvider);
     final judgement = _judgement;
     if (problem == null || judgement == null) return const SizedBox.shrink();
-    return TextButton.icon(
-      onPressed: () => showMathAiExplainSheet(
-        context,
-        problemText: problem.problemText,
-        correctAnswer: problem.answerText,
-        userAnswer: judgement.isCorrect ? null : _userAnswerOf(problem),
-        diagnosisCategory: judgement.diagnosis?.category,
-      ),
-      icon: const Icon(Icons.auto_awesome, size: 18),
-      label: const Text('AI 帮我讲'),
-    );
+    final isWide = MediaQuery.sizeOf(context).width >= 420;
+    void open() => showMathAiExplainSheet(
+          context,
+          problemText: problem.problemText,
+          correctAnswer: problem.answerText,
+          userAnswer: judgement.isCorrect ? null : _userAnswerOf(problem),
+          diagnosisCategory: judgement.diagnosis?.category,
+        );
+    return isWide
+        ? TextButton.icon(
+            onPressed: open,
+            icon: const Icon(Icons.auto_awesome, size: 18),
+            label: const Text('AI 帮我讲'),
+          )
+        : IconButton(
+            onPressed: open,
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'AI 帮我讲',
+          );
   }
 
   /// 从本次会话记录中回查该题作答（只读，不改动记录链路）。

@@ -23,8 +23,7 @@ import 'package:poemath/features/profile/notification_settings_page.dart';
 import 'package:poemath/features/profile/practice_settings_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 import 'package:poemath/features/profile/tts_settings_page.dart';
-import 'package:poemath/features/profile/llm_settings_page.dart';
-import 'package:poemath/features/profile/prompt_settings_page.dart';
+import 'package:poemath/features/profile/ai_settings_page.dart';
 
 enum _SettingsSection { hub, appearance, sound, learning, data }
 
@@ -278,40 +277,19 @@ class SettingsPage extends ConsumerWidget {
             if (_section == _SettingsSection.learning)
               const SizedBox(height: SpacingTokens.sm),
 
-            // 应用题 AI 出题（LLM 服务配置 → 子页面）
+            // AI 设置（供应商 / 使用场景 / 提示词 → 枢纽子页）
             if (_section == _SettingsSection.learning)
               AppTile(
                 icon: Icons.smart_toy_outlined,
                 iconColor: theme.colorScheme.tertiary,
-                title: '应用题 AI 出题',
+                title: 'AI 设置',
                 subtitle: settingsRepo.llmProviders.isEmpty
                     ? '未配置'
                     : '已配置 ${settingsRepo.llmProviders.length} 个服务',
                 onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(
-                    builder: (_) => const LlmSettingsPage(),
-                  ),
-                ),
-              ),
-            if (_section == _SettingsSection.learning)
-              const SizedBox(height: SpacingTokens.md),
-
-            // AI 讲解提示词（诗词讲解 / 口算解析 system prompt 编辑）
-            if (_section == _SettingsSection.learning)
-              AppTile(
-                icon: Icons.edit_note_outlined,
-                iconColor: theme.colorScheme.tertiary,
-                title: 'AI 讲解提示词',
-                subtitle:
-                    (settingsRepo.poemExplainPromptOverride != null ||
-                            settingsRepo.mathExplainPromptOverride != null)
-                        ? '已自定义'
-                        : '内置默认',
-                onTap: () => Navigator.push<void>(
-                  context,
-                  fadeSlideRoute(
-                    builder: (_) => const PromptSettingsPage(),
+                    builder: (_) => const AiSettingsPage(),
                   ),
                 ),
               ),

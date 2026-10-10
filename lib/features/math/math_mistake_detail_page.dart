@@ -39,8 +39,34 @@ class MathMistakeDetailPage extends ConsumerWidget {
       );
     }
 
+    final isWide = MediaQuery.sizeOf(context).width >= 420;
+    // AI 解析入口（移至 AppBar 右上角）：只做讲解展示，不参与判分与错题状态。
+    void openAiExplain() => showMathAiExplainSheet(
+          context,
+          problemText: mistake.problemText,
+          correctAnswer: mistake.correctAnswer,
+          userAnswer: mistake.userAnswer,
+          diagnosisCategory: mistake.errorType,
+        );
+
     return Scaffold(
-      appBar: AppBar(title: const Text('错题详情')),
+      appBar: AppBar(
+        title: const Text('错题详情'),
+        actions: [
+          if (isWide)
+            TextButton.icon(
+              onPressed: openAiExplain,
+              icon: const Icon(Icons.auto_awesome, size: 18),
+              label: const Text('AI 帮我讲'),
+            )
+          else
+            IconButton(
+              onPressed: openAiExplain,
+              icon: const Icon(Icons.auto_awesome),
+              tooltip: 'AI 帮我讲',
+            ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(SpacingTokens.md),
         child: Column(
@@ -177,24 +203,6 @@ class MathMistakeDetailPage extends ConsumerWidget {
                     delay: 200.ms,
                     duration: 300.ms,
                   ),
-
-            const SizedBox(height: SpacingTokens.md),
-
-            // AI 解析入口（只做讲解展示，不参与判分与错题状态）。
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => showMathAiExplainSheet(
-                  context,
-                  problemText: mistake.problemText,
-                  correctAnswer: mistake.correctAnswer,
-                  userAnswer: mistake.userAnswer,
-                  diagnosisCategory: mistake.errorType,
-                ),
-                icon: const Icon(Icons.auto_awesome, size: 18),
-                label: const Text('AI 帮我讲'),
-              ),
-            ),
 
             const SizedBox(height: SpacingTokens.lg),
 

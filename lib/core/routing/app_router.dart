@@ -44,7 +44,7 @@ import 'package:poemath/features/poem/poem_tab_page.dart';
 import 'package:poemath/features/profile/about_page.dart';
 import 'package:poemath/features/profile/achievement_page.dart';
 import 'package:poemath/features/profile/learning_stats_page.dart';
-import 'package:poemath/features/profile/llm_settings_page.dart';
+import 'package:poemath/features/profile/llm_provider_settings_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
@@ -283,7 +283,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.llmSettings,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: const LlmSettingsPage(),
+          child: const LlmProviderSettingsPage(),
         ),
       ),
       // ============ 学习报告（非 Shell 子路由，全屏） ============

@@ -4,11 +4,14 @@
 // - loading：打开即生成，纯文案提示；关闭弹层丢弃在途请求（不崩溃）
 // - ready：markdown 清洗分段渲染 + 重新生成；请求走 mathExplain 场景配置
 // - error：错误文案不含 API Key，点「重新生成」可恢复成功
-// - unconfigured：引导文案 + 「去设置」跳转 llmSettings 路由
+// - unconfigured：引导文案 + 「去设置」tag 跳转 llmSettings 路由
 // - 错题详情页入口：「AI 帮我讲」点击弹出弹层并携带题面/答案
 //
 // 配置读取走 mock SettingsRepository（不触碰 Hive），HTTP 走 MockClient，
 // 时序均为微任务级，无需 runAsync 真实异步区。
+// 注意：loading 态标题右侧是 busy AiActionTag（内含无限动画转圈），
+// 停留在 loading 的用例不能用 pumpAndSettle（永不 settle），见
+// [pumpSheet] 的 settle 参数。
 
 import 'dart:async';
 import 'dart:convert';
@@ -25,6 +28,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
+import 'package:poemath/core/widgets/ai_action_tag.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
@@ -112,10 +116,15 @@ void main() {
     return settings;
   }
 
+  /// 打开弹层。[settle] 为 true（默认）末尾 pumpAndSettle——适用于生成
+  /// 已到达 ready/error/unconfigured 终态、busy 转圈已卸下的场景；
+  /// loading 停留场景（配置读取或请求被挂起）busy tag 无限动画，
+  /// pumpAndSettle 会超时，传 false 只推帧。
   Future<void> pumpSheet(
     WidgetTester tester, {
     required SettingsRepository settings,
     http.Client? client,
+    bool settle = true,
   }) async {
     final router = GoRouter(
       routes: [
@@ -141,7 +150,12 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('打开 AI 解析'));
     await tester.pump();
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      // 弹层入场动画 ~300ms；busy 转圈持续，只推固定时长。
+      await tester.pump(const Duration(milliseconds: 400));
+    }
   }
 
   testWidgets('loading：纯文案提示；关闭弹层丢弃在途请求不崩溃', (tester) async {
@@ -154,6 +168,7 @@ void main() {
     await pumpSheet(
       tester,
       settings: settings,
+      settle: false,
       client: MockClient((_) async {
         requests++;
         return _chatResponse('不该被请求');
@@ -162,10 +177,15 @@ void main() {
 
     expect(find.text('AI 解析'), findsOneWidget);
     expect(find.text('AI 正在准备解析，请稍候…'), findsOneWidget);
+    // loading 态标题右侧为 busy tag（转圈中，不可点）。
+    expect(find.widgetWithText(AiActionTag, '生成中…'), findsOneWidget);
 
     // loading 中关闭：discardPending 使晚到回调失效，dispose 不写状态。
+    // 出场动画期间 busy 转圈仍在树上（无限动画），不能 pumpAndSettle，
+    // 推过出场时长（modal 反向动画 ~200ms）即可。
     await tester.tap(find.byTooltip('关闭'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     completer.complete(
       const LlmConfig(
@@ -241,7 +261,7 @@ void main() {
     expect(calls, 2);
   });
 
-  testWidgets('unconfigured：引导文案 + 「去设置」跳转设置页', (tester) async {
+  testWidgets('unconfigured：引导文案 + 「去设置」tag 跳转设置页', (tester) async {
     final settings = _MockSettingsRepository();
     when(() => settings.readLlmConfigForScenario(any()))
         .thenAnswer((_) async => null);
@@ -257,7 +277,8 @@ void main() {
 
     expect(find.text('还没有配置 AI 服务，配置后即可使用 AI 解析。'),
         findsOneWidget,);
-    expect(find.widgetWithText(OutlinedButton, '去设置'), findsOneWidget);
+    // 未配置态主操作收敛为「去设置」tag（非按钮）。
+    expect(find.widgetWithText(AiActionTag, '去设置'), findsOneWidget);
     // 未配置不发任何网络请求。
     expect(requests, 0);
 
@@ -276,6 +297,7 @@ void main() {
     await pumpSheet(
       tester,
       settings: configuredRepo(),
+      settle: false,
       client: MockClient((request) async {
         calls++;
         // 第一次请求挂起（模拟慢请求在途），弹层停在 loading。
@@ -290,16 +312,18 @@ void main() {
     expect(calls, 1);
 
     // loading 中关闭：discardPending 废令牌，但 provider state 仍残留
-    // loading（dispose 不写状态）。
+    // loading（dispose 不写状态）。出场动画期间转圈仍在，只推帧。
     await tester.tap(find.byTooltip('关闭'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('AI 解析'), findsNothing);
 
     // 再开新弹层：initState 先 reset()（清残留 loading + 废令牌）再
     // generate()，否则 isLoading 守卫拦截第二次请求 → 永久卡 loading。
+    // 打开后停 loading（busy 转圈在转），只推帧。
     await tester.tap(find.text('打开 AI 解析'));
     await tester.pump();
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 400));
 
     // 第二次请求已发出且到达 ready 终态（修复前：calls 仍为 1、卡 loading）。
     expect(calls, 2);
@@ -307,6 +331,7 @@ void main() {
     expect(find.text('AI 正在准备解析，请稍候…'), findsNothing);
 
     // 收尾：放行第一次请求（令牌已废，续体空转不写状态），避免悬挂 future。
+    // 第二个弹层已到 ready 终态（busy 转圈已卸下），可 settle。
     firstGate.complete(_chatResponse('late'));
     await tester.pumpAndSettle();
   });

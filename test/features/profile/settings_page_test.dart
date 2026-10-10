@@ -91,6 +91,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('练习设置'), findsOneWidget);
     expect(find.text('通知设置'), findsOneWidget);
+    // AI 设置：合并入口（供应商 / 使用场景 / 提示词进枢纽子页）。
+    expect(find.text('AI 设置'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 

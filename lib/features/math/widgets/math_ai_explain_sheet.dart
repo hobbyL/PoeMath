@@ -8,13 +8,18 @@
 //
 // 边界：只展示讲解，不参与判分与错题记录。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/math/math_explain/math_explain_controller.dart';
 import 'package:poemath/features/math/math_explain/math_explain_models.dart';
 
@@ -62,10 +67,28 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
   /// dispose 阶段 ref 不可用，initState 先捕获 notifier。
   late final MathExplainNotifier _notifier;
 
+  /// TTS 服务（dispose 阶段 ref 不可用，initState 先捕获）。
+  late final TtsService _tts;
+
+  /// 是否正在朗读解析内容。
+  bool _isSpeaking = false;
+
+  /// 点击可播区域 → 首段音频就绪前（或停止 await 期）的遮罩期，
+  /// 作为重入守卫拦截一切重复点击，避免 stop 未完成时并发启动第二个会话。
+  bool _isPreparing = false;
+
+  /// 当前持有播放态的会话 id，-1 表示无（空闲 / 已停止）。
+  /// 身份来源是 [TtsService.currentSessionId]（服务唯一权威）。
+  int _activeSessionId = -1;
+
+  /// 该回调 / 该次 await 是否仍属于当前持有播放态的会话。
+  bool _isCurrentSession(int sessionId) => sessionId == _activeSessionId;
+
   @override
   void initState() {
     super.initState();
     _notifier = ref.read(mathExplainProvider.notifier);
+    _tts = ref.read(ttsServiceProvider);
     // 打开即生成（入口按钮本身就是用户的生成意图）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // 上一个弹层关闭时在途请求被 discardPending 废弃，state 可能残留
@@ -82,6 +105,18 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
     // provider 状态——弹层元素在 unmount 期间仍订阅该 provider，
     // 同步状态写会通知 defunct element 触发 markNeedsBuild 断言。
     _notifier.discardPending();
+    // 关闭弹层即停播（AC12「关闭停播」）：stop 同步段递增服务令牌，
+    // 在途朗读的晚到回调天然失配。
+    unawaited(
+      _tts.stop().onError(
+            (error, stackTrace) => AppLogger.e(
+              '关闭 AI 解析弹层时停止朗读失败',
+              tag: 'MathAiExplain',
+              error: error,
+              stackTrace: stackTrace,
+            ),
+          ),
+    );
     super.dispose();
   }
 
@@ -98,6 +133,30 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final state = ref.watch(mathExplainProvider);
+    final playing = _isSpeaking;
+
+    // 标题右侧状态操作 tag：生成中/重新生成/去设置收敛到此，正文不再放按钮。
+    // 弹层打开即自动生成，idle 仅为瞬时态，与 loading 同样显示「生成中…」。
+    final actionTag = switch (state.status) {
+      MathExplainStatus.idle ||
+      MathExplainStatus.loading =>
+        const AiActionTag(label: '生成中…', busy: true),
+      MathExplainStatus.ready => AiActionTag(
+          label: '重新生成',
+          onTap: _generate,
+        ),
+      MathExplainStatus.error => AiActionTag(
+          label: '重新生成',
+          onTap: _generate,
+        ),
+      MathExplainStatus.unconfigured => AiActionTag(
+          label: '去设置',
+          onTap: () {
+            Navigator.of(context).pop();
+            context.push(AppRoutes.llmSettings);
+          },
+        ),
+    };
 
     return SafeArea(
       child: ConstrainedBox(
@@ -124,8 +183,16 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (playing) ...[
+                    const SizedBox(width: SpacingTokens.xs),
+                    Icon(
+                      Icons.graphic_eq,
+                      size: 16,
+                      color: theme.colorScheme.tertiary,
+                    ),
+                  ],
                   const SizedBox(width: SpacingTokens.sm),
-                  _AiBadge(color: theme.colorScheme.tertiary),
+                  actionTag,
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -143,7 +210,7 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
                     width: double.infinity,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _buildBody(context, theme, state),
+                      children: _buildBody(theme, state),
                     ),
                   ),
                 ),
@@ -156,7 +223,6 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
   }
 
   List<Widget> _buildBody(
-    BuildContext context,
     ThemeData theme,
     MathExplainState state,
   ) {
@@ -171,18 +237,23 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
         ];
       case MathExplainStatus.ready:
         return [
-          for (final paragraph in state.paragraphs) ...[
-            Text(
-              paragraph,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.7),
+          // 内容区可点击播放：点击朗读，再次点击停止（竞态由会话令牌护栏）。
+          InkWell(
+            onTap: () => _onTapContent(state.fullText),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final paragraph in state.paragraphs) ...[
+                  Text(
+                    paragraph,
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.7),
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                ],
+              ],
             ),
-            const SizedBox(height: SpacingTokens.sm),
-          ],
-          TextButton.icon(
-            onPressed: _generate,
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('重新生成'),
           ),
+          Text('点击内容可朗读，再次点击停止。', style: hintStyle),
         ];
       case MathExplainStatus.error:
         return [
@@ -192,12 +263,6 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
               color: theme.colorScheme.error,
             ),
           ),
-          const SizedBox(height: SpacingTokens.sm),
-          OutlinedButton.icon(
-            onPressed: _generate,
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('重新生成'),
-          ),
         ];
       case MathExplainStatus.unconfigured:
         return [
@@ -205,45 +270,104 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
             state.message ?? '还没有配置 AI 服务，配置后即可使用 AI 解析。',
             style: hintStyle,
           ),
-          const SizedBox(height: SpacingTokens.sm),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.push(AppRoutes.llmSettings);
-            },
-            icon: const Icon(Icons.settings_outlined, size: 18),
-            label: const Text('去设置'),
-          ),
         ];
     }
   }
-}
 
-/// 「AI 生成」角标。
-///
-/// 行内徽标（非信息卡片/容器），与 AppTile 内图标容器同类，沿用
-/// BoxDecoration + 设计令牌，不套 ColoredCard。
-class _AiBadge extends StatelessWidget {
-  const _AiBadge({required this.color});
+  /// 内容区点击：空闲→朗读，朗读中→停止（单区域，无切换分支）。
+  Future<void> _onTapContent(String text) async {
+    if (_isPreparing) return;
+    if (_isSpeaking) {
+      // 先置遮罩再 await stop：挡住停止窗口期的二次点击，避免 stop
+      // 未完成时并发启动第二个会话。
+      setState(() => _isPreparing = true);
+      await _stopSpeaking();
+      if (mounted) setState(() => _isPreparing = false);
+      return;
+    }
+    if (!mounted) return;
+    await _startSpeak(text);
+  }
 
-  final Color color;
+  /// 停止当前朗读并清理播放态。返回 stop 是否成功；失败时已弹 SnackBar。
+  /// 失败保留 `_isSpeaking`（音频可能仍在播），让后续点击继续走停止路由。
+  Future<bool> _stopSpeaking() async {
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      await _tts.stop();
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '停止 AI 解析朗读失败',
+        tag: 'MathAiExplain',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('停止朗读失败，请稍后重试')),
+        );
+      }
+      return false;
+    }
+    _activeSessionId = -1;
+    if (mounted) setState(() => _isSpeaking = false);
+    return true;
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: SpacingTokens.xs,
-        vertical: 1,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-      ),
-      child: Text(
-        'AI 生成',
-        style: theme.textTheme.labelSmall?.copyWith(color: color),
-      ),
-    );
+  /// 朗读解析内容（按标点分句）。会话令牌护栏复用诗词侧纪律：
+  /// `Future.sync` 使「捕获会话 id」一定先于任何异常/回调被观察到。
+  Future<void> _startSpeak(String text) async {
+    final scaffold = ScaffoldMessenger.of(context);
+    setState(() {
+      _isPreparing = true;
+      _isSpeaking = true;
+    });
+    final speaking = Future.sync(() {
+      return _tts.speakSentences(
+        text,
+        onReady: (sessionId) {
+          if (mounted && _isCurrentSession(sessionId)) {
+            setState(() => _isPreparing = false);
+          }
+        },
+      );
+    });
+    // 朗读入口在任何 await 之前递增服务令牌，发起与读取之间无挂起点。
+    final sessionId = _tts.currentSessionId;
+    _activeSessionId = sessionId;
+    try {
+      await speaking;
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        'AI 解析朗读失败',
+        tag: 'MathAiExplain',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted && _isCurrentSession(sessionId)) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          SnackBar(
+            content: Text(
+              error is TtsException
+                  ? '朗读失败：${error.message}'
+                  : '朗读失败，请检查系统语音服务后重试',
+            ),
+          ),
+        );
+      }
+    } finally {
+      // 过期会话（已被 stop/新会话接管）不清理，避免复位新会话的状态。
+      if (_isCurrentSession(sessionId)) {
+        _activeSessionId = -1;
+        if (mounted) {
+          setState(() {
+            _isPreparing = false;
+            _isSpeaking = false;
+          });
+        }
+      }
+    }
   }
 }

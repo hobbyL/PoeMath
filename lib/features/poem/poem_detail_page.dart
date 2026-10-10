@@ -865,6 +865,31 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     final state = (raw.poemId == null || raw.poemId == poem.id)
         ? raw
         : const PoemExplainState();
+    final playing = _isSpeaking && _activeSection == _sectionAiExplain;
+
+    // 标题右侧状态操作 tag：生成/重新生成/去设置均收敛到此，正文不再放按钮。
+    final actionTag = switch (state.status) {
+      PoemExplainStatus.idle => AiActionTag(
+          label: '生成讲解',
+          onTap: () => _explainNotifier.generate(poem),
+        ),
+      PoemExplainStatus.loading => const AiActionTag(
+          label: '生成中…',
+          busy: true,
+        ),
+      PoemExplainStatus.ready => AiActionTag(
+          label: '重新生成',
+          onTap: () => _explainNotifier.generate(poem),
+        ),
+      PoemExplainStatus.error => AiActionTag(
+          label: '重新生成',
+          onTap: () => _explainNotifier.generate(poem),
+        ),
+      PoemExplainStatus.unconfigured => AiActionTag(
+          label: '去设置',
+          onTap: () => context.push(AppRoutes.llmSettings),
+        ),
+    };
 
     return ColoredCard(
       color: theme.colorScheme.tertiary,
@@ -887,44 +912,27 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(width: SpacingTokens.sm),
-              _buildAiBadge(theme),
+              if (playing) ...[
+                const SizedBox(width: SpacingTokens.xs),
+                Icon(
+                  Icons.graphic_eq,
+                  size: 16,
+                  color: theme.colorScheme.tertiary,
+                ),
+              ],
+              const Spacer(),
+              actionTag,
             ],
           ),
           const SizedBox(height: SpacingTokens.sm),
-          ..._buildAiExplainBody(context, theme, poem, state),
+          ..._buildAiExplainBody(theme, state),
         ],
       ),
     );
   }
 
-  /// 「AI 生成」角标：内容由模型生成，需明确标识。
-  ///
-  /// 行内徽标（非信息卡片/容器），与 AppTile 内 40×40 图标容器同类，
-  /// 沿用 BoxDecoration + 设计令牌，不套 ColoredCard。
-  Widget _buildAiBadge(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: SpacingTokens.xs,
-        vertical: 1,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.tertiary.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-      ),
-      child: Text(
-        'AI 生成',
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.tertiary,
-        ),
-      ),
-    );
-  }
-
   List<Widget> _buildAiExplainBody(
-    BuildContext context,
     ThemeData theme,
-    Poem poem,
     PoemExplainState state,
   ) {
     final hintStyle = theme.textTheme.bodySmall?.copyWith(
@@ -933,12 +941,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     switch (state.status) {
       case PoemExplainStatus.idle:
         return [
-          Text('让 AI 用小朋友能听懂的话讲讲这首诗。', style: hintStyle),
-          const SizedBox(height: SpacingTokens.sm),
-          OutlinedButton.icon(
-            onPressed: () => _explainNotifier.generate(poem),
-            icon: const Icon(Icons.auto_awesome, size: 18),
-            label: const Text('生成讲解'),
+          Text(
+            '点右上角「生成讲解」，让 AI 用小朋友能听懂的话讲讲这首诗。',
+            style: hintStyle,
           ),
         ];
       case PoemExplainStatus.loading:
@@ -947,35 +952,25 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         ];
       case PoemExplainStatus.ready:
         return [
-          for (final paragraph in state.paragraphs) ...[
-            Text(
-              paragraph,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+          // 内容区可点击播放：复用折叠区的 _onTapSection 竞态/会话逻辑。
+          InkWell(
+            onTap: () => _onTapSection(
+              (section: _sectionAiExplain, playText: state.fullText),
             ),
-            const SizedBox(height: SpacingTokens.sm),
-          ],
-          Row(
-            children: [
-              TextButton.icon(
-                onPressed: () => _onTapSection(
-                  (section: _sectionAiExplain, playText: state.fullText),
-                ),
-                icon: Icon(
-                  _activeSection == _sectionAiExplain && _isSpeaking
-                      ? Icons.stop_circle_outlined
-                      : Icons.volume_up_outlined,
-                  size: 18,
-                ),
-                label: const Text('朗读讲解'),
-              ),
-              const SizedBox(width: SpacingTokens.sm),
-              TextButton.icon(
-                onPressed: () => _explainNotifier.generate(poem),
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('重新生成'),
-              ),
-            ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final paragraph in state.paragraphs) ...[
+                  Text(
+                    paragraph,
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                ],
+              ],
+            ),
           ),
+          Text('点击内容可朗读，再次点击停止。', style: hintStyle),
         ];
       case PoemExplainStatus.error:
         return [
@@ -985,24 +980,12 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               color: theme.colorScheme.error,
             ),
           ),
-          const SizedBox(height: SpacingTokens.sm),
-          OutlinedButton.icon(
-            onPressed: () => _explainNotifier.generate(poem),
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('重新生成'),
-          ),
         ];
       case PoemExplainStatus.unconfigured:
         return [
           Text(
             state.message ?? '还没有配置 AI 服务，配置后即可使用 AI 讲解。',
             style: hintStyle,
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          OutlinedButton.icon(
-            onPressed: () => context.push(AppRoutes.llmSettings),
-            icon: const Icon(Icons.settings_outlined, size: 18),
-            label: const Text('去设置'),
           ),
         ];
     }

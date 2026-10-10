@@ -253,17 +253,21 @@ class _WordProblemGeneratePageState
       children: [
         Text('年级', style: theme.textTheme.titleSmall),
         const SizedBox(height: SpacingTokens.xs),
-        Wrap(
-          spacing: SpacingTokens.xs,
-          runSpacing: SpacingTokens.xs,
-          children: [
-            for (var grade = 1; grade <= 6; grade++)
-              ChoiceChip(
-                label: Text('$grade 年级'),
-                selected: _grade == grade,
-                onSelected: (_) => setState(() => _grade = grade),
-              ),
-          ],
+        // 一行展示，宽度不够时横向滚动（参考错题本页年级行）。
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var grade = 1; grade <= 6; grade++) ...[
+                if (grade > 1) const SizedBox(width: SpacingTokens.xs),
+                ChoiceChip(
+                  label: Text('$grade 年级'),
+                  selected: _grade == grade,
+                  onSelected: (_) => setState(() => _grade = grade),
+                ),
+              ],
+            ],
+          ),
         ),
       ],
     );
@@ -289,22 +293,27 @@ class _WordProblemGeneratePageState
   }
 
   Widget _buildTopicSelector(ThemeData theme) {
+    final topics = WordProblemTopic.values;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('知识点', style: theme.textTheme.titleSmall),
         const SizedBox(height: SpacingTokens.xs),
-        Wrap(
-          spacing: SpacingTokens.xs,
-          runSpacing: SpacingTokens.xs,
-          children: [
-            for (final topic in WordProblemTopic.values)
-              ChoiceChip(
-                label: Text(topic.label),
-                selected: _topic == topic,
-                onSelected: (_) => setState(() => _topic = topic),
-              ),
-          ],
+        // 一行展示，宽度不够时横向滚动（参考错题本页年级行）。
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var i = 0; i < topics.length; i++) ...[
+                if (i > 0) const SizedBox(width: SpacingTokens.xs),
+                ChoiceChip(
+                  label: Text(topics[i].label),
+                  selected: _topic == topics[i],
+                  onSelected: (_) => setState(() => _topic = topics[i]),
+                ),
+              ],
+            ],
+          ),
         ),
       ],
     );

@@ -1,13 +1,16 @@
 // test/features/poem/poem_explain/poem_detail_ai_explain_test.dart
 //
 // 诗词详情页 AI 讲解区 widget 测试（任务 10-09-ai-explain-scenario-provider）：
-// - 未配置：点「生成讲解」进入引导态（提示 + 去设置按钮）
-// - 成功：讲解内容清洗 markdown 后分段渲染，附朗读/重新生成操作
+// - 未配置：点「生成讲解」tag 进入引导态（提示 + 去设置 tag）
+// - 成功：讲解内容清洗 markdown 后分段渲染，附重新生成 tag 与点击朗读提示
 // - 失败：错误文案展示（不含 API Key），点「重新生成」可恢复成功
 // - 切诗防护：讲解状态带 poemId，非当前诗词的结果不得闪现
 //
 // 配置读取走 mock SettingsRepository（不触碰 Hive），HTTP 走 MockClient，
 // 时序均为微任务级，无需 runAsync 真实异步区。
+// 注意：入场动画（AnimatedPageBody 交错 slideX）完成后才能点标题右侧的
+// actionTag——AI 卡位于列表尾部（交错延迟 ~960ms），动画未完成时卡片整体
+// 右偏 10%，tag 会落到 800px 测试视口外导致 tap hit test 落空、生成从未触发。
 
 import 'dart:convert';
 
@@ -22,6 +25,7 @@ import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/tts_service.dart';
+import 'package:poemath/core/widgets/ai_action_tag.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
@@ -103,8 +107,11 @@ void main() {
         ),
       ),
     );
-    // 等待 AnimatedPageBody 入场动画完成。
+    // 等待 AnimatedPageBody 入场动画完成：AI 卡位于列表尾部，交错
+    // 延迟最长（80ms × 12 ≈ 960ms）+ slideX 300ms；动画中卡片右偏
+    // 10%，右侧 tag 出 800px 视口，tap 会落空。
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 900));
   }
 
   /// 已配置场景厂商的 repo mock（诗词讲解走 DeepSeek 配置）。
@@ -137,24 +144,31 @@ void main() {
       }),
     );
 
-    // 初始 idle 态：提示文案 + 生成按钮 + AI 生成角标。
+    // 初始 idle 态：标题 + 生成讲解 tag + 引导文案（无旧「AI 生成」角标）。
     expect(find.text('AI 讲解'), findsOneWidget);
-    expect(find.text('AI 生成'), findsOneWidget);
-    expect(find.text('让 AI 用小朋友能听懂的话讲讲这首诗。'), findsOneWidget);
+    expect(find.text('AI 生成'), findsNothing);
+    expect(
+      find.text('点右上角「生成讲解」，让 AI 用小朋友能听懂的话讲讲这首诗。'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(AiActionTag, '生成讲解'), findsOneWidget);
 
     await tester.tap(find.text('生成讲解'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(
       find.text('还没有配置 AI 服务，配置后即可使用 AI 讲解。'),
       findsOneWidget,
     );
-    expect(find.widgetWithText(OutlinedButton, '去设置'), findsOneWidget);
+    // 未配置态主操作收敛为「去设置」tag（跳转 llmSettings 深链）。
+    expect(find.widgetWithText(AiActionTag, '去设置'), findsOneWidget);
     // 未配置不发任何网络请求。
     expect(requests, 0);
   });
 
-  testWidgets('成功：讲解清洗 markdown 后分段渲染，附朗读/重新生成', (tester) async {
+  testWidgets('成功：讲解清洗 markdown 后分段渲染，附重新生成与朗读提示',
+      (tester) async {
     late http.Request captured;
     await pumpPage(
       tester,
@@ -179,9 +193,10 @@ void main() {
     expect(find.text('举头望明月，低头思故乡。'), findsOneWidget);
     expect(find.textContaining('##'), findsNothing);
     expect(find.textContaining('**'), findsNothing);
-    // 操作按钮：朗读讲解 + 重新生成。
-    expect(find.text('朗读讲解'), findsOneWidget);
-    expect(find.text('重新生成'), findsOneWidget);
+    // 操作收敛为「重新生成」tag；朗读改为点击内容触发（不再有按钮）。
+    expect(find.text('朗读讲解'), findsNothing);
+    expect(find.widgetWithText(AiActionTag, '重新生成'), findsOneWidget);
+    expect(find.text('点击内容可朗读，再次点击停止。'), findsOneWidget);
     // 请求走诗词讲解场景配置的厂商。
     expect(
       captured.url.toString(),
@@ -212,7 +227,7 @@ void main() {
     expect(find.textContaining('secret-key-poem'), findsNothing);
 
     // 点「重新生成」恢复成功。
-    await tester.tap(find.text('重新生成'));
+    await tester.tap(find.widgetWithText(AiActionTag, '重新生成'));
     await tester.pumpAndSettle();
     expect(find.text('第二次成功的讲解内容。'), findsOneWidget);
     expect(calls, 2);
@@ -246,6 +261,7 @@ void main() {
 
     await tester.pumpWidget(scopeOf(_poemId));
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 900));
     await tester.tap(find.text('生成讲解'));
     await tester.pumpAndSettle();
     expect(find.text('静夜思的讲解内容。'), findsOneWidget);
@@ -253,10 +269,14 @@ void main() {
     // 切到另一首诗：AI 区回到 idle 态，旧讲解不闪现。
     await tester.pumpWidget(scopeOf(_poemId2));
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 900));
 
     expect(find.text('静夜思的讲解内容。'), findsNothing);
-    expect(find.text('让 AI 用小朋友能听懂的话讲讲这首诗。'), findsOneWidget);
-    expect(find.text('生成讲解'), findsOneWidget);
+    expect(
+      find.text('点右上角「生成讲解」，让 AI 用小朋友能听懂的话讲讲这首诗。'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(AiActionTag, '生成讲解'), findsOneWidget);
     // 新页面未发起请求（idle 态不发）。
     expect(calls, 1);
   });

@@ -31,4 +31,7 @@ class MathExplainState {
   bool get isIdle => status == MathExplainStatus.idle;
   bool get isLoading => status == MathExplainStatus.loading;
   bool get isReady => status == MathExplainStatus.ready;
+
+  /// 朗读文本：按段落换行拼接（与诗词侧 PoemExplainState.fullText 同义）。
+  String get fullText => paragraphs.join('\n');
 }
