@@ -5,6 +5,10 @@
 //       下载/校验/安装状态机（available → downloading → verifying →
 //       ready → installing，含 permissionRequired / error 分支）。
 //
+// 布局约定：弹窗自身即容器层，版本信息与更新内容直排（不套 ColoredCard）；
+// 正文整体可滚动，承接按 commit 自动生成的长更新说明。更新说明经
+// updateNotesLines 清洗，无内容时只提示有新版本。
+//
 // 与 UpdatePage 的关系：共享 apkCompatibilityError / friendlyUpdateError
 // 纯函数，下载校验安装链语义一致；UI 独立实现（弹窗内聚，无「重新检查」态）。
 
@@ -17,7 +21,6 @@ import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/core/services/update/update_models.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
-import 'package:poemath/core/widgets/app_widgets.dart';
 
 /// 弹窗关闭返回值语义（MainShell 据此调 markDismissedByUser / markDialogClosed）：
 /// - false：用户从未开始下载就取消/关闭 → 本进程不再自动提醒；
@@ -124,94 +127,88 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     final progressValue = _downloadTotal != null && _downloadTotal! > 0
         ? (_downloadReceived / _downloadTotal!).clamp(0.0, 1.0).toDouble()
         : null;
+    final noteLines = _phase == _UpdateDialogPhase.available
+        ? updateNotesLines(widget.update.notes)
+        : const <String>[];
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (_phase == _UpdateDialogPhase.available) ...[
-          _buildVersionCard(theme),
-          if (widget.update.notes.isNotEmpty) ...[
-            const SizedBox(height: SpacingTokens.sm),
-            _buildNotesCard(theme),
+    // 更新说明可达 600+ 字符（按 commit 自动生成时），会撑破 AlertDialog
+    // 对 content 的高度约束（Flexible）并触发 RenderFlex overflow，必须可滚动。
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_phase == _UpdateDialogPhase.available) ...[
+            // 弹窗自身即容器层，版本信息与更新内容直排，不再套卡片。
+            _InfoRow(
+              label: '当前版本',
+              value: 'v${widget.current.versionName}',
+            ),
+            _InfoRow(
+              label: '最新版本',
+              value: 'v${widget.update.versionName}',
+            ),
+            _InfoRow(
+              label: '安装包大小',
+              value: _formatBytes(widget.update.apkSize),
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+            // 无更新说明时只提示有新版本，不渲染空标题与空白正文。
+            if (noteLines.isEmpty)
+              Text(
+                '已有新版本可更新，建议立即下载安装。',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.45,
+                ),
+              )
+            else ...[
+              Text(
+                '更新内容',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.xs),
+              for (final line in noteLines)
+                Text(
+                  line,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                ),
+            ],
           ],
-        ],
-        if (_message.isNotEmpty) ...[
-          if (_phase == _UpdateDialogPhase.available)
-            const SizedBox(height: SpacingTokens.sm),
-          Text(
-            _message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: _phase == _UpdateDialogPhase.error
-                  ? theme.colorScheme.error
-                  : theme.colorScheme.onSurfaceVariant,
-              height: 1.45,
+          if (_message.isNotEmpty) ...[
+            if (_phase == _UpdateDialogPhase.available)
+              const SizedBox(height: SpacingTokens.sm),
+            Text(
+              _message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: _phase == _UpdateDialogPhase.error
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.onSurfaceVariant,
+                height: 1.45,
+              ),
             ),
-          ),
-        ],
-        if (_phase == _UpdateDialogPhase.downloading) ...[
-          const SizedBox(height: SpacingTokens.md),
-          LinearProgressIndicator(value: progressValue),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            _downloadProgressText,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          ],
+          if (_phase == _UpdateDialogPhase.downloading) ...[
+            const SizedBox(height: SpacingTokens.md),
+            LinearProgressIndicator(value: progressValue),
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              _downloadProgressText,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-        ],
-        if (_phase == _UpdateDialogPhase.verifying ||
-            _phase == _UpdateDialogPhase.installing) ...[
-          const SizedBox(height: SpacingTokens.md),
-          const LinearProgressIndicator(),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildVersionCard(ThemeData theme) {
-    return ColoredCard(
-      color: theme.colorScheme.primary,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _InfoRow(
-            label: '当前版本',
-            value: 'v${widget.current.versionName}',
-          ),
-          _InfoRow(
-            label: '最新版本',
-            value: 'v${widget.update.versionName}',
-          ),
-          _InfoRow(
-            label: '安装包大小',
-            value: _formatBytes(widget.update.apkSize),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotesCard(ThemeData theme) {
-    return ColoredCard(
-      color: theme.colorScheme.secondary,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '更新内容',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            widget.update.notes,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              height: 1.5,
-            ),
-          ),
+          ],
+          if (_phase == _UpdateDialogPhase.verifying ||
+              _phase == _UpdateDialogPhase.installing) ...[
+            const SizedBox(height: SpacingTokens.md),
+            const LinearProgressIndicator(),
+          ],
         ],
       ),
     );

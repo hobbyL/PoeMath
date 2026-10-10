@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/core/services/update/update_models.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/shell/update_dialog.dart';
 
 /// 可控的更新客户端 fake：绕过真实网络与文件 I/O（testWidgets 的
@@ -41,7 +42,7 @@ class _FakeUpdateClient extends UpdateClient {
   Future<String> sha256Of(File file) async => digest;
 }
 
-AppUpdateInfo _update() {
+AppUpdateInfo _update({String notes = '修复若干问题，优化体验。'}) {
   return AppUpdateInfo(
     packageName: 'com.poemath.app',
     versionName: '2.0.0',
@@ -52,7 +53,7 @@ AppUpdateInfo _update() {
     apkSha256: 'a' * 64,
     apkSize: 4,
     mandatory: false,
-    notes: '修复若干问题，优化体验。',
+    notes: notes,
   );
 }
 
@@ -86,11 +87,15 @@ List<String> _installChannelHandler({required bool canInstall}) {
 }
 
 /// 打开弹窗并完成入场动画，返回 showUpdateDialog 的 Future。
+///
+/// [update] 默认带非空 notes；验证 notes 相关渲染分支时注入自定义 fixture。
 Future<Future<bool?>?> _openDialog(
   WidgetTester tester, {
   required UpdateClient client,
   required AndroidUpdateInstaller installer,
+  AppUpdateInfo? update,
 }) async {
+  final updateInfo = update ?? _update();
   Future<bool?>? result;
   await tester.pumpWidget(
     MaterialApp(
@@ -101,7 +106,7 @@ Future<Future<bool?>?> _openDialog(
               onPressed: () {
                 result = showUpdateDialog(
                   context: context,
-                  update: _update(),
+                  update: updateInfo,
                   current: _current(),
                   client: client,
                   installer: installer,
@@ -146,6 +151,107 @@ void main() {
     expect(find.text('取消'), findsOneWidget);
     expect(find.text('下载更新'), findsOneWidget);
     expect(client.downloadCount, 0);
+  });
+
+  // 回归：notes 为空时（本次发布无面向用户的变更，release_notes.py 输出空串）
+  // 不渲染空标题与空白正文，只给一句「有新版本」提示。
+  testWidgets('notes 为空时只提示有新版本，不渲染更新内容区', (tester) async {
+    _installChannelHandler(canInstall: true);
+    final client = _FakeUpdateClient(digest: 'a' * 64);
+
+    await _openDialog(
+      tester,
+      client: client,
+      installer: _installer(),
+      update: _update(notes: ''),
+    );
+
+    expect(find.text('发现新版本'), findsOneWidget);
+    expect(find.text('已有新版本可更新，建议立即下载安装。'), findsOneWidget);
+    expect(find.text('更新内容'), findsNothing);
+    // 版本信息仍在，只是没有更新说明。
+    expect(find.text('当前版本'), findsOneWidget);
+    expect(find.text('下载更新'), findsOneWidget);
+  });
+
+  // 回归：notes 可能是人工撰写的 markdown（GitHub Release body），弹窗不引入
+  // markdown 渲染库，必须经 updateNotesLines 清洗后再逐行渲染。
+  testWidgets('markdown 格式的 notes 清洗后渲染，无标记残留', (tester) async {
+    _installChannelHandler(canInstall: true);
+    final client = _FakeUpdateClient(digest: 'a' * 64);
+
+    await _openDialog(
+      tester,
+      client: client,
+      installer: _installer(),
+      update: _update(
+        notes: '## 优化\n'
+            '\n'
+            '- 修复A\n'
+            '- **重点**修复B\n',
+      ),
+    );
+
+    expect(find.text('更新内容'), findsOneWidget);
+    expect(find.text('优化'), findsOneWidget);
+    expect(find.text('• 修复A'), findsOneWidget);
+    expect(find.text('• 重点修复B'), findsOneWidget);
+
+    // 弹窗内任何文本都不得出现 markdown 标记残留。
+    final texts = tester.widgetList<Text>(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(Text),
+      ),
+    );
+    for (final text in texts) {
+      final data = text.data ?? '';
+      expect(data.contains('#'), isFalse, reason: data);
+      expect(data.contains('**'), isFalse, reason: data);
+    }
+  });
+
+  // 回归：版本信息与更新内容直排在弹窗上（弹窗自身即容器层），
+  // 不再套 ColoredCard 形成「卡片套卡片」的双层边框。
+  testWidgets('版本信息与更新内容直排，不套卡片容器', (tester) async {
+    _installChannelHandler(canInstall: true);
+    final client = _FakeUpdateClient(digest: 'a' * 64);
+
+    await _openDialog(tester, client: client, installer: _installer());
+
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(ColoredCard),
+      ),
+      findsNothing,
+    );
+  });
+
+  // 回归：按 commit 自动生成的 notes 可达 600+ 字符，正文必须可滚动，
+  // 否则撑破 AlertDialog 对 content 的高度约束并触发 RenderFlex overflow。
+  testWidgets('长 notes 正文可滚动且不溢出', (tester) async {
+    _installChannelHandler(canInstall: true);
+    final client = _FakeUpdateClient(digest: 'a' * 64);
+    final longNotes = [
+      for (var i = 1; i <= 50; i++) '- 第 $i 项改进',
+    ].join('\n');
+
+    await _openDialog(
+      tester,
+      client: client,
+      installer: _installer(),
+      update: _update(notes: longNotes),
+    );
+
+    // 布局阶段的 overflow 会被 testWidgets 捕获为异常。
+    expect(tester.takeException(), isNull);
+    expect(find.text('• 第 1 项改进'), findsOneWidget);
+
+    // 末行需能滚动进可视区（无 Scrollable 祖先时 ensureVisible 会抛错）。
+    await tester.ensureVisible(find.text('• 第 50 项改进'));
+    await tester.pumpAndSettle();
+    expect(find.text('• 第 50 项改进'), findsOneWidget);
   });
 
   testWidgets('下载 → 校验 → 就绪完整链路', (tester) async {

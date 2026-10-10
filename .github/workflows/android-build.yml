@@ -22,6 +22,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # release notes 需要 `git describe --tags` 定位上一个 tag，
+          # 默认 fetch-depth=1 下拿不到 tag 历史。
+          fetch-depth: 0
 
       # -------- 从 tag 提取版本号 --------
       - name: Extract version from tag
@@ -149,13 +153,44 @@ jobs:
             exit 1
           fi
 
-          # 获取 Release notes
-          default_release_notes="韵算 ${GITHUB_REF_NAME}"
-          gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || \
-            gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --title "韵算 ${GITHUB_REF_NAME}" --notes "${default_release_notes}"
-          release_notes="$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json body --jq '.body')"
-          if [ -z "${release_notes}" ]; then
-            release_notes="${default_release_notes}"
+          # 获取 Release notes：人工撰写的 Release body 优先，否则按 commit 自动生成。
+          # 任何情况下都不写「韵算 vX.Y.Z」版本号占位——那会让应用内
+          # 「更新内容」只剩版本号（本次修复的根因）。
+          placeholder_notes="韵算 ${GITHUB_REF_NAME}"
+          notes_file="${RUNNER_TEMP}/release-notes.md"
+
+          # Release 必须存在（末尾 gh release upload 依赖它）。tag push 触发时
+          # 通常尚未创建，此处建 body 为空的 release。
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            # `.body // ""`：API 对未填写 body 的 Release 可能返回 null，
+            # jq 会把 null 输出为字面串 "null"，须归一为空串再走自动生成。
+            release_body="$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json body --jq '.body // ""')"
+          else
+            gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
+              --title "韵算 ${GITHUB_REF_NAME}" --notes ""
+            release_body=""
+          fi
+
+          # 旧流程遗留的占位文案视为「无人工 notes」，走自动生成。
+          if [ "$(printf '%s' "${release_body}" | tr -d '[:space:]')" \
+             = "$(printf '%s' "${placeholder_notes}" | tr -d '[:space:]')" ]; then
+            release_body=""
+          fi
+
+          if [ -n "${release_body}" ]; then
+            release_notes="${release_body}"
+            echo "→ release notes: 采用 GitHub Release body（人工撰写，${#release_notes} 字符）"
+          else
+            release_notes="$(python3 tools/release_notes.py "${GITHUB_REF_NAME}")"
+            if [ -n "${release_notes}" ]; then
+              # 回写 Release body，保证 GitHub 发布页与应用内「更新内容」一致。
+              printf '%s\n' "${release_notes}" > "${notes_file}"
+              gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
+                --notes-file "${notes_file}"
+              echo "→ release notes: 按 commit 自动生成并回写 Release（${#release_notes} 字符）"
+            else
+              echo "→ release notes: 本次无面向用户的变更，notes 留空"
+            fi
           fi
 
           # 计算 SHA256 和文件大小

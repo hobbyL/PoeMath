@@ -194,4 +194,96 @@ void main() {
       );
     });
   });
+
+  group('updateNotesLines', () {
+    test('空内容返回空列表', () {
+      expect(updateNotesLines(''), isEmpty);
+      expect(updateNotesLines('   \n\n  \t '), isEmpty);
+    });
+
+    test('仅 code fence 返回空列表', () {
+      expect(updateNotesLines('```\n```'), isEmpty);
+      expect(updateNotesLines('~~~bash\nflutter build apk\n~~~'), isEmpty);
+    });
+
+    test('剥离标题标记并保留文本', () {
+      expect(updateNotesLines('## 新增功能'), ['新增功能']);
+      expect(updateNotesLines('###### 深层标题'), ['深层标题']);
+      expect(updateNotesLines('#无空格也剥'), ['无空格也剥']);
+    });
+
+    test('各式列表前缀统一为 •', () {
+      expect(
+        updateNotesLines(
+          '- 修复A\n* 修复B\n+ 修复C\n• 修复D\n1. 修复E\n2、修复F\n3) 修复G',
+        ),
+        ['• 修复A', '• 修复B', '• 修复C', '• 修复D', '• 修复E', '• 修复F', '• 修复G'],
+      );
+    });
+
+    test('剥离加粗标记与链接，保留文本', () {
+      expect(updateNotesLines('**重点**修复'), ['重点修复']);
+      expect(updateNotesLines('__强调__内容'), ['强调内容']);
+      expect(
+        updateNotesLines('详见 [发布页面](https://example.com/releases/v2)'),
+        ['详见 发布页面'],
+      );
+    });
+
+    test('小数开头的正文不被当成序号列表', () {
+      // `.` / `)` 要求后随空格，故 `1.5` 不触发列表归一。
+      expect(updateNotesLines('1.5 倍速朗读'), ['1.5 倍速朗读']);
+    });
+
+    test('空列表项与孤立符号被丢弃', () {
+      expect(updateNotesLines('-   \n•\n## '), isEmpty);
+    });
+
+    test('混合 markdown 清洗为可渲染行', () {
+      final lines = updateNotesLines(
+        '## 新增功能\n'
+        '\n'
+        '- **AI 讲解**：场景级厂商选择\n'
+        '- 错题重练入口\n'
+        '\n'
+        '```dart\n'
+        'void main() {}\n'
+        '```\n'
+        '\n'
+        '## 问题修复\n'
+        '1. 修复弹层死锁\n',
+      );
+
+      expect(lines, [
+        '新增功能',
+        '• AI 讲解：场景级厂商选择',
+        '• 错题重练入口',
+        '问题修复',
+        '• 修复弹层死锁',
+      ]);
+      // markdown 残留符号不得泄漏到渲染层。
+      for (final line in lines) {
+        expect(line.contains('#'), isFalse);
+        expect(line.contains('**'), isFalse);
+      }
+    });
+
+    test('脚本自动生成的 notes 原样保留分组与条目', () {
+      // tools/release_notes.py 的输出格式：小节标题无前缀，条目以 '• ' 起。
+      final lines = updateNotesLines(
+        '新增功能\n'
+        '• AI 讲解提示词内置到设置\n'
+        '\n'
+        '问题修复\n'
+        '• 配置链路审查修复\n',
+      );
+
+      expect(lines, [
+        '新增功能',
+        '• AI 讲解提示词内置到设置',
+        '问题修复',
+        '• 配置链路审查修复',
+      ]);
+    });
+  });
 }

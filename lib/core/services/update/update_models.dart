@@ -132,3 +132,62 @@ String friendlyUpdateError(Object error, {required String fallback}) {
   if (error is UpdateInstallException) return error.message;
   return fallback;
 }
+
+// ---------- 更新说明清洗 ----------
+
+/// 行首 markdown 标题标记（`#` ~ `######`）。
+final RegExp _notesHeading = RegExp(r'^#{1,6}\s*');
+
+/// 行首列表标记：`- ` / `* ` / `+ ` / `• ` / `1. ` / `1) ` / `1、`。
+///
+/// `.` 与 `)` 要求后随空格，避免把 `1.5 倍速` 当成序号列表；中文顿号写法
+/// 惯例不带空格（`2、修复`），故 `、` 后空格可省。
+final RegExp _notesBullet = RegExp(r'^(?:[-*+•]\s+|\d+[.)]\s+|\d+、\s*)');
+
+/// 剥离标记后只剩孤立列表符号的行（如 `-` / `•` / `1.`），无实际内容。
+final RegExp _notesBareMarker = RegExp(r'^([-*+•]|\d+[.、)])$');
+
+/// 行内加粗标记 `**x**` / `__x__`（仅剥标记，保留文本）。
+final RegExp _notesEmphasis = RegExp(r'\*\*|__');
+
+/// 行内 markdown 链接 `[text](url)` → `text`。
+final RegExp _notesLink = RegExp(r'\[([^\]]*)\]\([^)]*\)');
+
+/// 更新说明 → 可逐行渲染的纯文本行。
+///
+/// `notes` 可能来自人工撰写的 GitHub Release body（markdown），弹窗不引入
+/// markdown 渲染库，故在此做纯文本清洗：丢弃空行与 code fence 代码块、剥离
+/// 标题与加粗标记、把各式列表前缀统一为 `• `，避免原样渲染出 `#` / `**` 残留。
+///
+/// 返回空列表表示「无可展示的更新内容」（调用方据此只提示有新版本）。
+List<String> updateNotesLines(String raw) {
+  final lines = <String>[];
+  // code fence 整块丢弃（块内多为命令/代码示例，对用户无意义）；
+  // 未闭合的围栏按 markdown 语义吞至结尾。
+  var inFence = false;
+  for (final rawLine in raw.split('\n')) {
+    var line = rawLine.trim();
+    if (line.startsWith('```') || line.startsWith('~~~')) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence || line.isEmpty) continue;
+
+    line = line.replaceAllMapped(_notesLink, (m) => m.group(1) ?? '');
+    line = line.replaceAll(_notesEmphasis, '');
+    line = line.replaceFirst(_notesHeading, '').trim();
+    // 列表前缀统一为 `• `：标题行剥完井号后可能才暴露列表标记，故在其后处理。
+    final bullet = _notesBullet.firstMatch(line);
+    if (bullet != null) {
+      final content = line.substring(bullet.end).trim();
+      if (content.isEmpty) continue;
+      line = '• $content';
+    } else if (_notesBareMarker.hasMatch(line)) {
+      continue;
+    }
+
+    if (line.isEmpty) continue;
+    lines.add(line);
+  }
+  return lines;
+}
