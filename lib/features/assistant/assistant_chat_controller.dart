@@ -1,9 +1,10 @@
 // lib/features/assistant/assistant_chat_controller.dart
 //
 // 层级：features/assistant
-// 职责：AI 助手多轮流式对话控制器 —— 读场景配置、发起 chatStream、维护
-//       六态状态机，用会话代际令牌护栏防止换会话/中途停止后晚到的流片
-//       覆盖新状态。
+// 职责：AI 助手多轮流式对话控制器 —— 读场景配置、按需走工具循环
+//       （chatComplete 判定 → 执行工具 → 回灌 role:tool，≤4 轮），再以
+//       chatStream 流式产出最终回答，维护六态状态机，用会话代际令牌护栏
+//       防止换会话/中途停止后晚到的流片覆盖新状态。
 //
 // 纪律与讲解侧同源（math_explain_controller）：防重入守卫先于首个 await；
 // _sessionToken 在每个 await / 每片 chunk 之后校验，过期直接 return 且
@@ -12,9 +13,12 @@
 // 安全边界：API Key 仅经 LlmConfig 下沉到 Authorization 头，绝不写入
 // 日志 / 异常 message / state。
 
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/prompts/assistant_prompt_defaults.dart';
+import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
@@ -23,9 +27,15 @@ import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/assistant/assistant_chat_state.dart';
+import 'package:poemath/features/assistant/tools/assistant_tool.dart';
+import 'package:poemath/features/assistant/tools/assistant_tools_provider.dart';
 
 /// 助手单轮回答的 token 上限（多段中文，略高于讲解档）。
 const int kAssistantMaxTokens = 1024;
+
+/// 工具循环硬上限（≤4 轮）：防止模型反复要工具导致死循环；到顶后强制
+/// 走最终流式回答（见 design §5）。
+const int kAssistantMaxToolRounds = 4;
 
 class AssistantChatController extends Notifier<AssistantChatState> {
   /// 会话代际令牌：send / stop / regenerate / 切换会话都会使旧请求失效。
@@ -115,8 +125,9 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     _sessionToken++;
   }
 
-  /// 读配置 → 流式接收 → 固化回答。假定 `state.messages` 末尾已是待回答
-  /// 的 user 轮次。全程以 [token] 守护代际一致性。
+  /// 读配置 →（按需）工具循环 → 流式接收 → 固化回答。假定 `state.messages`
+  /// 末尾已是待回答的 user 轮次。全程以 [token] 守护代际一致性：每次 await
+  /// 后校验，mismatch 只 return 不写 state。
   Future<void> _complete(int token) async {
     LlmClient? client;
     try {
@@ -132,13 +143,67 @@ class AssistantChatController extends Notifier<AssistantChatState> {
         return;
       }
 
+      // 家长 override 优先，否则内置儿童安全默认。
+      final systemPrompt =
+          repo.assistantPromptOverride ?? kAssistantSystemPrompt;
+      final tools = ref.read(assistantToolsProvider);
+      final toolSchemas = <Map<String, Object?>>[
+        for (final tool in tools) tool.toSchema(),
+      ];
+      final toolsByName = <String, AssistantTool>{
+        for (final tool in tools) tool.name: tool,
+      };
+
       client = LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+
+      // 工具循环：非流式 chatComplete 判定是否调工具；有则执行并回灌
+      // role:tool，循环（≤4 轮）；无 tool_calls 或到顶即跳出走流式收尾。
+      final working = <ChatMessage>[...state.messages];
+      for (var round = 0; round < kAssistantMaxToolRounds; round++) {
+        final completion = await client.chatComplete(
+          config: config,
+          systemPrompt: systemPrompt,
+          messages: working,
+          tools: toolSchemas,
+          maxTokens: kAssistantMaxTokens,
+        );
+        if (token != _sessionToken) return;
+        if (completion.toolCalls.isEmpty) break;
+
+        // assistant 发起工具调用的轮次（content 可空）并入历史与 UI。
+        working.add(
+          ChatMessage(
+            role: ChatRole.assistant,
+            content: completion.content ?? '',
+            toolCalls: completion.toolCalls,
+          ),
+        );
+        for (final call in completion.toolCalls) {
+          final result = await _runTool(toolsByName, call);
+          if (token != _sessionToken) return;
+          working.add(
+            ChatMessage(
+              role: ChatRole.tool,
+              content: result.content,
+              toolCallId: call.id,
+              name: call.name,
+            ),
+          );
+        }
+        // 工具轮次并入 state → UI 渲染工具卡；仍 loading，等流式收尾。
+        state = state.copyWith(
+          status: AssistantChatStatus.loading,
+          messages: List<ChatMessage>.unmodifiable(working),
+          streamingText: '',
+        );
+      }
+
+      // 收尾：流式产出最终自然语言回答（保留逐段渐显 UX）。
       final buffer = StringBuffer();
       await for (final chunk in client.chatStream(
         config: config,
-        // 家长 override 优先，否则内置儿童安全默认。
-        systemPrompt: repo.assistantPromptOverride ?? kAssistantSystemPrompt,
-        messages: state.messages,
+        systemPrompt: systemPrompt,
+        messages: working,
         maxTokens: kAssistantMaxTokens,
       )) {
         // 每片校验令牌：切会话 / stop 后立即丢弃在途流，不写 state。
@@ -174,6 +239,34 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     } finally {
       // 注入的 client 不被关闭（LlmClient 不持有所有权）。
       client?.close();
+    }
+  }
+
+  /// 执行单个工具调用：未知工具名 / 参数 JSON 非法一律回 [ToolResult.error]
+  /// 友好文本（回灌给模型让其纠正），不抛异常、不中断循环。
+  Future<ToolResult> _runTool(
+    Map<String, AssistantTool> toolsByName,
+    ToolCall call,
+  ) async {
+    final tool = toolsByName[call.name];
+    if (tool == null) {
+      return ToolResult.error('未知工具「${call.name}」，请改用可用的工具。');
+    }
+    Map<String, dynamic> args;
+    try {
+      final decoded = jsonDecode(call.argumentsJson);
+      args = decoded is Map<String, dynamic>
+          ? decoded
+          : <String, dynamic>{};
+    } on FormatException {
+      args = const <String, dynamic>{};
+    }
+    try {
+      return await tool.execute(ref, args);
+    } catch (error) {
+      // 工具自身兜底之上的最后防线：任何未预期异常都转错误文本回灌。
+      AppLogger.e('助手工具执行失败：${call.name}', tag: 'Assistant', error: error);
+      return const ToolResult.error('工具执行出错，请换个方式再试试。');
     }
   }
 

@@ -22,6 +22,7 @@ import 'package:poemath/features/assistant/assistant_session_provider.dart';
 import 'package:poemath/features/assistant/widgets/chat_input_bar.dart';
 import 'package:poemath/features/assistant/widgets/chat_message_bubble.dart';
 import 'package:poemath/features/assistant/widgets/conversation_drawer.dart';
+import 'package:poemath/features/assistant/widgets/tool_message_card.dart';
 
 /// AI 助手主页。
 class AssistantPage extends ConsumerStatefulWidget {
@@ -141,6 +142,27 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
           return const _PendingBubble();
         }
         final m = messages[index];
+        // 工具调用请求（assistant 携带 toolCalls）→ 可折叠小卡（默认折叠）。
+        final toolCalls = m.toolCalls;
+        if (m.role == ChatRole.assistant &&
+            toolCalls != null &&
+            toolCalls.isNotEmpty) {
+          final labels =
+              toolCalls.map((c) => toolDisplayName(c.name)).join('、');
+          final detail = <String>[
+            if (m.content.trim().isNotEmpty) m.content.trim(),
+            for (final c in toolCalls)
+              '${toolDisplayName(c.name)}（${c.name}）\n参数：${c.argumentsJson}',
+          ].join('\n\n');
+          return ToolMessageCard(title: '调用工具：$labels', detail: detail);
+        }
+        // 工具结果回灌（role:tool）→ 可折叠小卡（默认折叠）。
+        if (m.role == ChatRole.tool) {
+          return ToolMessageCard(
+            title: '工具结果：${toolDisplayName(m.name ?? '')}',
+            detail: m.content,
+          );
+        }
         final isLastAssistant = index == messages.length - 1 &&
             m.role == ChatRole.assistant &&
             !chatState.isBusy;

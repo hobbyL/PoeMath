@@ -15,6 +15,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/assistant_message.dart';
@@ -34,6 +35,42 @@ ChatMessage chatMessageFromMessage(Message m) => ChatMessage(
       toolCallId: m.toolCallId,
       name: m.toolName,
     );
+
+/// 载入历史会话时重建 assistant 轮次的 `toolCalls`。
+///
+/// 持久化 [Message] 未落 `tool_calls`（仅 role:tool 侧存了
+/// toolCallId/toolName），直接回放会得到「assistant 无 tool_calls 却紧跟
+/// role:tool」的畸形历史——续问时发往 OpenAI 会 400。此处按「assistant 轮次
+/// 紧随的连续 role:tool」反推其 toolCalls（arguments 已丢失，占位 `{}`，续问
+/// 只需结构合法、不重放旧工具）。原地替换不增删元素，保持与 _persistedIds
+/// 的一一对应。
+List<ChatMessage> reconstructToolCalls(List<ChatMessage> messages) {
+  final result = List<ChatMessage>.of(messages);
+  for (var i = 0; i < result.length; i++) {
+    if (result[i].role != ChatRole.assistant) continue;
+    final calls = <ToolCall>[];
+    for (var j = i + 1; j < result.length; j++) {
+      final t = result[j];
+      if (t.role != ChatRole.tool) break;
+      if (t.toolCallId != null && t.name != null) {
+        calls.add(
+          ToolCall(id: t.toolCallId!, name: t.name!, argumentsJson: '{}'),
+        );
+      }
+    }
+    if (calls.isNotEmpty) {
+      final a = result[i];
+      result[i] = ChatMessage(
+        role: ChatRole.assistant,
+        content: a.content,
+        toolCallId: a.toolCallId,
+        name: a.name,
+        toolCalls: calls,
+      );
+    }
+  }
+  return result;
+}
 
 /// 内核 [ChatMessage] → 持久化 [MessageRole] 映射。
 ///
@@ -148,8 +185,6 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
     );
   }
 
-  // PLACEHOLDER_OPS
-
   /// 进入页面：已打开且仍存在则保持；否则打开最近一条会话，无则新建。
   Future<void> ensureOpen() async {
     final current = state.conversationId;
@@ -167,7 +202,11 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
     final models = _repo.messagesOf(id); // createdAt 升序
     _persistedIds = models.map((m) => m.id).toList();
     _suspend = true;
-    _chat.loadConversation(models.map(chatMessageFromMessage).toList());
+    // 回放前重建 assistant 的 tool_calls（持久层未落，见 reconstructToolCalls），
+    // 否则续问会把畸形历史发往模型。原地替换不改长度，_persistedIds 仍对齐。
+    _chat.loadConversation(
+      reconstructToolCalls(models.map(chatMessageFromMessage).toList()),
+    );
     _suspend = false;
     state = state.copyWith(conversationId: id, revision: state.revision + 1);
   }

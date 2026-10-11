@@ -14,6 +14,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
@@ -439,6 +440,51 @@ final class LlmClient {
     if (_ownsHttpClient) _httpClient.close();
   }
 
+  /// 非流式工具调用（function calling）：一次性取回 `choices[0].message` 的
+  /// `content` 与 `tool_calls`，供控制器判定是否进入工具循环（见 design §2）。
+  ///
+  /// 工具判定刻意走非流式——流式增量里拼接 `tool_calls.arguments` 片段既
+  /// 复杂又易错，一次性拿完整结构最稳；最终自然语言回答仍走 [chatStream]。
+  ///
+  /// [tools] 是已序列化的 OpenAI tools schema 列表（`{type:function,
+  /// function:{...}}`），由上层 `AssistantTool.toSchema()` 构造后传入——
+  /// core 层不反向依赖 features 的工具类型。空列表时请求不带 `tools` 字段，
+  /// 模型退化为纯聊天。
+  ///
+  /// 端点 `/chat/completions`、Bearer 头（空 Key 省略）、错误分类同 [explain]：
+  /// 401/403 → [LlmAuthError]、5xx → [LlmServerError]、网络/超时 →
+  /// [LlmNetworkError]、响应结构无效 → [LlmResponseFormatError]。
+  Future<ChatCompletion> chatComplete({
+    required LlmConfig config,
+    required String systemPrompt,
+    required List<ChatMessage> messages,
+    List<Map<String, Object?>> tools = const <Map<String, Object?>>[],
+    String toolChoice = 'auto',
+    int maxTokens = 1024,
+  }) async {
+    final base = normalizeBaseUrl(config.baseUrl);
+    final body = jsonEncode(<String, Object?>{
+      'model': config.model,
+      'messages': <Map<String, Object?>>[
+        {'role': 'system', 'content': systemPrompt},
+        for (final message in messages) message.toJson(),
+      ],
+      'max_tokens': maxTokens,
+      if (tools.isNotEmpty) ...<String, Object?>{
+        'tools': tools,
+        'tool_choice': toolChoice,
+      },
+    });
+    final response = await _send(
+      uri: _join(base, _chatPath),
+      body: body,
+      apiKey: config.apiKey,
+      timeout: _chatTimeout,
+      timeoutMessage: 'AI 助手响应超时，请稍后重试',
+    );
+    return _parseChatCompletion(response);
+  }
+
   // ============ Prompt 构造（design §3.2） ============
 
   String _buildGenerationBody(
@@ -613,6 +659,52 @@ final class LlmClient {
       throw const LlmResponseFormatError('模型输出内容为空');
     }
     return content;
+  }
+
+  /// 解析非流式工具调用响应：取 `choices[0].message` 的 `content`（可空）
+  /// 与 `tool_calls`（可空数组）。与 [_extractAssistantContent] 的差别：
+  /// 这里 content 允许为空（模型只发起工具调用时常如此），但 content 与
+  /// tool_calls 不能同时为空（视为空回复，抛格式错误）。
+  ChatCompletion _parseChatCompletion(http.Response response) {
+    Object? decoded;
+    try {
+      decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    } on FormatException {
+      throw const LlmResponseFormatError('模型响应不是有效 JSON');
+    }
+    if (decoded is! Map<String, dynamic>) {
+      throw const LlmResponseFormatError('模型响应结构无效');
+    }
+    final choices = decoded['choices'];
+    if (choices is! List<Object?> || choices.isEmpty) {
+      final error = decoded['error'];
+      if (error is Map<String, dynamic> && error['message'] is String) {
+        throw LlmResponseFormatError('模型返回错误：${error['message']}');
+      }
+      throw const LlmResponseFormatError('模型响应缺少 choices');
+    }
+    final choice = choices.first;
+    if (choice is! Map<Object?, Object?>) {
+      throw const LlmResponseFormatError('模型响应 choices 结构无效');
+    }
+    final message = choice['message'];
+    if (message is! Map<Object?, Object?>) {
+      throw const LlmResponseFormatError('模型响应缺少 message');
+    }
+    final rawContent = message['content'];
+    final content = rawContent is String ? rawContent : null;
+    final toolCalls = <ToolCall>[];
+    final rawToolCalls = message['tool_calls'];
+    if (rawToolCalls is List<Object?>) {
+      for (final item in rawToolCalls) {
+        final call = ToolCall.fromWire(item);
+        if (call != null) toolCalls.add(call);
+      }
+    }
+    if ((content == null || content.trim().isEmpty) && toolCalls.isEmpty) {
+      throw const LlmResponseFormatError('模型输出内容为空');
+    }
+    return ChatCompletion(content: content, toolCalls: toolCalls);
   }
 
   /// 从单条 SSE data payload 提取 `choices[0].delta.content`。

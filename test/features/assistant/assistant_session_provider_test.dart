@@ -90,6 +90,8 @@ Message _msg({
   required MessageRole role,
   required String content,
   DateTime? createdAt,
+  String? toolName,
+  String? toolCallId,
 }) =>
     Message(
       id: id,
@@ -98,6 +100,8 @@ Message _msg({
       role: role,
       content: content,
       createdAt: createdAt ?? DateTime(2026, 10, 1),
+      toolName: toolName,
+      toolCallId: toolCallId,
     );
 
 void main() {
@@ -290,5 +294,51 @@ void main() {
       <String>{'出一道题', '重答'},
     );
     expect(repo().messagesOf(id).length, 2);
+  });
+
+  test('载入含工具轮次会话：assistant 轮次按后续 role:tool 重建 tool_calls',
+      () async {
+    final c = await repo().create();
+    await repo().appendMessage(_msg(
+      id: 'u1',
+      conversationId: c.id,
+      role: MessageRole.user,
+      content: '讲讲我的错题',
+      createdAt: DateTime(2026, 10, 1, 9, 0, 0),
+    ),);
+    // assistant 发起工具调用的轮次：持久层未落 tool_calls（content 为空）。
+    await repo().appendMessage(_msg(
+      id: 'a1',
+      conversationId: c.id,
+      role: MessageRole.assistant,
+      content: '',
+      createdAt: DateTime(2026, 10, 1, 9, 0, 1),
+    ),);
+    // 工具结果回灌：toolCallId/toolName 已落库（field 6/7）。
+    await repo().appendMessage(_msg(
+      id: 't1',
+      conversationId: c.id,
+      role: MessageRole.tool,
+      content: '题目：25 + 38 = ?',
+      createdAt: DateTime(2026, 10, 1, 9, 0, 2),
+      toolName: 'explain_mistake',
+      toolCallId: 'call_1',
+    ),);
+
+    await session().ensureOpen();
+
+    final msgs = chatMessages();
+    // 长度不变（原地重建，_persistedIds 对齐）。
+    expect(msgs, hasLength(3));
+    // assistant 轮次重建出 tool_calls，指向后续 role:tool。
+    final assistant = msgs[1];
+    expect(assistant.role, ChatRole.assistant);
+    expect(assistant.toolCalls, hasLength(1));
+    expect(assistant.toolCalls!.single.id, 'call_1');
+    expect(assistant.toolCalls!.single.name, 'explain_mistake');
+    // 工具结果轮次保留 toolCallId/name。
+    expect(msgs[2].role, ChatRole.tool);
+    expect(msgs[2].toolCallId, 'call_1');
+    expect(msgs[2].name, 'explain_mistake');
   });
 }

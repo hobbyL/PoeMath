@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/features/assistant/assistant_chat_controller.dart';
 import 'package:poemath/features/assistant/assistant_chat_state.dart';
@@ -19,6 +20,7 @@ import 'package:poemath/features/assistant/assistant_page.dart';
 import 'package:poemath/features/assistant/assistant_session_provider.dart';
 import 'package:poemath/features/assistant/widgets/chat_input_bar.dart';
 import 'package:poemath/features/assistant/widgets/chat_message_bubble.dart';
+import 'package:poemath/features/assistant/widgets/tool_message_card.dart';
 
 /// 固定状态的假对话控制器：build 返回目标状态，所有变更方法空操作，
 /// 使注入状态在渲染期间保持不变（不触发真实 chatStream / 网络）。
@@ -317,6 +319,48 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(h.session.regenerateCount, 1);
+  });
+
+  testWidgets('工具轮次：assistant.toolCalls 与 role:tool 渲染为可折叠工具卡，'
+      '最终回答仍为气泡', (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: <ChatMessage>[
+          _user('讲讲我的错题'),
+          const ChatMessage(
+            role: ChatRole.assistant,
+            content: '',
+            toolCalls: <ToolCall>[
+              ToolCall(
+                id: 'call_1',
+                name: 'explain_mistake',
+                argumentsJson: '{}',
+              ),
+            ],
+          ),
+          const ChatMessage(
+            role: ChatRole.tool,
+            content: '题目：25 + 38 = ?',
+            toolCallId: 'call_1',
+            name: 'explain_mistake',
+          ),
+          _assistant('我们一步步来看～'),
+        ],
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pumpAndSettle();
+
+    // 调用请求 + 结果回灌 = 两张工具卡；user + 最终回答 = 两个气泡。
+    expect(find.byType(ToolMessageCard), findsNWidgets(2));
+    expect(find.byType(ChatMessageBubble), findsNWidgets(2));
+    expect(find.text('调用工具：讲解错题'), findsOneWidget);
+    expect(find.text('工具结果：讲解错题'), findsOneWidget);
+    // 默认折叠：工具结果明细不出现在初始视图。
+    expect(find.text('题目：25 + 38 = ?'), findsNothing);
+    // 最终回答气泡仍带「重新生成」。
+    expect(find.byTooltip('重新生成'), findsOneWidget);
   });
 }
 
