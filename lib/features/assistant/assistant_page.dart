@@ -139,11 +139,17 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
 
   Widget _buildMessageList(ThemeData theme, AssistantChatState chatState) {
     final messages = chatState.messages;
+    final base = chatState.contextBaseIndex;
     final hasPending = chatState.isLoading || chatState.isStreaming;
     if (messages.isEmpty && !hasPending && !chatState.isError) {
       return _buildEmptyState(theme);
     }
-    final itemCount = messages.length + (hasPending ? 1 : 0);
+    // 清除点正好在末尾、且无在途气泡时，补一条末尾分割线项。
+    final showTrailingDivider =
+        base > 0 && base == messages.length && !hasPending;
+    final itemCount = messages.length +
+        (hasPending ? 1 : 0) +
+        (showTrailingDivider ? 1 : 0);
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(
@@ -152,49 +158,91 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
       ),
       itemCount: itemCount,
       itemBuilder: (context, index) {
-        if (index >= messages.length) {
-          if (chatState.isStreaming) {
-            return ChatMessageBubble(
-              role: ChatRole.assistant,
-              text: chatState.streamingText,
-              isStreaming: true,
-            );
-          }
-          return const _PendingBubble();
+        if (showTrailingDivider && index == itemCount - 1) {
+          return _buildContextDivider(theme);
         }
-        final m = messages[index];
-        // 工具调用请求（assistant 携带 toolCalls）→ 可折叠小卡（默认折叠）。
-        final toolCalls = m.toolCalls;
-        if (m.role == ChatRole.assistant &&
-            toolCalls != null &&
-            toolCalls.isNotEmpty) {
-          final labels =
-              toolCalls.map((c) => toolDisplayName(c.name)).join('、');
-          final detail = <String>[
-            if (m.content.trim().isNotEmpty) m.content.trim(),
-            for (final c in toolCalls)
-              '${toolDisplayName(c.name)}（${c.name}）\n参数：${c.argumentsJson}',
-          ].join('\n\n');
-          return ToolMessageCard(title: '调用工具：$labels', detail: detail);
-        }
-        // 工具结果回灌（role:tool）→ 可折叠小卡（默认折叠）。
-        if (m.role == ChatRole.tool) {
-          return ToolMessageCard(
-            title: '工具结果：${toolDisplayName(m.name ?? '')}',
-            detail: m.content,
+        final item = _buildMessageItem(theme, chatState, index);
+        // 上下文起点前插入分割线：此点之前的消息仅存档、不参与请求。
+        if (base > 0 && index == base) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[_buildContextDivider(theme), item],
           );
         }
-        final isLastAssistant = index == messages.length - 1 &&
-            m.role == ChatRole.assistant &&
-            !chatState.isBusy;
-        return ChatMessageBubble(
-          role: m.role,
-          text: m.content,
-          onRegenerate: isLastAssistant
-              ? () => ref.read(assistantSessionProvider.notifier).regenerate()
-              : null,
-        );
+        return item;
       },
+    );
+  }
+
+  /// 单条消息项（流式/等待气泡、工具卡、普通气泡），不含上下文分割线。
+  Widget _buildMessageItem(
+    ThemeData theme,
+    AssistantChatState chatState,
+    int index,
+  ) {
+    final messages = chatState.messages;
+    if (index >= messages.length) {
+      if (chatState.isStreaming) {
+        return ChatMessageBubble(
+          role: ChatRole.assistant,
+          text: chatState.streamingText,
+          isStreaming: true,
+        );
+      }
+      return const _PendingBubble();
+    }
+    final m = messages[index];
+    // 工具调用请求（assistant 携带 toolCalls）→ 可折叠小卡（默认折叠）。
+    final toolCalls = m.toolCalls;
+    if (m.role == ChatRole.assistant &&
+        toolCalls != null &&
+        toolCalls.isNotEmpty) {
+      final labels = toolCalls.map((c) => toolDisplayName(c.name)).join('、');
+      final detail = <String>[
+        if (m.content.trim().isNotEmpty) m.content.trim(),
+        for (final c in toolCalls)
+          '${toolDisplayName(c.name)}（${c.name}）\n参数：${c.argumentsJson}',
+      ].join('\n\n');
+      return ToolMessageCard(title: '调用工具：$labels', detail: detail);
+    }
+    // 工具结果回灌（role:tool）→ 可折叠小卡（默认折叠）。
+    if (m.role == ChatRole.tool) {
+      return ToolMessageCard(
+        title: '工具结果：${toolDisplayName(m.name ?? '')}',
+        detail: m.content,
+      );
+    }
+    final isLastAssistant = index == messages.length - 1 &&
+        m.role == ChatRole.assistant &&
+        !chatState.isBusy;
+    return ChatMessageBubble(
+      role: m.role,
+      text: m.content,
+      onRegenerate: isLastAssistant
+          ? () => ref.read(assistantSessionProvider.notifier).regenerate()
+          : null,
+    );
+  }
+
+  /// 上下文清除分割线：标记此处之前的消息仅存档、不再作为对话上下文发送。
+  Widget _buildContextDivider(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: SpacingTokens.sm),
+      child: Row(
+        children: <Widget>[
+          const Expanded(child: Divider()),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.sm),
+            child: Text(
+              '上下文已清除',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const Expanded(child: Divider()),
+        ],
+      ),
     );
   }
 

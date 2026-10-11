@@ -158,6 +158,38 @@ void main() {
     expect(find.byIcon(Icons.stop), findsNothing);
   });
 
+  testWidgets('清除上下文后：消息列表在清除点出现分割线', (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: <ChatMessage>[
+          _user('旧问'),
+          _assistant('旧答'),
+          _user('新问'),
+          _assistant('新答'),
+        ],
+        contextBaseIndex: 2,
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pumpAndSettle();
+
+    expect(find.text('上下文已清除'), findsOneWidget);
+  });
+
+  testWidgets('未清除上下文（contextBaseIndex=0）：不显示分割线', (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: <ChatMessage>[_user('问'), _assistant('答')],
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pumpAndSettle();
+
+    expect(find.text('上下文已清除'), findsNothing);
+  });
+
   testWidgets('ready：末条 assistant 显示复制 + 重答，输入栏为发送态',
       (tester) async {
     final h = _harness(
