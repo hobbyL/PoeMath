@@ -15,10 +15,10 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
-import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/assistant/assistant_chat_controller.dart';
 import 'package:poemath/features/assistant/assistant_chat_state.dart';
 import 'package:poemath/features/assistant/assistant_session_provider.dart';
+import 'package:poemath/features/assistant/widgets/assistant_provider_switcher.dart';
 import 'package:poemath/features/assistant/widgets/chat_input_bar.dart';
 import 'package:poemath/features/assistant/widgets/chat_message_bubble.dart';
 import 'package:poemath/features/assistant/widgets/conversation_drawer.dart';
@@ -68,25 +68,20 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chatState = ref.watch(assistantChatControllerProvider);
-    final sessionState = ref.watch(assistantSessionProvider);
     // 消息 / 流式变化后滚到底部。
     ref.listen<AssistantChatState>(
       assistantChatControllerProvider,
       (_, __) => _scrollToBottomSoon(),
     );
 
-    final repo = ref.read(conversationRepositoryProvider);
-    final convId = sessionState.conversationId;
-    final title =
-        convId != null ? (repo.getById(convId)?.title ?? '新对话') : 'AI 助手';
-
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        // 会话列表改为 endDrawer（右侧滑出）；leading 显式返回箭头（点左上角
-        // 退出页面），右侧只放「会话列表」入口——新建对话在抽屉内完成。
+        // leading 显式返回箭头（点左上角退出页面）；标题位放「模型 | 供应商」
+        // 切换器；会话列表入口在右侧 endDrawer（右滑或点图标打开）。
         leading: const BackButton(),
-        title: Text(title),
+        titleSpacing: 0,
+        title: const AssistantProviderSwitcher(),
         actions: <Widget>[
           Builder(
             builder: (context) => IconButton(

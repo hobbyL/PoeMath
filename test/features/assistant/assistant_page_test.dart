@@ -22,6 +22,8 @@ import 'package:poemath/features/assistant/widgets/chat_input_bar.dart';
 import 'package:poemath/features/assistant/widgets/chat_message_bubble.dart';
 import 'package:poemath/features/assistant/widgets/tool_message_card.dart';
 
+import '../../helpers/hive_test_helper.dart';
+
 /// 固定状态的假对话控制器：build 返回目标状态，所有变更方法空操作，
 /// 使注入状态在渲染期间保持不变（不触发真实 chatStream / 网络）。
 class _FakeChat extends AssistantChatController {
@@ -133,6 +135,16 @@ ChatMessage _assistant(String content) =>
     ChatMessage(role: ChatRole.assistant, content: content);
 
 void main() {
+  // AppBar 的 AssistantProviderSwitcher 读 settingsRepositoryProvider →
+  // HiveBoxes.settings，需初始化 Hive（否则 LateInitializationError）。
+  setUp(() async {
+    await setUpHiveForTesting();
+  });
+
+  tearDown(() async {
+    await tearDownHiveForTesting();
+  });
+
   testWidgets('idle 空会话：显示空态引导，无消息气泡', (tester) async {
     final h = _harness(const AssistantChatState());
     await _pump(tester, h.container);
