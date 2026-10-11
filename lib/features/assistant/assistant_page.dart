@@ -83,11 +83,18 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        // Scaffold 配 drawer 后 Flutter 默认 leading 是 ☰ 菜单；显式改
-        // 返回箭头（点左上角退出），抽屉仍可左边缘滑出打开。
+        // Scaffold 配 drawer 后 Flutter 默认 leading 是 ☰ 菜单；改为返回箭头
+        // （点左上角退出），会话列表入口移到右侧 actions。
         leading: const BackButton(),
         title: Text(title),
         actions: <Widget>[
+          Builder(
+            builder: (context) => IconButton(
+              onPressed: () => Scaffold.of(context).openDrawer(),
+              icon: const Icon(Icons.forum_outlined),
+              tooltip: '会话列表',
+            ),
+          ),
           IconButton(
             onPressed: () => _session.startNew(),
             icon: const Icon(Icons.add_comment_outlined),
