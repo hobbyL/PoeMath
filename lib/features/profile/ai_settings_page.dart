@@ -14,6 +14,7 @@ import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/features/assistant/assistant_enabled_provider.dart';
 import 'package:poemath/features/profile/llm_provider_settings_page.dart';
 import 'package:poemath/features/profile/llm_scenario_settings_page.dart';
 import 'package:poemath/features/profile/prompt_settings_page.dart';
@@ -31,12 +32,26 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
     final theme = Theme.of(context);
     final settingsRepo = ref.watch(settingsRepositoryProvider);
     final providerCount = settingsRepo.llmProviders.length;
+    final assistantEnabled = ref.watch(assistantEnabledProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('AI 设置')),
       body: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),
         children: [
+          AppTile(
+            icon: Icons.smart_toy_outlined,
+            iconColor: theme.colorScheme.primary,
+            title: 'AI 助手',
+            subtitle: assistantEnabled ? '悬浮入口已开启' : '悬浮入口已关闭',
+            trailing: Switch(
+              value: assistantEnabled,
+              onChanged: (value) => ref
+                  .read(assistantEnabledProvider.notifier)
+                  .setEnabled(value),
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.sm),
           AppTile(
             icon: Icons.dns_outlined,
             iconColor: theme.colorScheme.primary,

@@ -19,6 +19,7 @@ import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_check_controller.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/core/services/update/update_models.dart';
+import 'package:poemath/features/assistant/assistant_enabled_provider.dart';
 import 'package:poemath/features/assistant/widgets/draggable_assistant_bubble.dart';
 import 'package:poemath/features/shell/update_dialog.dart';
 
@@ -174,12 +175,13 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   Widget build(BuildContext context) {
     final currentIndex = _indexFromRoute(context);
+    final assistantEnabled = ref.watch(assistantEnabledProvider);
 
     return Scaffold(
       body: Stack(
         children: <Widget>[
           widget.child,
-          const DraggableAssistantBubble(),
+          if (assistantEnabled) const DraggableAssistantBubble(),
         ],
       ),
       bottomNavigationBar: NavigationBar(

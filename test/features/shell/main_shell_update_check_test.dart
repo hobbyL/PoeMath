@@ -10,6 +10,8 @@ import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/core/services/update/update_models.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 
+import '../../helpers/hive_test_helper.dart';
+
 /// 记录 maybeCheck 调用次数的 spy 控制器（基类依赖从不执行）。
 class _SpyUpdateController extends UpdateCheckController {
   _SpyUpdateController()
@@ -92,6 +94,16 @@ Future<void> _pumpShell(WidgetTester tester, GoRouter router) {
 }
 
 void main() {
+  // MainShell 现经 assistantEnabledProvider 读 settings box（默认关闭，不挂
+  // 气泡），须先初始化 Hive 否则 build 抛 LateInitializationError。
+  setUp(() async {
+    await setUpHiveForTesting();
+  });
+
+  tearDown(() async {
+    await tearDownHiveForTesting();
+  });
+
   testWidgets('冷启动首帧后恰触发一次自动检测', (tester) async {
     final spy = _SpyUpdateController();
     final router = _router((_) => spy);

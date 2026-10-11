@@ -81,6 +81,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   'llm_poem_explain_prompt': 'string', // 诗词讲解 system prompt 覆盖
   'llm_math_explain_prompt': 'string', // 口算解析 system prompt 覆盖
   'llm_assistant_prompt': 'string', // AI 助手 system prompt 覆盖
+  'assistant_enabled': 'bool', // AI 助手悬浮气泡开关（默认关闭）
 };
 
 class BackupService {
