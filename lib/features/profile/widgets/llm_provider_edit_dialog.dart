@@ -79,6 +79,9 @@ class _LlmProviderEditDialogState
   final _apiKeyController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
+  /// 候选模型清单（含默认模型）。配置时可拉取多选 / 手动增删；用时各场景从中选。
+  final List<String> _models = <String>[];
+
   /// 弹窗局部 Messenger：拉取/测试/清除/校验提示在此弹，避免落到被全屏
   /// 弹窗遮挡的底层页；保存/删除成功的确认由列表页在应用级 Messenger 弹。
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -105,8 +108,16 @@ class _LlmProviderEditDialogState
       _providerNameController.text = config.name;
       _baseUrlController.text = config.baseUrl;
       _modelController.text = config.model;
+      _models.addAll(config.models);
       unawaited(_loadStoredKey(config.id));
     }
+  }
+
+  /// 把模型名加入候选清单（去空白、去重）。
+  void _addModel(String model) {
+    final m = model.trim();
+    if (m.isEmpty || _models.contains(m)) return;
+    setState(() => _models.add(m));
   }
 
   @override
@@ -210,56 +221,85 @@ class _LlmProviderEditDialogState
       );
       return;
     }
-    final selected = await _pickModelSheet(models);
-    if (selected != null && mounted) {
-      setState(() => _modelController.text = selected);
+    final selected = await _pickModelsSheet(models);
+    if (selected != null && selected.isNotEmpty && mounted) {
+      setState(() {
+        for (final m in selected) {
+          if (!_models.contains(m)) _models.add(m);
+        }
+        // 默认模型为空时取第一个选中的，保证有默认可用。
+        if (_modelController.text.trim().isEmpty) {
+          _modelController.text = selected.first;
+        }
+      });
     }
   }
 
-  /// 底部弹层模型列表；返回选中模型名，取消返回 null。
-  Future<String?> _pickModelSheet(List<String> models) {
-    return showModalBottomSheet<String>(
+  /// 底部弹层：多选模型，返回勾选的模型名列表；取消返回 null。
+  /// 已在候选清单中的模型默认勾选，便于增量加入。
+  Future<List<String>?> _pickModelsSheet(List<String> models) {
+    final chosen = <String>{..._models.where(models.contains)};
+    return showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) {
         final theme = Theme.of(sheetContext);
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(SpacingTokens.md),
-                  child: Text(
-                    '选择模型',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(sheetContext).size.height * 0.7,
                 ),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.only(
-                      bottom: SpacingTokens.md,
-                    ),
-                    children: [
-                      for (final model in models)
-                        ListTile(
-                          title: Text(model),
-                          selected: model == _modelController.text.trim(),
-                          selectedColor: theme.colorScheme.primary,
-                          onTap: () => Navigator.pop(sheetContext, model),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(SpacingTokens.md),
+                      child: Text(
+                        '选择模型（可多选）',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.onSurface,
                         ),
-                    ],
-                  ),
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final model in models)
+                            CheckboxListTile(
+                              value: chosen.contains(model),
+                              title: Text(model),
+                              controlAffinity:
+                                  ListTileControlAffinity.leading,
+                              onChanged: (v) => setSheetState(() {
+                                if (v ?? false) {
+                                  chosen.add(model);
+                                } else {
+                                  chosen.remove(model);
+                                }
+                              }),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(SpacingTokens.md),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () =>
+                              Navigator.pop(sheetContext, chosen.toList()),
+                          child: Text('加入 ${chosen.length} 个模型'),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -339,6 +379,7 @@ class _LlmProviderEditDialogState
         baseUrl: _baseUrlController.text.trim(),
         model: _modelController.text.trim(),
         apiKey: _apiKeyController.text.trim(),
+        models: _models,
       );
     } on FormatException catch (e) {
       if (mounted) {
@@ -521,8 +562,8 @@ class _LlmProviderEditDialogState
               TextFormField(
                 controller: _modelController,
                 decoration: InputDecoration(
-                  labelText: '模型',
-                  hintText: '可手动填写，或点击右侧按钮拉取',
+                  labelText: '默认模型',
+                  hintText: '手动填写或点右侧拉取；留空取候选第一个',
                   prefixIcon: const Icon(Icons.model_training_outlined),
                   border: const OutlineInputBorder(),
                   suffixIcon: _fetchingModels
@@ -538,16 +579,49 @@ class _LlmProviderEditDialogState
                         )
                       : IconButton(
                           icon: const Icon(Icons.download_outlined),
-                          tooltip: '从服务拉取模型列表',
+                          tooltip: '从服务拉取模型列表（可多选）',
                           onPressed: _fetchModels,
                         ),
                 ),
                 onChanged: (_) => setState(() {}),
+                // 默认模型会在保存时并入候选清单；手动输入也可直接作为默认。
+                onFieldSubmitted: _addModel,
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) return '请填写模型名';
+                  if (value == null || value.trim().isEmpty) return '请填写默认模型';
                   return null;
                 },
               ),
+              // 候选模型清单（配置时可多选；用时各功能里从中切换）。
+              if (_models.isNotEmpty) ...[
+                const SizedBox(height: SpacingTokens.sm),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '候选模型（用时可在各功能里切换；点 × 移除）',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.xs),
+                Wrap(
+                  spacing: SpacingTokens.sm,
+                  runSpacing: SpacingTokens.xs,
+                  children: <Widget>[
+                    for (final m in _models)
+                      InputChip(
+                        label: Text(m),
+                        onDeleted: () => setState(() {
+                          _models.remove(m);
+                          if (_modelController.text.trim() == m) {
+                            _modelController.text =
+                                _models.isNotEmpty ? _models.first : '';
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: SpacingTokens.lg),
 
               Row(

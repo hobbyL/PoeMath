@@ -189,7 +189,7 @@ void main() {
       'https://api.example.com',
     );
     await tester.enterText(
-      find.widgetWithText(TextFormField, '模型'),
+      find.widgetWithText(TextFormField, '默认模型'),
       'deepseek-chat',
     );
     await tester.enterText(
@@ -261,7 +261,7 @@ void main() {
 
       // 修改模型名，Key 原样（回显值）保存。
       await tester.enterText(
-        find.widgetWithText(TextFormField, '模型'),
+        find.widgetWithText(TextFormField, '默认模型'),
         'deepseek-reasoner',
       );
       await tester.pump();
@@ -292,11 +292,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('编辑：DeepSeek'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('从服务拉取模型列表'));
+    await tester.tap(find.byTooltip('从服务拉取模型列表（可多选）'));
     await tester.pumpAndSettle();
 
     expect(authHeader, 'Bearer key-p1');
-    expect(find.text('选择模型'), findsOneWidget);
+    expect(find.text('选择模型（可多选）'), findsOneWidget);
   });
 
   testWidgets('测试连接：用回显的已存 Key 请求 chat 接口',
@@ -326,7 +326,7 @@ void main() {
     expect(find.text('连接成功，模型可用'), findsOneWidget);
   });
 
-  testWidgets('拉取成功弹出底部模型列表，点选回填输入框', (tester) async {
+  testWidgets('拉取成功弹出底部模型列表，多选加入候选并回填默认', (tester) async {
     final client = MockClient((request) async {
       expect(request.url.path, endsWith('/models'));
       return http.Response(
@@ -344,25 +344,25 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byTooltip('从服务拉取模型列表'));
+    await tester.tap(find.byTooltip('从服务拉取模型列表（可多选）'));
     await tester.pumpAndSettle();
 
-    // 底部弹层显示两个模型，点选一个。
-    expect(find.text('选择模型'), findsOneWidget);
+    // 底部弹层多选：勾选一个模型，点「加入」。
+    expect(find.text('选择模型（可多选）'), findsOneWidget);
     expect(find.text('qwen2.5:7b'), findsOneWidget);
     await tester.tap(find.text('gpt-4o-mini'));
+    await tester.pump();
+    await tester.tap(find.textContaining('加入'));
     await tester.pumpAndSettle();
 
-    // 回填模型输入框，弹层关闭。
-    expect(find.text('选择模型'), findsNothing);
-    final modelField = find.widgetWithText(
-      TextFormField,
-      '模型',
-    );
+    // 弹层关闭；默认模型回填为选中项，候选清单出现该模型 chip。
+    expect(find.text('选择模型（可多选）'), findsNothing);
+    final modelField = find.widgetWithText(TextFormField, '默认模型');
     expect(
       (tester.widget<TextFormField>(modelField).controller)?.text,
       'gpt-4o-mini',
     );
+    expect(find.widgetWithText(InputChip, 'gpt-4o-mini'), findsOneWidget);
   });
 
   testWidgets('未填服务地址点拉取：SnackBar 提示、不发网络请求', (tester) async {
@@ -376,7 +376,7 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, '新增配置'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('从服务拉取模型列表'));
+    await tester.tap(find.byTooltip('从服务拉取模型列表（可多选）'));
     await tester.pump();
 
     expect(find.text('请先填写服务地址'), findsOneWidget);
@@ -394,16 +394,16 @@ void main() {
       'https://api.example.com',
     );
     await tester.enterText(
-      find.widgetWithText(TextFormField, '模型'),
+      find.widgetWithText(TextFormField, '默认模型'),
       'my-model',
     );
     await tester.pump();
 
-    await tester.tap(find.byTooltip('从服务拉取模型列表'));
+    await tester.tap(find.byTooltip('从服务拉取模型列表（可多选）'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('拉取模型失败'), findsOneWidget);
-    final modelField = find.widgetWithText(TextFormField, '模型');
+    final modelField = find.widgetWithText(TextFormField, '默认模型');
     expect(
       (tester.widget<TextFormField>(modelField).controller)?.text,
       'my-model',
@@ -428,12 +428,12 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byTooltip('从服务拉取模型列表'));
+    await tester.tap(find.byTooltip('从服务拉取模型列表（可多选）'));
     await tester.pump();
     expect(requests, 1);
 
     // 加载态：IconButton 消失，出现 CircularProgressIndicator。
-    expect(find.byTooltip('从服务拉取模型列表'), findsNothing);
+    expect(find.byTooltip('从服务拉取模型列表（可多选）'), findsNothing);
     // 重复点击无效果（按钮已不在树上）。
     await tester
         .tapAt(tester.getCenter(find.byType(CircularProgressIndicator)));
