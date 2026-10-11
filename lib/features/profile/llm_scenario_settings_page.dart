@@ -102,35 +102,46 @@ class _LlmScenarioSettingsPageState
                     shrinkWrap: true,
                     padding: const EdgeInsets.only(bottom: SpacingTokens.md),
                     children: [
-                      RadioGroup<String>(
-                        groupValue: currentId ?? _followDefaultValue,
-                        onChanged: (value) {
-                          Navigator.pop(
-                            sheetContext,
-                            _ScenarioPick(
-                              value == _followDefaultValue ? null : value,
-                            ),
-                          );
-                        },
-                        child: Column(
-                          children: [
-                            const RadioListTile<String>(
-                              value: _followDefaultValue,
-                              title: Text('跟随默认'),
-                              controlAffinity:
-                                  ListTileControlAffinity.leading,
-                            ),
-                            for (final (index, config) in providers.indexed)
-                              RadioListTile<String>(
-                                value: config.id,
-                                title: Text(providerDisplayName(index, config)),
-                                subtitle: Text(providerHostSummary(config.baseUrl)),
-                                controlAffinity:
-                                    ListTileControlAffinity.leading,
-                              ),
-                          ],
+                      // 普通 ListTile（非 RadioGroup）：点「当前项」也要能继续
+                      // 进入第二级选模型（RadioGroup 对未改变的值不触发）。
+                      ListTile(
+                        leading: Icon(
+                          (currentId ?? _followDefaultValue) ==
+                                  _followDefaultValue
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: (currentId ?? _followDefaultValue) ==
+                                  _followDefaultValue
+                              ? Theme.of(sheetContext).colorScheme.primary
+                              : Theme.of(sheetContext)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                        ),
+                        title: const Text('跟随默认'),
+                        onTap: () => Navigator.pop(
+                          sheetContext,
+                          const _ScenarioPick(null),
                         ),
                       ),
+                      for (final (index, config) in providers.indexed)
+                        ListTile(
+                          leading: Icon(
+                            config.id == currentId
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            color: config.id == currentId
+                                ? Theme.of(sheetContext).colorScheme.primary
+                                : Theme.of(sheetContext)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                          ),
+                          title: Text(providerDisplayName(index, config)),
+                          subtitle: Text(providerHostSummary(config.baseUrl)),
+                          onTap: () => Navigator.pop(
+                            sheetContext,
+                            _ScenarioPick(config.id),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -205,21 +216,19 @@ class _LlmScenarioSettingsPageState
                     shrinkWrap: true,
                     padding: const EdgeInsets.only(bottom: SpacingTokens.md),
                     children: [
-                      RadioGroup<String>(
-                        groupValue: selected,
-                        onChanged: (v) => Navigator.pop(sheetContext, v),
-                        child: Column(
-                          children: [
-                            for (final m in models)
-                              RadioListTile<String>(
-                                value: m,
-                                title: Text(m),
-                                controlAffinity:
-                                    ListTileControlAffinity.leading,
-                              ),
-                          ],
+                      for (final m in models)
+                        ListTile(
+                          leading: Icon(
+                            m == selected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            color: m == selected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                          title: Text(m),
+                          onTap: () => Navigator.pop(sheetContext, m),
                         ),
-                      ),
                     ],
                   ),
                 ),

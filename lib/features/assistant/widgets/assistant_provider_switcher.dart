@@ -138,15 +138,35 @@ class _AssistantProviderSwitcherState
   }
 
   /// 第一级弹层：选供应商；返回 config.id / _followDefaultValue / null(取消)。
+  /// 用普通 ListTile（非 RadioGroup）：点「当前项」也要能继续进入第二级选模型
+  /// （RadioGroup 对未改变的值不触发 onChanged，会卡住同供应商换模型）。
   Future<String?> _pickProviderSheet(
     List<LlmProviderConfig> providers,
     String? currentId,
   ) {
+    final groupValue = currentId ?? _followDefaultValue;
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       builder: (sheetContext) {
         final theme = Theme.of(sheetContext);
+        Widget tile(String value, String title, String? subtitle) {
+          final sel = value == groupValue;
+          return ListTile(
+            leading: Icon(
+              sel
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: sel
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            title: Text(title),
+            subtitle: subtitle == null ? null : Text(subtitle),
+            onTap: () => Navigator.pop(sheetContext, value),
+          );
+        }
+
         return SafeArea(
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -164,28 +184,13 @@ class _AssistantProviderSwitcherState
                     shrinkWrap: true,
                     padding: const EdgeInsets.only(bottom: SpacingTokens.md),
                     children: <Widget>[
-                      RadioGroup<String>(
-                        groupValue: currentId ?? _followDefaultValue,
-                        onChanged: (v) => Navigator.pop(sheetContext, v),
-                        child: Column(
-                          children: <Widget>[
-                            const RadioListTile<String>(
-                              value: _followDefaultValue,
-                              title: Text('跟随默认'),
-                              controlAffinity: ListTileControlAffinity.leading,
-                            ),
-                            for (final (index, config) in providers.indexed)
-                              RadioListTile<String>(
-                                value: config.id,
-                                title: Text(providerDisplayName(index, config)),
-                                subtitle:
-                                    Text(providerHostSummary(config.baseUrl)),
-                                controlAffinity:
-                                    ListTileControlAffinity.leading,
-                              ),
-                          ],
+                      tile(_followDefaultValue, '跟随默认', null),
+                      for (final (index, config) in providers.indexed)
+                        tile(
+                          config.id,
+                          providerDisplayName(index, config),
+                          providerHostSummary(config.baseUrl),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -231,21 +236,19 @@ class _AssistantProviderSwitcherState
                     shrinkWrap: true,
                     padding: const EdgeInsets.only(bottom: SpacingTokens.md),
                     children: <Widget>[
-                      RadioGroup<String>(
-                        groupValue: selected,
-                        onChanged: (v) => Navigator.pop(sheetContext, v),
-                        child: Column(
-                          children: <Widget>[
-                            for (final m in models)
-                              RadioListTile<String>(
-                                value: m,
-                                title: Text(m),
-                                controlAffinity:
-                                    ListTileControlAffinity.leading,
-                              ),
-                          ],
+                      for (final m in models)
+                        ListTile(
+                          leading: Icon(
+                            m == selected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            color: m == selected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                          title: Text(m),
+                          onTap: () => Navigator.pop(sheetContext, m),
                         ),
-                      ),
                     ],
                   ),
                 ),

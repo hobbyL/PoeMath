@@ -95,7 +95,7 @@ Future<void> _pumpPage(
 /// 场景选择弹层内的选项。
 Finder _sheetTile(String title) => find.descendant(
       of: find.byType(BottomSheet),
-      matching: find.widgetWithText(RadioListTile<String>, title),
+      matching: find.widgetWithText(ListTile, title),
     );
 
 /// 点场景行打开选择弹层。
