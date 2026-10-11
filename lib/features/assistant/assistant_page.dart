@@ -84,6 +84,26 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         centerTitle: false,
         title: const AssistantProviderSwitcher(),
         actions: <Widget>[
+          IconButton(
+            onPressed: (chatState.messages.isNotEmpty &&
+                    chatState.contextBaseIndex < chatState.messages.length &&
+                    !chatState.isBusy)
+                ? () {
+                    final cleared = ref
+                        .read(assistantChatControllerProvider.notifier)
+                        .clearContext();
+                    if (cleared) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('已清除上下文，后续对话不再带入之前的记录（记录保留）'),
+                        ),
+                      );
+                    }
+                  }
+                : null,
+            icon: const Icon(Icons.cleaning_services_outlined),
+            tooltip: '清除上下文',
+          ),
           Builder(
             builder: (context) => IconButton(
               onPressed: () => Scaffold.of(context).openEndDrawer(),

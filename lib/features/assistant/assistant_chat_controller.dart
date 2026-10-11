@@ -59,6 +59,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
         ...state.messages,
         ChatMessage(role: ChatRole.user, content: text),
       ],
+      contextBaseIndex: state.contextBaseIndex,
     );
     await _complete(token);
   }
@@ -75,6 +76,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     state = AssistantChatState(
       status: AssistantChatStatus.loading,
       messages: messages.sublist(0, lastUserIndex + 1),
+      contextBaseIndex: state.contextBaseIndex.clamp(0, lastUserIndex + 1),
     );
     await _complete(token);
   }
@@ -98,6 +100,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
         ...state.messages,
         ChatMessage(role: ChatRole.assistant, content: partial),
       ],
+      contextBaseIndex: state.contextBaseIndex,
     );
   }
 
@@ -116,6 +119,16 @@ class AssistantChatController extends Notifier<AssistantChatState> {
   void startNewConversation() {
     _sessionToken++;
     state = const AssistantChatState();
+  }
+
+  /// 清除当前对话上下文：**保留全部消息记录**（展示/存档不变），仅把上下文
+  /// 起点移到末尾——后续对话不再把此前的消息发给模型。返回是否实际清除
+  /// （已在末尾 / 空会话 / 在途时为 false，不动状态）。
+  bool clearContext() {
+    if (state.isBusy) return false;
+    if (state.contextBaseIndex >= state.messages.length) return false;
+    state = state.copyWith(contextBaseIndex: state.messages.length);
+    return true;
   }
 
   /// 页面销毁时调用：仅令牌失效（丢弃在途流的晚到回调），不写状态
@@ -158,7 +171,9 @@ class AssistantChatController extends Notifier<AssistantChatState> {
 
       // 工具循环：非流式 chatComplete 判定是否调工具；有则执行并回灌
       // role:tool，循环（≤4 轮）；无 tool_calls 或到顶即跳出走流式收尾。
-      final working = <ChatMessage>[...state.messages];
+      // 从 contextBaseIndex 起取历史：清除上下文后旧消息仅存档、不入请求。
+      final base = state.contextBaseIndex.clamp(0, state.messages.length);
+      final working = <ChatMessage>[...state.messages.sublist(base)];
       for (var round = 0; round < kAssistantMaxToolRounds; round++) {
         final completion = await client.chatComplete(
           config: config,
@@ -288,6 +303,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
         ...state.messages,
         ChatMessage(role: ChatRole.assistant, content: trimmed),
       ],
+      contextBaseIndex: state.contextBaseIndex,
     );
   }
 }

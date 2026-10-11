@@ -18,6 +18,7 @@ class AssistantChatState {
     this.messages = const <ChatMessage>[],
     this.streamingText = '',
     this.message,
+    this.contextBaseIndex = 0,
   });
 
   final AssistantChatStatus status;
@@ -30,6 +31,11 @@ class AssistantChatState {
 
   /// 错误 / 引导文案（error / unconfigured 时非空）。
   final String? message;
+
+  /// 上下文起点下标：发给模型的历史从 `messages[contextBaseIndex]` 开始，
+  /// 之前的消息仅用于展示/存档，不参与下一轮请求。点「清除上下文」会把它
+  /// 置为当前 `messages.length`（记录保留，后续对话不再带入旧消息）。
+  final int contextBaseIndex;
 
   bool get isIdle => status == AssistantChatStatus.idle;
   bool get isLoading => status == AssistantChatStatus.loading;
@@ -46,12 +52,14 @@ class AssistantChatState {
     List<ChatMessage>? messages,
     String? streamingText,
     String? message,
+    int? contextBaseIndex,
   }) {
     return AssistantChatState(
       status: status ?? this.status,
       messages: messages ?? this.messages,
       streamingText: streamingText ?? this.streamingText,
       message: message ?? this.message,
+      contextBaseIndex: contextBaseIndex ?? this.contextBaseIndex,
     );
   }
 }

@@ -227,6 +227,55 @@ void main() {
     expect(messages[3]['content'], '第二问');
   });
 
+  test('清除上下文：清后下一轮只带 system + 新问（不含旧记录），消息记录仍保留',
+      () async {
+    await seedProviders();
+    late http.Request captured;
+    var streamCall = 0;
+    final container = containerWith(MockClient((request) async {
+      if (!_isStream(request.body)) return _completionResponse();
+      captured = request;
+      streamCall++;
+      return _sseResponse(streamCall == 1 ? '第一答' : '第二答');
+    }),);
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+
+    await notifier.send('第一问');
+    final cleared = notifier.clearContext();
+    expect(cleared, isTrue);
+    await notifier.send('第二问');
+
+    // 第二轮请求体只含 system + 第二问，旧记录（第一问/第一答）不入上下文。
+    final messages = (jsonDecode(captured.body)
+        as Map<String, dynamic>)['messages'] as List<dynamic>;
+    expect(messages, hasLength(2));
+    expect(messages[0]['role'], 'system');
+    expect(messages[1]['content'], '第二问');
+
+    // 记录仍保留：state.messages 完整 4 条，contextBaseIndex 停在清除点。
+    final state = container.read(assistantChatControllerProvider);
+    expect(state.messages, hasLength(4));
+    expect(state.messages[0].content, '第一问');
+    expect(state.messages[3].content, '第二答');
+    expect(state.contextBaseIndex, 2);
+  });
+
+  test('清除上下文：空会话 / 已在末尾时返回 false，不动状态', () async {
+    await seedProviders();
+    final container = containerWith(MockClient((request) async {
+      if (!_isStream(request.body)) return _completionResponse();
+      return _sseResponse('答');
+    }),);
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+
+    // 空会话：无可清。
+    expect(notifier.clearContext(), isFalse);
+
+    await notifier.send('问');
+    expect(notifier.clearContext(), isTrue); // 首次清除生效
+    expect(notifier.clearContext(), isFalse); // 已在末尾，再清为 no-op
+  });
+
   test('未配置：unconfigured 态，保留 user 气泡且不发请求', () async {
     var requests = 0;
     final container = containerWith(MockClient((_) async {
