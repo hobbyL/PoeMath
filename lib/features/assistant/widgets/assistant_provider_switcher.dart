@@ -62,22 +62,14 @@ class _AssistantProviderSwitcherState
       borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
       child: Padding(
         padding: const EdgeInsets.symmetric(
-          horizontal: SpacingTokens.xs,
+          horizontal: SpacingTokens.sm,
           vertical: SpacingTokens.xs,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Flexible(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ),
-            Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurfaceVariant),
-          ],
+        child: Text(
+          label,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleSmall
+              ?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
     );

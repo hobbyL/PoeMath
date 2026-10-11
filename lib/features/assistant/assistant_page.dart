@@ -81,6 +81,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         // 切换器；会话列表入口在右侧 endDrawer（右滑或点图标打开）。
         leading: const BackButton(),
         titleSpacing: 0,
+        centerTitle: false,
         title: const AssistantProviderSwitcher(),
         actions: <Widget>[
           Builder(
