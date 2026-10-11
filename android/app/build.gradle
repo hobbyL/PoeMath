@@ -86,7 +86,7 @@ android {
 
     defaultConfig {
         applicationId = "com.poemath.app"
-        minSdk = 21
+        minSdkVersion = flutter.minSdkVersion
         targetSdk = 35
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
