@@ -181,7 +181,7 @@ void main() {
     expect(
       find.descendant(
         of: find.widgetWithText(AppTile, '诗词讲解'),
-        matching: find.text('配置 2'),
+        matching: find.textContaining('配置 2'),
       ),
       findsOneWidget,
     );
@@ -194,7 +194,7 @@ void main() {
     expect(
       find.descendant(
         of: find.widgetWithText(AppTile, '诗词讲解'),
-        matching: find.text('配置 2'),
+        matching: find.textContaining('配置 2'),
       ),
       findsOneWidget,
     );
@@ -212,7 +212,7 @@ void main() {
     expect(
       find.descendant(
         of: find.widgetWithText(AppTile, '口算解析'),
-        matching: find.text('配置 2'),
+        matching: find.textContaining('配置 2'),
       ),
       findsOneWidget,
     );

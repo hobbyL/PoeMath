@@ -46,15 +46,18 @@ class LlmScenarioSettingsPage extends ConsumerStatefulWidget {
 
 class _LlmScenarioSettingsPageState
     extends ConsumerState<LlmScenarioSettingsPage> {
-  /// 点场景行：选择该场景使用的厂商（null = 跟随默认），点选即持久化。
-  Future<void> _setScenarioProvider(
-    LlmScenario scenario,
-    String? id,
-  ) async {
+  /// 应用场景选择：厂商 + 模型一次写入（null 厂商 = 跟随默认，连带清模型）。
+  Future<void> _applyScenarioSelection(
+    LlmScenario scenario, {
+    required String? providerId,
+    required String? model,
+  }) async {
     try {
-      await ref
-          .read(settingsRepositoryProvider)
-          .setProviderIdForScenario(scenario, id);
+      await ref.read(settingsRepositoryProvider).setScenarioSelection(
+            scenario,
+            providerId: providerId,
+            model: model,
+          );
     } on ArgumentError catch (e) {
       // 竞态：列表在读取后被外部改写。刷新列表即可。
       if (mounted) {
@@ -138,18 +141,114 @@ class _LlmScenarioSettingsPageState
       },
     );
     if (selection == null) return;
-    await _setScenarioProvider(scenario, selection.id);
+    final providerId = selection.id;
+    if (providerId == null) {
+      await _applyScenarioSelection(scenario, providerId: null, model: null);
+      return;
+    }
+    // 选了具体供应商：其有多个候选模型时，二级选模型。
+    final cfg = providers.firstWhere((p) => p.id == providerId);
+    final models = cfg.models.isNotEmpty
+        ? cfg.models
+        : (cfg.model.trim().isEmpty
+            ? const <String>[]
+            : <String>[cfg.model.trim()]);
+    String? model;
+    if (models.length <= 1) {
+      model = models.isEmpty ? null : models.first;
+    } else {
+      final currentModel = currentId == providerId
+          ? ref.read(settingsRepositoryProvider).modelForScenario(scenario)
+          : null;
+      model = await _pickModel(cfg, models, currentModel);
+      if (model == null) return; // 取消模型选择 = 不改动
+    }
+    await _applyScenarioSelection(
+      scenario,
+      providerId: providerId,
+      model: model,
+    );
   }
 
-  /// 场景行副标题：已绑定显示厂商名，未绑定显示「跟随默认（厂商名）」。
+  /// 二级弹层：选 [cfg] 下的模型；返回模型名 / null(取消)。
+  Future<String?> _pickModel(
+    LlmProviderConfig cfg,
+    List<String> models,
+    String? currentModel,
+  ) {
+    final selected = (currentModel != null && models.contains(currentModel))
+        ? currentModel
+        : (models.contains(cfg.model) ? cfg.model : models.first);
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  child: Text(
+                    '选择模型',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(color: theme.colorScheme.onSurface),
+                  ),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+                    children: [
+                      RadioGroup<String>(
+                        groupValue: selected,
+                        onChanged: (v) => Navigator.pop(sheetContext, v),
+                        child: Column(
+                          children: [
+                            for (final m in models)
+                              RadioListTile<String>(
+                                value: m,
+                                title: Text(m),
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 场景行副标题：已绑定显示「厂商名 · 模型」，未绑定显示「跟随默认（厂商名）」。
   String _scenarioSummary(
     List<LlmProviderConfig> providers,
     String? scenarioId,
     String? activeId,
+    String? scenarioModel,
   ) {
     if (scenarioId != null) {
       final index = providers.indexWhere((p) => p.id == scenarioId);
-      if (index >= 0) return providerDisplayName(index, providers[index]);
+      if (index >= 0) {
+        final cfg = providers[index];
+        final model =
+            (scenarioModel != null && cfg.models.contains(scenarioModel))
+                ? scenarioModel
+                : cfg.model;
+        final name = providerDisplayName(index, cfg);
+        return model.trim().isEmpty ? name : '$name · ${model.trim()}';
+      }
     }
     final activeIndex = providers.indexWhere((p) => p.id == activeId);
     if (activeIndex >= 0) {
@@ -216,6 +315,7 @@ class _LlmScenarioSettingsPageState
                   providers,
                   settingsRepo.providerIdForScenario(scenario),
                   activeId,
+                  settingsRepo.modelForScenario(scenario),
                 ),
                 onTap: () => _pickScenarioProvider(
                   scenario,
