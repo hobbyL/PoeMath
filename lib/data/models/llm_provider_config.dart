@@ -16,6 +16,7 @@ class LlmProviderConfig {
     required this.name,
     required this.baseUrl,
     required this.model,
+    this.models = const <String>[],
   });
 
   /// 唯一标识（'p' + 毫秒时间戳 + 3 位随机）。
@@ -27,8 +28,33 @@ class LlmProviderConfig {
   /// 已 normalize 的服务地址。
   final String baseUrl;
 
-  /// 模型名。
+  /// 默认模型名（场景未单独选模型时用它）；非空时须 ∈ [models]。
   final String model;
+
+  /// 候选模型清单（去重、保序；含默认 [model]）。空 = 未配置模型。
+  final List<String> models;
+
+  /// 规整候选模型：去空白、去重、保序；[defaultModel] 非空且不在列表中
+  /// 则插到首位，保证默认模型可被选中。
+  static List<String> normalizeModels(
+    Iterable<String> raw,
+    String defaultModel,
+  ) {
+    final seen = <String>{};
+    final out = <String>[];
+    void add(String m) {
+      final t = m.trim();
+      if (t.isEmpty || !seen.add(t)) return;
+      out.add(t);
+    }
+
+    final d = defaultModel.trim();
+    if (d.isNotEmpty) add(d);
+    for (final m in raw) {
+      add(m);
+    }
+    return List<String>.unmodifiable(out);
+  }
 
   /// 生成唯一 id：'p' + 毫秒时间戳 + 3 位随机数字。
   static String generateId() {
@@ -41,15 +67,25 @@ class LlmProviderConfig {
         'name': name,
         'baseUrl': baseUrl,
         'model': model,
+        'models': models,
       };
 
-  factory LlmProviderConfig.fromJson(Map<String, dynamic> json) =>
-      LlmProviderConfig(
-        id: json['id'] as String,
-        name: json['name'] as String? ?? '',
-        baseUrl: json['baseUrl'] as String,
-        model: json['model'] as String,
-      );
+  factory LlmProviderConfig.fromJson(Map<String, dynamic> json) {
+    // model 保持硬 cast（缺失=坏数据，由 decodeList 整体回退，防御行为不变）。
+    final model = json['model'] as String;
+    // 迁移：旧数据无 'models' → 用 [model]（model 非空）；新数据按原样规整。
+    final rawModels = (json['models'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        (model.isEmpty ? const <String>[] : <String>[model]);
+    return LlmProviderConfig(
+      id: json['id'] as String,
+      name: json['name'] as String? ?? '',
+      baseUrl: json['baseUrl'] as String,
+      model: model,
+      models: normalizeModels(rawModels, model),
+    );
+  }
 
   /// 将配置列表序列化为 JSON 字符串。
   static String encodeList(List<LlmProviderConfig> configs) {

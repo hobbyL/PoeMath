@@ -306,7 +306,10 @@ class SettingsRepository {
     final scenarioId = providerIdForScenario(scenario);
     final targetId = scenarioId ?? llmActiveProviderId;
     if (targetId == null) return null;
-    return _assembleLlmConfig(targetId);
+    // 仅当场景确有绑定配置时，场景选中 model 才适用（回落默认配置时忽略）。
+    final modelOverride =
+        scenarioId != null ? modelForScenario(scenario) : null;
+    return _assembleLlmConfig(targetId, modelOverride: modelOverride);
   }
 
   /// 读取场景绑定的配置 id；未绑定或绑定已悬空（配置被删）返回 null。
@@ -329,6 +332,8 @@ class SettingsRepository {
   ) async {
     if (id == null) {
       await HiveBoxes.settings.delete(scenario.settingsKey);
+      // 解绑同时清掉该场景选中的 model（旧 model 属于被解绑的配置）。
+      await HiveBoxes.settings.delete(scenario.modelKey);
       return;
     }
     if (!llmProviders.any((p) => p.id == id)) {
@@ -337,16 +342,56 @@ class SettingsRepository {
     await HiveBoxes.settings.put(scenario.settingsKey, id);
   }
 
+  /// 场景选中的模型名；未选 / 空串读作 null（跟随该配置默认 model）。
+  ///
+  /// 读时不校验是否 ∈ 候选（校验在 [readLlmConfigForScenario] 组装处做，
+  /// 悬空静默回落默认），与 [providerIdForScenario] 的读策略一致。
+  String? modelForScenario(LlmScenario scenario) {
+    final stored = HiveBoxes.settings.get(scenario.modelKey);
+    if (stored is! String || stored.trim().isEmpty) return null;
+    return stored;
+  }
+
+  /// 设置场景选中的模型；[model] 为 null / 空串表示清除（跟随默认）。
+  Future<void> setModelForScenario(LlmScenario scenario, String? model) async {
+    final trimmed = model?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      await HiveBoxes.settings.delete(scenario.modelKey);
+      return;
+    }
+    await HiveBoxes.settings.put(scenario.modelKey, trimmed);
+  }
+
+  /// 一次设定场景的（配置, 模型）绑定（助手切换器 / 场景设置页用）。
+  /// [providerId] 为 null 清除绑定（连带清 model）；非 null 时 id 须存在。
+  Future<void> setScenarioSelection(
+    LlmScenario scenario, {
+    required String? providerId,
+    required String? model,
+  }) async {
+    await setProviderIdForScenario(scenario, providerId);
+    if (providerId != null) {
+      await setModelForScenario(scenario, model);
+    }
+  }
+
   /// 按配置 id 组装 [LlmConfig]（[readLlmConfig] 与
   /// [readLlmConfigForScenario] 共用尾段）。
   ///
   /// 配置不存在或 baseUrl/model 为空返回 null；Key 允许为空。
-  Future<LlmConfig?> _assembleLlmConfig(String id) async {
+  Future<LlmConfig?> _assembleLlmConfig(
+    String id, {
+    String? modelOverride,
+  }) async {
     final providers = llmProviders;
     if (!providers.any((p) => p.id == id)) return null;
     final target = providers.firstWhere((p) => p.id == id);
     final base = target.baseUrl.trim();
-    final model = target.model.trim();
+    // 覆盖 model 须 ∈ 该配置候选模型，否则回落默认 model（防删/改名悬空）。
+    final model =
+        (modelOverride != null && target.models.contains(modelOverride))
+            ? modelOverride.trim()
+            : target.model.trim();
     if (base.isEmpty || model.isEmpty) return null;
     final apiKey = await _credentialStore.readLlmApiKeyFor(id);
     return LlmConfig(baseUrl: base, apiKey: apiKey ?? '', model: model);
@@ -364,6 +409,7 @@ class SettingsRepository {
     required String baseUrl,
     required String model,
     required String apiKey,
+    List<String> models = const <String>[],
   }) async {
     // 先校验地址合法（非法抛 FormatException，不落盘）。
     final normalized = LlmClient.normalizeBaseUrl(baseUrl);
@@ -378,6 +424,7 @@ class SettingsRepository {
       name: name.trim(),
       baseUrl: normalized.toString(),
       model: model.trim(),
+      models: LlmProviderConfig.normalizeModels(models, model.trim()),
     );
     final index = list.indexWhere((c) => c.id == id);
     if (index >= 0) {
@@ -415,6 +462,8 @@ class SettingsRepository {
     for (final scenario in LlmScenario.values) {
       if (HiveBoxes.settings.get(scenario.settingsKey) == id) {
         await HiveBoxes.settings.delete(scenario.settingsKey);
+        // 绑定被删，该场景选中的 model 一并清掉（属于被删配置）。
+        await HiveBoxes.settings.delete(scenario.modelKey);
       }
     }
     final list = llmProviders..removeWhere((c) => c.id == id);

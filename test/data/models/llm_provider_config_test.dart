@@ -186,4 +186,67 @@ void main() {
       expect(LlmProviderConfig.decodeList(json), isEmpty);
     });
   });
+
+  group('多模型 models 字段 + 迁移', () {
+    test('旧结构（无 models）迁移为 [model]', () {
+      final json = jsonEncode([
+        <String, dynamic>{
+          'id': 'p1',
+          'name': 'OpenAI',
+          'baseUrl': 'https://api.openai.com/v1',
+          'model': 'gpt-4o',
+        },
+      ]);
+      final decoded = LlmProviderConfig.decodeList(json);
+      expect(decoded.single.model, 'gpt-4o');
+      expect(decoded.single.models, ['gpt-4o']);
+    });
+
+    test('新结构保留 models；默认 model 若缺则补到首位、去重保序', () {
+      final json = jsonEncode([
+        <String, dynamic>{
+          'id': 'p1',
+          'name': 'OpenAI',
+          'baseUrl': 'https://api.openai.com/v1',
+          'model': 'gpt-4o',
+          'models': ['gpt-4o-mini', 'gpt-4o', 'gpt-4o-mini', 'o3-mini'],
+        },
+      ]);
+      final decoded = LlmProviderConfig.decodeList(json);
+      // 默认 gpt-4o 置首，去重后：gpt-4o, gpt-4o-mini, o3-mini。
+      expect(decoded.single.models, ['gpt-4o', 'gpt-4o-mini', 'o3-mini']);
+    });
+
+    test('往返保持 models', () {
+      final configs = [
+        LlmProviderConfig(
+          id: 'p1',
+          name: 'OpenAI',
+          baseUrl: 'https://api.openai.com/v1',
+          model: 'gpt-4o',
+          models: const ['gpt-4o', 'gpt-4o-mini'],
+        ),
+      ];
+      final decoded = LlmProviderConfig.decodeList(
+        LlmProviderConfig.encodeList(configs),
+      );
+      expect(decoded.single.models, ['gpt-4o', 'gpt-4o-mini']);
+      expect(decoded.single.model, 'gpt-4o');
+    });
+
+    test('normalizeModels：去空白/去重/保序/默认插首位', () {
+      expect(
+        LlmProviderConfig.normalizeModels(
+          [' b ', 'a', 'b', '', 'c'],
+          'a',
+        ),
+        ['a', 'b', 'c'],
+      );
+      // 默认空：不插入，仅去重保序。
+      expect(
+        LlmProviderConfig.normalizeModels(['x', 'x', 'y'], ''),
+        ['x', 'y'],
+      );
+    });
+  });
 }

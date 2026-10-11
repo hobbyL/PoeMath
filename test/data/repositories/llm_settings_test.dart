@@ -92,6 +92,72 @@ void main() {
     );
   }
 
+  Future<void> saveMultiModel() async {
+    await repository.saveLlmProviderConfig(
+      id: 'p1',
+      name: 'OpenAI',
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o',
+      apiKey: 'k',
+      models: const ['gpt-4o', 'gpt-4o-mini'],
+    );
+  }
+
+  test('场景选中模型生效：readLlmConfigForScenario 用场景选中的 model', () async {
+    await saveMultiModel();
+    await repository.setScenarioSelection(
+      LlmScenario.assistant,
+      providerId: 'p1',
+      model: 'gpt-4o-mini',
+    );
+    final cfg = await repository.readLlmConfigForScenario(LlmScenario.assistant);
+    expect(cfg!.model, 'gpt-4o-mini');
+    expect(repository.modelForScenario(LlmScenario.assistant), 'gpt-4o-mini');
+  });
+
+  test('按场景隔离：助手与口算各用各自选中的 model', () async {
+    await saveMultiModel();
+    await repository.setScenarioSelection(
+      LlmScenario.assistant,
+      providerId: 'p1',
+      model: 'gpt-4o',
+    );
+    await repository.setScenarioSelection(
+      LlmScenario.mathExplain,
+      providerId: 'p1',
+      model: 'gpt-4o-mini',
+    );
+    expect(
+      (await repository.readLlmConfigForScenario(LlmScenario.assistant))!.model,
+      'gpt-4o',
+    );
+    expect(
+      (await repository.readLlmConfigForScenario(LlmScenario.mathExplain))!
+          .model,
+      'gpt-4o-mini',
+    );
+  });
+
+  test('悬空回落：场景选中 model 不在候选 → 用默认 model', () async {
+    await saveMultiModel();
+    await repository.setProviderIdForScenario(LlmScenario.assistant, 'p1');
+    await repository.setModelForScenario(LlmScenario.assistant, 'ghost-model');
+    final cfg = await repository.readLlmConfigForScenario(LlmScenario.assistant);
+    expect(cfg!.model, 'gpt-4o');
+  });
+
+  test('删除配置：清掉指向它的场景 model 选择', () async {
+    await saveMultiModel();
+    await repository.setScenarioSelection(
+      LlmScenario.assistant,
+      providerId: 'p1',
+      model: 'gpt-4o-mini',
+    );
+    await repository.deleteLlmProviderConfig('p1');
+    expect(repository.modelForScenario(LlmScenario.assistant), isNull);
+    expect(repository.providerIdForScenario(LlmScenario.assistant), isNull);
+  });
+
   test('新增两条配置：列表顺序持久化、Key 按配置独立、第一条自动生效', () async {
     await saveTwo();
 
