@@ -101,14 +101,16 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
                     }
                   }
                 : null,
+            iconSize: 24,
             icon: const Icon(Icons.cleaning_services_outlined),
             tooltip: '清除上下文',
           ),
           Builder(
             builder: (context) => IconButton(
               onPressed: () => Scaffold.of(context).openEndDrawer(),
-              icon: const Icon(Icons.forum_outlined),
-              tooltip: '会话列表',
+              iconSize: 24,
+              icon: const Icon(Icons.history),
+              tooltip: '对话记录',
             ),
           ),
         ],
