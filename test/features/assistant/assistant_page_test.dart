@@ -64,6 +64,7 @@ class _FakeSession extends AssistantSessionController {
   int stopCount = 0;
   int regenerateCount = 0;
   int startNewCount = 0;
+  final List<int> resentIndexes = <int>[];
 
   @override
   AssistantSessionState build() => _initial;
@@ -89,6 +90,11 @@ class _FakeSession extends AssistantSessionController {
   @override
   Future<void> regenerate() async {
     regenerateCount++;
+  }
+
+  @override
+  Future<void> resendFrom(int index) async {
+    resentIndexes.add(index);
   }
 
   @override
@@ -261,7 +267,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ChatMessageBubble), findsNWidgets(2));
-    expect(find.byTooltip('复制'), findsOneWidget);
+    // 用户气泡与助手气泡各一个复制按钮。
+    expect(find.byTooltip('复制'), findsNWidgets(2));
     expect(find.byTooltip('重新生成'), findsOneWidget);
     expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
     expect(find.byIcon(Icons.stop), findsNothing);
@@ -422,6 +429,95 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(h.session.regenerateCount, 1);
+  });
+
+  testWidgets('回答失败：用户提问气泡出「重新发送」，点击直接重发（末条不弹确认）',
+      (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.error,
+        messages: <ChatMessage>[_user('出一道题')],
+        message: '网络开小差了',
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('重新发送'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('重新发送'));
+    await tester.pumpAndSettle();
+
+    // 末条提问之后无记录可删 → 不弹确认，直接重发 index 0。
+    expect(h.session.resentIndexes, <int>[0]);
+  });
+
+  testWidgets('历史提问重发：先弹确认框；确认后转接 resendFrom(该下标)',
+      (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: <ChatMessage>[
+          _user('第一问'),
+          _assistant('第一答'),
+          _user('第二问'),
+          _assistant('第二答'),
+        ],
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pumpAndSettle();
+
+    // 两条用户提问各有一个「重新发送」。
+    expect(find.byTooltip('重新发送'), findsNWidgets(2));
+
+    // 点第一问（非末条）→ 弹确认框。
+    await tester.tap(find.byTooltip('重新发送').first);
+    await tester.pumpAndSettle();
+    expect(find.text('重新发送这条提问？'), findsOneWidget);
+    expect(h.session.resentIndexes, isEmpty); // 未确认前不执行
+
+    // 取消：不执行。
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(h.session.resentIndexes, isEmpty);
+
+    // 再点并确认：以第一问的下标 0 重发。
+    await tester.tap(find.byTooltip('重新发送').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, '重新发送'));
+    await tester.pumpAndSettle();
+    expect(h.session.resentIndexes, <int>[0]);
+  });
+
+  testWidgets('在途（streaming）：用户提问气泡不出「重新发送」', (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.streaming,
+        messages: <ChatMessage>[_user('讲讲乘法')],
+        streamingText: '乘法是……',
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.byTooltip('重新发送'), findsNothing);
+
+    await _teardownAnim(tester);
+  });
+
+  testWidgets('用户气泡出「复制」按钮（原先只能长按）', (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: <ChatMessage>[_user('1+1'), _assistant('等于 2')],
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pumpAndSettle();
+
+    // 用户气泡 + 助手气泡各一个复制按钮。
+    expect(find.byTooltip('复制'), findsNWidgets(2));
   });
 
   testWidgets('工具轮次：assistant.toolCalls 与 role:tool 渲染为可折叠工具卡，'

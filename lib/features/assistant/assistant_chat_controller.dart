@@ -88,6 +88,26 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     await _complete(token);
   }
 
+  /// 重新发送 [index] 处的用户提问：截掉它之后的全部消息（该提问保留为
+  /// 末条）再重跑。用于回答失败 / 被中断 / 想换个答案时从任意历史提问重来
+  /// ——与 [regenerate] 的差别仅在起点可指定（regenerate 恒为最后一条）。
+  ///
+  /// [index] 非法（越界 / 不是 user 轮次）或在途时忽略。截断为「从尾部截断」，
+  /// 会话层按长度 diff 连带删除已落库的后续消息（见 assistant_session_provider）。
+  Future<void> resendFrom(int index) async {
+    if (state.isBusy) return;
+    final messages = state.messages;
+    if (index < 0 || index >= messages.length) return;
+    if (messages[index].role != ChatRole.user) return;
+    final token = ++_sessionToken;
+    state = AssistantChatState(
+      status: AssistantChatStatus.loading,
+      messages: messages.sublist(0, index + 1),
+      contextBaseIndex: state.contextBaseIndex.clamp(0, index + 1),
+    );
+    await _complete(token);
+  }
+
   /// 中止在途请求：令牌失配使在途流自然失效；已累积的增量固化为一条
   /// assistant 消息（允许部分回答），无增量则回 ready。
   void stop() {

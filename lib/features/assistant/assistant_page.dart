@@ -223,7 +223,38 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
       onRegenerate: isLastAssistant
           ? () => ref.read(assistantSessionProvider.notifier).regenerate()
           : null,
+      // 用户提问：非在途时可重新发送（回答失败 / 被中断后的重试入口）。
+      onResend: (m.role == ChatRole.user && !chatState.isBusy)
+          ? () => _confirmResend(index, isLast: index == messages.length - 1)
+          : null,
     );
+  }
+
+  /// 重新发送第 [index] 条提问。其后尚有记录时先确认（删除不可撤销）；
+  /// [isLast]（末条提问，无后续记录可删）直接重发。
+  Future<void> _confirmResend(int index, {required bool isLast}) async {
+    if (!isLast) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('重新发送这条提问？'),
+          content: const Text('这条提问之后的对话记录会被删除，且不能恢复。'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('重新发送'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      if (!mounted) return;
+    }
+    await ref.read(assistantSessionProvider.notifier).resendFrom(index);
   }
 
   /// 上下文清除分割线：标记此处之前的消息仅存档、不再作为对话上下文发送。

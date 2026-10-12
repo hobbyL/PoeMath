@@ -480,6 +480,88 @@ void main() {
     expect(requests, 0);
   });
 
+  test('resendFrom：截掉该提问之后的全部消息并重跑，上下文只含该提问',
+      () async {
+    await seedProviders();
+    late http.Request captured;
+    var streamCall = 0;
+    final container = containerWith(MockClient((request) async {
+      if (!_isStream(request.body)) return _completionResponse();
+      captured = request;
+      streamCall++;
+      return _sseResponse('第$streamCall答');
+    }),);
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+
+    await notifier.send('第一问');
+    await notifier.send('第二问');
+    expect(
+      container
+          .read(assistantChatControllerProvider)
+          .messages
+          .map((m) => m.content)
+          .toList(),
+      ['第一问', '第1答', '第二问', '第2答'],
+    );
+
+    // 重发第一问（index 0）：其后 3 条（第1答/第二问/第2答）被截掉。
+    await notifier.resendFrom(0);
+
+    final state = container.read(assistantChatControllerProvider);
+    expect(state.isReady, isTrue);
+    expect(
+      state.messages.map((m) => m.content).toList(),
+      ['第一问', '第3答'],
+    );
+    // 请求上下文只剩 system + 第一问。
+    final messages = (jsonDecode(captured.body)
+        as Map<String, dynamic>)['messages'] as List<dynamic>;
+    expect(messages, hasLength(2));
+    expect(messages[0]['role'], 'system');
+    expect(messages[1]['content'], '第一问');
+  });
+
+  test('resendFrom：越界 / 非 user 轮次 / 在途时忽略', () async {
+    await seedProviders();
+    var streamCall = 0;
+    final container = containerWith(MockClient((request) async {
+      if (!_isStream(request.body)) return _completionResponse();
+      streamCall++;
+      return _sseResponse('答$streamCall');
+    }),);
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+
+    await notifier.send('问');
+    final before = container.read(assistantChatControllerProvider).messages;
+
+    await notifier.resendFrom(-1); // 越界
+    await notifier.resendFrom(99); // 越界
+    await notifier.resendFrom(1); // messages[1] 是 assistant，非 user
+
+    expect(container.read(assistantChatControllerProvider).messages, before);
+    expect(streamCall, 1); // 未重跑
+  });
+
+  test('resendFrom：清除点在重发点之后时被收紧到重发点（contextBaseIndex 不越界）',
+      () async {
+    await seedProviders();
+    final container = containerWith(MockClient((request) async {
+      if (!_isStream(request.body)) return _completionResponse();
+      return _sseResponse('答');
+    }),);
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+
+    await notifier.send('第一问');
+    await notifier.send('第二问');
+    notifier.clearContext(); // base = 4（末尾）
+    expect(container.read(assistantChatControllerProvider).contextBaseIndex, 4);
+
+    await notifier.resendFrom(0); // 消息截到 1 条 → base 须收紧到 ≤1
+    final state = container.read(assistantChatControllerProvider);
+    expect(state.contextBaseIndex, lessThanOrEqualTo(state.messages.length));
+    expect(state.messages, hasLength(2)); // 第一问 + 新答
+  });
+
   test('页面销毁在 streaming：discardPending 收敛状态（固化增量），不卡 busy',
       () async {
     await seedProviders();

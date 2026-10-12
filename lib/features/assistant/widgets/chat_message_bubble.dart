@@ -4,7 +4,8 @@
 // 职责：单条对话气泡。基于 ColoredCard（禁手写 BoxDecoration）：
 //       用户消息 primary 右对齐，助手 / 工具消息 secondary 左对齐；
 //       正文委托 AssistantMarkdown 渲染 Markdown + LaTeX。
-//       长按复制；助手气泡底部操作行（复制 / 重新生成，按状态显隐）。
+//       长按复制；气泡底部操作行（按状态显隐）：助手气泡为复制 / 重新生成，
+//       用户气泡为复制 / 重新发送（回答失败或被中断后的唯一重试入口）。
 //       停止操作在输入栏（流式中切为停止），不在气泡内（见 design §4）。
 
 import 'package:flutter/material.dart';
@@ -21,6 +22,8 @@ import 'package:poemath/features/assistant/widgets/assistant_markdown.dart';
 /// - [text]：正文（Markdown + `$...$` LaTeX）。
 /// - [isStreaming]：流式气泡（启用淡入动画，禁用复制 / 操作行）。
 /// - [onRegenerate]：非空时在助手气泡底部显示「重新生成」。
+/// - [onResend]：非空时在用户气泡底部显示「重新发送」（会删除此条提问
+///   之后的全部记录，故由调用方弹确认框后再执行）。
 class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({
     super.key,
@@ -28,12 +31,14 @@ class ChatMessageBubble extends StatelessWidget {
     required this.text,
     this.isStreaming = false,
     this.onRegenerate,
+    this.onResend,
   });
 
   final ChatRole role;
   final String text;
   final bool isStreaming;
   final VoidCallback? onRegenerate;
+  final VoidCallback? onResend;
 
   bool get _isUser => role == ChatRole.user;
 
@@ -44,8 +49,10 @@ class ChatMessageBubble extends StatelessWidget {
     // 用户 primary、助手/工具 secondary；ColoredCard 内部按 8% 透明度着色。
     final bubbleColor =
         _isUser ? theme.colorScheme.primary : theme.colorScheme.secondary;
-    // 助手完成态才显示操作行（流式中内容仍在增长，不可复制 / 重答）。
-    final showActions = !_isUser && !isStreaming;
+    // 完成态才显示操作行（流式中内容仍在增长，不可复制 / 重答）。
+    // 用户气泡仅在调用方给出 onResend 时出操作行（在途轮次不给）。
+    final showActions =
+        !isStreaming && (_isUser ? onResend != null : true);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: SpacingTokens.xs),
@@ -90,6 +97,14 @@ class ChatMessageBubble extends StatelessWidget {
             onPressed: onRegenerate,
             icon: const Icon(Icons.refresh, size: 18),
             tooltip: '重新生成',
+            visualDensity: VisualDensity.compact,
+            color: color,
+          ),
+        if (onResend != null)
+          IconButton(
+            onPressed: onResend,
+            icon: const Icon(Icons.send_outlined, size: 18),
+            tooltip: '重新发送',
             visualDensity: VisualDensity.compact,
             color: color,
           ),

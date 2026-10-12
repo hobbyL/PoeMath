@@ -233,6 +233,10 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
   /// 重新生成：删末条 assistant（内存+repo 经 _syncMessages）后以末条 user 重跑。
   Future<void> regenerate() => _chat.regenerate();
 
+  /// 重新发送第 [index] 条用户提问：截掉其后全部消息（内存 + repo 经
+  /// _syncMessages 的尾部截断 diff）后重跑。
+  Future<void> resendFrom(int index) => _chat.resendFrom(index);
+
   /// 停止在途流（固化部分内容为 assistant 并落库）。
   void stop() => _chat.stop();
 
