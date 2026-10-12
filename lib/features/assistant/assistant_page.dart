@@ -314,10 +314,12 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
 
   /// 朗读目标失守检测：正在朗读的回答被重发截断 / 切换会话移除后停播，
   /// 避免气泡已消失而音频仍在播、且无停止入口。ChatMessage 未覆写 ==，
-  /// contains 即对象身份判断。
+  /// contains 即对象身份判断。准备期（首段音频未就绪）同样停播：stop
+  /// 递增服务令牌使在途会话首个检查即死，[_startSpeaking] 的 finally 因
+  /// 令牌失配不会复位已清理的状态。
   void _syncSpeakingMessage(List<ChatMessage> messages) {
     final target = _speakingMessage;
-    if (target == null || _isPreparing || messages.contains(target)) return;
+    if (target == null || messages.contains(target)) return;
     unawaited(_stopSpeaking());
   }
 

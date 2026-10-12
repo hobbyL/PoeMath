@@ -855,6 +855,43 @@ void main() {
       handles.single.signalFinish();
       await tester.pump();
     });
+
+    testWidgets('准备期（首段未就绪）截断正在启动的朗读：同样自动停止',
+        (tester) async {
+      final h = _harness(
+        AssistantChatState(
+          status: AssistantChatStatus.ready,
+          messages: <ChatMessage>[
+            _user('问一'),
+            _assistant('答一'),
+            _user('问二'),
+            _assistant('答二'),
+          ],
+        ),
+      );
+      final handles = _stubSpeakSentences(h.tts);
+      await _pump(tester, h.container);
+      await tester.pumpAndSettle();
+
+      // 点击朗读但不投递 onReady（停留在合成准备期）。
+      await tester.tap(find.byTooltip('朗读').last);
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('停止朗读'), findsOneWidget);
+
+      // 截断移除正在启动的目标 → 仍自动停播，不留幽灵音频。
+      h.chat.state = AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: <ChatMessage>[_user('问一')],
+      );
+      await tester.pumpAndSettle();
+
+      verify(() => h.tts.stop()).called(1);
+      expect(find.byTooltip('停止朗读'), findsNothing);
+      // 被停止的会话完成后不复活状态（令牌失守）。
+      handles.single.signalFinish();
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('停止朗读'), findsNothing);
+    });
   });
 }
 
