@@ -480,6 +480,81 @@ void main() {
     expect(requests, 0);
   });
 
+  test('页面销毁在 streaming：discardPending 收敛状态（固化增量），不卡 busy',
+      () async {
+    await seedProviders();
+    final sse = StreamController<List<int>>();
+    final container = containerWith(
+      MockClient.streaming((request, bodyStream) async {
+        final body = utf8.decode(await bodyStream.toBytes());
+        if (!_isStream(body)) return _completionStreamed();
+        return http.StreamedResponse(sse.stream, 200);
+      }),
+    );
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+
+    final done = notifier.send('在吗');
+    sse.add(utf8.encode(_sseData('在的')));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(
+      container.read(assistantChatControllerProvider).isStreaming,
+      isTrue,
+    );
+
+    // 页面退出：废弃在途流。若不收敛，重进页面（ensureOpen 对仍在的
+    // 会话不重置聊天状态）后 isBusy 永远为 true，清除上下文按钮恒灰。
+    notifier.discardPending();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    final state = container.read(assistantChatControllerProvider);
+    expect(state.isBusy, isFalse);
+    expect(state.isReady, isTrue);
+    // 已累积增量固化为 assistant（与 stop 同语义），记录不丢。
+    expect(state.messages.last.role, ChatRole.assistant);
+    expect(state.messages.last.content, '在的');
+    expect(state.streamingText, isEmpty);
+
+    // 晚到分片不改写已收敛的状态（令牌护栏仍生效）。
+    sse.add(utf8.encode(_sseData('——晚到')));
+    sse.add(utf8.encode('data: [DONE]\n\n'));
+    await sse.close();
+    await done;
+    expect(
+      container.read(assistantChatControllerProvider).messages.last.content,
+      '在的',
+    );
+  });
+
+  test('页面销毁在 loading（判定中无增量）：discardPending 收敛回 ready，不新增消息',
+      () async {
+    await seedProviders();
+    final completer = Completer<http.Response>();
+    final container = containerWith(MockClient((request) async {
+      if (_isStream(request.body)) return _sseResponse('不该到这');
+      return completer.future; // 挂住 chatComplete 工具判定阶段。
+    }),);
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+
+    final done = notifier.send('在吗');
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    expect(container.read(assistantChatControllerProvider).isLoading, isTrue);
+
+    notifier.discardPending();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    final state = container.read(assistantChatControllerProvider);
+    expect(state.isBusy, isFalse);
+    expect(state.isReady, isTrue); // user 气泡保留
+    expect(state.messages, hasLength(1));
+
+    // 被废弃的判定响应晚到：不写状态。
+    completer.complete(_completionResponse());
+    await done;
+    final finalState = container.read(assistantChatControllerProvider);
+    expect(finalState.isReady, isTrue);
+    expect(finalState.messages, hasLength(1));
+  });
+
   test('工具一轮：chatComplete 回 tool_calls → 执行 → 回灌 role:tool → 流式收尾',
       () async {
     await seedProviders();

@@ -190,6 +190,65 @@ void main() {
     expect(find.text('上下文已清除'), findsNothing);
   });
 
+  /// 「清除上下文」按钮的 onPressed（null = 灰态不可点）。
+  /// byTooltip 命中的是 Tooltip 组件，需向上取 IconButton 才能断言 onPressed。
+  IconButton clearButton(WidgetTester tester) => tester.widget<IconButton>(
+        find
+            .ancestor(
+              of: find.byTooltip('清除上下文'),
+              matching: find.byType(IconButton),
+            )
+            .first,
+      );
+
+  testWidgets('清除上下文按钮：ready 且有未清除消息时可点', (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: <ChatMessage>[_user('问'), _assistant('答')],
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pumpAndSettle();
+
+    expect(clearButton(tester).onPressed, isNotNull);
+  });
+
+  testWidgets('清除上下文按钮：已清到末尾 / 空会话时灰态', (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: <ChatMessage>[_user('问'), _assistant('答')],
+        contextBaseIndex: 2, // 已清到末尾
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pumpAndSettle();
+
+    expect(clearButton(tester).onPressed, isNull);
+
+    final empty = _harness(const AssistantChatState());
+    await _pump(tester, empty.container);
+    await tester.pumpAndSettle();
+
+    expect(clearButton(tester).onPressed, isNull);
+  });
+
+  testWidgets('清除上下文按钮：在途（loading/streaming）时灰态', (tester) async {
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.loading,
+        messages: <ChatMessage>[_user('问')],
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pump();
+
+    expect(clearButton(tester).onPressed, isNull);
+
+    await _teardownAnim(tester);
+  });
+
   testWidgets('ready：末条 assistant 显示复制 + 重答，输入栏为发送态',
       (tester) async {
     final h = _harness(

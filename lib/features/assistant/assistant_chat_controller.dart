@@ -13,6 +13,7 @@
 // 安全边界：API Key 仅经 LlmConfig 下沉到 Authorization 头，绝不写入
 // 日志 / 异常 message / state。
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,8 +42,14 @@ class AssistantChatController extends Notifier<AssistantChatState> {
   /// 会话代际令牌：send / stop / regenerate / 切换会话都会使旧请求失效。
   int _sessionToken = 0;
 
+  /// provider 是否已销毁（微任务收敛前的写入防抖）。
+  bool _disposed = false;
+
   @override
-  AssistantChatState build() => const AssistantChatState();
+  AssistantChatState build() {
+    ref.onDispose(() => _disposed = true);
+    return const AssistantChatState();
+  }
 
   /// 发送一条用户消息并流式接收助手回答。在途（loading/streaming）时忽略。
   Future<void> send(String userInput) async {
@@ -131,11 +138,40 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     return true;
   }
 
-  /// 页面销毁时调用：仅令牌失效（丢弃在途流的晚到回调），不写状态
-  /// ——订阅本 provider 的 element 在 unmount 期间同步写会触发
-  /// defunct element markNeedsBuild 断言。
+  /// 页面销毁时调用：令牌失效（丢弃在途流的晚到回调）并收敛在途状态。
+  ///
+  /// 本 provider 为 App 生命周期常驻（非 autoDispose）：若只令牌失效而不
+  /// 收敛，状态会永远停在 loading/streaming —— 重进页面（当前会话仍存在，
+  /// ensureOpen 不重置聊天状态）后 isBusy 恒真，清除上下文按钮恒灰、输入栏
+  /// 恒禁用。收敛语义与 [stop] 一致：streaming 已累积增量固化为一条
+  /// assistant 消息（记录保留、经会话监听自动落库），无增量则回 ready。
+  ///
+  /// 收敛须延后到微任务：页面 unmount 期间同步写 state 会触发 defunct
+  /// element markNeedsBuild 断言；微任务时点 unmount 已完成。
   void discardPending() {
     _sessionToken++;
+    if (!state.isBusy) return;
+    final snapshot = state;
+    scheduleMicrotask(() {
+      // 期间已被 stop / 切换会话收敛，或 provider 已销毁：不再写。
+      if (_disposed || !state.isBusy) return;
+      final partial = snapshot.streamingText.trim();
+      if (partial.isEmpty) {
+        state = snapshot.copyWith(
+          status: AssistantChatStatus.ready,
+          streamingText: '',
+        );
+        return;
+      }
+      state = AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: [
+          ...snapshot.messages,
+          ChatMessage(role: ChatRole.assistant, content: partial),
+        ],
+        contextBaseIndex: snapshot.contextBaseIndex,
+      );
+    });
   }
 
   /// 读配置 →（按需）工具循环 → 流式接收 → 固化回答。假定 `state.messages`
