@@ -77,6 +77,11 @@ class SettingsRepository {
   static const String _keyPoemExplainPrompt = 'llm_poem_explain_prompt';
   static const String _keyMathExplainPrompt = 'llm_math_explain_prompt';
   static const String _keyAssistantPrompt = 'llm_assistant_prompt';
+  // AI 助手悬浮球位置（设备绑定，不入备份白名单）：坐标随屏幕尺寸
+  // 变化而失效，换机/旋转后由 _clampToBounds 越界回落兜底，跨设备
+  // 迁移无意义（对照：assistant_enabled 是用户偏好，在白名单内）。
+  static const String _keyAssistantBubbleDx = 'assistant_bubble_dx';
+  static const String _keyAssistantBubbleDy = 'assistant_bubble_dy';
 
   // ============ 主题 ============
 
@@ -668,6 +673,24 @@ class SettingsRepository {
     } else {
       await HiveBoxes.settings.put(_keyMathPracticeMode, mode);
     }
+  }
+
+  // ============ AI 助手悬浮球位置（设备绑定，不入备份白名单） ============
+
+  /// 悬浮球上次停留位置 x（body 坐标系逻辑像素）；null = 未存过（默认角）。
+  double? get assistantBubbleDx =>
+      (HiveBoxes.settings.get(_keyAssistantBubbleDx) as num?)?.toDouble();
+
+  Future<void> setAssistantBubbleDx(double dx) async {
+    await HiveBoxes.settings.put(_keyAssistantBubbleDx, dx);
+  }
+
+  /// 悬浮球上次停留位置 y（body 坐标系逻辑像素）；null = 未存过（默认角）。
+  double? get assistantBubbleDy =>
+      (HiveBoxes.settings.get(_keyAssistantBubbleDy) as num?)?.toDouble();
+
+  Future<void> setAssistantBubbleDy(double dy) async {
+    await HiveBoxes.settings.put(_keyAssistantBubbleDy, dy);
   }
 
   // ============ 新手引导 ============

@@ -3,6 +3,8 @@
 // 层级：features/assistant/widgets
 // 职责：挂于 MainShell 的全局可拖拽悬浮气泡 —— AI 助手的跨页入口。
 //       拖拽改位置、松手贴最近水平边吸附；点击（小位移）跳转助手页。
+//       停留位置落 settings box（assistant_bubble_dx/dy），首帧经
+//       LayoutBuilder 边界校验后恢复（越界回落），跨启动保持。
 // 依赖：Flutter 手势 / Riverpod（appRouterProvider context-free 导航）。
 //
 // 例外说明：本组件是「不使用浮动按钮」与「卡片必须用 ColoredCard」两条
@@ -10,12 +12,16 @@
 //   「全局悬浮气泡例外」小节）。圆形面用 Material(shape: CircleBorder) +
 //   InkWell，非手写 BoxDecoration，颜色走 theme.colorScheme、尺寸用常量。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 
 /// 气泡定位边界（body 坐标系，已扣除安全区与边距）。
 typedef _Bounds = ({double minX, double maxX, double minY, double maxY});
@@ -50,14 +56,50 @@ class _DraggableAssistantBubbleState
   /// 气泡左上角位置（body 坐标系）；null 表示尚未交互，用默认角。
   Offset? _position;
 
+  /// 是否已把持久化位置恢复进 [_position]（只恢复一次，避免每帧重读）。
+  bool _restoredFromStorage = false;
+
   /// 当前帧解析出的定位边界，供手势回调复用（避免回调里重算约束）。
   _Bounds? _bounds;
 
   /// AnimatedPositioned 时长：拖拽跟手为 0，松手贴边才启用过渡。
   Duration _moveDuration = Duration.zero;
 
-  // TODO(assistant-bubble): 跨 App 重启的位置持久化（落 settings box 的
-  //   assistant_bubble_dx/dy，initState 读取）为可选增强，本轮不做。
+  /// 首帧（LayoutBuilder 解析出边界后）恢复持久化位置：越界（屏幕
+  /// 尺寸变化 / 换设备）经 [_clampToBounds] 回落到边界内；无存档或
+  /// 严重越界保持 null → 默认角。
+  void _restoreFromStorage(_Bounds bounds) {
+    if (_restoredFromStorage) return;
+    _restoredFromStorage = true;
+    final repo = ref.read(settingsRepositoryProvider);
+    final dx = repo.assistantBubbleDx;
+    final dy = repo.assistantBubbleDy;
+    if (dx == null || dy == null) return;
+    final saved = Offset(dx, dy);
+    final withinBounds = saved.dx >= bounds.minX &&
+        saved.dx <= bounds.maxX &&
+        saved.dy >= bounds.minY &&
+        saved.dy <= bounds.maxY;
+    if (!withinBounds) return; // 严重越界：弃用存档，用默认角
+    _position = _clampToBounds(saved, bounds);
+  }
+
+  /// 松手贴边后的最终位置持久化（拖拽过程不写，避免高频 IO）。
+  /// 失败仅记日志，不影响交互。
+  Future<void> _persistPosition(Offset pos) async {
+    try {
+      final repo = ref.read(settingsRepositoryProvider);
+      await repo.setAssistantBubbleDx(pos.dx);
+      await repo.setAssistantBubbleDy(pos.dy);
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '悬浮球位置持久化失败',
+        tag: 'Assistant',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
 
   Offset _clampToBounds(Offset pos, _Bounds b) {
     return Offset(
@@ -92,10 +134,13 @@ class _DraggableAssistantBubbleState
     final centerX = current.dx + _diameter / 2;
     final midline = (b.minX + b.maxX + _diameter) / 2;
     final snappedX = centerX < midline ? b.minX : b.maxX;
+    final snapped = Offset(snappedX, current.dy);
     setState(() {
       _moveDuration = _snapDuration;
-      _position = Offset(snappedX, current.dy);
+      _position = snapped;
     });
+    // 贴边吸附的最终位置落盘，下次启动恢复。
+    unawaited(_persistPosition(snapped));
   }
 
   void _openAssistant() {
@@ -119,6 +164,8 @@ class _DraggableAssistantBubbleState
         final maxY = (maxH - _diameter - _margin).clamp(minY, double.infinity);
         final bounds = (minX: minX, maxX: maxX, minY: minY, maxY: maxY);
         _bounds = bounds;
+        // 首帧恢复持久化位置（需要边界才能判断越界回落）。
+        _restoreFromStorage(bounds);
 
         // 默认右下角；已交互则用当前位置（随约束变化重新 clamp）。
         final pos = _clampToBounds(

@@ -162,5 +162,34 @@ void main() {
         expect(HiveBoxes.settings.get('llm_assistant_prompt'), isNull);
       });
     });
+
+    // 悬浮球坐标（设备绑定：随屏幕尺寸失效，不入备份白名单）。
+    group('assistantBubble 位置', () {
+      test('无存档时 dx/dy 为 null', () {
+        expect(repo.assistantBubbleDx, isNull);
+        expect(repo.assistantBubbleDy, isNull);
+      });
+
+      test('set 后读取 roundtrip（落到约定 key）', () async {
+        await repo.setAssistantBubbleDx(12.5);
+        await repo.setAssistantBubbleDy(340.75);
+
+        expect(repo.assistantBubbleDx, 12.5);
+        expect(repo.assistantBubbleDy, 340.75);
+        expect(HiveBoxes.settings.get('assistant_bubble_dx'), 12.5);
+        expect(HiveBoxes.settings.get('assistant_bubble_dy'), 340.75);
+      });
+
+      test('重复写入取最新值', () async {
+        await repo.setAssistantBubbleDx(10);
+        await repo.setAssistantBubbleDx(99.5);
+        expect(repo.assistantBubbleDx, 99.5);
+      });
+
+      test('整数存值经 num 转 double 读出', () async {
+        await HiveBoxes.settings.put('assistant_bubble_dy', 8);
+        expect(repo.assistantBubbleDy, 8.0);
+      });
+    });
   });
 }
