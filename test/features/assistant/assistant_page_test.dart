@@ -520,6 +520,35 @@ void main() {
     expect(find.byTooltip('复制'), findsNWidgets(2));
   });
 
+  testWidgets('进入页面有历史：消息列表自动定位到最下方', (tester) async {
+    // 缩小视口（400x600 逻辑像素），使 30 条消息超出可滚动范围。
+    tester.view.physicalSize = const Size(400, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final messages = <ChatMessage>[
+      for (var i = 0; i < 15; i++) ...[
+        _user('问题 $i：这是一段用来撑高列表的较长文本内容'),
+        _assistant('回答 $i：这是一段用来撑高列表的较长文本内容'),
+      ],
+    ];
+    final h = _harness(
+      AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: messages,
+      ),
+    );
+    await _pump(tester, h.container);
+    await tester.pumpAndSettle();
+
+    // 末条消息在视口内已构建（未滚动时 ListView.builder 不构建视口外条目，
+    // 末条 itemBuilder 下标即滚动位置的最直接证据）。
+    expect(find.textContaining('回答 14'), findsOneWidget);
+    // 首条已远出视口与缓存区（未构建 = 已滚离顶部）。
+    expect(find.textContaining('回答 0'), findsNothing);
+  });
+
   testWidgets('工具轮次：assistant.toolCalls 与 role:tool 渲染为可折叠工具卡，'
       '最终回答仍为气泡', (tester) async {
     final h = _harness(

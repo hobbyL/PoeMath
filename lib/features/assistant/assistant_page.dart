@@ -40,8 +40,16 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   void initState() {
     super.initState();
     _session = ref.read(assistantSessionProvider.notifier);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _session.ensureOpen();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _session.ensureOpen();
+      // 进入时直接跳到最下方（瞬时定位，不做动画）。重进页面时 ensureOpen
+      // 早退（provider 常驻、会话仍打开），聊天状态无变化、ref.listen 不
+      // 触发，列表会停在顶部——故此处无条件定位；无历史时 jumpTo(0) 无感。
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      });
     });
   }
 
