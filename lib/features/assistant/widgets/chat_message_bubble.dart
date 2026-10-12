@@ -103,7 +103,9 @@ class ChatMessageBubble extends StatelessWidget {
         if (onResend != null)
           IconButton(
             onPressed: onResend,
-            icon: const Icon(Icons.send_outlined, size: 18),
+            // 与助手气泡「重新生成」同为刷新样式（语义同为「再来一次」），
+            // tooltip 区分文案。
+            icon: const Icon(Icons.refresh, size: 18),
             tooltip: '重新发送',
             visualDensity: VisualDensity.compact,
             color: color,
