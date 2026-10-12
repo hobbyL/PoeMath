@@ -76,7 +76,10 @@ final filteredPoemsProvider = Provider<List<Poem>>((ref) {
           (p) =>
               p.title.toLowerCase().contains(lower) ||
               p.content.toLowerCase().contains(lower) ||
-              p.author.toLowerCase().contains(lower),
+              p.author.toLowerCase().contains(lower) ||
+              // 名句与标签也参与命中（如搜「思乡」命中标签、搜名句片段命中原诗）
+              p.famousLines.any((l) => l.toLowerCase().contains(lower)) ||
+              p.tags.any((t) => t.toLowerCase().contains(lower)),
         )
         .toList();
   }
