@@ -4,9 +4,10 @@
 // 职责：单条对话气泡。基于 ColoredCard（禁手写 BoxDecoration）：
 //       用户消息 primary 右对齐，助手 / 工具消息 secondary 左对齐；
 //       正文委托 AssistantMarkdown 渲染 Markdown + LaTeX。
-//       长按复制；气泡底部操作行（按状态显隐）：助手气泡为复制 / 重新生成，
-//       用户气泡为复制 / 重新发送（回答失败或被中断后的唯一重试入口）。
-//       停止操作在输入栏（流式中切为停止），不在气泡内（见 design §4）。
+//       长按复制；气泡底部操作行（按状态显隐）：助手气泡为复制 / 朗读 /
+//       重新生成，用户气泡为复制 / 重新发送（回答失败或被中断后的唯一
+//       重试入口）。停止操作在输入栏（流式中切为停止），不在气泡内
+//       （见 design §4）。
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,6 +25,8 @@ import 'package:poemath/features/assistant/widgets/assistant_markdown.dart';
 /// - [onRegenerate]：非空时在助手气泡底部显示「重新生成」。
 /// - [onResend]：非空时在用户气泡底部显示「重新发送」（会删除此条提问
 ///   之后的全部记录，故由调用方弹确认框后再执行）。
+/// - [onSpeak]：非空时在助手气泡底部显示「朗读」按钮（播放当前回答）。
+/// - [isSpeaking]：本条回答正在朗读（按钮切换为停止图标与主色）。
 class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({
     super.key,
@@ -32,6 +35,8 @@ class ChatMessageBubble extends StatelessWidget {
     this.isStreaming = false,
     this.onRegenerate,
     this.onResend,
+    this.onSpeak,
+    this.isSpeaking = false,
   });
 
   final ChatRole role;
@@ -39,6 +44,8 @@ class ChatMessageBubble extends StatelessWidget {
   final bool isStreaming;
   final VoidCallback? onRegenerate;
   final VoidCallback? onResend;
+  final VoidCallback? onSpeak;
+  final bool isSpeaking;
 
   bool get _isUser => role == ChatRole.user;
 
@@ -92,6 +99,19 @@ class ChatMessageBubble extends StatelessWidget {
           visualDensity: VisualDensity.compact,
           color: color,
         ),
+        if (onSpeak != null)
+          IconButton(
+            onPressed: onSpeak,
+            // 播放中切换为停止图标（主色高亮）；空闲为喇叭样式，
+            // 与设置页「语音朗读」入口图标一致。
+            icon: Icon(
+              isSpeaking ? Icons.stop : Icons.volume_up_outlined,
+              size: 18,
+            ),
+            tooltip: isSpeaking ? '停止朗读' : '朗读',
+            visualDensity: VisualDensity.compact,
+            color: isSpeaking ? theme.colorScheme.primary : color,
+          ),
         if (onRegenerate != null)
           IconButton(
             onPressed: onRegenerate,

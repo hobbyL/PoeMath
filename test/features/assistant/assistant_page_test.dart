@@ -8,12 +8,17 @@
 // 纯状态测试：覆写 assistantChatControllerProvider（固定状态 + 空操作）
 //   与 assistantSessionProvider（conversationId=null，记录回调），不触碰 Hive。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
+import 'package:poemath/core/services/tts_service.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/assistant/assistant_chat_controller.dart';
 import 'package:poemath/features/assistant/assistant_chat_state.dart';
 import 'package:poemath/features/assistant/assistant_page.dart';
@@ -23,6 +28,8 @@ import 'package:poemath/features/assistant/widgets/chat_message_bubble.dart';
 import 'package:poemath/features/assistant/widgets/tool_message_card.dart';
 
 import '../../helpers/hive_test_helper.dart';
+
+class _MockTtsService extends Mock implements TtsService {}
 
 /// 固定状态的假对话控制器：build 返回目标状态，所有变更方法空操作，
 /// 使注入状态在渲染期间保持不变（不触发真实 chatStream / 网络）。
@@ -101,21 +108,33 @@ class _FakeSession extends AssistantSessionController {
   void discardPending() {}
 }
 
-typedef _Harness = ({ProviderContainer container, _FakeSession session});
+typedef _Harness = ({
+  ProviderContainer container,
+  _FakeSession session,
+  _FakeChat chat,
+  _MockTtsService tts,
+});
 
 _Harness _harness(
   AssistantChatState chatState, {
   AssistantSessionState sessionState = const AssistantSessionState(),
 }) {
+  final chat = _FakeChat(chatState);
   final session = _FakeSession(sessionState);
+  final tts = _MockTtsService();
+  // 默认桩：页面 dispose / 停止路径都会调 stop；currentSessionId 兜底 0。
+  // 朗读行为由各测试按需经 _stubSpeakSentences 覆写。
+  when(() => tts.stop()).thenAnswer((_) async {});
+  when(() => tts.currentSessionId).thenReturn(0);
   final container = ProviderContainer(
     overrides: <Override>[
-      assistantChatControllerProvider.overrideWith(() => _FakeChat(chatState)),
+      assistantChatControllerProvider.overrideWith(() => chat),
       assistantSessionProvider.overrideWith(() => session),
+      ttsServiceProvider.overrideWithValue(tts),
     ],
   );
   addTearDown(container.dispose);
-  return (container: container, session: session);
+  return (container: container, session: session, chat: chat, tts: tts);
 }
 
 Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
@@ -132,6 +151,64 @@ Future<void> _pump(WidgetTester tester, ProviderContainer container) async {
 Future<void> _teardownAnim(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pumpAndSettle();
+}
+
+/// 会话身份模拟器：复刻 TtsService 的会话代际令牌语义——朗读入口同步段
+/// 递增，回调携带该 id，`currentSessionId` 返回最新值。恒返回常量会让
+/// 过期会话的晚到回调被误判为当前会话（假绿），mock 须与真服务同构。
+class _SessionIds {
+  int _current = 0;
+
+  int get current => _current;
+
+  int next() => ++_current;
+}
+
+/// 一次可控朗读：合成期挂起 → [signalReady] 触发 onReady（遮罩解除）→
+/// 朗读期挂起 → [signalFinish] 完成朗读 Future（页面回空闲）。
+class _SpeakHandle {
+  _SpeakHandle({
+    required this.sessionId,
+    required this.text,
+    required this.onReady,
+    required Completer<void> completer,
+  }) : _completer = completer;
+
+  final int sessionId;
+  final String text;
+  final void Function(int sessionId)? onReady;
+  final Completer<void> _completer;
+
+  void signalReady() => onReady?.call(sessionId);
+
+  void signalFinish() {
+    if (!_completer.isCompleted) _completer.complete();
+  }
+}
+
+/// 覆写 speakSentences 为可控脚本，返回按发生顺序累积的朗读记录。
+List<_SpeakHandle> _stubSpeakSentences(_MockTtsService tts) {
+  final handles = <_SpeakHandle>[];
+  final sessions = _SessionIds();
+  when(() => tts.currentSessionId).thenAnswer((_) => sessions.current);
+  when(
+    () => tts.speakSentences(any(), onReady: any(named: 'onReady')),
+  ).thenAnswer((invocation) {
+    final sessionId = sessions.next();
+    final onReady =
+        invocation.namedArguments[#onReady] as void Function(int)?;
+    final completer = Completer<void>();
+    handles.add(
+      _SpeakHandle(
+        sessionId: sessionId,
+        text: invocation.positionalArguments[0] as String,
+        onReady: onReady,
+        completer: completer,
+      ),
+    );
+    return completer.future;
+  });
+  return handles;
 }
 
 ChatMessage _user(String content) =>
@@ -589,6 +666,195 @@ void main() {
     expect(find.text('题目：25 + 38 = ?'), findsNothing);
     // 最终回答气泡仍带「重新生成」。
     expect(find.byTooltip('重新生成'), findsOneWidget);
+  });
+
+  group('回答朗读', () {
+    testWidgets('ready：回答气泡出「朗读」，用户气泡不出', (tester) async {
+      final h = _harness(
+        AssistantChatState(
+          status: AssistantChatStatus.ready,
+          messages: <ChatMessage>[_user('1+1'), _assistant('等于 2')],
+        ),
+      );
+      await _pump(tester, h.container);
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('朗读'), findsOneWidget);
+    });
+
+    testWidgets('点击「朗读」：清洗后文本送 TTS，图标切停止；完成后还原',
+        (tester) async {
+      final h = _harness(
+        AssistantChatState(
+          status: AssistantChatStatus.ready,
+          messages: <ChatMessage>[
+            _user('二分之一怎么写'),
+            _assistant(r'**结果是** $\frac{1}{2}$ 哦'),
+          ],
+        ),
+      );
+      final handles = _stubSpeakSentences(h.tts);
+      await _pump(tester, h.container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('朗读'));
+      await tester.pumpAndSettle();
+
+      // Markdown / LaTeX 已清洗为口语文本再送 TTS。
+      expect(handles.single.text, '结果是 2分之1 哦');
+      // 朗读中：按钮切换为「停止朗读」。
+      expect(find.byTooltip('停止朗读'), findsOneWidget);
+
+      // 首段就绪 → 全部朗读完毕：回空闲，按钮还原。
+      handles.single.signalReady();
+      handles.single.signalFinish();
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('朗读'), findsOneWidget);
+      verifyNever(() => h.tts.stop());
+    });
+
+    testWidgets('朗读中再次点击：转接 tts.stop，停止后按钮还原', (tester) async {
+      final h = _harness(
+        AssistantChatState(
+          status: AssistantChatStatus.ready,
+          messages: <ChatMessage>[_user('1+1'), _assistant('等于 2')],
+        ),
+      );
+      final handles = _stubSpeakSentences(h.tts);
+      await _pump(tester, h.container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('朗读'));
+      await tester.pumpAndSettle();
+      handles.single.signalReady();
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('停止朗读'));
+      await tester.pumpAndSettle();
+
+      verify(() => h.tts.stop()).called(1);
+      expect(find.byTooltip('朗读'), findsOneWidget);
+      // 收尾挂起的朗读 Future（过期会话不写状态）。
+      handles.single.signalFinish();
+      await tester.pump();
+    });
+
+    testWidgets('播放中点其他回答：先停再切，新文本送 TTS', (tester) async {
+      final h = _harness(
+        AssistantChatState(
+          status: AssistantChatStatus.ready,
+          messages: <ChatMessage>[
+            _user('第一问'),
+            _assistant('第一答内容'),
+            _user('第二问'),
+            _assistant('第二答内容'),
+          ],
+        ),
+      );
+      final handles = _stubSpeakSentences(h.tts);
+      await _pump(tester, h.container);
+      await tester.pumpAndSettle();
+
+      // 播第一条回答；之后第二条按钮仍为「朗读」。
+      await tester.tap(find.byTooltip('朗读').first);
+      await tester.pumpAndSettle();
+      handles.first.signalReady();
+      await tester.pump();
+
+      // 点第二条回答的「朗读」→ 先 stop 再切。
+      await tester.tap(find.byTooltip('朗读'));
+      await tester.pumpAndSettle();
+
+      verify(() => h.tts.stop()).called(1);
+      expect(handles.length, 2);
+      expect(handles.last.text, '第二答内容');
+      // 新回答在播（其按钮已切「停止朗读」）。
+      expect(find.byTooltip('停止朗读'), findsOneWidget);
+
+      handles.first.signalFinish();
+      handles.last.signalReady();
+      handles.last.signalFinish();
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('停止朗读'), findsNothing);
+    });
+
+    testWidgets('退出页面：停止朗读', (tester) async {
+      final h = _harness(
+        AssistantChatState(
+          status: AssistantChatStatus.ready,
+          messages: <ChatMessage>[_user('1+1'), _assistant('等于 2')],
+        ),
+      );
+      final handles = _stubSpeakSentences(h.tts);
+      await _pump(tester, h.container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('朗读'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      verify(() => h.tts.stop()).called(1);
+      handles.single.signalFinish();
+      await tester.pump();
+    });
+
+    testWidgets('无可朗读文本（全代码块回答）：提示且不调 TTS', (tester) async {
+      final h = _harness(
+        AssistantChatState(
+          status: AssistantChatStatus.ready,
+          messages: <ChatMessage>[
+            _user('写段代码'),
+            _assistant('```\nprint(1);\n```'),
+          ],
+        ),
+      );
+      final handles = _stubSpeakSentences(h.tts);
+      await _pump(tester, h.container);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('朗读'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('这条回答没有可朗读的文本内容'), findsOneWidget);
+      expect(handles, isEmpty);
+      // 未进入播放态，按钮保持「朗读」。
+      expect(find.byTooltip('朗读'), findsOneWidget);
+    });
+
+    testWidgets('正在朗读的回答被重发截断移除：自动停止', (tester) async {
+      final h = _harness(
+        AssistantChatState(
+          status: AssistantChatStatus.ready,
+          messages: <ChatMessage>[
+            _user('问一'),
+            _assistant('答一'),
+            _user('问二'),
+            _assistant('答二'),
+          ],
+        ),
+      );
+      final handles = _stubSpeakSentences(h.tts);
+      await _pump(tester, h.container);
+      await tester.pumpAndSettle();
+
+      // 播最后一条回答（答二）。
+      await tester.tap(find.byTooltip('朗读').last);
+      await tester.pumpAndSettle();
+      handles.single.signalReady();
+      await tester.pump();
+
+      // 重发第一问：其后记录（含正在朗读的答二）被截断删除 → 自动停播。
+      h.chat.state = AssistantChatState(
+        status: AssistantChatStatus.ready,
+        messages: <ChatMessage>[_user('问一')],
+      );
+      await tester.pumpAndSettle();
+
+      verify(() => h.tts.stop()).called(1);
+      expect(find.byTooltip('停止朗读'), findsNothing);
+      handles.single.signalFinish();
+      await tester.pump();
+    });
   });
 }
 

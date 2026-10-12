@@ -6,6 +6,10 @@
 //       发送 / 停止 / 重答 / 会话增删改经 assistantSessionProvider 协调，
 //       持久化由 session 的监听-diff 自动完成（见 assistant_session_provider）。
 //       页面销毁仅 discardPending（丢弃在途流晚到回调，不写状态）。
+//       回答气泡提供朗读（TtsService，Markdown 清洗后逐句播）；竞态纪律
+//       复用讲解弹层：会话令牌护栏 + _isPreparing 遮罩 + 先停再切。
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,8 +17,12 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
+import 'package:poemath/core/services/tts/markdown_speech_text.dart';
+import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/assistant/assistant_chat_controller.dart';
 import 'package:poemath/features/assistant/assistant_chat_state.dart';
 import 'package:poemath/features/assistant/assistant_session_provider.dart';
@@ -36,10 +44,31 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   final ScrollController _scrollController = ScrollController();
   late final AssistantSessionController _session;
 
+  /// TTS 服务（dispose 阶段 ref 不可用，initState 先捕获）。
+  late final TtsService _tts;
+
+  /// 正在朗读的回答（对象身份跟踪：重发截断 / 切换会话后据此停播）。
+  ChatMessage? _speakingMessage;
+
+  /// 是否正在朗读（含首段音频就绪前的准备期）。
+  bool _isSpeaking = false;
+
+  /// 点击朗读 → 首段音频就绪前（或停止 await 期）的遮罩期，作为重入
+  /// 守卫拦截一切重复点击，避免 stop 未完成时并发启动第二个会话。
+  bool _isPreparing = false;
+
+  /// 当前持有播放态的会话 id，-1 表示无（空闲 / 已停止）。
+  /// 身份来源是 [TtsService.currentSessionId]（服务唯一权威）。
+  int _activeSessionId = -1;
+
+  /// 该回调 / 该次 await 是否仍属于当前持有播放态的会话。
+  bool _isCurrentSession(int sessionId) => sessionId == _activeSessionId;
+
   @override
   void initState() {
     super.initState();
     _session = ref.read(assistantSessionProvider.notifier);
+    _tts = ref.read(ttsServiceProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _session.ensureOpen();
       // 进入时直接跳到最下方（瞬时定位，不做动画）。重进页面时 ensureOpen
@@ -57,6 +86,18 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   void dispose() {
     // 仅丢弃在途流晚到回调，不写状态（避免对已卸载 element markNeedsBuild）。
     _session.discardPending();
+    // 退出页面即停朗读（同讲解弹层「关闭停播」）：stop 同步段递增服务
+    // 令牌，在途朗读的晚到回调天然失配。
+    unawaited(
+      _tts.stop().onError(
+            (error, stackTrace) => AppLogger.e(
+              '退出 AI 助手时停止朗读失败',
+              tag: 'Assistant',
+              error: error,
+              stackTrace: stackTrace,
+            ),
+          ),
+    );
     _scrollController.dispose();
     super.dispose();
   }
@@ -79,7 +120,10 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     // 消息 / 流式变化后滚到底部。
     ref.listen<AssistantChatState>(
       assistantChatControllerProvider,
-      (_, __) => _scrollToBottomSoon(),
+      (_, next) {
+        _syncSpeakingMessage(next.messages);
+        _scrollToBottomSoon();
+      },
     );
 
     return Scaffold(
@@ -235,6 +279,9 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
       onResend: (m.role == ChatRole.user && !chatState.isBusy)
           ? () => _confirmResend(index, isLast: index == messages.length - 1)
           : null,
+      // 助手回答：朗读当前内容（Markdown 清洗后逐句播）。
+      onSpeak: m.role == ChatRole.assistant ? () => _onTapSpeak(m) : null,
+      isSpeaking: _isSpeaking && identical(_speakingMessage, m),
     );
   }
 
@@ -263,6 +310,123 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
       if (!mounted) return;
     }
     await ref.read(assistantSessionProvider.notifier).resendFrom(index);
+  }
+
+  /// 朗读目标失守检测：正在朗读的回答被重发截断 / 切换会话移除后停播，
+  /// 避免气泡已消失而音频仍在播、且无停止入口。ChatMessage 未覆写 ==，
+  /// contains 即对象身份判断。
+  void _syncSpeakingMessage(List<ChatMessage> messages) {
+    final target = _speakingMessage;
+    if (target == null || _isPreparing || messages.contains(target)) return;
+    unawaited(_stopSpeaking());
+  }
+
+  /// 点回答气泡的朗读按钮：空闲 → 朗读；正在播本条 → 停止；正在播其他
+  /// 条 → 先停再切（stop 失败不切换，防双读——同诗词页点击播放纪律）。
+  Future<void> _onTapSpeak(ChatMessage message) async {
+    if (_isPreparing) return;
+    if (_isSpeaking) {
+      final wasSame = _speakingMessage == message;
+      // 先置遮罩再 await stop：挡住停止窗口期的二次点击。
+      setState(() => _isPreparing = true);
+      final stopped = await _stopSpeaking();
+      if (mounted) setState(() => _isPreparing = false);
+      if (!stopped || wasSame || !mounted) return;
+    }
+    await _startSpeaking(message);
+  }
+
+  /// 停止当前朗读并清理播放态。返回 stop 是否成功；失败时已弹 SnackBar。
+  /// 失败保留 `_isSpeaking`（音频可能仍在播），让后续点击继续走停止路由。
+  Future<bool> _stopSpeaking() async {
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      await _tts.stop();
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        '停止 AI 助手朗读失败',
+        tag: 'Assistant',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('停止朗读失败，请稍后重试')),
+        );
+      }
+      return false;
+    }
+    _activeSessionId = -1;
+    _speakingMessage = null;
+    if (mounted) setState(() => _isSpeaking = false);
+    return true;
+  }
+
+  /// 朗读一条回答（Markdown 清洗后按标点分句播）。会话令牌护栏复用讲解
+  /// 弹层纪律：`Future.sync` 使「捕获会话 id」一定先于任何异常 / 回调被
+  /// 观察到。
+  Future<void> _startSpeaking(ChatMessage message) async {
+    final speakable = markdownToSpeechText(message.content).trim();
+    if (speakable.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('这条回答没有可朗读的文本内容')),
+      );
+      return;
+    }
+    final scaffold = ScaffoldMessenger.of(context);
+    setState(() {
+      _isPreparing = true;
+      _isSpeaking = true;
+    });
+    _speakingMessage = message;
+    final speaking = Future.sync(() {
+      return _tts.speakSentences(
+        speakable,
+        onReady: (sessionId) {
+          if (mounted && _isCurrentSession(sessionId)) {
+            setState(() => _isPreparing = false);
+          }
+        },
+      );
+    });
+    // 朗读入口在任何 await 之前递增服务令牌，发起与读取之间无挂起点。
+    final sessionId = _tts.currentSessionId;
+    _activeSessionId = sessionId;
+    try {
+      await speaking;
+    } on Exception catch (error, stackTrace) {
+      AppLogger.e(
+        'AI 助手朗读失败',
+        tag: 'Assistant',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted && _isCurrentSession(sessionId)) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          SnackBar(
+            content: Text(
+              error is TtsException
+                  ? '朗读失败：${error.message}'
+                  : '朗读失败，请检查系统语音服务后重试',
+            ),
+          ),
+        );
+      }
+    } finally {
+      // 过期会话（已被 stop / 新会话接管）不清理，避免复位新会话的状态。
+      if (_isCurrentSession(sessionId)) {
+        _activeSessionId = -1;
+        _speakingMessage = null;
+        if (mounted) {
+          setState(() {
+            _isPreparing = false;
+            _isSpeaking = false;
+          });
+        }
+      }
+    }
   }
 
   /// 上下文清除分割线：标记此处之前的消息仅存档、不再作为对话上下文发送。
