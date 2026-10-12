@@ -134,18 +134,15 @@ class HomePage extends ConsumerWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
 
-    return Container(
+    return ColoredCard(
+      gradient: LinearGradient(
+        colors: [primary, primary.withValues(alpha: 0.6)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      boxShadow: SpacingTokens.softShadow,
       width: double.infinity,
       padding: const EdgeInsets.all(SpacingTokens.lg),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [primary, primary.withValues(alpha: 0.6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        boxShadow: SpacingTokens.softShadow,
-      ),
       child: Row(
         children: [
           Expanded(
