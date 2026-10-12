@@ -26,11 +26,16 @@ final selectedCategoryProvider = StateProvider<String?>((ref) => null);
 /// 搜索关键词
 final formulaSearchQueryProvider = StateProvider<String>((ref) => '');
 
-/// 筛选后的公式列表
+/// 是否仅显示已收藏公式（收藏视图）
+final formulaFavoritesOnlyProvider = StateProvider<bool>((ref) => false);
+
+/// 筛选后的公式列表（分类 → 搜索 → 收藏三层叠加）
 final filteredFormulasProvider = Provider<List<Formula>>((ref) {
   final repo = ref.watch(formulaRepoProvider);
+  final favoriteRepo = ref.watch(formulaFavoriteRepoProvider);
   final category = ref.watch(selectedCategoryProvider);
   final query = ref.watch(formulaSearchQueryProvider);
+  final favoritesOnly = ref.watch(formulaFavoritesOnlyProvider);
 
   List<Formula> formulas;
   if (category != null) {
@@ -44,6 +49,11 @@ final filteredFormulasProvider = Provider<List<Formula>>((ref) {
     if (category != null) {
       formulas = formulas.where((f) => f.category == category).toList();
     }
+  }
+
+  if (favoritesOnly) {
+    final favoriteIds = favoriteRepo.getFavoriteIds().toSet();
+    formulas = formulas.where((f) => favoriteIds.contains(f.id)).toList();
   }
 
   return formulas;

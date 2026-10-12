@@ -276,6 +276,8 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
               final repo = ref.read(formulaFavoriteRepoProvider);
               await repo.toggle(widget.formulaId);
               ref.invalidate(isFormulaFavoriteProvider(widget.formulaId));
+              // 收藏视图列表过滤依赖收藏集合，同步失效。
+              ref.invalidate(filteredFormulasProvider);
             },
           ),
         ],

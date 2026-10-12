@@ -20,6 +20,7 @@ class StudyHubPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final formulas = ref.watch(filteredFormulasProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
+    final favoritesOnly = ref.watch(formulaFavoritesOnlyProvider);
     final theme = Theme.of(context);
 
     final filterLabel = selectedCategory ?? '全部';
@@ -35,6 +36,22 @@ class StudyHubPage extends ConsumerWidget {
                 snap: true,
                 title: const Text('公式知识库'),
                 actions: [
+                  // 收藏视图切换：仅显示已收藏的公式（与分类/搜索叠加）。
+                  IconButton(
+                    onPressed: () {
+                      ref.read(formulaFavoritesOnlyProvider.notifier).state =
+                          !favoritesOnly;
+                    },
+                    icon: Icon(
+                      favoritesOnly
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                    ),
+                    color: favoritesOnly
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                    tooltip: favoritesOnly ? '显示全部公式' : '仅显示已收藏',
+                  ),
                   TextButton.icon(
                     onPressed: () => _showCategoryPicker(
                       context,
@@ -84,14 +101,19 @@ class StudyHubPage extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.functions_rounded,
+                          favoritesOnly
+                              ? Icons.star_outline_rounded
+                              : Icons.functions_rounded,
                           size: 64,
                           color: theme.colorScheme.onSurfaceVariant
                               .withValues(alpha: 0.3),
                         ),
                         const SizedBox(height: SpacingTokens.md),
                         Text(
-                          '暂无公式',
+                          favoritesOnly
+                              ? '还没有收藏的公式\n点击公式右上角星标即可收藏'
+                              : '暂无公式',
+                          textAlign: TextAlign.center,
                           style: theme.textTheme.bodyLarge?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
