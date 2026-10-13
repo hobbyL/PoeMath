@@ -86,6 +86,73 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
+  testWidgets('编辑已有配置：回填安全存储的密码，且可切明文查看', (tester) async {
+    final settings = _MockSettingsRepository();
+    // 传入的 existing 凭据为空 → 触发 _loadCredentials 从安全存储取回。
+    when(() => settings.loadWebDavConfigWithCredentials(any())).thenAnswer(
+      (_) async => WebDavConfig(
+        id: 'cfg-1',
+        name: '家庭云盘',
+        url: 'https://dav.example.com',
+        username: 'alice',
+        password: 'stored-secret',
+        remotePath: '/poemath/',
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsRepositoryProvider.overrideWithValue(settings),
+        ],
+        child: MaterialApp(
+          home: WebDavConfigPage(
+            existing: WebDavConfig(
+              id: 'cfg-1',
+              name: '家庭云盘',
+              url: 'https://dav.example.com',
+              username: '',
+              password: '',
+              remotePath: '/poemath/',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 密码框（索引 3）已回填安全存储中的明文；账户同样回填。
+    final fields = find.byType(TextFormField);
+    expect(
+      tester.widget<TextFormField>(fields.at(3)).controller?.text,
+      'stored-secret',
+    );
+    expect(
+      tester.widget<TextFormField>(fields.at(2)).controller?.text,
+      'alice',
+    );
+
+    // 回填后默认仍是密文，点眼睛可显示（这是刻意保留的能力：
+    // 已存密码允许明文核对）。
+    final passwordField = fields.at(3);
+    EditableText editable() => tester.widget<EditableText>(
+          find.descendant(
+            of: passwordField,
+            matching: find.byType(EditableText),
+          ),
+        );
+    expect(editable().obscureText, isTrue);
+
+    await tester.ensureVisible(find.byIcon(Icons.visibility_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.visibility_outlined));
+    await tester.pump();
+    expect(editable().obscureText, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
   testWidgets('保存失败后按钮恢复可操作并显示错误', (tester) async {
     final settings = _MockSettingsRepository();
     when(() => settings.saveWebDavConfig(any())).thenAnswer(
