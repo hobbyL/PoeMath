@@ -13,6 +13,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_mistake.dart';
+import 'package:poemath/features/math/mistake_consolidation_labels.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_ai_explain_sheet.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
@@ -352,6 +353,7 @@ class _ActionButtons extends ConsumerWidget {
           _buildActionButton(
             icon: Icons.check,
             label: '已掌握',
+            tooltip: '跳过巩固抽查，直接标记为已掌握',
             onTap: () async {
               final repo = ref.read(mathMistakeRepoProvider);
               await repo.resolve(mistake.id);
@@ -400,24 +402,28 @@ class _ActionButtons extends ConsumerWidget {
     required String label,
     required VoidCallback onTap,
     required Color color,
+    String? tooltip,
   }) {
-    return Expanded(
-      child: TextButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 14, color: color),
-        label: Text(
-          label,
-          style: TextStyle(fontSize: 11, color: color),
-        ),
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(
-            horizontal: SpacingTokens.xs,
-            vertical: SpacingTokens.xs,
-          ),
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
+    final button = TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 14, color: color),
+      label: Text(
+        label,
+        style: TextStyle(fontSize: 11, color: color),
       ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.xs,
+          vertical: SpacingTokens.xs,
+        ),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+    return Expanded(
+      child: tooltip == null
+          ? button
+          : Tooltip(message: tooltip, child: button),
     );
   }
 
@@ -433,9 +439,23 @@ class _ActionButtons extends ConsumerWidget {
     if (result == null) return;
 
     final repo = ref.read(mathMistakeRepoProvider);
-    await repo.recordRetryResult(mistake.id, isCorrect: result);
+    final outcome = await repo.recordRepracticeResult(
+      mistake.id,
+      isCorrect: result,
+    );
 
     ref.invalidate(mathMistakeRepoProvider);
+
+    // 巩固状态机反馈：进入巩固 / 通过一关 / 三关全过 / 打回未掌握。
+    if (outcome != null && context.mounted) {
+      final updated = repo.getById(mistake.id) ?? mistake;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(repracticeOutcomeMessage(outcome, updated)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   void _generateSimilar(BuildContext context, WidgetRef ref) {

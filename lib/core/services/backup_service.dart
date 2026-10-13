@@ -25,6 +25,7 @@ import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
+import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
@@ -430,6 +431,8 @@ class BackupService {
         'retryCount': m.retryCount,
         'wrongCount': m.wrongCount,
         'lastWrongAt': m.lastWrongAt?.toIso8601String(),
+        'consolidationRound': m.consolidationRound,
+        'nextConsolidationDate': m.nextConsolidationDate?.toIso8601String(),
       };
     }).toList();
   }
@@ -663,6 +666,8 @@ class BackupService {
         retryCount: m['retryCount'] as int? ?? 0,
         wrongCount: m['wrongCount'] as int? ?? 1,
         lastWrongAt: _parseDateTime(m['lastWrongAt']),
+        consolidationRound: m['consolidationRound'] as int? ?? 0,
+        nextConsolidationDate: _parseDateTime(m['nextConsolidationDate']),
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -1053,6 +1058,14 @@ class BackupService {
     _optionalNonNegativeInt(item, 'retryCount', path);
     _optionalNonNegativeInt(item, 'wrongCount', path);
     _validateOptionalDate(item, 'lastWrongAt', path);
+    _optionalInt(
+      item,
+      'consolidationRound',
+      path,
+      min: 0,
+      max: MathMistakeRepository.consolidationIntervals.length,
+    );
+    _validateOptionalDate(item, 'nextConsolidationDate', path);
   }
 
   void _validateMathSession(Map<String, dynamic> item, String path) {

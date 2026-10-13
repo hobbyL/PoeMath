@@ -104,22 +104,34 @@ void main() {
       expect(m.retryCount, 0);
     });
 
-    test('recordRetryResult 答错只增加一次重练次数', () async {
+    test('recordRepracticeResult 答错只增加一次重练次数且不入巩固队列', () async {
       await repo.add(makeMistake(id: 'm1'));
-      await repo.recordRetryResult('m1', isCorrect: false);
+      final outcome =
+          await repo.recordRepracticeResult('m1', isCorrect: false);
 
+      expect(outcome, RepracticeOutcome.reset);
       final m = repo.getById('m1')!;
       expect(m.retryCount, 1);
       expect(m.isResolved, isFalse);
+      expect(m.consolidationRound, 0);
+      expect(m.nextConsolidationDate, isNull);
     });
 
-    test('recordRetryResult 答对只增加一次并标记已解决', () async {
+    test('recordRepracticeResult 首次答对进入巩固队列而非直接掌握', () async {
       await repo.add(makeMistake(id: 'm1'));
-      await repo.recordRetryResult('m1', isCorrect: true);
+      final outcome = await repo.recordRepracticeResult('m1', isCorrect: true);
 
+      expect(outcome, RepracticeOutcome.enteredConsolidation);
       final m = repo.getById('m1')!;
       expect(m.retryCount, 1);
-      expect(m.isResolved, isTrue);
+      // 关键语义变更：答对一次不再立即出列，先进入 1 天后的抽查。
+      expect(m.isResolved, isFalse);
+      expect(m.consolidationRound, 1);
+      expect(m.isConsolidating, isTrue);
+      expect(
+        m.nextConsolidationDate,
+        _today().add(const Duration(days: 1)),
+      );
     });
 
     test('totalCount 和 unresolvedCount', () async {
@@ -282,7 +294,6 @@ void main() {
     });
 
     test('getAll 按 lastWrongAt 倒序（最近答错在前）', () async {
-      final old = DateTime(2026, 1, 1);
       await repo.add(
         MathMistake(
           id: 'm_old',
@@ -292,7 +303,7 @@ void main() {
           userAnswer: '3',
           problemType: 'arithmetic',
           grade: 1,
-          createdAt: old,
+          createdAt: DateTime(2026, 1, 1),
         ),
       );
       await repo.recordWrong(
@@ -308,4 +319,148 @@ void main() {
       expect(list.last.id, 'm_old');
     });
   });
+
+  group('巩固状态机（1/3/7 天三关）', () {
+    /// 连续答对 n 次，返回最后一次的 outcome。
+    Future<RepracticeOutcome?> passTimes(String id, int n) async {
+      RepracticeOutcome? outcome;
+      for (var i = 0; i < n; i++) {
+        outcome = await repo.recordRepracticeResult(id, isCorrect: true);
+      }
+      return outcome;
+    }
+
+    test('三关依次顺延 1 → 3 → 7 天', () async {
+      await repo.add(makeMistake(id: 'm1'));
+
+      await passTimes('m1', 1);
+      var m = repo.getById('m1')!;
+      expect(m.consolidationRound, 1);
+      expect(m.nextConsolidationDate, _today().add(const Duration(days: 1)));
+
+      expect(
+        await repo.recordRepracticeResult('m1', isCorrect: true),
+        RepracticeOutcome.advanced,
+      );
+      m = repo.getById('m1')!;
+      expect(m.consolidationRound, 2);
+      expect(m.nextConsolidationDate, _today().add(const Duration(days: 3)));
+
+      expect(
+        await repo.recordRepracticeResult('m1', isCorrect: true),
+        RepracticeOutcome.advanced,
+      );
+      m = repo.getById('m1')!;
+      expect(m.consolidationRound, 3);
+      expect(m.nextConsolidationDate, _today().add(const Duration(days: 7)));
+      expect(m.isResolved, isFalse);
+    });
+
+    test('三关全过后出列标记已掌握', () async {
+      await repo.add(makeMistake(id: 'm1'));
+      final outcome = await passTimes('m1', 4);
+
+      expect(outcome, RepracticeOutcome.mastered);
+      final m = repo.getById('m1')!;
+      expect(m.isResolved, isTrue);
+      expect(m.isConsolidating, isFalse);
+      expect(m.nextConsolidationDate, isNull);
+      expect(m.retryCount, 4);
+    });
+
+    test('任一关答错即打回未掌握并清零轮次', () async {
+      await repo.add(makeMistake(id: 'm1'));
+      await passTimes('m1', 3);
+      expect(repo.getById('m1')!.consolidationRound, 3);
+
+      final outcome =
+          await repo.recordRepracticeResult('m1', isCorrect: false);
+
+      expect(outcome, RepracticeOutcome.reset);
+      final m = repo.getById('m1')!;
+      expect(m.consolidationRound, 0);
+      expect(m.isUnmastered, isTrue);
+      expect(m.nextConsolidationDate, isNull);
+    });
+
+    test('已掌握后答错重新回到未掌握', () async {
+      await repo.add(makeMistake(id: 'm1'));
+      await passTimes('m1', 4);
+      expect(repo.getById('m1')!.isResolved, isTrue);
+
+      await repo.recordRepracticeResult('m1', isCorrect: false);
+
+      final m = repo.getById('m1')!;
+      expect(m.isResolved, isFalse);
+      expect(m.isUnmastered, isTrue);
+    });
+
+    test('手动 resolve 跳过巩固直接出列并清零轮次', () async {
+      await repo.add(makeMistake(id: 'm1'));
+      await passTimes('m1', 2);
+      expect(repo.getById('m1')!.consolidationRound, 2);
+
+      await repo.resolve('m1');
+
+      final m = repo.getById('m1')!;
+      expect(m.isResolved, isTrue);
+      expect(m.consolidationRound, 0);
+      expect(m.nextConsolidationDate, isNull);
+      // 手动出列不计重练次数
+      expect(m.retryCount, 2);
+    });
+
+    test('记录不存在时返回 null', () async {
+      expect(
+        await repo.recordRepracticeResult('missing', isCorrect: true),
+        isNull,
+      );
+    });
+
+    test('getUnresolved 含未掌握与待巩固两组', () async {
+      await repo.add(makeMistake(id: 'm_unmastered'));
+      await repo.add(makeMistake(id: 'm_consolidating'));
+      await repo.add(makeMistake(id: 'm_mastered'));
+      await passTimes('m_consolidating', 1);
+      await passTimes('m_mastered', 4);
+
+      final unresolved = repo.getUnresolved().map((m) => m.id).toSet();
+      expect(unresolved, {'m_unmastered', 'm_consolidating'});
+    });
+
+    test('getDueConsolidation 只返回到期的待巩固题', () async {
+      // 到期：抽查日为昨天
+      await repo.add(makeMistake(id: 'm_due'));
+      await passTimes('m_due', 1);
+      final due = repo.getById('m_due')!;
+      due.nextConsolidationDate =
+          _today().subtract(const Duration(days: 1));
+      await due.save();
+
+      // 未到期：抽查日为 1 天后
+      await repo.add(makeMistake(id: 'm_pending'));
+      await passTimes('m_pending', 1);
+
+      // 未掌握题不进抽查队列
+      await repo.add(makeMistake(id: 'm_unmastered'));
+
+      expect(repo.getDueConsolidation().map((m) => m.id), ['m_due']);
+    });
+
+    test('抽查日为今天即算到期', () async {
+      await repo.add(makeMistake(id: 'm1'));
+      await passTimes('m1', 1);
+      final m = repo.getById('m1')!;
+      m.nextConsolidationDate = _today();
+      await m.save();
+
+      expect(m.isConsolidationDue, isTrue);
+    });
+  });
+}
+
+/// 当天零点（与仓储内 nextConsolidationDate 的构造口径一致）。
+DateTime _today() {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
 }

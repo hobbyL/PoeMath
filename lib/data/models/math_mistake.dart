@@ -63,6 +63,14 @@ class MathMistake extends HiveObject {
   @HiveField(13)
   DateTime? lastWrongAt;
 
+  /// 巩固轮次 0-3（0 = 未掌握，1-3 = 已通过第 N 关抽查）
+  @HiveField(14)
+  int consolidationRound;
+
+  /// 下次抽查到期日
+  @HiveField(15)
+  DateTime? nextConsolidationDate;
+
   MathMistake({
     required this.id,
     required this.profileId,
@@ -78,5 +86,25 @@ class MathMistake extends HiveObject {
     this.retryCount = 0,
     this.wrongCount = 1,
     this.lastWrongAt,
+    this.consolidationRound = 0,
+    this.nextConsolidationDate,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  // ============ 派生状态（单一真相源：isResolved + consolidationRound）============
+
+  /// 待巩固：已答对过但还没通过全部抽查。
+  bool get isConsolidating => !isResolved && consolidationRound > 0;
+
+  /// 未掌握：还没答对过（或抽查答错被打回）。
+  bool get isUnmastered => !isResolved && consolidationRound == 0;
+
+  /// 今日可练：待巩固且抽查到期（按天比较，当天到期即算）。
+  bool get isConsolidationDue {
+    if (!isConsolidating) return false;
+    final due = nextConsolidationDate;
+    if (due == null) return true;
+    final now = DateTime.now();
+    return !DateTime(due.year, due.month, due.day)
+        .isAfter(DateTime(now.year, now.month, now.day));
+  }
 }

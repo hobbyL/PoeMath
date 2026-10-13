@@ -380,6 +380,8 @@ void main() {
         retryCount: 1,
         wrongCount: 3,
         lastWrongAt: DateTime(2026, 10, 12),
+        consolidationRound: 2,
+        nextConsolidationDate: DateTime(2026, 10, 15),
       ),
     );
     // 迁移前的旧数据：lastWrongAt 为 null 也要能往返。
@@ -410,9 +412,16 @@ void main() {
     expect(aggregated.lastWrongAt, equals(DateTime(2026, 10, 12)));
     expect(aggregated.createdAt, equals(DateTime(2026, 10, 1)));
     expect(aggregated.retryCount, equals(1));
+    expect(aggregated.consolidationRound, equals(2));
+    expect(
+      aggregated.nextConsolidationDate,
+      equals(DateTime(2026, 10, 15)),
+    );
     final legacy = HiveBoxes.mathMistakes.get('default_m_legacy');
     expect(legacy!.wrongCount, equals(1));
     expect(legacy.lastWrongAt, isNull);
+    expect(legacy.consolidationRound, equals(0));
+    expect(legacy.nextConsolidationDate, isNull);
   });
 
   test('恢复无效 JSON 应抛出 FormatException', () {

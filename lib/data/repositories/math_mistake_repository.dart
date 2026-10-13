@@ -10,7 +10,25 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 
+/// 一次重练提交的结果，决定 UI 反馈文案。
+enum RepracticeOutcome {
+  /// 首次答对，进入巩固队列
+  enteredConsolidation,
+
+  /// 通过一关抽查，顺延下一关
+  advanced,
+
+  /// 三关全过，彻底掌握
+  mastered,
+
+  /// 答错，打回未掌握
+  reset,
+}
+
 class MathMistakeRepository {
+  /// 巩固抽查间隔（天）：答对后依次 1 → 3 → 7 天各抽查一次，三关全过即掌握。
+  static const List<int> consolidationIntervals = [1, 3, 7];
+
   /// 题面归一化 key：同题面 + 同正确答案视为同一条错题。
   /// Unicode 减号统一为 ASCII（与重练弹层归一一致），空白折叠后 md5。
   static String problemKey({
@@ -107,29 +125,75 @@ class MathMistakeRepository {
     return getAll().where((m) => m.grade == grade).toList();
   }
 
-  /// 获取未解决的错题
+  /// 获取未解决的错题（未掌握 + 待巩固两组之和）
   List<MathMistake> getUnresolved() {
     return getAll().where((m) => !m.isResolved).toList();
   }
 
-  /// 手动标记错题已解决，不计入重练次数
+  /// 今日到期的待巩固错题（抽查队列）
+  List<MathMistake> getDueConsolidation() {
+    return getAll().where((m) => m.isConsolidationDue).toList();
+  }
+
+  /// 手动标记错题已解决，不计入重练次数。
+  /// 家长逃生口：跳过巩固直接出列，巩固轮次一并清零。
   Future<void> resolve(String id) async {
     final mistake = getById(id);
     if (mistake == null) return;
-    mistake.isResolved = true;
+    mistake
+      ..isResolved = true
+      ..consolidationRound = 0
+      ..nextConsolidationDate = null;
     await mistake.save();
   }
 
-  /// 记录一次已提交的重练结果；答对时同时标记为已解决
-  Future<void> recordRetryResult(
+  /// 记录一次已提交的重练结果，推进巩固状态机：
+  ///
+  /// - 答对且 round == 0：进入巩固队列（round 1，1 天后抽查）
+  /// - 答对且 round 1/2：通过本关，按 [consolidationIntervals] 顺延下一关
+  /// - 答对且 round == 3：三关全过，出列标记已掌握
+  /// - 答错（任何阶段）：打回未掌握，轮次清零
+  ///
+  /// 返回本次结果用于 UI 文案；记录不存在返回 null。
+  Future<RepracticeOutcome?> recordRepracticeResult(
     String id, {
     required bool isCorrect,
   }) async {
     final mistake = getById(id);
-    if (mistake == null) return;
+    if (mistake == null) return null;
+
     mistake.retryCount++;
-    if (isCorrect) mistake.isResolved = true;
+
+    if (!isCorrect) {
+      mistake
+        ..isResolved = false
+        ..consolidationRound = 0
+        ..nextConsolidationDate = null;
+      await mistake.save();
+      return RepracticeOutcome.reset;
+    }
+
+    final RepracticeOutcome outcome;
+    if (mistake.consolidationRound >= consolidationIntervals.length) {
+      // 末关已通过，这次答对即彻底掌握。
+      mistake
+        ..isResolved = true
+        ..nextConsolidationDate = null;
+      outcome = RepracticeOutcome.mastered;
+    } else {
+      final nextRound = mistake.consolidationRound + 1;
+      final now = DateTime.now();
+      mistake
+        ..consolidationRound = nextRound
+        ..nextConsolidationDate = DateTime(now.year, now.month, now.day)
+            .add(Duration(days: consolidationIntervals[nextRound - 1]));
+      outcome = nextRound == 1
+          ? RepracticeOutcome.enteredConsolidation
+          : RepracticeOutcome.advanced;
+    }
+
     await mistake.save();
+    return outcome;
   }
 
   /// 错题总数

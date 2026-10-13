@@ -78,6 +78,8 @@ void main() {
         retryCount: 1,
         wrongCount: 3,
         lastWrongAt: DateTime(2026, 10, 12),
+        consolidationRound: 2,
+        nextConsolidationDate: DateTime(2026, 10, 15),
       ),
     );
     // 迁移前的旧数据：lastWrongAt 为 null 也要原样保留。
@@ -101,8 +103,12 @@ void main() {
     expect(a.lastWrongAt, DateTime(2026, 10, 12));
     expect(a.createdAt, DateTime(2026, 10, 1));
     expect(a.retryCount, 1);
+    expect(a.consolidationRound, 2);
+    expect(a.nextConsolidationDate, DateTime(2026, 10, 15));
     final b = HiveBoxes.mathMistakes.get('default_m_b')!;
     expect(b.wrongCount, 1);
     expect(b.lastWrongAt, isNull);
+    expect(b.consolidationRound, 0);
+    expect(b.nextConsolidationDate, isNull);
   });
 }

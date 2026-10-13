@@ -116,8 +116,22 @@ final mathMistakesProvider = Provider<List<MathMistake>>((ref) {
 /// 错题筛选：年级（null = 全部）
 final mistakeGradeFilterProvider = StateProvider<int?>((ref) => null);
 
-/// 错题筛选：状态（null = 全部, true = 已掌握, false = 待复练）
-final mistakeStatusFilterProvider = StateProvider<bool?>((ref) => null);
+/// 错题状态筛选项。与模型派生 getter 一一对应，避免与 `isResolved` /
+/// `getUnresolved()`（= 未掌握 + 待巩固）的既有语义撞名。
+enum MistakeStatusFilter {
+  /// 未掌握：isUnmastered
+  unmastered,
+
+  /// 待巩固：isConsolidating
+  consolidating,
+
+  /// 已掌握：isResolved
+  mastered,
+}
+
+/// 错题筛选：状态（null = 全部）
+final mistakeStatusFilterProvider =
+    StateProvider<MistakeStatusFilter?>((ref) => null);
 
 /// 筛选后的错题列表
 final filteredMistakesProvider = Provider<List<MathMistake>>((ref) {
@@ -131,17 +145,31 @@ final filteredMistakesProvider = Provider<List<MathMistake>>((ref) {
     result = result.where((m) => m.grade == gradeFilter).toList();
   }
 
-  if (statusFilter != null) {
-    result = result.where((m) => m.isResolved == statusFilter).toList();
-  }
+  result = switch (statusFilter) {
+    null => result,
+    MistakeStatusFilter.unmastered =>
+      result.where((m) => m.isUnmastered).toList(),
+    MistakeStatusFilter.consolidating =>
+      result.where((m) => m.isConsolidating).toList(),
+    MistakeStatusFilter.mastered =>
+      result.where((m) => m.isResolved).toList(),
+  };
 
   return result;
 });
 
-/// 未解决的错题
+/// 未解决的错题（未掌握 + 待巩固）
 final unresolvedMistakesProvider = Provider<List<MathMistake>>((ref) {
   final repo = ref.watch(mathMistakeRepoProvider);
   return repo.getUnresolved();
+});
+
+/// 待重练队列：未掌握 + 今日到期的待巩固（批量重练数据源）
+final repracticeQueueProvider = Provider<List<MathMistake>>((ref) {
+  final mistakes = ref.watch(mathMistakesProvider);
+  return mistakes
+      .where((m) => m.isUnmastered || m.isConsolidationDue)
+      .toList();
 });
 
 /// 错题数量

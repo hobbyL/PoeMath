@@ -12,6 +12,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_mistake.dart';
+import 'package:poemath/features/math/mistake_consolidation_labels.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
@@ -26,10 +27,13 @@ class MathMistakePage extends ConsumerWidget {
     final filteredMistakes = ref.watch(filteredMistakesProvider);
     final gradeFilter = ref.watch(mistakeGradeFilterProvider);
     final statusFilter = ref.watch(mistakeStatusFilterProvider);
+    final repracticeQueue = ref.watch(repracticeQueueProvider);
     final theme = Theme.of(context);
 
     final resolvedCount = allMistakes.where((m) => m.isResolved).length;
-    final unresolvedCount = allMistakes.length - resolvedCount;
+    final consolidatingCount =
+        allMistakes.where((m) => m.isConsolidating).length;
+    final unmasteredCount = allMistakes.where((m) => m.isUnmastered).length;
 
     // 收集所有错题中出现的年级，用于筛选 chips
     final availableGrades = <int>{};
@@ -104,9 +108,14 @@ class MathMistakePage extends ConsumerWidget {
                                 color: theme.colorScheme.primary,
                               ),
                               _StatBadge(
-                                label: '待复练',
-                                value: '$unresolvedCount',
+                                label: '未掌握',
+                                value: '$unmasteredCount',
                                 color: theme.colorScheme.error,
+                              ),
+                              _StatBadge(
+                                label: '待巩固',
+                                value: '$consolidatingCount',
+                                color: theme.semantic.caution,
                               ),
                               _StatBadge(
                                 label: '已掌握',
@@ -206,32 +215,22 @@ class MathMistakePage extends ConsumerWidget {
                                           .state = null;
                                     },
                                   ),
-                                  const SizedBox(width: SpacingTokens.xs),
-                                  ChoiceChip(
-                                    label: const Text('待复练'),
-                                    selected: statusFilter == false,
-                                    onSelected: (_) {
-                                      ref
-                                          .read(mistakeStatusFilterProvider
-                                              .notifier,)
-                                          .state = statusFilter == false
-                                          ? null
-                                          : false;
-                                    },
-                                  ),
-                                  const SizedBox(width: SpacingTokens.xs),
-                                  ChoiceChip(
-                                    label: const Text('已掌握'),
-                                    selected: statusFilter == true,
-                                    onSelected: (_) {
-                                      ref
-                                          .read(mistakeStatusFilterProvider
-                                              .notifier,)
-                                          .state = statusFilter == true
-                                          ? null
-                                          : true;
-                                    },
-                                  ),
+                                  for (final filter
+                                      in MistakeStatusFilter.values) ...[
+                                    const SizedBox(width: SpacingTokens.xs),
+                                    ChoiceChip(
+                                      label: Text(_statusFilterLabel(filter)),
+                                      selected: statusFilter == filter,
+                                      onSelected: (_) {
+                                        ref
+                                            .read(mistakeStatusFilterProvider
+                                                .notifier,)
+                                            .state = statusFilter == filter
+                                            ? null
+                                            : filter;
+                                      },
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -240,8 +239,8 @@ class MathMistakePage extends ConsumerWidget {
                       ),
                     ),
 
-                    // 错题重练按钮（有未掌握错题时显示）
-                    if (unresolvedCount > 0)
+                    // 重练按钮：未掌握 + 今日到期的巩固抽查
+                    if (repracticeQueue.isNotEmpty)
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(
@@ -254,12 +253,12 @@ class MathMistakePage extends ConsumerWidget {
                             onPressed: () => _startBatchRepractice(
                               context,
                               ref,
-                              allMistakes
-                                  .where((m) => !m.isResolved)
-                                  .toList(),
+                              repracticeQueue,
                             ),
                             icon: const Icon(Icons.replay_rounded),
-                            label: Text('重练全部未掌握（$unresolvedCount 题）'),
+                            label: Text(
+                              '开始重练（${repracticeQueue.length} 题）',
+                            ),
                             style: FilledButton.styleFrom(
                               minimumSize:
                                   const Size(double.infinity, 48),
@@ -373,17 +372,20 @@ class MathMistakePage extends ConsumerWidget {
     return 1;
   }
 
-  /// 批量重练所有未掌握错题。
+  static String _statusFilterLabel(MistakeStatusFilter filter) =>
+      mistakeStatusFilterLabel(filter);
+
+  /// 批量重练：未掌握题与今日到期的巩固抽查混合，逐题走巩固状态机。
   Future<void> _startBatchRepractice(
     BuildContext context,
     WidgetRef ref,
-    List<MathMistake> unresolved,
+    List<MathMistake> queue,
   ) async {
     var correctCount = 0;
     var totalDone = 0;
     final repo = ref.read(mathMistakeRepoProvider);
 
-    for (final mistake in unresolved) {
+    for (final mistake in queue) {
       if (!context.mounted) break;
 
       final result = await showDialog<bool>(
@@ -391,7 +393,7 @@ class MathMistakePage extends ConsumerWidget {
         barrierDismissible: false,
         builder: (_) => MistakeRepracticeDialog(
           problemText:
-              '(${totalDone + 1}/${unresolved.length}) ${mistake.problemText}',
+              '(${totalDone + 1}/${queue.length}) ${mistake.problemText}',
           correctAnswer: mistake.correctAnswer,
         ),
       );
@@ -401,7 +403,7 @@ class MathMistakePage extends ConsumerWidget {
 
       totalDone++;
       if (result) correctCount++;
-      await repo.recordRetryResult(mistake.id, isCorrect: result);
+      await repo.recordRepracticeResult(mistake.id, isCorrect: result);
     }
 
     if (totalDone > 0 && context.mounted) {
@@ -465,6 +467,13 @@ class _MistakeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // 三态推导单一来源：模型的 isResolved / isConsolidating / isUnmastered。
+    final statusLabel = mistakeStatusLabel(mistake);
+    final statusColor = mistake.isResolved
+        ? theme.semantic.success
+        : mistake.isConsolidating
+            ? theme.semantic.caution
+            : theme.colorScheme.error;
 
     return ColoredCard(
       color: theme.colorScheme.primary,
@@ -484,23 +493,40 @@ class _MistakeCard extends StatelessWidget {
                   vertical: SpacingTokens.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: (mistake.isResolved
-                          ? theme.colorScheme.tertiary
-                          : theme.colorScheme.primary)
-                      .withValues(alpha: 0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius:
                       BorderRadius.circular(SpacingTokens.radiusSmall),
                 ),
                 child: Text(
-                  mistake.isResolved ? '已掌握' : '待复练',
+                  statusLabel,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: mistake.isResolved
-                        ? theme.colorScheme.tertiary
-                        : theme.colorScheme.primary,
+                    color: statusColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
+              // 抽查到期角标
+              if (mistake.isConsolidationDue) ...[
+                const SizedBox(width: SpacingTokens.xs),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpacingTokens.sm,
+                    vertical: SpacingTokens.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                    borderRadius:
+                        BorderRadius.circular(SpacingTokens.radiusSmall),
+                  ),
+                  child: Text(
+                    '今日可练',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
               if (mistake.errorType != null) ...[
                 const SizedBox(width: SpacingTokens.xs),
                 Container(
