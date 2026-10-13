@@ -14,6 +14,7 @@ import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/llm_problem.dart';
+import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
@@ -361,6 +362,57 @@ void main() {
     expect(r1.lastScore, equals(0.85));
     final r2 = HiveBoxes.reviewSchedules.get('default_poem_r2');
     expect(r2!.lastScore, isNull);
+  });
+
+  test('备份并恢复错题，wrongCount / lastWrongAt 往返保留', () async {
+    await HiveBoxes.mathMistakes.put(
+      'default_m_aggregated',
+      MathMistake(
+        id: 'm_aggregated',
+        profileId: 'default',
+        problemText: '25 + 38 = ?',
+        correctAnswer: '63',
+        userAnswer: '61',
+        problemType: 'addition',
+        grade: 2,
+        errorType: 'carry_omission',
+        createdAt: DateTime(2026, 10, 1),
+        retryCount: 1,
+        wrongCount: 3,
+        lastWrongAt: DateTime(2026, 10, 12),
+      ),
+    );
+    // 迁移前的旧数据：lastWrongAt 为 null 也要能往返。
+    await HiveBoxes.mathMistakes.put(
+      'default_m_legacy',
+      MathMistake(
+        id: 'm_legacy',
+        profileId: 'default',
+        problemText: '7 × 8 = ?',
+        correctAnswer: '56',
+        userAnswer: '54',
+        problemType: 'multiplication',
+        grade: 2,
+        createdAt: DateTime(2026, 9, 1),
+      ),
+    );
+
+    final json = await backupService.exportToJson();
+    expect(json, contains('"wrongCount"'));
+
+    await HiveBoxes.mathMistakes.clear();
+
+    final count = await backupService.restoreFromJson(json);
+    expect(count, greaterThanOrEqualTo(2));
+
+    final aggregated = HiveBoxes.mathMistakes.get('default_m_aggregated');
+    expect(aggregated!.wrongCount, equals(3));
+    expect(aggregated.lastWrongAt, equals(DateTime(2026, 10, 12)));
+    expect(aggregated.createdAt, equals(DateTime(2026, 10, 1)));
+    expect(aggregated.retryCount, equals(1));
+    final legacy = HiveBoxes.mathMistakes.get('default_m_legacy');
+    expect(legacy!.wrongCount, equals(1));
+    expect(legacy.lastWrongAt, isNull);
   });
 
   test('恢复无效 JSON 应抛出 FormatException', () {

@@ -21,7 +21,6 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/models/challenge_record.dart';
-import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
@@ -219,9 +218,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final grade = ref.read(mathGradeProvider);
     final repo = ref.read(mathMistakeRepoProvider);
 
-    final mistake = MathMistake(
-      id: 'challenge_${DateTime.now().millisecondsSinceEpoch}_$_totalAnswered',
-      profileId: ProfileScope.currentId,
+    repo.recordWrong(
       problemText: problem.problemText,
       correctAnswer: problem.answerText,
       userAnswer: userAnswer,
@@ -230,8 +227,6 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       errorType: judgement.diagnosis?.category,
       solutionStepsJson: _stepsToJson(judgement.correctSteps),
     );
-
-    repo.add(mistake);
     ref.invalidate(mathMistakeRepoProvider);
   }
 

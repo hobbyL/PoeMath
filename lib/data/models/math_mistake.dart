@@ -10,7 +10,7 @@ part 'math_mistake.g.dart';
 @HiveType(typeId: 8)
 class MathMistake extends HiveObject {
   @HiveField(0)
-  final String id; // 自动生成 UUID
+  String id; // 题面归一化 key（迁移期由旧 id 改写）
 
   @HiveField(1)
   final String profileId;
@@ -23,25 +23,25 @@ class MathMistake extends HiveObject {
   @HiveField(3)
   final String correctAnswer;
 
-  /// 用户给出的错误答案
+  /// 用户给出的错误答案（同题再错时被最近一次作答覆盖）
   @HiveField(4)
-  final String userAnswer;
+  String userAnswer;
 
   /// 题型标识（arithmetic / vertical / fraction / ...）
   @HiveField(5)
-  final String problemType;
+  String problemType;
 
   /// 年级
   @HiveField(6)
-  final int grade;
+  int grade;
 
   /// 错因标识（carry / borrow / multiplication_table / order / remainder / decimal）
   @HiveField(7)
-  final String? errorType;
+  String? errorType;
 
   /// 解题步骤 JSON（序列化的 List<Map>）
   @HiveField(8)
-  final String? solutionStepsJson;
+  String? solutionStepsJson;
 
   /// 创建时间
   @HiveField(9)
@@ -54,6 +54,14 @@ class MathMistake extends HiveObject {
   /// 重练次数
   @HiveField(11)
   int retryCount;
+
+  /// 累计答错次数（同题面聚合，每次答错 +1）
+  @HiveField(12)
+  int wrongCount;
+
+  /// 最近一次答错时间（旧数据迁移时回填 createdAt）
+  @HiveField(13)
+  DateTime? lastWrongAt;
 
   MathMistake({
     required this.id,
@@ -68,5 +76,7 @@ class MathMistake extends HiveObject {
     DateTime? createdAt,
     this.isResolved = false,
     this.retryCount = 0,
+    this.wrongCount = 1,
+    this.lastWrongAt,
   }) : createdAt = createdAt ?? DateTime.now();
 }

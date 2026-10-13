@@ -17,7 +17,6 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
-import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -231,9 +230,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final grade = ref.read(mathGradeProvider);
     final repo = ref.read(mathMistakeRepoProvider);
 
-    final mistake = MathMistake(
-      id: '${_sessionId}_${ref.read(mathCurrentIndexProvider)}',
-      profileId: ProfileScope.currentId,
+    repo.recordWrong(
       problemText: problem.problemText,
       correctAnswer: problem.answerText,
       userAnswer: userAnswer,
@@ -242,8 +239,6 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       errorType: judgement.diagnosis?.category,
       solutionStepsJson: _stepsToJson(judgement.correctSteps),
     );
-
-    repo.add(mistake);
     ref.invalidate(mathMistakeRepoProvider);
   }
 

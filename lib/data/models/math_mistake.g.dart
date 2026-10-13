@@ -29,13 +29,15 @@ class MathMistakeAdapter extends TypeAdapter<MathMistake> {
       createdAt: fields[9] as DateTime?,
       isResolved: fields[10] as bool,
       retryCount: fields[11] as int,
+      wrongCount: fields[12] as int,
+      lastWrongAt: fields[13] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, MathMistake obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +61,11 @@ class MathMistakeAdapter extends TypeAdapter<MathMistake> {
       ..writeByte(10)
       ..write(obj.isResolved)
       ..writeByte(11)
-      ..write(obj.retryCount);
+      ..write(obj.retryCount)
+      ..writeByte(12)
+      ..write(obj.wrongCount)
+      ..writeByte(13)
+      ..write(obj.lastWrongAt);
   }
 
   @override

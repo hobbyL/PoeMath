@@ -10,6 +10,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 
 import '../../helpers/hive_test_helper.dart';
@@ -59,5 +60,49 @@ void main() {
     expect(a.lastReviewedAt, DateTime(2026, 10, 13));
     final b = HiveBoxes.reviewSchedules.get('default_poem_b')!;
     expect(b.lastScore, isNull);
+  });
+
+  test('MathMistake 聚合字段关闭重开后仍保留', () async {
+    await HiveBoxes.mathMistakes.put(
+      'default_m_a',
+      MathMistake(
+        id: 'm_a',
+        profileId: 'default',
+        problemText: '25 + 38 = ?',
+        correctAnswer: '63',
+        userAnswer: '61',
+        problemType: 'addition',
+        grade: 2,
+        errorType: 'carry_omission',
+        createdAt: DateTime(2026, 10, 1),
+        retryCount: 1,
+        wrongCount: 3,
+        lastWrongAt: DateTime(2026, 10, 12),
+      ),
+    );
+    // 迁移前的旧数据：lastWrongAt 为 null 也要原样保留。
+    await HiveBoxes.mathMistakes.put(
+      'default_m_b',
+      MathMistake(
+        id: 'm_b',
+        profileId: 'default',
+        problemText: '7 × 8 = ?',
+        correctAnswer: '56',
+        userAnswer: '54',
+        problemType: 'multiplication',
+        grade: 2,
+      ),
+    );
+
+    await reopenBoxes();
+
+    final a = HiveBoxes.mathMistakes.get('default_m_a')!;
+    expect(a.wrongCount, 3);
+    expect(a.lastWrongAt, DateTime(2026, 10, 12));
+    expect(a.createdAt, DateTime(2026, 10, 1));
+    expect(a.retryCount, 1);
+    final b = HiveBoxes.mathMistakes.get('default_m_b')!;
+    expect(b.wrongCount, 1);
+    expect(b.lastWrongAt, isNull);
   });
 }

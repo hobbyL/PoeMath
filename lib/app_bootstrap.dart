@@ -13,6 +13,7 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/hive/hive_registrar.dart';
+import 'package:poemath/data/hive/migrations/math_mistake_key_migration.dart';
 
 typedef AppInitializer = Future<void> Function();
 
@@ -20,6 +21,7 @@ Future<void> initializeCoreStorage() async {
   await Hive.initFlutter();
   registerHiveAdapters();
   await HiveBoxes.init();
+  await MathMistakeKeyMigration.run();
 }
 
 Future<void> initializeOptionalServices() async {

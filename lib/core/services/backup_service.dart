@@ -428,6 +428,8 @@ class BackupService {
         'createdAt': m.createdAt.toIso8601String(),
         'isResolved': m.isResolved,
         'retryCount': m.retryCount,
+        'wrongCount': m.wrongCount,
+        'lastWrongAt': m.lastWrongAt?.toIso8601String(),
       };
     }).toList();
   }
@@ -659,6 +661,8 @@ class BackupService {
         createdAt: _parseDateTime(m['createdAt']),
         isResolved: m['isResolved'] as bool? ?? false,
         retryCount: m['retryCount'] as int? ?? 0,
+        wrongCount: m['wrongCount'] as int? ?? 1,
+        lastWrongAt: _parseDateTime(m['lastWrongAt']),
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -1047,6 +1051,8 @@ class BackupService {
     _validateOptionalDate(item, 'createdAt', path);
     _optionalBool(item, 'isResolved', path);
     _optionalNonNegativeInt(item, 'retryCount', path);
+    _optionalNonNegativeInt(item, 'wrongCount', path);
+    _validateOptionalDate(item, 'lastWrongAt', path);
   }
 
   void _validateMathSession(Map<String, dynamic> item, String path) {

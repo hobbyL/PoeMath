@@ -150,6 +150,15 @@ class MathMistakeDetailPage extends ConsumerWidget {
                       ),
                     ),
                   ],
+
+                  // 常驻统计行：累计答错次数（与「重练 N 次」语义并存）
+                  const SizedBox(height: SpacingTokens.sm),
+                  Text(
+                    '累计答错 ${mistake.wrongCount} 次',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
             )

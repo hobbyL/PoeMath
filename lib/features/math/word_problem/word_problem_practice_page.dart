@@ -19,7 +19,6 @@ import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/llm_problem.dart';
-import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -130,19 +129,15 @@ class _WordProblemPracticePageState
     final problem = _current;
     final repo = ref.read(mathMistakeRepoProvider);
 
-    repo.add(
-      MathMistake(
-        id: '${_sessionId}_$_currentIndex',
-        profileId: ProfileScope.currentId,
-        problemText: problem.questionText,
-        correctAnswer: problem.answer.toString(),
-        userAnswer: userAnswer,
-        problemType: 'llm_word_problem',
-        grade: problem.grade,
-        errorType: null,
-        // 应用题讲解是自然语言文本，直接存储。
-        solutionStepsJson: problem.explanation.isEmpty ? null : problem.explanation,
-      ),
+    repo.recordWrong(
+      problemText: problem.questionText,
+      correctAnswer: problem.answer.toString(),
+      userAnswer: userAnswer,
+      problemType: 'llm_word_problem',
+      grade: problem.grade,
+      // 应用题讲解是自然语言文本，直接存储。
+      solutionStepsJson:
+          problem.explanation.isEmpty ? null : problem.explanation,
     );
     ref.invalidate(mathMistakeRepoProvider);
   }

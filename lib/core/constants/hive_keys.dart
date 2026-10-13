@@ -75,4 +75,7 @@ class HiveKeys {
 
   /// 活跃 profile ID
   static const String metaActiveProfileId = 'active_profile_id';
+
+  /// 错题 key 迁移完成标记
+  static const String metaMistakeKeyMigrated = 'mistake_key_migrated';
 }
