@@ -329,8 +329,7 @@ void main() {
     }
   });
 
-  test('AC3 补充：导出 JSON 明文任何位置不含 llm_api_key_hint', () async {
-    // 预置带 Key 的 LLM 配置（导出端写 hint 的前提条件）。
+  test('AC3 补充：导出 JSON 明文任何位置不含 llm_api_key_hint', () async {    // 预置带 Key 的 LLM 配置（导出端写 hint 的前提条件）。
     await HiveBoxes.settings.put(
       'llm_providers',
       jsonEncode([
@@ -367,6 +366,34 @@ void main() {
     expect(json, isNot(contains('llm_api_key_hint')));
     // 降级导出确实不含凭据节。
     expect(node.containsKey('credentials'), isFalse);
+  });
+
+  test('last_synced_at 属设备绑定 key：不导出、也不被备份恢复覆盖', () async {
+    // 它是「本机与云端的相对时间线」，随备份迁到另一台设备会继承一台机器
+    // 的时点、制造冲突误报，因此刻意排除在白名单外。
+    await HiveBoxes.settings.put('last_synced_at', '2026-10-13T09:30:00.000');
+    await HiveBoxes.settings.put('theme_mode', 'light');
+
+    final json = await backupService.exportToJson();
+    final settings = (jsonDecode(json) as Map<String, dynamic>)['settings']
+        as Map<String, dynamic>;
+    expect(
+      settings.containsKey('last_synced_at'),
+      isFalse,
+      reason: '设备绑定 key 不应随备份导出',
+    );
+
+    // 反向：备份里塞入该 key 也不得覆盖本机值。
+    final before = HiveBoxes.settings.get('last_synced_at');
+    await backupService.restoreFromJson(
+      await backupWithSettings(<String, dynamic>{
+        'last_synced_at': '2030-01-01T00:00:00.000',
+        'theme_mode': 'dark',
+      }),
+    );
+    expect(HiveBoxes.settings.get('last_synced_at'), before);
+    // 同备份内的白名单 key 正常恢复，证明不是整体跳过。
+    expect(HiveBoxes.settings.get('theme_mode'), 'dark');
   });
 
   test('AC4 兼容测试：含排除 key 的正常旧备份恢复成功，白名单 key 全部还原', () async {

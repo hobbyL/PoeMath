@@ -33,11 +33,12 @@ void main() {
   });
 
   test('今日题量只包含当前 profile 的今日挑战', () async {
-    // 固定「今日」：仓储判定今日边界用的是自取 `DateTime.now()`。
-    // 构造今天/昨天的记录必须与它同一天 —— 直接用 `now.subtract(1s)` 造
-    // 「昨天」，在恰跨午夜时会落到前天，断言偶发失败。
-    final today = DateTime(2026, 10, 13);
+    // 固定「今日」：给仓储注入固定时钟，记录与该时刻同一天即可。
+    // **不要**在测试里硬编码日历日期 —— 真实日期越过那天零点后，记录会
+    // 落到「昨天」，断言必然失败（而非偶发）。
+    final today = DateTime(2026, 10, 13, 10);
     final yesterday = today.subtract(const Duration(days: 1));
+    repo = ChallengeRecordRepository(now: () => today);
 
     await repo.save(_record(id: 'today', total: 8, createdAt: today));
     await repo.save(

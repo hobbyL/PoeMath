@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/routing/page_transitions.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/webdav_service.dart';
@@ -20,6 +21,7 @@ import 'package:poemath/features/profile/webdav_config_page.dart';
 import 'package:poemath/features/profile/widgets/backup_passphrase_dialog.dart';
 import 'package:poemath/features/profile/widgets/credential_export_failed_dialog.dart';
 import 'package:poemath/features/profile/widgets/llm_endpoint_confirm_dialog.dart';
+import 'package:poemath/features/profile/widgets/sync_conflict_dialog.dart';
 
 class CloudSyncPage extends ConsumerStatefulWidget {
   const CloudSyncPage({
@@ -115,11 +117,26 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     try {
       final fullConfig =
           await settingsRepo.loadWebDavConfigWithCredentials(config);
-      final passphrase = await ref
-          .read(secureCredentialStoreProvider)
-          .readBackupPassphrase();
+      final passphrase =
+          await ref.read(secureCredentialStoreProvider).readBackupPassphrase();
       final json = await backup.exportToJson(passphrase: passphrase);
+
+      // 冲突检测（上传方向）：本机导出时刻晚于本机上次同步 → 云端也在本机
+      // 上次同步之后被其他设备写过。先拉一份云端读它的 exportedAt，两种
+      // 情况都要拦：云端更新（本机覆盖会让对方数据消失）与云端也更旧但
+      // 不可比对（老备份无 exportedAt，只能按「无从判断」处理，不拦）。
+      final conflict = await _detectUploadConflict(webdav, fullConfig, json);
+      if (conflict == SyncConflictDecision.cancelled) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('已取消上传（云端备份未变更）')),
+        );
+        return;
+      }
+
       await webdav.upload(fullConfig, json);
+      // 上传成功才推进时间线：失败时留旧值，下次仍会正确判定冲突。
+      await settingsRepo.setLastSyncedAt(_exportedAtOf(json) ?? DateTime.now());
 
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
@@ -146,6 +163,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       final fullConfig =
           await settingsRepo.loadWebDavConfigWithCredentials(config);
       await webdav.upload(fullConfig, json);
+      await settingsRepo.setLastSyncedAt(_exportedAtOf(json) ?? DateTime.now());
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
         const SnackBar(content: Text('上传成功 ✓（不含密钥）')),
@@ -224,10 +242,32 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
         if (trusted != true) return; // 用户取消 = 中止恢复，数据零变更
       }
 
+      // 冲突检测（下载方向）：云端 exportedAt 晚于本机上次同步 → 另一台
+      // 设备在本机之后写过云端，本机那边没有这些新数据，恢复前必须知情。
+      final lastSyncedAt = settingsRepo.lastSyncedAt;
+      final remoteExportedAt = BackupService.exportedAt(json);
+      if (lastSyncedAt != null &&
+          remoteExportedAt != null &&
+          remoteExportedAt.isAfter(lastSyncedAt)) {
+        if (!mounted) return;
+        final proceed = await showSyncConflictDialog(
+          context,
+          direction: SyncConflictDirection.download,
+          remoteExportedAt: remoteExportedAt,
+          localSyncedAt: lastSyncedAt,
+        );
+        if (proceed != true) return; // 用户取消 = 中止恢复，数据零变更
+      }
+
       final count = await backup.restoreFromJson(json, passphrase: passphrase);
       final notificationsApplied =
           await notifications.reconcileWithStoredSettings();
       if (!mounted) return;
+
+      // 恢复成功才推进时间线，与上传方向对称。
+      if (remoteExportedAt != null) {
+        await settingsRepo.setLastSyncedAt(remoteExportedAt);
+      }
 
       // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
       invalidateAllHiveProviders(ref.invalidate);
@@ -279,6 +319,68 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     } on StateError {
       return null;
     }
+  }
+
+  /// 本次导出 JSON 的 `exportedAt`；解析不出来时调用方退化为「现在」。
+  DateTime? _exportedAtOf(String json) => BackupService.exportedAt(json);
+
+  /// 上传前冲突判定。
+  ///
+  /// 返回 [SyncConflictDecision.proceed] 表示可以直接上传，
+  /// [SyncConflictDecision.cancelled] 表示用户取消（调用方须中止）。
+  ///
+  /// 判定依据：本机导出的 `exportedAt` 与**本机记录的 `lastSyncedAt`** 比。
+  /// 云端备份只在本机上次同步之后被改过，才可能在本机之后被别的设备写过
+  /// （`lastSyncedAt` 之后云端若有写入，必定来自其他设备）。
+  ///
+  /// 为拿到云端那一侧的时间线，需要先下载一次云端备份 —— 这是本功能的
+  /// 已知代价（比对必须有对方的 `exportedAt`），仅比对不恢复，数据零变更。
+  ///
+  /// 读取失败（首次配置、云端还没有备份、网络异常）一律**放行**：冲突检测
+  /// 是防误覆盖的辅助闸门，不能反过来阻断正常上传；真正的上传失败会由
+  /// 调用方已有的 `WebDavException` 分支给出明确提示。
+  Future<SyncConflictDecision> _detectUploadConflict(
+    WebDavService webdav,
+    WebDavConfig fullConfig,
+    String localJson,
+  ) async {
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    final lastSyncedAt = settingsRepo.lastSyncedAt;
+    if (lastSyncedAt == null) return SyncConflictDecision.proceed;
+
+    final String remoteJson;
+    try {
+      remoteJson = await webdav.download(fullConfig);
+    } on Object catch (error) {
+      AppLogger.w(
+        '上传前冲突检测跳过：云端备份不可读（$error）',
+        tag: 'CloudSync',
+      );
+      return SyncConflictDecision.proceed;
+    }
+
+    final remoteExportedAt = BackupService.exportedAt(remoteJson);
+    final localExportedAt = _exportedAtOf(localJson);
+    if (remoteExportedAt == null || localExportedAt == null) {
+      return SyncConflictDecision.proceed;
+    }
+
+    // 云端在本机上次同步之后被写过，且本机这次导出的内容也晚于上次同步
+    // —— 双方各自有新进展，属真冲突。
+    final remoteMoved = remoteExportedAt.isAfter(lastSyncedAt);
+    final localMoved = localExportedAt.isAfter(lastSyncedAt);
+    if (!remoteMoved || !localMoved) return SyncConflictDecision.proceed;
+
+    if (!mounted) return SyncConflictDecision.cancelled;
+    final proceed = await showSyncConflictDialog(
+      context,
+      direction: SyncConflictDirection.upload,
+      remoteExportedAt: remoteExportedAt,
+      localSyncedAt: lastSyncedAt,
+    );
+    return proceed == true
+        ? SyncConflictDecision.proceed
+        : SyncConflictDecision.cancelled;
   }
 
   @override
@@ -503,4 +605,16 @@ class _SmallSpinner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 上传前冲突检测的三态结论。
+///
+/// 独立成枚举而非 `bool?`：三态（继续 / 取消）语义与「无冲突」重合时，
+/// `null` 与 `false` 极易混用，而两者后果完全不同（放行 vs 中止上传）。
+enum SyncConflictDecision {
+  /// 无冲突或无法判定 —— 继续上传。
+  proceed,
+
+  /// 检出冲突且用户选择取消 —— 调用方必须中止上传，云端零变更。
+  cancelled,
 }

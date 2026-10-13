@@ -229,6 +229,25 @@ class BackupService {
     }
   }
 
+  /// 读取备份顶层 `exportedAt`（导出时刻），供跨设备冲突检测比对。
+  ///
+  /// 返回 null 表示**无法判定**：JSON 非法、顶层不是对象、字段缺失或不是
+  /// 合法 ISO 字符串。老版本备份没有该字段，旧备份与新备份混用时也会落到
+  /// null —— 调用方应把 null 当作「无时间线可比」，**不得**据此判定冲突，
+  /// 否则换机首次恢复会被无谓拦截。
+  static DateTime? exportedAt(String jsonString) {
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(jsonString);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map) return null;
+    final value = decoded['exportedAt'];
+    if (value is! String) return null;
+    return DateTime.tryParse(value);
+  }
+
   /// 比对备份与本机的 LLM 端点差异，供恢复前确认框展示（P1 补偿控制）。
   ///
   /// 返回 null 表示**无法判定或无需确认**：JSON 非法、无 `settings` 节、
@@ -304,8 +323,7 @@ class BackupService {
     // 仅当备份未给出可解析的厂商列表时才纳入：厂商列表存在时它是权威端点
     // 来源，且 `_doMigrateLegacyLlmConfig` 不会在 providers 非空时升格
     // legacy 值，此时 legacy 字段不构成独立端点。
-    final backupProvidersUsable =
-        incoming != null && incoming.isNotEmpty;
+    final backupProvidersUsable = incoming != null && incoming.isNotEmpty;
     if (!backupProvidersUsable) {
       final legacy = settings['llm_base_url'];
       if (legacy is String && legacy.trim().isNotEmpty) {
@@ -432,8 +450,8 @@ class BackupService {
           await _secureStore.saveLlmApiKeyFor(matchedId, llmApiKey);
         }
       } else {
-        final activeId = HiveBoxes.settings.get('llm_active_provider_id')
-            as String?;
+        final activeId =
+            HiveBoxes.settings.get('llm_active_provider_id') as String?;
         if (activeId != null && activeId.isNotEmpty) {
           await _secureStore.saveLlmApiKeyFor(activeId, llmApiKey);
         }
@@ -1588,8 +1606,7 @@ class BackupService {
     }
     // 操作数类型检查：非负整数
     final operands = item['operands'];
-    if (operands is! List<Object?> ||
-        operands.any((v) => v is! int || v < 0)) {
+    if (operands is! List<Object?> || operands.any((v) => v is! int || v < 0)) {
       _invalidField('$path.operands', '必须是非负整数数组');
     }
 
@@ -1861,7 +1878,6 @@ class LlmEndpointChangeSet {
   bool get isEmpty => added.isEmpty && changed.isEmpty;
 
   @override
-  String toString() =>
-      'LlmEndpointChangeSet(added: $added, changed: $changed, '
+  String toString() => 'LlmEndpointChangeSet(added: $added, changed: $changed, '
       'removed: $removed)';
 }

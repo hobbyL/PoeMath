@@ -82,6 +82,8 @@ class SettingsRepository {
   // 迁移无意义（对照：assistant_enabled 是用户偏好，在白名单内）。
   static const String _keyAssistantBubbleDx = 'assistant_bubble_dx';
   static const String _keyAssistantBubbleDy = 'assistant_bubble_dy';
+  // 本机与云端的同步时间线（设备绑定，不入备份白名单）：见 lastSyncedAt。
+  static const String _keyLastSyncedAt = 'last_synced_at';
 
   // ============ 主题 ============
 
@@ -275,8 +277,7 @@ class SettingsRepository {
   String? get llmActiveProviderId {
     final providers = llmProviders;
     if (providers.isEmpty) return null;
-    final stored =
-        HiveBoxes.settings.get(_keyLlmActiveProviderId) as String?;
+    final stored = HiveBoxes.settings.get(_keyLlmActiveProviderId) as String?;
     if (providers.any((p) => p.id == stored)) return stored;
     final fallback = providers.first.id;
     HiveBoxes.settings.put(_keyLlmActiveProviderId, fallback);
@@ -481,7 +482,9 @@ class SettingsRepository {
       return;
     }
     final activeId = llmActiveProviderId;
-    if (activeId == null || activeId == id || !list.any((c) => c.id == activeId)) {
+    if (activeId == null ||
+        activeId == id ||
+        !list.any((c) => c.id == activeId)) {
       await HiveBoxes.settings.put(
         _keyLlmActiveProviderId,
         list.first.id,
@@ -673,6 +676,30 @@ class SettingsRepository {
     } else {
       await HiveBoxes.settings.put(_keyMathPracticeMode, mode);
     }
+  }
+
+  // ============ 云端同步时间线（设备绑定，不入备份白名单） ============
+
+  /// 本机最后一次成功上传/下载云端备份的时刻；null = 从未同步过。
+  ///
+  /// 用途：跨设备冲突检测。云端备份顶层带 `exportedAt`（导出时刻），若它
+  /// **晚于**本机上次同步时刻，说明另一台设备在本机之后又写过云端，直接
+  /// 覆盖会让对方的数据消失 —— 此时先提醒用户。
+  ///
+  /// 刻意**不**进 `_settingsValueType` 白名单：它是「本机与云端的相对时间线」，
+  /// 随备份迁到另一台设备会继承一台机器的时点，反而制造误报（对照：
+  /// assistant_bubble_dx 同属设备绑定）。用测试锁定导出 JSON 不含该 key。
+  DateTime? get lastSyncedAt {
+    final raw = HiveBoxes.settings.get(_keyLastSyncedAt) as String?;
+    if (raw == null) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  Future<void> setLastSyncedAt(DateTime value) async {
+    await HiveBoxes.settings.put(
+      _keyLastSyncedAt,
+      value.toIso8601String(),
+    );
   }
 
   // ============ AI 助手悬浮球位置（设备绑定，不入备份白名单） ============

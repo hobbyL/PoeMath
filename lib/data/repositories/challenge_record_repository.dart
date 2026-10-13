@@ -8,6 +8,16 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 
 class ChallengeRecordRepository {
+  /// [now] 仅用于「今日」边界判定，测试可注入固定时刻。
+  ///
+  /// 与 `UpdateCheckController` / `TencentAsrClient` 同一套注入约定：默认
+  /// `DateTime.now`，生产路径不受影响。测试若硬编码「今天」的日期，
+  /// 会在真实日期跨过那一天的零点后必然失败 —— 这正是本参数要消除的脆弱性。
+  ChallengeRecordRepository({DateTime Function()? now})
+      : _now = now ?? DateTime.now;
+
+  final DateTime Function() _now;
+
   /// 保存挑战记录
   Future<void> save(ChallengeRecord record) async {
     final key = ProfileScope.key(record.id);
@@ -47,7 +57,7 @@ class ChallengeRecordRepository {
 
   /// 今日挑战完成的题数
   int get todayProblems {
-    final now = DateTime.now();
+    final now = _now();
     final todayStart = DateTime(now.year, now.month, now.day);
     return getAll()
         .where((r) => !r.createdAt.isBefore(todayStart))
