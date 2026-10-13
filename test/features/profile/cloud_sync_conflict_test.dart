@@ -307,8 +307,61 @@ void main() {
     expect(HiveBoxes.checkIns.length, 1);
   });
 
-  testWidgets('上传：云端在本机上次同步后被改过 → 弹冲突框；取消则不上传', (tester) async {
-    // 云端更晚（另一台设备写的），本机这次导出也晚于上次同步 → 真冲突。
+  testWidgets('上传：云端在上次同步后被改过 → 弹框（不要求本机也有改动）', (tester) async {
+    // 回归锁定：判定曾错误地叠加「本机导出晚于上次同步」这一条件。
+    // 备份的 exportedAt 是**导出时刻**（`DateTime.now()`），不是数据变更
+    // 时刻，所以该条件对本机本次导出恒为真 —— 它不过滤任何情况，只是把
+    // 提示伪装成「双方都有新进展」。
+    //
+    // 本用例刻意让本机**零改动**（settings 只有 last_synced_at，无业务数据），
+    // 云端被别的设备写过。旧判定会因为恒真条件而弹框；新判定同样弹框，
+    // 但语义诚实：覆盖云端前用户应当知情。若将来真的引入数据变更时间戳，
+    // 此用例即是要被重新审视的行为契约。
+    cloud = _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
+
+    await pumpPage(tester, cloud, before: () async {
+      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
+    },);
+    await tapAndSettle(tester, find.text('上传到云端'));
+
+    expect(find.text('⚠️ 云端数据比本机新'), findsOneWidget);
+  });
+
+  testWidgets('上传：云端不比上次同步新 → 不打扰，直接上传', (tester) async {
+    // 边界：云端 exportedAt 恰好等于 last_synced_at（同一时刻）时不弹框。
+    // `isAfter` 是严格大于，相等不算「被改过」。
+    cloud = _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 12, 8)));
+
+    await pumpPage(tester, cloud, before: () async {
+      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
+    },);
+    await tapAndSettle(tester, find.text('上传到云端'));
+
+    expect(find.text('⚠️ 云端数据比本机新'), findsNothing);
+    expect(cloud.puts, 1);
+  });
+
+  testWidgets('上传：云端 exportedAt 无法解析 → 跳过冲突检测，仍可上传', (tester) async {
+    // 老版本备份没有 exportedAt（或被别的内容顶掉）：不得据此判定冲突，
+    // 否则换机后第一次上传会被无谓拦截。
+    cloud = _FakeCloud(
+      content: jsonEncode(<String, dynamic>{
+        'version': 1,
+        'settings': <String, dynamic>{},
+      }),
+    );
+
+    await pumpPage(tester, cloud, before: () async {
+      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
+    },);
+    await tapAndSettle(tester, find.text('上传到云端'));
+
+    expect(find.text('⚠️ 云端数据比本机新'), findsNothing);
+    expect(cloud.puts, 1);
+  });
+
+  testWidgets('上传：取消冲突框 → 不发出 PUT，时间线保持原值', (tester) async {
+    // 云端更晚（另一台设备写的）。
     cloud = _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
 
     await pumpPage(tester, cloud, before: () async {

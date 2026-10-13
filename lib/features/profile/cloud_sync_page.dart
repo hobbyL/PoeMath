@@ -125,7 +125,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       // 上次同步之后被其他设备写过。先拉一份云端读它的 exportedAt，两种
       // 情况都要拦：云端更新（本机覆盖会让对方数据消失）与云端也更旧但
       // 不可比对（老备份无 exportedAt，只能按「无从判断」处理，不拦）。
-      final conflict = await _detectUploadConflict(webdav, fullConfig, json);
+      final conflict = await _detectUploadConflict(webdav, fullConfig);
       if (conflict == SyncConflictDecision.cancelled) {
         scaffold.clearSnackBars();
         scaffold.showSnackBar(
@@ -329,9 +329,12 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   /// 返回 [SyncConflictDecision.proceed] 表示可以直接上传，
   /// [SyncConflictDecision.cancelled] 表示用户取消（调用方须中止）。
   ///
-  /// 判定依据：本机导出的 `exportedAt` 与**本机记录的 `lastSyncedAt`** 比。
-  /// 云端备份只在本机上次同步之后被改过，才可能在本机之后被别的设备写过
-  /// （`lastSyncedAt` 之后云端若有写入，必定来自其他设备）。
+  /// 判定依据：**云端**备份的顶层 `exportedAt` 与本机记录的 `lastSyncedAt`
+  /// 比较。`lastSyncedAt` 之后云端若有写入，必定来自其他设备（本机没有在
+  /// 那之后同步过），本机此刻上传会覆盖掉那些数据。
+  ///
+  /// 不叠加「本机是否有新改动」：备份的 `exportedAt` 记的是导出时刻而非数据
+  /// 变更时刻，拿它判断本机改动恒为真，属于伪条件。详见方法体内的说明。
   ///
   /// 为拿到云端那一侧的时间线，需要先下载一次云端备份 —— 这是本功能的
   /// 已知代价（比对必须有对方的 `exportedAt`），仅比对不恢复，数据零变更。
@@ -342,7 +345,6 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   Future<SyncConflictDecision> _detectUploadConflict(
     WebDavService webdav,
     WebDavConfig fullConfig,
-    String localJson,
   ) async {
     final settingsRepo = ref.read(settingsRepositoryProvider);
     final lastSyncedAt = settingsRepo.lastSyncedAt;
@@ -359,17 +361,26 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       return SyncConflictDecision.proceed;
     }
 
+    // 云端时间线无法判定（老版本备份没有 exportedAt、或被别的内容顶掉）：
+    // 不据此判定冲突，避免换机首次恢复/上传被无谓拦截。
     final remoteExportedAt = BackupService.exportedAt(remoteJson);
-    final localExportedAt = _exportedAtOf(localJson);
-    if (remoteExportedAt == null || localExportedAt == null) {
+    if (remoteExportedAt == null) {
       return SyncConflictDecision.proceed;
     }
 
-    // 云端在本机上次同步之后被写过，且本机这次导出的内容也晚于上次同步
-    // —— 双方各自有新进展，属真冲突。
-    final remoteMoved = remoteExportedAt.isAfter(lastSyncedAt);
-    final localMoved = localExportedAt.isAfter(lastSyncedAt);
-    if (!remoteMoved || !localMoved) return SyncConflictDecision.proceed;
+    // 云端在本机上次同步之后被别的设备写过 —— 本机那边没有这些新数据，
+    // 上传会把它覆盖掉，用户必须知情。
+    //
+    // 这里**只**看云端是否推进，不叠加本机侧条件。原因：备份顶层的
+    // `exportedAt` 是「导出动作发生的时刻」（`BackupService.exportToJson`
+    // 写的是 `DateTime.now()`），不是「数据最后变更时刻」。因此
+    // `localExportedAt.isAfter(lastSyncedAt)` 对本机本次导出恒为真，拿它
+    // 当「本机也有新进展」的证据是伪条件 —— 会让提示伪装成双向冲突，却
+    // 过滤不掉任何情况。真正的「本机是否有改动」需要另设数据变更时间戳，
+    // 当前设计不提供，故不做该判断。
+    if (!remoteExportedAt.isAfter(lastSyncedAt)) {
+      return SyncConflictDecision.proceed;
+    }
 
     if (!mounted) return SyncConflictDecision.cancelled;
     final proceed = await showSyncConflictDialog(
