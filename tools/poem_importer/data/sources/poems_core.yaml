@@ -88,7 +88,7 @@ poems:
   difficulty: 1
   content: '远看山有色，近听水无声。
 
-    春去花还在,人来鸟不惊。
+    春去花还在，人来鸟不惊。
 
     '
   pinyin: 'yuǎn kàn shān yǒu sè ， jìn tīng shuǐ wú shēng 。
@@ -120,9 +120,9 @@ poems:
   textbook_unit: 语文一年级上·语文园地
   is_required: true
   difficulty: 1
-  content: '锄禾日当午,汗滴禾下土。
+  content: '锄禾日当午，汗滴禾下土。
 
-    谁知盘中餐,粒粒皆辛苦。
+    谁知盘中餐，粒粒皆辛苦。
 
     '
   pinyin: 'chú hé rì dāng wǔ ， hàn dī hé xià tǔ 。
@@ -158,9 +158,9 @@ poems:
   textbook_unit: 语文一年级下·课文8
   is_required: true
   difficulty: 1
-  content: '床前明月光,疑是地上霜。
+  content: '床前明月光，疑是地上霜。
 
-    举头望明月,低头思故乡。
+    举头望明月，低头思故乡。
 
     '
   pinyin: 'chuáng qián míng yuè guāng ， yí shì dì shàng shuāng 。
@@ -194,9 +194,9 @@ poems:
   textbook_unit: 语文一年级下·课文12
   is_required: true
   difficulty: 1
-  content: '春眠不觉晓,处处闻啼鸟。
+  content: '春眠不觉晓，处处闻啼鸟。
 
-    夜来风雨声,花落知多少。
+    夜来风雨声，花落知多少。
 
     '
   pinyin: 'chūn mián bù jué xiǎo ， chù chù wén tí niǎo 。
@@ -230,9 +230,9 @@ poems:
   textbook_unit: 语文一年级下·课文12
   is_required: true
   difficulty: 1
-  content: '李白乘舟将欲行,忽闻岸上踏歌声。
+  content: '李白乘舟将欲行，忽闻岸上踏歌声。
 
-    桃花潭水深千尺,不及汪伦送我情。
+    桃花潭水深千尺，不及汪伦送我情。
 
     '
   pinyin: 'lǐ bái chéng zhōu jiāng yù xíng ， hū wén àn shàng tà gē shēng 。
@@ -268,9 +268,9 @@ poems:
   textbook_unit: 语文一年级下·语文园地
   is_required: true
   difficulty: 1
-  content: '松下问童子,言师采药去。
+  content: '松下问童子，言师采药去。
 
-    只在此山中,云深不知处。
+    只在此山中，云深不知处。
 
     '
   pinyin: 'sōng xià wèn tóng zǐ ， yán shī cǎi yào qù 。
@@ -305,9 +305,9 @@ poems:
   textbook_unit: 语文一年级下·语文园地
   is_required: true
   difficulty: 1
-  content: '小娃撑小艇,偷采白莲回。
+  content: '小娃撑小艇，偷采白莲回。
 
-    不解藏踪迹,浮萍一道开。
+    不解藏踪迹，浮萍一道开。
 
     '
   pinyin: 'xiǎo wá chēng xiǎo tǐng ， tōu cǎi bái lián huí 。
@@ -342,9 +342,9 @@ poems:
   textbook_unit: 语文一年级下·语文园地
   is_required: true
   difficulty: 1
-  content: '泉眼无声惜细流,树阴照水爱晴柔。
+  content: '泉眼无声惜细流，树阴照水爱晴柔。
 
-    小荷才露尖尖角,早有蜻蜓立上头。
+    小荷才露尖尖角，早有蜻蜓立上头。
 
     '
   pinyin: 'quán yǎn wú shēng xī xì liú ， shù yīn zhào shuǐ ài qíng róu 。
@@ -380,9 +380,9 @@ poems:
   textbook_unit: 语文二年级上·识字
   is_required: true
   difficulty: 1
-  content: '墙角数枝梅,凌寒独自开。
+  content: '墙角数枝梅，凌寒独自开。
 
-    遥知不是雪,为有暗香来。
+    遥知不是雪，为有暗香来。
 
     '
   pinyin: 'qiáng jiǎo shù zhī méi ， líng hán dú zì kāi 。
@@ -416,9 +416,9 @@ poems:
   textbook_unit: 语文二年级上·课文8
   is_required: true
   difficulty: 1
-  content: '白日依山尽,黄河入海流。
+  content: '白日依山尽，黄河入海流。
 
-    欲穷千里目,更上一层楼。
+    欲穷千里目，更上一层楼。
 
     '
   pinyin: 'bái rì yī shān jìn ， huáng hé rù hǎi liú 。
@@ -460,9 +460,9 @@ poems:
   textbook_unit: 语文二年级上·课文8
   is_required: true
   difficulty: 2
-  content: '日照香炉生紫烟,遥看瀑布挂前川。
+  content: '日照香炉生紫烟，遥看瀑布挂前川。
 
-    飞流直下三千尺,疑是银河落九天。
+    飞流直下三千尺，疑是银河落九天。
 
     '
   pinyin: 'rì zhào xiāng lú shēng zǐ yān ， yáo kàn pù bù guà qián chuān 。
@@ -500,9 +500,9 @@ poems:
   textbook_unit: 语文二年级下·课文1
   is_required: true
   difficulty: 1
-  content: '碧玉妆成一树高,万条垂下绿丝绦。
+  content: '碧玉妆成一树高，万条垂下绿丝绦。
 
-    不知细叶谁裁出,二月春风似剪刀。
+    不知细叶谁裁出，二月春风似剪刀。
 
     '
   pinyin: 'bì yù zhuāng chéng yī shù gāo ， wàn tiáo chuí xià lǜ sī tāo 。
@@ -538,9 +538,9 @@ poems:
   textbook_unit: 语文二年级下·课文1
   is_required: true
   difficulty: 1
-  content: '草长莺飞二月天,拂堤杨柳醉春烟。
+  content: '草长莺飞二月天，拂堤杨柳醉春烟。
 
-    儿童散学归来早,忙趁东风放纸鸢。
+    儿童散学归来早，忙趁东风放纸鸢。
 
     '
   pinyin: 'cǎo zhǎng yīng fēi èr yuè tiān ， fú dī yáng liǔ zuì chūn yān 。
@@ -576,9 +576,9 @@ poems:
   textbook_unit: 语文二年级下·课文8
   is_required: true
   difficulty: 1
-  content: '离离原上草,一岁一枯荣。
+  content: '离离原上草，一岁一枯荣。
 
-    野火烧不尽,春风吹又生。
+    野火烧不尽，春风吹又生。
 
     '
   pinyin: 'lí lí yuán shàng cǎo ， yī suì yī kū róng 。
@@ -610,9 +610,9 @@ poems:
   textbook_unit: 语文三年级上·课文4
   is_required: true
   difficulty: 2
-  content: '远上寒山石径斜,白云生处有人家。
+  content: '远上寒山石径斜，白云生处有人家。
 
-    停车坐爱枫林晚,霜叶红于二月花。
+    停车坐爱枫林晚，霜叶红于二月花。
 
     '
   pinyin: 'yuǎn shàng hán shān shí jìng xiá ， bái yún shēng chù yǒu rén jiā 。
@@ -650,9 +650,9 @@ poems:
   textbook_unit: 语文三年级上·课文4
   is_required: true
   difficulty: 2
-  content: '荷尽已无擎雨盖,菊残犹有傲霜枝。
+  content: '荷尽已无擎雨盖，菊残犹有傲霜枝。
 
-    一年好景君须记,最是橙黄橘绿时。
+    一年好景君须记，最是橙黄橘绿时。
 
     '
   pinyin: 'hé jìn yǐ wú qíng yǔ gài ， jú cán yóu yǒu ào shuāng zhī 。
@@ -686,9 +686,9 @@ poems:
   textbook_unit: 语文三年级上·课文4
   is_required: true
   difficulty: 2
-  content: '萧萧梧叶送寒声,江上秋风动客情。
+  content: '萧萧梧叶送寒声，江上秋风动客情。
 
-    知有儿童挑促织,夜深篱落一灯明。
+    知有儿童挑促织，夜深篱落一灯明。
 
     '
   pinyin: 'xiāo xiāo wú yè sòng hán shēng ， jiāng shàng qiū fēng dòng kè qíng 。
@@ -723,9 +723,9 @@ poems:
   textbook_unit: 语文三年级上·课文17
   is_required: true
   difficulty: 2
-  content: '天门中断楚江开,碧水东流至此回。
+  content: '天门中断楚江开，碧水东流至此回。
 
-    两岸青山相对出,孤帆一片日边来。
+    两岸青山相对出，孤帆一片日边来。
 
     '
   pinyin: 'tiān mén zhōng duàn chǔ jiāng kāi ， bì shuǐ dōng liú zhì cǐ huí 。
@@ -761,9 +761,9 @@ poems:
   textbook_unit: 语文三年级上·课文17
   is_required: true
   difficulty: 2
-  content: '水光潋滟晴方好,山色空蒙雨亦奇。
+  content: '水光潋滟晴方好，山色空蒙雨亦奇。
 
-    欲把西湖比西子,淡妆浓抹总相宜。
+    欲把西湖比西子，淡妆浓抹总相宜。
 
     '
   pinyin: 'shuǐ guāng liàn yàn qíng fāng hǎo ， shān sè kōng méng yǔ yì qí 。
@@ -799,9 +799,9 @@ poems:
   textbook_unit: 语文三年级下·课文9
   is_required: true
   difficulty: 2
-  content: '独在异乡为异客,每逢佳节倍思亲。
+  content: '独在异乡为异客，每逢佳节倍思亲。
 
-    遥知兄弟登高处,遍插茱萸少一人。
+    遥知兄弟登高处，遍插茱萸少一人。
 
     '
   pinyin: 'dú zài yì xiāng wéi yì kè ， měi féng jiā jié bèi sī qīn 。
@@ -839,9 +839,9 @@ poems:
   textbook_unit: 语文三年级下·语文园地
   is_required: true
   difficulty: 2
-  content: '清明时节雨纷纷,路上行人欲断魂。
+  content: '清明时节雨纷纷，路上行人欲断魂。
 
-    借问酒家何处有,牧童遥指杏花村。
+    借问酒家何处有，牧童遥指杏花村。
 
     '
   pinyin: 'qīng míng shí jié yǔ fēn fēn ， lù shàng xíng rén yù duàn hún 。
@@ -877,9 +877,9 @@ poems:
   textbook_unit: 语文三年级下·语文园地
   is_required: true
   difficulty: 2
-  content: '爆竹声中一岁除,春风送暖入屠苏。
+  content: '爆竹声中一岁除，春风送暖入屠苏。
 
-    千门万户曈曈日,总把新桃换旧符。
+    千门万户曈曈日，总把新桃换旧符。
 
     '
   pinyin: 'bào zhú shēng zhōng yī suì chú ， chūn fēng sòng nuǎn rù tú sū 。
@@ -915,9 +915,9 @@ poems:
   textbook_unit: 语文四年级上·课文9
   is_required: true
   difficulty: 2
-  content: '一道残阳铺水中,半江瑟瑟半江红。
+  content: '一道残阳铺水中，半江瑟瑟半江红。
 
-    可怜九月初三夜,露似真珠月似弓。
+    可怜九月初三夜，露似真珠月似弓。
 
     '
   pinyin: 'yī dào cán yáng pū shuǐ zhōng ， bàn jiāng sè sè bàn jiāng hóng 。
@@ -955,9 +955,9 @@ poems:
   textbook_unit: 语文四年级上·课文9
   is_required: true
   difficulty: 2
-  content: '横看成岭侧成峰,远近高低各不同。
+  content: '横看成岭侧成峰，远近高低各不同。
 
-    不识庐山真面目,只缘身在此山中。
+    不识庐山真面目，只缘身在此山中。
 
     '
   pinyin: 'héng kàn chéng lǐng cè chéng fēng ， yuǎn jìn gāo dī gè bù tóng 。
@@ -989,9 +989,9 @@ poems:
   textbook_unit: 语文四年级上·课文21
   is_required: true
   difficulty: 2
-  content: '秦时明月汉时关,万里长征人未还。
+  content: '秦时明月汉时关，万里长征人未还。
 
-    但使龙城飞将在,不教胡马度阴山。
+    但使龙城飞将在，不教胡马度阴山。
 
     '
   pinyin: 'qín shí míng yuè hàn shí guān ， wàn lǐ cháng zhēng rén wèi huán 。
@@ -1029,9 +1029,9 @@ poems:
   textbook_unit: 语文四年级下·课文9
   is_required: true
   difficulty: 2
-  content: '众鸟高飞尽,孤云独去闲。
+  content: '众鸟高飞尽，孤云独去闲。
 
-    相看两不厌,只有敬亭山。
+    相看两不厌，只有敬亭山。
 
     '
   pinyin: 'zhòng niǎo gāo fēi jìn ， gū yún dú qù xián 。
@@ -1067,9 +1067,9 @@ poems:
   textbook_unit: 语文四年级下·课文9
   is_required: true
   difficulty: 2
-  content: '湖光秋月两相和,潭面无风镜未磨。
+  content: '湖光秋月两相和，潭面无风镜未磨。
 
-    遥望洞庭山水翠,白银盘里一青螺。
+    遥望洞庭山水翠，白银盘里一青螺。
 
     '
   pinyin: 'hú guāng qiū yuè liǎng xiāng hé ， tán miàn wú fēng jìng wèi mó 。
@@ -1105,9 +1105,9 @@ poems:
   textbook_unit: 语文四年级下·课文9
   is_required: true
   difficulty: 2
-  content: '江南好,风景旧曾谙。
+  content: '江南好，风景旧曾谙。
 
-    日出江花红胜火,春来江水绿如蓝。
+    日出江花红胜火，春来江水绿如蓝。
 
     能不忆江南?
 
@@ -3998,9 +3998,9 @@ poems:
   dynasty: 唐
   is_required: true
   difficulty: 2
-  content: '渭城朝雨浥轻尘,客舍青青柳色新。
+  content: '渭城朝雨浥轻尘，客舍青青柳色新。
 
-    劝君更尽一杯酒,西出阳关无故人。
+    劝君更尽一杯酒，西出阳关无故人。
 
     '
   pinyin: 'wèi chéng zhāo yǔ yì qīng chén ， kè shè qīng qīng liǔ sè xīn 。
@@ -4034,9 +4034,9 @@ poems:
   dynasty: 唐
   is_required: true
   difficulty: 2
-  content: '朝辞白帝彩云间,千里江陵一日还。
+  content: '朝辞白帝彩云间，千里江陵一日还。
 
-    两岸猿声啼不住,轻舟已过万重山。
+    两岸猿声啼不住，轻舟已过万重山。
 
     '
   pinyin: 'zhāo cí bái dì cǎi yún jiān ， qiān lǐ jiāng líng yī rì huán 。
@@ -4072,9 +4072,9 @@ poems:
   dynasty: 唐
   is_required: true
   difficulty: 2
-  content: '故人西辞黄鹤楼,烟花三月下扬州。
+  content: '故人西辞黄鹤楼，烟花三月下扬州。
 
-    孤帆远影碧空尽,唯见长江天际流。
+    孤帆远影碧空尽，唯见长江天际流。
 
     '
   pinyin: 'gù rén xī cí huáng hè lóu ， yān huā sān yuè xià yáng zhōu 。
@@ -4108,9 +4108,9 @@ poems:
   dynasty: 唐
   is_required: true
   difficulty: 2
-  content: '少小离家老大回,乡音无改鬓毛衰。
+  content: '少小离家老大回，乡音无改鬓毛衰。
 
-    儿童相见不相识,笑问客从何处来。
+    儿童相见不相识，笑问客从何处来。
 
     '
   pinyin: 'shào xiǎo lí jiā lǎo dà huí ， xiāng yīn wú gǎi bìn máo cuī 。
@@ -4146,9 +4146,9 @@ poems:
   dynasty: 宋
   is_required: true
   difficulty: 2
-  content: '京口瓜洲一水间,钟山只隔数重山。
+  content: '京口瓜洲一水间，钟山只隔数重山。
 
-    春风又绿江南岸,明月何时照我还。
+    春风又绿江南岸，明月何时照我还。
 
     '
   pinyin: 'jīng kǒu guā zhōu yī shuǐ jiān ， zhōng shān zhǐ gé shù chóng shān 。
@@ -4182,13 +4182,13 @@ poems:
   dynasty: 唐
   is_required: true
   difficulty: 3
-  content: '好雨知时节,当春乃发生。
+  content: '好雨知时节，当春乃发生。
 
-    随风潜入夜,润物细无声。
+    随风潜入夜，润物细无声。
 
-    野径云俱黑,江船火独明。
+    野径云俱黑，江船火独明。
 
-    晓看红湿处,花重锦官城。
+    晓看红湿处，花重锦官城。
 
     '
   pinyin: 'hǎo yǔ zhī shí jié ， dāng chūn nǎi fā shēng 。
@@ -4226,13 +4226,13 @@ poems:
   dynasty: 唐
   is_required: true
   difficulty: 3
-  content: '国破山河在,城春草木深。
+  content: '国破山河在，城春草木深。
 
-    感时花溅泪,恨别鸟惊心。
+    感时花溅泪，恨别鸟惊心。
 
-    烽火连三月,家书抵万金。
+    烽火连三月，家书抵万金。
 
-    白头搔更短,浑欲不胜簪。
+    白头搔更短，浑欲不胜簪。
 
     '
   pinyin: 'guó pò shān hé zài ， chéng chūn cǎo mù shēn 。
@@ -4617,7 +4617,7 @@ poems:
   - word: 乡关
     meaning: 故乡
   translation: 昔日的仙人已乘着黄鹤飞去，这地方只留下空荡的黄鹤楼。 黄鹤一去再也没有返回这里，千万年来只有白云飘飘悠悠。 汉阳晴川阁的碧树历历可辨，更能看清芳草繁茂的鹦鹉洲。 时至黄昏不知何处是我家乡？看江面烟波渺渺更使人烦愁！
-  appreciation: 这首诗是吊古怀乡之佳作。诗人登临古迹黄鹤楼，泛览眼前景物，即景而生情，诗兴大作，脱口而出，一泻千里。既自然宏丽，又饶有风骨。诗虽不协律，但音节浏亮而不拗口。真是信手而就，一气呵成，成为历代所推崇的珍品。传说李白登此楼，目睹此诗，大为折服。说：“眼前有景道不得，崔颢题诗在上头。”严沧浪也说唐人七言律诗，当以此为第一。足见诗贵自然，纵使格律诗也无不如此。历代写黄鹤楼的诗很多，但崔颢的一首七律，人称最佳，请看他是怎样写的：昔人已乘黄鹤去,此地空余黄鹤楼。
+  appreciation: 这首诗是吊古怀乡之佳作。诗人登临古迹黄鹤楼，泛览眼前景物，即景而生情，诗兴大作，脱口而出，一泻千里。既自然宏丽，又饶有风骨。诗虽不协律，但音节浏亮而不拗口。真是信手而就，一气呵成，成为历代所推崇的珍品。传说李白登此楼，目睹此诗，大为折服。说：“眼前有景道不得，崔颢题诗在上头。”严沧浪也说唐人七言律诗，当以此为第一。足见诗贵自然，纵使格律诗也无不如此。历代写黄鹤楼的诗很多，但崔颢的一首七律，人称最佳，请看他是怎样写的：昔人已乘黄鹤去，此地空余黄鹤楼。
     黄鹤一去不复返，白云千载空悠悠。晴川历历汉阳树，芳草萋萋鹦鹉洲。日暮乡关何处是？烟波江上使人愁。 此诗写得意境开阔、气魄宏大，风景如画，情真意切。且淳朴生动，一如口语，不能不令人叹为观止。这一首诗不仅是崔颢的成名之作、传世之作，也为他奠定了一世诗名的基础。下这样的结论绝不是哪一个人，更不是我硬要往开封人脸上贴金。《唐诗三百首》是后人对唐诗的选集，就把崔颢这首诗列为七律诗中的第一首。可见对此诗的器重。元人辛文房《唐才子传》记李白登黄鹤楼本欲赋诗，因见崔颢此作，为之敛手说：“眼前有景道不得，崔颢题诗在上头。”有人说此说或出于后人附会，未必真有其事。但我以为也决非全部子虚乌有，李白写的。
   background: "崔颢登武昌黄鹤楼吊古怀乡之作。传说李白见此诗而搁笔，被誉为唐人七律压卷之一。"
   famous_lines:
