@@ -121,6 +121,17 @@ class PoemReciteModePage extends ConsumerWidget {
                 );
               },
             ),
+            const SizedBox(height: SpacingTokens.sm),
+
+            _ModeCard(
+              icon: Icons.hearing_outlined,
+              iconColor: theme.colorScheme.secondary,
+              title: '诗词听写',
+              subtitle: '听一句，写一句',
+              onTap: () {
+                context.push(AppRoutes.poemDictationOf(poemId));
+              },
+            ),
             const SizedBox(height: SpacingTokens.lg),
 
             // 底部：诗文预览折叠区

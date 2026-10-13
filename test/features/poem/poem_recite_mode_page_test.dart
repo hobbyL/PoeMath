@@ -52,13 +52,22 @@ void main() {
       );
     }
 
-    testWidgets('显示 3 种模式卡片', (tester) async {
+    testWidgets('显示 4 种模式卡片', (tester) async {
       await tester.pumpWidget(buildApp(poemId: 'test-001'));
       await tester.pump();
 
       expect(find.text('渐进背诵'), findsOneWidget);
       expect(find.text('填空测试'), findsOneWidget);
       expect(find.text('选择题'), findsOneWidget);
+      expect(find.text('诗词听写'), findsOneWidget);
+    });
+
+    testWidgets('诗词听写卡片副标题与图标', (tester) async {
+      await tester.pumpWidget(buildApp(poemId: 'test-001'));
+      await tester.pump();
+
+      expect(find.text('听一句，写一句'), findsOneWidget);
+      expect(find.byIcon(Icons.hearing_outlined), findsOneWidget);
     });
 
     testWidgets('显示诗词标题', (tester) async {

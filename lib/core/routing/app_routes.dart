@@ -23,6 +23,7 @@ class AppRoutes {
   static const String poemLearningPath = '/poem/path';
   static const String poemReciteMode = '/poem/recite-mode/:id';
   static const String poemReadAlong = '/poem/read-along/:id';
+  static const String poemDictation = '/poem/dictation/:id';
 
   // ============ 口算模块 ============
   static const String mathPractice = '/math/practice';
@@ -65,5 +66,6 @@ class AppRoutes {
   static String poemQuizOf(String id) => '/poem/quiz/$id';
   static String poemReciteModeOf(String id) => '/poem/recite-mode/$id';
   static String poemReadAlongOf(String id) => '/poem/read-along/$id';
+  static String poemDictationOf(String id) => '/poem/dictation/$id';
   static String formulaDetailOf(String id) => '/formula/detail/$id';
 }
