@@ -52,11 +52,26 @@ class ReviewRepository {
         .toList();
   }
 
-  /// 完成一次复习并推进到下一轮
-  Future<void> completeReview(String poemId) async {
+  /// 完成一次复习并按得分自适应推进。
+  ///
+  /// 三分层（及格线复用 QuizSession.isPassed 的 0.8 口径）：
+  /// - [score] 为 null（背诵完成）或 ≥ 0.8（测试通过）：推进下一轮；
+  /// - score < 0.8：不推进，`nextReviewDate` 重置明天再来一轮。
+  /// 两种情况均记录 `lastScore`（null 不覆盖既有值）。
+  Future<void> completeReview(String poemId, {double? score}) async {
     final schedule = get(poemId);
     if (schedule == null || schedule.isCompleted) return;
-    schedule.advanceToNextRound();
+
+    if (score != null) {
+      schedule.lastScore = score;
+    }
+
+    if (score != null && score < 0.8) {
+      // 未达及格线：本轮不推进，明天重测。
+      schedule.nextReviewDate = DateTime.now().add(const Duration(days: 1));
+    } else {
+      schedule.advanceToNextRound();
+    }
     await save(schedule);
   }
 }

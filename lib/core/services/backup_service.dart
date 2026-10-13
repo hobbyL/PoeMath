@@ -408,6 +408,7 @@ class BackupService {
         'nextReviewDate': r.nextReviewDate.toIso8601String(),
         'lastReviewedAt': r.lastReviewedAt?.toIso8601String(),
         'isCompleted': r.isCompleted,
+        'lastScore': r.lastScore,
       };
     }).toList();
   }
@@ -633,6 +634,7 @@ class BackupService {
         nextReviewDate: _parseDateTime(m['nextReviewDate']) ?? DateTime.now(),
         lastReviewedAt: _parseDateTime(m['lastReviewedAt']),
         isCompleted: m['isCompleted'] as bool? ?? false,
+        lastScore: (m['lastScore'] as num?)?.toDouble(),
       );
       await box.put('${obj.profileId}_${obj.poemId}', obj);
     }
@@ -1025,6 +1027,7 @@ class BackupService {
     _validateOptionalDate(item, 'nextReviewDate', path);
     _validateOptionalDate(item, 'lastReviewedAt', path);
     _optionalBool(item, 'isCompleted', path);
+    _optionalScore(item, 'lastScore', path);
   }
 
   void _validateMathMistake(Map<String, dynamic> item, String path) {
@@ -1416,6 +1419,18 @@ class BackupService {
     final value = item[key];
     if (value != null && value is! bool) {
       _invalidField('$path.$key', '必须是布尔值');
+    }
+  }
+
+  void _optionalScore(
+    Map<String, dynamic> item,
+    String key,
+    String path,
+  ) {
+    final value = item[key];
+    if (value == null) return;
+    if (value is! num || value < 0 || value > 1) {
+      _invalidField('$path.$key', '必须是 0.0–1.0 之间的得分或 null');
     }
   }
 

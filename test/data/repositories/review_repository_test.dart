@@ -120,6 +120,55 @@ void main() {
       expect(schedule.lastReviewedAt, isNotNull);
     });
 
+    test('completeReview 满分推进并记录 lastScore', () async {
+      await repo.createSchedule('poem_full');
+      await repo.completeReview('poem_full', score: 1.0);
+
+      final schedule = repo.get('poem_full')!;
+      expect(schedule.currentRound, 1);
+      expect(schedule.lastScore, 1.0);
+      // 第 1 轮后下次间隔 3 天
+      expect(
+        schedule.nextReviewDate.difference(DateTime.now()).inDays,
+        inInclusiveRange(2, 3),
+      );
+    });
+
+    test('completeReview 得分 0.8–0.99 推进且记录 lastScore', () async {
+      await repo.createSchedule('poem_mid');
+      await repo.completeReview('poem_mid', score: 0.85);
+
+      final schedule = repo.get('poem_mid')!;
+      expect(schedule.currentRound, 1);
+      expect(schedule.lastScore, 0.85);
+    });
+
+    test('completeReview 得分低于 0.8 不推进、明天重测', () async {
+      await repo.createSchedule('poem_low');
+      await repo.completeReview('poem_low', score: 0.5);
+
+      final schedule = repo.get('poem_low')!;
+      expect(schedule.currentRound, 0);
+      expect(schedule.lastScore, 0.5);
+      // 未达及格线：nextReviewDate 重置为明天
+      expect(
+        schedule.nextReviewDate.difference(DateTime.now()).inDays,
+        inInclusiveRange(0, 1),
+      );
+      expect(schedule.lastReviewedAt, isNull);
+    });
+
+    test('completeReview 无得分不覆盖既有 lastScore', () async {
+      await repo.createSchedule('poem_keep');
+      await repo.completeReview('poem_keep', score: 0.9);
+      // 背诵完成路径：无得分，lastScore 应保持 0.9
+      await repo.completeReview('poem_keep');
+
+      final schedule = repo.get('poem_keep')!;
+      expect(schedule.lastScore, 0.9);
+      expect(schedule.currentRound, 2);
+    });
+
     test('completeReview 全部轮次完成后标记 isCompleted', () async {
       await repo.createSchedule('poem_all');
 

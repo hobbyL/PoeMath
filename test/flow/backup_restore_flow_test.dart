@@ -16,6 +16,7 @@ import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
+import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
@@ -323,6 +324,43 @@ void main() {
     expect(restoredCheckIn.durationSeconds, equals(600));
     expect(restoredCheckIn.isCheckedIn, isFalse);
     expect(restoredCheckIn.hasActivitySummary, isTrue);
+  });
+
+  test('备份并恢复复习计划，lastScore 往返保留', () async {
+    await HiveBoxes.reviewSchedules.put(
+      'default_poem_r1',
+      ReviewSchedule(
+        poemId: 'poem_r1',
+        profileId: 'default',
+        currentRound: 2,
+        nextReviewDate: DateTime(2026, 10, 20),
+        lastReviewedAt: DateTime(2026, 10, 13),
+        lastScore: 0.85,
+      ),
+    );
+    // 背诵完成路径的旧数据：lastScore 为 null 也要能往返。
+    await HiveBoxes.reviewSchedules.put(
+      'default_poem_r2',
+      ReviewSchedule(
+        poemId: 'poem_r2',
+        profileId: 'default',
+        nextReviewDate: DateTime(2026, 10, 14),
+      ),
+    );
+
+    final json = await backupService.exportToJson();
+    expect(json, contains('"lastScore"'));
+
+    await HiveBoxes.reviewSchedules.clear();
+
+    final count = await backupService.restoreFromJson(json);
+    expect(count, greaterThanOrEqualTo(2));
+
+    final r1 = HiveBoxes.reviewSchedules.get('default_poem_r1');
+    expect(r1!.currentRound, equals(2));
+    expect(r1.lastScore, equals(0.85));
+    final r2 = HiveBoxes.reviewSchedules.get('default_poem_r2');
+    expect(r2!.lastScore, isNull);
   });
 
   test('恢复无效 JSON 应抛出 FormatException', () {

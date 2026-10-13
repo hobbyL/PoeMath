@@ -31,6 +31,10 @@ class ReviewSchedule extends HiveObject {
   @HiveField(5)
   bool isCompleted;
 
+  /// 最近一次复习测试得分（0.0–1.0）；null = 未测过 / 背诵完成。
+  @HiveField(6)
+  double? lastScore;
+
   ReviewSchedule({
     required this.poemId,
     required this.profileId,
@@ -38,6 +42,7 @@ class ReviewSchedule extends HiveObject {
     required this.nextReviewDate,
     this.lastReviewedAt,
     this.isCompleted = false,
+    this.lastScore,
   });
 
   /// 艾宾浩斯间隔天数：1, 3, 7, 14, 30

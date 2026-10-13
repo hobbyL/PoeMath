@@ -21,6 +21,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
+import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/poem_quiz_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
@@ -305,6 +306,7 @@ void main() {
   testWidgets('完成页双击完成：仅 pop 一次且结果为 quizPassed', (tester) async {
     // R3 同步 pop 回归：旧实现经 postFrameCallback 延迟一帧 pop，
     // 双击的第二次 canPop 已恢复，会再 pop(null) 丢结果/误弹上级路由。
+    // 本例同时覆盖 ④ 侧信道双端纪律：进入清空陈旧分数、pop 前写入真实得分。
     final poem = Poem(
       id: 'quiz_back_double',
       title: '双击返回测试诗',
@@ -321,6 +323,31 @@ void main() {
     });
 
     final popResults = <PoemPracticeResult?>[];
+    // 受控 container：沿用 fake 仓储覆写，防止 _finishQuiz 的真实 Hive 写
+    // 在 fake-async 区挂起；同时验证 ④ 侧信道双端纪律。
+    final scoreContainer = ProviderContainer(
+      overrides: [
+        poemByIdProvider('quiz_back_double').overrideWith((ref) => poem),
+        poemByIdProvider('quiz_back_double').overrideWith((ref) => poem),
+        poemProgressRepoProvider.overrideWith(
+          (ref) => _ImmediatePoemProgressRepository(),
+        ),
+        reviewRepoProvider.overrideWith((ref) => _ExistingReviewRepository()),
+        checkInRepoProvider.overrideWith(
+          (ref) => _ImmediateCheckInRepository(),
+        ),
+        userStatsRepoProvider.overrideWith((ref) => _ImmediateStatsRepository()),
+        learningActivityRepositoryProvider.overrideWith(
+          (ref) => _ImmediateLearningActivityRepository(),
+        ),
+        achievementRepoProvider.overrideWith(
+          (ref) => _AlreadyUnlockedAchievementRepository(),
+        ),
+      ],
+    );
+    addTearDown(scoreContainer.dispose);
+    // 预置一个陈旧分数，验证 quiz 页进入时清空的纪律。
+    scoreContainer.read(lastPracticeScoreProvider.notifier).state = 0.7;
     final recorderHome = Builder(
       builder: (context) => TextButton(
         onPressed: () {
@@ -342,28 +369,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          poemByIdProvider('quiz_back_double').overrideWith((ref) => poem),
-          poemProgressRepoProvider.overrideWith(
-            (ref) => _ImmediatePoemProgressRepository(),
-          ),
-          reviewRepoProvider.overrideWith(
-            (ref) => _ExistingReviewRepository(),
-          ),
-          checkInRepoProvider.overrideWith(
-            (ref) => _ImmediateCheckInRepository(),
-          ),
-          userStatsRepoProvider.overrideWith(
-            (ref) => _ImmediateStatsRepository(),
-          ),
-          learningActivityRepositoryProvider.overrideWith(
-            (ref) => _ImmediateLearningActivityRepository(),
-          ),
-          achievementRepoProvider.overrideWith(
-            (ref) => _AlreadyUnlockedAchievementRepository(),
-          ),
-        ],
+      UncontrolledProviderScope(
+        container: scoreContainer,
         child: MaterialApp(home: recorderHome),
       ),
     );
@@ -371,6 +378,9 @@ void main() {
 
     await tester.tap(find.text('开始测验'));
     await tester.pump();
+
+    // 进入 quiz 页 initState 即清空侧信道，陈旧分数不得残留。
+    expect(scoreContainer.read(lastPracticeScoreProvider), isNull);
     await tester.pump(const Duration(seconds: 2));
     await tester.pump();
 
@@ -394,6 +404,8 @@ void main() {
 
     expect(popResults, hasLength(1));
     expect(popResults.single, PoemPracticeResult.quizPassed);
+    // 侧信道纪律：pop 前写入本次最终得分（单题全对 = 1.0）。
+    expect(scoreContainer.read(lastPracticeScoreProvider), 1.0);
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());

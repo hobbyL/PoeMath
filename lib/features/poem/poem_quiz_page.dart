@@ -19,6 +19,7 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
+import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/quiz/quiz_engine.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
@@ -65,6 +66,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   }
 
   void _initQuiz() {
+    // 侧信道纪律：进入时清空，防止上一次练习的陈旧分数被误消费。
+    ref.read(lastPracticeScoreProvider.notifier).state = null;
     final poem = ref.read(poemByIdProvider(widget.poemId));
     if (poem == null) return;
 
@@ -293,6 +296,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     // 导致第二击 pop(null) 丢失结果的竞态。pop 本身触发路由移除，
     // 无需 setState 通知 canPop。
     _allowResultPop = true;
+    // 侧信道纪律：pop 前写入本次最终得分，复习页读取后推进自适应分层。
+    ref.read(lastPracticeScoreProvider.notifier).state = session.accuracy;
     final result = session.isPassed
         ? PoemPracticeResult.quizPassed
         : PoemPracticeResult.quizFailed;

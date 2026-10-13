@@ -16,6 +16,7 @@ import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
+import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 class PoemReviewPage extends ConsumerWidget {
@@ -419,6 +420,7 @@ class PoemReviewPage extends ConsumerWidget {
   }
 
   /// 导航到复习页面，仅在练习明确完成或测试通过时推进复习。
+  /// quizPassed/quizFailed 均带得分走自适应推进（<0.8 不推进、明天重测）。
   Future<bool> _navigateAndComplete(
     BuildContext context,
     WidgetRef ref,
@@ -426,12 +428,48 @@ class PoemReviewPage extends ConsumerWidget {
     String route,
   ) async {
     final result = await context.push<PoemPracticeResult>(route);
-    if (result?.completesReview != true || !context.mounted) return false;
+
+    // 侧信道纪律：读取即清空，只消费属于本次练习的分数。
+    final score = ref.read(lastPracticeScoreProvider);
+    ref.read(lastPracticeScoreProvider.notifier).state = null;
+
+    if (!context.mounted) return false;
+
+    final isQuizOutcome = result == PoemPracticeResult.quizPassed ||
+        result == PoemPracticeResult.quizFailed;
+    if (isQuizOutcome) {
+      final reviewRepo = ref.read(reviewRepoProvider);
+      if (result == PoemPracticeResult.quizFailed) {
+        // 未达及格线：有得分才落库（仓储内部不推进、明天重测）；
+        // 无得分不写任何状态。返回 false 中断批量循环（现状语义不变）。
+        if (score != null) {
+          await reviewRepo.completeReview(schedule.poemId, score: score);
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('本次测试未达 80%，明天再来一轮'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        ref.invalidate(reviewRepoProvider);
+        ref.invalidate(dueReviewCountProvider);
+        return false;
+      }
+      // 测试通过：带得分自适应推进（>=0.8 推进轮次）。
+      await reviewRepo.completeReview(schedule.poemId, score: score);
+    } else if (result?.completesReview != true) {
+      return false;
+    }
 
     // 明确完成后推进复习计划
     if (context.mounted) {
       final reviewRepo = ref.read(reviewRepoProvider);
-      await reviewRepo.completeReview(schedule.poemId);
+      if (!isQuizOutcome) {
+        // 背诵完成：无得分路径，走原有推进。
+        await reviewRepo.completeReview(schedule.poemId);
+      }
 
       // 如果复习全部完成，将状态更新为「已掌握」
       final nextSchedule = reviewRepo.get(schedule.poemId);
@@ -472,8 +510,11 @@ class PoemReviewPage extends ConsumerWidget {
       if (context.mounted) {
         final message = nextSchedule != null && nextSchedule.isCompleted
             ? '恭喜！该诗词复习全部完成！'
-            : '复习已记录 ✓ 下次复习在 '
-                '${nextSchedule != null ? _formatNextDate(nextSchedule) : ''}';
+            : (isQuizOutcome && score != null && score < 1.0
+                ? '对了 ${(score * 100).toStringAsFixed(0)}%，差一点点满分！下次复习在 '
+                    '${nextSchedule != null ? _formatNextDate(nextSchedule) : ''}'
+                : '复习已记录 ✓ 下次复习在 '
+                    '${nextSchedule != null ? _formatNextDate(nextSchedule) : ''}');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
