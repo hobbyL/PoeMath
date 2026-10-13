@@ -389,6 +389,17 @@ class _LlmProviderEditDialogState
         );
       }
       return;
+    } on Object catch (error) {
+      // UI 边界兜底（见 error-handling.md「UI boundary exception」）：
+      // Key 写入要过平台通道，可能抛 PlatformException 甚至 Error。
+      // 不兜底则 _saving 永久为 true，保存按钮卡 loading 无法重试。
+      if (mounted) {
+        setState(() => _saving = false);
+        _messengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text('保存失败：$error')),
+        );
+      }
+      return;
     }
     if (!mounted) return;
     navigator.pop(LlmProviderEditResult.saved);
@@ -422,7 +433,18 @@ class _LlmProviderEditDialogState
       ),
     );
     if (confirmed != true) return;
-    await ref.read(settingsRepositoryProvider).clearLlmApiKey(editingId);
+    try {
+      await ref.read(settingsRepositoryProvider).clearLlmApiKey(editingId);
+    } on Object catch (error) {
+      // UI 边界兜底：清除走平台通道，失败必须给用户可见反馈，
+      // 否则弹窗无任何变化、用户以为已清除。
+      if (mounted) {
+        _messengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text('清除失败：$error')),
+        );
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _hasStoredKey = false;
@@ -465,9 +487,19 @@ class _LlmProviderEditDialogState
       ),
     );
     if (confirmed != true) return;
-    await ref
-        .read(settingsRepositoryProvider)
-        .deleteLlmProviderConfig(editingId);
+    try {
+      await ref
+          .read(settingsRepositoryProvider)
+          .deleteLlmProviderConfig(editingId);
+    } on Object catch (error) {
+      // UI 边界兜底：删除失败必须给反馈，否则弹窗既不关闭也无提示。
+      if (mounted) {
+        _messengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text('删除失败：$error')),
+        );
+      }
+      return;
+    }
     if (!mounted) return;
     navigator.pop(LlmProviderEditResult.deleted);
   }

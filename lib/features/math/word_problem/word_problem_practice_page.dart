@@ -12,8 +12,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
@@ -125,20 +127,37 @@ class _WordProblemPracticePageState
     return 'hard';
   }
 
-  void _recordMistake(String userAnswer) {
+  /// 记录错题到 Hive。
+  ///
+  /// 必须 await 后再 `invalidate`：写入未完成就失效 provider 会让错题本
+  /// 读到旧快照；写入失败时记日志并跳过 invalidate（无新数据可读）。
+  Future<void> _recordMistake(String userAnswer) async {
     final problem = _current;
     final repo = ref.read(mathMistakeRepoProvider);
 
-    repo.recordWrong(
-      problemText: problem.questionText,
-      correctAnswer: problem.answer.toString(),
-      userAnswer: userAnswer,
-      problemType: 'llm_word_problem',
-      grade: problem.grade,
-      // 应用题讲解是自然语言文本，直接存储。
-      solutionStepsJson:
-          problem.explanation.isEmpty ? null : problem.explanation,
-    );
+    try {
+      await repo.recordWrong(
+        problemText: problem.questionText,
+        correctAnswer: problem.answer.toString(),
+        userAnswer: userAnswer,
+        problemType: 'llm_word_problem',
+        grade: problem.grade,
+        // 应用题讲解是自然语言文本，直接存储。
+        solutionStepsJson:
+            problem.explanation.isEmpty ? null : problem.explanation,
+      );
+    } on Object catch (error, stackTrace) {
+      // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到；
+      // 此处位于 UI 边界，兜底后仅记日志，不打断答题流程。
+      AppLogger.e(
+        '应用题错题落库失败',
+        tag: 'WordProblemPractice',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return;
+    }
+    if (!mounted) return;
     ref.invalidate(mathMistakeRepoProvider);
   }
 
@@ -163,7 +182,7 @@ class _WordProblemPracticePageState
     } else {
       sound.play(SoundEffect.wrong);
       await haptic.heavy();
-      _recordMistake(userAnswer);
+      await _recordMistake(userAnswer);
     }
 
     _problemRecords.add(
@@ -304,7 +323,12 @@ class _WordProblemPracticePageState
 
     if (!mounted) return;
     // 应用题练习结束返回题库。
-    context.pop();
+    // 栈内没有上一页时（深链直达 / 进程恢复）pop 会断言失败，改为直接去题库。
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.wordProblemLibrary);
+    }
   }
 
   @override

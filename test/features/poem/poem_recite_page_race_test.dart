@@ -265,8 +265,6 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
-          // 故意非 const：需要时可再次 pump 触发 didUpdateWidget 重建
-          // （保留 State），用于提交按钮按最新输入重新求值启用态。
           home: home ?? PoemRecitePage(poemId: poemId),
         ),
       ),
@@ -292,9 +290,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
+    // 输入即触发控制器监听器 → setState，提交按钮随之启用（无需重挂载）。
     await tester.enterText(find.byType(TextField), '床');
-    // 重挂载同构树触发页面重建（State 保留），使提交按钮按非空文本启用。
-    await pumpHost(tester, container, home: home);
     await tester.pump();
   }
 
@@ -441,9 +438,7 @@ void main() {
             Navigator.of(context)
                 .push<PoemPracticeResult>(
                   MaterialPageRoute(
-                    // 非 const：配合重挂载触发 didUpdateWidget 重建。
-                    // ignore: prefer_const_constructors
-                    builder: (_) => PoemRecitePage(poemId: _poemId),
+                    builder: (_) => const PoemRecitePage(poemId: _poemId),
                   ),
                 )
                 .then((result) => popResults.add(result)),

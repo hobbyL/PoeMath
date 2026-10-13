@@ -107,10 +107,32 @@ class UpdateClient {
   @visibleForTesting
   final int maxDownloadBytes;
 
-  /// 更新 URL 是否有效。
+  /// 更新 URL 是否已配置（可解析出 scheme 与 host）。
+  ///
+  /// 与 [isSecure] 是两回事：这里只回答「填了没」，不回答「填得安全吗」，
+  /// 两种情况的用户提示文案不同，不能合并判断。
   bool get isConfigured {
     final uri = Uri.tryParse(_updateUrl);
     return uri != null && uri.hasScheme && uri.host.isNotEmpty;
+  }
+
+  /// 更新 URL 是否走安全传输（HTTPS，或回环地址）。
+  ///
+  /// 更新接口的响应里同时包含 APK 地址和 SHA256 校验值：明文 HTTP 下中间人
+  /// 可以把两者一起替换，校验值校验的就是攻击者自己的包，等于零防护。
+  /// 因此检查与下载两段都强制 HTTPS，仅放开回环地址用于本地联调。
+  bool get isSecure {
+    final uri = Uri.tryParse(_updateUrl);
+    return uri != null && _isSecureUri(uri);
+  }
+
+  /// HTTPS 一律放行；明文 HTTP 仅在回环地址（本机联调）放行。
+  static bool _isSecureUri(Uri uri) {
+    if (uri.isScheme('https')) return true;
+    if (!uri.isScheme('http')) return false;
+    final host = uri.host.toLowerCase();
+    // Uri.host 已剥离 IPv6 的方括号，故这里比对裸 `::1`。
+    return host == 'localhost' || host == '127.0.0.1' || host == '::1';
   }
 
   /// 获取最新版本信息。
@@ -164,6 +186,11 @@ class UpdateClient {
     final uri = Uri.tryParse(update.apkUrl);
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
       throw const UpdateException('安装包下载地址不正确');
+    }
+    // apkUrl 来自更新接口（不可信输入）：明文 HTTP 下中间人可替换安装包，
+    // 同一响应里的 sha256 也会被一并替换，校验形同虚设，故强制 HTTPS。
+    if (!_isSecureUri(uri)) {
+      throw const UpdateException('安装包下载地址必须使用 HTTPS');
     }
 
     cancelToken?.throwIfCancelled();
@@ -272,7 +299,13 @@ class UpdateClient {
 
   Uri _updateUri() {
     if (!isConfigured) throw const UpdateConfigurationException();
-    return Uri.parse(_updateUrl);
+    final uri = Uri.parse(_updateUrl);
+    if (!_isSecureUri(uri)) {
+      throw const UpdateConfigurationException(
+        '更新检查地址必须使用 HTTPS，当前配置已被拒绝。',
+      );
+    }
+    return uri;
   }
 
   Object? _readPayload(http.Response response) {

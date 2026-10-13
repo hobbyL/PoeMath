@@ -147,18 +147,31 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   bool _showDictDiff = false;
   bool _allowResultPop = false;
 
+  /// 默写输入是否非空 —— 驱动「提交默写」按钮的启用状态。
+  /// 由 `_dictController` 的监听器维护，覆盖键入与 `clear()` 两条路径。
+  bool _canSubmitDictation = false;
+
   @override
   void initState() {
     super.initState();
     _activityId = _newActivityId();
+    _dictController.addListener(_onDictInputChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initPoem());
   }
 
   @override
   void dispose() {
     _celebrationCtrl.dispose();
+    _dictController.removeListener(_onDictInputChanged);
     _dictController.dispose();
     super.dispose();
+  }
+
+  void _onDictInputChanged() {
+    final canSubmit = _dictController.text.trim().isNotEmpty;
+    if (canSubmit != _canSubmitDictation) {
+      setState(() => _canSubmitDictation = canSubmit);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -956,8 +969,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
           const SizedBox(height: SpacingTokens.md),
           if (!_showDictDiff)
             FilledButton.icon(
-              onPressed:
-                  _dictController.text.trim().isEmpty ? null : _submitDictation,
+              onPressed: _canSubmitDictation ? _submitDictation : null,
               icon: const Icon(Icons.check_circle_outline),
               label: const Text('提交默写'),
             ),

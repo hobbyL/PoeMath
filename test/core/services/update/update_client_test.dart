@@ -366,6 +366,76 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  group('强制 HTTPS', () {
+    test('明文 HTTP 更新地址：已配置但不安全，检查更新直接拒绝', () async {
+      var requested = false;
+      final client = UpdateClient(
+        updateUrl: 'http://updates.example.com/latest.json',
+        client: MockClient((request) async {
+          requested = true;
+          return http.Response.bytes(utf8.encode(_validPayload()), 200);
+        }),
+      );
+
+      // 「填了但不安全」与「没填」是两种状态，提示文案不同，不能合并。
+      expect(client.isConfigured, isTrue);
+      expect(client.isSecure, isFalse);
+      await expectLater(
+        client.fetchLatest(),
+        throwsA(
+          isA<UpdateConfigurationException>().having(
+            (error) => error.message,
+            'message',
+            contains('HTTPS'),
+          ),
+        ),
+      );
+      expect(requested, isFalse, reason: '不安全地址不应发出任何请求');
+    });
+
+    test('回环地址允许明文 HTTP（本地联调）', () async {
+      final client = UpdateClient(
+        updateUrl: 'http://127.0.0.1:8080/latest.json',
+        client: MockClient(
+          (request) async =>
+              http.Response.bytes(utf8.encode(_validPayload()), 200),
+        ),
+      );
+
+      expect(client.isSecure, isTrue);
+      final update = await client.fetchLatest();
+      expect(update.versionCode, 2);
+    });
+
+    test('更新接口返回明文 HTTP 安装包地址时拒绝下载', () async {
+      final client = UpdateClient(
+        updateUrl: 'https://updates.example.com/latest.json',
+        client: MockClient(
+          (request) async => http.Response.bytes(
+            utf8.encode(
+              _validPayload(apkUrl: 'http://updates.example.com/poemath.apk'),
+            ),
+            200,
+          ),
+        ),
+        temporaryDirectoryProvider: () async => temporaryDirectory,
+      );
+
+      final update = await client.fetchLatest();
+      // apkUrl 与 sha256 同源，明文下可被一并替换，校验值不构成防护。
+      await expectLater(
+        client.downloadApk(update),
+        throwsA(
+          isA<UpdateException>().having(
+            (error) => error.message,
+            'message',
+            '安装包下载地址必须使用 HTTPS',
+          ),
+        ),
+      );
+    });
+  });
 }
 
 File _downloadFile(Directory temporaryDirectory) {

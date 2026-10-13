@@ -32,6 +32,21 @@ import 'package:poemath/math_engine/models/difficulty_level.dart';
 import 'package:poemath/math_engine/models/math_problem.dart';
 import 'package:poemath/math_engine/presets/grade_presets.dart';
 
+/// 计算时间进度条比例（0.0 ~ 1.0）。
+///
+/// 固定模式以初始秒数为分母；续命模式答对会加时，剩余秒数可能超过初始值，
+/// 取两者较大者作分母，保证结果不超过 1.0。
+double challengeTimeRatio({
+  required int remainingSeconds,
+  required int initialSeconds,
+  required bool extending,
+}) {
+  final baseSeconds = extending && remainingSeconds > initialSeconds
+      ? remainingSeconds
+      : initialSeconds;
+  return remainingSeconds / baseSeconds;
+}
+
 class MathChallengePage extends ConsumerStatefulWidget {
   const MathChallengePage({super.key});
 
@@ -161,7 +176,8 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final userAnswer = _controller.text.trim();
     if (userAnswer.isEmpty) return;
 
-    final judgement = MathEngine.judge(_currentProblem!, userAnswer);
+    final problem = _currentProblem!;
+    final judgement = MathEngine.judge(problem, userAnswer);
     final isCorrect = judgement.isCorrect;
 
     final sound = ref.read(soundServiceProvider);
@@ -190,13 +206,19 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
         sound.play(SoundEffect.correct);
       } else {
         _currentCombo = 0;
-        _recordMistake(_currentProblem!, userAnswer, judgement);
         sound.play(SoundEffect.wrong);
         // 震动反馈
         HapticFeedback.mediumImpact();
         _shakeController.forward(from: 0);
       }
     });
+
+    if (!isCorrect) {
+      // setState 是同步闭包不能 await，故在闭包外发起；400ms 后
+      // `_generateProblem()` 会替换 `_currentProblem`，所以把当前题目
+      // 作为参数传入。内部已兜底异常，不会产生未捕获的异步错误。
+      unawaited(_recordMistake(problem, userAnswer, judgement));
+    }
 
     _controller.clear();
 
@@ -209,24 +231,40 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     });
   }
 
-  /// 记录错题到 Hive
-  void _recordMistake(
+  /// 记录错题到 Hive。
+  ///
+  /// 必须 await 后再 `invalidate`：写入未完成就失效 provider 会让错题本
+  /// 读到旧快照；写入失败时记日志并跳过 invalidate（无新数据可读）。
+  Future<void> _recordMistake(
     MathProblem problem,
     String userAnswer,
     AnswerJudgement judgement,
-  ) {
+  ) async {
     final grade = ref.read(mathGradeProvider);
     final repo = ref.read(mathMistakeRepoProvider);
 
-    repo.recordWrong(
-      problemText: problem.problemText,
-      correctAnswer: problem.answerText,
-      userAnswer: userAnswer,
-      problemType: 'challenge',
-      grade: grade,
-      errorType: judgement.diagnosis?.category,
-      solutionStepsJson: _stepsToJson(judgement.correctSteps),
-    );
+    try {
+      await repo.recordWrong(
+        problemText: problem.problemText,
+        correctAnswer: problem.answerText,
+        userAnswer: userAnswer,
+        problemType: 'challenge',
+        grade: grade,
+        errorType: judgement.diagnosis?.category,
+        solutionStepsJson: _stepsToJson(judgement.correctSteps),
+      );
+    } on Object catch (error, stackTrace) {
+      // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到；
+      // 此处位于 UI 边界，兜底后仅记日志，不打断挑战流程。
+      AppLogger.e(
+        '挑战错题落库失败',
+        tag: 'MathChallenge',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return;
+    }
+    if (!mounted) return;
     ref.invalidate(mathMistakeRepoProvider);
   }
 
@@ -568,11 +606,11 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   }
 
   Widget _buildChallenge(ThemeData theme) {
-    // 固定模式: 正常 ratio; 续命模式: 防止超过 1.0
-    final baseSeconds = _challengeMode == 'extending'
-        ? _remainingSeconds.clamp(_initialSeconds, _remainingSeconds)
-        : _initialSeconds;
-    final timeRatio = _remainingSeconds / baseSeconds;
+    final timeRatio = challengeTimeRatio(
+      remainingSeconds: _remainingSeconds,
+      initialSeconds: _initialSeconds,
+      extending: _challengeMode == 'extending',
+    );
     final timeColor =
         timeRatio > 0.3 ? theme.colorScheme.primary : theme.colorScheme.error;
 

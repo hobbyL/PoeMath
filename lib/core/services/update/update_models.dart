@@ -122,7 +122,13 @@ String? apkCompatibilityError({
 
 /// 异常 → 用户可见中文文案；无匹配时返回 [fallback]。
 String friendlyUpdateError(Object error, {required String fallback}) {
-  if (error is UpdateConfigurationException) return '当前安装包未配置更新检查地址。';
+  if (error is UpdateConfigurationException) {
+    // message 非空 = 「配了但不合法」（如明文 HTTP 被拒），需原样透出；
+    // 为空才是「完全没配」。
+    final message = error.message?.trim();
+    if (message != null && message.isNotEmpty) return message;
+    return '当前安装包未配置更新检查地址。';
+  }
   if (error is UpdateException) {
     if (error.statusCode == 404) return '更新信息不存在，请确认发布配置。';
     if (error.statusCode == 429) return '请求过于频繁，请稍后重试。';

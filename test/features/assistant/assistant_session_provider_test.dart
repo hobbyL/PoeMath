@@ -341,4 +341,74 @@ void main() {
     expect(msgs[2].toolCallId, 'call_1');
     expect(msgs[2].name, 'explain_mistake');
   });
+
+  test('写入失败不毒化串行链：后续消息仍能落库，revision 只随成功写入自增', () async {
+    final flakyRepo = _FlakyAppendRepository(failUntilCall: 1);
+    final flakyContainer = ProviderContainer(
+      overrides: <Override>[
+        assistantChatControllerProvider.overrideWith(_ScriptedChat.new),
+        conversationRepositoryProvider.overrideWithValue(flakyRepo),
+      ],
+    );
+    addTearDown(flakyContainer.dispose);
+
+    final flakySession =
+        flakyContainer.read(assistantSessionProvider.notifier);
+    await flakySession.startNew();
+    final id = flakyContainer.read(assistantSessionProvider).conversationId!;
+    final revisionAfterOpen =
+        flakyContainer.read(assistantSessionProvider).revision;
+
+    // 第一批（user + assistant）：首个 appendMessage 抛异常，整批失败。
+    // 裸 Future 链的旧实现会就此进入错误态并粘连，后续写入全被跳过；
+    // 且此处若无 onError，未捕获的异步异常会直接把本测试判红。
+    await flakySession.send('第一条');
+    await settle();
+
+    expect(flakyRepo.appendCalls, 1, reason: '首次调用抛异常后整批中止');
+    expect(flakyRepo.persisted, isEmpty);
+    expect(
+      flakyContainer.read(assistantSessionProvider).revision,
+      revisionAfterOpen,
+      reason: '写入失败不得自增 revision（语义是「repo 确已变更」）',
+    );
+
+    // 第二批：链条已自愈，正常落库。
+    await flakySession.send('第二条');
+    await settle();
+
+    expect(
+      flakyRepo.persisted.map((m) => m.content).toSet(),
+      <String>{'第二条', '回答：第二条'},
+      reason: '一次失败后链条必须自愈，后续写入照常生效',
+    );
+    expect(
+      flakyRepo.messagesOf(id).map((m) => m.content).toSet(),
+      <String>{'第二条', '回答：第二条'},
+    );
+    expect(
+      flakyContainer.read(assistantSessionProvider).revision,
+      greaterThan(revisionAfterOpen),
+    );
+  });
+}
+
+/// 前 [failUntilCall] 次 `appendMessage` 抛异常，之后正常落库。
+/// 用于验证单次写入失败不会毒化 session 的串行写链。
+class _FlakyAppendRepository extends ConversationRepository {
+  _FlakyAppendRepository({required this.failUntilCall});
+
+  final int failUntilCall;
+  int appendCalls = 0;
+  final List<Message> persisted = <Message>[];
+
+  @override
+  Future<void> appendMessage(Message message) async {
+    appendCalls++;
+    if (appendCalls <= failUntilCall) {
+      throw StateError('append failed #$appendCalls');
+    }
+    persisted.add(message);
+    await super.appendMessage(message);
+  }
 }

@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/assistant_message.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -163,8 +164,24 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
   }
 
   /// 把 repo 写入排到串行链尾，完成后刷新 revision。
+  ///
+  /// 单次写入失败必须在链上就地吞掉：裸 `Future` 链一旦进入错误态会粘连，
+  /// 后续所有排队写入都被跳过（整条持久化链永久静默失效）。这里改为
+  /// 「记日志 + 不刷新 revision」，让链条在下一次写入时自愈。
+  /// 失败那一批消息仍留在 `_persistedIds` 中，不会重试落库——
+  /// 代价是丢这一批，换取后续会话继续正常持久化。
   void _enqueue(Future<void> Function() op) {
-    _writeChain = _writeChain.then((_) => op()).then((_) => _bumpRevision());
+    _writeChain = _writeChain.then((_) => op()).then(
+          (_) => _bumpRevision(),
+          onError: (Object error, StackTrace stackTrace) {
+            AppLogger.e(
+              '助手消息落库失败',
+              tag: 'AssistantSession',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          },
+        );
   }
 
   void _bumpRevision() {

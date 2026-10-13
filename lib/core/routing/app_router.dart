@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
+import 'package:poemath/core/routing/route_fallback_page.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/core/services/update/android_update_installer.dart';
@@ -57,9 +58,19 @@ import 'package:poemath/features/shell/onboarding_page.dart';
 import 'package:poemath/features/shell/splash_page.dart';
 
 /// `Provider<GoRouter>`：整个应用共享一份 GoRouter 实例。
-final appRouterProvider = Provider<GoRouter>((ref) {
+final appRouterProvider = Provider<GoRouter>((ref) => createAppRouter());
+
+/// 构造应用路由器。
+///
+/// [initialLocation] 仅为测试预留：测试需要直达某条深层路由验证兜底行为，
+/// 而默认启动页会触发真实数据导入。生产代码一律用默认值。
+GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
   return GoRouter(
-    initialLocation: AppRoutes.splash,
+    initialLocation: initialLocation,
+    // 未匹配到任何路由时（旧版本链接、外部跳错）渲染兜底页；
+    // 缺省行为是 go_router 自带的英文错误页，对小学生用户不可读。
+    errorBuilder: (context, state) =>
+        RouteFallbackPage.notFound(path: state.uri.path),
     routes: <RouteBase>[
       GoRoute(
         path: AppRoutes.splash,
@@ -211,7 +222,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.mathSessionDetail,
         pageBuilder: (context, state) {
-          final session = state.extra! as MathSession;
+          // extra 不进 URL：深链/进程恢复时为 null，类型不符也当失效处理。
+          final session = state.extra;
+          if (session is! MathSession) {
+            return fadeSlideTransitionPage(
+              state: state,
+              child: const RouteFallbackPage.dataMissing(
+                title: '练习详情',
+                fallbackLocation: AppRoutes.mathHistory,
+                fallbackLabel: '前往练习历史',
+              ),
+            );
+          }
           return fadeSlideTransitionPage(
             state: state,
             child: MathSessionDetailPage(session: session),
@@ -221,7 +243,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.mathMistakeDetail,
         pageBuilder: (context, state) {
-          final mistakeId = state.extra! as String;
+          final mistakeId = state.extra;
+          if (mistakeId is! String) {
+            return fadeSlideTransitionPage(
+              state: state,
+              child: const RouteFallbackPage.dataMissing(
+                title: '错题详情',
+                fallbackLocation: AppRoutes.mathMistake,
+                fallbackLabel: '前往错题本',
+              ),
+            );
+          }
           return fadeSlideTransitionPage(
             state: state,
             child: MathMistakeDetailPage(mistakeId: mistakeId),
@@ -239,7 +271,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.wordProblemPreview,
         pageBuilder: (context, state) {
-          final data = state.extra! as WordProblemPreviewData;
+          final data = state.extra;
+          if (data is! WordProblemPreviewData) {
+            return fadeSlideTransitionPage(
+              state: state,
+              child: const RouteFallbackPage.dataMissing(
+                title: '家长预览',
+                fallbackLocation: AppRoutes.wordProblemGenerate,
+                fallbackLabel: '重新生成题目',
+              ),
+            );
+          }
           return fadeSlideTransitionPage(
             state: state,
             child: WordProblemPreviewPage(data: data),
@@ -256,7 +298,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.wordProblemPractice,
         pageBuilder: (context, state) {
-          final problems = state.extra! as List<LlmProblem>;
+          final problems = state.extra;
+          if (problems is! List<LlmProblem> || problems.isEmpty) {
+            return fadeSlideTransitionPage(
+              state: state,
+              child: const RouteFallbackPage.dataMissing(
+                title: '应用题练习',
+                fallbackLocation: AppRoutes.wordProblemLibrary,
+                fallbackLabel: '前往题库',
+              ),
+            );
+          }
           return fadeSlideTransitionPage(
             state: state,
             child: WordProblemPracticePage(problems: problems),
@@ -355,4 +407,4 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
-});
+}

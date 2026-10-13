@@ -1,0 +1,145 @@
+// test/features/math/math_challenge_page_test.dart
+//
+// 限时挑战页回归测试：
+// ① 时间进度条比例的纯函数（原 clamp 上下界反转，续命模式倒计时必崩）
+// ② 续命模式真实倒计时 1 秒后页面不抛异常（P0-1 的端到端复现）
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/features/math/math_challenge_page.dart';
+
+import '../../helpers/hive_test_helper.dart';
+
+Future<void> _pumpPage(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(1200, 2400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    const ProviderScope(
+      child: MaterialApp(home: MathChallengePage()),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  group('challengeTimeRatio', () {
+    test('续命模式剩余秒数小于初始值时按初始值作分母', () {
+      // 回归点：旧实现 clamp(60, 59) 的下界大于上界，必抛 ArgumentError。
+      final ratio = challengeTimeRatio(
+        remainingSeconds: 59,
+        initialSeconds: 60,
+        extending: true,
+      );
+      expect(ratio, closeTo(59 / 60, 1e-9));
+      expect(ratio, lessThan(1.0));
+    });
+
+    test('续命模式答对加时超过初始值时比例封顶为 1.0', () {
+      expect(
+        challengeTimeRatio(
+          remainingSeconds: 62,
+          initialSeconds: 60,
+          extending: true,
+        ),
+        1.0,
+      );
+      expect(
+        challengeTimeRatio(
+          remainingSeconds: 180,
+          initialSeconds: 60,
+          extending: true,
+        ),
+        1.0,
+      );
+    });
+
+    test('固定模式始终以初始值作分母', () {
+      expect(
+        challengeTimeRatio(
+          remainingSeconds: 30,
+          initialSeconds: 60,
+          extending: false,
+        ),
+        0.5,
+      );
+      // 固定模式不加时，但即便传入超额秒数也不改变分母语义。
+      expect(
+        challengeTimeRatio(
+          remainingSeconds: 62,
+          initialSeconds: 60,
+          extending: false,
+        ),
+        closeTo(62 / 60, 1e-9),
+      );
+    });
+
+    test('时间耗尽时比例为 0 且不除零', () {
+      expect(
+        challengeTimeRatio(
+          remainingSeconds: 0,
+          initialSeconds: 60,
+          extending: true,
+        ),
+        0.0,
+      );
+    });
+  });
+
+  group('MathChallengePage 倒计时', () {
+    setUp(() async {
+      await setUpHiveForTesting();
+      // 关闭音效，避免 widget 测试触发 AudioPlayer 平台通道。
+      await HiveBoxes.settings.put('sound_enabled', false);
+    });
+
+    tearDown(() async {
+      await tearDownHiveForTesting();
+    });
+
+    testWidgets('续命模式开始挑战后第 1 秒不抛异常且进度条未溢出', (tester) async {
+      await _pumpPage(tester);
+
+      // 默认即续命模式。
+      expect(find.text('开始挑战'), findsOneWidget);
+      await tester.tap(find.text('开始挑战'));
+      await tester.pump();
+
+      expect(find.text('60s'), findsOneWidget);
+
+      // 推进 1 秒：旧实现在这里抛 ArgumentError 并渲染红屏。
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('59s'), findsOneWidget);
+
+      final indicator = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(indicator.value, closeTo(59 / 60, 1e-9));
+
+      // 收尾：让页面销毁以取消 Timer。
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('固定模式开始挑战后第 1 秒不抛异常', (tester) async {
+      await _pumpPage(tester);
+
+      await tester.tap(find.text('固定时间'));
+      await tester.pump();
+      await tester.tap(find.text('开始挑战'));
+      await tester.pump();
+
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('59s'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+}

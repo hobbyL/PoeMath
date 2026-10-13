@@ -117,6 +117,17 @@ void main() {
       );
     });
 
+    test('UpdateConfigurationException 带 message 时原样透出（如 HTTPS 被拒）', () {
+      // 「没配」与「配了但不安全」提示不同，后者不能被未配置文案吞掉。
+      expect(
+        friendlyUpdateError(
+          const UpdateConfigurationException('更新检查地址必须使用 HTTPS，当前配置已被拒绝。'),
+          fallback: '后备文案',
+        ),
+        '更新检查地址必须使用 HTTPS，当前配置已被拒绝。',
+      );
+    });
+
     test('404 返回更新信息不存在文案', () {
       expect(
         friendlyUpdateError(

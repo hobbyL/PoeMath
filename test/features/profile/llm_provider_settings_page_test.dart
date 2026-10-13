@@ -10,6 +10,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -598,4 +599,51 @@ void main() {
     // 两条配置之间恰有一条分割线（首项前不插）。
     expect(find.byType(Divider), findsOneWidget);
   });
+
+  testWidgets(
+    '保存抛非 FormatException（安全存储不可用）：弹窗不关闭、提示失败、'
+    '保存按钮恢复可用',
+    (tester) async {
+      final store = _ThrowingCredentialStore();
+      await _pumpPage(tester, credentialStore: store);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, '新增配置'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '服务地址（Base URL）'),
+        'https://api.example.com',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, '默认模型'),
+        'deepseek-chat',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'API Key（可选）'),
+        'secret-key',
+      );
+      await tester.pump();
+
+      await _tapReal(tester, find.text('保存配置'));
+
+      // 回归点：原先只捕获 FormatException，PlatformException 逃逸后
+      // _saving 永久为 true，按钮卡 loading、弹窗也不关闭，用户无法重试。
+      expect(find.byType(TextFormField), findsNWidgets(4), reason: '弹窗仍打开');
+      expect(find.textContaining('保存失败'), findsOneWidget);
+      final saveBtn = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, '保存配置'),
+      );
+      expect(saveBtn.onPressed, isNotNull, reason: '保存按钮必须恢复可点，允许重试');
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+/// 安全存储写入永久失败（模拟 Android keystore 失效 / 桌面无插件）。
+final class _ThrowingCredentialStore extends _MemoryCredentialStore {
+  @override
+  Future<void> saveLlmApiKeyFor(String configId, String apiKey) async {
+    throw PlatformException(code: 'unavailable', message: '安全存储不可用');
+  }
 }
