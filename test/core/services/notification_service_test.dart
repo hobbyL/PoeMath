@@ -193,7 +193,9 @@ void main() {
     expect(service.isWeeklyReportEnabled, isFalse);
   });
 
-  test('启动恢复每日提醒失败时清除失真的开启状态', () async {
+  test('启动恢复每日提醒失败时保留用户开关，只打降级标记', () async {
+    // 用户没关提醒，只是这台设备没能排上；旧实现会把开关改成 false，
+    // 把设备问题谎报成用户的选择，并且不再重试。
     await HiveBoxes.settings.put('reminder_enabled', true);
     await HiveBoxes.settings.put('reminder_hour', 7);
     await HiveBoxes.settings.put('reminder_minute', 30);
@@ -222,9 +224,79 @@ void main() {
       localTimeZoneIdentifierResolver: () async => 'Asia/Shanghai',
     );
 
-    await service.initialize();
+    final reconciled = await service.reconcileWithStoredSettings();
 
-    expect(service.isReminderEnabled, isFalse);
+    expect(reconciled, isFalse);
+    expect(service.isReminderEnabled, isTrue, reason: '用户开关不得被改写');
+    expect(HiveBoxes.settings.get('reminder_enabled'), isTrue);
+    expect(service.isReminderDegraded, isTrue, reason: '失败要能被设置页看到');
+  });
+
+  test('恢复成功后清除降级标记', () async {
+    await HiveBoxes.settings.put('reminder_enabled', true);
+    await HiveBoxes.settings.put('reminder_degraded', true);
+    final plugin = _createPlugin();
+    when(
+      () => plugin.initialize(
+        any(),
+        onDidReceiveNotificationResponse:
+            any(named: 'onDidReceiveNotificationResponse'),
+      ),
+    ).thenAnswer((_) async => true);
+    when(
+      () => plugin.zonedSchedule(
+        any(),
+        any(),
+        any(),
+        any(),
+        any(),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: any(named: 'payload'),
+      ),
+    ).thenAnswer((_) async {});
+    final service = NotificationService.forTesting(
+      plugin: plugin,
+      localTimeZoneIdentifierResolver: () async => 'Asia/Shanghai',
+    );
+
+    expect(await service.reconcileWithStoredSettings(), isTrue);
+
+    expect(service.isReminderEnabled, isTrue);
+    expect(service.isReminderDegraded, isFalse);
+  });
+
+  test('启动恢复每周提醒失败时同样只打降级标记', () async {
+    await HiveBoxes.settings.put('weekly_report_enabled', true);
+    final plugin = _createPlugin();
+    when(
+      () => plugin.initialize(
+        any(),
+        onDidReceiveNotificationResponse:
+            any(named: 'onDidReceiveNotificationResponse'),
+      ),
+    ).thenAnswer((_) async => true);
+    when(
+      () => plugin.zonedSchedule(
+        any(),
+        any(),
+        any(),
+        any(),
+        any(),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: any(named: 'payload'),
+      ),
+    ).thenThrow(Exception('schedule failed'));
+    final service = NotificationService.forTesting(
+      plugin: plugin,
+      localTimeZoneIdentifierResolver: () async => 'Asia/Shanghai',
+    );
+
+    expect(await service.reconcileWithStoredSettings(), isFalse);
+
+    expect(service.isWeeklyReportEnabled, isTrue);
+    expect(HiveBoxes.settings.get('weekly_report_degraded'), isTrue);
   });
 
   test('重复初始化只初始化一次通知插件', () async {

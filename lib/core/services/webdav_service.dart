@@ -27,8 +27,10 @@ class WebDavService {
   /// 向远程根目录发送 PROPFIND 请求，返回是否连通。
   Future<bool> testConnection(WebDavConfig config) async {
     _validateConfig(config);
+    // URI 构造放在 try 外：越界属于配置错误，必须抛给调用方，
+    // 不能被下面的 `on Exception` 吞成「连接失败」。
+    final uri = _remoteUri(config);
     try {
-      final uri = Uri.parse('${config.baseUrl}${config.normalizedPath}');
       final request = http.Request('PROPFIND', uri);
       request.headers.addAll(_authHeaders(config));
       request.headers['Depth'] = '0';
@@ -54,12 +56,10 @@ class WebDavService {
   /// 自动创建远程目录（如不存在）。
   Future<void> upload(WebDavConfig config, String jsonContent) async {
     _validateConfig(config);
+    final uri = _remoteUri(config, fileName: _backupFileName);
     // 先确保目录存在
     await _ensureDirectory(config);
 
-    final uri = Uri.parse(
-      '${config.baseUrl}${config.normalizedPath}$_backupFileName',
-    );
     final response = await _client
         .put(
           uri,
@@ -84,9 +84,7 @@ class WebDavService {
   /// 从 WebDAV 服务器下载备份 JSON。
   Future<String> download(WebDavConfig config) async {
     _validateConfig(config);
-    final uri = Uri.parse(
-      '${config.baseUrl}${config.normalizedPath}$_backupFileName',
-    );
+    final uri = _remoteUri(config, fileName: _backupFileName);
     final response = await _client
         .get(
           uri,
@@ -164,13 +162,27 @@ class WebDavService {
     if (config.password.isEmpty) {
       throw const WebDavException('WebDAV 密码不能为空');
     }
-    if (config.remotePath.trim().isEmpty) {
-      throw const WebDavException('WebDAV 远程目录不能为空');
+    // 路径规则与表单共用 WebDavConfig.validateRemotePath（含空值、编码后的
+    // `..`、反斜杠、控制字符），避免两层校验口径不一致。
+    final pathError = WebDavConfig.validateRemotePath(config.remotePath);
+    if (pathError != null) throw WebDavException(pathError);
+  }
+
+  /// 拼接远程 URI，并断言结果没有跳出配置目录。
+  ///
+  /// 纵深防御：`_validateConfig` 已拦掉编码后的 `..`，这里再对拼接结果做
+  /// 点段归一化后比对 origin 与路径前缀。两道都过不去的输入才会发出请求。
+  Uri _remoteUri(WebDavConfig config, {String fileName = ''}) {
+    final directory = Uri.parse('${config.baseUrl}${config.normalizedPath}');
+    final target = Uri.parse(
+      '${config.baseUrl}${config.normalizedPath}$fileName',
+    );
+    final normalized = target.normalizePath();
+    if (normalized.origin != directory.origin ||
+        !normalized.path.startsWith(directory.normalizePath().path)) {
+      throw const WebDavException('WebDAV 远程目录不合法');
     }
-    final segments = config.normalizedPath.split('/');
-    if (segments.contains('..')) {
-      throw const WebDavException('WebDAV 远程目录不能包含 ..');
-    }
+    return target;
   }
 
   /// PROPFIND 请求体。

@@ -30,6 +30,9 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   late int _reminderMinute;
   late bool _weeklyEnabled;
 
+  /// 上次启动恢复时系统未能排上提醒（用户开关仍然是「开」）。
+  late bool _reminderDegraded;
+
   NotificationService get _notificationService =>
       widget.notificationService ?? NotificationService.instance;
 
@@ -41,6 +44,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     _reminderHour = svc.reminderHour;
     _reminderMinute = svc.reminderMinute;
     _weeklyEnabled = svc.isWeeklyReportEnabled;
+    _reminderDegraded = svc.isReminderDegraded;
   }
 
   String get _timeLabel =>
@@ -66,8 +70,11 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         _showScheduleFailure('每日提醒设置失败，请稍后重试');
         return;
       }
+      // 本次手动调度成功，之前的降级状态随之解除。
+      _reminderDegraded = false;
     } else {
       await svc.cancelDailyReminder();
+      _reminderDegraded = false;
     }
     if (mounted) setState(() => _reminderEnabled = value);
   }
@@ -174,6 +181,31 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (_reminderEnabled && _reminderDegraded) ...[
+                    const SizedBox(height: SpacingTokens.sm),
+                    // 开关还是「开」，但这台设备没能排上；不提示的话用户
+                    // 会以为提醒已生效，静默漏掉每日任务。
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: 16,
+                          color: theme.colorScheme.error,
+                        ),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Expanded(
+                          child: Text(
+                            '提醒未能生效：请检查系统通知权限或电池优化设置，'
+                            '再来这里重新打开一次。',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (_reminderEnabled) ...[
                     const SizedBox(height: SpacingTokens.md),
                     InkWell(

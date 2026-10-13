@@ -52,6 +52,43 @@ void main() {
     );
   });
 
+  test('远程目录穿越：编码变体与非法字符全部拒绝', () {
+    const rejected = <String>[
+      '/../private/', // 字面 ..
+      '/%2e%2e/private/', // 单层编码
+      '/%2E%2E/private/', // 大写十六进制
+      '/%252e%252e/private/', // 双层编码（服务端解一次后仍是 ..）
+      '/..%2fprivate/', // 编码斜杠
+      '/poem%2f..%2fsecret/', // 编码斜杠 + ..
+      '/a/./b/', // 单点段
+      r'/..\private\', // 反斜杠（部分服务端等价 /）
+      '/poemath/../', // 尾随 ..
+      '/%zz/', // 无法解码的转义
+      '/poemath/?x=1', // query 截断
+      '/poemath/#frag', // fragment 截断
+    ];
+
+    for (final path in rejected) {
+      expect(
+        WebDavConfig.validateRemotePath(path),
+        isNotNull,
+        reason: '「$path」应被拒绝',
+      );
+    }
+
+    const accepted = <String>['/poemath/', 'poemath', '/a/b/', '/a-b_c.d/'];
+    for (final path in accepted) {
+      expect(
+        WebDavConfig.validateRemotePath(path),
+        isNull,
+        reason: '「$path」应被接受',
+      );
+    }
+
+    // 空值走同一条校验，不再是服务层的独立分支。
+    expect(WebDavConfig.validateRemotePath('   '), isNotNull);
+  });
+
   test('HTTP、URL 凭据和路径越界在发出请求前被拒绝', () async {
     var requestCount = 0;
     final service = WebDavService(
@@ -66,6 +103,9 @@ void main() {
       _config(url: 'http://dav.example.com'),
       _config(url: 'https://alice:secret@dav.example.com'),
       _config(remotePath: '/../private/'),
+      _config(remotePath: '/%252e%252e/private/'),
+      _config(remotePath: '/poem%2f..%2fsecret/'),
+      _config(remotePath: r'/..\private\'),
     ]) {
       await expectLater(
         service.testConnection(config),

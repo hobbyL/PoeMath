@@ -522,6 +522,12 @@ class SettingsPage extends ConsumerWidget {
       subtitle = '提醒已关闭 · 周报已关闭';
     }
 
+    // 用户开着提醒、但本机这次没排上（权限被回收 / 免打扰 / ROM 限制）时
+    // 明确告知，否则用户会以为提醒真的生效了，静默漏掉每日任务。
+    if (reminderOn && svc.isReminderDegraded) {
+      subtitle = '提醒未能生效，请检查系统通知权限 · $subtitle';
+    }
+
     return AppTile(
       icon: Icons.notifications_outlined,
       iconColor: theme.colorScheme.secondary,

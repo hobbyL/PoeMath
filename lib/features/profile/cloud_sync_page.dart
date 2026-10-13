@@ -18,6 +18,7 @@ import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/webdav_config_page.dart';
 import 'package:poemath/features/profile/widgets/backup_passphrase_dialog.dart';
+import 'package:poemath/features/profile/widgets/credential_export_failed_dialog.dart';
 import 'package:poemath/features/profile/widgets/llm_endpoint_confirm_dialog.dart';
 
 class CloudSyncPage extends ConsumerStatefulWidget {
@@ -107,12 +108,13 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     setState(() => _uploading = true);
     final scaffold = ScaffoldMessenger.of(context);
 
+    final settingsRepo = ref.read(settingsRepositoryProvider);
+    final backup = ref.read(backupServiceProvider);
+    final webdav = ref.read(webDavServiceProvider);
+
     try {
-      final settingsRepo = ref.read(settingsRepositoryProvider);
       final fullConfig =
           await settingsRepo.loadWebDavConfigWithCredentials(config);
-      final backup = ref.read(backupServiceProvider);
-      final webdav = ref.read(webDavServiceProvider);
       final passphrase = await ref
           .read(secureCredentialStoreProvider)
           .readBackupPassphrase();
@@ -126,6 +128,27 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
             passphrase == null ? '上传成功 ✓（未设置备份加密口令，本次备份不含凭据）' : '上传成功 ✓',
           ),
         ),
+      );
+    } on BackupCredentialExportException {
+      // 口令已设但密钥读不出来：不能静默上传一份缺密钥的备份，
+      // 让用户先决定是否接受。
+      if (!mounted) return;
+      final proceed = await showCredentialExportFailedDialog(context);
+      if (proceed != true) {
+        scaffold.clearSnackBars();
+        scaffold.showSnackBar(
+          const SnackBar(content: Text('已取消上传（未修改云端备份）')),
+        );
+        return;
+      }
+      // 无口令重导：跳过凭据读取，得到一份不含密钥但其余数据完整的备份。
+      final json = await backup.exportToJson();
+      final fullConfig =
+          await settingsRepo.loadWebDavConfigWithCredentials(config);
+      await webdav.upload(fullConfig, json);
+      scaffold.clearSnackBars();
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('上传成功 ✓（不含密钥）')),
       );
     } on WebDavException catch (e) {
       scaffold.clearSnackBars();

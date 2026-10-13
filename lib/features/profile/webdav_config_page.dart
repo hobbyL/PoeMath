@@ -238,8 +238,10 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
                   hintText: '/poemath/',
                   prefixIcon: Icon(Icons.folder_outlined),
                 ),
+                // 与服务层共用同一套路径规则（含编码后的 `..` 等穿越写法），
+                // 避免表单放行、请求时才报错。
                 validator: (v) =>
-                    v == null || v.trim().isEmpty ? '请输入远程目录' : null,
+                    WebDavConfig.validateRemotePath(v ?? ''),
               ),
               const SizedBox(height: SpacingTokens.xl),
 

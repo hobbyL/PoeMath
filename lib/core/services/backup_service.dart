@@ -10,6 +10,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/check_in.dart';
@@ -110,6 +111,21 @@ const Map<String, String> _settingsValueType = <String, String>{
   'assistant_enabled': 'bool', // AI 助手悬浮气泡开关（默认关闭）
 };
 
+/// 导出口令非空、但安全存储读取失败时抛出。
+///
+/// 旧实现把读取失败静默降级成「不含凭据的备份」：用户以为备份完整，
+/// 换机恢复后才发现 Key 全丢了，且拿不到任何线索。这里改为显式抛错，
+/// 由 UI 让用户决定「仍然导出（不含密钥）」还是「取消」。
+class BackupCredentialExportException implements Exception {
+  const BackupCredentialExportException(this.cause);
+
+  /// 原始错误（安全存储 / 平台通道异常），仅供日志，不得展示给用户。
+  final Object cause;
+
+  @override
+  String toString() => 'BackupCredentialExportException: $cause';
+}
+
 class BackupService {
   BackupService({SecureCredentialStore? secureStore})
       : _secureStore = secureStore ?? SecureCredentialStore();
@@ -120,6 +136,9 @@ class BackupService {
   ///
   /// [passphrase] 非空且安全存储中存在凭据时，凭据以
   /// PBKDF2 + AES-256-GCM 加密写入 `credentials` 节；否则省略该节。
+  ///
+  /// 口令非空但读取凭据失败时抛 [BackupCredentialExportException]，
+  /// **不再**静默产出缺凭据的备份（见该类文档）。
   Future<String> exportToJson({String? passphrase}) async {
     final data = <String, dynamic>{
       'version': _backupVersion,
@@ -146,8 +165,13 @@ class BackupService {
     return const JsonEncoder.withIndent('  ').convert(data);
   }
 
-  /// 读取安全存储凭据并加密；无口令、无凭据或读取失败时返回 `null`
-  /// （导出静默降级为不含凭据节）。
+  /// 读取安全存储凭据并加密。
+  ///
+  /// 两种「没有凭据」是合法的，返回 `null` 让调用方省略 `credentials` 节：
+  /// ① 没填口令（用户本来就没打算带走密钥）；② 各项凭据都为空。
+  ///
+  /// 读取**失败**不是合法状态：抛 [BackupCredentialExportException]，
+  /// 由 UI 决定降级导出还是取消。
   Future<Map<String, dynamic>?> _exportCredentials(String? passphrase) async {
     final normalized = passphrase?.trim() ?? '';
     if (normalized.isEmpty) return null;
@@ -172,8 +196,15 @@ class BackupService {
       }
       if (payload.isEmpty) return null;
       return await encryptCredentials(payload, normalized);
-    } on Object {
-      return null;
+    } on Object catch (error, stackTrace) {
+      // 不得记录 payload：只记异常本身。
+      AppLogger.e(
+        '导出凭据失败',
+        tag: 'Backup',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      throw BackupCredentialExportException(error);
     }
   }
 

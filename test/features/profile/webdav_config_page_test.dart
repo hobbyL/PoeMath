@@ -12,13 +12,17 @@ class _MockSettingsRepository extends Mock implements SettingsRepository {}
 
 class _FakeWebDavConfig extends Fake implements WebDavConfig {}
 
-Future<void> _fillForm(WidgetTester tester, {required String url}) async {
+Future<void> _fillForm(
+  WidgetTester tester, {
+  required String url,
+  String remotePath = '/poemath/',
+}) async {
   final fields = find.byType(TextFormField);
   await tester.enterText(fields.at(0), '测试配置');
   await tester.enterText(fields.at(1), url);
   await tester.enterText(fields.at(2), 'alice');
   await tester.enterText(fields.at(3), 'secret');
-  await tester.enterText(fields.at(4), '/poemath/');
+  await tester.enterText(fields.at(4), remotePath);
 }
 
 void main() {
@@ -39,6 +43,30 @@ void main() {
     await tester.pump();
 
     expect(find.text('服务器地址必须使用 HTTPS，不支持明文 HTTP'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('远程目录穿越（含编码变体）在表单层被拒绝，不发请求', (tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(home: WebDavConfigPage()),
+      ),
+    );
+    await tester.pump();
+    // 双层编码：解一次仍是 `..`，会落到服务端解码后的越界路径。
+    await _fillForm(
+      tester,
+      url: 'https://dav.example.com',
+      remotePath: '/%252e%252e/private/',
+    );
+
+    await tester.tap(find.text('测试链接'));
+    await tester.pump();
+
+    expect(find.textContaining('路径段'), findsOneWidget);
+    // 表单校验未放行 → 不会进入「测试中」状态。
+    expect(find.text('测试中…'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));
   });

@@ -59,6 +59,63 @@ class WebDavConfig {
     return null;
   }
 
+  /// 校验远程目录。
+  ///
+  /// `remotePath` 会被直接拼进请求 URL（`baseUrl + normalizedPath + 文件名`），
+  /// 而服务端在路由前会做百分号解码，所以只检查字面 `..` 会被
+  /// `%2e%2e`、`%252e%252e`、`..%2f` 之类的编码绕过，拿到越界的读写路径。
+  /// 这里先反复解码到稳定再逐段比对，并拒绝会改变 URL 结构的字符。
+  ///
+  /// 返回 `null` 表示合法；否则返回面向用户的中文错误。
+  static String? validateRemotePath(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return '请输入远程目录';
+
+    final decoded = _fullyDecodePath(trimmed);
+    if (decoded == null) return '远程目录包含无法识别的转义字符';
+
+    // `\` 在部分 WebDAV 服务端等价于 `/`；`?` 与 `#` 会截断路径，
+    // 让备份文件名落进 query/fragment。
+    if (decoded.contains(r'\')) return '远程目录不能包含反斜杠';
+    if (decoded.contains('?') || decoded.contains('#')) {
+      return '远程目录不能包含 ? 或 #';
+    }
+    if (decoded.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f)) {
+      return '远程目录不能包含控制字符';
+    }
+
+    final segments = decoded.split('/');
+    if (segments.contains('..') || segments.contains('.')) {
+      return '远程目录不能包含 . 或 .. 路径段';
+    }
+    return null;
+  }
+
+  /// 反复百分号解码直到不再变化。
+  ///
+  /// 非法转义（如 `%zz`）或超过 [_maxDecodePasses] 轮仍在变化都返回 `null`：
+  /// 这类输入在不同服务端的解码次数不一致，无法静态判定安全，直接拒绝。
+  static String? _fullyDecodePath(String value) {
+    var current = value;
+    for (var pass = 0; pass < _maxDecodePasses; pass++) {
+      if (!current.contains('%')) return current;
+      final String next;
+      try {
+        next = Uri.decodeComponent(current);
+      } on ArgumentError {
+        return null;
+      } on FormatException {
+        return null;
+      }
+      if (next == current) return current;
+      current = next;
+    }
+    return null;
+  }
+
+  /// 解码轮数上限，防解码炸弹。
+  static const int _maxDecodePasses = 4;
+
   /// 规范化后的基础 URL：去尾 `/`。
   String get baseUrl {
     final trimmed = url.trim();

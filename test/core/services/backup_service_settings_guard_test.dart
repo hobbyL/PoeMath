@@ -345,11 +345,17 @@ void main() {
     await HiveBoxes.settings.put('llm_active_provider_id', 'p1');
 
     // 该测试的 BackupService 用真实 SecureCredentialStore（测试环境无
-    // 平台通道），改为只断言明文 JSON 层：无论凭据节是否存在，
+    // 平台通道），读取必定抛异常 —— 这正是「安全存储不可用」的真实形态。
+    // 契约变更后导出不再静默降级，而是抛 BackupCredentialExportException；
+    // 这里走用户的降级路径（无口令重导），继续断言明文 JSON 层：
     // llm_api_key_hint 作为凭据白名单键只允许出现在加密载荷内，
     // 明文 JSON 文本不得含该键名（settings 白名单外的 key 不导出，
     // 顶层亦无此键）。
-    final json = await backupService.exportToJson(passphrase: 'pw');
+    await expectLater(
+      backupService.exportToJson(passphrase: 'pw'),
+      throwsA(isA<BackupCredentialExportException>()),
+    );
+    final json = await backupService.exportToJson();
     final node = jsonDecode(json) as Map<String, dynamic>;
 
     // 顶层无此键。
@@ -359,6 +365,8 @@ void main() {
     expect(settings?.containsKey('llm_api_key_hint') ?? false, isFalse);
     // 明文序列化文本（缩进美化后字段名均可见）不含该键名。
     expect(json, isNot(contains('llm_api_key_hint')));
+    // 降级导出确实不含凭据节。
+    expect(node.containsKey('credentials'), isFalse);
   });
 
   test('AC4 兼容测试：含排除 key 的正常旧备份恢复成功，白名单 key 全部还原', () async {

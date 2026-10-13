@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/services/backup_service.dart';
@@ -20,6 +21,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/widgets/backup_passphrase_dialog.dart';
+import 'package:poemath/features/profile/widgets/credential_export_failed_dialog.dart';
 import 'package:poemath/features/profile/widgets/llm_endpoint_confirm_dialog.dart';
 
 class BackupRestorePage extends ConsumerStatefulWidget {
@@ -206,9 +208,14 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
     try {
       final backup = ref.read(backupServiceProvider);
       final passphrase = await _readExportPassphrase();
+      if (!mounted) return;
 
       if (action == 'save') {
-        final json = await backup.exportToJson(passphrase: passphrase);
+        final json = await _exportAcceptingCredentialFailure(
+          backup,
+          passphrase,
+        );
+        if (json == null) return; // 凭据读取失败且用户选择取消。
         final timestamp = DateTime.now()
             .toIso8601String()
             .replaceAll(':', '-')
@@ -230,15 +237,45 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
           ),
         );
       } else {
-        final filePath = await backup.exportToFile(passphrase: passphrase);
+        final json = await _exportAcceptingCredentialFailure(
+          backup,
+          passphrase,
+        );
+        if (json == null) return;
+        final timestamp = DateTime.now()
+            .toIso8601String()
+            .replaceAll(':', '-')
+            .split('.')
+            .first;
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/poemath_backup_$timestamp.json');
+        await file.writeAsString(json);
         await SharePlus.instance.share(
-          ShareParams(files: [XFile(filePath)]),
+          ShareParams(files: [XFile(file.path)]),
         );
       }
     } on Exception catch (e) {
       scaffold.showSnackBar(
         SnackBar(content: Text('备份失败: $e')),
       );
+    }
+  }
+
+  /// 导出 JSON；凭据读取失败时让用户选「仍然导出（不含密钥）」或取消。
+  ///
+  /// 返回 `null` 表示用户选择取消。重试导出时不带口令，安全存储读取
+  /// 随即被跳过 —— 这是唯一能拿到「其余数据照常导出」的路径。
+  Future<String?> _exportAcceptingCredentialFailure(
+    BackupService backup,
+    String? passphrase,
+  ) async {
+    try {
+      return await backup.exportToJson(passphrase: passphrase);
+    } on BackupCredentialExportException {
+      if (!mounted) return null;
+      final proceed = await showCredentialExportFailedDialog(context);
+      if (proceed != true) return null;
+      return backup.exportToJson();
     }
   }
 

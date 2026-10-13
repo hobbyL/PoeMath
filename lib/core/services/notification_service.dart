@@ -70,6 +70,13 @@ class NotificationService {
   static const String _keyReminderHour = 'reminder_hour';
   static const String _keyReminderMinute = 'reminder_minute';
 
+  // ============ 降级标记（不进备份白名单） ============
+  // 语义是「本机这次调度失败了」：换机后由新设备自己重新判定，
+  // 迁移过来只会在新设备上弹出错误的告警，因此不入白名单。
+
+  static const String _keyReminderDegraded = 'reminder_degraded';
+  static const String _keyWeeklyDegraded = 'weekly_report_degraded';
+
   static const int _notificationId = 1001;
   static const int _weeklyReportId = 1002;
   static const String _channelId = 'daily_reminder';
@@ -217,12 +224,18 @@ class NotificationService {
   Future<bool> _reconcileStoredSchedules() async {
     var succeeded = true;
 
+    // 调度失败**不得**改写用户开关。旧实现在这里写 enabled=false，
+    // 用户明明开着提醒，只是系统调度临时失败（免打扰、权限被系统回收、
+    // 厂商 ROM 限制），却被静默改写成「用户关掉了」，且不再重试。
+    // 现在只记录一个独立的降级标记供设置页提示，用户开关保持不变。
     if (isReminderEnabled) {
       final scheduled =
           await scheduleDailyReminder(reminderHour, reminderMinute);
       if (!scheduled) {
-        await HiveBoxes.settings.put(_keyReminderEnabled, false);
+        await _markReminderDegraded(true);
         succeeded = false;
+      } else {
+        await _markReminderDegraded(false);
       }
     } else {
       try {
@@ -240,8 +253,10 @@ class NotificationService {
     if (isWeeklyReportEnabled) {
       final scheduled = await scheduleWeeklyReport();
       if (!scheduled) {
-        await HiveBoxes.settings.put(_keyWeeklyEnabled, false);
+        await _markWeeklyDegraded(true);
         succeeded = false;
+      } else {
+        await _markWeeklyDegraded(false);
       }
     } else {
       try {
@@ -259,6 +274,16 @@ class NotificationService {
     return succeeded;
   }
 
+  /// 记录/清除「提醒已开启但系统未能调度」的降级标记。
+  Future<void> _markReminderDegraded(bool degraded) async {
+    await HiveBoxes.settings.put(_keyReminderDegraded, degraded);
+  }
+
+  /// 记录/清除周报的降级标记。
+  Future<void> _markWeeklyDegraded(bool degraded) async {
+    await HiveBoxes.settings.put(_keyWeeklyDegraded, degraded);
+  }
+
   // ============ 设置存取 ============
 
   /// 提醒是否已开启。
@@ -273,6 +298,13 @@ class NotificationService {
   int get reminderMinute =>
       HiveBoxes.settings.get(_keyReminderMinute, defaultValue: 0) as int;
 
+  /// 提醒已开启但系统未能调度（权限被回收、免打扰、厂商 ROM 限制等）。
+  ///
+  /// 与 [isReminderEnabled] 正交：这个为 true 表示**用户没关**提醒，
+  /// 只是这台设备这次没能排上，设置页据此提示「提醒未能生效」。
+  bool get isReminderDegraded =>
+      HiveBoxes.settings.get(_keyReminderDegraded, defaultValue: false) as bool;
+
   // ============ 权限请求 ============
 
   /// 请求通知权限（Android 13+ / iOS）。
@@ -283,7 +315,11 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (android != null) {
       final granted = await android.requestNotificationsPermission();
-      return granted ?? false;
+      if (granted != null) return granted;
+      // Android 12 及以下没有运行时通知权限，插件返回 null。
+      // 旧实现把 null 当 false，导致这些设备「开启提醒」永远失败。
+      // 此时应用通知是被系统整体开关控制的，查实际状态才是准的。
+      return await android.areNotificationsEnabled() ?? true;
     }
 
     // iOS / macOS
@@ -366,9 +402,18 @@ class NotificationService {
       hour,
       minute,
     );
-    // 如果今天的时间已过，推到明天
+    // 如果今天的时间已过，推到明天。
+    // 用构造函数按日历加一天，而非 `add(Duration(days: 1))`：后者是绝对
+    // 时长，跨夏令时切换日会整体偏移一小时（03:00 漂成 02:00 或 04:00）。
     if (scheduled.isBefore(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
+      scheduled = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day + 1,
+        hour,
+        minute,
+      );
     }
     return scheduled;
   }
@@ -434,9 +479,21 @@ class NotificationService {
       hour,
       minute,
     );
-    // 找到下一个周日
+    // 找到下一个周日。
+    // 同样按日历天数递增构造，避免 `add(Duration(days: 1))` 在夏令时切换日
+    // 把 18:00 漂成 17:00 或 19:00。`d + n` 允许 n 超过当月天数，
+    // TZDateTime 会归一化到正确的月份。
+    var dayOffset = 0;
     while (date.weekday != DateTime.sunday || date.isBefore(now)) {
-      date = date.add(const Duration(days: 1));
+      dayOffset++;
+      date = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day + dayOffset,
+        hour,
+        minute,
+      );
     }
     return date;
   }

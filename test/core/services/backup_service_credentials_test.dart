@@ -5,6 +5,7 @@
 
 import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/backup_service.dart';
@@ -20,6 +21,14 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   String? tencentSecretKey;
   String? workerApiKey;
 
+  /// 模拟安全存储不可用（系统密钥库被重置 / 桌面无插件）。
+  bool throwOnRead = false;
+
+  Never _failRead() => throw PlatformException(
+        code: 'unavailable',
+        message: '安全存储不可用',
+      );
+
   @override
   Future<void> saveTencentAsrCredentials(
     TencentAsrCredentials credentials,
@@ -30,6 +39,7 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
 
   @override
   Future<TencentAsrCredentials?> readTencentAsrCredentials() async {
+    if (throwOnRead) _failRead();
     final id = tencentSecretId;
     final key = tencentSecretKey;
     if (id == null || key == null) return null;
@@ -49,7 +59,10 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   }
 
   @override
-  Future<String?> readWorkerTtsApiKey() => Future.value(workerApiKey);
+  Future<String?> readWorkerTtsApiKey() async {
+    if (throwOnRead) _failRead();
+    return workerApiKey;
+  }
 
   @override
   Future<void> deleteWorkerTtsApiKey() async {
@@ -65,7 +78,10 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   }
 
   @override
-  Future<String?> readLlmApiKey() => Future.value(llmApiKey);
+  Future<String?> readLlmApiKey() async {
+    if (throwOnRead) _failRead();
+    return llmApiKey;
+  }
 
   @override
   Future<void> deleteLlmApiKey() async {
@@ -231,6 +247,52 @@ void main() {
   test('jsonHasCredentials：坏 JSON 返回 false', () {
     expect(BackupService.jsonHasCredentials('not valid json'), isFalse);
     expect(BackupService.jsonHasCredentials('[]'), isFalse);
+  });
+
+  test('安全存储读取失败：抛 BackupCredentialExportException 而非静默丢密钥', () async {
+    // 回归点：旧实现 `on Object { return null; }` 会把读取失败伪装成
+    // 「这份备份本来就没有凭据」，用户换机恢复后才发现 Key 全丢。
+    await seedCredentials();
+    await seedProgress('poem_1');
+    credentialStore.throwOnRead = true;
+
+    await expectLater(
+      backupService.exportToJson(passphrase: '同步口令'),
+      throwsA(isA<BackupCredentialExportException>()),
+    );
+  });
+
+  test('无口令导出不受读取失败影响（合法路径仍然静默省略凭据节）', () async {
+    await seedCredentials();
+    credentialStore.throwOnRead = true;
+
+    // 用户没设口令 = 本来就不打算带密钥走，这不是失败。
+    final json = await backupService.exportToJson();
+    expect(BackupService.jsonHasCredentials(json), isFalse);
+  });
+
+  test('凭据读取失败且用户接受降级：不带口令重导得到完整数据、无凭据节', () async {
+    await seedCredentials();
+    await seedProgress('poem_1');
+    credentialStore.throwOnRead = true;
+
+    // UI 降级路径：捕获异常 → 用户点「仍然导出（不含密钥）」→ 无口令重试。
+    final json = await backupService.exportToJson();
+    final node = jsonDecode(json) as Map<String, dynamic>;
+    expect(node.containsKey('credentials'), isFalse);
+    expect(
+      (node['poemProgress'] as List<dynamic>),
+      hasLength(1),
+      reason: '除密钥外的学习数据必须照常导出',
+    );
+  });
+
+  test('凭据为空但读取成功：仍是合法省略，不抛异常', () async {
+    // 已设口令但一个凭据都没存过 → payload 为空 → 合法返回 null。
+    expect(
+      await backupService.exportToJson(passphrase: '同步口令'),
+      isNot(contains('credentials')),
+    );
   });
 
   test('credentials 节非对象时校验拒绝', () async {
