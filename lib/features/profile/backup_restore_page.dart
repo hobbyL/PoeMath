@@ -20,6 +20,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/widgets/backup_passphrase_dialog.dart';
+import 'package:poemath/features/profile/widgets/llm_endpoint_confirm_dialog.dart';
 
 class BackupRestorePage extends ConsumerStatefulWidget {
   const BackupRestorePage({
@@ -288,6 +289,17 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
         if (!context.mounted) return;
         passphrase = await showBackupPassphraseInputDialog(context);
         if (passphrase == null) return; // 用户取消
+      }
+
+      // 端点变更预检：LLM 配置随备份迁移（含 baseUrl），恢复前让用户确认
+      // 地址变更，避免恶意备份把真实 API Key 导向攻击者服务器（P1 闸门）。
+      final endpointChanges =
+          BackupService.detectLlmEndpointChanges(fileJson);
+      if (endpointChanges != null && !endpointChanges.isEmpty) {
+        if (!context.mounted) return;
+        final trusted =
+            await showLlmEndpointConfirmDialog(context, endpointChanges);
+        if (trusted != true) return; // 用户取消 = 中止恢复，数据零变更
       }
 
       final count = await backup.restoreFromFile(filePath, passphrase: passphrase);

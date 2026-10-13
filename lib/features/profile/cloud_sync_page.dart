@@ -18,6 +18,7 @@ import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/webdav_config_page.dart';
 import 'package:poemath/features/profile/widgets/backup_passphrase_dialog.dart';
+import 'package:poemath/features/profile/widgets/llm_endpoint_confirm_dialog.dart';
 
 class CloudSyncPage extends ConsumerStatefulWidget {
   const CloudSyncPage({
@@ -188,6 +189,16 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
         if (!mounted) return;
         passphrase = await showBackupPassphraseInputDialog(context);
         if (passphrase == null) return; // 用户取消
+      }
+
+      // 端点变更预检：LLM 配置随备份迁移（含 baseUrl），恢复前让用户确认
+      // 地址变更，避免恶意备份把真实 API Key 导向攻击者服务器（P1 闸门）。
+      final endpointChanges = BackupService.detectLlmEndpointChanges(json);
+      if (endpointChanges != null && !endpointChanges.isEmpty) {
+        if (!mounted) return;
+        final trusted =
+            await showLlmEndpointConfirmDialog(context, endpointChanges);
+        if (trusted != true) return; // 用户取消 = 中止恢复，数据零变更
       }
 
       final count = await backup.restoreFromJson(json, passphrase: passphrase);

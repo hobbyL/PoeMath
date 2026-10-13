@@ -502,10 +502,11 @@ void main() {
     expect(HiveBoxes.settings.get('pinyin_visible'), equals(true));
   });
 
-  test('恢复 settings 会等待写入并移除备份中不存在的白名单旧键', () async {
-    // stale_setting 已不在白名单内：恢复只删白名单 key，本机保留原值。
+  test('恢复 settings 会等待写入；备份未给出的白名单 key 保留本机值', () async {
+    // stale_setting 不在白名单内：恢复不写，本机保留原值。
     await HiveBoxes.settings.put('stale_setting', 'keep-me');
-    // math_batch_size 在白名单内：备份中缺失 → 恢复时被移除。
+    // math_batch_size 在白名单内，但备份未给出 → 删除范围只覆盖「最终写入集」，
+    // 因此本机值保留（旧行为会移除，导致恢复旧备份时抹掉本机 LLM 等配置）。
     await HiveBoxes.settings.put('math_batch_size', 20);
     final json = jsonEncode({
       'version': 1,
@@ -515,8 +516,20 @@ void main() {
     await backupService.restoreFromJson(json);
 
     expect(HiveBoxes.settings.get('tts_speed'), equals(0.8));
-    expect(HiveBoxes.settings.get('math_batch_size'), isNull);
+    expect(HiveBoxes.settings.get('math_batch_size'), equals(20));
     expect(HiveBoxes.settings.get('stale_setting'), 'keep-me');
+  });
+
+  test('备份给出的白名单 key 以备份为准（覆盖本机值）', () async {
+    await HiveBoxes.settings.put('math_batch_size', 20);
+    final json = jsonEncode({
+      'version': 1,
+      'settings': <String, dynamic>{'math_batch_size': 5},
+    });
+
+    await backupService.restoreFromJson(json);
+
+    expect(HiveBoxes.settings.get('math_batch_size'), equals(5));
   });
 
   test('中途写入失败时回滚已写入 Box，并保留原始异常', () async {

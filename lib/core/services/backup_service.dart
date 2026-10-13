@@ -28,6 +28,8 @@ import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
+import 'package:poemath/core/services/llm/llm_client.dart';
+import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -42,15 +44,25 @@ const int _backupVersion = 1;
 /// 类型不符跳过该 key（不毁整个恢复）。恢复不再 `box.clear()`：本机的
 /// 排除 key（如 webdav_configs）原值保留，防止攻击者借恶意备份清空设备配置。
 ///
-/// 排除项及理由（设备绑定、换机重配，与凭据不随备份明文迁移的既有设计一致）：
-/// - webdav_configs / llm_providers / llm_active_provider_id /
-///   llm_base_url / llm_model / tts_cloud_base_url /
-///   tts_cloud_enabled / tts_cloud_voice / tts_cloud_style：
-///   指向外部服务的端点或开关（llm_providers 含 baseUrl/model，
-///   llm_active_provider_id 依赖其存在），注入即成为凭据外泄端点（P1）；
-/// - llm_provider_word_problem / llm_provider_poem_explain /
-///   llm_provider_math_explain：场景级厂商绑定（LlmScenario.settingsKey），
-///   值为 llm_providers 条目 id，跨机迁移必然悬空；
+/// **LLM 端点类 key 的纳入前提（P1 补偿控制）**：
+/// llm_providers（含 baseUrl/model）、llm_active_provider_id、llm_base_url /
+/// llm_model、四个场景绑定（LlmScenario.settingsKey / modelKey）**已纳入**
+/// —— 这些 key 指向外部服务，注入即成为凭据外泄端点（P1）。纳入原因是
+/// 换机可用性：API Key 本身已随加密凭据节迁移，若地址不迁移则 Key 无处投递，
+/// AI 全链路不可用。
+///
+/// 补偿控制：`detectLlmEndpointChanges` + 恢复前地址变更确认框
+/// （features/profile/widgets/llm_endpoint_confirm_dialog.dart）。两个恢复
+/// 入口（cloud_sync_page / backup_restore_page）在写入前比对并弹框，用户取消
+/// 即中止恢复、数据零变更，把 P1 从「静默生效」降级为「知情同意」。
+///
+/// **纪律**：新增端点类 key 一律必须先有恢复前确认闸门，不得静默纳入。
+///
+/// 仍排除的 key 及理由：
+/// - webdav_configs：其 url 与凭据是同一份数据的两半，拆不开；凭据不随备份
+///   明文迁移的既有设计下无法只迁 url（与 llm_providers 不同类）；
+/// - tts_cloud_base_url / tts_cloud_enabled / tts_cloud_voice / tts_cloud_style：
+///   TTS 云端端点与开关，当前无对应确认闸门；
 /// - tencent_asr_credential_fingerprint / tencent_asr_verified_at /
 ///   worker_tts_verified_fingerprint：与凭据绑定的验证状态，凭据不随备份
 ///   走，指纹/时间戳单独迁移会误导验证状态。
@@ -71,6 +83,19 @@ const Map<String, String> _settingsValueType = <String, String>{
   'math_difficulty': 'string', // 练习难度 easy/medium/hard
   'math_practice_mode': 'string', // 练习模式（综合或 ProblemMode.name）
   'llm_provider_name': 'string', // LLM 供应商名称（纯展示，非敏感）
+  // LLM 厂商配置与场景绑定（含端点，受恢复前确认闸门约束，见上方说明）。
+  'llm_providers': 'string', // LlmProviderConfig.encodeList 的 JSON 字符串
+  'llm_active_provider_id': 'string', // 当前生效配置 id
+  'llm_base_url': 'string', // 旧单配置残留（legacy 往返）
+  'llm_model': 'string', // 旧单配置残留
+  'llm_provider_assistant': 'string', // AI 助手绑定的配置 id
+  'llm_model_assistant': 'string', // AI 助手选中的模型名
+  'llm_provider_word_problem': 'string', // AI 出题绑定的配置 id
+  'llm_model_word_problem': 'string', // AI 出题选中的模型名
+  'llm_provider_poem_explain': 'string', // 诗词讲解绑定的配置 id
+  'llm_model_poem_explain': 'string', // 诗词讲解选中的模型名
+  'llm_provider_math_explain': 'string', // 口算解析绑定的配置 id
+  'llm_model_math_explain': 'string', // 口算解析选中的模型名
   'has_onboarded': 'bool', // 是否完成引导
   // 通知设置（notification_service 直读写，随备份迁移，见其 key 常量区）。
   'reminder_enabled': 'bool', // 每日提醒开关
@@ -171,6 +196,129 @@ class BackupService {
     } on FormatException {
       return false;
     }
+  }
+
+  /// 比对备份与本机的 LLM 端点差异，供恢复前确认框展示（P1 补偿控制）。
+  ///
+  /// 返回 null 表示**无法判定或无需确认**：JSON 非法、无 `settings` 节、
+  /// 备份既无 `llm_providers` 也无 `llm_base_url`、厂商列表结构损坏或为空
+  /// 且无 legacy 端点。调用方应把 null 与 `isEmpty` 一样对待 —— 直接继续
+  /// 恢复，不弹框（不因预检失败阻断恢复）。
+  ///
+  /// 只有 `added` / `changed` 触发弹框；`removed`（本机有、备份无）不构成
+  /// 外泄风险，仅为信息性字段。
+  ///
+  /// **必须同时覆盖 legacy 端点**：备份可以只带 `llm_base_url`
+  /// （旧版本导出的单配置备份），此时若不比对即返回 null，攻击者只需给出
+  /// `{'settings': {'llm_base_url': 'https://attacker.example.net'}}` 就能
+  /// 绕过确认闸门 —— `SettingsRepository._doMigrateLegacyLlmConfig` 会在
+  /// `llm_providers` 为空且 `llm_base_url` 非空时把它**升格为生效配置**并
+  /// 关联本机 Key，构成完整的凭据外泄链路。
+  static LlmEndpointChangeSet? detectLlmEndpointChanges(String jsonString) {
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(jsonString);
+    } on FormatException {
+      return null;
+    }
+    if (decoded is! Map) return null;
+
+    final settings = decoded['settings'];
+    if (settings is! Map) return null;
+
+    // 本机侧：数据可信，坏数据退化为空列表即「无本地端点」，语义正确。
+    final local = LlmProviderConfig.decodeList(
+      HiveBoxes.settings.get('llm_providers') as String?,
+    );
+    final localById = <String, LlmProviderConfig>{
+      for (final config in local) config.id: config,
+    };
+
+    final added = <String>[];
+    final changed = <LlmEndpointChange>[];
+
+    // ---- 来源一：备份的 llm_providers ----
+    final rawProviders = settings['llm_providers'];
+    List<LlmProviderConfig>? incoming;
+    if (rawProviders is String && rawProviders.isNotEmpty) {
+      // 备份侧：结构损坏返回 null（区分「坏结构」与「合法空列表」，见
+      // _tryParseProviderList 注释）。
+      incoming = _tryParseProviderList(rawProviders);
+      if (incoming != null) {
+        for (var index = 0; index < incoming.length; index++) {
+          final config = incoming[index];
+          final host = _endpointOf(config.baseUrl);
+          final existing = localById[config.id];
+          if (existing == null) {
+            added.add(host);
+            continue;
+          }
+          final localHost = _endpointOf(existing.baseUrl);
+          if (localHost != host) {
+            changed.add(
+              LlmEndpointChange(
+                label: config.name.trim().isEmpty
+                    ? '配置 ${index + 1}'
+                    : config.name.trim(),
+                from: localHost,
+                to: host,
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    // ---- 来源二：备份的 legacy llm_base_url（绕过面，见方法注释）----
+    // 仅当备份未给出可解析的厂商列表时才纳入：厂商列表存在时它是权威端点
+    // 来源，且 `_doMigrateLegacyLlmConfig` 不会在 providers 非空时升格
+    // legacy 值，此时 legacy 字段不构成独立端点。
+    final backupProvidersUsable =
+        incoming != null && incoming.isNotEmpty;
+    if (!backupProvidersUsable) {
+      final legacy = settings['llm_base_url'];
+      if (legacy is String && legacy.trim().isNotEmpty) {
+        final localLegacy =
+            (HiveBoxes.settings.get('llm_base_url') as String?) ?? '';
+        final host = _endpointOf(legacy);
+        // 本机 legacy 值可能是「已被升格过」= providers 非空，此时本机
+        // 真正生效的是 providers，legacy 残留不作为对比基准（避免误报）。
+        if (local.isEmpty) {
+          if (localLegacy.trim().isEmpty) {
+            added.add(host);
+          } else {
+            final localHost = _endpointOf(localLegacy);
+            if (localHost != host) {
+              changed.add(
+                LlmEndpointChange(
+                  label: '默认服务地址',
+                  from: localHost,
+                  to: host,
+                ),
+              );
+            }
+          }
+        } else {
+          // 本机已有厂商列表 → legacy 注入会被升格为新配置，仍属端点新增。
+          added.add(host);
+        }
+      }
+    }
+
+    // 既无厂商列表也无 legacy 端点 → 无端点可注入，不弹框。
+    if (incoming == null && added.isEmpty && changed.isEmpty) return null;
+
+    final incomingIds = incoming?.map((c) => c.id).toSet() ?? const <String>{};
+    final removed = <String>[
+      for (final config in local)
+        if (!incomingIds.contains(config.id)) _endpointOf(config.baseUrl),
+    ];
+
+    return LlmEndpointChangeSet(
+      added: added,
+      changed: changed,
+      removed: removed,
+    );
   }
 
   /// 从 JSON 字符串恢复数据。
@@ -297,9 +445,30 @@ class BackupService {
   /// 配置的归属提示：host 取 baseUrl 解析出的 host（解析失败回退原串），
   /// 与 model 以「|」连接。非敏感（加密节内已含各 API key，host|model
   /// 不新增暴露面）。
-  static String _llmKeyHintOf(String baseUrl, String model) {
-    final host = Uri.tryParse(baseUrl)?.host ?? '';
-    return '${host.isEmpty ? baseUrl : host}|$model';
+  static String _llmKeyHintOf(String baseUrl, String model) =>
+      '${_hostOf(baseUrl)}|$model';
+
+  /// 端点比对键：host + 显式端口。
+  ///
+  /// 与 [_hostOf] 分开是刻意的：`_hostOf` 是 `llm_api_key_hint` 的组成
+  /// 部分，属跨版本兼容字段，**不得改动**；而端点比对必须把「同 host 换了
+  /// 端口」视为变更 —— 不同端口可能是完全不同的服务，Key 一样会被发过去。
+  /// 未显式写端口时不含冒号，避免 `host` 与 `host:443` 误判为不同端点。
+  static String _endpointOf(String baseUrl) {
+    final trimmed = baseUrl.trim();
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || uri.host.isEmpty) {
+      return trimmed;
+    }
+    return uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
+  }
+
+  /// 从 baseUrl 解析 host；解析失败回退原串（保持 [_llmKeyHintOf] 的既有
+  /// 语义逐字符不变 —— hint 是跨版本兼容字段）。
+  static String _hostOf(String baseUrl) {
+    final trimmed = baseUrl.trim();
+    final host = Uri.tryParse(trimmed)?.host ?? '';
+    return host.isEmpty ? trimmed : host;
   }
 
   /// 读取当前生效 LLM 配置的 API Key（llm_api_key_{activeId}）；
@@ -856,17 +1025,128 @@ class BackupService {
 
   Future<void> _restoreSettings(Map<String, dynamic> items) async {
     final box = HiveBoxes.settings;
-    // 只删并重写白名单 key：排除 key（如本机 webdav_configs）原值保留，
-    // 恶意备份既不能注入外部服务端点，也不能借恢复清空设备配置。
-    for (final key in _settingsValueType.keys) {
-      await box.delete(key);
-    }
+
+    // 先规范化全部白名单内的值（类型不符跳过该 key，不毁整个恢复）。
+    final normalized = <String, Object>{};
     for (final entry in items.entries) {
       final expected = _settingsValueType[entry.key];
       if (expected == null) continue; // 白名单外：跳过
       final value = _normalizeSettingValue(entry.value, expected);
-      if (value == null) continue; // 类型不符：跳过该 key，不毁整个恢复
-      await box.put(entry.key, value);
+      if (value == null) continue; // 类型不符：跳过
+      normalized[entry.key] = value;
+    }
+
+    // LLM 一致性过滤：不落悬空 id / 坏结构（见 _filterLlmSettings）。
+    // 非 LLM key 原样透传。
+    final accepted = _filterLlmSettings(normalized);
+
+    // 只删「最终会被写入」的 key，而非遍历 items.keys 或全白名单：
+    // - 遍历全白名单 → 旧备份会抹掉本机新纳入的 LLM 配置；
+    // - 遍历 items.keys → 备份中结构不合格（如坏 llm_providers）或类型
+    //   不符的 key 被删后无写回，本机原值丢失。
+    // 语义：备份中**有效给出**的 key 以备份为准，其余保留本机。
+    for (final key in accepted.keys) {
+      await box.delete(key);
+    }
+    for (final entry in accepted.entries) {
+      await box.put(entry.key, entry.value);
+    }
+  }
+
+  /// LLM 相关 settings 的一致性过滤（加固，非安全边界 —— 安全边界是恢复前的
+  /// 端点确认框）。返回可落盘的子集；不合规的单个 key 跳过，不影响其余数据。
+  /// 非 LLM key 原样透传（本方法同时充当「写入集」的构造入口）。
+  ///
+  /// 运行时消费端已能容忍悬空（`providerIdForScenario` 返回 null、
+  /// `llmActiveProviderId` 自动回落、`_assembleLlmConfig` 对悬空 model 回落
+  /// 默认），此处过滤的目的是**不把垃圾落盘**，不是防崩溃。
+  Map<String, Object> _filterLlmSettings(Map<String, Object> values) {
+    // 非 LLM key 透传。
+    final out = <String, Object>{
+      for (final entry in values.entries)
+        if (!_isLlmSettingKey(entry.key)) entry.key: entry.value,
+    };
+
+    // 1. llm_providers：结构探测。区分「坏结构 → 跳过」与「合法空列表 → 放行」
+    //    （用户主动清空厂商列表必须能恢复）。
+    var providerIds = <String>{};
+    final rawProviders = values['llm_providers'];
+    if (rawProviders is String) {
+      final parsed = _tryParseProviderList(rawProviders);
+      if (parsed != null) {
+        out['llm_providers'] = rawProviders;
+        providerIds = parsed.map((c) => c.id).toSet();
+      }
+    }
+
+    // 2. legacy llm_base_url：仅校验合法性（丢弃 normalizeBaseUrl 返回值 ——
+    //    它会补 /v1 改变值；此处只判断抛不抛异常）。
+    final legacyBase = values['llm_base_url'];
+    if (legacyBase is String && _isValidBaseUrl(legacyBase)) {
+      out['llm_base_url'] = legacyBase;
+      // 3. legacy llm_model：仅在 base 也落盘时写入（孤立的 model 无意义）。
+      final legacyModel = values['llm_model'];
+      if (legacyModel is String) out['llm_model'] = legacyModel;
+    }
+
+    // 4. active 与场景绑定：值须 ∈ 本次落盘的厂商 id 集合。
+    final activeId = values['llm_active_provider_id'];
+    if (activeId is String && providerIds.contains(activeId)) {
+      out['llm_active_provider_id'] = activeId;
+    }
+    for (final scenario in LlmScenario.values) {
+      final boundId = values[scenario.settingsKey];
+      if (boundId is! String || !providerIds.contains(boundId)) continue;
+      out[scenario.settingsKey] = boundId;
+      // 5. 场景 model：仅在绑定也落盘时写入（boundId 已校验存在）。
+      final model = values[scenario.modelKey];
+      if (model is String) out[scenario.modelKey] = model;
+    }
+
+    return out;
+  }
+
+  /// 该 key 是否属于「受一致性过滤约束的 LLM 配置类 key」。
+  ///
+  /// 注意与 `llm_provider_name` / `llm_*_prompt` 区分：后者是纯展示名与
+  /// 提示词文本，不指向外部服务，不受过滤约束（照常透传）。
+  static bool _isLlmSettingKey(String key) {
+    if (key.startsWith('llm_provider_') || key.startsWith('llm_model_')) {
+      // llm_provider_name 是纯展示名，不是场景绑定 —— 透传。
+      return key != 'llm_provider_name';
+    }
+    return key == 'llm_providers' ||
+        key == 'llm_active_provider_id' ||
+        key == 'llm_base_url' ||
+        key == 'llm_model';
+  }
+
+  /// 结构探测 `llm_providers` 字符串：坏结构返回 null，合法（含空列表）
+  /// 返回配置列表。
+  ///
+  /// **不得**改用 `LlmProviderConfig.decodeList(...).isEmpty` 判定 ——
+  /// decodeList 对坏 JSON / 坏条目同样返回空列表（见其注释「坏数据回退空
+  /// 列表」），会与「用户主动清空厂商列表」混淆，导致清空操作恢复失效。
+  static List<LlmProviderConfig>? _tryParseProviderList(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return null;
+      return decoded
+          .map((e) => LlmProviderConfig.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on Object {
+      // TypeError 是 Error 不是 Exception，须捕 Object 兜全。
+      return null;
+    }
+  }
+
+  /// 校验 baseUrl 合法性；不改变值（规范化由写入侧负责）。
+  static bool _isValidBaseUrl(String raw) {
+    try {
+      LlmClient.normalizeBaseUrl(raw);
+      return true;
+    } on FormatException {
+      return false;
     }
   }
 
@@ -1504,4 +1784,53 @@ class BackupRestoreException implements Exception {
 
   @override
   String toString() => 'BackupRestoreException: $message';
+}
+
+/// 单条 LLM 端点变更（同 id 配置的 host 变化）。
+class LlmEndpointChange {
+  const LlmEndpointChange({
+    required this.label,
+    required this.from,
+    required this.to,
+  });
+
+  /// 配置显示名（name 为空时回落「配置 N」）。
+  final String label;
+
+  /// 本机 host。
+  final String from;
+
+  /// 备份 host。
+  final String to;
+
+  @override
+  String toString() => 'LlmEndpointChange($label: $from → $to)';
+}
+
+/// 备份与本机的 LLM 端点差异摘要（恢复前确认框的数据源）。
+///
+/// 只含 host，不含完整 URL —— 降低无谓的信息暴露，也避免长串撑爆弹框。
+class LlmEndpointChangeSet {
+  const LlmEndpointChangeSet({
+    required this.added,
+    required this.changed,
+    required this.removed,
+  });
+
+  /// 备份有、本机无的 host。
+  final List<String> added;
+
+  /// 同 id 但 host 变了的配置。
+  final List<LlmEndpointChange> changed;
+
+  /// 本机有、备份无的 host（信息性，不触发确认框）。
+  final List<String> removed;
+
+  /// 是否需要用户确认 —— 只有新增与变更构成外泄风险；移除不打扰用户。
+  bool get isEmpty => added.isEmpty && changed.isEmpty;
+
+  @override
+  String toString() =>
+      'LlmEndpointChangeSet(added: $added, changed: $changed, '
+      'removed: $removed)';
 }

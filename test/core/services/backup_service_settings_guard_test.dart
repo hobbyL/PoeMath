@@ -1,8 +1,13 @@
 // test/core/services/backup_service_settings_guard_test.dart
 //
-// BackupService settings 白名单防护测试（AC1–AC4）：
-// 恶意备份注入外部服务端点 key 不落盘、类型不符跳过、导出不含排除 key、
-// 正常旧备份兼容。
+// BackupService settings 白名单防护测试：
+// 排除 key（webdav_configs / tts_cloud_* / 凭据指纹类）不落盘、类型不符跳过、
+// 导出不含排除 key、正常旧备份兼容。
+//
+// 注：LLM 端点类 key（llm_providers / llm_active_provider_id / llm_base_url /
+// llm_model / 场景绑定）**已纳入**白名单（换机可用性），改由「恢复前地址变更
+// 确认框」承担 P1 补偿控制。其行为测试见
+// backup_service_llm_endpoint_test.dart，本文件只锁定仍被排除的 key。
 
 import 'dart:convert';
 
@@ -14,9 +19,11 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import '../../helpers/hive_test_helper.dart';
 
 /// 恶意备份中的注入 settings 节：外部服务端点 + 凭据绑定状态 key。
+///
+/// 本机预置同名 key 时，恢复后必须原样保留（这些仍是排除项）。
 Map<String, dynamic> _maliciousSettings() => <String, dynamic>{
       'theme_mode': 'dark',
-      // P1 注入目标：全部不应落盘。
+      // 仍被排除：不应落盘。
       'webdav_configs': jsonEncode([
         <String, dynamic>{
           'id': 'evil-1',
@@ -27,6 +34,17 @@ Map<String, dynamic> _maliciousSettings() => <String, dynamic>{
           'remotePath': '/steal',
         },
       ]),
+      'tts_cloud_base_url': 'http://attacker-tts.example.com',
+      'tts_cloud_enabled': true,
+      'tencent_asr_verified_at': DateTime(2030, 1, 1).toIso8601String(),
+      'worker_tts_verified_fingerprint': 'evil-fingerprint',
+    };
+
+/// 备份中的 LLM 端点 key（现纳入白名单）。
+///
+/// 恢复后会覆盖本机值 —— 这正是「恢复前确认框」要拦截的场景，
+/// 服务层本身照写（确认发生在 UI 层调用 recover 之前）。
+Map<String, dynamic> _llmEndpointSettings() => <String, dynamic>{
       'llm_base_url': 'https://attacker-llm.example.com',
       'llm_model': 'evil-model',
       'llm_providers': jsonEncode([
@@ -38,18 +56,12 @@ Map<String, dynamic> _maliciousSettings() => <String, dynamic>{
         },
       ]),
       'llm_active_provider_id': 'evil-p1',
-      // 场景级厂商绑定 key（LlmScenario.settingsKey）：值为
-      // llm_providers 条目 id，跨机迁移必然悬空，同样不应落盘。
       'llm_provider_word_problem': 'evil-p1',
       'llm_provider_poem_explain': 'evil-p1',
       'llm_provider_math_explain': 'evil-p1',
-      'tts_cloud_base_url': 'http://attacker-tts.example.com',
-      'tts_cloud_enabled': true,
-      'tencent_asr_verified_at': DateTime(2030, 1, 1).toIso8601String(),
-      'worker_tts_verified_fingerprint': 'evil-fingerprint',
     };
 
-/// 全量白名单 key 的合法 settings 节（AC4 正常旧备份）。
+/// 全量白名单 key 的合法 settings 节（正常旧备份）。
 Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       'theme_mode': 'light',
       'active_subject': 'math',
@@ -96,7 +108,7 @@ void main() {
   }
 
   test('AC1 注入测试：排除 key 不落盘且本机原值保留', () async {
-    // 本机已有真实的 webdav_configs / llm_base_url，恢复后必须原样保留。
+    // 本机已有真实值，恢复后必须原样保留（这些仍是排除项）。
     await HiveBoxes.settings.put(
       'webdav_configs',
       jsonEncode([
@@ -110,26 +122,6 @@ void main() {
         },
       ]),
     );
-    await HiveBoxes.settings
-        .put('llm_base_url', 'https://llm.local.example.com');
-    await HiveBoxes.settings.put(
-      'llm_providers',
-      jsonEncode([
-        <String, dynamic>{
-          'id': 'local-p1',
-          'name': '本地LLM',
-          'baseUrl': 'https://llm.local.example.com',
-          'model': 'local-model',
-        },
-      ]),
-    );
-    await HiveBoxes.settings.put('llm_active_provider_id', 'local-p1');
-    await HiveBoxes.settings.put(
-      'llm_provider_word_problem',
-      'local-p1',
-    );
-    await HiveBoxes.settings.put('llm_provider_poem_explain', 'local-p1');
-    await HiveBoxes.settings.put('llm_provider_math_explain', 'local-p1');
     await HiveBoxes.settings.put(
       'tts_cloud_base_url',
       'https://tts.cloudm.cc',
@@ -138,16 +130,6 @@ void main() {
 
     final before = {
       'webdav_configs': HiveBoxes.settings.get('webdav_configs'),
-      'llm_base_url': HiveBoxes.settings.get('llm_base_url'),
-      'llm_providers': HiveBoxes.settings.get('llm_providers'),
-      'llm_active_provider_id':
-          HiveBoxes.settings.get('llm_active_provider_id'),
-      'llm_provider_word_problem':
-          HiveBoxes.settings.get('llm_provider_word_problem'),
-      'llm_provider_poem_explain':
-          HiveBoxes.settings.get('llm_provider_poem_explain'),
-      'llm_provider_math_explain':
-          HiveBoxes.settings.get('llm_provider_math_explain'),
       'tts_cloud_base_url': HiveBoxes.settings.get('tts_cloud_base_url'),
       'tencent_asr_verified_at':
           HiveBoxes.settings.get('tencent_asr_verified_at'),
@@ -155,36 +137,6 @@ void main() {
 
     await backupService.restoreFromJson(
       await backupWithSettings(_maliciousSettings()),
-    );
-
-    // LLM 多配置 key 同样不落盘：本机 llm_providers / active id 原样
-    // 保留，恶意注入不生效（evil-p1 / attacker-llm 均未写入）。
-    expect(HiveBoxes.settings.get('llm_providers'), before['llm_providers']);
-    expect(
-      HiveBoxes.settings.get('llm_active_provider_id'),
-      before['llm_active_provider_id'],
-    );
-    expect(
-      HiveBoxes.settings.get('llm_providers') ?? '',
-      isNot(contains('evil-p1')),
-    );
-    expect(
-      HiveBoxes.settings.get('llm_active_provider_id'),
-      isNot('evil-p1'),
-    );
-
-    // 场景级厂商绑定 key：本机原值保留，恶意 id 不生效。
-    expect(
-      HiveBoxes.settings.get('llm_provider_word_problem'),
-      before['llm_provider_word_problem'],
-    );
-    expect(
-      HiveBoxes.settings.get('llm_provider_poem_explain'),
-      before['llm_provider_poem_explain'],
-    );
-    expect(
-      HiveBoxes.settings.get('llm_provider_math_explain'),
-      before['llm_provider_math_explain'],
     );
 
     // 本机原值保留，恶意注入未生效。
@@ -196,10 +148,6 @@ void main() {
     expect(
       jsonEncode(HiveBoxes.settings.get('webdav_configs') ?? ''),
       isNot(contains('injected-password')),
-    );
-    expect(
-      HiveBoxes.settings.get('llm_base_url'),
-      before['llm_base_url'],
     );
     expect(
       HiveBoxes.settings.get('tts_cloud_base_url'),
@@ -215,6 +163,52 @@ void main() {
     );
     // 白名单内 key 正常恢复。
     expect(HiveBoxes.settings.get('theme_mode'), 'dark');
+  });
+
+  test('LLM 端点 key：现纳入白名单，服务层照写（UI 层确认框负责拦截）', () async {
+    // 本机先有一条本地配置。
+    await HiveBoxes.settings.put(
+      'llm_providers',
+      jsonEncode([
+        <String, dynamic>{
+          'id': 'local-p1',
+          'name': '本地LLM',
+          'baseUrl': 'https://llm.local.example.com',
+          'model': 'local-model',
+        },
+      ]),
+    );
+    await HiveBoxes.settings.put('llm_active_provider_id', 'local-p1');
+
+    final maliciousJson = await backupWithSettings(_llmEndpointSettings());
+
+    // 预检须在恢复**之前**调用（与 UI 层调用顺序一致）：此时本机仍是
+    // 本地配置，备份的端点构成变更，确认框会弹出。
+    final changes = BackupService.detectLlmEndpointChanges(maliciousJson);
+    expect(changes, isNotNull);
+    expect(changes!.isEmpty, isFalse, reason: '恢复前应检出端点变更');
+    // 本机 id=local-p1、备份 id=evil-p1 —— id 不同，归入 added。
+    expect(changes.added, contains('attacker-llm.example.com'));
+
+    await backupService.restoreFromJson(maliciousJson);
+
+    // 备份值覆盖本机 —— 这是刻意的行为变更：P1 防护由恢复前确认框承担，
+    // 服务层不再静默拒绝（否则换机恢复 LLM 配置将不可用）。
+    expect(
+      HiveBoxes.settings.get('llm_providers'),
+      contains('attacker-llm.example.com'),
+    );
+    expect(HiveBoxes.settings.get('llm_active_provider_id'), 'evil-p1');
+    expect(
+      HiveBoxes.settings.get('llm_provider_word_problem'),
+      'evil-p1',
+    );
+    // legacy 字段仅在校验通过时落盘（合法 https）。
+    expect(
+      HiveBoxes.settings.get('llm_base_url'),
+      'https://attacker-llm.example.com',
+    );
+    expect(HiveBoxes.settings.get('llm_model'), 'evil-model');
   });
 
   test('AC2 类型测试：类型不符的 key 跳过，int 语速规范化为 double', () async {
@@ -308,13 +302,6 @@ void main() {
     expect(settings.keys, contains('theme_mode'));
     const excluded = <String>{
       'webdav_configs',
-      'llm_providers',
-      'llm_active_provider_id',
-      'llm_provider_word_problem',
-      'llm_provider_poem_explain',
-      'llm_provider_math_explain',
-      'llm_base_url',
-      'llm_model',
       'tts_cloud_base_url',
       'tts_cloud_enabled',
       'tts_cloud_voice',
@@ -325,6 +312,20 @@ void main() {
     };
     for (final key in excluded) {
       expect(settings.containsKey(key), isFalse, reason: '排除 key 不应导出: $key');
+    }
+
+    // LLM 端点 key 现**应**导出（换机可用性），P1 由恢复前确认框承担。
+    const included = <String>{
+      'llm_providers',
+      'llm_active_provider_id',
+      'llm_base_url',
+      'llm_model',
+      'llm_provider_word_problem',
+      'llm_provider_poem_explain',
+      'llm_provider_math_explain',
+    };
+    for (final key in included) {
+      expect(settings.containsKey(key), isTrue, reason: 'LLM key 应导出: $key');
     }
   });
 
@@ -403,8 +404,13 @@ void main() {
     expect(HiveBoxes.settings.get('reminder_hour'), 7);
     expect(HiveBoxes.settings.get('reminder_minute'), 30);
     expect(HiveBoxes.settings.get('weekly_report_enabled'), isTrue);
-    // 排除 key 跳过。
-    expect(HiveBoxes.settings.get('llm_base_url'), isNull);
+    // 仍被排除的 key 跳过。
+    expect(HiveBoxes.settings.get('webdav_configs'), isNull);
+    // LLM 端点 key 现随备份还原（legacy 字段合法 https → 落盘）。
+    expect(
+      HiveBoxes.settings.get('llm_base_url'),
+      'https://old-llm.example.com',
+    );
   });
 
   test('导出往返：白名单 key 经导出 → 清空 → 恢复全部还原', () async {

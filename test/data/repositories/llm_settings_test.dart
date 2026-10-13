@@ -641,11 +641,12 @@ void main() {
       expect(config, isNull);
     });
 
-    test('场景绑定不随备份导出（设备绑定）', () async {
+    test('场景绑定随备份导出（换机恢复场景选择）', () async {
       await saveTwo();
-      await repository.setProviderIdForScenario(LlmScenario.poemExplain, 'p2');
-      await repository.setProviderIdForScenario(LlmScenario.mathExplain, 'p1');
-      await repository.setProviderIdForScenario(LlmScenario.wordProblem, 'p1');
+      // 全部场景绑定到 p2，逐场景断言导出值。
+      for (final scenario in LlmScenario.values) {
+        await repository.setProviderIdForScenario(scenario, 'p2');
+      }
 
       final exported =
           await BackupService(secureStore: credentialStore).exportToJson();
@@ -654,8 +655,13 @@ void main() {
       for (final scenario in LlmScenario.values) {
         expect(
           settingsNode.containsKey(scenario.settingsKey),
-          isFalse,
-          reason: '场景 key 不应导出: ${scenario.settingsKey}',
+          isTrue,
+          reason: '场景 key 应随备份导出: ${scenario.settingsKey}',
+        );
+        expect(
+          settingsNode[scenario.settingsKey],
+          'p2',
+          reason: '场景绑定值应导出: ${scenario.settingsKey}',
         );
       }
     });
@@ -684,19 +690,26 @@ void main() {
   });
 
   test(
-      '备份导出：不含 llm_providers / active id / Key 明文；'
-      '凭据白名单维持单 llm_api_key', () async {
+      '备份导出：含 llm_providers / active id（换机可用），'
+      '但不含 Key 明文；凭据白名单维持单 llm_api_key', () async {
     await saveTwo();
 
     final backup = BackupService(secureStore: credentialStore);
     final exported = await backup.exportToJson(passphrase: 'pw');
 
+    // API Key 明文永不入备份（只在加密凭据节内）。
     expect(exported, isNot(contains('key-p1')));
     expect(exported, isNot(contains('key-p2')));
+
+    // LLM 端点配置随备份迁移 —— 换机后 Key 才有投递目标。
+    // P1 补偿控制：恢复前的地址变更确认框（见 backup_service.dart
+    // detectLlmEndpointChanges 与 llm_endpoint_confirm_dialog.dart）。
     final settingsNode = (jsonDecode(exported)
         as Map<String, dynamic>)['settings'] as Map<String, dynamic>;
-    expect(settingsNode.containsKey('llm_providers'), isFalse);
-    expect(settingsNode.containsKey('llm_active_provider_id'), isFalse);
+    expect(settingsNode.containsKey('llm_providers'), isTrue);
+    expect(settingsNode.containsKey('llm_active_provider_id'), isTrue);
+    // baseUrl 随 llm_providers 一并迁移。
+    expect(exported, contains('dashscope.example.com'));
 
     // 凭据加密节维持单 llm_api_key 条目语义。
     expect(kBackupCredentialKeys, contains('llm_api_key'));
@@ -775,13 +788,13 @@ void main() {
     expect(await repository.readLlmApiKeyFor('p2'), 'key-p2');
   });
 
-  test('备份恢复（hint 匹配）：本机无匹配配置时 key 丢弃', () async {
+  test('备份恢复（hint 匹配）：厂商配置随备份还原，key 落到还原后的槽位', () async {
     // 导出机：p1（DeepSeek）为 active 且带 key。
     await saveTwo();
     final exported = await BackupService(secureStore: credentialStore)
         .exportToJson(passphrase: 'pw');
 
-    // 恢复到「无匹配配置」机：只有地址/模型不同的 p9，active 指向它。
+    // 恢复到「地址/模型都不同」的机器：只有 p9。
     await tearDownHiveForTesting();
     await setUpHiveForTesting();
     final freshStore = _MemoryCredentialStore();
@@ -797,9 +810,49 @@ void main() {
     await BackupService(secureStore: freshStore)
         .restoreFromJson(exported, passphrase: 'pw');
 
-    // hint 匹配不到任何本机配置：key 丢弃，p9 的 Key 不被污染。
+    // 行为变更：llm_providers 现随备份迁移，恢复后本机已有 p1/p2，
+    // hint 因此能匹配到 p1，key 落到还原后的 p1 槽位（这正是「换机后
+    // AI 立即可用」的目标）。p9 未被污染。
+    expect(freshStore.llmApiKeysByConfigId['p1'], 'key-p1');
     expect(freshStore.llmApiKeysByConfigId['p9'], isNull);
-    expect(freshStore.llmApiKeysByConfigId.length, 0);
+    // 还原后的本机配置含备份的两条。
+    expect(
+      freshRepo.llmProviders.map((c) => c.id),
+      containsAll(<String>['p1', 'p2']),
+    );
+  });
+
+  test('备份恢复（hint 匹配）：厂商配置被过滤丢弃时 key 一并丢弃', () async {
+    // 同上场景，但备份的 llm_providers 结构损坏 → 该 key 被一致性过滤跳过，
+    // 本机仍只有 p9，hint 匹配不到 → key 丢弃（不污染 p9）。
+    await saveTwo();
+    final exported = await BackupService(secureStore: credentialStore)
+        .exportToJson(passphrase: 'pw');
+    // 定向破坏 llm_providers 的结构（改成 JSON 对象，非数组）——
+    // 走 JSON 层操作，避免字符串替换因缩进/转义失配而静默失效。
+    final node = jsonDecode(exported) as Map<String, dynamic>;
+    (node['settings'] as Map<String, dynamic>)['llm_providers'] = '{"a":1}';
+    final broken = jsonEncode(node);
+
+    await tearDownHiveForTesting();
+    await setUpHiveForTesting();
+    final freshStore = _MemoryCredentialStore();
+    final freshRepo = SettingsRepository(credentialStore: freshStore);
+    await freshRepo.saveLlmProviderConfig(
+      id: 'p9',
+      name: 'Other',
+      baseUrl: 'https://other.example.com',
+      model: 'other-model',
+      apiKey: '',
+    );
+
+    await BackupService(secureStore: freshStore)
+        .restoreFromJson(broken, passphrase: 'pw');
+
+    // llm_providers 未被采用（坏结构跳过）→ 本机仍只有 p9。
+    expect(freshRepo.llmProviders.map((c) => c.id), <String>['p9']);
+    // hint 匹配不到 → key 丢弃，不污染 p9。
+    expect(freshStore.llmApiKeysByConfigId['p9'], isNull);
   });
 
   test(
