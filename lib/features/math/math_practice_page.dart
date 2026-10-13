@@ -119,7 +119,11 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   /// 每答一题后同步更新 Hive，确保数据立即持久化。
   ///
-  /// Hive put() 的内存写入是同步的，后续 provider 读取立刻可见。
+  /// 「同步」在这里指**内存可见性**，不是落盘完成：Hive 的 `put()` 会
+  /// 同步写入内存中的 box，随后任何 provider/仓储读取立刻看到新值。
+  /// 磁盘 flush 是异步的，因此这里刻意不 `await` —— 等待 flush 会阻塞
+  /// 答题主流程，而内存值已足够保证「同一次会话内读到自己的写入」。
+  /// 进程被系统杀掉时最多丢失最后一次 flush 之前的数据，属可接受代价。
   void _persistProgress({required bool isCorrect}) {
     final answered = ref.read(mathAnsweredCountProvider);
     final correctCount = ref.read(mathCorrectCountProvider);

@@ -14,6 +14,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 
 class MathSessionDetailPage extends ConsumerWidget {
   const MathSessionDetailPage({super.key, required this.session});
@@ -44,13 +45,12 @@ class MathSessionDetailPage extends ConsumerWidget {
 
     // 用时格式化
     final dur = session.durationSeconds;
-    final durStr =
-        dur >= 60 ? '${dur ~/ 60}分${dur % 60}秒' : '$dur秒';
+    final durStr = dur >= 60 ? '${dur ~/ 60}分${dur % 60}秒' : '$dur秒';
 
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = _responsiveColumns(constraints.maxWidth);
+          final columns = ResponsiveLayout.columns(constraints.maxWidth);
 
           return CustomScrollView(
             slivers: [
@@ -99,7 +99,8 @@ class MathSessionDetailPage extends ConsumerWidget {
                       ],
                     ),
                   ),
-                ).animate()
+                )
+                    .animate()
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1, end: 0, duration: 400.ms),
               ),
@@ -123,8 +124,7 @@ class MathSessionDetailPage extends ConsumerWidget {
                     horizontal: SpacingTokens.md,
                   ),
                   sliver: SliverList.builder(
-                    itemCount:
-                        (records.length + columns - 1) ~/ columns,
+                    itemCount: (records.length + columns - 1) ~/ columns,
                     itemBuilder: (context, rowIndex) {
                       final start = rowIndex * columns;
                       final rowWidgets = <Widget>[];
@@ -158,8 +158,7 @@ class MathSessionDetailPage extends ConsumerWidget {
                             ),
                           );
                         } else {
-                          rowWidgets
-                              .add(const Expanded(child: SizedBox()));
+                          rowWidgets.add(const Expanded(child: SizedBox()));
                         }
                       }
                       return Padding(
@@ -168,8 +167,7 @@ class MathSessionDetailPage extends ConsumerWidget {
                         ),
                         child: IntrinsicHeight(
                           child: Row(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.stretch,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: rowWidgets,
                           ),
                         ),
@@ -185,11 +183,6 @@ class MathSessionDetailPage extends ConsumerWidget {
   }
 
   /// 根据可用宽度计算列数。
-  static int _responsiveColumns(double width) {
-    if (width >= 900) return 3;
-    if (width >= 600) return 2;
-    return 1;
-  }
 }
 
 class _SummaryItem extends StatelessWidget {
@@ -258,9 +251,8 @@ class _ProblemRow extends ConsumerWidget {
     final canNavigate = mistakeId != null;
 
     // 参考 _SessionCard 配色：用 primary/tertiary 做主视觉
-    final statusColor = isCorrect
-        ? theme.colorScheme.tertiary
-        : theme.colorScheme.primary;
+    final statusColor =
+        isCorrect ? theme.colorScheme.tertiary : theme.colorScheme.primary;
 
     return GestureDetector(
       onTap: canNavigate

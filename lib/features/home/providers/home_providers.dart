@@ -9,28 +9,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/user_stats.dart';
-import 'package:poemath/data/repositories/achievement_repository.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/challenge_record_repository.dart';
-import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/math_session_repository.dart';
 import 'package:poemath/data/repositories/poem_progress_repository.dart';
 import 'package:poemath/data/repositories/poem_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
-import 'package:poemath/data/repositories/user_stats_repository.dart';
 
 // ============ Repositories ============
+//
+// 这三个仓库的 Provider 归 `data/providers/repository_providers.dart` 统一管理。
+// 本文件曾各自再定义一份同类型 Provider，导致 test 里覆写其中一个、实际读取
+// 另一个（obvious 的类型相同但实例不同）。此处只做转发，保持既有引用可编译，
+// 但**所有实例只有一个来源**，覆写任一名即生效。
+//
+// 新代码请直接用 `repository_providers.dart` 的 `xxxRepositoryProvider`。
 
-final checkInRepoProvider = Provider<CheckInRepository>((ref) {
-  return CheckInRepository();
-});
+final checkInRepoProvider = checkInRepositoryProvider;
 
-final userStatsRepoProvider = Provider<UserStatsRepository>((ref) {
-  return UserStatsRepository();
-});
+final userStatsRepoProvider = userStatsRepositoryProvider;
 
-final achievementRepoProvider = Provider<AchievementRepository>((ref) {
-  return AchievementRepository();
-});
+final achievementRepoProvider = achievementRepositoryProvider;
 
 // ============ 日期失效源 ============
 

@@ -87,6 +87,12 @@ class _WordProblemPracticePageState
   }
 
   /// 每答一题后同步写 Hive（MathSession 同 ID 覆盖 + userStats 增量）。
+  ///
+  /// 「同步」指内存可见性而非落盘：Hive `put()` 同步更新内存中的 box，
+  /// 之后的读取（含刚 `invalidate` 的 provider）立即拿到新值。磁盘 flush
+  /// 异步进行，这里刻意不 `await`，避免拖慢答题；代价是进程被强杀时可能
+  /// 丢掉最后一次 flush 之前的数据。真正需要「写完再读」的路径（如
+  /// 错题记录）另见 `_recordMistake`，那里是 `await` 后才 invalidate。
   void _persistProgress({required bool isCorrect}) {
     final answered = _currentIndex + 1;
     final duration = DateTime.now().difference(_startTime).inSeconds;

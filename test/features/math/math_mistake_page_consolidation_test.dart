@@ -27,6 +27,10 @@ class _FakeMistakeRepo extends MathMistakeRepository {
   int get totalCount => _mistakes.length;
 }
 
+/// 当天零点。取一次「现在」后归一化到日期字段构造，
+/// 相比 `DateTime.now().subtract(Duration(days: n))` 在 DST 切换日仍能拿到
+/// 正确的日历日期（一天不总是 24 小时）。调用方须只用其结果，不要再单独
+/// 调 `DateTime.now()` 做对比——那会引入跨午夜漂移。
 DateTime _today() {
   final now = DateTime.now();
   return DateTime(now.year, now.month, now.day);

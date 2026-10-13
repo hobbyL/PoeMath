@@ -49,7 +49,10 @@ void main() {
   });
 
   test('今日口算题量合并普通练习与限时挑战', () async {
+    // 记录时间戳取「今天零点 + 1 小时」，仍属今日但不贴近午夜，
+    // 避免恰跨午夜时被今日过滤条件排除。
     final now = DateTime.now();
+    final stamp = DateTime(now.year, now.month, now.day, 1);
     await HiveBoxes.mathSessions.put(
       'default_session',
       MathSession(
@@ -59,7 +62,7 @@ void main() {
         problemType: 'mixed',
         totalProblems: 8,
         correctCount: 7,
-        finishedAt: now,
+        finishedAt: stamp,
       ),
     );
     await HiveBoxes.challengeRecords.put(
@@ -76,7 +79,7 @@ void main() {
         semester: '上',
         difficulty: 'medium',
         durationSeconds: 60,
-        createdAt: now,
+        createdAt: stamp,
       ),
     );
 

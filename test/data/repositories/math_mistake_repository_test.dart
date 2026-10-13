@@ -460,6 +460,10 @@ void main() {
 }
 
 /// 当天零点（与仓储内 nextConsolidationDate 的构造口径一致）。
+///
+/// 取「现在」后立即归一化到零点：`DateTime(now.year, now.month, now.day)`
+/// 只用到日期部分，午夜边界不会让结果漂移；真正的风险是调用方在此之后
+/// 又自行调用 `DateTime.now()` 做对比。
 DateTime _today() {
   final now = DateTime.now();
   return DateTime(now.year, now.month, now.day);

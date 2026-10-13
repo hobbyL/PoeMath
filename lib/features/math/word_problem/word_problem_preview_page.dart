@@ -86,6 +86,21 @@ class _WordProblemPreviewPageState
 
   int get _selectedCount => _selected.values.where((v) => v).length;
 
+  /// 上一条 batchId 的微秒值，用于同微秒连点时的自增兜底。
+  int _lastBatchMicros = 0;
+
+  /// 产出严格递增的 batchId。
+  ///
+  /// 纯微秒时间戳在同一微秒内两次调用会得到相同值，那会把两批题合并成
+  /// 一批（按批删除/筛选随之混淆）。这里保证单调递增，最多用 future
+  /// 偏移 1 微秒，实际可忽略。
+  String _nextBatchId(DateTime now) {
+    var micros = now.microsecondsSinceEpoch;
+    if (micros <= _lastBatchMicros) micros = _lastBatchMicros + 1;
+    _lastBatchMicros = micros;
+    return micros.toString();
+  }
+
   Future<void> _confirm() async {
     if (_saving || _selectedCount == 0) return;
     setState(() => _saving = true);
@@ -93,7 +108,9 @@ class _WordProblemPreviewPageState
     final now = DateTime.now();
     // 用微秒时间戳：同毫秒连续确认两批会合并批次，按批删除/筛选混淆。
     // 与下方 id（已用微秒）保持一致；存量毫秒 batchId 天然是不同 key，无需迁移。
-    final batchId = now.microsecondsSinceEpoch.toString();
+    // 跨批唯一性由 `_lastBatchId` 自增兜底：同一微秒内连续两批（测试或
+    // 极快的两次点击）不会再拿到同一个 batchId。
+    final batchId = _nextBatchId(now);
     final profileId = ProfileScope.currentId;
 
     final problems = <LlmProblem>[];

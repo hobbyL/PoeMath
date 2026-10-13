@@ -28,6 +28,10 @@ class _FakeCheckInRepo extends CheckInRepository {
   CheckIn? getToday() => today;
 }
 
+/// 生产实现 `_todayKey()` 的等价副本（同格式、同口径）。
+///
+/// 断言「provider 初始值 == 今日」需要按同一时钟取值；若两端分别调
+/// `DateTime.now()`，跨午夜瞬间会得到不同日期。基准在一次测试内只取一次。
 String todayKey() {
   final now = DateTime.now();
   return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';

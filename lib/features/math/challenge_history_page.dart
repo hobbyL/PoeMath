@@ -12,6 +12,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/repositories/challenge_record_repository.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 
 class ChallengeHistoryPage extends ConsumerWidget {
   const ChallengeHistoryPage({super.key});
@@ -25,7 +26,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = _responsiveColumns(constraints.maxWidth);
+          final columns = ResponsiveLayout.columns(constraints.maxWidth);
 
           return records.isEmpty
               ? CustomScrollView(
@@ -90,8 +91,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
                         vertical: SpacingTokens.sm,
                       ),
                       sliver: SliverList.builder(
-                        itemCount:
-                            (records.length + columns - 1) ~/ columns,
+                        itemCount: (records.length + columns - 1) ~/ columns,
                         itemBuilder: (context, rowIndex) {
                           final start = rowIndex * columns;
                           final rowWidgets = <Widget>[];
@@ -121,8 +121,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
                                 ),
                               );
                             } else {
-                              rowWidgets
-                                  .add(const Expanded(child: SizedBox()));
+                              rowWidgets.add(const Expanded(child: SizedBox()));
                             }
                           }
                           return Padding(
@@ -131,8 +130,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
                             ),
                             child: IntrinsicHeight(
                               child: Row(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: rowWidgets,
                               ),
                             ),
@@ -228,11 +226,6 @@ class ChallengeHistoryPage extends ConsumerWidget {
   }
 
   /// 根据可用宽度计算列数。
-  static int _responsiveColumns(double width) {
-    if (width >= 900) return 3;
-    if (width >= 600) return 2;
-    return 1;
-  }
 }
 
 class _RecordCard extends StatelessWidget {
@@ -275,9 +268,7 @@ class _RecordCard extends StatelessWidget {
 
     // 用时格式化
     final dur = record.durationSeconds;
-    final durStr = dur >= 60
-        ? '${dur ~/ 60}分${dur % 60}秒'
-        : '$dur秒';
+    final durStr = dur >= 60 ? '${dur ~/ 60}分${dur % 60}秒' : '$dur秒';
 
     return ColoredCard(
       color: theme.colorScheme.primary,
@@ -313,8 +304,7 @@ class _RecordCard extends StatelessWidget {
                   vertical: SpacingTokens.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary
-                      .withValues(alpha: 0.12),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(
                     SpacingTokens.radiusSmall,
                   ),
@@ -334,8 +324,7 @@ class _RecordCard extends StatelessWidget {
                   vertical: SpacingTokens.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.tertiary
-                      .withValues(alpha: 0.12),
+                  color: theme.colorScheme.tertiary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(
                     SpacingTokens.radiusSmall,
                   ),
@@ -373,8 +362,7 @@ class _RecordCard extends StatelessWidget {
               // 答题
               _StatItem(
                 label: '答题',
-                value:
-                    '${record.correctCount}/${record.totalAnswered}',
+                value: '${record.correctCount}/${record.totalAnswered}',
                 color: accuracyColor,
               ),
               const SizedBox(width: SpacingTokens.lg),

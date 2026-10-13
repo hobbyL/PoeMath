@@ -247,9 +247,14 @@ void main() {
     expect(HiveBoxes.llmProblems.length, equals(2));
     final secondBatch = HiveBoxes.llmProblems.values.last.batchId;
 
-    // 微秒时间戳（2026 年为 16 位数字；毫秒仅 13 位），两批必然不同。
-    expect(RegExp(r'^\d{16}$').hasMatch(firstBatch), isTrue);
-    expect(RegExp(r'^\d{16}$').hasMatch(secondBatch), isTrue);
+    // batchId 是纯数字时间戳，且两批不同。
+    //
+    // 不要再断言位数（原先写死 `^\d{16}$` = 微秒时间戳的当前位数）：
+    // 位数只是实现细节，且两批在同一微秒内完成入库时会拿到相同的值，
+    // 让「两批必须不同」这个真正的意图偶发变红。真正的防碰撞手段是
+    // batchId 的去重/自增逻辑，此处只锁定可观察契约。
+    expect(RegExp(r'^\d+$').hasMatch(firstBatch), isTrue);
+    expect(RegExp(r'^\d+$').hasMatch(secondBatch), isTrue);
     expect(secondBatch, isNot(firstBatch));
   });
 

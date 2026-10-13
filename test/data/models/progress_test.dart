@@ -37,7 +37,8 @@ void main() {
       final schedule = ReviewSchedule(
         poemId: 'poem_001',
         profileId: 'default',
-        nextReviewDate: DateTime.now(),
+        // 固定初始复习日：本用例只校验轮次推进，不关心「现在」。
+        nextReviewDate: DateTime(2026, 10, 13),
       );
 
       expect(schedule.currentRound, 0);
@@ -53,7 +54,8 @@ void main() {
       final schedule = ReviewSchedule(
         poemId: 'poem_001',
         profileId: 'default',
-        nextReviewDate: DateTime.now(),
+        // 固定初始复习日：本用例只校验轮次推进，不关心「现在」。
+        nextReviewDate: DateTime(2026, 10, 13),
       );
 
       for (int i = 0; i < 5; i++) {

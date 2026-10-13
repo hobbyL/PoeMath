@@ -13,6 +13,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/poem_card.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 
 class PoemTabPage extends ConsumerStatefulWidget {
   const PoemTabPage({super.key});
@@ -121,7 +122,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = _responsiveColumns(constraints.maxWidth);
+          final columns = ResponsiveLayout.columns(constraints.maxWidth);
           return CustomScrollView(
             slivers: [
               // ============ AppBar（精简版） ============
@@ -130,16 +131,14 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                 snap: true,
                 automaticallyImplyLeading: false,
                 leading: IconButton(
-                  onPressed: () =>
-                      context.push(AppRoutes.poemLearningPath),
+                  onPressed: () => context.push(AppRoutes.poemLearningPath),
                   icon: const Icon(Icons.route_rounded),
                   tooltip: '学习路径',
                 ),
                 title: Text('诗词(${poems.length})'),
                 actions: [
                   IconButton(
-                    onPressed: () =>
-                        context.push(AppRoutes.poemFavorites),
+                    onPressed: () => context.push(AppRoutes.poemFavorites),
                     icon: const Icon(Icons.favorite_border),
                     tooltip: '我的收藏',
                   ),
@@ -199,8 +198,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                     vertical: SpacingTokens.sm,
                   ).copyWith(bottom: 100),
                   sliver: SliverGrid(
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: columns,
                       crossAxisSpacing: SpacingTokens.sm,
                       mainAxisSpacing: SpacingTokens.sm,
@@ -209,8 +207,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final poem = poems[index];
-                        final isFav =
-                            ref.watch(isFavoriteProvider(poem.id));
+                        final isFav = ref.watch(isFavoriteProvider(poem.id));
                         final progress =
                             ref.watch(poemProgressProvider(poem.id));
                         return PoemCard(
@@ -255,12 +252,10 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
 
     // 根据选中年级联动计算可选作者/朝代
     final repo = ref.read(poemRepoProvider);
-    final gradePoems = _localGrade != null
-        ? repo.byGrade(_localGrade!)
-        : repo.getAll();
+    final gradePoems =
+        _localGrade != null ? repo.byGrade(_localGrade!) : repo.getAll();
     final authors = gradePoems.map((p) => p.author).toSet().toList()..sort();
-    final dynasties = gradePoems.map((p) => p.dynasty).toSet().toList()
-      ..sort();
+    final dynasties = gradePoems.map((p) => p.dynasty).toSet().toList()..sort();
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -332,8 +327,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                       current: _localAuthor,
                       items: authors,
                       allLabel: '全部作者',
-                      onChanged: (v) =>
-                          setState(() => _localAuthor = v),
+                      onChanged: (v) => setState(() => _localAuthor = v),
                     ),
                   );
                   final dynastyTile = _buildDropdownTile(
@@ -345,8 +339,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                       current: _localDynasty,
                       items: dynasties,
                       allLabel: '全部朝代',
-                      onChanged: (v) =>
-                          setState(() => _localDynasty = v),
+                      onChanged: (v) => setState(() => _localDynasty = v),
                     ),
                   );
 
@@ -435,11 +428,9 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   void _invalidateLinkedFilters() {
     if (_localAuthor == null && _localDynasty == null) return;
     final repo = ref.read(poemRepoProvider);
-    final poems = _localGrade != null
-        ? repo.byGrade(_localGrade!)
-        : repo.getAll();
-    if (_localAuthor != null &&
-        !poems.any((p) => p.author == _localAuthor)) {
+    final poems =
+        _localGrade != null ? repo.byGrade(_localGrade!) : repo.getAll();
+    if (_localAuthor != null && !poems.any((p) => p.author == _localAuthor)) {
       _localAuthor = null;
     }
     if (_localDynasty != null &&
@@ -729,9 +720,4 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   }
 
   /// 根据可用宽度计算列数。
-  static int _responsiveColumns(double width) {
-    if (width >= 900) return 3;
-    if (width >= 600) return 2;
-    return 1;
-  }
 }

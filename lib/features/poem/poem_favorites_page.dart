@@ -13,6 +13,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/poem_card.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 
 class PoemFavoritesPage extends ConsumerWidget {
   const PoemFavoritesPage({super.key});
@@ -28,7 +29,7 @@ class PoemFavoritesPage extends ConsumerWidget {
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = _responsiveColumns(constraints.maxWidth);
+          final columns = ResponsiveLayout.columns(constraints.maxWidth);
           return CustomScrollView(
             slivers: [
               SliverAppBar(
@@ -46,8 +47,8 @@ class PoemFavoritesPage extends ConsumerWidget {
                         Icon(
                           Icons.favorite_border,
                           size: 64,
-                          color: theme.colorScheme.primary
-                              .withValues(alpha: 0.3),
+                          color:
+                              theme.colorScheme.primary.withValues(alpha: 0.3),
                         ),
                         const SizedBox(height: SpacingTokens.md),
                         Text(
@@ -95,8 +96,8 @@ class PoemFavoritesPage extends ConsumerWidget {
                           poem: poem,
                           isFavorite: isFav,
                           learningStatus: status,
-                          onTap: () => context
-                              .push(AppRoutes.poemDetailOf(poem.id)),
+                          onTap: () =>
+                              context.push(AppRoutes.poemDetailOf(poem.id)),
                         )
                             .animate()
                             .fadeIn(
@@ -119,11 +120,5 @@ class PoemFavoritesPage extends ConsumerWidget {
         },
       ),
     );
-  }
-
-  static int _responsiveColumns(double width) {
-    if (width >= 900) return 3;
-    if (width >= 600) return 2;
-    return 1;
   }
 }

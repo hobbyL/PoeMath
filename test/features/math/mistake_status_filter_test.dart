@@ -23,6 +23,8 @@ class _FakeMistakeRepo extends MathMistakeRepository {
       _mistakes.where((m) => !m.isResolved).toList();
 }
 
+/// 当天零点。口径同 math_mistake_page_consolidation_test：日期字段构造，
+/// DST 安全；调用方不要再自行取 `DateTime.now()` 对比。
 DateTime _today() {
   final now = DateTime.now();
   return DateTime(now.year, now.month, now.day);

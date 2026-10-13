@@ -13,6 +13,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 
 class MathHistoryPage extends ConsumerWidget {
   const MathHistoryPage({super.key});
@@ -26,7 +27,7 @@ class MathHistoryPage extends ConsumerWidget {
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = _responsiveColumns(constraints.maxWidth);
+          final columns = ResponsiveLayout.columns(constraints.maxWidth);
 
           return sessions.isEmpty
               ? CustomScrollView(
@@ -82,8 +83,7 @@ class MathHistoryPage extends ConsumerWidget {
                         vertical: SpacingTokens.sm,
                       ),
                       sliver: SliverList.builder(
-                        itemCount:
-                            (sessions.length + columns - 1) ~/ columns,
+                        itemCount: (sessions.length + columns - 1) ~/ columns,
                         itemBuilder: (context, rowIndex) {
                           final start = rowIndex * columns;
                           final rowWidgets = <Widget>[];
@@ -103,8 +103,7 @@ class MathHistoryPage extends ConsumerWidget {
                                       AppRoutes.mathSessionDetail,
                                       extra: session,
                                     ),
-                                    child:
-                                        _SessionCard(session: session),
+                                    child: _SessionCard(session: session),
                                   )
                                       .animate()
                                       .fadeIn(
@@ -120,8 +119,7 @@ class MathHistoryPage extends ConsumerWidget {
                                 ),
                               );
                             } else {
-                              rowWidgets
-                                  .add(const Expanded(child: SizedBox()));
+                              rowWidgets.add(const Expanded(child: SizedBox()));
                             }
                           }
                           return Padding(
@@ -130,8 +128,7 @@ class MathHistoryPage extends ConsumerWidget {
                             ),
                             child: IntrinsicHeight(
                               child: Row(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: rowWidgets,
                               ),
                             ),
@@ -147,11 +144,6 @@ class MathHistoryPage extends ConsumerWidget {
   }
 
   /// 根据可用宽度计算列数。
-  static int _responsiveColumns(double width) {
-    if (width >= 900) return 3;
-    if (width >= 600) return 2;
-    return 1;
-  }
 }
 
 class _SessionCard extends StatelessWidget {
@@ -192,120 +184,115 @@ class _SessionCard extends StatelessWidget {
 
     // 用时格式化
     final dur = session.durationSeconds;
-    final durStr = dur >= 60
-        ? '${dur ~/ 60}分${dur % 60}秒'
-        : '$dur秒';
+    final durStr = dur >= 60 ? '${dur ~/ 60}分${dur % 60}秒' : '$dur秒';
 
     return ColoredCard(
       color: theme.colorScheme.primary,
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 标题行：年级 + 时间
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpacingTokens.sm,
-                    vertical: SpacingTokens.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary
-                        .withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(
-                      SpacingTokens.radiusSmall,
-                    ),
-                  ),
-                  child: Text(
-                    '${session.grade}年级$semesterLabel',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标题行：年级 + 时间
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.sm,
+                  vertical: SpacingTokens.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(
+                    SpacingTokens.radiusSmall,
                   ),
                 ),
-                const SizedBox(width: SpacingTokens.xs),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpacingTokens.sm,
-                    vertical: SpacingTokens.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.tertiary
-                        .withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(
-                      SpacingTokens.radiusSmall,
-                    ),
-                  ),
-                  child: Text(
-                    difficultyLabel,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.tertiary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                child: Text(
+                  '${session.grade}年级$semesterLabel',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  timeStr,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: SpacingTokens.xs),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.sm,
+                  vertical: SpacingTokens.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.tertiary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(
+                    SpacingTokens.radiusSmall,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: SpacingTokens.sm),
+                child: Text(
+                  difficultyLabel,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.tertiary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                timeStr,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.sm),
 
-            // 统计行
-            Row(
-              children: [
-                // 正确率
-                _StatItem(
-                  label: '正确率',
-                  value: '$accuracyPct%',
-                  color: accuracyColor,
+          // 统计行
+          Row(
+            children: [
+              // 正确率
+              _StatItem(
+                label: '正确率',
+                value: '$accuracyPct%',
+                color: accuracyColor,
+              ),
+              const SizedBox(width: SpacingTokens.lg),
+
+              // 做题数
+              _StatItem(
+                label: '题数',
+                value: '${session.correctCount}/${session.totalProblems}',
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: SpacingTokens.lg),
+
+              // 用时
+              _StatItem(
+                label: '用时',
+                value: durStr,
+                color: theme.colorScheme.secondary,
+              ),
+
+              const Spacer(),
+
+              // 星星
+              if (stars > 0)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(3, (i) {
+                    return Icon(
+                      i < stars
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      size: 20,
+                      color: i < stars
+                          ? theme.semantic.caution
+                          : theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.3),
+                    );
+                  }),
                 ),
-                const SizedBox(width: SpacingTokens.lg),
-
-                // 做题数
-                _StatItem(
-                  label: '题数',
-                  value:
-                      '${session.correctCount}/${session.totalProblems}',
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: SpacingTokens.lg),
-
-                // 用时
-                _StatItem(
-                  label: '用时',
-                  value: durStr,
-                  color: theme.colorScheme.secondary,
-                ),
-
-                const Spacer(),
-
-                // 星星
-                if (stars > 0)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(3, (i) {
-                      return Icon(
-                        i < stars
-                            ? Icons.star_rounded
-                            : Icons.star_outline_rounded,
-                        size: 20,
-                        color: i < stars
-                            ? theme.semantic.caution
-                            : theme.colorScheme.onSurfaceVariant
-                                .withValues(alpha: 0.3),
-                      );
-                    }),
-                  ),
-              ],
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

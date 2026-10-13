@@ -114,8 +114,11 @@ void main() {
     expect(schedule.currentRound, 0);
     expect(schedule.lastScore, 0.5);
     // 未达及格线：明天重测（0 或 1 天内到期）。
+    // 基准在动作结束后立即取一次：若断言处再调一次 `DateTime.now()`，
+    // 两点之间恰跨午夜时 `inDays` 会少 1，用例随机变红。
+    final base = DateTime.now();
     expect(
-      schedule.nextReviewDate.difference(DateTime.now()).inDays,
+      schedule.nextReviewDate.difference(base).inDays,
       inInclusiveRange(0, 1),
     );
     // 消费端纪律：读取即清空。

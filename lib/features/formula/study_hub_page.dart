@@ -12,6 +12,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/formula/providers/formula_providers.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 
 class StudyHubPage extends ConsumerWidget {
   const StudyHubPage({super.key});
@@ -28,7 +29,7 @@ class StudyHubPage extends ConsumerWidget {
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = _responsiveColumns(constraints.maxWidth);
+          final columns = ResponsiveLayout.columns(constraints.maxWidth);
           return CustomScrollView(
             slivers: [
               SliverAppBar(
@@ -78,17 +79,15 @@ class StudyHubPage extends ConsumerWidget {
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor:
-                            theme.colorScheme.surfaceContainerHighest,
+                        fillColor: theme.colorScheme.surfaceContainerHighest,
                         contentPadding: const EdgeInsets.symmetric(
                           vertical: SpacingTokens.sm,
                         ),
                         isDense: true,
                       ),
                       onChanged: (value) {
-                        ref
-                            .read(formulaSearchQueryProvider.notifier)
-                            .state = value;
+                        ref.read(formulaSearchQueryProvider.notifier).state =
+                            value;
                       },
                     ),
                   ),
@@ -110,9 +109,7 @@ class StudyHubPage extends ConsumerWidget {
                         ),
                         const SizedBox(height: SpacingTokens.md),
                         Text(
-                          favoritesOnly
-                              ? '还没有收藏的公式\n点击公式右上角星标即可收藏'
-                              : '暂无公式',
+                          favoritesOnly ? '还没有收藏的公式\n点击公式右上角星标即可收藏' : '暂无公式',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyLarge?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -129,8 +126,7 @@ class StudyHubPage extends ConsumerWidget {
                     vertical: SpacingTokens.sm,
                   ).copyWith(bottom: 100),
                   sliver: SliverGrid(
-                    gridDelegate:
-                        SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: columns,
                       crossAxisSpacing: SpacingTokens.sm,
                       mainAxisSpacing: SpacingTokens.sm,
@@ -158,9 +154,8 @@ class StudyHubPage extends ConsumerWidget {
                             child: Row(
                               children: [
                                 CircleAvatar(
-                                  backgroundColor:
-                                      theme.colorScheme.primary
-                                          .withValues(alpha: 0.15),
+                                  backgroundColor: theme.colorScheme.primary
+                                      .withValues(alpha: 0.15),
                                   child: Icon(
                                     Icons.functions,
                                     color: theme.colorScheme.primary,
@@ -171,13 +166,11 @@ class StudyHubPage extends ConsumerWidget {
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
                                         formula.name,
-                                        style: theme
-                                            .textTheme.titleSmall
+                                        style: theme.textTheme.titleSmall
                                             ?.copyWith(
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -187,11 +180,10 @@ class StudyHubPage extends ConsumerWidget {
                                         formula.formulaText,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: theme
-                                            .textTheme.bodySmall
-                                            ?.copyWith(
-                                          color: theme.colorScheme
-                                              .onSurfaceVariant,
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          color: theme
+                                              .colorScheme.onSurfaceVariant,
                                         ),
                                       ),
                                     ],
@@ -203,8 +195,7 @@ class StudyHubPage extends ConsumerWidget {
                                       : Icons.bookmark_border,
                                   color: isFav
                                       ? theme.colorScheme.secondary
-                                      : theme
-                                          .colorScheme.onSurfaceVariant,
+                                      : theme.colorScheme.onSurfaceVariant,
                                   size: 20,
                                 ),
                               ],
@@ -235,11 +226,6 @@ class StudyHubPage extends ConsumerWidget {
   }
 
   /// 根据可用宽度计算列数。
-  static int _responsiveColumns(double width) {
-    if (width >= 900) return 3;
-    if (width >= 600) return 2;
-    return 1;
-  }
 
   void _showCategoryPicker(
     BuildContext context,

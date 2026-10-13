@@ -11,6 +11,17 @@ import '../../helpers/hive_test_helper.dart';
 void main() {
   late ReviewRepository repo;
 
+  /// 采集「当前时刻」的基准，供断言计算时间差。
+  ///
+  /// 仓储内部用 `DateTime.now()` 算出 nextReviewDate，断言端点若**再次**
+  /// 调用 `DateTime.now()`，两次取值之间会跨过真实时间 —— 恰在午夜边界
+  /// 时 `inDays` 就少 1，用例随机变红。这里在动作结束后立刻取一次基准，
+  /// 与产出时间几乎同刻，误差只剩毫秒级（不会跨天）。
+  var base = DateTime.now();
+
+  /// 把基准重置到「现在」（在每个产生 nextReviewDate 的动作后调用）。
+  void captureBase() => base = DateTime.now();
+
   setUp(() async {
     await setUpHiveForTesting();
     ProfileScope.reset();
@@ -123,13 +134,14 @@ void main() {
     test('completeReview 满分推进并记录 lastScore', () async {
       await repo.createSchedule('poem_full');
       await repo.completeReview('poem_full', score: 1.0);
+      captureBase();
 
       final schedule = repo.get('poem_full')!;
       expect(schedule.currentRound, 1);
       expect(schedule.lastScore, 1.0);
       // 第 1 轮后下次间隔 3 天
       expect(
-        schedule.nextReviewDate.difference(DateTime.now()).inDays,
+        schedule.nextReviewDate.difference(base).inDays,
         inInclusiveRange(2, 3),
       );
     });
@@ -146,13 +158,14 @@ void main() {
     test('completeReview 得分低于 0.8 不推进、明天重测', () async {
       await repo.createSchedule('poem_low');
       await repo.completeReview('poem_low', score: 0.5);
+      captureBase();
 
       final schedule = repo.get('poem_low')!;
       expect(schedule.currentRound, 0);
       expect(schedule.lastScore, 0.5);
       // 未达及格线：nextReviewDate 重置为明天
       expect(
-        schedule.nextReviewDate.difference(DateTime.now()).inDays,
+        schedule.nextReviewDate.difference(base).inDays,
         inInclusiveRange(0, 1),
       );
       expect(schedule.lastReviewedAt, isNull);

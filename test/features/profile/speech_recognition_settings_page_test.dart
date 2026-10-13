@@ -77,7 +77,10 @@ final class _FakeSettingsRepository extends SettingsRepository {
       throw StateError('credentials changed');
     }
     _verified = true;
-    _verifiedAt = verifiedAt ?? DateTime.now();
+    // 固定时间戳：真实 `DateTime.now()` 会让「验证时间」文案随执行时刻
+    // 变化（跨零点/跨时区运行），断言无法稳定。调用方显式传入时以传入
+    // 值为准，未传入则用本固定值。
+    _verifiedAt = verifiedAt ?? DateTime(2026, 10, 13, 9, 30);
   }
 
   @override

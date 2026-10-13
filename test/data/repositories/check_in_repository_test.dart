@@ -154,9 +154,12 @@ void main() {
     test('calculateStreak 连续打卡计算正确', () async {
       final now = DateTime.now();
 
-      // 手动添加昨天和前天的打卡记录
+      // 手动添加昨天和前天的打卡记录。
+      // 用日期字段逐日递减构造，而不是 `subtract(Duration(days: i))`：
+      // 后者在 DST 切换日会得到 23/25 小时，日历日期可能不随 i 移动，
+      // streak 断言会偶发失败。
       for (var i = 0; i < 3; i++) {
-        final date = now.subtract(Duration(days: i));
+        final date = DateTime(now.year, now.month, now.day - i);
         final dateStr =
             '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
         final key = ProfileScope.key(dateStr);
@@ -180,8 +183,8 @@ void main() {
         CheckIn(profileId: ProfileScope.currentId, date: todayStr),
       );
 
-      // 前天打卡（跳过昨天）
-      final dayBefore = now.subtract(const Duration(days: 2));
+      // 前天打卡（跳过昨天）。日期字段递减构造，理由同上（DST 安全）。
+      final dayBefore = DateTime(now.year, now.month, now.day - 2);
       final dayBeforeStr =
           '${dayBefore.year}-${dayBefore.month.toString().padLeft(2, '0')}-${dayBefore.day.toString().padLeft(2, '0')}';
       await HiveBoxes.checkIns.put(

@@ -33,9 +33,11 @@ void main() {
   });
 
   test('今日题量只包含当前 profile 的今日挑战', () async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(seconds: 1));
+    // 固定「今日」：仓储判定今日边界用的是自取 `DateTime.now()`。
+    // 构造今天/昨天的记录必须与它同一天 —— 直接用 `now.subtract(1s)` 造
+    // 「昨天」，在恰跨午夜时会落到前天，断言偶发失败。
+    final today = DateTime(2026, 10, 13);
+    final yesterday = today.subtract(const Duration(days: 1));
 
     await repo.save(_record(id: 'today', total: 8, createdAt: today));
     await repo.save(

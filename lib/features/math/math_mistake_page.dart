@@ -17,6 +17,7 @@ import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 
 class MathMistakePage extends ConsumerWidget {
   const MathMistakePage({super.key});
@@ -45,7 +46,7 @@ class MathMistakePage extends ConsumerWidget {
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = _responsiveColumns(constraints.maxWidth);
+          final columns = ResponsiveLayout.columns(constraints.maxWidth);
 
           return allMistakes.isEmpty
               ? CustomScrollView(
@@ -164,8 +165,10 @@ class MathMistakePage extends ConsumerWidget {
                                       selected: gradeFilter == null,
                                       onSelected: (_) {
                                         ref
-                                            .read(mistakeGradeFilterProvider
-                                                .notifier,)
+                                            .read(
+                                              mistakeGradeFilterProvider
+                                                  .notifier,
+                                            )
                                             .state = null;
                                       },
                                     ),
@@ -176,11 +179,12 @@ class MathMistakePage extends ConsumerWidget {
                                         selected: gradeFilter == g,
                                         onSelected: (_) {
                                           ref
-                                              .read(mistakeGradeFilterProvider
-                                                  .notifier,)
-                                              .state = gradeFilter == g
-                                              ? null
-                                              : g;
+                                                  .read(
+                                                    mistakeGradeFilterProvider
+                                                        .notifier,
+                                                  )
+                                                  .state =
+                                              gradeFilter == g ? null : g;
                                         },
                                       ),
                                     ],
@@ -199,8 +203,7 @@ class MathMistakePage extends ConsumerWidget {
                                     '状态',
                                     style:
                                         theme.textTheme.labelMedium?.copyWith(
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -210,8 +213,10 @@ class MathMistakePage extends ConsumerWidget {
                                     selected: statusFilter == null,
                                     onSelected: (_) {
                                       ref
-                                          .read(mistakeStatusFilterProvider
-                                              .notifier,)
+                                          .read(
+                                            mistakeStatusFilterProvider
+                                                .notifier,
+                                          )
                                           .state = null;
                                     },
                                   ),
@@ -223,11 +228,14 @@ class MathMistakePage extends ConsumerWidget {
                                       selected: statusFilter == filter,
                                       onSelected: (_) {
                                         ref
-                                            .read(mistakeStatusFilterProvider
-                                                .notifier,)
-                                            .state = statusFilter == filter
-                                            ? null
-                                            : filter;
+                                                .read(
+                                                  mistakeStatusFilterProvider
+                                                      .notifier,
+                                                )
+                                                .state =
+                                            statusFilter == filter
+                                                ? null
+                                                : filter;
                                       },
                                     ),
                                   ],
@@ -260,8 +268,7 @@ class MathMistakePage extends ConsumerWidget {
                               '开始重练（${repracticeQueue.length} 题）',
                             ),
                             style: FilledButton.styleFrom(
-                              minimumSize:
-                                  const Size(double.infinity, 48),
+                              minimumSize: const Size(double.infinity, 48),
                             ),
                           ),
                         ),
@@ -300,9 +307,8 @@ class MathMistakePage extends ConsumerWidget {
                           vertical: SpacingTokens.sm,
                         ),
                         sliver: SliverList.builder(
-                          itemCount:
-                              (filteredMistakes.length + columns - 1) ~/
-                                  columns,
+                          itemCount: (filteredMistakes.length + columns - 1) ~/
+                              columns,
                           itemBuilder: (context, rowIndex) {
                             final start = rowIndex * columns;
                             final rowWidgets = <Widget>[];
@@ -322,8 +328,7 @@ class MathMistakePage extends ConsumerWidget {
                                         AppRoutes.mathMistakeDetail,
                                         extra: mistake.id,
                                       ),
-                                      child:
-                                          _MistakeCard(mistake: mistake),
+                                      child: _MistakeCard(mistake: mistake),
                                     )
                                         .animate()
                                         .fadeIn(
@@ -366,11 +371,6 @@ class MathMistakePage extends ConsumerWidget {
   }
 
   /// 根据可用宽度计算列数。
-  static int _responsiveColumns(double width) {
-    if (width >= 900) return 3;
-    if (width >= 600) return 2;
-    return 1;
-  }
 
   static String _statusFilterLabel(MistakeStatusFilter filter) =>
       mistakeStatusFilterLabel(filter);
@@ -535,8 +535,7 @@ class _MistakeCard extends StatelessWidget {
                     vertical: SpacingTokens.xs,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.secondary
-                        .withValues(alpha: 0.12),
+                    color: theme.colorScheme.secondary.withValues(alpha: 0.12),
                     borderRadius:
                         BorderRadius.circular(SpacingTokens.radiusSmall),
                   ),
