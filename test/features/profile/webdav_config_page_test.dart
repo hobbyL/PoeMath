@@ -43,6 +43,49 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
+  testWidgets('密码默认密文，点「显示密码」后可切明文并再次隐藏', (tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(home: WebDavConfigPage()),
+      ),
+    );
+    await tester.pump();
+
+    // 密码是第 4 个字段（索引 3）。
+    final passwordField = find.byType(TextFormField).at(3);
+    EditableText editable() => tester.widget<EditableText>(
+          find.descendant(
+            of: passwordField,
+            matching: find.byType(EditableText),
+          ),
+        );
+
+    // 默认密文。
+    expect(editable().obscureText, isTrue);
+    expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+
+    // 眼睛图标可能在视口外，先滚动到可见再点。
+    await tester.ensureVisible(find.byIcon(Icons.visibility_outlined));
+    await tester.pumpAndSettle();
+
+    // 点眼睛 → 明文。
+    await tester.tap(find.byIcon(Icons.visibility_outlined));
+    await tester.pump();
+    expect(editable().obscureText, isFalse);
+    expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
+
+    // 再点 → 回到密文。
+    await tester.ensureVisible(find.byIcon(Icons.visibility_off_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.visibility_off_outlined));
+    await tester.pump();
+    expect(editable().obscureText, isTrue);
+    expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
   testWidgets('保存失败后按钮恢复可操作并显示错误', (tester) async {
     final settings = _MockSettingsRepository();
     when(() => settings.saveWebDavConfig(any())).thenAnswer(

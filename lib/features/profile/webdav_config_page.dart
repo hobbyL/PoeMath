@@ -32,6 +32,8 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
   bool _testing = false;
   bool _saving = false;
   bool _loadingCredentials = false;
+  // 密码明/密文切换（默认密文），对齐 llm_provider_edit_dialog 的 API Key 写法。
+  bool _passwordVisible = false;
 
   @override
   void initState() {
@@ -208,11 +210,22 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
               // 密码
               TextFormField(
                 controller: _passwordController,
-                decoration: const InputDecoration(
+                obscureText: !_passwordVisible,
+                decoration: InputDecoration(
                   labelText: '密码',
-                  prefixIcon: Icon(Icons.lock_outlined),
+                  prefixIcon: const Icon(Icons.lock_outlined),
+                  // 输入框右侧「眼睛」：切换明/密文查看（默认密文）。
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _passwordVisible
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                    ),
+                    tooltip: _passwordVisible ? '隐藏密码' : '显示密码',
+                    onPressed: () =>
+                        setState(() => _passwordVisible = !_passwordVisible),
+                  ),
                 ),
-                obscureText: true,
                 validator: (v) => v == null || v.isEmpty ? '请输入密码' : null,
               ),
               const SizedBox(height: SpacingTokens.md),
