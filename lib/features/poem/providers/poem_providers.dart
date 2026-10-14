@@ -132,9 +132,6 @@ final availableDynastiesProvider = Provider<List<String>>((ref) {
 
 // ============ 诗词详情 ============
 
-/// 当前查看的诗词
-final currentPoemProvider = StateProvider<Poem?>((ref) => null);
-
 /// 指定 ID 的诗词
 final poemByIdProvider = Provider.family<Poem?, String>((ref, id) {
   final repo = ref.watch(poemRepoProvider);
