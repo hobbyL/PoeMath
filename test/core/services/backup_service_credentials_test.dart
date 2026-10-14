@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
@@ -142,8 +143,45 @@ void main() {
     expect(HiveBoxes.poemProgress.values.single.poemId, 'poem_1');
   });
 
-  test('AC2 错口令：写入前失败，Hive 与安全存储零变更', () async {
+  test('跨版本恢复：备份含未来版本的凭据键，学习数据与已知凭据照常恢复',
+      () async {
+    // 回归「旧版本读不了新版本备份」：此前 decryptCredentials 对任一
+    // 未知键直接抛 FormatException，而解密发生在 _doRestore **之前**，
+    // 异常一路冒到 UI —— 用户的诗词进度、错题本、复习计划全都恢复不了，
+    // 提示却只说「凭据节载荷无效」，无从自救。
+    //
+    // 场景：一台设备升级后新增了凭据键并导出，另一台未升级的设备恢复。
     await seedCredentials();
+    await seedProgress('poem_1');
+    final json = await backupService.exportToJson(passphrase: '同步口令');
+
+    // 伪造「更高版本」的备份：凭据节里多一个本版本不认识的键。
+    final data = jsonDecode(json) as Map<String, dynamic>;
+    data['credentials'] = await encryptCredentials({
+      kCredKeyTencentSecretId: 'AKID-private-secret-id',
+      kCredKeyTencentSecretKey: 'SK-private-secret-key',
+      kCredKeyWorkerTtsApiKey: 'worker-tts-private-key',
+      'future_vendor_api_key': '来自更高版本',
+    }, '同步口令',);
+    final futureJson = jsonEncode(data);
+
+    await credentialStore.deleteTencentAsrCredentials();
+    await credentialStore.deleteWorkerTtsApiKey();
+    await HiveBoxes.poemProgress.clear();
+
+    final count =
+        await backupService.restoreFromJson(futureJson, passphrase: '同步口令');
+
+    // 学习数据必须照常恢复 —— 这是此前整体失败的那一部分。
+    expect(count, greaterThan(0));
+    expect(HiveBoxes.poemProgress.values.single.poemId, 'poem_1');
+    // 本版本认识的凭据也照常恢复，未知键只是被跳过。
+    expect(credentialStore.tencentSecretId, 'AKID-private-secret-id');
+    expect(credentialStore.tencentSecretKey, 'SK-private-secret-key');
+    expect(credentialStore.workerApiKey, 'worker-tts-private-key');
+  });
+
+  test('AC2 错口令：写入前失败，Hive 与安全存储零变更', () async {    await seedCredentials();
     await seedProgress('poem_1');
     final json = await backupService.exportToJson(passphrase: '同步口令');
 

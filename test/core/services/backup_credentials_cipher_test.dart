@@ -143,29 +143,69 @@ void main() {
     );
   });
 
-  test('载荷键不在白名单拒绝', () async {
+  test('载荷键全部不识别：抛错且文案指向版本、给出自救出路', () async {
     final node = await encryptCredentials({'bogus_key': 'value'}, 'p');
     await expectLater(
       decryptCredentials(node, 'p'),
-      throwsFormatException,
+      throwsA(
+        isA<FormatException>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains('更高版本'), contains('留空口令')),
+        ),
+      ),
+    );
+  });
+
+  test('载荷含未识别键：跳过未知键、照常返回已知键（向前兼容）', () async {
+    // 跨版本恢复的核心路径：更高版本新增了凭据键，旧版本必须仍能用
+    // 自己认识的那部分。此前的实现对任一未知键直接抛 FormatException，
+    // 而解密发生在 `_doRestore` 之前，异常会让**整个恢复**失败 ——
+    // 用户的诗词进度、错题本、复习计划全都恢复不了。
+    //
+    // 未知键不可能来自篡改：走到白名单校验时 AES-GCM 认证已经通过，
+    // 能产出合法密文的人必须知道口令。
+    final node = await encryptCredentials({
+      kCredKeyTencentSecretId: 'id-1',
+      kCredKeyTencentSecretKey: 'key-1',
+      'future_vendor_api_key': 'from-newer-version',
+    }, '正确口令-123',);
+
+    final restored = await decryptCredentials(node, '正确口令-123');
+
+    expect(restored, <String, String>{
+      kCredKeyTencentSecretId: 'id-1',
+      kCredKeyTencentSecretKey: 'key-1',
+    }, reason: '已知键必须照常恢复，未知键静默跳过',);
+    expect(
+      restored.containsKey('future_vendor_api_key'),
+      isFalse,
+      reason: '未知键不得进入恢复结果（否则会被写进意料之外的位置）',
     );
   });
 
   test('白名单键锁定：内容精确且每个键都能完整往返', () async {
     // 恒真回归：本用例原先是 `expect(kBackupCredentialKeys, contains('...'))`
     // 三连 —— 把常量跟自己的字面量比，等于「断言常量等于常量」。标题声称
-    // 「与 SecureCredentialStore 存储键一致」，但全程没有引用过
-    // SecureCredentialStore（它的键是私有的 `_tencentSecretIdKey` 等，
-    // 测试引用不到），而且漏掉了 llm_api_key / llm_api_key_hint 两项。
+    // 「与 SecureCredentialStore 存储键一致」，但那个说法本身就是概念错误：
+    // 这些是**备份 JSON 内部**的 payload 键，恢复端经
+    // `saveTencentAsrCredentials` 等方法写安全存储、不按键直写，
+    // 两套名字同名纯属巧合，不存在「必须一致」的契约。
     //
-    // 真实风险：生产端 `BackupService._exportCredentials` 若写入一个不在
-    // 白名单里的键，解密端 `backup_credentials_cipher.dart:135` 会
-    // throw FormatException，**整个 credentials 节报废** —— 用户恢复备份后
-    // 所有凭据静默丢失。所以这里改为两条有牙齿的断言。
+    // 真实风险在于备份子系统**内部**的副本漂移：生产端
+    // `_exportCredentials` 若写入白名单外的键，该键在恢复端会被跳过，
+    // 凭据静默丢失。现已把三处字面量收敛到 backup_credentials_cipher.dart
+    // 的命名常量，这里负责锁定常量表本身。
 
-    // 1) 精确锁定白名单内容：任何增删改都必须同步改这里，
-    //    逼迫改动者回头确认另外三处副本（存储层私有常量、
-    //    BackupService 生产端 :182-191、消费端 :424-444）。
+    // 1) 精确锁定白名单内容：任何增删改都必须同步改这里。
+    expect(kBackupCredentialKeys, <String>[
+      kCredKeyTencentSecretId,
+      kCredKeyTencentSecretKey,
+      kCredKeyWorkerTtsApiKey,
+      kCredKeyLlmApiKey,
+      kCredKeyLlmApiKeyHint,
+    ]);
+    // 2) 常量的字面值也锁定：改动会让已发布版本导出的备份读不出对应项。
     expect(kBackupCredentialKeys, <String>[
       'tencent_asr_secret_id',
       'tencent_asr_secret_key',
@@ -174,8 +214,8 @@ void main() {
       'llm_api_key_hint',
     ]);
 
-    // 2) 每个白名单键都必须能真正往返：防止「加进白名单但密码学层处理
-    //    不了」的半成品键 —— 那种键一旦被生产端写入就使备份不可恢复。
+    // 3) 每个白名单键都必须能真正往返：防止「加进白名单但密码学层处理
+    //    不了」的半成品键 —— 那种键一旦被生产端写入就使凭据不可恢复。
     final payload = <String, String>{
       for (final key in kBackupCredentialKeys) key: 'value-of-$key',
     };

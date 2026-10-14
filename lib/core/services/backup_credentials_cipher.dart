@@ -8,18 +8,37 @@ import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
 
+import 'package:poemath/core/utils/logger.dart';
+
 /// 备份 `credentials` 节的加密参数（写死的安全基线，写入备份供解密端校验）。
 const String _kdfAlgorithm = 'pbkdf2-sha256';
 const int _kdfIterations = 120000;
 const String _cipherAlgorithm = 'aes-256-gcm';
 
-/// 备份中凭据加密的明文载荷键（与 SecureCredentialStore 的存储键一致）。
+/// 备份凭据明文载荷的键名 —— **单一来源**，生产端与消费端都必须引用这里。
+///
+/// 这些是**备份 JSON 内部**的 payload 键，与 [SecureCredentialStore] 的存储键
+/// 没有耦合：恢复端经 `saveTencentAsrCredentials` / `saveWorkerTtsApiKey` 等
+/// 方法写入安全存储，不按键直写，两套名字恰好同名纯属巧合。改这里不会影响
+/// 已存在设备上的凭据，但**会影响跨版本备份的可读性** —— 见
+/// [decryptCredentials] 对未知键的处理。
+const String kCredKeyTencentSecretId = 'tencent_asr_secret_id';
+const String kCredKeyTencentSecretKey = 'tencent_asr_secret_key';
+const String kCredKeyWorkerTtsApiKey = 'worker_tts_api_key';
+const String kCredKeyLlmApiKey = 'llm_api_key';
+const String kCredKeyLlmApiKeyHint = 'llm_api_key_hint';
+
+/// 本版本可识别的全部载荷键。
+///
+/// 新增凭据键时只需在上面加常量并补进本表，生产端（`BackupService`
+/// `_exportCredentials`）与消费端（`_restoreCredentials`）引用常量即可，
+/// 不再有字面量副本各自漂移的空间。
 const List<String> kBackupCredentialKeys = [
-  'tencent_asr_secret_id',
-  'tencent_asr_secret_key',
-  'worker_tts_api_key',
-  'llm_api_key',
-  'llm_api_key_hint',
+  kCredKeyTencentSecretId,
+  kCredKeyTencentSecretKey,
+  kCredKeyWorkerTtsApiKey,
+  kCredKeyLlmApiKey,
+  kCredKeyLlmApiKeyHint,
 ];
 
 /// 用口令加密凭据明文，产出备份 `credentials` 节的 JSON 结构。
@@ -128,16 +147,47 @@ Future<Map<String, String>> decryptCredentials(
   }
 
   final result = <String, String>{};
+  final skipped = <String>[];
   for (final entry in decoded.entries) {
+    final key = entry.key;
     final value = entry.value;
-    if (entry.key is! String ||
-        value is! String ||
-        !kBackupCredentialKeys.contains(entry.key)) {
+    // 结构损坏（键/值类型不对）与版本差异（键名不认识）必须区分对待：
+    // 前者说明密文解出来的不是我们的载荷格式，继续解析没有意义。
+    if (key is! String || value is! String) {
       throw const FormatException('备份凭据节载荷无效');
     }
-    result[entry.key as String] = value;
+    if (!kBackupCredentialKeys.contains(key)) {
+      // 向前兼容：跳过而非抛错。
+      //
+      // 这里能走到说明 AES-GCM 认证**已经通过** —— 能产出合法密文的人
+      // 必须知道口令，所以未知键不可能来自篡改，只可能来自「键集更新过
+      // 的更高版本导出的合法备份」。旧版本对此抛错的代价极不对称：异常
+      // 从 `BackupService.restoreFromJson` 冒到 UI，而解密发生在
+      // `_doRestore` **之前**，于是用户的诗词进度、错题本、复习计划
+      // 全都恢复不了，提示却只说「凭据节载荷无效」，无从自救。
+      skipped.add(key);
+      continue;
+    }
+    result[key] = value;
+  }
+  if (skipped.isNotEmpty) {
+    // 只记键名，绝不记值 —— 这里每个 value 都是凭据明文。
+    // 开发期加键漏改 kBackupCredentialKeys 时，这条日志是唯一线索。
+    AppLogger.w(
+      '备份凭据节含本版本不识别的键，已跳过：${skipped.join(", ")}',
+      tag: 'Backup',
+    );
   }
   if (result.isEmpty) {
+    if (skipped.isNotEmpty) {
+      // 全部键都不识别：无法降级恢复任何凭据，必须让用户知道，
+      // 同时给出真实可行的出路 —— 口令留空时
+      // `BackupService.restoreFromJson` 会整节跳过，学习数据照常恢复。
+      throw const FormatException(
+        '备份中的凭据来自更高版本，本版本无法识别；'
+        '请升级应用后重试，或留空口令以只恢复学习数据',
+      );
+    }
     throw const FormatException('备份凭据节载荷无效');
   }
   return result;

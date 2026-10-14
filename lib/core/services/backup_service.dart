@@ -179,20 +179,20 @@ class BackupService {
       final payload = <String, String>{};
       final tencent = await _secureStore.readTencentAsrCredentials();
       if (tencent != null) {
-        payload['tencent_asr_secret_id'] = tencent.secretId;
-        payload['tencent_asr_secret_key'] = tencent.secretKey;
+        payload[kCredKeyTencentSecretId] = tencent.secretId;
+        payload[kCredKeyTencentSecretKey] = tencent.secretKey;
       }
       final workerApiKey = await _secureStore.readWorkerTtsApiKey();
       if (workerApiKey != null && workerApiKey.isNotEmpty) {
-        payload['worker_tts_api_key'] = workerApiKey;
+        payload[kCredKeyWorkerTtsApiKey] = workerApiKey;
       }
       final llmApiKey = await _readActiveLlmApiKey();
       if (llmApiKey != null && llmApiKey.isNotEmpty) {
-        payload['llm_api_key'] = llmApiKey;
+        payload[kCredKeyLlmApiKey] = llmApiKey;
         // 归属提示（host|model，非敏感）：恢复端凭它在本机 llm_providers
         // 中找回 key 的归属配置，防止导出后本机切换 active 导致 key 写
         // 进错误槽位。只进加密凭据节，明文备份任何位置不得出现。
-        payload['llm_api_key_hint'] = _activeLlmKeyHint();
+        payload[kCredKeyLlmApiKeyHint] = _activeLlmKeyHint();
       }
       if (payload.isEmpty) return null;
       return await encryptCredentials(payload, normalized);
@@ -421,14 +421,14 @@ class BackupService {
 
   /// 把解密后的凭据写入安全存储（覆盖式）。
   Future<void> _restoreCredentials(Map<String, String> credentials) async {
-    final secretId = credentials['tencent_asr_secret_id'];
-    final secretKey = credentials['tencent_asr_secret_key'];
+    final secretId = credentials[kCredKeyTencentSecretId];
+    final secretKey = credentials[kCredKeyTencentSecretKey];
     if (secretId != null && secretKey != null) {
       await _secureStore.saveTencentAsrCredentials(
         TencentAsrCredentials(secretId: secretId, secretKey: secretKey),
       );
     }
-    final apiKey = credentials['worker_tts_api_key'];
+    final apiKey = credentials[kCredKeyWorkerTtsApiKey];
     if (apiKey != null && apiKey.isNotEmpty) {
       await _secureStore.saveWorkerTtsApiKey(apiKey);
     }
@@ -441,9 +441,9 @@ class BackupService {
     //   url/model 不迁移纪律一致）。
     // - 无 hint（旧备份）：维持现行为——写本机当前生效配置的键位；
     //   本机无生效配置则丢弃（兼容不倒退）。
-    final llmApiKey = credentials['llm_api_key'];
+    final llmApiKey = credentials[kCredKeyLlmApiKey];
     if (llmApiKey != null && llmApiKey.isNotEmpty) {
-      final hint = credentials['llm_api_key_hint'];
+      final hint = credentials[kCredKeyLlmApiKeyHint];
       if (hint != null && hint.isNotEmpty) {
         final matchedId = _matchLlmProviderByHint(hint);
         if (matchedId != null) {
