@@ -26,6 +26,14 @@ Future<void> _pumpPastSplashAndAnimations(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 3));
 }
 
+/// 当前高亮的 tab 下标 —— 「页面真的切了」的可观测证据。
+///
+/// `MainShell` 不自己存选中态，`selectedIndex` 由 `_indexFromRoute(context)`
+/// 从真实 GoRouter 路径推导，所以这个值变了就说明路由真的跳了。
+int _selectedTab(WidgetTester tester) {
+  return tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
+}
+
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
@@ -51,6 +59,10 @@ void main() {
     await _pumpPastSplashAndAnimations(tester);
 
     expect(find.byType(NavigationBar), findsOneWidget);
+    // 伪测试回归：本用例原先只断言主题不变，标题前半句「应切换页面」
+    // 毫无验证 —— 把 `MainShell._switch` 改成空函数，主题当然也不变，
+    // 用例照样全绿。切换本身必须单独断言。
+    expect(_selectedTab(tester), 0, reason: '初始应停在首页 tab');
 
     // 记录初始主题
     final initialSubject = container.read(activeSubjectProvider);
@@ -60,6 +72,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
+    expect(_selectedTab(tester), 2, reason: '应切到口算 tab');
     expect(container.read(activeSubjectProvider), initialSubject);
 
     // 点击"诗词" — 切换到诗词页，主题仍不变
@@ -67,6 +80,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
+    expect(_selectedTab(tester), 1, reason: '应切到诗词 tab');
     expect(container.read(activeSubjectProvider), initialSubject);
   });
 

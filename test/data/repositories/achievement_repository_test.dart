@@ -81,12 +81,49 @@ void main() {
     });
 
     test('unlock 已解锁的成就不重复处理', () async {
-      await addAchievement(id: 'a1', isUnlocked: true);
-      await repo.unlock('a1'); // 应该不抛异常
+      // 零断言回归：本用例原先只有 `await repo.unlock('a1'); // 应该不抛异常`，
+      // 对 `unlock` 的早退守卫（achievement_repository.dart:38
+      // `if (achievement.isUnlocked) return;`）毫无验证 —— 删掉那行，
+      // `unlockedAt` 会被 `DateTime.now()` 覆盖、`progress` 被重置为 1.0，
+      // 而原用例照样通过。
+      //
+      // 注意不能用 `addAchievement(isUnlocked: true)` 当 fixture：它不设
+      // `unlockedAt`，拿 null 当「首次解锁时刻」没法表达真实不变量。
+      final firstUnlock = DateTime(2024, 5, 1, 8, 30);
+      await repo.save(Achievement(
+        id: 'a1',
+        profileId: ProfileScope.currentId,
+        title: '测试成就',
+        isUnlocked: true,
+        unlockedAt: firstUnlock,
+        progress: 0.4,
+      ),);
+
+      await repo.unlock('a1');
+
+      final after = repo.getById('a1')!;
+      expect(
+        after.unlockedAt,
+        firstUnlock,
+        reason: '重复 unlock 不得改写首次解锁时刻',
+      );
+      expect(after.progress, 0.4, reason: '重复 unlock 不得重置进度');
     });
 
     test('unlock 对不存在的成就无操作', () async {
-      await repo.unlock('nonexistent'); // 不应抛异常
+      // 零断言回归：原先只调用不断言。删掉「不存在则早退」守卫
+      // （achievement_repository.dart:37）后，原用例仍绿。
+      await addAchievement(id: 'a1');
+
+      await repo.unlock('nonexistent');
+
+      expect(repo.getAll(), hasLength(1), reason: '不得凭空创建记录');
+      expect(repo.getById('nonexistent'), isNull);
+      expect(
+        repo.getById('a1')!.isUnlocked,
+        isFalse,
+        reason: '不得误解锁其他成就',
+      );
     });
 
     test('updateProgress 更新进度', () async {

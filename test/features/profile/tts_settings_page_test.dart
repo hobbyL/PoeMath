@@ -374,4 +374,97 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));
   });
+
+  testWidgets('语速拖动期间不落盘，松手才写一次 —— 防抖生效', (tester) async {
+    // 回归锁定：原实现 `onChanged` 直接 await setTtsSpeed，
+    // Slider 拖动期间逐帧回调 → 一次拖动上百次 Hive 写入。
+    //
+    // 注意断言范围：`tester.drag` 会自行触发 `onChangeEnd`（松手），所以这里
+    // **不**用 drag 验「拖动中」，而是按帧直接回调 `onChanged` —— 这正是拖动
+    // 期间真实发生的调用序列。`onChangeEnd` 不参与本用例。
+    final tts = _MockTtsService();
+    final settings = _MockSettingsRepository();
+    _stubBaseSettings(settings, verified: true, cloudEnabled: true);
+    _stubTtsIdle(tts);
+    when(() => settings.setTtsSpeed(any())).thenAnswer((_) async {});
+
+    await _pumpPage(tester, tts: tts, settings: settings);
+
+    final slider = tester.widget<Slider>(find.byType(Slider));
+
+    // 连续 5 帧拖动，每帧间隔 50ms —— 远小于 400ms 防抖窗口。
+    for (final value in [0.2, 0.3, 0.4, 0.6, 0.8]) {
+      slider.onChanged!(value);
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    // 拖动全程零落盘。
+    verifyNever(() => settings.setTtsSpeed(any()));
+
+    // 停手满一个防抖窗口：只有**最后一次**取值落盘，中途值全部丢弃。
+    await tester.pump(TtsSettingsPage.speedPersistDebounce);
+    await tester.pump();
+
+    verify(() => settings.setTtsSpeed(0.8)).called(1);
+    verifyNever(() => settings.setTtsSpeed(0.2));
+    verifyNever(() => settings.setTtsSpeed(0.4));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('语速松手立即落盘，不等防抖窗口', (tester) async {
+    final tts = _MockTtsService();
+    final settings = _MockSettingsRepository();
+    _stubBaseSettings(settings, verified: true, cloudEnabled: true);
+    _stubTtsIdle(tts);
+    when(() => settings.setTtsSpeed(any())).thenAnswer((_) async {});
+
+    await _pumpPage(tester, tts: tts, settings: settings);
+
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(0.3);
+    await tester.pump(const Duration(milliseconds: 50));
+    verifyNever(() => settings.setTtsSpeed(any()));
+
+    // 松手：不推进防抖窗口也要落盘。
+    slider.onChangeEnd!(0.3);
+    await tester.pump();
+
+    verify(() => settings.setTtsSpeed(0.3)).called(1);
+
+    // 防抖计时器已被取消 —— 窗口走完不会产生第二次写入。
+    // 用 `verifyNever` 而非再次 `verify(...).called(1)`：mocktail 会消费掉
+    // 已匹配的调用记录，重复 verify 同一调用只会得到「No matching calls」。
+    await tester.pump(TtsSettingsPage.speedPersistDebounce);
+    await tester.pump();
+    verifyNever(() => settings.setTtsSpeed(any()));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('语速写入失败不抛出、不阻断页面', (tester) async {
+    // setTtsSpeed 直接 Hive.put，磁盘满/Box 损坏会抛。计时器回调里未捕获的
+    // 异常会成为 unhandled error 并让测试失败 —— 这里锁定它被吞下并记日志。
+    final tts = _MockTtsService();
+    final settings = _MockSettingsRepository();
+    _stubBaseSettings(settings, verified: true, cloudEnabled: true);
+    _stubTtsIdle(tts);
+    when(() => settings.setTtsSpeed(any()))
+        .thenThrow(StateError('磁盘写入失败'));
+
+    await _pumpPage(tester, tts: tts, settings: settings);
+
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChangeEnd!(0.9);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // 页面仍在，滑块仍可交互；异常未冒泡（否则本用例会以 unhandled 失败）。
+    expect(find.byType(Slider), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
 }

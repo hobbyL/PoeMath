@@ -14,6 +14,7 @@ import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
@@ -193,12 +194,9 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: settingsRepo.pinyinVisible ? '已开启' : '已关闭',
                 trailing: Switch(
                   value: settingsRepo.pinyinVisible,
-                  onChanged: (v) async {
+                  onChanged: (v) => _writeSetting(context, ref, '拼音显示', () async {
                     await settingsRepo.setPinyinVisible(v);
-                    if (context.mounted) {
-                      ref.invalidate(settingsRepositoryProvider);
-                    }
-                  },
+                  }),
                 ),
               ),
             if (_section == _SettingsSection.appearance)
@@ -230,12 +228,9 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: settingsRepo.soundEnabled ? '已开启' : '已关闭',
                 trailing: Switch(
                   value: settingsRepo.soundEnabled,
-                  onChanged: (v) async {
+                  onChanged: (v) => _writeSetting(context, ref, '音效', () async {
                     await settingsRepo.setSoundEnabled(v);
-                    if (context.mounted) {
-                      ref.invalidate(settingsRepositoryProvider);
-                    }
-                  },
+                  }),
                 ),
               ),
             if (_section == _SettingsSection.sound)
@@ -250,16 +245,13 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: settingsRepo.hapticEnabled ? '已开启（需真机体验）' : '已关闭',
                 trailing: Switch(
                   value: settingsRepo.hapticEnabled,
-                  onChanged: (v) async {
+                  onChanged: (v) => _writeSetting(context, ref, '触觉反馈', () async {
                     await settingsRepo.setHapticEnabled(v);
-                    if (context.mounted) {
-                      ref.invalidate(settingsRepositoryProvider);
-                    }
                     // 开启时触发一次测试震动
                     if (v) {
                       await HapticFeedback.mediumImpact();
                     }
-                  },
+                  }),
                 ),
               ),
             if (_section == _SettingsSection.sound)
@@ -345,6 +337,49 @@ class SettingsPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// 执行一次设置写入，并在成功后刷新 provider 让开关文案同步。
+  ///
+  /// 收拢原先散落在三个 Switch 的 `onChanged` 里的同一段逻辑，补上两处原实现
+  /// 的缺口：
+  ///
+  /// 1. **写入失败不再静默**：`setPinyinVisible` 等直接 `Hive.put`，磁盘满或
+  ///    Box 损坏会抛。原先异常从 `onChanged` 冒泡到框架，用户只看到开关弹回、
+  ///    无任何解释。这里捕获后提示，且**不** invalidate —— 失败时 provider 里
+  ///    仍是旧值，开关自动回弹，界面与真实状态一致。
+  /// 2. **无谓的 invalidate 不再执行**：原实现在 await 之后无条件 invalidate，
+  ///    而它紧跟着失败也会执行，把新值推给 provider 造成「界面已开、落盘失败」
+  ///    的假象。
+  ///
+  /// [label] 仅用于日志与提示文案；[write] 是真正的写入动作（可含附带效果，
+  /// 如触觉反馈的测试震动）。
+  ///
+  /// 本类是 `ConsumerWidget`（无 State），故 `context`/`ref` 由调用处显式传入
+  /// —— 不能用成员访问，也不应把 `BuildContext` 存进字段。
+  Future<void> _writeSetting(
+    BuildContext context,
+    WidgetRef ref,
+    String label,
+    Future<void> Function() write,
+  ) async {
+    try {
+      await write();
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '$label 设置保存失败',
+        tag: 'SettingsPage',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('$label设置保存失败，请重试')));
+      return;
+    }
+    if (!context.mounted) return;
+    ref.invalidate(settingsRepositoryProvider);
   }
 
   void _openSection(BuildContext context, _SettingsSection section) {

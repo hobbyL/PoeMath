@@ -24,6 +24,14 @@ class _DelayedSettingsRepository extends SettingsRepository {
   }
 }
 
+/// 模拟 Hive 落盘失败（磁盘满 / Box 损坏）。
+class _FailingSettingsRepository extends SettingsRepository {
+  @override
+  Future<void> setPinyinVisible(bool visible) async {
+    throw StateError('磁盘写入失败');
+  }
+}
+
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
@@ -235,6 +243,40 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('设置写入失败：提示用户、不回滚界面、不冒泡异常', (tester) async {
+    // 回归锁定：三个 Switch 原先各自内联 `onChanged: (v) async { await ... }`，
+    // Hive.put 抛出的异常直接冒泡到框架 —— 用户只看到开关弹回，没有任何解释。
+    // 现在统一由 `_writeSetting` 捕获并提示。
+    final settings = _FailingSettingsRepository();
+    final container = ProviderContainer(
+      overrides: [
+        settingsRepositoryProvider.overrideWithValue(settings),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: SettingsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('外观与显示'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+
+    // 异常被吞下（不冒泡），并以 SnackBar 告知用户。
+    expect(tester.takeException(), isNull);
+    expect(find.text('拼音显示设置保存失败，请重试'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
   });
 
   testWidgets('窄屏和大字号下设置页不应溢出', (tester) async {

@@ -17,6 +17,7 @@ import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_check_controller.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/core/services/update/update_models.dart';
 import 'package:poemath/features/assistant/assistant_enabled_provider.dart';
@@ -108,6 +109,15 @@ class _MainShellState extends ConsumerState<MainShell>
     );
   }
 
+  /// 展示「有新版本」弹窗。
+  ///
+  /// 本方法经 `unawaited(...)` 从 `UpdateCheckController.onAvailable` 触发
+  /// （该回调是同步 `void`，`unawaited` 的 Future 不会回流到 controller 的
+  /// try-catch）。因此这里必须自己兜住异常：一旦 `showUpdateDialog` 抛错
+  /// 且无人接，`markDialogShown()` 已被调用而弹窗从未展示，`hasActiveDialog`
+  /// 会**永久**卡在 true —— 之后所有更新检查都被这个守卫静默吞掉，
+  /// 用户再也不会收到升级提示，且线上无从察觉。捕获后补一次
+  /// `markDialogClosed()` 把状态放回可用，是这里的关键。
   Future<void> _onUpdateAvailable(
     UpdateCheckController controller,
     AppUpdateInfo update,
@@ -116,17 +126,28 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!mounted) return;
     // 先同步标记弹窗显示，保证守卫（hasActiveDialog）先于弹窗动画生效。
     controller.markDialogShown();
-    final dismissed = await showUpdateDialog(
-      context: context,
-      update: update,
-      current: current,
-      client: controller.client,
-      installer: controller.installer,
-    );
-    // controller 不依赖 context，await 后直接调用安全。
-    if (dismissed == false) {
-      controller.markDismissedByUser();
-    } else {
+    try {
+      final dismissed = await showUpdateDialog(
+        context: context,
+        update: update,
+        current: current,
+        client: controller.client,
+        installer: controller.installer,
+      );
+      // controller 不依赖 context，await 后直接调用安全。
+      if (dismissed == false) {
+        controller.markDismissedByUser();
+      } else {
+        controller.markDialogClosed();
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '更新弹窗展示失败',
+        tag: 'MainShell',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      // 复位守卫：否则 hasActiveDialog 永久为 true，后续更新检查全部被吞。
       controller.markDialogClosed();
     }
   }

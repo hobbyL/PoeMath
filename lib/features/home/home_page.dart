@@ -11,8 +11,10 @@ import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
+import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -220,12 +222,37 @@ class HomePage extends ConsumerWidget {
                 }
 
                 final checkInRepo = ref.read(checkInRepoProvider);
-                await checkInRepo.checkInToday();
-
-                // 更新连续打卡天数到 UserStats
-                final newStreak = checkInRepo.calculateStreak();
                 final statsRepo = ref.read(userStatsRepoProvider);
-                await statsRepo.updateStreak(newStreak);
+                final messenger = ScaffoldMessenger.of(context);
+
+                // 打卡落库。磁盘满 / Box 损坏时 `Hive.put` 抛 `HiveError`
+                // ——`HiveError extends Error` 而非 `Exception`，故捕 `Object`
+                // （项目其余页面同一约定）。不捕获的话异常冒泡成 unhandled
+                // error，用户只看到按钮弹回、连续天数没涨，会以为没点上而
+                // 反复点，损伤「打卡有记录」这一核心信任。
+                int newStreak;
+                try {
+                  await checkInRepo.checkInToday();
+                  // 更新连续打卡天数到 UserStats
+                  newStreak = checkInRepo.calculateStreak();
+                  await statsRepo.updateStreak(newStreak);
+                } on Object catch (error, stackTrace) {
+                  AppLogger.e(
+                    '打卡落库失败',
+                    tag: 'Home',
+                    error: error,
+                    stackTrace: stackTrace,
+                  );
+                  if (!context.mounted) return;
+                  messenger
+                    ..clearSnackBars()
+                    ..showSnackBar(
+                      const SnackBar(
+                        content: Text('打卡失败，请检查设备存储空间后重试'),
+                      ),
+                    );
+                  return;
+                }
 
                 ref.read(soundServiceProvider).play(SoundEffect.checkIn);
                 await ref.read(hapticServiceProvider).medium();
@@ -233,8 +260,19 @@ class HomePage extends ConsumerWidget {
                 ref.invalidate(streakProvider);
                 ref.invalidate(userStatsProvider);
 
-                // 成就自动检查
-                final newlyUnlocked = await checkAchievements(ref);
+                // 成就自动检查。这里失败不影响打卡本身（打卡已落库），
+                // 故只记日志不打断庆祝流程。
+                var newlyUnlocked = <Achievement>[];
+                try {
+                  newlyUnlocked = await checkAchievements(ref);
+                } on Object catch (error, stackTrace) {
+                  AppLogger.e(
+                    '打卡后成就检查失败',
+                    tag: 'Home',
+                    error: error,
+                    stackTrace: stackTrace,
+                  );
+                }
                 ref.invalidate(unlockedAchievementsCountProvider);
 
                 if (context.mounted) {

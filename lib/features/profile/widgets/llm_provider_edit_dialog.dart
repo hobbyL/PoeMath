@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:poemath/core/services/llm/llm_client.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -131,14 +132,29 @@ class _LlmProviderEditDialogState
 
   /// 编辑态读取已存 Key：回显到输入框（默认密文）并置「已存」标志
   /// （后者决定清除入口与 Key 空回退）。
+  ///
+  /// 失败**不吞**：读不到就保持 `_hasStoredKey = false`，而这会让
+  /// 「Key 留空 = 用已存 Key」的回退（拉取模型与测试连接两处）静默失效 ——
+  /// 用户会看到「测试连接失败」，却不知道真正原因是安全存储读取出错。
+  /// 该链条由 `unawaited` 触发，不捕获就是 unhandled error，故必须 log。
   Future<void> _loadStoredKey(String id) async {
-    final stored =
-        await ref.read(settingsRepositoryProvider).readLlmApiKeyFor(id);
+    late final String? stored;
+    try {
+      stored = await ref.read(settingsRepositoryProvider).readLlmApiKeyFor(id);
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '读取已存 LLM API Key 失败（「留空沿用已存 Key」将不可用）',
+        tag: 'LlmProviderEdit',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return;
+    }
     if (!mounted) return;
     final hasKey = stored != null && stored.trim().isNotEmpty;
     setState(() {
       _hasStoredKey = hasKey;
-      if (hasKey) _apiKeyController.text = stored;
+      if (hasKey) _apiKeyController.text = stored!;
     });
   }
 

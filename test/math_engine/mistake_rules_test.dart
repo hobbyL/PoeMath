@@ -163,8 +163,13 @@ void main() {
     test('describe 使用小×大格式', () {
       final p = mulProblem(9, 3);
       final diag = rule.describe(p);
-      expect(diag.message, contains('3'));
-      expect(diag.message, contains('9'));
+      // 弱断言回归：原先是 contains('3') + contains('9')，对「9×3」
+      // 同样成立 —— 而「9×3」恰恰是本用例标题要防的错序。模板
+      // （mistake_rule.dart:97）是 '…多背几遍：{small}×{big}={correct}'，
+      // 所以直接断言整段小×大子串：{small}/{big} 写反就会红。
+      expect(diag.message, contains('3×9=27'));
+      // 口诀前半段保留用户原始顺序，不受 small/big 影响。
+      expect(diag.message, contains('口诀：9×3=27'));
     });
   });
 

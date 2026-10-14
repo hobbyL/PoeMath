@@ -19,6 +19,13 @@ import 'package:poemath/data/providers/repository_providers.dart';
 class TtsSettingsPage extends ConsumerStatefulWidget {
   const TtsSettingsPage({super.key});
 
+  /// 语速落盘的防抖窗口：停手满这个时长才写入 Hive。
+  ///
+  /// 取 400ms：短于用户「连续拖动中的停顿」（通常 >1s），长于一次快速滑动的
+  /// 帧间隔，所以正常拖动过程中不会触发中间写入。松手时由 `onChangeEnd`
+  /// 立即落盘，用户不必等满这个窗口。
+  static const speedPersistDebounce = Duration(milliseconds: 400);
+
   @override
   ConsumerState<TtsSettingsPage> createState() => _TtsSettingsPageState();
 }
@@ -55,6 +62,18 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
   late final TextEditingController _baseUrlController;
   late final TextEditingController _apiKeyController;
   bool _obscureApiKey = true;
+
+  /// 语速落盘防抖定时器。
+  ///
+  /// 滑块的 `onChanged` 在**拖动期间逐帧触发**（Slider 每帧都回调），而
+  /// `setTtsSpeed` 是真实的 Hive 落盘。原实现每帧 await 一次写盘：一次拖动
+  /// 可产生上百次写入，低端机表现为掉帧，且写入顺序无保证（后发的写可能先
+  /// 落盘，留下与滑块不同的值）。
+  ///
+  /// 现在只有 [TtsSettingsPage.speedPersistDebounce] 内的**最后一次**取值会落盘 ——
+  /// 中途值全部丢弃，这正是防抖想要的效果（用户只在停手的那一刻要持久化）。
+  /// 拖动过程本身不需要等待写盘：`_speed` 已经 setState，滑块用的是内存值。
+  Timer? _speedDebounce;
 
   static const _previewText = '床前明月光，疑是地上霜。';
 
@@ -186,10 +205,44 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     }
   }
 
-  Future<void> _onSpeedChanged(double speed) async {
+  /// 只更新内存态，不落盘 —— 见 [_speedDebounce]。
+  void _onSpeedChanged(double speed) {
     setState(() => _speed = speed);
-    final settingsRepo = ref.read(settingsRepositoryProvider);
-    await settingsRepo.setTtsSpeed(speed);
+    _speedDebounce?.cancel();
+    _speedDebounce = Timer(TtsSettingsPage.speedPersistDebounce, _persistSpeed);
+  }
+
+  /// 拖动结束：立刻落盘并取消待执行的防抖任务。
+  ///
+  /// `onChangeEnd` 在松手时触发，比防抖更准 —— 用户停手就持久化，不必再等
+  /// 一个防抖周期。两者都通向 `_persistSpeed`，且都会先 cancel，所以同一次
+  /// 拖动只会写一次盘。
+  void _onSpeedChangeEnd(double speed) {
+    setState(() => _speed = speed);
+    _speedDebounce?.cancel();
+    _speedDebounce = null;
+    _persistSpeed();
+  }
+
+  /// 把当前内存中的语速写入 Hive。
+  ///
+  /// 计时器回调与 [TtsSettingsPage] 的 dispose 都可能调用；不读 `_speed` 之外的
+  /// 任何 `State`，也不 setState，因此页面销毁后仍可安全完成这次写入。
+  Future<void> _persistSpeed() async {
+    _speedDebounce = null;
+    try {
+      await ref.read(settingsRepositoryProvider).setTtsSpeed(_speed);
+    } on Object catch (error, stackTrace) {
+      // 这是唯一会静默丢弃用户操作的地方：拖动结束没写进去，用户看到的
+      // 滑块位置与重启后的值不一致。捕获以免抛出到计时器；Hive 已按约定
+      // 在内存中生效，故不弹提示打断，但必须留日志可查。
+      AppLogger.e(
+        '语速保存失败',
+        tag: 'TtsSettings',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   // ====== 云端朗读（自建 Worker 合成） ======
@@ -373,6 +426,13 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
 
   @override
   void dispose() {
+    // 最后一次拖动可能仍在防抖窗口内：取消计时器会丢掉尚未落盘的取值，
+    // 所以先触发一次写入再取消（不等它完成 —— dispose 不能 await）。
+    if (_speedDebounce?.isActive ?? false) {
+      unawaited(_persistSpeed());
+    }
+    _speedDebounce?.cancel();
+    _speedDebounce = null;
     // 离开页面停止试听
     unawaited(
       _tts.stop().onError(
@@ -466,6 +526,8 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
                           divisions: 9,
                           label: _speed.toStringAsFixed(1),
                           onChanged: _onSpeedChanged,
+                          // 松手即落盘，不必等防抖窗口走完。
+                          onChangeEnd: _onSpeedChangeEnd,
                         ),
                       ),
                       Text(

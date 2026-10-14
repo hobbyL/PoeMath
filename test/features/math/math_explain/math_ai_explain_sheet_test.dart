@@ -444,9 +444,21 @@ void main() {
       // 弹层打开并完成生成，讲解内容渲染。
       expect(find.text('AI 解析'), findsOneWidget);
       expect(find.text('这道题考查乘法口诀。三五十五，得 15。'), findsOneWidget);
-      // prompt 载荷携带题面答案与用户作答（14 / 15）。
-      expect(utf8.decode(captured.bodyBytes), contains('14'));
-      expect(utf8.decode(captured.bodyBytes), contains('15'));
+      // prompt 载荷携带题面答案与用户作答（正确 15 / 作答 14）。
+      //
+      // 弱断言回归：原先是对**整个请求体**做 contains('14') / contains('15')，
+      // 而请求体里还有 model / max_tokens / stream 等字段 —— 任何含
+      // 「14」「15」子串的数字都能让断言凭空通过（把 max_tokens 从 800
+      // 改成 1500，contains('15') 立刻变成恒真）。现在只在 messages 的
+      // content 文本里断言，确保数字真的进了 prompt。
+      final body = jsonDecode(utf8.decode(captured.bodyBytes))
+          as Map<String, dynamic>;
+      final promptText = (body['messages'] as List)
+          .map((m) => (m as Map)['content'])
+          .join('\n');
+      expect(promptText, contains('15'), reason: '正确答案须入 prompt');
+      expect(promptText, contains('14'), reason: '用户作答须入 prompt');
+      expect(promptText, contains('3 × 5'), reason: '题面须入 prompt');
     });
   });
 }

@@ -27,6 +27,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:http/testing.dart';
 
+import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/webdav_service.dart';
@@ -390,11 +391,25 @@ void main() {
     await tapAndSettle(tester, find.text('仍然上传覆盖'));
 
     expect(cloud.puts, 1);
+
+    // 精确断言：上传成功后 `last_synced_at` 必须**逐字节等于**本次 PUT 的
+    // `exportedAt`（见 `cloud_sync_page.dart` 上传分支 `setLastSyncedAt(
+    // _exportedAtOf(json))`），也就等于云端当前持有的那份备份的 exportedAt。
+    //
+    // 不要退化成 `DateTime.parse(saved).isAfter(基准)`：那样的断言对任何
+    // 「写错了但恰好更晚」的值都成立（比如误写成 DateTime.now()，或把
+    // 下载方向的 exportedAt 写进来），等于没验。同文件其他用例都用精确相等。
     final saved = HiveBoxes.settings.get('last_synced_at') as String;
+    expect(
+      DateTime.parse(saved),
+      BackupService.exportedAt(cloud.content),
+      reason: '同步时刻应精确推进到本次上传内容的 exportedAt',
+    );
+    // 同时确认时间线确实**前进了**（而非原地不动恰好相等）。
     expect(
       DateTime.parse(saved).isAfter(DateTime(2026, 10, 12, 8)),
       isTrue,
-      reason: '同步时刻应被推进',
+      reason: '时间线应相对上次同步前进',
     );
   });
 

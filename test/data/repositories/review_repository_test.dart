@@ -195,8 +195,21 @@ void main() {
     });
 
     test('completeReview 对不存在的诗词无操作', () async {
-      // 不应抛异常
+      // 零断言回归：原先只有 `await repo.completeReview('nonexistent');`
+      // 配一句「不应抛异常」注释。删掉 completeReview 的
+      // 「取不到记录就早退」守卫后，原用例照样绿。
+      await repo.createSchedule('poem_exists');
+      final before = repo.get('poem_exists')!.currentRound;
+
       await repo.completeReview('nonexistent');
+
+      expect(repo.get('nonexistent'), isNull, reason: '不得凭空创建计划');
+      expect(repo.getActive(), hasLength(1), reason: '不得新增记录');
+      expect(
+        repo.get('poem_exists')!.currentRound,
+        before,
+        reason: '不得误推进其他诗词的轮次',
+      );
     });
 
     test('getActive 不包含其他 profile 的数据', () async {

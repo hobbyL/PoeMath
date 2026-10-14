@@ -18,6 +18,15 @@ Finder _bottomBarItem(String label) {
   );
 }
 
+/// 当前高亮的 tab 下标。
+///
+/// 这是「路由真的跳了」的可观测证据：`MainShell` 的 `selectedIndex` 由
+/// `_indexFromRoute(context)` 从真实 GoRouter 路径推导，而非自己存 state。
+/// 所以断言它 == 预期值，等价于断言 `context.go(...)` 生效。
+int _selectedTab(WidgetTester tester) {
+  return tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
+}
+
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
@@ -38,9 +47,25 @@ void main() {
     expect(find.byType(MainShell), findsOneWidget);
     expect(find.byType(NavigationBar), findsOneWidget);
 
-    for (final label in ['诗词', '口算', '我的', '首页']) {
-      await tester.tap(_bottomBarItem(label));
+    // 伪测试回归：本用例原先只在循环后断言 `takeException(), isNull`，
+    // 把 `MainShell._switch` 改成空函数（彻底不跳转）照样全绿 ——
+    // 标题承诺的「均可切换」完全没被验证。现在逐个断言高亮下标。
+    expect(_selectedTab(tester), 0, reason: '启动应停在首页 tab');
+
+    const expectedIndex = <String, int>{
+      '诗词': 1,
+      '口算': 2,
+      '我的': 3,
+      '首页': 0,
+    };
+    for (final entry in expectedIndex.entries) {
+      await tester.tap(_bottomBarItem(entry.key));
       await tester.pumpAndSettle();
+      expect(
+        _selectedTab(tester),
+        entry.value,
+        reason: '点击「${entry.key}」后应切到下标 ${entry.value}',
+      );
     }
 
     expect(tester.takeException(), isNull);

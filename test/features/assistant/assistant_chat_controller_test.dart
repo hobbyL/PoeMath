@@ -558,7 +558,12 @@ void main() {
 
     await notifier.resendFrom(0); // 消息截到 1 条 → base 须收紧到 ≤1
     final state = container.read(assistantChatControllerProvider);
-    expect(state.contextBaseIndex, lessThanOrEqualTo(state.messages.length));
+    // 弱断言回归：原先是 lessThanOrEqualTo(state.messages.length)（=2），
+    // 比本行注释声称的「≤1」还松 —— base=2 也能通过，而那意味着上下文
+    // 起点落在新回答之后，刚重发出来的这轮对话会被整段排除出请求历史。
+    // 实现是 `clamp(0, index + 1)`（assistant_chat_controller.dart:106），
+    // resendFrom(0) 的精确结果就是 1，直接锁死。
+    expect(state.contextBaseIndex, 1);
     expect(state.messages, hasLength(2)); // 第一问 + 新答
   });
 

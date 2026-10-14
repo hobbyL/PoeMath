@@ -49,12 +49,27 @@ void main() {
     );
   });
 
-  test('自身导出结果可被解析（导出/解析同源）', () {
-    // 不依赖 Hive：直接构造导出形态的 JSON，锁定字段名与格式一致。
+  test('合法 ISO 字符串可被解析（纯格式契约）', () {
+    // 原标题是「自身导出结果可被解析（导出/解析同源）」，但本用例手搓
+    // JSON、从不调用 `exportToJson()` —— 真正的生产者换个字段名
+    // （比如 exported_at）它照样绿，而「同源」恰恰只有生产者参与才测得到。
+    //
+    // 本文件不接 Hive，跑不了真实导出，所以这里只保留它真正验证的东西：
+    // 格式契约。真正的同源断言已落在
+    // `test/flow/backup_restore_flow_test.dart` 的「导出空数据库应生成合法
+    // JSON」里 —— 那里有 Hive，用的是 `exportToJson()` 的真实输出。
+    final exportedAt = DateTime.now();
     final json = jsonEncode(<String, dynamic>{
       'version': 1,
-      'exportedAt': DateTime.now().toIso8601String(),
+      'exportedAt': exportedAt.toIso8601String(),
     });
-    expect(BackupService.exportedAt(json), isNotNull);
+
+    // 断言解析出的**值**，而非仅 isNotNull：后者对任何「能解析但解析错」
+    // 的实现（比如丢掉时区、返回 epoch）都成立。
+    expect(
+      BackupService.exportedAt(json),
+      exportedAt,
+      reason: 'ISO 往返必须保值',
+    );
   });
 }

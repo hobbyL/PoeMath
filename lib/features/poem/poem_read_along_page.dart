@@ -636,25 +636,44 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     final statsRepo = ref.read(userStatsRepoProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
 
-    await activityRepo.record(
-      id: activityId,
-      activityType: LearningActivityType.readAlong,
-      totalItems: total,
-      successfulItems: qualified,
-      poemId: poemId,
-      starsEarned: stars,
-      durationSeconds: duration,
-      completedAt: completedAt,
-    );
-    if (stars > 0) {
-      await statsRepo.addStars(stars, activityId: activityId);
+    // 磁盘满 / Box 损坏时下列写入会抛。`HiveError extends Error`，故必须捕
+    // `Object` 而非 `Exception`（同文件其余 IO 链同一约定）。
+    //
+    // 这里**不弹 SnackBar**：调用点已 `setState` 切到结果页，页面正在展示分数，
+    // 中途弹条会比失败本身更打扰；且本方法由 `unawaited` 触发，抛出去就是
+    // unhandled error。故只记日志 + 让 `_settlementStarted` 复位，
+    // 用户下次进入仍可重新结算（activityId 未落库，重试幂等）。
+    try {
+      await activityRepo.record(
+        id: activityId,
+        activityType: LearningActivityType.readAlong,
+        totalItems: total,
+        successfulItems: qualified,
+        poemId: poemId,
+        starsEarned: stars,
+        durationSeconds: duration,
+        completedAt: completedAt,
+      );
+      if (stars > 0) {
+        await statsRepo.addStars(stars, activityId: activityId);
+      }
+      await checkInRepo.updateToday(
+        activityId: activityId,
+        addPoems: 1,
+        addStars: stars,
+        addDuration: duration,
+      );
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '跟读完成结算失败',
+        tag: 'ReadAlong',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      // 复位防重入标记：本次未结算成功，不应阻止后续重试。
+      _settlementStarted = false;
+      return;
     }
-    await checkInRepo.updateToday(
-      activityId: activityId,
-      addPoems: 1,
-      addStars: stars,
-      addDuration: duration,
-    );
 
     // —— 数据结算完毕；以下 UI 部分要求页面仍挂载 ——
     if (!mounted) return;

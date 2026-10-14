@@ -210,24 +210,63 @@ void main() {
     });
 
     test('拒绝奇数字节和超过 60 秒的 PCM', () async {
+      // 回归锁定：本用例原先把 mock 写成恒返回 500，于是「本地校验」与
+      // 「服务端返回错误」两条路径抛出的都是 TencentAsrException，
+      // 断言 `throwsA(isA<TencentAsrException>())` 无法区分 —— 把整段本地
+      // PCM 校验删掉，请求照常发出、收到 500 照样抛异常，测试仍然绿。
+      //
+      // 现在改为「mock 记录是否被请求 + 返回成功」，把本地校验做成
+      // 唯一可能的失败来源，并断言请求**从未发出**：
+      //   - 校验被删 → 请求发出 → requested 为 true → 断言失败；
+      //   - 校验保留 → 本地抛出，不触网 → requested 保持 false。
+      var requested = false;
       final client = TencentAsrClient(
-        httpClient: MockClient((_) async => http.Response('', 500)),
+        httpClient: MockClient((_) async {
+          requested = true;
+          return http.Response('{"Response":{"Result":"ok"}}', 200);
+        }),
       );
 
+      // 奇数字节：格式不完整，必须在本地被拒。
       await expectLater(
         client.recognizePcm16(
           pcmBytes: Uint8List.fromList(<int>[0]),
           credentials: credentials,
         ),
-        throwsA(isA<TencentAsrException>()),
+        throwsA(
+          isA<TencentAsrException>().having(
+            (e) => e.kind,
+            'kind',
+            TencentAsrErrorKind.request,
+          ),
+        ),
       );
+      expect(requested, isFalse, reason: '非法字节数必须在本地拒绝，不得发出请求');
+
+      // 超过 60 秒：同样本地拒绝。
       await expectLater(
         client.recognizePcm16(
           pcmBytes: Uint8List(TencentAsrClient.maxRawBytes + 2),
           credentials: credentials,
         ),
-        throwsA(isA<TencentAsrException>()),
+        throwsA(
+          isA<TencentAsrException>().having(
+            (e) => e.kind,
+            'kind',
+            TencentAsrErrorKind.request,
+          ),
+        ),
       );
+      expect(requested, isFalse, reason: '超长录音必须在本地拒绝，不得发出请求');
+
+      // 对照：合法 PCM 应当真的发请求并成功 —— 证明上面的 requested 探测
+      // 本身有效（否则「永不发请求」的错误实现也能骗过上两条断言）。
+      final text = await client.recognizePcm16(
+        pcmBytes: Uint8List.fromList(<int>[0, 0]),
+        credentials: credentials,
+      );
+      expect(requested, isTrue, reason: '合法 PCM 必须真正发出请求');
+      expect(text, 'ok');
     });
   });
 }

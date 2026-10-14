@@ -11,8 +11,10 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_mistake.dart';
+import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/features/math/mistake_consolidation_labels.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_ai_explain_sheet.dart';
@@ -356,7 +358,14 @@ class _ActionButtons extends ConsumerWidget {
             tooltip: '跳过巩固抽查，直接标记为已掌握',
             onTap: () async {
               final repo = ref.read(mathMistakeRepoProvider);
-              await repo.resolve(mistake.id);
+              final ok = await _writeMistake(
+                ScaffoldMessenger.of(context),
+                '标记已掌握',
+                () async {
+                  await repo.resolve(mistake.id);
+                },
+              );
+              if (!ok) return;
               ref.invalidate(mathMistakeRepoProvider);
             },
             color: theme.colorScheme.primary,
@@ -365,6 +374,8 @@ class _ActionButtons extends ConsumerWidget {
           icon: Icons.delete_outline,
           label: '删除',
           onTap: () async {
+            // 在首个 await（对话框）之前捕获 messenger，供写入失败时提示。
+            final messenger = ScaffoldMessenger.of(context);
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -387,7 +398,10 @@ class _ActionButtons extends ConsumerWidget {
             );
             if (confirmed != true) return;
             final repo = ref.read(mathMistakeRepoProvider);
-            await repo.delete(mistake.id);
+            final ok = await _writeMistake(messenger, '删除错题', () async {
+              await repo.delete(mistake.id);
+            });
+            if (!ok) return;
             ref.invalidate(mathMistakeRepoProvider);
             if (context.mounted) onDeleted();
           },
@@ -427,7 +441,47 @@ class _ActionButtons extends ConsumerWidget {
     );
   }
 
+  /// 执行一次错题写入，失败时提示用户。
+  ///
+  /// `resolve` / `delete` / `recordRepracticeResult` 内部都是 `Hive.put/delete`，
+  /// 磁盘满或 Box 损坏会抛 —— 且抛的是 `HiveError extends Error`，**不是**
+  /// `Exception`，所以必须捕 `Object`。
+  ///
+  /// 原先三处写入全部裸 await：异常冒泡到框架，用户看到的是「点了没反应」
+  /// ——「已掌握」按钮点了没变化、确认删除后错题还在原地。界面与真实状态
+  /// 脱节且无任何解释，用户会反复点。这里统一补上日志 + 提示。
+  ///
+  /// 返回 true 表示写入成功，调用方据此决定是否 invalidate / 回调 onDeleted。
+  ///
+  /// 传入 [messenger] 而非 `BuildContext`：调用点普遍是「先 await 一个对话框、
+  /// 再 await 写入」，`context` 会跨越 async gap，直接用它会被
+  /// `use_build_context_synchronously` 判为不安全。调用方在首个 await 之前
+  /// 捕获 `ScaffoldMessenger.of(context)`，语义等价且无 lint。
+  Future<bool> _writeMistake(
+    ScaffoldMessengerState messenger,
+    String label,
+    Future<void> Function() write,
+  ) async {
+    try {
+      await write();
+      return true;
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '$label失败',
+        tag: 'MathMistakeDetail',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('$label失败，请重试')));
+      return false;
+    }
+  }
+
   Future<void> _repractice(BuildContext context, WidgetRef ref) async {
+    // 在首个 await（对话框）之前捕获 messenger。
+    final messenger = ScaffoldMessenger.of(context);
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => MistakeRepracticeDialog(
@@ -439,19 +493,25 @@ class _ActionButtons extends ConsumerWidget {
     if (result == null) return;
 
     final repo = ref.read(mathMistakeRepoProvider);
-    final outcome = await repo.recordRepracticeResult(
-      mistake.id,
-      isCorrect: result,
-    );
+    RepracticeOutcome? outcome;
+    final ok = await _writeMistake(messenger, '提交巩固结果', () async {
+      outcome = await repo.recordRepracticeResult(
+        mistake.id,
+        isCorrect: result,
+      );
+    });
+    if (!ok) return;
 
     ref.invalidate(mathMistakeRepoProvider);
 
     // 巩固状态机反馈：进入巩固 / 通过一关 / 三关全过 / 打回未掌握。
-    if (outcome != null && context.mounted) {
+    // 写入成功（ok == true）时 outcome 必已赋值；用局部变量承接以便提升类型。
+    final settled = outcome;
+    if (settled != null && context.mounted) {
       final updated = repo.getById(mistake.id) ?? mistake;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(repracticeOutcomeMessage(outcome, updated)),
+          content: Text(repracticeOutcomeMessage(settled, updated)),
           duration: const Duration(seconds: 2),
         ),
       );

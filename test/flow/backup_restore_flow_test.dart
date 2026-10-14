@@ -75,8 +75,19 @@ void main() {
   test('导出空数据库应生成合法 JSON', () async {
     final json = await backupService.exportToJson();
     expect(json, contains('"version"'));
-    expect(json, contains('"exportedAt"'));
     expect(json, contains('"poemProgress": []'));
+
+    // 导出/解析同源：不只断言字段名出现过（`contains('"exportedAt"')` 对
+    // 一个格式写错的值同样成立），而是让真实导出结果过一遍真实解析器。
+    // 这是跨设备冲突检测的前置条件 —— 解析不出来就退化成「无法判定」，
+    // 覆盖提醒会静默失效（见 BackupService.exportedAt 文档）。
+    final exportedAt = BackupService.exportedAt(json);
+    expect(exportedAt, isNotNull, reason: '自身导出的 exportedAt 必须可被自己解析');
+    expect(
+      DateTime.now().difference(exportedAt!).abs(),
+      lessThan(const Duration(minutes: 5)),
+      reason: '导出时刻应接近当下，而非 epoch 或解析偏移后的值',
+    );
   });
 
   test('备份并恢复 PoemProgress 数据', () async {

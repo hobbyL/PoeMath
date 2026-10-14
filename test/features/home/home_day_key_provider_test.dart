@@ -89,10 +89,21 @@ void main() {
     expect(container.read(todayCheckInProvider), isNotNull);
   });
 
-  test('dayKeyProvider dispose 时释放 Timer（容器可正常关闭）', () {
+  testWidgets('dayKeyProvider dispose 时释放 Timer（无遗留 pending timer）',
+      (tester) async {
+    // 零断言回归：本用例原先是 `test(...)` + 注释「dispose 后无 pending
+    // timer 抛错即通过」—— 但纯 `test()` **不检查** pending timer，
+    // 所以 DayKeyNotifier 漏掉 `_timer?.cancel()` 时它依然全绿，
+    // 而那个 30s 周期 Timer 会在真机上一直跑。
+    //
+    // 换成 `testWidgets` 后跑在 FakeAsync 下，flutter_test 会在用例结束时
+    // 断言没有遗留 timer（"A Timer is still pending..."），注释里声称的
+    // 检查才真正存在。下面再显式推时间，确认 Timer 不会在 dispose 后回调。
     final container = ProviderContainer();
     container.read(dayKeyProvider); // 触发 Timer 创建
     container.dispose();
-    // dispose 后无 pending timer 抛错即通过
+
+    // 远超 30s 轮询周期：若 Timer 未取消，这里会触发已 dispose 容器的回调。
+    await tester.pump(const Duration(minutes: 5));
   });
 }
