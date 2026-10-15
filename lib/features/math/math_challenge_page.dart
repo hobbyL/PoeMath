@@ -21,6 +21,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/models/challenge_record.dart';
+import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
@@ -300,7 +301,14 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     try {
       await _saveRecord(elapsed: elapsed, stars: stars);
       if (!mounted) return;
-      final newlyUnlocked = await checkAchievements(ref);
+      // 挑战页只落 ChallengeRecord，但「单次全对 / 困难全对」类成就的判定
+      // 口径来自 MathSession（见 AchievementChecker._sessionPerfect）。这里把
+      // 本次挑战映射成一份内存态 MathSession 传入，不写入 Hive —— 挑战数据
+      // 的持久化仍以 ChallengeRecord 为唯一来源，避免出现双份记录。
+      final newlyUnlocked = await checkAchievements(
+        ref,
+        latestSession: _asAchievementSession(elapsed: elapsed, stars: stars),
+      );
 
       if (!mounted) return;
 
@@ -402,6 +410,30 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       addMathCorrect: _correctCount,
       addStars: stars,
       addDuration: elapsed,
+    );
+  }
+
+  /// 把本次挑战映射为成就判定用的 [MathSession]。
+  ///
+  /// 仅用于 `checkAchievements(latestSession:)` 的上下文，**不写入 Hive**。
+  /// 字段对齐挑战页的统计口径，使「单次全对」（`totalProblems >= n` 且
+  /// 正确率 100%）与「困难全对」等成就对挑战模式同样生效。
+  MathSession _asAchievementSession({
+    required int elapsed,
+    required int stars,
+  }) {
+    return MathSession(
+      id: _challengeId,
+      profileId: ProfileScope.currentId,
+      grade: ref.read(mathGradeProvider),
+      problemType: 'challenge',
+      totalProblems: _totalAnswered,
+      correctCount: _correctCount,
+      durationSeconds: elapsed,
+      starsEarned: stars,
+      finishedAt: DateTime.now(),
+      semester: ref.read(mathSemesterProvider),
+      difficulty: ref.read(settingsRepositoryProvider).mathDifficulty,
     );
   }
 

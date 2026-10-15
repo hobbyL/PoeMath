@@ -10,6 +10,10 @@ enum LearningActivityType {
   mistakeReview,
   readAlong,
   manualCheckIn,
+
+  /// 应用题练习。**必须追加在末尾**：Hive 以字符串 `name` 持久化，
+  /// 但 `typeOrNull` 之外的代码若按 `index` 取值，插入中间会错位。
+  wordProblem,
 }
 
 class LearningRewardCalculator {
@@ -37,7 +41,9 @@ class LearningRewardCalculator {
         _calculateRecitationStars(totalItems, successfulItems),
       LearningActivityType.poemQuiz ||
       LearningActivityType.mathPractice ||
-      LearningActivityType.mathChallenge =>
+      LearningActivityType.mathChallenge ||
+      // 应用题与口算同口径：题量少但正确率标准不应特殊对待。
+      LearningActivityType.wordProblem =>
         _calculateAccuracyStars(totalItems, successfulItems),
       LearningActivityType.mistakeReview ||
       LearningActivityType.readAlong ||

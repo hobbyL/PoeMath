@@ -253,7 +253,7 @@ class _WordProblemPracticePageState
     final first = problems.first;
 
     final stars = LearningRewardCalculator.calculateStars(
-      activityType: LearningActivityType.mathPractice,
+      activityType: LearningActivityType.wordProblem,
       totalItems: problems.length,
       successfulItems: correctCount,
     );
@@ -280,7 +280,7 @@ class _WordProblemPracticePageState
     final activityId = 'llm_word_practice:${session.id}';
     await ref.read(learningActivityRepositoryProvider).record(
           id: activityId,
-          activityType: LearningActivityType.mathPractice,
+          activityType: LearningActivityType.wordProblem,
           totalItems: problems.length,
           successfulItems: correctCount,
           starsEarned: stars,

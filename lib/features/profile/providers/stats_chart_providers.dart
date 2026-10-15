@@ -141,7 +141,8 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
           hasMath: previous.hasMath,
         ),
       LearningActivityType.mathPractice ||
-      LearningActivityType.mathChallenge =>
+      LearningActivityType.mathChallenge ||
+      LearningActivityType.wordProblem =>
         (
           poemCount: previous.poemCount,
           poemStars: previous.poemStars,

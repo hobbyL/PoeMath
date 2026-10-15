@@ -60,6 +60,9 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       _progress = 0;
       _statusText = '正在启动…';
       _isImporting = false;
+      // 重试入口：必须清掉上一次的失败状态，否则 `_initializationError != null`
+      // 会让 build 继续渲染失败视图，用户看不到重试进度（表现为点击无反应）。
+      _initializationError = null;
     });
 
     try {
