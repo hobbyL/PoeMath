@@ -15,6 +15,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/poem_progress_repository.dart';
 import 'package:poemath/features/formula/providers/formula_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 /// 返回值可辨认的假仓储，用于确认实际读到的是覆写后的实例。
@@ -103,6 +104,16 @@ void main() {
       expect(
         container.read(challengeRecordRepositoryProvider),
         same(container.read(challengeRecordRepoProvider)),
+      );
+    });
+
+    test('应用题模块别名同样指向同一实例', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(
+        container.read(llmProblemRepoDataProvider),
+        same(container.read(llmProblemRepositoryProvider)),
       );
     });
 

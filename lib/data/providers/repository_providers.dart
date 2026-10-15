@@ -22,6 +22,7 @@ import 'package:poemath/data/repositories/challenge_record_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/data/repositories/learning_activity_repository.dart';
+import 'package:poemath/data/repositories/llm_problem_repository.dart';
 import 'package:poemath/data/repositories/assistant_conversation_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/core/services/backup_service.dart';
@@ -96,6 +97,15 @@ final userStatsRepositoryProvider = Provider<UserStatsRepository>((ref) {
 final learningActivityRepositoryProvider =
     Provider<LearningActivityRepository>((ref) {
   return LearningActivityRepository();
+});
+
+/// 应用题题库仓储。
+///
+/// **不叫 `llmProblemRepositoryProvider`**：features 层保留了这个名字做别名，
+/// 两侧同名会让同时 import 二者的页面触发 `ambiguous_import`。数据层用短名，
+/// features 层沿用旧名，与 `poemRepositoryProvider`/`poemRepoProvider` 同构。
+final llmProblemRepoDataProvider = Provider<LlmProblemRepository>((ref) {
+  return LlmProblemRepository();
 });
 
 final conversationRepositoryProvider =

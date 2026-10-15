@@ -27,9 +27,12 @@ final wordProblemSkeletonProvider =
 });
 
 /// 应用题题库 repository。
-final llmProblemRepositoryProvider = Provider<LlmProblemRepository>((ref) {
-  return LlmProblemRepository();
-});
+///
+/// 纯别名，指向数据层唯一实例（与其余 features 层仓储 Provider 同法）。
+/// 显式标注类型：顶层 `final` 靠赋值推断，该文件与数据层互相 import 时
+/// 推断会成环，跨文件读到的类型可能退化为 `dynamic`。
+final Provider<LlmProblemRepository> llmProblemRepositoryProvider =
+    llmProblemRepoDataProvider;
 
 /// LLM 配置（null = 未配置，生成页显示引导态）。
 final llmConfigProvider = FutureProvider.autoDispose((ref) async {
