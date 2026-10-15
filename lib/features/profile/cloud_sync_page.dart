@@ -173,7 +173,11 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       scaffold.showSnackBar(
         SnackBar(content: Text('上传失败: ${e.message}')),
       );
-    } on Exception catch (e) {
+    } on Object catch (e) {
+      // `on Object` 兜在具体类型之后：`settingsRepo.setLastSyncedAt` 写
+      // `HiveBoxes`，失败抛 `HiveError extends Error`，`on Exception` 接不住。
+      // 有 `finally` 复位 `_uploading` 不会卡死，但漏捕会让上传按钮点了
+      // 既无成功也无失败反馈（异常直抛框架）。
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
         SnackBar(content: Text('上传失败: $e')),
@@ -301,7 +305,11 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       scaffold.showSnackBar(
         SnackBar(content: Text('恢复失败: ${e.message}')),
       );
-    } on Exception catch (e) {
+    } on Object catch (e) {
+      // `on Object` 兜在具体类型之后：下载后的恢复流程要成批写 `HiveBoxes`，
+      // 中途失败抛 `HiveError extends Error`，`on Exception` 接不住 ——
+      // 而这正是「恢复写到一半」最需要提示用户的场景。有 `finally` 复位
+      // `_downloading` 不会卡死。
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
         SnackBar(content: Text('下载失败: $e')),

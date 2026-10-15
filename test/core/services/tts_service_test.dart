@@ -729,4 +729,36 @@ void main() {
       expect(engine.spokenTexts, const <String>['真的吗', '太好了', '走吧']);
     });
   });
+
+  group('Hive 异常穿透防护', () {
+    // `_runEngineOperation` 原先用 `on Exception catch` 包装平台异常，
+    // 但引擎初始化与云端状态刷新都会读 `_settings`（Hive），而 Hive 抛的是
+    // `HiveError extends Error` —— 它不会被 `on Exception` 接住，会**穿透**
+    // 包装层把裸 `Error` 抛给页面，令下游按 `TtsException` 分层处理的分支
+    // 全部失效（页面显示通用文案而非具体原因，或干脆无反馈）。
+    //
+    // 这类缺陷无法用「改回 on Exception」以外的形式察觉：测试断言的是
+    // **异常类型**，而非某个 UI 文案。
+
+    setUp(() {
+      // 让引擎初始化时的第一次 Hive 读取抛 `Error`（HiveError 的真实形态：
+      // 是 Error 不是 Exception）。用普通 Error 即可覆盖同一分支。
+      when(() => settings.ttsSpeed).thenThrow(StateError('HiveBoxes 已关闭'));
+    });
+
+    test('引擎初始化读 Hive 失败时，包装为 TtsException 而非裸 Error', () async {
+      // getChineseVoices 先走 _ensureInitialized（读 ttsSpeed）。
+      expect(
+        () => service.getChineseVoices(),
+        throwsA(isA<TtsException>()),
+      );
+    });
+
+    test('speak 初始化失败同样包装为 TtsException', () async {
+      expect(
+        () => service.speak('第一句'),
+        throwsA(isA<TtsException>()),
+      );
+    });
+  });
 }

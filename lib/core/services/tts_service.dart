@@ -302,7 +302,12 @@ class TtsService {
       return await operation();
     } on TtsException {
       rethrow;
-    } on Exception catch (error) {
+    } on Object catch (error) {
+      // `on Object` 而非 `on Exception`：操作体内会读 `_settings`（Hive），
+      // `HiveError extends Error` 不被 `on Exception` 接住 —— 它会**穿透**
+      // 本方法，绕过这里的统一包装，把裸 `HiveError` 抛给页面。下游调用点
+      // 普遍按 `TtsException` 分层处理（透传中文 message + 通用兜底），
+      // 包装一旦缺失，这些分支全部失效。
       throw TtsException(failureMessage, cause: error);
     }
   }

@@ -108,7 +108,11 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       if (verified && _cloudEnabled) {
         _loadCloudVoices();
       }
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // `on Object` 而非 `on Exception`：`settingsRepo` 的读取链最终落到
+      // `HiveBoxes`，Hive 抛的 `HiveError extends Error`，`on Exception` 捕不到。
+      // 本方法没有 finally 兜底，异常一旦逃逸会直接把未捕获错误抛给框架，
+      // 用户看到的是「验证状态一直转圈」而无任何提示。
       AppLogger.e(
         '读取自建服务验证状态失败',
         tag: 'TtsSettings',
@@ -135,7 +139,11 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
           _loading = false;
         });
       }
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // `getChineseVoices` 先走引擎初始化，其间读 `_settings.ttsSpeed` /
+      // `ttsVoice`（Hive 读）。`HiveError extends Error` 会穿透
+      // `tts_service._runEngineOperation` 的 `on Exception`，故此处用
+      // `on Object`。漏捕时音色列表永远停在 loading 态。
       AppLogger.e(
         '加载系统音色失败',
         tag: 'TtsSettings',
@@ -159,7 +167,11 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     try {
       await _tts.stop();
       await _tts.setVoice(voice);
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // `_tts.setVoice` 内部以 `_settings.setTtsVoice(voice)` 落到
+      // `HiveBoxes.settings`（见 `tts_service.dart:373`），Hive 写失败抛的
+      // `HiveError extends Error` 会被 `on Exception` 漏掉。这里捕获后是
+      // 「提示 + 保留原音色」，漏捕则音色视觉上像已切换、实际没落盘。
       AppLogger.e(
         '保存 TTS 音色失败',
         tag: 'TtsSettings',
@@ -181,7 +193,10 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
 
     try {
       await _tts.preview(_previewText);
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // `preview` 即 `speak`，入口读 `_ensureInitialized` 与
+      // `_refreshCloudState` 的 Hive 配置。`HiveError extends Error`
+      // 穿透服务层的 `on Exception`，此处同样放宽。
       AppLogger.e(
         'TTS 音色试听失败',
         tag: 'TtsSettings',
@@ -269,7 +284,10 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
         _cloudVoices = voices;
         _cloudVoicesLoading = false;
       });
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // `listCloudVoices` 读 `_settings.ttsCloudBaseUrl`（Hive 读），
+      // `HiveError extends Error` 不被 `on Exception` 接住。此处有回退列表
+      // 兜底，但漏捕会让这个兜底永远执行不到，列表停在 loading 态。
       AppLogger.e(
         '获取在线音色失败',
         tag: 'TtsSettings',
@@ -322,7 +340,11 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       if (mounted) setState(() => _verifyError = error.message);
     } on WorkerTtsException catch (error) {
       if (mounted) setState(() => _verifyError = error.message);
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // `on Object` 兜在具体类型之后：`saveWorkerTtsConfig` /
+      // `markWorkerTtsVerified` 写 `HiveBoxes`，失败抛 `HiveError extends
+      // Error`，`on Exception` 接不住。守卫位有 `finally` 兜底不会卡死，
+      // 但漏捕会让「保存」按钮点了毫无反馈（异常直抛框架）。
       AppLogger.e(
         '自建语音服务保存或验证失败',
         tag: 'TtsSettings',
@@ -373,7 +395,10 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       _baseUrlController.text = settingsRepo.ttsCloudBaseUrl;
       _apiKeyController.clear();
       AppLogger.d('自建语音服务配置已删除', tag: 'TtsSettings');
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // `deleteWorkerTtsConfig` 删的是 `HiveBoxes` 与安全存储；Hive 侧失败抛
+      // `HiveError extends Error`，`on Exception` 捕不到。本方法无 finally，
+      // 漏捕时用户点了「删除」既看不到成功提示、也看不到失败提示。
       AppLogger.e(
         '删除自建语音服务配置失败',
         tag: 'TtsSettings',
@@ -406,7 +431,10 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
         scaffold.clearSnackBars();
         scaffold.showSnackBar(SnackBar(content: Text(error.message)));
       }
-    } on Exception catch (error, stackTrace) {
+    } on Object catch (error, stackTrace) {
+      // `setTtsCloudVoice` / `setTtsCloudStyle` 直写 `HiveBoxes.settings`，
+      // 失败抛 `HiveError extends Error`。`finally` 会复位 `_cloudBusy`
+      // （不会卡住），但漏捕时用户点音色后无任何反馈。
       AppLogger.e(
         '云端音色试听失败',
         tag: 'TtsSettings',
