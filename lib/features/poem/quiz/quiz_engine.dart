@@ -30,7 +30,7 @@ class QuizEngine {
 
     // 随机打乱后取 maxQuestions 道
     final shuffled = List<_LinePair>.from(pairs)..shuffle(r);
-    final count = shuffled.length.clamp(2, maxQuestions);
+    final count = _boundedCount(shuffled.length, maxQuestions);
 
     return shuffled.take(count).map((pair) {
       final blankResult = _createBlank(pair.line, r);
@@ -65,7 +65,7 @@ class QuizEngine {
     final allLines = <String>{...lines, ...extraLines};
 
     final shuffled = List<_LinePair>.from(pairs)..shuffle(r);
-    final count = shuffled.length.clamp(2, maxQuestions);
+    final count = _boundedCount(shuffled.length, maxQuestions);
 
     return shuffled.take(count).map((pair) {
       final distractors = _pickDistractors(
@@ -128,7 +128,7 @@ class QuizEngine {
     }
 
     final shuffledLines = List<String>.from(lines)..shuffle(r);
-    final count = shuffledLines.length.clamp(2, maxQuestions);
+    final count = _boundedCount(shuffledLines.length, maxQuestions);
 
     return shuffledLines.take(count).map((line) {
       final distractors = _pickStringDistractors(
@@ -207,12 +207,37 @@ class QuizEngine {
     final pool = candidates.where((c) => c != correct).toList()..shuffle(random);
     final result = pool.take(count).toList();
 
-    // 不足时补充
+    // 不足时补充占位项
+    if (result.length < count) {
+      result.addAll(
+        _buildFallbacks(
+          prefix: fallbackPrefix,
+          needed: count - result.length,
+          exclude: {...result, correct},
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// 生成 [needed] 个互不相同、且不与 [exclude] 相撞的占位字符串。
+  ///
+  /// 一次性生成而非「循环 add 直到够数」：后者在候选与占位项重合时可能
+  /// 反复产出同一个串（旧 `_pickDistractors` 的固定文案分支就是这个形态），
+  /// 要么死循环、要么产出重复选项。此处同时跳过 `exclude` 中的值。
+  static List<String> _buildFallbacks({
+    required String prefix,
+    required int needed,
+    required Set<String> exclude,
+  }) {
+    if (needed <= 0) return const [];
+
+    final result = <String>[];
     var idx = 1;
-    while (result.length < count) {
-      final fallback = '$fallbackPrefix$idx';
-      if (!result.contains(fallback) && fallback != correct) {
-        result.add(fallback);
+    while (result.length < needed) {
+      final candidate = '$prefix$idx';
+      if (!exclude.contains(candidate) && !result.contains(candidate)) {
+        result.add(candidate);
       }
       idx++;
     }
@@ -221,12 +246,26 @@ class QuizEngine {
 
   // ============ 内部方法 ============
 
+  /// 题目数量：至少 2 道，至多 [maxQuestions] 道，且不超过可用素材数。
+  ///
+  /// 不用 `available.clamp(2, maxQuestions)` —— `num.clamp` 在
+  /// `lower > upper` 时抛 `ArgumentError`，即 `maxQuestions < 2` 会直接崩。
+  /// 当前调用方恰好都不触发，但这是悬着的坑。
+  static int _boundedCount(int available, int maxQuestions) {
+    return min(available, max(2, maxQuestions));
+  }
+
   /// 将诗词正文按行拆分，过滤空行和纯标点行。
+  ///
+  /// **不再丢弃单字行**：`_splitLines` 的结果决定 `_buildPairs` 的配对，
+  /// 少一行就会让其后所有行整体错位（上句配到下句、题干与答案不再对应）。
+  /// 单字行（如某些词的领字）由 `_createBlank` 的 `chars.length <= 2`
+  /// 分支按「整行挖空」处理，`_buildPairs` 也只按索引配对、对行长无假设。
   static List<String> _splitLines(String content) {
     return content
         .split('\n')
         .map((l) => l.trim())
-        .where((l) => l.isNotEmpty && l.length > 1)
+        .where((l) => l.isNotEmpty)
         .toList();
   }
 
@@ -282,12 +321,16 @@ class QuizEngine {
       return candidates.sublist(0, count);
     }
 
-    // 不足时补充变形行
+    // 不足时补充变形行（复用占位生成，保证互异且不与正确答案重合）
     final result = List<String>.from(candidates);
-    while (result.length < count) {
-      final firstChar = String.fromCharCode(correctAnswer.runes.first);
-      result.add('$firstChar…… (无此句)');
-    }
+    final firstChar = String.fromCharCode(correctAnswer.runes.first);
+    result.addAll(
+      _buildFallbacks(
+        prefix: '$firstChar…… (无此句) ',
+        needed: count - result.length,
+        exclude: {...candidates, correctAnswer, contextLine},
+      ),
+    );
     return result;
   }
 }

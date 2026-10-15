@@ -197,6 +197,148 @@ void main() {
     });
   });
 
+  group('QuizEngine - 出题引擎健壮性（审计 D1/D2/D3）', () {
+    test('D1: maxQuestions < 2 不抛 ArgumentError', () {
+      // 修复前 `shuffled.length.clamp(2, maxQuestions)` 在 maxQuestions=1
+      // 时抛 ArgumentError（num.clamp 要求 lower <= upper）。
+      final poem = _makePoem();
+
+      expect(
+        () => QuizEngine.generateFillBlank(
+          poem,
+          maxQuestions: 1,
+          random: Random(42),
+        ),
+        returnsNormally,
+      );
+      expect(
+        () => QuizEngine.generateMultipleChoice(
+          poem,
+          maxQuestions: 1,
+          random: Random(42),
+        ),
+        returnsNormally,
+      );
+      expect(
+        () => QuizEngine.generateChooseAuthor(
+          poem,
+          allPoems: [poem],
+          maxQuestions: 1,
+          random: Random(42),
+        ),
+        returnsNormally,
+      );
+
+      // 下界受保护后仍产出 2 道（min(可用素材, max(2, maxQuestions))）。
+      final questions = QuizEngine.generateFillBlank(
+        poem,
+        maxQuestions: 1,
+        random: Random(42),
+      );
+      expect(questions.length, 2);
+    });
+
+    test('D1: maxQuestions 为 0 或负数也不抛', () {
+      final poem = _makePoem();
+      for (final n in [0, -1, -100]) {
+        expect(
+          () => QuizEngine.generateFillBlank(
+            poem,
+            maxQuestions: n,
+            random: Random(42),
+          ),
+          returnsNormally,
+          reason: 'maxQuestions=$n',
+        );
+      }
+    });
+
+    test('D2: 干扰项极少的诗句，选项内无重复字符串', () {
+      // 只用 2 行诗且不给 extraLines —— 可选干扰项为 0，
+      // 必须全部走占位补足分支。修复前该分支反复产出同一固定串，
+      // 会出现 3 个完全相同（且等于正确选项之外的同串）的选项。
+      final poem = _makePoem(content: '白日依山尽，\n黄河入海流。');
+      final questions = QuizEngine.generateMultipleChoice(
+        poem,
+        random: Random(7),
+      );
+
+      expect(questions, isNotEmpty);
+      for (final q in questions) {
+        final options = q.options!;
+        expect(
+          options.toSet().length,
+          options.length,
+          reason: '选项应互异，实际为 $options',
+        );
+        expect(options.length, 4);
+        // 正确答案只出现一次
+        expect(options.where((o) => o == q.correctAnswer).length, 1);
+      }
+    });
+
+    test('D2: 作者/朝代干扰项不足时补足项也互异', () {
+      final poem = _makePoem();
+      // allPoems 只有本诗 → 没有其他作者/朝代可作干扰项。
+      final authorQuestions = QuizEngine.generateChooseAuthor(
+        poem,
+        allPoems: [poem],
+        random: Random(3),
+      );
+      for (final q in authorQuestions) {
+        final options = q.options!;
+        expect(options.toSet().length, options.length);
+        expect(options.length, 4);
+      }
+
+      final dynastyQuestions = QuizEngine.generateChooseDynasty(
+        poem,
+        allPoems: [poem],
+        random: Random(3),
+      );
+      for (final q in dynastyQuestions) {
+        final options = q.options!;
+        expect(options.toSet().length, options.length);
+        expect(options.length, 4);
+      }
+    });
+
+    test('D3: 单字行不再被丢弃，配对不错位', () {
+      // 「风」是单字行。修复前 `_splitLines` 会把它滤掉，导致
+      // 「吹」与「又」被配成一对（上句/下句整体错位）。
+      const content = '风\n吹\n又\n生';
+      final poem = _makePoem(content: content);
+
+      final questions = QuizEngine.generateFillBlank(
+        poem,
+        random: Random(1),
+      );
+
+      // 4 行 → 2 对：(风,吹) 与 (又,生)。
+      // 修复前只剩 3 行 → 1 对 (吹,又)。
+      expect(questions.length, 2);
+
+      // 每个答案都应是它这对的第二行，且与题干上句相邻。
+      final pairs = questions.map((q) => (q.contextLine, q.correctAnswer));
+      expect(pairs, containsAll([('风', '吹'), ('又', '生')]));
+    });
+
+    test('D3: 纯空行仍被过滤（行为不变）', () {
+      final poem = _makePoem(content: '床前明月光，\n\n疑是地上霜。\n   \n举头望明月，\n低头思故乡。');
+      final questions = QuizEngine.generateFillBlank(
+        poem,
+        random: Random(42),
+      );
+
+      // 4 个有效行 → 2 对
+      expect(questions.length, 2);
+      for (final q in questions) {
+        expect(q.contextLine.trim(), isNotEmpty);
+        expect(q.correctAnswer.trim(), isNotEmpty);
+      }
+    });
+  });
+
   group('QuizSession', () {
     test('作答记录和正确率计算', () {
       final questions = [
