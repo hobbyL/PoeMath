@@ -225,7 +225,6 @@ class StudyHubPage extends ConsumerWidget {
     );
   }
 
-  /// 根据可用宽度计算列数。
 
   void _showCategoryPicker(
     BuildContext context,

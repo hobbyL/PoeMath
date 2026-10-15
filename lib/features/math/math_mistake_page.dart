@@ -370,7 +370,6 @@ class MathMistakePage extends ConsumerWidget {
     );
   }
 
-  /// 根据可用宽度计算列数。
 
   static String _statusFilterLabel(MistakeStatusFilter filter) =>
       mistakeStatusFilterLabel(filter);

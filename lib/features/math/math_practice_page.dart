@@ -428,13 +428,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     if (newlyUnlocked.isNotEmpty) {
       _confettiController.play();
       final names = newlyUnlocked.map((a) => a.title).join('、');
-      showCelebration(
+      // await 到庆祝弹窗关闭为止，再弹结果对话框（避免两窗重叠）。
+      await showCelebration(
         context,
         type: CelebrationType.achievement,
         subtitle: names,
       );
-      // 等庆祝弹窗自动关闭后再弹结果
-      await Future<void>.delayed(const Duration(milliseconds: 1800));
       if (!mounted) return;
     }
 
@@ -777,7 +776,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           context,
           problemText: problem.problemText,
           correctAnswer: problem.answerText,
-          userAnswer: judgement.isCorrect ? null : _userAnswerOf(problem),
+          userAnswer: judgement.isCorrect ? null : _userAnswerOfCurrent(),
           diagnosisCategory: judgement.diagnosis?.category,
         );
     return isWide
@@ -794,12 +793,16 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           );
   }
 
-  /// 从本次会话记录中回查该题作答（只读，不改动记录链路）。
-  String? _userAnswerOf(MathProblem problem) {
-    for (final record in _problemRecords.reversed) {
-      if (record.problemText == problem.problemText) return record.userAnswer;
-    }
-    return null;
+  /// 回查当前题的作答（只读，不改动记录链路）。
+  ///
+  /// 按**题目索引**定位，不用题干文本匹配：`_problemRecords` 与
+  /// `mathProblemsProvider` 同序（每题作答时 `add` 一条），索引即权威关联。
+  /// 文本匹配在题干重复时会命中错误的旧记录（如连出两道同形题，
+  /// 第二次作答前显示的是第一次的答案）。
+  String? _userAnswerOfCurrent() {
+    final index = ref.read(mathCurrentIndexProvider);
+    if (index < 0 || index >= _problemRecords.length) return null;
+    return _problemRecords[index].userAnswer;
   }
 
   Widget _buildAnswerInput(BuildContext context) {

@@ -37,10 +37,19 @@ enum CelebrationType {
   final Color color;
 }
 
+/// 庆祝弹窗自动关闭时长。
+///
+/// 调用方若需要「等庆祝结束再继续」（如等它关掉再弹结算对话框），
+/// **直接 `await showCelebration(...)` 即可** —— 返回的 Future 在弹窗
+/// 关闭时完成，不必再自行 `Future.delayed` 猜时长（猜测值一旦小于实际
+/// 时长就会让两个弹窗重叠）。
+const Duration kCelebrationAutoCloseDuration = Duration(milliseconds: 1500);
+
 /// 显示庆祝弹窗。
 ///
 /// [subtitle] 可选的副标题（如成就名称、新等级名）。
-/// 自动在 1.5 秒后关闭。
+/// 自动在 [kCelebrationAutoCloseDuration] 后关闭；返回的 Future 在弹窗
+/// 关闭时完成，因此 `await showCelebration(...)` 可await 到弹窗收起。
 Future<void> showCelebration(
   BuildContext context, {
   required CelebrationType type,
@@ -76,7 +85,7 @@ class _CelebrationDialogContentState extends State<_CelebrationDialogContent> {
   void initState() {
     super.initState();
     // 自动关闭
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(kCelebrationAutoCloseDuration, () {
       if (mounted) Navigator.of(context).pop();
     });
   }

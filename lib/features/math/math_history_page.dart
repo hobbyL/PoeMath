@@ -143,7 +143,6 @@ class MathHistoryPage extends ConsumerWidget {
     );
   }
 
-  /// 根据可用宽度计算列数。
 }
 
 class _SessionCard extends StatelessWidget {

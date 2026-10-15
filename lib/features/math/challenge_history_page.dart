@@ -225,7 +225,6 @@ class ChallengeHistoryPage extends ConsumerWidget {
     );
   }
 
-  /// 根据可用宽度计算列数。
 }
 
 class _RecordCard extends StatelessWidget {

@@ -328,12 +328,12 @@ class _WordProblemPracticePageState
     if (newlyUnlocked.isNotEmpty) {
       _confettiController.play();
       final names = newlyUnlocked.map((a) => a.title).join('、');
-      showCelebration(
+      // await 到庆祝弹窗关闭为止，再弹结果对话框（避免两窗重叠）。
+      await showCelebration(
         context,
         type: CelebrationType.achievement,
         subtitle: names,
       );
-      await Future<void>.delayed(const Duration(milliseconds: 1800));
       if (!mounted) return;
     }
 

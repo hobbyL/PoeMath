@@ -3,6 +3,8 @@
 // 层级：features/home
 // 职责：首页 — 每日概览、连续打卡、快捷入口、今日推荐。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -154,7 +156,7 @@ class HomePage extends ConsumerWidget {
                 Text(
                   isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
                   ),
                 ),
                 const SizedBox(height: SpacingTokens.xs),
@@ -164,7 +166,7 @@ class HomePage extends ConsumerWidget {
                     Text(
                       '$streak',
                       style: theme.textTheme.displaySmall?.copyWith(
-                        color: Colors.white,
+                        color: theme.colorScheme.onPrimary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -174,7 +176,8 @@ class HomePage extends ConsumerWidget {
                       child: Text(
                         '天连续',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color:
+                              theme.colorScheme.onPrimary.withValues(alpha: 0.8),
                         ),
                       ),
                     ),
@@ -276,33 +279,36 @@ class HomePage extends ConsumerWidget {
                 ref.invalidate(unlockedAchievementsCountProvider);
 
                 if (context.mounted) {
-                  showCelebration(
+                  // 打卡庆祝；若同时解锁成就，等它关闭后再弹成就庆祝。
+                  // await 而非 `Future.delayed(1800ms)` 猜时长：后者一旦短于
+                  // 庆祝弹窗自身时长，两窗就会重叠。
+                  final checkInDone = showCelebration(
                     context,
                     type: CelebrationType.checkIn,
                     subtitle: '连续打卡 $newStreak 天！继续保持！',
                   );
-                  // 若同时解锁了成就，等打卡庆祝关闭后再弹
                   if (newlyUnlocked.isNotEmpty) {
-                    Future.delayed(
-                      const Duration(milliseconds: 1800),
-                      () {
-                        if (context.mounted) {
-                          final names =
-                              newlyUnlocked.map((a) => a.title).join('、');
-                          showCelebration(
-                            context,
-                            type: CelebrationType.achievement,
-                            subtitle: names,
-                          );
-                        }
-                      },
+                    unawaited(
+                      checkInDone.then((_) async {
+                        if (!context.mounted) return;
+                        final names =
+                            newlyUnlocked.map((a) => a.title).join('、');
+                        await showCelebration(
+                          context,
+                          type: CelebrationType.achievement,
+                          subtitle: names,
+                        );
+                      }),
                     );
                   }
                 }
               },
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                foregroundColor: Colors.white,
+                // 主色渐变卡片上的按钮：用 onPrimary 而非白色硬编码，
+                // 换主题时自动跟随（与下方 `onPrimary` 图标同源）。
+                backgroundColor:
+                    theme.colorScheme.onPrimary.withValues(alpha: 0.2),
+                foregroundColor: theme.colorScheme.onPrimary,
               ),
               child: const Text('打卡'),
             ),
@@ -453,6 +459,11 @@ class HomePage extends ConsumerWidget {
                     child: Text(
                       '$mistakeCount',
                       style: const TextStyle(
+                        // 刻意保留白色，不用 `colorScheme.onError`：
+                        // 亮色主题下二者同为白，但**暗色主题下 onError 派生为
+                        // 深红**（实测 ~#690005），落在同样是红色的 error 圆形
+                        // 背景上几乎不可读。徽章背景恒为 `error`（见上方
+                        // decoration），故此处用与之恒有对比的白。
                         color: Colors.white,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,

@@ -11,6 +11,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
@@ -384,30 +385,44 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final activityRepo = ref.read(learningActivityRepositoryProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
 
-    await progressRepo.recordRecitation(poemId, level: masteryLevel);
-    await statsRepo.updatePoemStats(learned: progressRepo.learnedCount);
-    await activityRepo.record(
-      id: activityId,
-      activityType: LearningActivityType.poemRecitation,
-      totalItems: maxQualityPoints,
-      successfulItems: qualityPoints,
-      poemId: poemId,
-      starsEarned: rewardStars,
-      durationSeconds: duration,
-      completedAt: completedAt,
-    );
+    try {
+      await progressRepo.recordRecitation(poemId, level: masteryLevel);
+      await statsRepo.updatePoemStats(learned: progressRepo.learnedCount);
+      await activityRepo.record(
+        id: activityId,
+        activityType: LearningActivityType.poemRecitation,
+        totalItems: maxQualityPoints,
+        successfulItems: qualityPoints,
+        poemId: poemId,
+        starsEarned: rewardStars,
+        durationSeconds: duration,
+        completedAt: completedAt,
+      );
 
-    // 记录星星到全局统计
-    if (rewardStars > 0) {
-      await statsRepo.addStars(rewardStars, activityId: activityId);
+      // 记录星星到全局统计
+      if (rewardStars > 0) {
+        await statsRepo.addStars(rewardStars, activityId: activityId);
+      }
+
+      await checkInRepo.updateToday(
+        activityId: activityId,
+        addPoems: 1,
+        addStars: rewardStars,
+        addDuration: duration,
+      );
+    } on Object catch (error, stackTrace) {
+      // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到。
+      AppLogger.e(
+        '背诵完成结算失败',
+        tag: 'PoemRecite',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      // 复位防重入标记：本次未结算成功，不应阻止后续重试
+      //（否则用户再次提交会被 `_settlementStarted` 静默拦住）。
+      _settlementStarted = false;
+      return;
     }
-
-    await checkInRepo.updateToday(
-      activityId: activityId,
-      addPoems: 1,
-      addStars: rewardStars,
-      addDuration: duration,
-    );
 
     // —— 数据结算完毕；以下 UI 部分要求页面仍挂载 ——
     if (!mounted) return;
@@ -430,12 +445,13 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     if (newlyUnlocked.isNotEmpty) {
       _celebrationCtrl.play();
       final names = newlyUnlocked.map((a) => a.title).join('、');
-      showCelebration(
+      // await 到弹窗关闭为止（showCelebration 的 Future 在关闭时完成），
+      // 不再用硬编码延时猜时长。
+      await showCelebration(
         context,
         type: CelebrationType.achievement,
         subtitle: names,
       );
-      await Future<void>.delayed(const Duration(milliseconds: 1800));
       if (!mounted) return;
     }
 

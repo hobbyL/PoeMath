@@ -82,7 +82,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
             icon: Icons.edit_note_outlined,
             iconColor: theme.colorScheme.secondary,
             title: '提示词设置',
-            subtitle: 'AI 讲解的内置提示词与自定义',
+            subtitle: '讲解、解析与助手人设的内置提示词与自定义',
             onTap: () => Navigator.push<void>(
               context,
               fadeSlideRoute(

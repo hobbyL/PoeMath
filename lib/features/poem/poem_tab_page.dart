@@ -719,5 +719,4 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
     );
   }
 
-  /// 根据可用宽度计算列数。
 }

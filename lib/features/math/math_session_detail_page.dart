@@ -182,7 +182,6 @@ class MathSessionDetailPage extends ConsumerWidget {
     );
   }
 
-  /// 根据可用宽度计算列数。
 }
 
 class _SummaryItem extends StatelessWidget {
