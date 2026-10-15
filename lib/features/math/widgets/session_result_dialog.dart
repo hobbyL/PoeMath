@@ -53,20 +53,38 @@ class SessionResultDialog extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
       ),
-      title: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(_grade.icon, color: theme.colorScheme.primary, size: 28),
-            const SizedBox(width: SpacingTokens.sm),
-            Text(
-              _grade.text,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+      title: Stack(
+        children: [
+          // 标题居中：两侧的关闭按钮未参与布局（Positioned），
+          // 标题行必须独占整宽才能保持视觉居中。
+          Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_grade.icon, color: theme.colorScheme.primary, size: 28),
+                const SizedBox(width: SpacingTokens.sm),
+                Text(
+                  _grade.text,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          // 右上角关闭：返回 null，由调用方按「返回上一页」处理。
+          Positioned(
+            top: -SpacingTokens.sm,
+            right: -SpacingTokens.sm,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close_rounded),
+              tooltip: '关闭',
+              visualDensity: VisualDensity.compact,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,

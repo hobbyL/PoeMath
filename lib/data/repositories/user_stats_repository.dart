@@ -99,6 +99,23 @@ class UserStatsRepository {
     }
   }
 
+  /// 记录一道口算题的作答结果（做题数 +1，答对时正确数 +1，并刷新连对纪录）。
+  ///
+  /// 单次写入覆盖三处字段，供「逐题持久化」使用——每题一次 Hive `put()`，
+  /// 避免拆成 `addMathResults` + `updateMathBestStreak` 的两次写盘。
+  Future<void> recordMathAttempt({
+    required bool isCorrect,
+    required int bestStreak,
+  }) async {
+    final stats = await getOrCreate();
+    stats.mathTotalProblems += 1;
+    if (isCorrect) stats.mathTotalCorrect += 1;
+    if (bestStreak > stats.mathBestStreak) {
+      stats.mathBestStreak = bestStreak;
+    }
+    await stats.save();
+  }
+
   /// 一次性结算限时挑战的口算统计、连击、星星和等级。
   Future<UserStats> settleMathChallenge({
     String? activityId,

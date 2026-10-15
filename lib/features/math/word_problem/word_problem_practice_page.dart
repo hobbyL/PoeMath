@@ -5,6 +5,7 @@
 //       结算链复用口算（MathSession problemType 'llm_word_problem'
 //       计入每日目标；星星/打卡/学习活动/成就同步）。
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -19,7 +20,6 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
-import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
@@ -114,19 +114,29 @@ class _WordProblemPracticePageState
         _problemRecords.map((r) => r.toJson()).toList(),
       ),
     );
-    HiveBoxes.mathSessions.put(ProfileScope.key(_sessionId), session);
+    unawaited(ref.read(mathSessionRepositoryProvider).save(session));
 
-    final statsKey = ProfileScope.key('stats');
-    var stats = HiveBoxes.userStats.get(statsKey);
-    stats ??= UserStats(profileId: ProfileScope.currentId);
-    stats.mathTotalProblems += 1;
-    if (isCorrect) stats.mathTotalCorrect += 1;
-    HiveBoxes.userStats.put(statsKey, stats);
+    // 增量更新用户统计（每题 +1），与口算练习页共用同一仓储写入路径。
+    unawaited(
+      ref
+          .read(userStatsRepositoryProvider)
+          .recordMathAttempt(
+            isCorrect: isCorrect,
+            bestStreak: 0,
+          )
+          .catchError((Object error, StackTrace stackTrace) {
+            AppLogger.e(
+              '应用题答题进度落库失败',
+              tag: 'WordProblemPractice',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          }),
+    );
 
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayMathCountProvider);
   }
-
   static String _difficultyLabel(int difficulty) {
     if (difficulty <= 2) return 'easy';
     if (difficulty == 3) return 'medium';
@@ -225,6 +235,17 @@ class _WordProblemPracticePageState
   }
 
   Future<void> _finishSession() async {
+    // 结算主体包 `try/finally`：任一 await 抛错都必须复位 `_isFinishing`，
+    // 否则 `_nextProblem` 的防重入守卫会永久拦住后续结算。
+    try {
+      await _settleSession();
+    } finally {
+      _isFinishing = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _settleSession() async {
     final problems = widget.problems;
     final correctCount = _correctCount;
     final completedAt = DateTime.now();
@@ -316,9 +337,10 @@ class _WordProblemPracticePageState
       if (!mounted) return;
     }
 
-    await showDialog<String>(
+    final action = await showDialog<String>(
       context: context,
-      barrierDismissible: false,
+      // 允许点击空白收起：返回值 null 与右上角关闭图标同为「返回题库」。
+      barrierDismissible: true,
       builder: (context) => SessionResultDialog(
         totalProblems: problems.length,
         correctCount: correctCount,
@@ -328,13 +350,34 @@ class _WordProblemPracticePageState
     );
 
     if (!mounted) return;
-    // 应用题练习结束返回题库。
-    // 栈内没有上一页时（深链直达 / 进程恢复）pop 会断言失败，改为直接去题库。
-    if (context.canPop()) {
-      context.pop();
+
+    if (action == 'review') {
+      context.pushReplacement(AppRoutes.mathMistake);
+    } else if (action == 'retry') {
+      _retrySession();
     } else {
-      context.go(AppRoutes.wordProblemLibrary);
+      // null（关闭图标 / 点击空白）→ 返回题库。
+      // 栈内没有上一页时（深链直达 / 进程恢复）pop 会断言失败，改为直接去题库。
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(AppRoutes.wordProblemLibrary);
+      }
     }
+  }
+
+  /// 重置答题状态并重新开始同一套题。
+  void _retrySession() {
+    _answerController.clear();
+    _problemRecords.clear();
+    _isFinishing = false;
+    _startTime = DateTime.now();
+    setState(() {
+      _currentIndex = 0;
+      _correctCount = 0;
+      _isCorrect = null;
+      _showExplanation = false;
+    });
   }
 
   @override

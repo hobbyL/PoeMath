@@ -2,6 +2,7 @@
 //
 // 口算练习页：题目展示 → 用户输入 → 判定反馈 → 分步讲解。
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -17,7 +18,6 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
-import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -117,7 +117,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     super.dispose();
   }
 
-  /// 每答一题后同步更新 Hive，确保数据立即持久化。
+  /// 每答一题后同步更新存储，确保数据立即持久化。
   ///
   /// 「同步」在这里指**内存可见性**，不是落盘完成：Hive 的 `put()` 会
   /// 同步写入内存中的 box，随后任何 provider/仓储读取立刻看到新值。
@@ -146,18 +146,27 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         _problemRecords.map((r) => r.toJson()).toList(),
       ),
     );
-    HiveBoxes.mathSessions.put(ProfileScope.key(_sessionId), session);
+    unawaited(ref.read(mathSessionRepositoryProvider).save(session));
 
-    // 增量更新用户统计（每题 +1）
-    final statsKey = ProfileScope.key('stats');
-    var stats = HiveBoxes.userStats.get(statsKey);
-    stats ??= UserStats(profileId: ProfileScope.currentId);
-    stats.mathTotalProblems += 1;
-    if (isCorrect) stats.mathTotalCorrect += 1;
-    if (_bestConsecutive > stats.mathBestStreak) {
-      stats.mathBestStreak = _bestConsecutive;
-    }
-    HiveBoxes.userStats.put(statsKey, stats);
+    // 增量更新用户统计（每题 +1），与其余练习页共用同一仓储写入路径。
+    unawaited(
+      ref
+          .read(userStatsRepositoryProvider)
+          .recordMathAttempt(
+            isCorrect: isCorrect,
+            bestStreak: _bestConsecutive,
+          )
+          .catchError((Object error, StackTrace stackTrace) {
+            // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到；
+            // 此处位于 UI 边界，兜底后仅记日志，不打断答题流程。
+            AppLogger.e(
+              '答题进度落库失败',
+              tag: 'MathPractice',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          }),
+    );
 
     // 刷新 providers
     ref.invalidate(userStatsProvider);
@@ -315,6 +324,18 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   }
 
   Future<void> _finishSession() async {
+    // 结算主体包 `try/finally`：任一 await 抛错（Hive IO、成就检查等）都必须
+    // 复位 `_isFinishing`，否则 `_nextProblem` 的防重入守卫会永久拦住后续结算，
+    // 用户只能退出页面才能恢复。与 `poem_quiz_page._finishQuiz` 同法。
+    try {
+      await _settleSession();
+    } finally {
+      _isFinishing = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _settleSession() async {
     final grade = ref.read(mathGradeProvider);
     final problems = ref.read(mathProblemsProvider);
     final correctCount = ref.read(mathCorrectCountProvider);
@@ -419,7 +440,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     final action = await showDialog<String>(
       context: context,
-      barrierDismissible: false,
+      // 允许点击空白收起：返回值 null 走 else 分支（返回上一页）。
+      barrierDismissible: true,
       builder: (context) => SessionResultDialog(
         totalProblems: problems.length,
         correctCount: correctCount,
