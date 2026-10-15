@@ -10,11 +10,9 @@ import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
-import 'package:poemath/data/repositories/challenge_record_repository.dart';
-import 'package:poemath/data/repositories/math_session_repository.dart';
-import 'package:poemath/data/repositories/poem_progress_repository.dart';
-import 'package:poemath/data/repositories/poem_repository.dart';
-import 'package:poemath/data/repositories/settings_repository.dart';
+import 'package:poemath/data/repositories/achievement_repository.dart';
+import 'package:poemath/data/repositories/check_in_repository.dart';
+import 'package:poemath/data/repositories/user_stats_repository.dart';
 
 // ============ Repositories ============
 //
@@ -25,11 +23,13 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 //
 // 新代码请直接用 `repository_providers.dart` 的 `xxxRepositoryProvider`。
 
-final checkInRepoProvider = checkInRepositoryProvider;
+final Provider<CheckInRepository> checkInRepoProvider = checkInRepositoryProvider;
 
-final userStatsRepoProvider = userStatsRepositoryProvider;
+final Provider<UserStatsRepository> userStatsRepoProvider =
+    userStatsRepositoryProvider;
 
-final achievementRepoProvider = achievementRepositoryProvider;
+final Provider<AchievementRepository> achievementRepoProvider =
+    achievementRepositoryProvider;
 
 // ============ 日期失效源 ============
 
@@ -94,19 +94,25 @@ final userStatsProvider = Provider<UserStats>((ref) {
 });
 
 // ============ 今日活动统计 ============
+//
+// 这些 Provider 读的是**实时的** Hive 值（仓库方法每次都现查 box），但
+// `Provider` 自身不会因为 Hive 写入而失效 —— 缓存的是上一次的计算结果。
+// 因此除了 `dayKeyProvider`（跨天）之外，还必须在**活动结算点**显式
+// `ref.invalidate`，否则做完题回到首页看到的仍是进入前的旧数字。
+// 结算点的既有写法见 `poem_read_along_page.dart` 与该页的练习结算流程。
 
 /// 今日诗词学习数
 final todayPoemCountProvider = Provider<int>((ref) {
   ref.watch(dayKeyProvider); // 跨天失效：dayKey 变化时重建
-  final repo = PoemProgressRepository();
+  final repo = ref.watch(poemProgressRepositoryProvider);
   return repo.todayStudiedCount;
 });
 
 /// 今日口算做题数
 final todayMathCountProvider = Provider<int>((ref) {
   ref.watch(dayKeyProvider); // 跨天失效：dayKey 变化时重建
-  final sessionRepo = MathSessionRepository();
-  final challengeRepo = ChallengeRecordRepository();
+  final sessionRepo = ref.watch(mathSessionRepositoryProvider);
+  final challengeRepo = ref.watch(challengeRecordRepositoryProvider);
   return sessionRepo.todayProblems + challengeRepo.todayProblems;
 });
 
@@ -114,13 +120,13 @@ final todayMathCountProvider = Provider<int>((ref) {
 
 /// 每日诗词目标
 final dailyPoemGoalProvider = Provider<int>((ref) {
-  final settings = SettingsRepository();
+  final settings = ref.watch(settingsRepositoryProvider);
   return settings.dailyPoemGoal;
 });
 
 /// 每日口算目标
 final dailyMathGoalProvider = Provider<int>((ref) {
-  final settings = SettingsRepository();
+  final settings = ref.watch(settingsRepositoryProvider);
   return settings.dailyMathGoal;
 });
 
@@ -137,8 +143,8 @@ final unlockedAchievementsCountProvider = Provider<int>((ref) {
 /// 今日推荐诗词 — 优先推荐未学习的诗词，基于日期做伪随机选择。
 final dailyRecommendedPoemProvider = Provider<Poem?>((ref) {
   ref.watch(dayKeyProvider); // 跨天失效：跨午夜后自然换诗
-  final poemRepo = PoemRepository();
-  final progressRepo = PoemProgressRepository();
+  final poemRepo = ref.watch(poemRepositoryProvider);
+  final progressRepo = ref.watch(poemProgressRepositoryProvider);
   final allPoems = poemRepo.getAll();
   if (allPoems.isEmpty) return null;
 

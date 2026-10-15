@@ -18,6 +18,7 @@ import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/data/repositories/math_session_repository.dart';
 import 'package:poemath/data/repositories/formula_favorite_repository.dart';
 import 'package:poemath/data/repositories/achievement_repository.dart';
+import 'package:poemath/data/repositories/challenge_record_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/data/repositories/learning_activity_repository.dart';
@@ -68,6 +69,11 @@ final mathMistakeRepositoryProvider = Provider<MathMistakeRepository>((ref) {
 
 final mathSessionRepositoryProvider = Provider<MathSessionRepository>((ref) {
   return MathSessionRepository();
+});
+
+final challengeRecordRepositoryProvider =
+    Provider<ChallengeRecordRepository>((ref) {
+  return ChallengeRecordRepository();
 });
 
 final formulaFavoriteRepositoryProvider =

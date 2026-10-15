@@ -9,16 +9,33 @@ import 'package:poemath/data/models/poem.dart';
 
 class PoemRepository {
   // ============ 应用层索引 ============
-  late final Map<int, List<String>> _byGrade;
-  late final Map<String, List<String>> _byAuthor;
-  late final Map<String, List<String>> _byDynasty;
-  late final Map<String, List<String>> _byTag;
-  late final Map<String, List<String>> _byLayer;
+  //
+  // 索引与「已构建」标记都是**静态**的：索引内容只依赖 `HiveBoxes.poems`，
+  // 与实例无关，而实例本身并不稳定 —— `Provider`（非 keepAlive）在页面
+  // 销毁后可能重建出新实例。若索引挂在实例上，新实例的 `_indexBuilt` 为
+  // false 而索引 map 未初始化，此时任何索引 getter 都会抛
+  // `LateInitializationError`（不是返回空列表）。静态化后任一实例构建
+  // 即全局生效，且每进程只构建一次。
 
-  bool _indexBuilt = false;
+  static Map<int, List<String>> _byGrade = const {};
+  static Map<String, List<String>> _byAuthor = const {};
+  static Map<String, List<String>> _byDynasty = const {};
+  static Map<String, List<String>> _byTag = const {};
+  static Map<String, List<String>> _byLayer = const {};
 
-  /// 构建内存索引。调用一次即可。
+  static bool _indexBuilt = false;
+
+  /// 构建内存索引。调用一次即可；重复调用是幂等的。
   Future<void> buildIndices() async {
+    _ensureIndices();
+  }
+
+  /// 未构建则同步兜底构建。
+  ///
+  /// 索引 getter 都经过这里，使得「忘记调 `buildIndices()`」不再导致崩溃 ——
+  /// 首次索引查询会顺手构建。启动流程仍显式 await `buildIndices()`，以便
+  /// 把构建耗时算进 Splash 进度条。
+  static void _ensureIndices() {
     if (_indexBuilt) return;
 
     final byGrade = <int, List<String>>{};
@@ -50,6 +67,16 @@ class PoemRepository {
     _indexBuilt = true;
   }
 
+  /// 丢弃已构建的索引（数据被整体替换后调用，如备份恢复）。
+  static void resetIndices() {
+    _byGrade = const {};
+    _byAuthor = const {};
+    _byDynasty = const {};
+    _byTag = const {};
+    _byLayer = const {};
+    _indexBuilt = false;
+  }
+
   // ============ 基础查询 ============
 
   /// 总诗词数
@@ -65,6 +92,7 @@ class PoemRepository {
 
   /// 按年级筛选
   List<Poem> byGrade(int grade) {
+    _ensureIndices();
     return _byGrade[grade]
             ?.map((id) => HiveBoxes.poems.get(id))
             .whereType<Poem>()
@@ -74,6 +102,7 @@ class PoemRepository {
 
   /// 按作者筛选
   List<Poem> byAuthor(String author) {
+    _ensureIndices();
     return _byAuthor[author]
             ?.map((id) => HiveBoxes.poems.get(id))
             .whereType<Poem>()
@@ -83,6 +112,7 @@ class PoemRepository {
 
   /// 按朝代筛选
   List<Poem> byDynasty(String dynasty) {
+    _ensureIndices();
     return _byDynasty[dynasty]
             ?.map((id) => HiveBoxes.poems.get(id))
             .whereType<Poem>()
@@ -92,6 +122,7 @@ class PoemRepository {
 
   /// 按标签筛选
   List<Poem> byTag(String tag) {
+    _ensureIndices();
     return _byTag[tag]
             ?.map((id) => HiveBoxes.poems.get(id))
             .whereType<Poem>()
@@ -101,6 +132,7 @@ class PoemRepository {
 
   /// 按层级筛选
   List<Poem> byLayer(String layer) {
+    _ensureIndices();
     return _byLayer[layer]
             ?.map((id) => HiveBoxes.poems.get(id))
             .whereType<Poem>()
@@ -109,18 +141,28 @@ class PoemRepository {
   }
 
   /// 获取所有可用年级
-  List<int> get availableGrades =>
-      (_byGrade.keys.toList()..sort());
+  List<int> get availableGrades {
+    _ensureIndices();
+    return _byGrade.keys.toList()..sort();
+  }
 
   /// 获取所有作者名
-  List<String> get availableAuthors =>
-      _byAuthor.keys.toList()..sort();
+  List<String> get availableAuthors {
+    _ensureIndices();
+    return _byAuthor.keys.toList()..sort();
+  }
 
   /// 获取所有朝代
-  List<String> get availableDynasties => _byDynasty.keys.toList();
+  List<String> get availableDynasties {
+    _ensureIndices();
+    return _byDynasty.keys.toList();
+  }
 
   /// 获取所有标签
-  List<String> get availableTags => _byTag.keys.toList();
+  List<String> get availableTags {
+    _ensureIndices();
+    return _byTag.keys.toList();
+  }
 
   /// 搜索（标题或内容包含关键词）
   List<Poem> search(String keyword) {

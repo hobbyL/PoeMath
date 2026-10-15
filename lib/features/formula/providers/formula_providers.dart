@@ -5,18 +5,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/models/formula.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/formula_favorite_repository.dart';
 import 'package:poemath/data/repositories/formula_repository.dart';
 
 // ============ Repositories ============
+//
+// 纯别名：唯一来源见 `data/providers/repository_providers.dart`，
+// 避免同类型双实例导致覆写失效。
 
-final formulaRepoProvider = Provider<FormulaRepository>((ref) {
-  return FormulaRepository();
-});
+final Provider<FormulaRepository> formulaRepoProvider = formulaRepositoryProvider;
 
-final formulaFavoriteRepoProvider = Provider<FormulaFavoriteRepository>((ref) {
-  return FormulaFavoriteRepository();
-});
+final Provider<FormulaFavoriteRepository> formulaFavoriteRepoProvider =
+    formulaFavoriteRepositoryProvider;
 
 // ============ 筛选 ============
 

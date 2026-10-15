@@ -11,6 +11,7 @@ import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/constants/hive_keys.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/hive/hive_registrar.dart';
+import 'package:poemath/data/repositories/poem_repository.dart';
 
 Directory? _tempDir;
 
@@ -20,6 +21,11 @@ Future<void> setUpHiveForTesting() async {
   Hive.init(_tempDir!.path);
   registerHiveAdapters();
   await HiveBoxes.init();
+
+  // 诗词索引是进程级静态字段（见 `PoemRepository` 的静态化说明），
+  // 会跨测试用例残留上一个用例的数据。此处复位，使每个用例都从
+  // 「索引未构建」的干净状态开始。
+  PoemRepository.resetIndices();
 
   // 预填数据版本，跳过 DataBootstrap asset 导入
   await HiveBoxes.meta.put(
@@ -38,4 +44,6 @@ Future<void> tearDownHiveForTesting() async {
     _tempDir!.deleteSync(recursive: true);
   }
   _tempDir = null;
+  // 静态索引指向已删除的临时 box，保留会污染后续用例。
+  PoemRepository.resetIndices();
 }

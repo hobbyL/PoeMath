@@ -6,30 +6,35 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/poem_progress.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/poem_favorite_repository.dart';
 import 'package:poemath/data/repositories/poem_progress_repository.dart';
 import 'package:poemath/data/repositories/poem_repository.dart';
 import 'package:poemath/data/repositories/review_repository.dart';
 
 // ============ Repositories ============
+//
+// 仓储 Provider 的唯一来源是 `data/providers/repository_providers.dart`。
+// 本文件曾各自再定义一份同类型 Provider，导致「test 里覆写其中一个、业务
+// 实际读另一个」——类型相同但实例不同，覆写看似生效实则落空。此处改为
+// **纯别名赋值**（`final a = b;`），两个名字指向同一 Provider 实例，
+// `ref.invalidate` 任一名即失效同一实例。
+//
+// 新代码请直接用数据层的 `xxxRepositoryProvider` 命名。
 
-final poemRepoProvider = Provider<PoemRepository>((ref) {
-  final repo = PoemRepository();
-  repo.buildIndices();
-  return repo;
-});
+// 显式标注类型：顶层 `final` 靠赋值推断，但该文件与数据层互相 import 时
+// 推断会形成环，跨文件读到的可能是 `dynamic`（表现为 `ref.watch` 类型
+// 无法推断、返回值退化为 dynamic）。标注后类型立即稳定。
 
-final poemProgressRepoProvider = Provider<PoemProgressRepository>((ref) {
-  return PoemProgressRepository();
-});
+final Provider<PoemRepository> poemRepoProvider = poemRepositoryProvider;
 
-final poemFavoriteRepoProvider = Provider<PoemFavoriteRepository>((ref) {
-  return PoemFavoriteRepository();
-});
+final Provider<PoemProgressRepository> poemProgressRepoProvider =
+    poemProgressRepositoryProvider;
 
-final reviewRepoProvider = Provider<ReviewRepository>((ref) {
-  return ReviewRepository();
-});
+final Provider<PoemFavoriteRepository> poemFavoriteRepoProvider =
+    poemFavoriteRepositoryProvider;
+
+final Provider<ReviewRepository> reviewRepoProvider = reviewRepositoryProvider;
 
 // ============ 诗词列表 ============
 

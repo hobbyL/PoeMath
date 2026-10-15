@@ -14,19 +14,18 @@ import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 // ============ Repositories ============
+//
+// 纯别名：唯一来源见 `data/providers/repository_providers.dart`，
+// 避免同类型双实例导致覆写失效（test 覆写 A、业务读 B）。
 
-final mathSessionRepoProvider = Provider<MathSessionRepository>((ref) {
-  return MathSessionRepository();
-});
+final Provider<MathSessionRepository> mathSessionRepoProvider =
+    mathSessionRepositoryProvider;
 
-final mathMistakeRepoProvider = Provider<MathMistakeRepository>((ref) {
-  return MathMistakeRepository();
-});
+final Provider<MathMistakeRepository> mathMistakeRepoProvider =
+    mathMistakeRepositoryProvider;
 
-final challengeRecordRepoProvider =
-    Provider<ChallengeRecordRepository>((ref) {
-  return ChallengeRecordRepository();
-});
+final Provider<ChallengeRecordRepository> challengeRecordRepoProvider =
+    challengeRecordRepositoryProvider;
 
 // ============ 练习选择 ============
 
