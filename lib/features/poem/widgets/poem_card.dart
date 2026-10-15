@@ -212,6 +212,9 @@ class _RibbonBadge extends StatelessWidget {
             child: Text(
               label,
               style: const TextStyle(
+                // 中性白属语义明确用法：底色由调用方按掌握程度传入
+                // （未学/学习中/已掌握各有专属色），此处白字需与这批
+                // 底色**全部**保持对比，不能用绑定单一 primary 的令牌。
                 color: Colors.white,
                 fontSize: 9,
                 fontWeight: FontWeight.w600,

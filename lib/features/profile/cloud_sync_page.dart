@@ -612,6 +612,9 @@ class _SmallSpinner extends StatelessWidget {
       height: 16,
       child: CircularProgressIndicator(
         strokeWidth: 2,
+        // 中性白属语义明确用法：`light = true` 表示本指示器置于主色
+        // （primary）实底之上，需要用与底恒定对比的白，而非随主题派生的
+        // 令牌色。另一分支已显式用 primary，此处与之对称。
         color: light ? Colors.white : Theme.of(context).colorScheme.primary,
       ),
     );

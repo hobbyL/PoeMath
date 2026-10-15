@@ -271,12 +271,14 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
                     child: FilledButton.icon(
                       onPressed: _saving || _loadingCredentials ? null : _save,
                       icon: _saving
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                // 落在 FilledButton 的 primary 底上，
+                                // 与按钮文字的 onPrimary 同色。
+                                color: Theme.of(context).colorScheme.onPrimary,
                               ),
                             )
                           : const Icon(Icons.save_outlined),
