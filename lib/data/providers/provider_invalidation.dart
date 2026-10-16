@@ -12,8 +12,13 @@ import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 void invalidateLearningBackground(void Function(ProviderOrFamily) invalidate) {
+  // 学习背景的年级/学期与练习类型都由 `settingsRepositoryProvider` 派生
+  // （见 math_providers 的 `mathGradeProvider` 等），先失效它再失效派生者，
+  // 否则保存后口算页仍读旧值。
+  invalidate(settingsRepositoryProvider);
   invalidate(mathGradeProvider);
   invalidate(mathSemesterProvider);
+  invalidate(mathEntryKindsProvider);
   invalidate(selectedGradeProvider);
   invalidate(selectedSemesterProvider);
   invalidate(dailyRecommendedPoemProvider);

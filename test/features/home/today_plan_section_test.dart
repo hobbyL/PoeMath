@@ -122,10 +122,11 @@ void main() {
     await tester.ensureVisible(up);
     await tester.tap(up);
     await tester.pumpAndSettle();
-    final save = find.text('保存计划');
-    await tester.ensureVisible(save);
+    // 已移除「保存计划」按钮：调整即生效，关闭 sheet 时统一落盘。
+    expect(find.text('保存计划'), findsNothing);
+    // 用系统返回关闭 sheet —— 走 PopScope 的落盘路径（同时覆盖手势关闭）。
     await tester.runAsync(() async {
-      await tester.tap(save);
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await Future<void>.delayed(const Duration(milliseconds: 150));
     });

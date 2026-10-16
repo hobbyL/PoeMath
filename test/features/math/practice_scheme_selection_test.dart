@@ -59,12 +59,14 @@ void main() {
         await HiveBoxes.settings.put('math_batch_size', 10);
         await HiveBoxes.settings.put('math_difficulty', 'medium');
         await HiveBoxes.settings.put('math_practice_mode', 'vertical');
+        // 册次只能经学习背景写入（口算页的就地选择已移除），故此处直接
+        // 落 Hive —— 保证它在下面的 `before` 快照内，配得出「练习不写盘」。
+        await HiveBoxes.settings.put('selected_grade', 2);
+        await HiveBoxes.settings.put('selected_semester', '上');
       });
       final before = HiveBoxes.settings.toMap();
       final container = ProviderContainer();
       addTearDown(container.dispose);
-      container.read(mathGradeProvider.notifier).state = 2;
-      container.read(mathSemesterProvider.notifier).state = '上';
       final router = GoRouter(
         routes: [
           GoRoute(path: '/', builder: (_, __) => const MathTabPage()),
@@ -83,7 +85,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('竖式过程练'), findsNothing);
-      await tester.tap(find.textContaining('开始练习 ·'));
+      // 口算入口已由底部按钮改为一级卡片。
+      await tester.tap(find.text('口算'));
       await tester.pumpAndSettle();
       expect(find.text('练习方案'), findsOneWidget);
       await tester.tap(find.widgetWithText(ChoiceChip, vertical ? '竖式' : '普通'));

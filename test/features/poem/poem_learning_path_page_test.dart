@@ -79,10 +79,21 @@ void main() {
     expect(find.text('其他学期'), findsNothing);
     expect(find.byIcon(Icons.lock_outline), findsNothing);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byType(DropdownButton<int>));
-    await tester.pumpAndSettle();
+    // 册次选择已由 Dropdown 改为底部弹层。
+    expect(find.byType(DropdownButton<int>), findsNothing);
+    await tester.tap(find.textContaining('年级 ·'));
+    // 窄屏大字号下 sheet 带入场动画，`pumpAndSettle` 可能等不到空闲；
+    // 用显式推进（见 spec 的「Widget Tests with Focus and Animations」）。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('选择册次'), findsOneWidget);
+    expect(find.text('仅用于浏览，不改变学习背景'), findsOneWidget);
     await tester.tap(find.text('6 年级').last);
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text('查看这一册'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    // 关键语义：浏览其他册次**不写回学习背景**。
     expect(SettingsRepository().selectedGrade, 4);
     expect(SettingsRepository().selectedSemester, '下');
     expect(tester.takeException(), isNull);

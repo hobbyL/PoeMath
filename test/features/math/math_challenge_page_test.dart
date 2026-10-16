@@ -11,9 +11,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/math/math_challenge_page.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
-import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/widgets/vertical_calc_widget.dart';
 import 'package:poemath/features/math/widgets/vertical_process_input.dart';
@@ -158,9 +158,13 @@ void main() {
       expect(mistake.errorType, 'vertical_process');
       expect((jsonDecode(mistake.attemptJson!) as Map)['regroup'], '1');
       expect(mistake.problemJson, isNotNull);
-      // 外部浏览状态变化不能改变已开始的挑战题组及最终记录。
-      container.read(mathGradeProvider.notifier).state = 1;
-      container.read(mathSemesterProvider.notifier).state = '下';
+      // 外部册次变化（现只能经学习背景写 Hive）不能改变已开始的挑战
+      // 题组及最终记录。
+      await tester.runAsync(() async {
+        await HiveBoxes.settings.put('selected_grade', 1);
+        await HiveBoxes.settings.put('selected_semester', '下');
+      });
+      container.invalidate(settingsRepositoryProvider);
       await tester.pump(const Duration(milliseconds: 400));
       expect(
         tester

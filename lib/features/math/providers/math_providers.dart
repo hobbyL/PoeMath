@@ -10,6 +10,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/data/repositories/math_session_repository.dart';
 import 'package:poemath/data/repositories/challenge_record_repository.dart';
+import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 import 'package:poemath/features/math/math_practice_request.dart';
@@ -47,14 +48,27 @@ final Provider<ChallengeRecordRepository> challengeRecordRepoProvider =
 
 // ============ 练习选择 ============
 
-/// 当前选中年级
-final mathGradeProvider = StateProvider<int>(
-  (ref) => ref.read(settingsRepositoryProvider).selectedGrade,
+/// 当前练习使用的年级 —— **只读派生**，一律跟随学习背景。
+///
+/// 原为可写 `StateProvider`（口算页年级网格与 AppBar 学期按钮可覆盖），
+/// 但那套覆盖只改内存、不写 Hive：用户切到三年级后重启即回到学习背景的
+/// 值，也不跨 Tab 传播（诗词页读的是另一组 provider）。同一份"当前册次"
+/// 存在三个互不同步的来源，故口算页的选择器已移除，这里改为派生。
+///
+/// `watch` 而非 `read`：学习背景写入后 `settingsRepositoryProvider` 失效
+/// （见 `invalidateLearningBackground`），口算页立即跟随，无需重启。
+final mathGradeProvider = Provider<int>(
+  (ref) => ref.watch(settingsRepositoryProvider).selectedGrade,
 );
 
-/// 当前选中学期
-final mathSemesterProvider = StateProvider<String>(
-  (ref) => ref.read(settingsRepositoryProvider).selectedSemester,
+/// 当前练习使用的学期 —— **只读派生**，理由同 [mathGradeProvider]。
+final mathSemesterProvider = Provider<String>(
+  (ref) => ref.watch(settingsRepositoryProvider).selectedSemester,
+);
+
+/// 口算页显示的一级入口 —— **只读派生**，跟随学习背景的练习类型开关。
+final mathEntryKindsProvider = Provider<Set<MathEntryKind>>(
+  (ref) => ref.watch(settingsRepositoryProvider).mathEntryKinds,
 );
 
 /// 管理下一次练习使用的一次性题数覆盖。

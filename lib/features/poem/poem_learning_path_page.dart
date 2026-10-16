@@ -69,28 +69,13 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('选择册次，直接开始', style: theme.textTheme.titleMedium),
-                  Wrap(
-                    spacing: SpacingTokens.md,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      DropdownButton<int>(
-                        value: grade,
-                        onChanged: (value) => setState(() => _grade = value),
-                        items: [
-                          for (var value = 1; value <= 6; value++)
-                            DropdownMenuItem(
-                                value: value, child: Text('$value 年级'),),
-                        ],
-                      ),
-                      DropdownButton<String>(
-                        value: semester,
-                        onChanged: (value) => setState(() => _semester = value),
-                        items: const [
-                          DropdownMenuItem(value: '上', child: Text('上册')),
-                          DropdownMenuItem(value: '下', child: Text('下册')),
-                        ],
-                      ),
-                    ],
+                  // 册次选择改为底部弹层：Dropdown 在移动端触控目标偏小，
+                  // 且与全 App 其余选择器（学期 sheet、计划 sheet）的交互
+                  // 不一致。选择仍只改页内局部 state，不写学习背景。
+                  OutlinedButton.icon(
+                    onPressed: () => _pickVolume(context, grade, semester),
+                    icon: const Icon(Icons.menu_book_outlined),
+                    label: Text('$grade 年级 · $semester册'),
                   ),
                   Text('本册必背 $learned/${required.length} 首已学 · $mastered 首已掌握'),
                   const SizedBox(height: SpacingTokens.sm),
@@ -129,6 +114,90 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
         ),
       ),
     );
+  }
+
+  /// 底部弹层选择册次。
+  ///
+  /// 只改页内局部 state（`_grade` / `_semester`），**不写学习背景** ——
+  /// 本页是"查看任意册次"的浏览工具，与"我这一学期在学哪册"是两回事。
+  /// 页面顶部已明示这一点。
+  Future<void> _pickVolume(
+    BuildContext context,
+    int currentGrade,
+    String currentSemester,
+  ) async {
+    var grade = currentGrade;
+    var semester = currentSemester;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '选择册次',
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+                const SizedBox(height: SpacingTokens.xs),
+                Text(
+                  '仅用于浏览，不改变学习背景',
+                  style: Theme.of(sheetContext).textTheme.bodySmall,
+                ),
+                const SizedBox(height: SpacingTokens.md),
+                Text('年级', style: Theme.of(sheetContext).textTheme.titleSmall),
+                const SizedBox(height: SpacingTokens.sm),
+                Wrap(
+                  spacing: SpacingTokens.sm,
+                  runSpacing: SpacingTokens.xs,
+                  children: [
+                    for (var value = 1; value <= 6; value++)
+                      ChoiceChip(
+                        label: Text('$value 年级'),
+                        selected: grade == value,
+                        onSelected: (_) =>
+                            setSheetState(() => grade = value),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: SpacingTokens.md),
+                Text('册次', style: Theme.of(sheetContext).textTheme.titleSmall),
+                const SizedBox(height: SpacingTokens.sm),
+                Wrap(
+                  spacing: SpacingTokens.sm,
+                  children: [
+                    for (final value in const ['上', '下'])
+                      ChoiceChip(
+                        label: Text('$value册'),
+                        selected: semester == value,
+                        onSelected: (_) =>
+                            setSheetState(() => semester = value),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: SpacingTokens.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(sheetContext, true),
+                    child: const Text('查看这一册'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _grade = grade;
+      _semester = semester;
+    });
   }
 
   Widget _poemTile(Poem poem, {required bool required}) {

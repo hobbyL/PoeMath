@@ -17,10 +17,11 @@ void main() {
       await tester.runAsync(() async {
         await HiveBoxes.settings.put('math_difficulty', sample.$2);
         await HiveBoxes.settings.put('math_batch_size', 2);
+        // 册次由学习背景落盘（口算页的就地选择已移除）。
+        await HiveBoxes.settings.put('selected_grade', sample.$1);
       });
       final container = ProviderContainer();
       addTearDown(container.dispose);
-      container.read(mathGradeProvider.notifier).state = sample.$1;
       container.read(mathPracticeModeProvider.notifier).state =
           ProblemMode.compare;
       await tester.runAsync(() async {

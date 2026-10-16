@@ -21,25 +21,30 @@ void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
 
-  test('学习背景重建后统一，临时跨年级浏览不写回', () async {
+  test('学习背景是唯一册次来源，口算与诗词的派生值随它变化', () async {
     final settings = SettingsRepository();
     await settings.setLearningBackground(4, '下');
     final first = ProviderContainer();
+    addTearDown(first.dispose);
     expect(first.read(mathGradeProvider), 4);
     expect(first.read(mathSemesterProvider), '下');
     expect(first.read(selectedGradeProvider), 4);
     expect(first.read(selectedSemesterProvider), '下');
-    first.read(mathGradeProvider.notifier).state = 2;
-    first.read(mathSemesterProvider.notifier).state = '上';
-    first.read(selectedGradeProvider.notifier).state = null;
-    first.dispose();
+
+    // 改学习背景（唯一写入口）后，失效即可让派生的口算册次跟随 ——
+    // 口算页已移除就地选择，故不存在"临时覆盖"这一中间态可断言。
+    await settings.setLearningBackground(2, '上');
+    invalidateLearningBackground(first.invalidate);
+    expect(first.read(mathGradeProvider), 2);
+    expect(first.read(mathSemesterProvider), '上');
+
+    // 重启后仍是学习背景的值（不因前面的读取而产生漂移）。
     final restarted = ProviderContainer();
     addTearDown(restarted.dispose);
-    expect(restarted.read(mathGradeProvider), 4);
-    expect(restarted.read(mathSemesterProvider), '下');
-    expect(restarted.read(selectedGradeProvider), 4);
-    expect(settings.selectedGrade, 4);
-    expect(settings.selectedSemester, '下');
+    expect(restarted.read(mathGradeProvider), 2);
+    expect(restarted.read(mathSemesterProvider), '上');
+    expect(settings.selectedGrade, 2);
+    expect(settings.selectedSemester, '上');
   });
 
   test('旧设置默认可用，非法背景整体拒绝，备份恢复同步默认', () async {
