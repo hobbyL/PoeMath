@@ -21,6 +21,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/features/math/math_practice_request.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/practice_entry_card.dart';
 import 'package:poemath/features/math/widgets/practice_scheme_selector.dart';
 import 'package:poemath/features/profile/learning_background_page.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -28,34 +29,46 @@ import 'package:poemath/math_engine/math_engine_api.dart';
 class MathTabPage extends ConsumerWidget {
   const MathTabPage({super.key});
 
-  /// 练习类型卡片的外观与路由。
-  ({String title, String subtitle, IconData icon, Color Function(ThemeData) color})
-      _appearance(MathEntryKind kind) => switch (kind) {
-            MathEntryKind.arithmetic => (
-                title: '口算',
-                subtitle: '综合练习，可选普通方案内的题型',
-                icon: Icons.calculate_outlined,
-                color: (theme) => theme.colorScheme.primary,
-              ),
-            MathEntryKind.vertical => (
-                title: '竖式',
-                subtitle: '按列计算，练加减乘的竖式写法',
-                icon: Icons.view_stream_outlined,
-                color: (theme) => theme.colorScheme.secondary,
-              ),
-            MathEntryKind.wordProblem => (
-                title: '应用题',
-                subtitle: '读懂题意，列式解决实际问题',
-                icon: Icons.auto_awesome_outlined,
-                color: (theme) => theme.colorScheme.tertiary,
-              ),
-            MathEntryKind.challenge => (
-                title: '挑战',
-                subtitle: '限时作答，看看能答对多少',
-                icon: Icons.timer_rounded,
-                color: (theme) => theme.colorScheme.primary,
-              ),
-          };
+  /// 册次简写：`2` + `上` → `二上`（用于 AppBar 标题后缀）。
+  ///
+  /// 用中文数字而非阿拉伯数字：与全局其它文案（"二年级上"、"四下"）的
+  /// 表述一致，且短——标题空间有限，`数学练习 · 二上` 在窄屏也不会被截。
+  static String _shortVolume(int grade, String semester) {
+    const digits = ['', '一', '二', '三', '四', '五', '六'];
+    final g = grade >= 1 && grade <= 6 ? digits[grade] : '$grade';
+    return '$g$semester';
+  }
+
+  /// 练习类型卡片的外观。
+  ///
+  /// 只含图标/标题/描述 —— 颜色与点击行为不再随类型分叉：卡片统一用
+  /// 主题主色（见 `PracticeEntryCard`），跳转统一走 `_open`。原先的
+  /// `color` 回调已无消费方（网格布局下多色反而杂乱）。
+  ({String title, String subtitle, IconData icon}) _appearance(
+    MathEntryKind kind,
+  ) =>
+      switch (kind) {
+        MathEntryKind.arithmetic => (
+            title: '口算练习',
+            subtitle: '综合练习，可选题型',
+            icon: Icons.calculate_outlined,
+          ),
+        MathEntryKind.vertical => (
+            title: '竖式计算',
+            subtitle: '按列计算，练竖式写法',
+            icon: Icons.view_stream_outlined,
+          ),
+        MathEntryKind.wordProblem => (
+            title: '应用题',
+            subtitle: '读懂题意，列式解决',
+            icon: Icons.auto_awesome_outlined,
+          ),
+        MathEntryKind.challenge => (
+            title: '挑战模式',
+            subtitle: '限时作答，看能对多少',
+            icon: Icons.timer_rounded,
+          ),
+      };
 
   /// 进入「口算」：先让用户选普通方案内的题型，再发起练习。
   Future<void> _startArithmetic(BuildContext context, WidgetRef ref) async {
@@ -214,13 +227,16 @@ class MathTabPage extends ConsumerWidget {
     final accuracy = ref.watch(overallAccuracyProvider);
     final mistakeCount = ref.watch(mistakeCountProvider);
     final isWide = MediaQuery.sizeOf(context).width >= 420;
-    final gradeLabel = GradePresets.get(grade, semester).label;
     // 按枚举声明顺序渲染卡片，与 MathEntryKind 的文档约定一致。
     final visible = MathEntryKind.values.where(kinds.contains).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('口算练习'),
+        // 标题带上当前册次简写（如「数学练习 · 二上」）：册次由学习背景
+        // 决定且页面上不再有别的常驻展示位，附在标题后是最省空间的告知。
+        // 不叫「口算练习」：页面已含四类入口，且「口算练习」是其中一张
+        // 卡片的标题，同名会造成语义混淆（也影响按文案定位的测试）。
+        title: Text('数学练习 · ${_shortVolume(grade, semester)}'),
         automaticallyImplyLeading: false,
         leadingWidth: mistakeCount > 0 ? (isWide ? 160.0 : 96.0) : null,
         leading: mistakeCount > 0
@@ -263,47 +279,89 @@ class MathTabPage extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(SpacingTokens.md),
-          children: [
-            // 统计概览
-            if (totalProblems > 0)
-              StatOverviewCard(
-                items: [
-                  StatOverviewItem(value: '$totalProblems', label: '已做题'),
-                  StatOverviewItem(
-                    value: '${(accuracy * 100).toStringAsFixed(0)}%',
-                    label: '正确率',
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // 按 ~160px 每列计算列数，与旧版年级网格同款响应式策略
+            // （`GradeSemesterCard` 的注释亦注明"适合 Grid 一行两个"）。
+            final gridWidth = constraints.maxWidth - SpacingTokens.md * 2;
+            final columns = (gridWidth / 160).floor().clamp(2, 4);
+
+            return ListView(
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              children: [
+                // 统计概览
+                if (totalProblems > 0)
+                  StatOverviewCard(
+                    items: [
+                      StatOverviewItem(value: '$totalProblems', label: '已做题'),
+                      StatOverviewItem(
+                        value: '${(accuracy * 100).toStringAsFixed(0)}%',
+                        label: '正确率',
+                      ),
+                      StatOverviewItem(value: '$mistakeCount', label: '错题'),
+                    ],
                   ),
-                  StatOverviewItem(value: '$mistakeCount', label: '错题'),
-                ],
-              ),
 
-            // 当前册次（只读）：册次统一由学习背景决定，此处仅展示并给出
-            // 修改入口，不提供就地切换。
-            const SizedBox(height: SpacingTokens.md),
-            AppTile(
-              icon: Icons.school_outlined,
-              iconColor: theme.colorScheme.primary,
-              title: '当前学习 $gradeLabel',
-              subtitle: '册次与练习类型在「学习背景」中调整',
-              onTap: () => _openLearningBackground(context, ref),
-            ),
-
-            const SizedBox(height: SpacingTokens.md),
-            Text('选择练习', style: theme.textTheme.titleMedium),
-            const SizedBox(height: SpacingTokens.sm),
-
-            if (visible.isEmpty)
-              // 学习背景里把四类全关时会走到这里；仓储层已拦空集合，
-              // 此处是异常数据（如手工改 Hive）的兜底展示。
-              const Text('尚未开启任何练习类型，请到「学习背景」中至少选择一类。')
-            else
-              for (final kind in visible) ...[
-                _entryCard(context, ref, kind, theme),
+                // 册次已并入 AppBar 标题，此处只留「学习背景」入口 ——
+                // 改册次是家长决策，入口仍受家长保护。
                 const SizedBox(height: SpacingTokens.sm),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => _openLearningBackground(context, ref),
+                    icon: const Icon(Icons.school_outlined, size: 16),
+                    label: const Text('学习背景'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.onSurfaceVariant,
+                      textStyle: theme.textTheme.bodySmall,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SpacingTokens.sm,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: SpacingTokens.sm),
+                Text('选择练习', style: theme.textTheme.titleMedium),
+                const SizedBox(height: SpacingTokens.sm),
+
+                if (visible.isEmpty)
+                  // 学习背景里把四类全关时会走到这里；仓储层已拦空集合，
+                  // 此处是异常数据（如手工改 Hive）的兜底展示。
+                  const Text('尚未开启任何练习类型，请到「学习背景」中至少选择一类。')
+                else
+                  for (var row = 0;
+                      row < (visible.length / columns).ceil();
+                      row++) ...[
+                    if (row > 0) const SizedBox(height: SpacingTokens.sm),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var col = 0; col < columns; col++) ...[
+                            if (col > 0)
+                              const SizedBox(width: SpacingTokens.sm),
+                            Expanded(
+                              child: row * columns + col < visible.length
+                                  ? _entryCard(
+                                      context,
+                                      ref,
+                                      visible[row * columns + col],
+                                      theme,
+                                    )
+                                  // 末行不足时留空占位，保持已排卡片同宽。
+                                  : const SizedBox.shrink(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
               ],
-          ],
+            );
+          },
         ),
       ),
     );
@@ -316,11 +374,10 @@ class MathTabPage extends ConsumerWidget {
     ThemeData theme,
   ) {
     final appearance = _appearance(kind);
-    return AppTile(
+    return PracticeEntryCard(
       icon: appearance.icon,
-      iconColor: appearance.color(theme),
       title: appearance.title,
-      subtitle: appearance.subtitle,
+      description: appearance.subtitle,
       onTap: () => _open(context, ref, kind),
     );
   }

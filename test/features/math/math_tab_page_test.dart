@@ -90,9 +90,10 @@ void main() {
     addTearDown(container.dispose);
     await _pumpTab(tester, container: container);
 
-    // 只读展示当前册次。
-    expect(find.textContaining('当前学习'), findsOneWidget);
-    expect(find.textContaining('四年级'), findsOneWidget);
+    // 册次并入 AppBar 标题（中文数字简写），页内不再有册次卡片。
+    expect(find.text('数学练习 · 四下'), findsOneWidget);
+    // 学习背景仍是可达入口（一行轻量文字按钮）。
+    expect(find.text('学习背景'), findsOneWidget);
     // 旧的年级选择网格（6 张可选卡片）与学期按钮不复存在。
     expect(find.text('1 年级'), findsNothing);
     expect(find.text('6 年级'), findsNothing);
@@ -105,14 +106,19 @@ void main() {
     addTearDown(container.dispose);
     await _pumpTab(tester, container: container);
 
-    for (final title in ['口算', '竖式', '应用题', '挑战']) {
+    for (final title in ['口算练习', '竖式计算', '应用题', '挑战模式']) {
       expect(find.text(title), findsOneWidget, reason: '缺少 $title 卡片');
     }
-    // 顺序：以 AppTile 的垂直位置为准。
-    final ys = ['口算', '竖式', '应用题', '挑战']
-        .map((t) => tester.getTopLeft(find.text(t)).dy)
+    // 网格按行优先排布：宽度 800 时列数 = (800-32)/160 = 4，故四张同在一行。
+    // 断言 y 相同（同一行）且 x 递增（顺序正确）。
+    final xs = ['口算练习', '竖式计算', '应用题', '挑战模式']
+        .map((t) => tester.getTopLeft(find.text(t)))
         .toList();
-    expect(ys, orderedEquals(List.of(ys)..sort()));
+    expect(xs.map((o) => o.dy).toSet().length, 1, reason: '四张卡片应在同一行');
+    expect(
+      xs.map((o) => o.dx).toList(),
+      orderedEquals(List.of(xs.map((o) => o.dx))..sort()),
+    );
   });
 
   testWidgets('按学习背景开关隐藏卡片', (tester) async {
@@ -126,9 +132,9 @@ void main() {
     addTearDown(container.dispose);
     await _pumpTab(tester, container: container);
 
-    expect(find.text('口算'), findsOneWidget);
-    expect(find.text('挑战'), findsOneWidget);
-    expect(find.text('竖式'), findsNothing);
+    expect(find.text('口算练习'), findsOneWidget);
+    expect(find.text('挑战模式'), findsOneWidget);
+    expect(find.text('竖式计算'), findsNothing);
     expect(find.text('应用题'), findsNothing);
   });
 
@@ -139,7 +145,7 @@ void main() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     await _pumpTab(tester, container: container);
-    expect(find.textContaining('一年级'), findsOneWidget);
+    expect(find.text('数学练习 · 一上'), findsOneWidget);
 
     // 经学习背景写入 —— 这是唯一的册次写入口。
     await tester.runAsync(() async {
@@ -149,8 +155,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
-    expect(find.textContaining('三年级'), findsOneWidget);
-    expect(find.textContaining('一年级'), findsNothing);
+    expect(find.text('数学练习 · 三下'), findsOneWidget);
+    expect(find.text('数学练习 · 一上'), findsNothing);
   });
 
   testWidgets('应用题与挑战卡片跳转到对应页面', (tester) async {
@@ -174,7 +180,7 @@ void main() {
     addTearDown(container.dispose);
     final probe = await _pumpTab(tester, container: container);
 
-    await tester.tap(find.text('竖式'));
+    await tester.tap(find.text('竖式计算'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     expect(probe.pushed, contains(AppRoutes.mathPractice));
@@ -197,7 +203,7 @@ void main() {
     addTearDown(container.dispose);
     final probe = await _pumpTab(tester, container: container);
 
-    await tester.tap(find.text('竖式'));
+    await tester.tap(find.text('竖式计算'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
@@ -215,7 +221,7 @@ void main() {
     addTearDown(container.dispose);
     final probe = await _pumpTab(tester, container: container);
 
-    await tester.tap(find.text('竖式'));
+    await tester.tap(find.text('竖式计算'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
