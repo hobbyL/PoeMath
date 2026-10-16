@@ -23,7 +23,8 @@ import 'package:poemath/data/repositories/user_stats_repository.dart';
 //
 // 新代码请直接用 `repository_providers.dart` 的 `xxxRepositoryProvider`。
 
-final Provider<CheckInRepository> checkInRepoProvider = checkInRepositoryProvider;
+final Provider<CheckInRepository> checkInRepoProvider =
+    checkInRepositoryProvider;
 
 final Provider<UserStatsRepository> userStatsRepoProvider =
     userStatsRepositoryProvider;
@@ -145,23 +146,35 @@ final dailyRecommendedPoemProvider = Provider<Poem?>((ref) {
   ref.watch(dayKeyProvider); // 跨天失效：跨午夜后自然换诗
   final poemRepo = ref.watch(poemRepositoryProvider);
   final progressRepo = ref.watch(poemProgressRepositoryProvider);
+  final settings = ref.watch(settingsRepositoryProvider);
   final allPoems = poemRepo.getAll();
   if (allPoems.isEmpty) return null;
+  final textbookPoems = allPoems
+      .where(
+        (p) =>
+            p.grade == settings.selectedGrade &&
+            p.semester == settings.selectedSemester &&
+            p.isRequired,
+      )
+      .toList();
+  final candidates = textbookPoems.isEmpty ? allPoems : textbookPoems;
 
   // 筛选未学习的诗词
-  final unlearned = allPoems.where((p) {
+  final unlearned = candidates.where((p) {
     final progress = progressRepo.get(p.id);
     return progress == null;
   }).toList();
 
   // 基于日期做伪随机，确保同一天推荐同一首
-  final daysSinceEpoch = DateTime.now().difference(
-    DateTime(2024),
-  ).inDays;
+  final daysSinceEpoch = DateTime.now()
+      .difference(
+        DateTime(2024),
+      )
+      .inDays;
 
   if (unlearned.isNotEmpty) {
     return unlearned[daysSinceEpoch % unlearned.length];
   }
   // 全部学过 → 从全部诗词中推荐
-  return allPoems[daysSinceEpoch % allPoems.length];
+  return candidates[daysSinceEpoch % candidates.length];
 });

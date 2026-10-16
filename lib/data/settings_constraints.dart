@@ -20,6 +20,7 @@ class SettingsConstraints {
         value is num && value.isFinite && value >= 0.1 && value <= 1.0,
       'theme_mode' => const ['system', 'light', 'dark'].contains(value),
       'active_subject' => const ['poem', 'math'].contains(value),
+      'selected_semester' => const ['上', '下'].contains(value),
       'math_difficulty' => const ['easy', 'medium', 'hard'].contains(value),
       'math_practice_mode' => const [
           'findResult',

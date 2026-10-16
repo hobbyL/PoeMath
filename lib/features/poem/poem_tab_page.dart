@@ -53,6 +53,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   // ---- 搜索面板本地状态（点击"搜索"才同步到 provider） ----
   final _searchController = TextEditingController();
   int? _localGrade;
+  String? _localSemester;
   LearningStatus? _localStatus;
   String? _localAuthor;
   String? _localDynasty;
@@ -68,6 +69,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   void _openPanel() {
     _searchController.text = ref.read(poemSearchQueryProvider);
     _localGrade = ref.read(selectedGradeProvider);
+    _localSemester = ref.read(selectedSemesterProvider);
     _localStatus = ref.read(selectedStatusFilterProvider);
     _localAuthor = ref.read(selectedAuthorFilterProvider);
     _localDynasty = ref.read(selectedDynastyFilterProvider);
@@ -85,6 +87,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
     ref.read(poemSearchQueryProvider.notifier).state =
         _searchController.text.trim();
     ref.read(selectedGradeProvider.notifier).state = _localGrade;
+    ref.read(selectedSemesterProvider.notifier).state = _localSemester;
     ref.read(selectedStatusFilterProvider.notifier).state = _localStatus;
     ref.read(selectedAuthorFilterProvider.notifier).state = _localAuthor;
     ref.read(selectedDynastyFilterProvider.notifier).state = _localDynasty;
@@ -97,6 +100,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
     _searchController.clear();
     setState(() {
       _localGrade = null;
+      _localSemester = null;
       _localStatus = null;
       _localAuthor = null;
       _localDynasty = null;
@@ -108,6 +112,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   bool get _hasActiveFilters {
     return ref.watch(poemSearchQueryProvider).isNotEmpty ||
         ref.watch(selectedGradeProvider) != null ||
+        ref.watch(selectedSemesterProvider) != null ||
         ref.watch(selectedStatusFilterProvider) != null ||
         ref.watch(selectedAuthorFilterProvider) != null ||
         ref.watch(selectedDynastyFilterProvider) != null ||
@@ -296,6 +301,18 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
               const SizedBox(height: SpacingTokens.md),
 
               // ---- 筛选项（窄屏三行、宽屏两行） ----
+              Wrap(
+                spacing: SpacingTokens.sm,
+                children: [
+                  for (final value in const <String?>[null, '上', '下'])
+                    ChoiceChip(
+                      label: Text(value == null ? '全部学期' : '$value学期'),
+                      selected: _localSemester == value,
+                      onSelected: (_) => setState(() => _localSemester = value),
+                    ),
+                ],
+              ),
+              const SizedBox(height: SpacingTokens.sm),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final statusTile = _buildDropdownTile(
@@ -419,6 +436,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   bool get _hasLocalFilters =>
       _searchController.text.isNotEmpty ||
       _localGrade != null ||
+      _localSemester != null ||
       _localStatus != null ||
       _localAuthor != null ||
       _localDynasty != null ||
@@ -718,5 +736,4 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
       },
     );
   }
-
 }

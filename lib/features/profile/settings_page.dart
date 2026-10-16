@@ -22,6 +22,7 @@ import 'package:poemath/features/profile/backup_restore_page.dart';
 import 'package:poemath/features/profile/cloud_sync_page.dart';
 import 'package:poemath/features/profile/notification_settings_page.dart';
 import 'package:poemath/features/profile/practice_settings_page.dart';
+import 'package:poemath/features/profile/learning_background_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 import 'package:poemath/features/profile/tts_settings_page.dart';
 import 'package:poemath/features/profile/ai_settings_page.dart';
@@ -258,6 +259,27 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.md),
 
             // 练习设置（每组题数 + 难度 + 每日目标）
+            if (_section == _SettingsSection.learning)
+              AppTile(
+                icon: Icons.school_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '学习背景',
+                subtitle:
+                    '${settingsRepo.selectedGrade} 年级${settingsRepo.selectedSemester}学期',
+                onTap: () async {
+                  await Navigator.push<void>(
+                    context,
+                    fadeSlideRoute(
+                      builder: (_) => const LearningBackgroundPage(),
+                    ),
+                  );
+                  if (context.mounted) {
+                    ref.invalidate(settingsRepositoryProvider);
+                  }
+                },
+              ),
+            if (_section == _SettingsSection.learning)
+              const SizedBox(height: SpacingTokens.sm),
             if (_section == _SettingsSection.learning)
               _buildPracticeSettings(context, ref),
             if (_section == _SettingsSection.learning)

@@ -45,6 +45,7 @@ class SettingsRepository {
   static const String _keySoundEnabled = 'sound_enabled';
   static const String _keyHapticEnabled = 'haptic_enabled';
   static const String _keySelectedGrade = 'selected_grade';
+  static const String _keySelectedSemester = 'selected_semester';
   static const String _keyTtsSpeed = 'tts_speed';
   static const String _keyTtsVoice =
       'tts_voice'; // JSON: {"name":"...", "locale":"..."}
@@ -146,6 +147,19 @@ class SettingsRepository {
 
   Future<void> setSelectedGrade(int grade) async {
     await _putValidated(_keySelectedGrade, grade);
+  }
+
+  String get selectedSemester => _boundedString(_keySelectedSemester, '上');
+
+  Future<void> setLearningBackground(int grade, String semester) async {
+    if (!SettingsConstraints.accepts(_keySelectedGrade, grade) ||
+        !SettingsConstraints.accepts(_keySelectedSemester, semester)) {
+      throw ArgumentError('请选择一至六年级及上、下学期');
+    }
+    await HiveBoxes.settings.putAll({
+      _keySelectedGrade: grade,
+      _keySelectedSemester: semester,
+    });
   }
 
   // ============ TTS 语速 ============

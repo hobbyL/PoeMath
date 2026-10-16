@@ -1,7 +1,7 @@
 // lib/features/shell/onboarding_page.dart
 //
 // 层级：features/shell
-// 职责：新手引导页 — 首次启动时展示3页介绍，完成后标记已引导并进入首页。
+// 职责：首次启动展示三页介绍及可跳过的学习背景，完成后进入首页。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -11,7 +11,9 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/learning_background_fields.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/provider_invalidation.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -23,6 +25,9 @@ class OnboardingPage extends ConsumerStatefulWidget {
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   final _controller = PageController();
   int _currentPage = 0;
+  int _grade = 1;
+  String _semester = '上';
+  bool _saving = false;
 
   static const _pages = <_OnboardingData>[
     _OnboardingData(
@@ -54,18 +59,34 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     super.dispose();
   }
 
-  Future<void> _finishOnboarding() async {
+  Future<void> _finishOnboarding({bool saveBackground = false}) async {
+    if (_saving) return;
+    setState(() => _saving = true);
     final settingsRepo = ref.read(settingsRepositoryProvider);
-    await settingsRepo.setHasOnboarded(true);
-    if (mounted) {
-      context.go(AppRoutes.home);
+    try {
+      if (saveBackground) {
+        await settingsRepo.setLearningBackground(_grade, _semester);
+      }
+      await settingsRepo.setHasOnboarded(true);
+      if (mounted) {
+        invalidateLearningBackground(ref.invalidate);
+        context.go(AppRoutes.home);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('保存失败，请重试')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isLast = _currentPage == _pages.length - 1;
+    final isLast = _currentPage == _pages.length;
 
     return Scaffold(
       body: SafeArea(
@@ -75,12 +96,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             Align(
               alignment: Alignment.topRight,
               child: TextButton(
-                onPressed: _finishOnboarding,
+                onPressed: _saving ? null : _finishOnboarding,
                 child: Text(
                   '跳过',
                   style: TextStyle(
-                    color:
-                        theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
               ),
@@ -90,11 +110,24 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             Expanded(
               child: PageView.builder(
                 controller: _controller,
-                itemCount: _pages.length,
+                itemCount: _pages.length + 1,
                 onPageChanged: (index) {
                   setState(() => _currentPage = index);
                 },
                 itemBuilder: (context, index) {
+                  if (index == _pages.length) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.all(SpacingTokens.lg),
+                      child: LearningBackgroundFields(
+                        grade: _grade,
+                        semester: _semester,
+                        onChanged: (grade, semester) => setState(() {
+                          _grade = grade;
+                          _semester = semester;
+                        }),
+                      ),
+                    );
+                  }
                   return _buildPage(context, _pages[index], index);
                 },
               ),
@@ -108,7 +141,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 children: [
                   // 页面指示点
                   Row(
-                    children: List.generate(_pages.length, (index) {
+                    children: List.generate(_pages.length + 1, (index) {
                       final isActive = index == _currentPage;
                       return AnimatedContainer(
                         duration: 300.ms,
@@ -130,16 +163,18 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
                   // 下一步 / 开始按钮
                   FilledButton.icon(
-                    onPressed: () {
-                      if (isLast) {
-                        _finishOnboarding();
-                      } else {
-                        _controller.nextPage(
-                          duration: 400.ms,
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                    },
+                    onPressed: _saving
+                        ? null
+                        : () {
+                            if (isLast) {
+                              _finishOnboarding(saveBackground: true);
+                            } else {
+                              _controller.nextPage(
+                                duration: 400.ms,
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          },
                     icon: Icon(isLast ? Icons.check : Icons.arrow_forward),
                     label: Text(isLast ? '开始使用' : '下一步'),
                   ),
@@ -211,8 +246,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           Text(
             data.subtitle,
             style: theme.textTheme.titleLarge?.copyWith(
-              color:
-                  theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           )
               .animate(
@@ -228,8 +262,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyLarge?.copyWith(
               height: 1.8,
-              color:
-                  theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           )
               .animate(

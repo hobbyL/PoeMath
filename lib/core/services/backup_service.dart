@@ -80,6 +80,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   'sound_enabled': 'bool', // 音效开关
   'haptic_enabled': 'bool', // 触觉反馈开关
   'selected_grade': 'int', // 选中年级
+  'selected_semester': 'string', // 学习背景学期 上/下
   'tts_speed': 'double', // TTS 语速
   'tts_voice': 'string', // TTS 音色 JSON 字符串
   'pinyin_visible': 'bool', // 拼音显示开关

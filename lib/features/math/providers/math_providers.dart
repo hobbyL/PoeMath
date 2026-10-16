@@ -30,10 +30,14 @@ final Provider<ChallengeRecordRepository> challengeRecordRepoProvider =
 // ============ 练习选择 ============
 
 /// 当前选中年级
-final mathGradeProvider = StateProvider<int>((ref) => 1);
+final mathGradeProvider = StateProvider<int>(
+  (ref) => ref.read(settingsRepositoryProvider).selectedGrade,
+);
 
 /// 当前选中学期
-final mathSemesterProvider = StateProvider<String>((ref) => '上');
+final mathSemesterProvider = StateProvider<String>(
+  (ref) => ref.read(settingsRepositoryProvider).selectedSemester,
+);
 
 /// 管理下一次练习使用的一次性题数覆盖。
 class MathBatchSizeOverrideNotifier extends Notifier<int?> {

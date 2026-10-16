@@ -39,7 +39,14 @@ final Provider<ReviewRepository> reviewRepoProvider = reviewRepositoryProvider;
 // ============ 诗词列表 ============
 
 /// 当前选中年级（null = 全部）
-final selectedGradeProvider = StateProvider<int?>((ref) => null);
+final selectedGradeProvider = StateProvider<int?>(
+  (ref) => ref.read(settingsRepositoryProvider).selectedGrade,
+);
+
+/// 临时浏览筛选；只有学习背景设置页会写入长期偏好。
+final selectedSemesterProvider = StateProvider<String?>(
+  (ref) => ref.read(settingsRepositoryProvider).selectedSemester,
+);
 
 /// 当前选中学习状态筛选（null = 全部）
 final selectedStatusFilterProvider =
@@ -61,6 +68,7 @@ final selectedLayerFilterProvider = StateProvider<String?>((ref) => null);
 final filteredPoemsProvider = Provider<List<Poem>>((ref) {
   final repo = ref.watch(poemRepoProvider);
   final grade = ref.watch(selectedGradeProvider);
+  final semester = ref.watch(selectedSemesterProvider);
   final query = ref.watch(poemSearchQueryProvider);
   final statusFilter = ref.watch(selectedStatusFilterProvider);
   final authorFilter = ref.watch(selectedAuthorFilterProvider);
@@ -86,6 +94,12 @@ final filteredPoemsProvider = Provider<List<Poem>>((ref) {
               p.famousLines.any((l) => l.toLowerCase().contains(lower)) ||
               p.tags.any((t) => t.toLowerCase().contains(lower)),
         )
+        .toList();
+  }
+
+  if (semester != null && grade != null) {
+    poems = poems
+        .where((p) => p.semester == null || p.semester == semester)
         .toList();
   }
 
