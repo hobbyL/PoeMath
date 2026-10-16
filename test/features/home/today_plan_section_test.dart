@@ -124,10 +124,15 @@ void main() {
     await tester.pumpAndSettle();
     // 已移除「保存计划」按钮：调整即生效，关闭 sheet 时统一落盘。
     expect(find.text('保存计划'), findsNothing);
-    // 用系统返回关闭 sheet —— 走 PopScope 的落盘路径（同时覆盖手势关闭）。
+    // 关闭 sheet 触发落盘。用 `Navigator.maybePop` 走 PopScope 的
+    // onPopInvokedWithResult（与系统返回/手势关闭同一条路径），但不像
+    // `handlePopRoute()` 那样依赖全局路由栈 —— 后者在并发测试下会被
+    // 其他用例的路由状态干扰。
     await tester.runAsync(() async {
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+      final navigator = Navigator.of(
+        tester.element(find.text('调整每日计划')),
+      );
+      await navigator.maybePop();
       await Future<void>.delayed(const Duration(milliseconds: 150));
     });
     await tester.pumpAndSettle();
