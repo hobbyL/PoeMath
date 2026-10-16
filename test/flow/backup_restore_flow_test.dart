@@ -641,6 +641,7 @@ void main() {
       id: 'challenge',
       profileId: 'default',
       mode: 'fixed',
+      calculationMode: 'vertical',
       score: 90,
       totalAnswered: 10,
       correctCount: 9,
@@ -663,13 +664,34 @@ void main() {
 
     final legacy = jsonDecode(json) as Map<String, dynamic>;
     final records = legacy['challengeRecords'] as List<dynamic>;
-    (records.single as Map<String, dynamic>).remove('starsEarned');
+    expect(
+      HiveBoxes.challengeRecords.get('default_challenge')!.calculationMode,
+      'vertical',
+    );
+    final invalid = jsonDecode(json) as Map<String, dynamic>;
+    ((invalid['challengeRecords'] as List).single as Map)['calculationMode'] =
+        'invalid';
+    await expectLater(
+      backupService.restoreFromJson(jsonEncode(invalid)),
+      throwsFormatException,
+    );
+    expect(
+      HiveBoxes.challengeRecords.get('default_challenge')!.calculationMode,
+      'vertical',
+    );
+    (records.single as Map<String, dynamic>)
+      ..remove('starsEarned')
+      ..remove('calculationMode');
     await HiveBoxes.challengeRecords.clear();
     await backupService.restoreFromJson(jsonEncode(legacy));
 
     expect(
       HiveBoxes.challengeRecords.get('default_challenge')!.starsEarned,
       0,
+    );
+    expect(
+      HiveBoxes.challengeRecords.get('default_challenge')!.calculationMode,
+      'normal',
     );
   });
 
@@ -744,8 +766,8 @@ void main() {
     );
     await HiveBoxes.llmProblems.put('default_p1', problem);
 
-    final legacy = jsonDecode(await backupService.exportToJson())
-        as Map<String, dynamic>;
+    final legacy =
+        jsonDecode(await backupService.exportToJson()) as Map<String, dynamic>;
     expect(legacy.containsKey('llmProblems'), isTrue);
     legacy.remove('llmProblems');
 
@@ -864,7 +886,8 @@ void main() {
       await seedExisting();
 
       await expectLater(
-        backupService.restoreFromJson(_llmBackupJson(_llmProblemJson(answer: -5))),
+        backupService
+            .restoreFromJson(_llmBackupJson(_llmProblemJson(answer: -5))),
         throwsA(isA<FormatException>()),
       );
 
@@ -876,7 +899,8 @@ void main() {
 
       // 12 - 4 求值为 8 ≠ 9
       await expectLater(
-        backupService.restoreFromJson(_llmBackupJson(_llmProblemJson(answer: 9))),
+        backupService
+            .restoreFromJson(_llmBackupJson(_llmProblemJson(answer: 9))),
         throwsA(isA<FormatException>()),
       );
       expect(HiveBoxes.llmProblems.get('default_existing'), isNotNull);

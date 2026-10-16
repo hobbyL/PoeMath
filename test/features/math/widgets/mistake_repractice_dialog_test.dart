@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
 
 /// 定位键盘上的按键（避免与答案显示区同文本冲突）。
 Finder key(String text) => find.descendant(
@@ -19,6 +20,7 @@ Future<void> pumpDialog(
   WidgetTester tester, {
   required String problemText,
   required String correctAnswer,
+  MathProblem? problem,
   required void Function(bool? result) onResult,
 }) async {
   // 默认 800x600 逻辑视口下 AlertDialog content 高度上限约 384，
@@ -40,6 +42,7 @@ Future<void> pumpDialog(
                   builder: (_) => MistakeRepracticeDialog(
                     problemText: problemText,
                     correctAnswer: correctAnswer,
+                    problem: problem,
                   ),
                 );
                 onResult(result);
@@ -63,6 +66,42 @@ Future<void> tapKeys(WidgetTester tester, List<String> keys) async {
 }
 
 void main() {
+  for (final regroup in ['0', '1']) {
+    testWidgets('竖式重练结果 83 相同，进位 $regroup 决定是否通过', (tester) async {
+      final problem = MathProblem(
+        operands: [NumberValue.fromInt(38), NumberValue.fromInt(45)],
+        operators: const [Operator.add],
+        result: NumberValue.fromInt(83),
+        mode: ProblemMode.vertical,
+        grade: 2,
+      );
+      bool? result;
+      await pumpDialog(
+        tester,
+        problemText: problem.problemText,
+        correctAnswer: '83',
+        problem: problem,
+        onResult: (value) => result = value,
+      );
+      for (final field in [
+        ('ones', '3'),
+        ('tens', '8'),
+        ('regroup', regroup),
+      ]) {
+        await tester.tap(find.byKey(ValueKey('vertical_${field.$1}')));
+        await tester.pump();
+        await tapKeys(tester, [field.$2]);
+      }
+      await tester.tap(find.byIcon(Icons.check_rounded));
+      await tester.pump();
+      expect(find.text(regroup == '1' ? '回答正确！' : '还是答错了'), findsOneWidget);
+      if (regroup == '0') expect(find.text('个位写 3，进位记 1'), findsOneWidget);
+      await tester.tap(find.text('关闭'));
+      await tester.pumpAndSettle();
+      expect(result, regroup == '1');
+    });
+  }
+
   group('MistakeRepracticeDialog 四种答案形态', () {
     testWidgets('余数答案 17…2 可输入并判对', (tester) async {
       bool? result;
@@ -176,10 +215,12 @@ void main() {
   group('MistakeRepracticeDialog 判定与取消契约', () {
     testWidgets('比较题直接选择关系符号并判对', (tester) async {
       bool? result;
-      await pumpDialog(tester,
-          problemText: '1 + 2 ○ 4',
-          correctAnswer: '<',
-          onResult: (r) => result = r,);
+      await pumpDialog(
+        tester,
+        problemText: '1 + 2 ○ 4',
+        correctAnswer: '<',
+        onResult: (r) => result = r,
+      );
       await tester.tap(find.text('<'));
       await tester.pump();
       expect(find.text('回答正确！'), findsOneWidget);
@@ -189,8 +230,12 @@ void main() {
     });
 
     testWidgets('等价分数 2/4 与标准答案 1/2 判分一致', (tester) async {
-      await pumpDialog(tester,
-          problemText: '1/4 + 1/4 = ?', correctAnswer: '1/2', onResult: (_) {},);
+      await pumpDialog(
+        tester,
+        problemText: '1/4 + 1/4 = ?',
+        correctAnswer: '1/2',
+        onResult: (_) {},
+      );
       await tapKeys(tester, ['2', '/', '4']);
       await tester.tap(find.byIcon(Icons.check_rounded));
       await tester.pump();

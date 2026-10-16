@@ -22,6 +22,7 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/home/practice_resume_section.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
@@ -54,8 +55,7 @@ class HomePage extends ConsumerWidget {
                 ),
                 decoration: BoxDecoration(
                   color: theme.semantic.caution.withValues(alpha: 0.15),
-                  borderRadius:
-                      BorderRadius.circular(SpacingTokens.radiusPill),
+                  borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -82,49 +82,50 @@ class HomePage extends ConsumerWidget {
       ),
       body: AnimatedPageBody(
         children: [
-            // 打卡 + 连续天数
-            _buildStreakCard(context, streak, isCheckedIn, ref),
-            const SizedBox(height: SpacingTokens.md),
+          // 打卡 + 连续天数
+          _buildStreakCard(context, streak, isCheckedIn, ref),
+          const SizedBox(height: SpacingTokens.md),
 
-            // 学习概览
-            _buildStatsOverview(context, stats, learnedPoems),
-            const SizedBox(height: SpacingTokens.lg),
+          // 学习概览
+          _buildStatsOverview(context, stats, learnedPoems),
+          const SizedBox(height: SpacingTokens.lg),
 
-            // 快捷入口
+          // 快捷入口
+          const PracticeResumeSection(),
+          Text(
+            '快捷入口',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          _buildQuickActions(context, mistakeCount),
+          const SizedBox(height: SpacingTokens.lg),
+
+          // 今日推荐
+          if (recommendedPoem != null) ...[
             Text(
-              '快捷入口',
+              '今日推荐',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: SpacingTokens.sm),
-            _buildQuickActions(context, mistakeCount),
+            _buildDailyRecommendation(context, recommendedPoem),
             const SizedBox(height: SpacingTokens.lg),
-
-            // 今日推荐
-            if (recommendedPoem != null) ...[
-              Text(
-                '今日推荐',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              _buildDailyRecommendation(context, recommendedPoem),
-              const SizedBox(height: SpacingTokens.lg),
-            ],
-
-            // 复习提醒（有待复习时显示）
-            if (dueReviews > 0) ...[
-              _buildReviewReminder(context, dueReviews),
-              const SizedBox(height: SpacingTokens.lg),
-            ],
-
-            // 今日目标
-            _buildDailyGoal(context, dueReviews, ref),
-            // 底部留白：为底部导航栏预留空间
-            const SizedBox(height: 100),
           ],
+
+          // 复习提醒（有待复习时显示）
+          if (dueReviews > 0) ...[
+            _buildReviewReminder(context, dueReviews),
+            const SizedBox(height: SpacingTokens.lg),
+          ],
+
+          // 今日目标
+          _buildDailyGoal(context, dueReviews, ref),
+          // 底部留白：为底部导航栏预留空间
+          const SizedBox(height: 100),
+        ],
       ),
     );
   }
@@ -176,8 +177,8 @@ class HomePage extends ConsumerWidget {
                       child: Text(
                         '天连续',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color:
-                              theme.colorScheme.onPrimary.withValues(alpha: 0.8),
+                          color: theme.colorScheme.onPrimary
+                              .withValues(alpha: 0.8),
                         ),
                       ),
                     ),
@@ -512,8 +513,7 @@ class HomePage extends ConsumerWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color:
-                        theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -662,9 +662,7 @@ class HomePage extends ConsumerWidget {
               text,
               style: theme.textTheme.bodyMedium?.copyWith(
                 decoration: done ? TextDecoration.lineThrough : null,
-                color: done
-                    ? theme.colorScheme.onSurfaceVariant
-                    : null,
+                color: done ? theme.colorScheme.onSurfaceVariant : null,
               ),
             ),
           ),
@@ -672,9 +670,8 @@ class HomePage extends ConsumerWidget {
             Text(
               '$current/$target',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: done
-                    ? theme.semantic.success
-                    : theme.colorScheme.primary,
+                color:
+                    done ? theme.semantic.success : theme.colorScheme.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),

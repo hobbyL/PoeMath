@@ -44,9 +44,26 @@ class VerticalCalcWidget extends StatelessWidget {
     }
 
     // 使用 toString() 保留小数和符号，显示实际数值
-    final aStr = operands[0].toString();
-    final bStr = operands[1].toString();
-    final resultStr = problem.result.toString();
+    var aStr = operands[0].toString();
+    var bStr = operands[1].toString();
+    var resultStr = problem.result.toString();
+    // 小数加减按小数点对齐，补零保持位值；乘法仍按末位对齐。
+    if (operator == Operator.add || operator == Operator.subtract) {
+      final values = [aStr, bStr, resultStr];
+      final places = values
+          .map((s) => s.contains('.') ? s.split('.').last.length : 0)
+          .reduce((a, b) => a > b ? a : b);
+      if (places > 0) {
+        String align(String value) {
+          final parts = value.split('.');
+          return '${parts.first}.${(parts.length > 1 ? parts.last : '').padRight(places, '0')}';
+        }
+
+        aStr = align(aStr);
+        bStr = align(bStr);
+        resultStr = align(resultStr);
+      }
+    }
 
     // 确定最大字符宽度，用于右对齐
     final maxDigits = [aStr.length, bStr.length, resultStr.length]
@@ -105,9 +122,7 @@ class VerticalCalcWidget extends StatelessWidget {
 
           // 结果行
           Text(
-            showAnswer
-                ? resultStr.padLeft(maxDigits)
-                : '?'.padLeft(maxDigits),
+            showAnswer ? resultStr.padLeft(maxDigits) : '?'.padLeft(maxDigits),
             style: digitStyle.copyWith(
               color: showAnswer ? theme.semantic.success : primaryColor,
             ),

@@ -22,13 +22,13 @@ import 'package:poemath/core/widgets/colored_card.dart';
 /// 通用列表行组件。
 ///
 /// 视觉规则继承 [ColoredCard]（半透明彩色背景 + 圆角），额外提供：
-/// - 40×40 圆角图标容器（12% 透明度）
+/// - 可选的 40×40 圆角图标容器（12% 透明度）
 /// - 标题 + 副标题文本列
 /// - 尾部组件（默认为 chevron 箭头；可替换为 Switch 等）
 class AppTile extends StatelessWidget {
   const AppTile({
     super.key,
-    required this.icon,
+    this.icon,
     required this.iconColor,
     required this.title,
     required this.subtitle,
@@ -36,8 +36,8 @@ class AppTile extends StatelessWidget {
     this.trailing,
   });
 
-  /// 图标。
-  final IconData icon;
+  /// 图标；省略时不展示图标，也不保留图标占位。
+  final IconData? icon;
 
   /// 图标主色调，同时决定卡片背景色。
   final Color iconColor;
@@ -70,17 +70,18 @@ class AppTile extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius:
-                  BorderRadius.circular(SpacingTokens.radiusSmall),
+          if (icon != null) ...[
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+              ),
+              child: Icon(icon, color: iconColor, size: 22),
             ),
-            child: Icon(icon, color: iconColor, size: 22),
-          ),
-          const SizedBox(width: SpacingTokens.md),
+            const SizedBox(width: SpacingTokens.md),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

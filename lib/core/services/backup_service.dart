@@ -32,6 +32,7 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
 import 'package:poemath/domain/poem_review_history.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
@@ -422,6 +423,12 @@ class BackupService {
   /// 恢复失败时分别补偿 Hive 数据、设置键的存在状态及已写入凭据。
   /// 补偿失败会通过 [BackupRestoreException.rollbackFailed] 显式报告。
   Future<int> restoreFromJson(String jsonString, {String? passphrase}) async {
+    return PracticeDraftRepository.whileRestoring(
+      () => _restoreFromJson(jsonString, passphrase: passphrase),
+    );
+  }
+
+  Future<int> _restoreFromJson(String jsonString, {String? passphrase}) async {
     final data = _decodeAndValidate(jsonString);
 
     // 凭据解密在快照与任何写入之前完成：口令错误时数据零变更。
@@ -447,16 +454,41 @@ class BackupService {
           key: HiveBoxes.settings.get(key),
     };
     final credentialUndo = <Future<void> Function()>[];
+    final hadDraftEpoch = HiveBoxes.meta.containsKey('practice_draft_epoch');
+    final oldDraftEpoch =
+        HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int;
 
     try {
+      // 先持久失效代次；若无法落盘则整次恢复失败，主体不会先被替换。
+      await HiveBoxes.meta.put('practice_draft_epoch', oldDraftEpoch + 1);
       final count = await _doRestore(data);
       if (plainCredentials != null) {
         await _restoreCredentials(plainCredentials, undo: credentialUndo);
+      }
+      // 主体成功后再使本机缓存失效。清理故障不能把数据回滚成半套草稿。
+      try {
+        await PracticeDraftRepository.clearAll(advanceEpoch: false);
+      } on Object catch (error, stackTrace) {
+        AppLogger.e(
+          '学习数据已恢复，练习缓存失效失败',
+          tag: 'Backup',
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
       return count;
     } on Object catch (error, stackTrace) {
       // 恢复失败，回滚到快照
       final rollbackErrors = <Object>[];
+      try {
+        if (hadDraftEpoch) {
+          await HiveBoxes.meta.put('practice_draft_epoch', oldDraftEpoch);
+        } else {
+          await HiveBoxes.meta.delete('practice_draft_epoch');
+        }
+      } on Object catch (rollbackError) {
+        rollbackErrors.add(rollbackError);
+      }
       try {
         final rollback = _decodeAndValidate(snapshot);
         await _doRestore(rollback, canonicalize: false);
@@ -923,6 +955,7 @@ class BackupService {
         'id': r.id,
         'profileId': r.profileId,
         'mode': r.mode,
+        'calculationMode': r.calculationMode,
         'score': r.score,
         'totalAnswered': r.totalAnswered,
         'correctCount': r.correctCount,
@@ -1197,6 +1230,7 @@ class BackupService {
         id: m['id'] as String,
         profileId: m['profileId'] as String,
         mode: m['mode'] as String,
+        calculationMode: m['calculationMode'] as String? ?? 'normal',
         score: m['score'] as int,
         totalAnswered: m['totalAnswered'] as int,
         correctCount: m['correctCount'] as int,
@@ -1791,6 +1825,12 @@ class BackupService {
   }
 
   void _validateChallengeRecord(Map<String, dynamic> item, String path) {
+    _optionalEnumString(
+      item,
+      'calculationMode',
+      path,
+      const {'normal', 'vertical'},
+    );
     for (final key in <String>[
       'id',
       'profileId',

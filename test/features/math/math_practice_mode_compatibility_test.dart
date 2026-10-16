@@ -23,15 +23,24 @@ void main() {
       container.read(mathGradeProvider.notifier).state = sample.$1;
       container.read(mathPracticeModeProvider.notifier).state =
           ProblemMode.compare;
-      await tester.pumpWidget(UncontrolledProviderScope(
-          container: container,
-          child: const MaterialApp(home: MathPracticePage()),),);
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: MathPracticePage()),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
       await tester.pump();
       expect(container.read(mathProblemsProvider), hasLength(2));
       expect(container.read(mathPracticeModeProvider), isNull);
       expect(find.text('所选模式不适用于当前年级或难度，已切换为综合练习'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
       await tester.pump(const Duration(seconds: 5));
     });
   }

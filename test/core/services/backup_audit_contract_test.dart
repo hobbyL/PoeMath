@@ -8,6 +8,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/assistant_conversation.dart';
 import 'package:poemath/data/models/assistant_message.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import '../../helpers/hive_test_helper.dart';
 
 class _Store extends SecureCredentialStore {
@@ -64,6 +65,9 @@ void main() {
     final store = _Store();
     await providers(store);
     final backup = BackupService(secureStore: store);
+    final drafts = PracticeDraftRepository();
+    await drafts.save('math', {'sessionId': 'keep-on-failure'});
+    expect(HiveBoxes.meta.containsKey('practice_draft_epoch'), isFalse);
     final original = HiveBoxes.settings.toMap();
     final data =
         jsonDecode(await backup.exportToJson()) as Map<String, dynamic>;
@@ -81,6 +85,9 @@ void main() {
     );
     expect(store.keys, {'p1': 'old-p1'});
     expect(HiveBoxes.settings.toMap(), original);
+    expect(HiveBoxes.meta.containsKey('practice_draft_epoch'), isFalse);
+    expect(drafts.get('math')?['sessionId'], 'keep-on-failure');
+    drafts.assertCurrent();
   });
 
   test('单条凭据撤销失败仍继续撤销其余凭据', () async {

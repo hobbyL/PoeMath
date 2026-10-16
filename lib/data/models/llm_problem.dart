@@ -105,6 +105,49 @@ class LlmProblem extends HiveObject {
   });
 
   /// 组装算式显示文本（如 "12 + 4 = ?"）。
+  Map<String, dynamic> toSnapshot() => {
+        'id': id,
+        'profileId': profileId,
+        'questionText': questionText,
+        'unit': unit,
+        'operands': operands,
+        'operators': operators,
+        'answer': answer,
+        'explanation': explanation,
+        'batchId': batchId,
+        'createdAt': createdAt.toIso8601String(),
+        'grade': grade,
+        'semester': semester,
+        'topic': topic,
+        'difficulty': difficulty,
+        'done': done,
+        'attempts': attempts,
+        'correctCount': correctCount,
+        'lastDoneAt': lastDoneAt?.toIso8601String(),
+      };
+
+  factory LlmProblem.fromSnapshot(Map<String, dynamic> json) => LlmProblem(
+        id: json['id'] as String,
+        profileId: json['profileId'] as String,
+        questionText: json['questionText'] as String,
+        unit: json['unit'] as String,
+        operands: (json['operands'] as List<dynamic>).cast<int>(),
+        operators: (json['operators'] as List<dynamic>).cast<String>(),
+        answer: json['answer'] as int,
+        explanation: json['explanation'] as String,
+        batchId: json['batchId'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        grade: json['grade'] as int,
+        semester: json['semester'] as String,
+        topic: json['topic'] as String,
+        difficulty: json['difficulty'] as int,
+        done: json['done'] as bool? ?? false,
+        attempts: json['attempts'] as int? ?? 0,
+        correctCount: json['correctCount'] as int? ?? 0,
+        lastDoneAt: DateTime.tryParse(json['lastDoneAt'] as String? ?? ''),
+      );
+
+  /// 组装算式显示文本（如 "12 + 4 = ?"）。
   String get expressionText {
     final buffer = StringBuffer(operands.first.toString());
     for (var i = 0; i < operators.length; i++) {

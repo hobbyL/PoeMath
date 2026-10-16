@@ -13,12 +13,84 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/grade_semester_card.dart';
+import 'package:poemath/features/math/widgets/practice_scheme_selector.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/features/math/math_practice_request.dart';
 
 class MathTabPage extends ConsumerWidget {
   const MathTabPage({super.key});
 
   static const _semesterLabels = {'上': '上学期', '下': '下学期'};
+
+  Future<void> _startPractice(BuildContext context, WidgetRef ref) async {
+    final grade = ref.read(mathGradeProvider);
+    final semester = ref.read(mathSemesterProvider);
+    final settings = ref.read(settingsRepositoryProvider);
+    final count = settings.mathBatchSize;
+    final difficulty = DifficultyLevel.values.byName(settings.mathDifficulty);
+    final supported = MathEngine.supportedModes(
+      grade: grade,
+      semester: semester,
+      difficulty: difficulty,
+    );
+    final preferred = ref.read(mathPracticeModeProvider);
+    var vertical = preferred == ProblemMode.vertical &&
+        supported.contains(ProblemMode.vertical);
+    final selected = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('练习方案'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${GradePresets.get(grade, semester).label} · $count 题 · ${difficulty.label}',
+                ),
+                const SizedBox(height: SpacingTokens.md),
+                PracticeSchemeSelector(
+                  grade: grade,
+                  semester: semester,
+                  difficulty: difficulty,
+                  vertical: vertical,
+                  onChanged: (value) => setDialogState(() => vertical = value),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, vertical),
+              child: const Text('开始练习'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null || !context.mounted) return;
+    ref.read(nextMathPracticeRequestProvider.notifier).setNext(
+          MathPracticeRequest(
+            grade: grade,
+            semester: semester,
+            count: count,
+            difficulty: difficulty,
+            mode: selected
+                ? ProblemMode.vertical
+                : preferred != ProblemMode.vertical &&
+                        supported.contains(preferred)
+                    ? preferred
+                    : null,
+          ),
+        );
+    await context.push(AppRoutes.mathPractice);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -28,31 +100,26 @@ class MathTabPage extends ConsumerWidget {
     final accuracy = ref.watch(overallAccuracyProvider);
     final mistakeCount = ref.watch(mistakeCountProvider);
     final isWide = MediaQuery.sizeOf(context).width >= 420;
-    final gradeLabel =
-        GradePresets.get(selectedGrade, selectedSemester).label;
+    final gradeLabel = GradePresets.get(selectedGrade, selectedSemester).label;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('口算练习'),
         automaticallyImplyLeading: false,
-        leadingWidth: mistakeCount > 0
-            ? (isWide ? 160.0 : 96.0)
-            : null,
+        leadingWidth: mistakeCount > 0 ? (isWide ? 160.0 : 96.0) : null,
         leading: mistakeCount > 0
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (isWide)
                     TextButton.icon(
-                      onPressed: () =>
-                          context.push(AppRoutes.mathMistake),
+                      onPressed: () => context.push(AppRoutes.mathMistake),
                       icon: const Icon(Icons.error_outline, size: 18),
                       label: Text('错题 $mistakeCount'),
                     )
                   else
                     IconButton(
-                      onPressed: () =>
-                          context.push(AppRoutes.mathMistake),
+                      onPressed: () => context.push(AppRoutes.mathMistake),
                       icon: Badge(
                         label: Text('$mistakeCount'),
                         child: const Icon(Icons.error_outline),
@@ -60,8 +127,7 @@ class MathTabPage extends ConsumerWidget {
                       tooltip: '错题 $mistakeCount',
                     ),
                   IconButton(
-                    onPressed: () =>
-                        context.push(AppRoutes.studyHub),
+                    onPressed: () => context.push(AppRoutes.studyHub),
                     icon: const Icon(Icons.auto_stories_outlined),
                     tooltip: '公式知识库',
                   ),
@@ -92,8 +158,7 @@ class MathTabPage extends ConsumerWidget {
               onPressed: () =>
                   _showSemesterPicker(context, ref, selectedSemester),
               icon: const Icon(Icons.filter_list),
-              tooltip: _semesterLabels[selectedSemester] ??
-                  selectedSemester,
+              tooltip: _semesterLabels[selectedSemester] ?? selectedSemester,
             ),
         ],
       ),
@@ -104,10 +169,8 @@ class MathTabPage extends ConsumerWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 // 按 ~180px 每列计算列数，最少 2 列，最多 6 列
-                final gridWidth =
-                    constraints.maxWidth - SpacingTokens.md * 2;
-                final columns =
-                    (gridWidth / 180).floor().clamp(2, 6);
+                final gridWidth = constraints.maxWidth - SpacingTokens.md * 2;
+                final columns = (gridWidth / 180).floor().clamp(2, 6);
                 const totalItems = 6;
                 final rows = (totalItems / columns).ceil();
 
@@ -126,8 +189,7 @@ class MathTabPage extends ConsumerWidget {
                               label: '已做题',
                             ),
                             StatOverviewItem(
-                              value:
-                                  '${(accuracy * 100).toStringAsFixed(0)}%',
+                              value: '${(accuracy * 100).toStringAsFixed(0)}%',
                               label: '正确率',
                             ),
                             StatOverviewItem(
@@ -138,14 +200,14 @@ class MathTabPage extends ConsumerWidget {
                         ),
 
                       // 年级网格
+                      const SizedBox(height: SpacingTokens.md),
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: SpacingTokens.md,
                         ),
                         child: Column(
                           children: [
-                            for (int row = 0; row < rows;
-                                row++) ...[
+                            for (int row = 0; row < rows; row++) ...[
                               if (row > 0)
                                 const SizedBox(
                                   height: SpacingTokens.sm,
@@ -155,33 +217,22 @@ class MathTabPage extends ConsumerWidget {
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    for (int col = 0;
-                                        col < columns;
-                                        col++) ...[
+                                    for (int col = 0; col < columns; col++) ...[
                                       if (col > 0)
                                         const SizedBox(
                                           width: SpacingTokens.sm,
                                         ),
                                       Expanded(
-                                        child: row * columns +
-                                                    col <
-                                                totalItems
+                                        child: row * columns + col < totalItems
                                             ? _buildGradeCard(
                                                 ref,
-                                                grade:
-                                                    row * columns +
-                                                        col +
-                                                        1,
-                                                selectedGrade:
-                                                    selectedGrade,
+                                                grade: row * columns + col + 1,
+                                                selectedGrade: selectedGrade,
                                                 selectedSemester:
                                                     selectedSemester,
-                                                animIndex:
-                                                    row * columns +
-                                                        col,
+                                                animIndex: row * columns + col,
                                               )
-                                            : const SizedBox
-                                                .shrink(),
+                                            : const SizedBox.shrink(),
                                       ),
                                     ],
                                   ],
@@ -208,8 +259,7 @@ class MathTabPage extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: () =>
-                            context.push(AppRoutes.mathPractice),
+                        onPressed: () => _startPractice(context, ref),
                         icon: const Icon(Icons.play_arrow_rounded),
                         label: Text(
                           isWide
@@ -222,8 +272,7 @@ class MathTabPage extends ConsumerWidget {
                     ),
                     const SizedBox(width: SpacingTokens.sm),
                     FilledButton.tonalIcon(
-                      onPressed: () =>
-                          context.push(AppRoutes.mathChallenge),
+                      onPressed: () => context.push(AppRoutes.mathChallenge),
                       icon: const Icon(Icons.timer_rounded),
                       label: const Text('挑战'),
                     ),
@@ -279,9 +328,7 @@ class MathTabPage extends ConsumerWidget {
 
   String _configDescription(GradeConfig config) {
     final parts = <String>[];
-    final ops = config.allowedOperators
-        .map((o) => o.symbol)
-        .join(' ');
+    final ops = config.allowedOperators.map((o) => o.symbol).join(' ');
     parts.add(ops);
     if (config.allowDecimal) parts.add('小数');
     if (config.allowFraction) parts.add('分数');

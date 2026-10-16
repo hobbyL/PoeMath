@@ -82,9 +82,22 @@ class UserStats extends HiveObject {
     '诗仙',
   ];
 
-  String get levelName =>
-      level < levelNames.length ? levelNames[level] : '诗仙';
+  String get levelName => level < levelNames.length ? levelNames[level] : '诗仙';
 
   double get mathAccuracy =>
       mathTotalProblems > 0 ? mathTotalCorrect / mathTotalProblems : 0.0;
+
+  UserStats copy() => UserStats(
+        profileId: profileId,
+        totalStars: totalStars,
+        currentStreak: currentStreak,
+        longestStreak: longestStreak,
+        poemsLearned: poemsLearned,
+        poemsMastered: poemsMastered,
+        mathTotalProblems: mathTotalProblems,
+        mathTotalCorrect: mathTotalCorrect,
+        level: level,
+        mathBestStreak: mathBestStreak,
+        createdAt: createdAt,
+      );
 }

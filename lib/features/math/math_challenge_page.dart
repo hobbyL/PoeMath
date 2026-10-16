@@ -6,10 +6,11 @@
 //       挑战结束后自动保存记录。
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -27,6 +28,13 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/math_practice_request.dart';
+import 'package:poemath/features/math/widgets/math_text.dart';
+import 'package:poemath/features/math/widgets/number_keypad.dart';
+import 'package:poemath/features/math/widgets/practice_scheme_selector.dart';
+import 'package:poemath/features/math/widgets/vertical_calc_widget.dart';
+import 'package:poemath/features/math/widgets/vertical_process_input.dart';
+import 'package:poemath/math_engine/models/vertical_attempt.dart';
 import 'package:poemath/math_engine/math_engine.dart';
 import 'package:poemath/math_engine/models/answer_judgement.dart';
 import 'package:poemath/math_engine/models/difficulty_level.dart';
@@ -49,14 +57,17 @@ double challengeTimeRatio({
 }
 
 class MathChallengePage extends ConsumerStatefulWidget {
-  const MathChallengePage({super.key});
+  const MathChallengePage({super.key, this.random});
+
+  /// 可注入固定随机源，复现挑战题组。
+  final Random? random;
 
   @override
   ConsumerState<MathChallengePage> createState() => _MathChallengePageState();
 }
 
 class _MathChallengePageState extends ConsumerState<MathChallengePage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   static const _initialSeconds = 60;
   static const _bonusSeconds = 3; // 答对加 3 秒（仅续命模式）
   static const _comboThreshold = 5; // 连续 5 题触发 combo 奖励
@@ -66,6 +77,10 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
 
   /// 挑战模式：'fixed'（固定时间）或 'extending'（续命模式）
   String _challengeMode = 'extending';
+  bool _verticalScheme = false;
+  MathPracticeRequest? _challengeRequest;
+  VerticalAttempt _verticalAttempt = const VerticalAttempt();
+  String _verticalField = 'ones';
 
   /// 剩余时间（秒）
   int _remainingSeconds = _initialSeconds;
@@ -109,6 +124,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -117,6 +133,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _nextProblemTimer?.cancel();
     _controller.dispose();
@@ -125,16 +142,85 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_started &&
+        !_finished &&
+        (state == AppLifecycleState.paused ||
+            state == AppLifecycleState.hidden)) {
+      _timer?.cancel();
+      unawaited(_finishChallenge());
+    }
+  }
+
+  Future<void> _confirmEndChallenge() async {
+    if (_isSaving || !_started || _finished) return;
+    final end = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('结束这次挑战？'),
+        content: const Text('限时挑战不能续练。结束后会结算已回答的题目。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('继续挑战'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('结束并结算'),
+          ),
+        ],
+      ),
+    );
+    if (end == true && mounted) {
+      _timer?.cancel();
+      await _finishChallenge();
+    }
+  }
+
   void _startChallenge() {
+    if (_started) return;
+    final settings = ref.read(settingsRepositoryProvider);
+    final grade = ref.read(mathGradeProvider);
+    final semester = ref.read(mathSemesterProvider);
+    final difficulty = DifficultyLevel.values.byName(settings.mathDifficulty);
+    final vertical = _verticalScheme &&
+        MathEngine.supportedModes(
+          grade: grade,
+          semester: semester,
+          difficulty: difficulty,
+        ).contains(ProblemMode.vertical);
+    _challengeRequest = MathPracticeRequest(
+      grade: grade,
+      semester: semester,
+      count: 1,
+      difficulty: difficulty,
+      mode: vertical ? ProblemMode.vertical : ProblemMode.findResult,
+    );
+    try {
+      _generateProblem();
+    } catch (error, stack) {
+      _challengeRequest = null;
+      AppLogger.e(
+        '挑战出题失败',
+        tag: 'MathChallenge',
+        error: error,
+        stackTrace: stack,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前方案暂时无法出题，请调整选择后重试')),
+      );
+      return;
+    }
     setState(() {
+      _verticalScheme = vertical;
       _challengeId = 'math_challenge:${DateTime.now().microsecondsSinceEpoch}';
       _started = true;
       _remainingSeconds = _initialSeconds;
       _startedAt = DateTime.now();
     });
-    _generateProblem();
     _startTimer();
-    _focusNode.requestFocus();
+    if (!_verticalScheme) _focusNode.requestFocus();
   }
 
   void _startTimer() {
@@ -157,35 +243,35 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   }
 
   void _generateProblem() {
-    final grade = ref.read(mathGradeProvider);
-    final semester = ref.read(mathSemesterProvider);
-    final settingsRepo = ref.read(settingsRepositoryProvider);
-    final difficulty = DifficultyLevel.values.firstWhere(
-      (d) => d.name == settingsRepo.mathDifficulty,
-      orElse: () => DifficultyLevel.medium,
-    );
-
+    final request = _challengeRequest!;
     final problem = MathEngine.generate(
-      grade: grade,
-      semester: semester,
-      mode: ProblemMode.findResult,
-      difficulty: difficulty,
+      grade: request.grade,
+      semester: request.semester,
+      mode: request.mode,
+      difficulty: request.difficulty,
+      random: widget.random,
     );
+    _controller.clear();
     setState(() {
       _currentProblem = problem;
       _lastCorrect = null;
       _answerPending = false;
+      _verticalAttempt = const VerticalAttempt();
+      _verticalField = 'ones';
     });
   }
 
   void _submitAnswer() {
     if (_finished || _answerPending || _currentProblem == null) return;
-    final userAnswer = _controller.text.trim();
+    final problem = _currentProblem!;
+    final process = VerticalAttempt.supports(problem) ? _verticalAttempt : null;
+    if (process != null && !process.complete(problem)) return;
+    final userAnswer = process?.answer(problem) ?? _controller.text.trim();
     if (userAnswer.isEmpty) return;
     _answerPending = true;
 
-    final problem = _currentProblem!;
-    final judgement = MathEngine.judge(problem, userAnswer);
+    final judgement =
+        process?.judge(problem) ?? MathEngine.judge(problem, userAnswer);
     final isCorrect = judgement.isCorrect;
 
     final sound = ref.read(soundServiceProvider);
@@ -225,7 +311,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       // setState 是同步闭包不能 await，故在闭包外发起；400ms 后
       // `_generateProblem()` 会替换 `_currentProblem`，所以把当前题目
       // 作为参数传入。内部已兜底异常，不会产生未捕获的异步错误。
-      unawaited(_recordMistake(problem, userAnswer, judgement));
+      unawaited(_recordMistake(problem, userAnswer, judgement, process));
     }
 
     _controller.clear();
@@ -233,8 +319,19 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     // 短暂显示反馈后出下一题
     _nextProblemTimer = Timer(const Duration(milliseconds: 400), () {
       if (mounted && !_finished) {
-        _generateProblem();
-        _focusNode.requestFocus();
+        try {
+          _generateProblem();
+          if (!_verticalScheme) _focusNode.requestFocus();
+        } catch (error, stack) {
+          AppLogger.e(
+            '挑战换题失败',
+            tag: 'MathChallenge',
+            error: error,
+            stackTrace: stack,
+          );
+          _timer?.cancel();
+          unawaited(_finishChallenge());
+        }
       }
     });
   }
@@ -247,8 +344,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     MathProblem problem,
     String userAnswer,
     AnswerJudgement judgement,
+    VerticalAttempt? process,
   ) async {
-    final grade = ref.read(mathGradeProvider);
+    final grade = problem.grade;
     final repo = ref.read(mathMistakeRepoProvider);
 
     try {
@@ -260,6 +358,10 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
         grade: grade,
         errorType: judgement.diagnosis?.category,
         solutionStepsJson: _stepsToJson(judgement.correctSteps),
+        skillId: problem.skillId,
+        semester: problem.semester,
+        problemJson: jsonEncode(problem.toJson()),
+        attemptJson: process == null ? null : jsonEncode(process.toJson()),
       );
     } on Object catch (error, stackTrace) {
       // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到；
@@ -370,16 +472,17 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     required int elapsed,
     required int stars,
   }) async {
-    final grade = ref.read(mathGradeProvider);
-    final semester = ref.read(mathSemesterProvider);
-    final settingsRepo = ref.read(settingsRepositoryProvider);
-    final difficulty = settingsRepo.mathDifficulty;
+    final request = _challengeRequest!;
+    final grade = request.grade;
+    final semester = request.semester;
+    final difficulty = request.difficulty.name;
     final completedAt = _completedAt ??= DateTime.now();
 
     final record = ChallengeRecord(
       id: _challengeId,
       profileId: ProfileScope.currentId,
       mode: _challengeMode,
+      calculationMode: _verticalScheme ? 'vertical' : 'normal',
       score: _score,
       totalAnswered: _totalAnswered,
       correctCount: _correctCount,
@@ -434,41 +537,49 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     return MathSession(
       id: _challengeId,
       profileId: ProfileScope.currentId,
-      grade: ref.read(mathGradeProvider),
-      problemType: 'challenge',
+      grade: _challengeRequest!.grade,
+      problemType: _verticalScheme ? 'vertical' : 'challenge',
       totalProblems: _totalAnswered,
       correctCount: _correctCount,
       durationSeconds: elapsed,
       starsEarned: stars,
       finishedAt: DateTime.now(),
-      semester: ref.read(mathSemesterProvider),
-      difficulty: ref.read(settingsRepositoryProvider).mathDifficulty,
+      semester: _challengeRequest!.semester,
+      difficulty: _challengeRequest!.difficulty.name,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final grade = ref.watch(mathGradeProvider);
-    final semester = ref.watch(mathSemesterProvider);
+    final selectedGrade = ref.watch(mathGradeProvider);
+    final selectedSemester = ref.watch(mathSemesterProvider);
+    final grade = _challengeRequest?.grade ?? selectedGrade;
+    final semester = _challengeRequest?.semester ?? selectedSemester;
 
     return PopScope(
-      canPop: !_isSaving,
+      canPop: !_isSaving && (!_started || _finished),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_confirmEndChallenge());
+      },
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            '限时挑战 · ${GradePresets.get(grade, semester).label}',
+            '${_started && _verticalScheme ? '竖式挑战' : '限时挑战'} · ${GradePresets.get(grade, semester).label}',
           ),
           actions: [
             IconButton(
               icon: const Icon(Icons.history_rounded),
               tooltip: '挑战记录',
-              onPressed: _isSaving
+              onPressed: _isSaving || (_started && !_finished)
                   ? null
                   : () => context.push(AppRoutes.challengeHistory),
             ),
           ],
         ),
+        bottomNavigationBar: _started && !_finished && _verticalScheme
+            ? _buildVerticalKeypad()
+            : null,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(SpacingTokens.md),
@@ -510,31 +621,37 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
             ),
             const SizedBox(height: SpacingTokens.lg),
 
-            // 模式选择卡片
-            Row(
-              children: [
-                Expanded(
-                  child: _buildModeCard(
-                    theme,
-                    icon: Icons.hourglass_top_rounded,
-                    title: '固定时间',
-                    description: '$_initialSeconds秒倒计时\n比拼速度与准确率',
-                    mode: 'fixed',
-                    color: theme.colorScheme.secondary,
-                  ),
+            ColoredCard(
+              color: theme.colorScheme.primary,
+              child: PracticeSchemeSelector(
+                grade: ref.watch(mathGradeProvider),
+                semester: ref.watch(mathSemesterProvider),
+                difficulty: DifficultyLevel.values.byName(
+                  ref.watch(settingsRepositoryProvider).mathDifficulty,
                 ),
-                const SizedBox(width: SpacingTokens.sm),
-                Expanded(
-                  child: _buildModeCard(
-                    theme,
-                    icon: Icons.add_alarm_rounded,
-                    title: '续命模式',
-                    description: '答对+$_bonusSeconds秒\n挑战你的极限',
-                    mode: 'extending',
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ],
+                vertical: _verticalScheme,
+                onChanged: (value) => setState(() => _verticalScheme = value),
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.md),
+
+            // 计时方式
+            _buildModeCard(
+              theme,
+              icon: Icons.hourglass_top_rounded,
+              title: '固定时间',
+              description: '$_initialSeconds 秒倒计时，比拼速度与准确率',
+              mode: 'fixed',
+              color: theme.colorScheme.secondary,
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            _buildModeCard(
+              theme,
+              icon: Icons.add_alarm_rounded,
+              title: '续命模式',
+              description: '答对 +$_bonusSeconds 秒，挑战你的极限',
+              mode: 'extending',
+              color: theme.colorScheme.primary,
             ),
             const SizedBox(height: SpacingTokens.md),
 
@@ -564,7 +681,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                   const SizedBox(height: SpacingTokens.xs),
                   Text(
                     '• 答对 +10 分，连续$_comboThreshold题正确双倍得分\n'
-                    '${_challengeMode == 'extending' ? '• 答对 +$_bonusSeconds秒，答错不扣时间' : '• 固定$_initialSeconds秒，答对不加时间'}',
+                    '${_challengeMode == 'extending' ? '• 答对 +$_bonusSeconds秒，答错不扣时间' : '• 固定$_initialSeconds秒，答对不加时间'}\n'
+                    '• 切到后台会结束并结算；离页需先结束挑战\n'
+                    '• 挑战不支持续练，强制关闭应用可能丢失本次未结算成绩',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       height: 1.6,
@@ -599,50 +718,49 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     required Color color,
   }) {
     final isSelected = _challengeMode == mode;
-
-    return GestureDetector(
+    return AppTile(
+      icon: icon,
+      iconColor: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+      title: title,
+      subtitle: description,
+      trailing: isSelected ? Icon(Icons.check_circle, color: color) : null,
       onTap: () => setState(() => _challengeMode = mode),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(SpacingTokens.md),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? color.withValues(alpha: 0.12)
-              : theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-          border: Border.all(
-            color: isSelected ? color : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 40,
-              color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: isSelected ? color : null,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ),
-      ),
+    );
+  }
+
+  Widget _buildVerticalKeypad() {
+    final problem = _currentProblem!;
+    final process = VerticalAttempt.supports(problem);
+    return NumberKeypad(
+      onNumberTap: (digit) {
+        if (_answerPending) return;
+        setState(() {
+          if (process) {
+            _verticalAttempt =
+                _verticalAttempt.withField(_verticalField, digit);
+          } else if (NumberKeypad.canAppend(_controller.text, digit)) {
+            _controller.text += digit;
+          }
+        });
+      },
+      onBackspace: () {
+        if (_answerPending) return;
+        setState(() {
+          if (process) {
+            _verticalAttempt = _verticalAttempt.withField(_verticalField, '');
+          } else if (_controller.text.isNotEmpty) {
+            _controller.text =
+                _controller.text.substring(0, _controller.text.length - 1);
+          }
+        });
+      },
+      onSubmit: _submitAnswer,
+      submitEnabled: !_answerPending &&
+          (process
+              ? _verticalAttempt.complete(problem)
+              : _controller.text.isNotEmpty),
+      showDecimal: !process && problem.resultForm == ResultForm.decimal,
+      showNegative: !process && problem.result.isNegative,
     );
   }
 
@@ -654,28 +772,23 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     );
     final timeColor =
         timeRatio > 0.3 ? theme.colorScheme.primary : theme.colorScheme.error;
+    final problem = _currentProblem!;
+    final process = VerticalAttempt.supports(problem);
 
     return Column(
       children: [
-        // 顶部状态栏：时间 + 分数 + combo
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          spacing: SpacingTokens.lg,
+          runSpacing: SpacingTokens.xs,
+          alignment: WrapAlignment.center,
           children: [
-            // 时间
-            Row(
-              children: [
-                Icon(Icons.timer, color: timeColor, size: 24),
-                const SizedBox(width: SpacingTokens.xs),
-                Text(
-                  '${_remainingSeconds}s',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: timeColor,
-                  ),
-                ),
-              ],
+            Text(
+              '${_remainingSeconds}s',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: timeColor,
+              ),
             ),
-            // 分数
             Text(
               '$_score 分',
               style: theme.textTheme.headlineSmall?.copyWith(
@@ -683,175 +796,137 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                 color: theme.colorScheme.primary,
               ),
             ),
-            // Combo
             if (_currentCombo >= 2)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.sm,
-                  vertical: SpacingTokens.xs,
+              Text(
+                '连对 $_currentCombo 题',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.semantic.caution,
                 ),
-                decoration: BoxDecoration(
-                  color: theme.semantic.caution.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.local_fire_department_rounded,
-                      size: 16,
-                      color: theme.semantic.caution,
-                    ),
-                    const SizedBox(width: SpacingTokens.xs),
-                    Text(
-                      'x$_currentCombo',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.semantic.caution,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              const SizedBox(width: 48),
+              ),
           ],
         ),
         const SizedBox(height: SpacingTokens.xs),
-
-        // 时间进度条
-        ClipRRect(
-          borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-          child: LinearProgressIndicator(
-            value: timeRatio.clamp(0.0, 1.0),
-            minHeight: 6,
-            backgroundColor: theme.colorScheme.surfaceContainerHighest,
-            valueColor: AlwaysStoppedAnimation(timeColor),
-          ),
+        LinearProgressIndicator(
+          value: timeRatio.clamp(0.0, 1.0),
+          backgroundColor: theme.colorScheme.surfaceContainerHighest,
+          valueColor: AlwaysStoppedAnimation(timeColor),
         ),
-
-        const Spacer(),
-
-        // 题目
-        if (_currentProblem != null)
-          AnimatedBuilder(
-            animation: _shakeController,
-            builder: (context, child) {
-              final dx = _shakeController.isAnimating
-                  ? 10 *
-                      (1 - _shakeController.value) *
-                      (_shakeController.value * 4 * 3.14159)
-                          .remainder(3.14159)
-                          .abs()
-                  : 0.0;
-              return Transform.translate(
-                offset: Offset(dx, 0),
-                child: child,
-              );
-            },
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: SpacingTokens.lg),
             child: Column(
               children: [
-                // 反馈指示器
-                if (_lastCorrect != null)
-                  Icon(
-                    _lastCorrect! ? Icons.check_circle : Icons.cancel,
-                    size: 32,
-                    color: _lastCorrect!
-                        ? theme.semantic.success
-                        : theme.colorScheme.error,
-                  ).animate().fadeIn(duration: 200.ms).scale(
-                        begin: const Offset(0.5, 0.5),
-                        end: const Offset(1, 1),
-                        duration: 200.ms,
+                AnimatedBuilder(
+                  animation: _shakeController,
+                  builder: (context, child) {
+                    final dx = _shakeController.isAnimating
+                        ? 10 *
+                            (1 - _shakeController.value) *
+                            (_shakeController.value * 4 * 3.14159)
+                                .remainder(3.14159)
+                                .abs()
+                        : 0.0;
+                    return Transform.translate(
+                      offset: Offset(dx, 0),
+                      child: child,
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      if (_lastCorrect != null)
+                        Icon(
+                          _lastCorrect! ? Icons.check_circle : Icons.cancel,
+                          size: 32,
+                          color: _lastCorrect!
+                              ? theme.semantic.success
+                              : theme.colorScheme.error,
+                        ),
+                      const SizedBox(height: SpacingTokens.md),
+                      if (_verticalScheme)
+                        Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: VerticalCalcWidget(problem: problem),
+                          ),
+                        )
+                      else
+                        MathText(
+                          problem.problemText,
+                          style: theme.textTheme.displaySmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.lg),
+                if (_verticalScheme)
+                  if (process)
+                    IgnorePointer(
+                      ignoring: _answerPending,
+                      child: VerticalProcessInput(
+                        problem: problem,
+                        attempt: _verticalAttempt,
+                        selectedField: _verticalField,
+                        onSelect: (field) =>
+                            setState(() => _verticalField = field),
                       ),
+                    )
+                  else ...[
+                    ColoredCard(
+                      color: theme.colorScheme.primary,
+                      width: double.infinity,
+                      child: Text(
+                        _controller.text.isEmpty ? '输入答案' : _controller.text,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineMedium,
+                      ),
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    const Text('本题填写结果；两位数整数加减法支持逐列过程练习。'),
+                  ]
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.headlineMedium,
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            hintText: '输入答案',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                SpacingTokens.radiusMedium,
+                              ),
+                            ),
+                          ),
+                          onSubmitted: (_) => _submitAnswer(),
+                        ),
+                      ),
+                      const SizedBox(width: SpacingTokens.sm),
+                      FilledButton(
+                        onPressed: _answerPending ? null : _submitAnswer,
+                        child: const Icon(Icons.send_rounded),
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: SpacingTokens.md),
                 Text(
-                  _currentProblem!.problemText,
-                  style: theme.textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
+                  '已答 $_totalAnswered 题 · 正确 $_correctCount 题',
+                  style: theme.textTheme.bodySmall,
                 ),
+                if (_challengeMode == 'extending') const Text('续命'),
               ],
             ),
           ),
-
-        const Spacer(),
-
-        // 输入框
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                focusNode: _focusNode,
-                // 挑战页年级覆盖 1-6 全 resultForm，含小数/分数/负数题；
-                // TextInputType.number 在 Android 上无小数点与负号，
-                // 必须显式开启 decimal + signed。
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                  signed: true,
-                ),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: '输入答案',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(
-                      SpacingTokens.radiusMedium,
-                    ),
-                  ),
-                ),
-                onSubmitted: (_) => _submitAnswer(),
-              ),
-            ),
-            const SizedBox(width: SpacingTokens.sm),
-            FilledButton(
-              onPressed: _submitAnswer,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(64, 56),
-              ),
-              child: const Icon(Icons.send_rounded),
-            ),
-          ],
         ),
-        const SizedBox(height: SpacingTokens.md),
-
-        // 底部统计
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '已答 $_totalAnswered 题 · 正确 $_correctCount 题',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            if (_challengeMode == 'extending') ...[
-              const SizedBox(width: SpacingTokens.sm),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.sm,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius:
-                      BorderRadius.circular(SpacingTokens.radiusSmall),
-                ),
-                child: Text(
-                  '续命',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: SpacingTokens.md),
       ],
     );
   }
@@ -888,7 +963,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
               borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
             ),
             child: Text(
-              _challengeMode == 'fixed' ? '固定时间' : '续命模式',
+              "${_verticalScheme ? '竖式' : '普通'} · ${_challengeMode == 'fixed' ? '固定时间' : '续命模式'}",
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.w600,
@@ -1061,6 +1136,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     setState(() {
       _started = false;
       _finished = false;
+      _challengeRequest = null;
       _totalAnswered = 0;
       _correctCount = 0;
       _currentCombo = 0;

@@ -44,13 +44,19 @@ class ChallengeRecordRepository {
   }
 
   /// 按模式筛选
-  List<ChallengeRecord> getByMode(String mode) {
-    return getAll().where((r) => r.mode == mode).toList();
+  List<ChallengeRecord> getByMode(String mode, {String? calculationMode}) {
+    return getAll()
+        .where(
+          (r) =>
+              r.mode == mode &&
+              (calculationMode == null || r.calculationMode == calculationMode),
+        )
+        .toList();
   }
 
   /// 某模式的最高分
-  int? bestScore(String mode) {
-    final records = getByMode(mode);
+  int? bestScore(String mode, {String? calculationMode}) {
+    final records = getByMode(mode, calculationMode: calculationMode);
     if (records.isEmpty) return null;
     return records.map((r) => r.score).reduce((a, b) => a > b ? a : b);
   }

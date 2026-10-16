@@ -28,14 +28,22 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/practice_clock.dart';
+import 'package:poemath/features/math/practice_resume_prompt.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/widgets/session_result_dialog.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 
 class WordProblemPracticePage extends ConsumerStatefulWidget {
-  const WordProblemPracticePage({super.key, required this.problems});
+  const WordProblemPracticePage({
+    super.key,
+    required this.problems,
+    this.resume = false,
+  });
 
   final List<LlmProblem> problems;
+  final bool resume;
 
   @override
   ConsumerState<WordProblemPracticePage> createState() =>
@@ -64,6 +72,13 @@ class _WordProblemPracticePageState
   DateTime? _completedAt;
   bool _submitting = false;
   bool _isFinishing = false;
+  final _drafts = PracticeDraftRepository();
+  late final PracticeClock _clock;
+  late List<LlmProblem> _problems;
+  bool _ready = false;
+  bool _draftDisabled = false;
+  String? _resumeError;
+  Timer? _draftTimer;
 
   @override
   void initState() {
@@ -71,16 +86,163 @@ class _WordProblemPracticePageState
     _startTime = DateTime.now();
     _sessionId = DateTime.now().microsecondsSinceEpoch.toString();
     _confettiController = CelebrationController();
+    _problems = widget.problems;
+    _clock = PracticeClock()..onPause = _saveOnPause;
+    _answerController.addListener(_queueDraftSave);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_initialize());
+    });
+  }
+
+  Future<void> _initialize() async {
+    try {
+      final draft = _drafts.get('word');
+      if (draft != null) {
+        final resume =
+            widget.resume ? true : await choosePracticeResume(context, '应用题');
+        if (!mounted) return;
+        if (resume == null) {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+          return;
+        }
+        if (resume) {
+          _problems = (draft['problems'] as List<dynamic>)
+              .map(
+                (p) => LlmProblem.fromSnapshot(p as Map<String, dynamic>),
+              )
+              .toList();
+          _problemRecords.addAll(
+            (draft['records'] as List<dynamic>).map(
+              (r) => ProblemRecord.fromJson(r as Map<String, dynamic>),
+            ),
+          );
+          _currentIndex = draft['index'] as int;
+          if (_problems.isEmpty ||
+              _currentIndex < 0 ||
+              _currentIndex >= _problems.length ||
+              _problemRecords.length < _currentIndex ||
+              _problemRecords.length > _currentIndex + 1) {
+            throw const FormatException('草稿答题位置无效');
+          }
+          _sessionId = draft['sessionId'] as String;
+          _startTime = DateTime.parse(draft['startedAt'] as String);
+          _completedAt =
+              DateTime.tryParse(draft['completedAt'] as String? ?? '');
+          _correctCount = _problemRecords.where((r) => r.isCorrect).length;
+          _isCorrect = _problemRecords.length > _currentIndex
+              ? _problemRecords[_currentIndex].isCorrect
+              : null;
+          _answerController.text = draft['input'] as String? ?? '';
+          _clock.start(
+            elapsedMilliseconds: draft['elapsedMilliseconds'] as int,
+          );
+          if (_completedAt != null) _clock.finish();
+          _submitting = true;
+          setState(() => _ready = true);
+          try {
+            if (_problemRecords.isNotEmpty) await _persistProgress();
+            if (_completedAt != null && mounted) await _finishSession();
+          } finally {
+            _submitting = false;
+            if (mounted) setState(() {});
+          }
+          return;
+        }
+        await _drafts.remove('word');
+      }
+      if (!mounted) return;
+      if (_problems.isEmpty) throw const FormatException('没有可恢复的应用题');
+      _clock.start();
+      setState(() => _ready = true);
+      await _saveDraft();
+    } catch (error, stack) {
+      AppLogger.e(
+        '应用题续练失败',
+        tag: 'WordProblemPractice',
+        error: error,
+        stackTrace: stack,
+      );
+      if (!mounted) return;
+      if (_ready) {
+        // 快照解析完成后的落盘失败可在当前题重试，不能挡住结算按钮。
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('练习已恢复，进度或结算暂未保存，请重试')),
+        );
+      } else {
+        setState(() => _resumeError = '上次应用题暂时无法恢复，请返回首页放弃草稿后重试');
+      }
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    if (!_ready || _draftDisabled || _problems.isEmpty) return;
+    await _drafts.save('word', {
+      'sessionId': _sessionId,
+      'startedAt': _startTime.toIso8601String(),
+      'completedAt': _completedAt?.toIso8601String(),
+      'elapsedMilliseconds': _clock.elapsedMilliseconds,
+      'index': _currentIndex,
+      'input': _answerController.text,
+      'problems': _problems.map((p) => p.toSnapshot()).toList(),
+      'records': _problemRecords.map((r) => r.toJson()).toList(),
+    });
+  }
+
+  void _queueDraftSave() {
+    if (_draftDisabled) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 200), () {
+      unawaited(
+        _saveDraft().catchError((Object error, StackTrace stack) {
+          AppLogger.e(
+            '应用题草稿保存失败',
+            tag: 'WordProblemPractice',
+            error: error,
+            stackTrace: stack,
+          );
+        }),
+      );
+    });
+  }
+
+  void _saveOnPause() {
+    _draftTimer?.cancel();
+    unawaited(
+      _saveDraft().catchError((Object error, StackTrace stack) {
+        AppLogger.e(
+          '暂停时保存应用题草稿失败',
+          tag: 'WordProblemPractice',
+          error: error,
+          stackTrace: stack,
+        );
+      }),
+    );
   }
 
   @override
   void dispose() {
+    _draftTimer?.cancel();
+    _clock.dispose();
+    unawaited(
+      _saveDraft().catchError((Object error, StackTrace stack) {
+        AppLogger.e(
+          '退出时保存草稿失败',
+          tag: 'WordProblemPractice',
+          error: error,
+          stackTrace: stack,
+        );
+      }),
+    );
     _answerController.dispose();
     _confettiController.dispose();
     super.dispose();
   }
 
-  LlmProblem get _current => widget.problems[_currentIndex];
+  LlmProblem get _current => _problems[_currentIndex];
 
   /// 判分：输入解析为 num 后与答案精确相等（"16" / "16.0" 均通过）。
   bool _judge(String userAnswer) {
@@ -88,17 +250,15 @@ class _WordProblemPracticePageState
     return parsed != null && parsed == _current.answer;
   }
 
-  /// 每答一题后同步写 Hive（MathSession 同 ID 覆盖 + userStats 增量）。
-  ///
-  /// 「同步」指内存可见性而非落盘：Hive `put()` 同步更新内存中的 box，
-  /// 之后的读取（含刚 `invalidate` 的 provider）立即拿到新值。磁盘 flush
-  /// 异步进行，这里刻意不 `await`，避免拖慢答题；代价是进程被强杀时可能
-  /// 丢掉最后一次 flush 之前的数据。真正需要「写完再读」的路径（如
-  /// 错题记录）另见 `_recordMistake`，那里是 `await` 后才 invalidate。
-  void _persistProgress({required bool isCorrect}) {
-    final answered = _currentIndex + 1;
-    final duration = DateTime.now().difference(_startTime).inSeconds;
-    final first = widget.problems.first;
+  /// 按固定题组和题序写入检查点，恢复后允许幂等重放。
+  Future<void> _persistProgress() async {
+    final answered = _problemRecords.length;
+    final duration = _clock.elapsedSeconds;
+    final first = _problems.first;
+    final sessions = ref.read(mathSessionRepositoryProvider);
+    final stats = ref.read(userStatsRepositoryProvider);
+    final problems = ref.read(llmProblemRepositoryProvider);
+    final mistakes = ref.read(mathMistakeRepoProvider);
 
     final session = MathSession(
       id: _sessionId,
@@ -109,6 +269,7 @@ class _WordProblemPracticePageState
       correctCount: _correctCount,
       durationSeconds: duration,
       starsEarned: 0,
+      startedAt: _startTime,
       finishedAt: DateTime.now(),
       semester: first.semester,
       difficulty: _difficultyLabel(first.difficulty),
@@ -116,40 +277,48 @@ class _WordProblemPracticePageState
         _problemRecords.map((r) => r.toJson()).toList(),
       ),
     );
-    unawaited(
-      ref
-          .read(mathSessionRepositoryProvider)
-          .save(session)
-          .catchError((Object error, StackTrace stack) {
-        AppLogger.e(
-          '练习快照保存失败',
-          tag: 'MathPractice',
-          error: error,
-          stackTrace: stack,
-        );
-      }),
-    );
+    if (_completedAt == null) await _drafts.guard(() => sessions.save(session));
 
     // 增量更新用户统计（每题 +1），与口算练习页共用同一仓储写入路径。
-    unawaited(
-      ref
-          .read(userStatsRepositoryProvider)
-          .recordMathAttempt(
-            isCorrect: isCorrect,
-            bestStreak: 0,
-          )
-          .catchError((Object error, StackTrace stackTrace) {
-        AppLogger.e(
-          '应用题答题进度落库失败',
-          tag: 'WordProblemPractice',
-          error: error,
-          stackTrace: stackTrace,
+    for (var i = 0; i < _problemRecords.length; i++) {
+      await _drafts.guard(
+        () => stats.recordMathAttempt(
+          isCorrect: _problemRecords[i].isCorrect,
+          bestStreak: 0,
+          activityId: 'word_attempt:$_sessionId:$i',
+        ),
+      );
+      await _drafts.guard(
+        () => problems.recordAttempt(
+          _problems[i].id,
+          correct: _problemRecords[i].isCorrect,
+          activityId: 'word_library_attempt:$_sessionId:$i',
+        ),
+      );
+      final record = _problemRecords[i];
+      if (!record.isCorrect) {
+        final problem = _problems[i];
+        await _drafts.guard(
+          () => mistakes.recordWrong(
+            problemText: problem.questionText,
+            correctAnswer: problem.answer.toString(),
+            userAnswer: record.userAnswer,
+            problemType: 'llm_word_problem',
+            grade: problem.grade,
+            semester: problem.semester,
+            solutionStepsJson:
+                problem.explanation.isEmpty ? null : problem.explanation,
+            activityId: 'word_mistake_attempt:$_sessionId:$i',
+          ),
         );
-      }),
-    );
+      }
+    }
 
-    ref.invalidate(userStatsProvider);
-    ref.invalidate(todayMathCountProvider);
+    if (mounted) {
+      ref.invalidate(userStatsProvider);
+      ref.invalidate(todayMathCountProvider);
+      ref.invalidate(mathMistakeRepoProvider);
+    }
   }
 
   static String _difficultyLabel(int difficulty) {
@@ -158,46 +327,11 @@ class _WordProblemPracticePageState
     return 'hard';
   }
 
-  /// 记录错题到 Hive。
-  ///
-  /// 必须 await 后再 `invalidate`：写入未完成就失效 provider 会让错题本
-  /// 读到旧快照；写入失败时记日志并跳过 invalidate（无新数据可读）。
-  Future<void> _recordMistake(String userAnswer) async {
-    final problem = _current;
-    final repo = ref.read(mathMistakeRepoProvider);
-
-    try {
-      await repo.recordWrong(
-        problemText: problem.questionText,
-        correctAnswer: problem.answer.toString(),
-        userAnswer: userAnswer,
-        problemType: 'llm_word_problem',
-        grade: problem.grade,
-        // 应用题讲解是自然语言文本，直接存储。
-        solutionStepsJson:
-            problem.explanation.isEmpty ? null : problem.explanation,
-      );
-    } on Object catch (error, stackTrace) {
-      // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到；
-      // 此处位于 UI 边界，兜底后仅记日志，不打断答题流程。
-      AppLogger.e(
-        '应用题错题落库失败',
-        tag: 'WordProblemPractice',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      return;
-    }
-    if (!mounted) return;
-    ref.invalidate(mathMistakeRepoProvider);
-  }
-
   Future<void> _submitAnswer() async {
     if (_isCorrect != null || _submitting) return;
     final userAnswer = _answerController.text.trim();
     if (userAnswer.isEmpty) return;
     final problem = _current;
-    final problemRepo = ref.read(llmProblemRepositoryProvider);
     final isCorrect = _judge(userAnswer);
     setState(() {
       _submitting = true;
@@ -217,12 +351,9 @@ class _WordProblemPracticePageState
         isCorrect: isCorrect,
       ),
     );
-    _persistProgress(isCorrect: isCorrect);
-    final mistakeWrite =
-        isCorrect ? Future<void>.value() : _recordMistake(userAnswer);
     try {
-      await problemRepo.recordAttempt(problem.id, correct: isCorrect);
-      await mistakeWrite;
+      await _saveDraft();
+      await _persistProgress();
       if (isCorrect) {
         sound.play(SoundEffect.correct);
         await haptic.medium();
@@ -238,6 +369,11 @@ class _WordProblemPracticePageState
         error: error,
         stackTrace: stackTrace,
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('本题进度暂未保存，下一步会重试，请勿强制关闭应用')),
+        );
+      }
     } finally {
       _submitting = false;
       if (mounted) setState(() {});
@@ -245,20 +381,36 @@ class _WordProblemPracticePageState
   }
 
   Future<void> _nextProblem() async {
-    if (_submitting || !mounted) return;
-    if (_currentIndex + 1 >= widget.problems.length) {
-      if (!_isFinishing) {
-        _isFinishing = true;
-        await _finishSession();
+    if (_submitting || _isCorrect == null || !mounted) return;
+    setState(() => _submitting = true);
+    try {
+      await _saveDraft();
+      await _persistProgress();
+      if (!mounted) return;
+      if (_currentIndex + 1 >= _problems.length) {
+        if (!_isFinishing) {
+          _isFinishing = true;
+          await _finishSession();
+        }
+        return;
       }
-      return;
+      setState(() {
+        _currentIndex++;
+        _isCorrect = null;
+        _showExplanation = false;
+      });
+      _answerController.clear();
+      await _saveDraft();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('答题进度或结算保存失败，请重试')),
+        );
+      }
+    } finally {
+      _submitting = false;
+      if (mounted) setState(() {});
     }
-    setState(() {
-      _currentIndex++;
-      _isCorrect = null;
-      _showExplanation = false;
-    });
-    _answerController.clear();
   }
 
   Future<void> _finishSession() async {
@@ -273,10 +425,12 @@ class _WordProblemPracticePageState
   }
 
   Future<void> _settleSession() async {
-    final problems = widget.problems;
+    final problems = _problems;
     final correctCount = _correctCount;
     final completedAt = _completedAt ??= DateTime.now();
-    final duration = completedAt.difference(_startTime).inSeconds;
+    _clock.finish();
+    final duration = _clock.elapsedSeconds;
+    final draftWrite = _saveDraft();
     final first = problems.first;
 
     final stars = LearningRewardCalculator.calculateStars(
@@ -294,6 +448,7 @@ class _WordProblemPracticePageState
       correctCount: correctCount,
       durationSeconds: duration,
       starsEarned: stars,
+      startedAt: _startTime,
       finishedAt: completedAt,
       semester: first.semester,
       difficulty: _difficultyLabel(first.difficulty),
@@ -306,30 +461,43 @@ class _WordProblemPracticePageState
     final activityRepo = ref.read(learningActivityRepositoryProvider);
     final statsRepo = ref.read(userStatsRepoProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
-    await repo.save(session);
+    await draftWrite;
+    await _drafts.guard(() => repo.save(session));
     final activityId = 'llm_word_practice:${session.id}';
-    await activityRepo.record(
-      id: activityId,
-      activityType: LearningActivityType.wordProblem,
-      totalItems: problems.length,
-      successfulItems: correctCount,
-      starsEarned: stars,
-      durationSeconds: duration,
-      completedAt: completedAt,
+    await _drafts.guard(
+      () => activityRepo.record(
+        id: activityId,
+        activityType: LearningActivityType.wordProblem,
+        totalItems: problems.length,
+        successfulItems: correctCount,
+        starsEarned: stars,
+        durationSeconds: duration,
+        completedAt: completedAt,
+      ),
     );
 
     // 做题数已在 _persistProgress() 中逐题更新，只需添加星星。
     final levelBeforeReward = statsRepo.get().level;
     if (stars > 0) {
-      await statsRepo.addStars(stars, activityId: activityId);
+      await _drafts
+          .guard(() => statsRepo.addStars(stars, activityId: activityId));
     }
-    await checkInRepo.updateToday(
-      activityId: activityId,
-      addMathTotal: problems.length,
-      addMathCorrect: correctCount,
-      addStars: stars,
-      addDuration: duration,
+    await _drafts.guard(
+      () => checkInRepo.updateToday(
+        activityId: activityId,
+        addMathTotal: problems.length,
+        addMathCorrect: correctCount,
+        addStars: stars,
+        addDuration: duration,
+      ),
     );
+    _draftDisabled = true;
+    try {
+      await _drafts.remove('word', sessionId: _sessionId);
+    } catch (_) {
+      _draftDisabled = false;
+      rethrow;
+    }
 
     final updatedStats = statsRepo.get();
     if (updatedStats.level > levelBeforeReward && mounted) {
@@ -399,6 +567,8 @@ class _WordProblemPracticePageState
 
   /// 重置答题状态并重新开始同一套题。
   void _retrySession() {
+    _draftDisabled = false;
+    _clock.start();
     _answerController.clear();
     _problemRecords.clear();
     _isFinishing = false;
@@ -415,9 +585,19 @@ class _WordProblemPracticePageState
 
   @override
   Widget build(BuildContext context) {
+    if (!_ready || _resumeError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('应用题练习')),
+        body: Center(
+          child: _resumeError == null
+              ? const CircularProgressIndicator()
+              : Text(_resumeError!),
+        ),
+      );
+    }
     final theme = Theme.of(context);
     final problem = _current;
-    final total = widget.problems.length;
+    final total = _problems.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -608,7 +788,7 @@ class _WordProblemPracticePageState
           onPressed: _submitting || _isFinishing ? null : _nextProblem,
           icon: const Icon(Icons.arrow_forward_rounded),
           label: Text(
-            _currentIndex + 1 >= widget.problems.length ? '查看成绩' : '下一题',
+            _currentIndex + 1 >= _problems.length ? '查看成绩' : '下一题',
           ),
         ),
       ).animate().fadeIn(duration: 250.ms).slideY(

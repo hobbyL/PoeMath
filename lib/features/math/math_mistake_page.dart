@@ -370,7 +370,6 @@ class MathMistakePage extends ConsumerWidget {
     );
   }
 
-
   static String _statusFilterLabel(MistakeStatusFilter filter) =>
       mistakeStatusFilterLabel(filter);
 
@@ -387,14 +386,11 @@ class MathMistakePage extends ConsumerWidget {
     for (final mistake in queue) {
       if (!context.mounted) break;
 
-      final result = await showDialog<bool>(
-        context: context,
+      final result = await showMistakeRepractice(
+        context,
+        mistake,
         barrierDismissible: false,
-        builder: (_) => MistakeRepracticeDialog(
-          problemText:
-              '(${totalDone + 1}/${queue.length}) ${mistake.problemText}',
-          correctAnswer: mistake.correctAnswer,
-        ),
+        title: '再练一次 (${totalDone + 1}/${queue.length})',
       );
 
       // 用户取消 → 退出重练

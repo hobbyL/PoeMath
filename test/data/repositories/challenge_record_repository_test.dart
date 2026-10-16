@@ -28,6 +28,31 @@ void main() {
     expect(record!.starsEarned, 2);
   });
 
+  test('普通和竖式的最高分分别统计，历史筛选互不混入', () async {
+    await repo.save(_record(id: 'normal'));
+    final vertical = ChallengeRecord(
+      id: 'vertical',
+      profileId: 'default',
+      mode: 'fixed',
+      calculationMode: 'vertical',
+      score: 20,
+      totalAnswered: 2,
+      correctCount: 2,
+      bestCombo: 2,
+      grade: 2,
+      semester: '上',
+      difficulty: 'medium',
+      durationSeconds: 60,
+    );
+    await repo.save(vertical);
+    expect(repo.bestScore('fixed', calculationMode: 'normal'), 80);
+    expect(repo.bestScore('fixed', calculationMode: 'vertical'), 20);
+    expect(
+      repo.getByMode('fixed', calculationMode: 'vertical').map((r) => r.id),
+      ['vertical'],
+    );
+  });
+
   test('旧记录兼容默认 0 星', () {
     expect(_record(id: 'legacy').starsEarned, 0);
   });

@@ -30,10 +30,17 @@ import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/widgets/session_result_dialog.dart';
 import 'package:poemath/features/math/widgets/vertical_calc_widget.dart';
+import 'package:poemath/features/math/widgets/vertical_process_input.dart';
+import 'package:poemath/math_engine/models/vertical_attempt.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/features/math/math_practice_request.dart';
+import 'package:poemath/features/math/practice_clock.dart';
+import 'package:poemath/features/math/practice_resume_prompt.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 
 class MathPracticePage extends ConsumerStatefulWidget {
-  const MathPracticePage({super.key});
+  const MathPracticePage({super.key, this.resume = false});
+  final bool resume;
 
   @override
   ConsumerState<MathPracticePage> createState() => _MathPracticePageState();
@@ -69,6 +76,17 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   /// 当前页面固定使用的题数，避免“再练一组”丢失临时覆盖。
   int? _sessionBatchSize;
+  MathPracticeRequest? _request;
+  String? _generationError;
+  final _drafts = PracticeDraftRepository();
+  late final PracticeClock _clock;
+  List<MathProblem> _sessionProblems = [];
+  int _draftIndex = 0;
+  bool _ready = false;
+  bool _draftDisabled = false;
+  Timer? _draftTimer;
+  VerticalAttempt _verticalAttempt = const VerticalAttempt();
+  String _verticalField = 'ones';
 
   @override
   void initState() {
@@ -76,44 +94,238 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     _startTime = DateTime.now();
     _sessionId = DateTime.now().microsecondsSinceEpoch.toString();
     _confettiController = CelebrationController();
+    _clock = PracticeClock()..onPause = _saveOnPause;
+    _answerController.addListener(_queueDraftSave);
 
     // 延迟到 build 之后初始化题目
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _generateProblems();
+      unawaited(_initialize());
     });
   }
 
+  Future<void> _initialize() async {
+    try {
+      final draft = _drafts.get('math');
+      if (draft != null) {
+        final resume =
+            widget.resume ? true : await choosePracticeResume(context, '口算');
+        if (!mounted) return;
+        if (resume == null) {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.home);
+          }
+          return;
+        }
+        if (resume) {
+          ref.read(nextMathPracticeRequestProvider.notifier).consume();
+          await _restoreDraft(draft);
+          return;
+        }
+        await _drafts.remove('math');
+      }
+      if (mounted) _generateProblems();
+    } catch (error, stack) {
+      AppLogger.e(
+        '续练初始化失败',
+        tag: 'MathPractice',
+        error: error,
+        stackTrace: stack,
+      );
+      if (!mounted) return;
+      if (_ready) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('练习已恢复，进度或结算暂未保存，请重试')),
+        );
+      } else {
+        setState(() => _generationError = '上次练习暂时无法恢复，请返回首页放弃草稿后重试');
+      }
+    }
+  }
+
+  Future<void> _restoreDraft(Map<String, dynamic> draft) async {
+    final problems = (draft['problems'] as List<dynamic>)
+        .map(
+          (p) => MathProblem.fromJson(p as Map<String, dynamic>),
+        )
+        .toList();
+    final records = (draft['records'] as List<dynamic>)
+        .map(
+          (r) => ProblemRecord.fromJson(r as Map<String, dynamic>),
+        )
+        .toList();
+    final index = draft['index'] as int;
+    if (problems.isEmpty ||
+        index < 0 ||
+        index >= problems.length ||
+        records.length < index ||
+        records.length > index + 1) {
+      throw const FormatException('草稿答题位置无效');
+    }
+    _request =
+        MathPracticeRequest.fromJson(draft['request'] as Map<String, dynamic>);
+    _sessionBatchSize = _request!.count;
+    _sessionProblems = problems;
+    _draftIndex = index;
+    _problemRecords.addAll(records);
+    _sessionId = draft['sessionId'] as String;
+    _startTime = DateTime.parse(draft['startedAt'] as String);
+    _completedAt = DateTime.tryParse(draft['completedAt'] as String? ?? '');
+    _consecutiveCorrect = draft['consecutiveCorrect'] as int? ?? 0;
+    _bestConsecutive = draft['bestConsecutive'] as int? ?? 0;
+    _clock.start(elapsedMilliseconds: draft['elapsedMilliseconds'] as int);
+    if (_completedAt != null) _clock.finish();
+    _answerController.text = draft['input'] as String? ?? '';
+    if (draft['verticalAttempt'] case final Map<String, dynamic> attempt) {
+      _verticalAttempt = VerticalAttempt.fromJson(attempt);
+    }
+    _verticalField = draft['verticalField'] as String? ?? 'ones';
+    ref.read(mathProblemsProvider.notifier).state = problems;
+    ref.read(mathCurrentIndexProvider.notifier).state = index;
+    ref.read(mathAnsweredCountProvider.notifier).state = records.length;
+    ref.read(mathCorrectCountProvider.notifier).state =
+        records.where((r) => r.isCorrect).length;
+    if (records.length > index) {
+      final record = records[index];
+      _judgement =
+          VerticalAttempt.supports(problems[index]) && record.attempt != null
+              ? VerticalAttempt.fromJson(record.attempt!).judge(problems[index])
+              : MathEngine.judge(problems[index], record.userAnswer);
+    }
+    _submitting = true;
+    if (mounted) setState(() => _ready = true);
+    try {
+      if (records.isNotEmpty) await _persistProgress();
+      if (_completedAt != null && mounted) await _finishSession();
+    } finally {
+      _submitting = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    if (!_ready ||
+        _draftDisabled ||
+        _sessionProblems.isEmpty ||
+        _request == null) {
+      return;
+    }
+    await _drafts.save('math', {
+      'sessionId': _sessionId,
+      'startedAt': _startTime.toIso8601String(),
+      'completedAt': _completedAt?.toIso8601String(),
+      'elapsedMilliseconds': _clock.elapsedMilliseconds,
+      'request': _request!.toJson(),
+      'index': _draftIndex,
+      'input': _answerController.text,
+      'verticalAttempt': _verticalAttempt.toJson(),
+      'verticalField': _verticalField,
+      'problems': _sessionProblems.map((p) => p.toJson()).toList(),
+      'records': _problemRecords.map((r) => r.toJson()).toList(),
+      'consecutiveCorrect': _consecutiveCorrect,
+      'bestConsecutive': _bestConsecutive,
+    });
+  }
+
+  void _queueDraftSave() {
+    if (_draftDisabled) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 200), () {
+      unawaited(
+        _saveDraft().catchError((Object error, StackTrace stack) {
+          AppLogger.e(
+            '续练草稿保存失败',
+            tag: 'MathPractice',
+            error: error,
+            stackTrace: stack,
+          );
+        }),
+      );
+    });
+  }
+
+  void _saveOnPause() {
+    _draftTimer?.cancel();
+    unawaited(
+      _saveDraft().catchError((Object error, StackTrace stack) {
+        AppLogger.e(
+          '暂停时保存草稿失败',
+          tag: 'MathPractice',
+          error: error,
+          stackTrace: stack,
+        );
+      }),
+    );
+  }
+
   void _generateProblems() {
-    final grade = ref.read(mathGradeProvider);
-    final semester = ref.read(mathSemesterProvider);
     final settingsRepo = ref.read(settingsRepositoryProvider);
     final batchSize = _sessionBatchSize ??= ref
         .read(mathBatchSizeOverrideProvider.notifier)
         .consumeOr(settingsRepo.mathBatchSize);
-    var practiceMode = ref.read(mathPracticeModeProvider);
-    final difficulty = DifficultyLevel.values.firstWhere(
+    final defaultDifficulty = DifficultyLevel.values.firstWhere(
       (d) => d.name == settingsRepo.mathDifficulty,
       orElse: () => DifficultyLevel.medium,
     );
+    final request = _request ??=
+        ref.read(nextMathPracticeRequestProvider.notifier).consume() ??
+            MathPracticeRequest(
+              grade: ref.read(mathGradeProvider),
+              semester: ref.read(mathSemesterProvider),
+              count: batchSize,
+              mode: ref.read(mathPracticeModeProvider),
+              difficulty: defaultDifficulty,
+            );
+    final grade = request.grade;
+    final semester = request.semester;
+    final difficulty = request.difficulty;
+    var practiceMode = request.mode;
 
     if (practiceMode != null &&
         !MathEngine.supportedModes(
-                grade: grade, semester: semester, difficulty: difficulty,)
-            .contains(practiceMode)) {
+          grade: grade,
+          semester: semester,
+          difficulty: difficulty,
+        ).contains(practiceMode)) {
+      if (request.skillId != null) {
+        setState(() => _generationError = '当前年级或难度不支持此专项模式，请返回选择其他练习');
+        ref.read(mathProblemsProvider.notifier).state = [];
+        return;
+      }
       practiceMode = null;
       ref.read(mathPracticeModeProvider.notifier).state = null;
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('所选模式不适用于当前年级或难度，已切换为综合练习')),);
+        const SnackBar(content: Text('所选模式不适用于当前年级或难度，已切换为综合练习')),
+      );
     }
 
-    final problems = MathEngine.generateBatch(
-      grade: grade,
-      semester: semester,
-      count: batchSize,
-      mode: practiceMode,
-      difficulty: difficulty,
-    );
+    List<MathProblem> problems;
+    try {
+      problems = MathEngine.generateBatch(
+        grade: grade,
+        semester: semester,
+        count: request.count,
+        mode: practiceMode,
+        difficulty: difficulty,
+        skillId: request.skillId,
+        verticalProcessOnly: request.verticalProcessOnly,
+      );
+    } catch (_) {
+      ref.read(mathProblemsProvider.notifier).state = [];
+      setState(() => _generationError = '当前册次或模式无法生成这一专项，请返回调整选择');
+      return;
+    }
+    _generationError = null;
+    _sessionProblems = problems;
+    _draftIndex = 0;
+    _verticalAttempt = const VerticalAttempt();
+    _verticalField = 'ones';
+    _draftDisabled = false;
+    _ready = true;
+    _clock.start();
+    _queueDraftSave();
 
     ref.read(mathProblemsProvider.notifier).state = problems;
     ref.read(mathCurrentIndexProvider.notifier).state = 0;
@@ -123,85 +335,107 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   @override
   void dispose() {
-    // 数据已在 _persistProgress() 中逐题保存，无需额外处理
-    _answerController.dispose();
-    _focusNode.dispose();
-    _confettiController.dispose();
-    super.dispose();
-  }
-
-  /// 每答一题后同步更新存储，确保数据立即持久化。
-  ///
-  /// 「同步」在这里指**内存可见性**，不是落盘完成：Hive 的 `put()` 会
-  /// 同步写入内存中的 box，随后任何 provider/仓储读取立刻看到新值。
-  /// 磁盘 flush 是异步的，因此这里刻意不 `await` —— 等待 flush 会阻塞
-  /// 答题主流程，而内存值已足够保证「同一次会话内读到自己的写入」。
-  /// 进程被系统杀掉时最多丢失最后一次 flush 之前的数据，属可接受代价。
-  void _persistProgress({required bool isCorrect}) {
-    final answered = ref.read(mathAnsweredCountProvider);
-    final correctCount = ref.read(mathCorrectCountProvider);
-    final duration = DateTime.now().difference(_startTime).inSeconds;
-
-    // 更新运行中的 session（同一 ID 覆盖写入）
-    final session = MathSession(
-      id: _sessionId,
-      profileId: ProfileScope.currentId,
-      grade: ref.read(mathGradeProvider),
-      problemType: 'mixed',
-      totalProblems: answered,
-      correctCount: correctCount,
-      durationSeconds: duration,
-      starsEarned: 0,
-      finishedAt: DateTime.now(),
-      semester: ref.read(mathSemesterProvider),
-      difficulty: ref.read(settingsRepositoryProvider).mathDifficulty,
-      problemsJson: jsonEncode(
-        _problemRecords.map((r) => r.toJson()).toList(),
-      ),
-    );
+    _draftTimer?.cancel();
+    _clock.dispose();
     unawaited(
-      ref
-          .read(mathSessionRepositoryProvider)
-          .save(session)
-          .catchError((Object error, StackTrace stack) {
+      _saveDraft().catchError((Object error, StackTrace stack) {
         AppLogger.e(
-          '练习快照保存失败',
+          '退出时保存草稿失败',
           tag: 'MathPractice',
           error: error,
           stackTrace: stack,
         );
       }),
     );
+    _answerController.dispose();
+    _focusNode.dispose();
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  /// 按固定题组和题序写入检查点，恢复后允许幂等重放。
+  Future<void> _persistProgress() async {
+    final answered = ref.read(mathAnsweredCountProvider);
+    final correctCount = ref.read(mathCorrectCountProvider);
+    final duration = _clock.elapsedSeconds;
+    final sessions = ref.read(mathSessionRepositoryProvider);
+    final stats = ref.read(userStatsRepositoryProvider);
+    final mistakes = ref.read(mathMistakeRepoProvider);
+
+    // 更新运行中的 session（同一 ID 覆盖写入）
+    final session = MathSession(
+      id: _sessionId,
+      profileId: ProfileScope.currentId,
+      grade: _request!.grade,
+      problemType: 'mixed',
+      totalProblems: answered,
+      correctCount: correctCount,
+      durationSeconds: duration,
+      starsEarned: 0,
+      startedAt: _startTime,
+      finishedAt: DateTime.now(),
+      semester: _request!.semester,
+      difficulty: _request!.difficulty.name,
+      problemsJson: jsonEncode(
+        _problemRecords.map((r) => r.toJson()).toList(),
+      ),
+    );
+    if (_completedAt == null) await _drafts.guard(() => sessions.save(session));
 
     // 增量更新用户统计（每题 +1），与其余练习页共用同一仓储写入路径。
-    unawaited(
-      ref
-          .read(userStatsRepositoryProvider)
-          .recordMathAttempt(
-            isCorrect: isCorrect,
-            bestStreak: _bestConsecutive,
-          )
-          .catchError((Object error, StackTrace stackTrace) {
-        // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到；
-        // 此处位于 UI 边界，兜底后仅记日志，不打断答题流程。
-        AppLogger.e(
-          '答题进度落库失败',
-          tag: 'MathPractice',
-          error: error,
-          stackTrace: stackTrace,
+    for (var i = 0; i < _problemRecords.length; i++) {
+      await _drafts.guard(
+        () => stats.recordMathAttempt(
+          isCorrect: _problemRecords[i].isCorrect,
+          bestStreak: _bestConsecutive,
+          activityId: 'math_attempt:$_sessionId:$i',
+        ),
+      );
+      final record = _problemRecords[i];
+      if (!record.isCorrect) {
+        final problem = _sessionProblems[i];
+        final judgement =
+            VerticalAttempt.supports(problem) && record.attempt != null
+                ? VerticalAttempt.fromJson(record.attempt!).judge(problem)
+                : MathEngine.judge(problem, record.userAnswer);
+        await _drafts.guard(
+          () => mistakes.recordWrong(
+            problemText: problem.problemText,
+            correctAnswer: problem.answerText,
+            userAnswer: record.userAnswer,
+            problemType: _problemTypeLabel(problem),
+            grade: problem.grade,
+            errorType: judgement.diagnosis?.category,
+            solutionStepsJson: _stepsToJson(judgement.correctSteps),
+            skillId: problem.skillId,
+            semester: problem.semester,
+            problemJson: jsonEncode(problem.toJson()),
+            attemptJson:
+                record.attempt == null ? null : jsonEncode(record.attempt),
+            activityId: 'math_mistake_attempt:$_sessionId:$i',
+          ),
         );
-      }),
-    );
+      }
+    }
 
     // 刷新 providers
-    ref.invalidate(userStatsProvider);
-    ref.invalidate(todayMathCountProvider);
+    if (mounted) {
+      ref.invalidate(userStatsProvider);
+      ref.invalidate(todayMathCountProvider);
+      ref.invalidate(mathMistakeRepoProvider);
+    }
   }
 
   void _submitAnswer() {
     final problem = ref.read(currentProblemProvider);
     if (problem == null || _judgement != null) return;
 
+    if (VerticalAttempt.supports(problem)) {
+      if (_verticalAttempt.complete(problem)) {
+        _processAnswer(problem, _verticalAttempt.answer(problem));
+      }
+      return;
+    }
     final userAnswer = _answerController.text.trim();
     if (userAnswer.isEmpty) return;
 
@@ -218,7 +452,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   Future<void> _processAnswer(MathProblem problem, String userAnswer) async {
     if (_submitting) return;
-    final judgement = MathEngine.judge(problem, userAnswer);
+    final process = VerticalAttempt.supports(problem) ? _verticalAttempt : null;
+    final judgement =
+        process?.judge(problem) ?? MathEngine.judge(problem, userAnswer);
     setState(() {
       _submitting = true;
       _judgement = judgement;
@@ -246,15 +482,15 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         answerText: problem.answerText,
         userAnswer: userAnswer,
         isCorrect: judgement.isCorrect,
+        skillId: problem.skillId,
+        problem: problem.toJson(),
+        attempt: process?.toJson(),
       ),
     );
 
-    // 每答一题就同步保存到 Hive
-    _persistProgress(isCorrect: judgement.isCorrect);
     try {
-      if (!judgement.isCorrect) {
-        await _recordMistake(problem, userAnswer, judgement);
-      }
+      await _saveDraft();
+      await _persistProgress();
       sound.play(judgement.isCorrect ? SoundEffect.correct : SoundEffect.wrong);
       if (judgement.isCorrect) {
         await haptic.medium();
@@ -269,47 +505,15 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         error: error,
         stackTrace: stackTrace,
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('本题进度暂未保存，下一步会重试，请勿强制关闭应用')),
+        );
+      }
     } finally {
       _submitting = false;
       if (mounted) setState(() {});
     }
-  }
-
-  /// 记录错题到 Hive。
-  ///
-  /// 必须 await 后再 `invalidate`：写入未完成就失效 provider 会让错题本
-  /// 读到旧快照；写入失败时记日志并跳过 invalidate（无新数据可读）。
-  Future<void> _recordMistake(
-    MathProblem problem,
-    String userAnswer,
-    AnswerJudgement judgement,
-  ) async {
-    final grade = ref.read(mathGradeProvider);
-    final repo = ref.read(mathMistakeRepoProvider);
-
-    try {
-      await repo.recordWrong(
-        problemText: problem.problemText,
-        correctAnswer: problem.answerText,
-        userAnswer: userAnswer,
-        problemType: _problemTypeLabel(problem),
-        grade: grade,
-        errorType: judgement.diagnosis?.category,
-        solutionStepsJson: _stepsToJson(judgement.correctSteps),
-      );
-    } on Object catch (error, stackTrace) {
-      // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到；
-      // 此处位于 UI 边界，兜底后仅记日志，不打断答题流程。
-      AppLogger.e(
-        '错题落库失败',
-        tag: 'MathPractice',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      return;
-    }
-    if (!mounted) return;
-    ref.invalidate(mathMistakeRepoProvider);
   }
 
   String _problemTypeLabel(MathProblem problem) {
@@ -342,25 +546,40 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   bool _isFinishing = false;
 
   Future<void> _nextProblem() async {
-    if (_submitting || !mounted) return;
-    final problems = ref.read(mathProblemsProvider);
-    final currentIndex = ref.read(mathCurrentIndexProvider);
-
-    if (currentIndex + 1 >= problems.length) {
-      if (!_isFinishing) {
-        _isFinishing = true;
-        await _finishSession();
+    if (_submitting || _judgement == null || !mounted) return;
+    setState(() => _submitting = true);
+    try {
+      await _saveDraft();
+      await _persistProgress();
+      if (!mounted) return;
+      if (_draftIndex + 1 >= _sessionProblems.length) {
+        if (!_isFinishing) {
+          _isFinishing = true;
+          await _finishSession();
+        }
+        return;
       }
-      return;
+      ref.read(mathCurrentIndexProvider.notifier).update((s) => s + 1);
+      _draftIndex++;
+      _answerController.clear();
+      _verticalAttempt = const VerticalAttempt();
+      _verticalField = 'ones';
+      setState(() {
+        _judgement = null;
+        _showSteps = false;
+      });
+      _focusNode.requestFocus();
+      await _saveDraft();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('答题进度或结算保存失败，请重试')),
+        );
+      }
+    } finally {
+      _submitting = false;
+      if (mounted) setState(() {});
     }
-
-    ref.read(mathCurrentIndexProvider.notifier).update((s) => s + 1);
-    _answerController.clear();
-    setState(() {
-      _judgement = null;
-      _showSteps = false;
-    });
-    _focusNode.requestFocus();
   }
 
   Future<void> _finishSession() async {
@@ -376,11 +595,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   }
 
   Future<void> _settleSession() async {
-    final grade = ref.read(mathGradeProvider);
+    final grade = _request!.grade;
     final problems = ref.read(mathProblemsProvider);
     final correctCount = ref.read(mathCorrectCountProvider);
     final completedAt = _completedAt ??= DateTime.now();
-    final duration = completedAt.difference(_startTime).inSeconds;
+    _clock.finish();
+    final duration = _clock.elapsedSeconds;
+    final draftWrite = _saveDraft();
 
     final stars = LearningRewardCalculator.calculateStars(
       activityType: LearningActivityType.mathPractice,
@@ -398,9 +619,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       correctCount: correctCount,
       durationSeconds: duration,
       starsEarned: stars,
+      startedAt: _startTime,
       finishedAt: completedAt,
-      semester: ref.read(mathSemesterProvider),
-      difficulty: ref.read(settingsRepositoryProvider).mathDifficulty,
+      semester: _request!.semester,
+      difficulty: _request!.difficulty.name,
       problemsJson: jsonEncode(
         _problemRecords.map((r) => r.toJson()).toList(),
       ),
@@ -410,33 +632,47 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final activityRepo = ref.read(learningActivityRepositoryProvider);
     final statsRepo = ref.read(userStatsRepoProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
-    await repo.save(session);
+    await draftWrite;
+    await _drafts.guard(() => repo.save(session));
     final activityId = 'math_practice:${session.id}';
-    await activityRepo.record(
-      id: activityId,
-      activityType: LearningActivityType.mathPractice,
-      totalItems: problems.length,
-      successfulItems: correctCount,
-      starsEarned: stars,
-      durationSeconds: duration,
-      completedAt: completedAt,
+    await _drafts.guard(
+      () => activityRepo.record(
+        id: activityId,
+        activityType: LearningActivityType.mathPractice,
+        totalItems: problems.length,
+        successfulItems: correctCount,
+        starsEarned: stars,
+        durationSeconds: duration,
+        completedAt: completedAt,
+      ),
     );
 
     // 做题数和连对数已在 _persistProgress() 中逐题更新，只需添加星星
     final levelBeforeReward = statsRepo.get().level;
     if (stars > 0) {
-      await statsRepo.addStars(
-        stars,
-        activityId: activityId,
+      await _drafts.guard(
+        () => statsRepo.addStars(
+          stars,
+          activityId: activityId,
+        ),
       );
     }
-    await checkInRepo.updateToday(
-      activityId: activityId,
-      addMathTotal: problems.length,
-      addMathCorrect: correctCount,
-      addStars: stars,
-      addDuration: duration,
+    await _drafts.guard(
+      () => checkInRepo.updateToday(
+        activityId: activityId,
+        addMathTotal: problems.length,
+        addMathCorrect: correctCount,
+        addStars: stars,
+        addDuration: duration,
+      ),
     );
+    _draftDisabled = true;
+    try {
+      await _drafts.remove('math', sessionId: _sessionId);
+    } catch (_) {
+      _draftDisabled = false;
+      rethrow;
+    }
 
     // addStars 会同步重算等级；页面仅负责展示升级反馈。
     final updatedStats = statsRepo.get();
@@ -536,10 +772,17 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final problem = ref.watch(currentProblemProvider);
     final theme = Theme.of(context);
 
-    if (problems.isEmpty || problem == null) {
+    if (!_ready || problems.isEmpty || problem == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('口算练习')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: _generationError == null
+              ? const CircularProgressIndicator()
+              : Padding(
+                  padding: const EdgeInsets.all(SpacingTokens.lg),
+                  child: Text(_generationError!),
+                ),
+        ),
       );
     }
 
@@ -562,6 +805,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           ),
         ],
       ),
+      bottomNavigationBar: _buildAnswerControls(context),
       body: Stack(
         children: [
           Padding(
@@ -569,94 +813,96 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
               horizontal: SpacingTokens.md,
               vertical: SpacingTokens.sm,
             ),
-            child: Column(
-              children: [
-                // 进度条
-                LinearProgressIndicator(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final question = Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 题目文本（竖式模式特殊展示）
+                    KeyedSubtree(
+                      key: ValueKey('q_$currentIndex'),
+                      child: (problem.mode == ProblemMode.vertical
+                              ? VerticalCalcWidget(
+                                  problem: problem,
+                                  showAnswer: _judgement != null,
+                                ) as Widget
+                              : MathText(
+                                  problem.problemText,
+                                  style: TypographyTokens.mathProblemStyle(
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ))
+                          .animate()
+                          .fadeIn(duration: 350.ms)
+                          .slideX(
+                            begin: 0.12,
+                            end: 0,
+                            duration: 350.ms,
+                            curve: Curves.easeOutCubic,
+                          ),
+                    ),
+                    const SizedBox(height: SpacingTokens.xl),
+
+                    // 判定反馈
+                    if (_judgement != null) ...[
+                      _buildJudgementFeedback(context)
+                          .animate()
+                          .fadeIn(duration: 300.ms)
+                          .scale(
+                            begin: const Offset(0.9, 0.9),
+                            end: const Offset(1, 1),
+                            duration: 300.ms,
+                            curve: Curves.easeOutBack,
+                          )
+                          .then()
+                          .shimmer(
+                            delay: 200.ms,
+                            duration: 600.ms,
+                            color: _judgement!.isCorrect
+                                ? theme.semantic.success.withValues(alpha: 0.3)
+                                : Colors.transparent,
+                          ),
+                      const SizedBox(height: SpacingTokens.md),
+                      if (_judgement!.correctSteps.isNotEmpty)
+                        _buildStepsSection(context),
+                    ],
+                  ],
+                );
+                final progress = LinearProgressIndicator(
                   value: (currentIndex + 1) / problems.length,
                   backgroundColor:
                       theme.colorScheme.primary.withValues(alpha: 0.1),
                   color: theme.colorScheme.primary,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-
-                // 题目显示
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // 题目文本（竖式模式特殊展示）
-                              KeyedSubtree(
-                                key: ValueKey('q_$currentIndex'),
-                                child: (problem.mode == ProblemMode.vertical
-                                        ? VerticalCalcWidget(
-                                            problem: problem,
-                                            showAnswer: _judgement != null,
-                                          ) as Widget
-                                        : MathText(
-                                            problem.problemText,
-                                            style: TypographyTokens
-                                                .mathProblemStyle(
-                                              color:
-                                                  theme.colorScheme.onSurface,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ))
-                                    .animate()
-                                    .fadeIn(duration: 350.ms)
-                                    .slideX(
-                                      begin: 0.12,
-                                      end: 0,
-                                      duration: 350.ms,
-                                      curve: Curves.easeOutCubic,
-                                    ),
-                              ),
-                              const SizedBox(height: SpacingTokens.xl),
-
-                              // 判定反馈
-                              if (_judgement != null) ...[
-                                _buildJudgementFeedback(context)
-                                    .animate()
-                                    .fadeIn(duration: 300.ms)
-                                    .scale(
-                                      begin: const Offset(0.9, 0.9),
-                                      end: const Offset(1, 1),
-                                      duration: 300.ms,
-                                      curve: Curves.easeOutBack,
-                                    )
-                                    .then()
-                                    .shimmer(
-                                      delay: 200.ms,
-                                      duration: 600.ms,
-                                      color: _judgement!.isCorrect
-                                          ? theme.semantic.success
-                                              .withValues(alpha: 0.3)
-                                          : Colors.transparent,
-                                    ),
-                                const SizedBox(height: SpacingTokens.md),
-                                if (_judgement!.correctSteps.isNotEmpty)
-                                  _buildStepsSection(context),
+                  borderRadius:
+                      BorderRadius.circular(SpacingTokens.radiusSmall),
+                );
+                return Column(
+                  children: [
+                    progress,
+                    const SizedBox(height: SpacingTokens.md),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, area) => SingleChildScrollView(
+                          child: ConstrainedBox(
+                            constraints:
+                                BoxConstraints(minHeight: area.maxHeight),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                question,
+                                if (_judgement == null &&
+                                    problem.mode != ProblemMode.compare)
+                                  _buildAnswerInput(context),
                               ],
-                            ],
+                            ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-
-                // 答案输入区
-                const SizedBox(height: SpacingTokens.sm),
-                _buildAnswerInput(context),
-              ],
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           ConfettiOverlay(controller: _confettiController),
@@ -670,21 +916,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final problem = ref.read(currentProblemProvider)!;
     final theme = Theme.of(context);
 
-    return Container(
+    return ColoredCard(
+      color: judgement.isCorrect
+          ? theme.semantic.success
+          : theme.colorScheme.tertiary,
       width: double.infinity,
       padding: const EdgeInsets.all(SpacingTokens.md),
-      decoration: BoxDecoration(
-        color: judgement.isCorrect
-            ? theme.semantic.success.withValues(alpha: 0.15)
-            : theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        border: Border.all(
-          width: 2,
-          color: judgement.isCorrect
-              ? theme.semantic.success
-              : theme.colorScheme.tertiary.withValues(alpha: 0.4),
-        ),
-      ),
       child: Column(
         children: [
           Row(
@@ -852,120 +1089,160 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     return _problemRecords[index].userAnswer;
   }
 
-  Widget _buildAnswerInput(BuildContext context) {
+  Widget _buildAnswerControls(BuildContext context) {
     if (_judgement != null) {
       // 已作答，显示"下一题"按钮
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: _submitting || _isFinishing ? null : _nextProblem,
-          icon: const Icon(Icons.arrow_forward_rounded),
-          label: Text(
-            ref.read(mathCurrentIndexProvider) + 1 >=
-                    ref.read(mathProblemsProvider).length
-                ? '查看成绩'
-                : '下一题',
-          ),
+      return SafeArea(
+        top: false,
+        minimum: const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.md,
+          vertical: SpacingTokens.sm,
         ),
-      ).animate().fadeIn(duration: 250.ms).slideY(
-            begin: 0.2,
-            end: 0,
-            duration: 250.ms,
-            curve: Curves.easeOutCubic,
-          );
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _submitting || _isFinishing ? null : _nextProblem,
+            icon: const Icon(Icons.arrow_forward_rounded),
+            label: Text(
+              ref.read(mathCurrentIndexProvider) + 1 >=
+                      ref.read(mathProblemsProvider).length
+                  ? '查看成绩'
+                  : '下一题',
+            ),
+          ),
+        ).animate().fadeIn(duration: 250.ms).slideY(
+              begin: 0.2,
+              end: 0,
+              duration: 250.ms,
+              curve: Curves.easeOutCubic,
+            ),
+      );
     }
 
     // 比大小模式：显示 > < = 三个按钮
     final problem = ref.watch(currentProblemProvider);
     if (problem?.mode == ProblemMode.compare) {
-      return _buildCompareButtons(context);
+      return SafeArea(
+        top: false,
+        minimum: const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.md,
+          vertical: SpacingTokens.sm,
+        ),
+        child: _buildCompareButtons(context),
+      );
     }
 
+    final process = problem != null && VerticalAttempt.supports(problem);
+    return NumberKeypad(
+      onNumberTap: (digit) {
+        setState(() {
+          if (process) {
+            if (RegExp(r'^\d$').hasMatch(digit)) {
+              _verticalAttempt =
+                  _verticalAttempt.withField(_verticalField, digit);
+              _queueDraftSave();
+            }
+            return;
+          }
+          if (NumberKeypad.canAppend(_answerController.text, digit)) {
+            _answerController.text += digit;
+          }
+        });
+      },
+      onBackspace: () {
+        setState(() {
+          if (process) {
+            _verticalAttempt = _verticalAttempt.withField(_verticalField, '');
+            _queueDraftSave();
+            return;
+          }
+          if (_answerController.text.isNotEmpty) {
+            _answerController.text = _answerController.text.substring(
+              0,
+              _answerController.text.length - 1,
+            );
+          }
+        });
+      },
+      onSubmit: _submitAnswer,
+      submitEnabled: !_submitting &&
+          (process
+              ? _verticalAttempt.complete(problem)
+              : _answerController.text.isNotEmpty),
+      showDecimal: problem?.resultForm == ResultForm.decimal,
+      showEllipsis: problem?.resultForm == ResultForm.withRemainder,
+      showSlash: problem?.resultForm == ResultForm.fraction,
+      showNegative: problem?.result.isNegative ?? false,
+    );
+  }
+
+  /// 作答内容位于可滚动题目区，数字键盘独立固定在页面底部。
+  Widget _buildAnswerInput(BuildContext context) {
+    final problem = ref.watch(currentProblemProvider);
     // 余数模式：显示商…余格式提示
     final isRemainder = problem?.resultForm == ResultForm.withRemainder;
 
-    // 普通模式：显示自定义数字键盘
+    // 数字键盘独立固定在底部，此处仅展示当前输入。
     final theme = Theme.of(context);
+    final process = problem != null && VerticalAttempt.supports(problem);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 答案输入框（只读，通过键盘输入）
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: SpacingTokens.md,
-            vertical: SpacingTokens.lg,
-          ),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.3),
+        if (process)
+          VerticalProcessInput(
+            problem: problem,
+            attempt: _verticalAttempt,
+            selectedField: _verticalField,
+            onSelect: (field) => setState(() => _verticalField = field),
+          )
+        else
+          ColoredCard(
+            color: theme.colorScheme.primary,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: SpacingTokens.md,
+              vertical: SpacingTokens.lg,
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _answerController.text.isEmpty
-                    ? (isRemainder ? '输入答案（格式：商…余）' : '输入答案')
-                    : _answerController.text,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: TypographyTokens.fsTitle,
-                  fontWeight: FontWeight.bold,
-                  color: _answerController.text.isEmpty
-                      ? theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.5)
-                      : theme.colorScheme.onSurface,
-                ),
-              ),
-              if (isRemainder && _answerController.text.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: SpacingTokens.xs),
-                  child: Text(
-                    '例如：3…2',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.6),
-                    ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _answerController.text.isEmpty
+                      ? (isRemainder ? '输入答案（格式：商…余）' : '输入答案')
+                      : _answerController.text,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: TypographyTokens.fsTitle,
+                    fontWeight: FontWeight.bold,
+                    color: _answerController.text.isEmpty
+                        ? theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.5)
+                        : theme.colorScheme.onSurface,
                   ),
                 ),
-            ],
+                if (isRemainder && _answerController.text.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: SpacingTokens.xs),
+                    child: Text(
+                      '例如：3…2',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: SpacingTokens.md),
-        // 儿童数字键盘
-        NumberKeypad(
-          onNumberTap: (digit) {
-            setState(() {
-              // 特殊键合法性校验（'-' 仅空串开头、'/' 与 '.' 与 '…' 至多一次）
-              if (NumberKeypad.canAppend(_answerController.text, digit)) {
-                _answerController.text += digit;
-              }
-            });
-          },
-          onBackspace: () {
-            setState(() {
-              if (_answerController.text.isNotEmpty) {
-                _answerController.text = _answerController.text.substring(
-                  0,
-                  _answerController.text.length - 1,
-                );
-              }
-            });
-          },
-          onSubmit: _submitAnswer,
-          submitEnabled: _answerController.text.isNotEmpty,
-          showDecimal: problem?.resultForm == ResultForm.decimal,
-          showEllipsis: isRemainder,
-          // 分数题（五/六年级 FractionGen，答案如 5/6）需要分数线
-          showSlash: problem?.resultForm == ResultForm.fraction,
-          // 当前题结果为负（六下 NegativeNumberGen）时才显示负号，
-          // 正整数题显示 '-' 反而诱导误输
-          showNegative: problem?.result.isNegative ?? false,
-        ),
+        if (problem?.mode == ProblemMode.vertical && !process)
+          Padding(
+            padding: const EdgeInsets.only(top: SpacingTokens.xs),
+            child: Text(
+              '本题为结果练习；两位数加减法支持逐列过程练习。',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
       ],
     );
   }

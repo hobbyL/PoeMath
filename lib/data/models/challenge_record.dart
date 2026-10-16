@@ -61,6 +61,10 @@ class ChallengeRecord extends HiveObject {
   @HiveField(12, defaultValue: 0)
   final int starsEarned;
 
+  /// 计算方案；升级前记录均为普通挑战。
+  @HiveField(13, defaultValue: 'normal')
+  final String calculationMode;
+
   ChallengeRecord({
     required this.id,
     required this.profileId,
@@ -74,13 +78,16 @@ class ChallengeRecord extends HiveObject {
     required this.difficulty,
     required this.durationSeconds,
     this.starsEarned = 0,
+    this.calculationMode = 'normal',
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
   /// 正确率
-  double get accuracy =>
-      totalAnswered > 0 ? correctCount / totalAnswered : 0.0;
+  double get accuracy => totalAnswered > 0 ? correctCount / totalAnswered : 0.0;
 
   /// 模式标签
   String get modeLabel => mode == 'fixed' ? '固定时间' : '续命模式';
+
+  String get calculationModeLabel =>
+      calculationMode == 'vertical' ? '竖式' : '普通';
 }

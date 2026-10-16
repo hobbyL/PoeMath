@@ -188,7 +188,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         path: AppRoutes.mathPractice,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: const MathPracticePage(),
+          child: MathPracticePage(
+              resume: state.uri.queryParameters['resume'] == '1',),
         ),
       ),
       GoRoute(
@@ -298,6 +299,12 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
       GoRoute(
         path: AppRoutes.wordProblemPractice,
         pageBuilder: (context, state) {
+          if (state.uri.queryParameters['resume'] == '1') {
+            return fadeSlideTransitionPage(
+              state: state,
+              child: const WordProblemPracticePage(problems: [], resume: true),
+            );
+          }
           final problems = state.extra;
           if (problems is! List<LlmProblem> || problems.isEmpty) {
             return fadeSlideTransitionPage(

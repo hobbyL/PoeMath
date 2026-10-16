@@ -46,6 +46,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
       _batchSize = settings.mathBatchSize;
       _difficulty = _parseDifficulty(settings.mathDifficulty);
       _practiceMode = ref.read(mathPracticeModeProvider);
+      if (_practiceMode == ProblemMode.vertical) _practiceMode = null;
       _initialized = true;
     }
   }
@@ -274,7 +275,6 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
       (null, '综合', Icons.shuffle_rounded),
       (ProblemMode.findMissing, '求未知', Icons.help_outline_rounded),
       (ProblemMode.compare, '比大小', Icons.compare_arrows_rounded),
-      (ProblemMode.vertical, '竖式', Icons.view_column_rounded),
       (ProblemMode.chain, '连续运算', Icons.link_rounded),
       (ProblemMode.withBrackets, '带括号', Icons.data_array_rounded),
     ];
@@ -293,7 +293,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
               ),
               const SizedBox(width: SpacingTokens.sm),
               Text(
-                '练习模式',
+                '普通方案题型',
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -318,7 +318,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
           ),
           const SizedBox(height: SpacingTokens.xs),
           Text(
-            '实际可用模式取决于所选年级学期的课标范围',
+            '题型随年级学期和难度调整；竖式在开始练习或挑战时选择',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),

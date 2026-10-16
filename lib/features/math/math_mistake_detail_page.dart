@@ -20,8 +20,10 @@ import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/math_ai_explain_sheet.dart';
 import 'package:poemath/features/math/widgets/math_text.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
-import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
-import 'package:poemath/math_engine/models/math_problem.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/features/math/math_practice_request.dart';
+import 'package:poemath/features/math/math_mistake_snapshot.dart';
+import 'package:poemath/math_engine/models/vertical_attempt.dart';
 
 class MathMistakeDetailPage extends ConsumerWidget {
   const MathMistakeDetailPage({super.key, required this.mistakeId});
@@ -42,6 +44,8 @@ class MathMistakeDetailPage extends ConsumerWidget {
       );
     }
 
+    final problem = mistake.originalProblem;
+    final attempt = mistake.originalAttempt;
     final isWide = MediaQuery.sizeOf(context).width >= 420;
     // AI 解析入口（移至 AppBar 右上角）：只做讲解展示，不参与判分与错题状态。
     void openAiExplain() => showMathAiExplainSheet(
@@ -109,6 +113,21 @@ class MathMistakeDetailPage extends ConsumerWidget {
                       ),
                     ],
                   ),
+
+                  if (problem != null && VerticalAttempt.supports(problem)) ...[
+                    const SizedBox(height: SpacingTokens.sm),
+                    const Text('本题同时检查结果与进退位，结果相同也可能出现过程错误。'),
+                    if (attempt != null)
+                      Text(
+                        [
+                          if (VerticalAttempt.needsHundreds(problem))
+                            '百位：${attempt.hundreds}',
+                          '十位：${attempt.tens}',
+                          '个位：${attempt.ones}',
+                          '${problem.operators.single == Operator.add ? '个位进位' : '十位借位'}：${attempt.regroup}',
+                        ].join(' · '),
+                      ),
+                  ],
 
                   // 已掌握标记
                   if (mistake.isResolved) ...[
@@ -207,10 +226,7 @@ class MathMistakeDetailPage extends ConsumerWidget {
               ColoredCard(
                 color: theme.colorScheme.secondary,
                 child: _buildSteps(context, mistake.solutionStepsJson!),
-              )
-                  .animate()
-                  .fadeIn(delay: 200.ms, duration: 300.ms)
-                  .slideX(
+              ).animate().fadeIn(delay: 200.ms, duration: 300.ms).slideX(
                     begin: 0.1,
                     end: 0,
                     delay: 200.ms,
@@ -222,10 +238,9 @@ class MathMistakeDetailPage extends ConsumerWidget {
             // 操作按钮
             _ActionButtons(
               mistake: mistake,
+              problem: problem,
               onDeleted: () => context.pop(),
-            )
-                .animate()
-                .fadeIn(delay: 300.ms, duration: 300.ms),
+            ).animate().fadeIn(delay: 300.ms, duration: 300.ms),
           ],
         ),
       ),
@@ -325,10 +340,12 @@ class _AnswerChip extends StatelessWidget {
 class _ActionButtons extends ConsumerWidget {
   const _ActionButtons({
     required this.mistake,
+    required this.problem,
     required this.onDeleted,
   });
 
   final MathMistake mistake;
+  final MathProblem? problem;
   final VoidCallback onDeleted;
 
   @override
@@ -435,9 +452,8 @@ class _ActionButtons extends ConsumerWidget {
       ),
     );
     return Expanded(
-      child: tooltip == null
-          ? button
-          : Tooltip(message: tooltip, child: button),
+      child:
+          tooltip == null ? button : Tooltip(message: tooltip, child: button),
     );
   }
 
@@ -482,13 +498,7 @@ class _ActionButtons extends ConsumerWidget {
   Future<void> _repractice(BuildContext context, WidgetRef ref) async {
     // 在首个 await（对话框）之前捕获 messenger。
     final messenger = ScaffoldMessenger.of(context);
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => MistakeRepracticeDialog(
-        problemText: mistake.problemText,
-        correctAnswer: mistake.correctAnswer,
-      ),
-    );
+    final result = await showMistakeRepractice(context, mistake);
 
     if (result == null) return;
 
@@ -519,43 +529,26 @@ class _ActionButtons extends ConsumerWidget {
   }
 
   void _generateSimilar(BuildContext context, WidgetRef ref) {
-    final errorType = mistake.errorType;
-    final grade = mistake.grade;
-
-    // 根据错因类型选择对应的练习模式
-    ProblemMode? targetMode;
-    if (errorType == 'carry_omission' || errorType == 'borrow_omission') {
-      // 进/退位错误 → 标准加减法
-      targetMode = ProblemMode.findResult;
-    } else if (errorType == 'multiplication_table') {
-      // 口诀错误 → 标准乘除法
-      targetMode = ProblemMode.findResult;
-    } else if (errorType == 'operation_order') {
-      // 运算顺序 → 连续运算
-      targetMode = ProblemMode.chain;
-    } else if (errorType == 'remainder_mistake') {
-      // 余数错误 → 标准（含除法）
-      targetMode = ProblemMode.findResult;
-    }
-
-    ref.read(mathGradeProvider.notifier).state = grade;
-    ref.read(mathBatchSizeOverrideProvider.notifier).setNext(5);
-    if (targetMode != null) {
-      ref.read(mathPracticeModeProvider.notifier).state = targetMode;
-    }
-
-    // 显示提示
-    if (errorType != null && context.mounted) {
+    final skill = MathSkill.fromId(mistake.skillId);
+    final semester = mistake.semester;
+    if (skill == null || semester == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '已生成针对「${errorCauseLabel(errorType)}」的练习题',
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+        const SnackBar(content: Text('这道旧错题缺少知识点或学期记录，请使用原题回练')),
       );
+      return;
     }
-
+    ref.read(nextMathPracticeRequestProvider.notifier).setNext(
+          MathPracticeRequest(
+            grade: mistake.grade,
+            semester: semester,
+            count: 5,
+            difficulty: DifficultyLevel.medium,
+            skillId: skill.id,
+            mode: problem?.mode == ProblemMode.vertical
+                ? ProblemMode.vertical
+                : null,
+          ),
+        );
     context.push(AppRoutes.mathPractice);
   }
 }

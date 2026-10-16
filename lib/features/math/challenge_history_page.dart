@@ -149,8 +149,22 @@ class ChallengeHistoryPage extends ConsumerWidget {
     ThemeData theme,
     ChallengeRecordRepository repo,
   ) {
-    final fixedBest = repo.bestScore('fixed');
-    final extendingBest = repo.bestScore('extending');
+    return Column(
+      children: [
+        for (final scheme in ['normal', 'vertical'])
+          _buildSchemeBestScores(theme, repo, scheme),
+      ],
+    );
+  }
+
+  Widget _buildSchemeBestScores(
+    ThemeData theme,
+    ChallengeRecordRepository repo,
+    String scheme,
+  ) {
+    final label = scheme == 'vertical' ? '竖式' : '普通';
+    final fixedBest = repo.bestScore('fixed', calculationMode: scheme);
+    final extendingBest = repo.bestScore('extending', calculationMode: scheme);
 
     if (fixedBest == null && extendingBest == null) {
       return const SizedBox.shrink();
@@ -180,7 +194,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '固定时间最高分',
+                      '$label · 固定时间最高分',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -211,7 +225,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '续命模式最高分',
+                      '$label · 续命模式最高分',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -224,7 +238,6 @@ class ChallengeHistoryPage extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 class _RecordCard extends StatelessWidget {
@@ -275,7 +288,10 @@ class _RecordCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 标题行：模式 + 年级 + 难度 + 时间
-          Row(
+          Wrap(
+            spacing: SpacingTokens.xs,
+            runSpacing: SpacingTokens.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -289,14 +305,13 @@ class _RecordCard extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  record.modeLabel,
+                  '${record.calculationModeLabel} · ${record.modeLabel}',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: modeColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              const SizedBox(width: SpacingTokens.xs),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: SpacingTokens.sm,
@@ -316,7 +331,6 @@ class _RecordCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: SpacingTokens.xs),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: SpacingTokens.sm,
@@ -336,7 +350,6 @@ class _RecordCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const Spacer(),
               Text(
                 timeStr,
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -348,7 +361,10 @@ class _RecordCard extends StatelessWidget {
           const SizedBox(height: SpacingTokens.sm),
 
           // 统计行
-          Row(
+          Wrap(
+            spacing: SpacingTokens.lg,
+            runSpacing: SpacingTokens.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               // 分数
               _StatItem(
@@ -356,7 +372,6 @@ class _RecordCard extends StatelessWidget {
                 value: '${record.score}',
                 color: theme.colorScheme.primary,
               ),
-              const SizedBox(width: SpacingTokens.lg),
 
               // 答题
               _StatItem(
@@ -364,7 +379,6 @@ class _RecordCard extends StatelessWidget {
                 value: '${record.correctCount}/${record.totalAnswered}',
                 color: accuracyColor,
               ),
-              const SizedBox(width: SpacingTokens.lg),
 
               // 正确率
               _StatItem(
@@ -372,7 +386,6 @@ class _RecordCard extends StatelessWidget {
                 value: '$accuracyPct%',
                 color: accuracyColor,
               ),
-              const SizedBox(width: SpacingTokens.lg),
 
               // 用时
               _StatItem(
@@ -380,8 +393,6 @@ class _RecordCard extends StatelessWidget {
                 value: durStr,
                 color: theme.colorScheme.secondary,
               ),
-
-              const Spacer(),
 
               // 最佳连击
               if (record.bestCombo > 0)

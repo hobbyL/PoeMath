@@ -6,6 +6,7 @@
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/llm_problem.dart';
+import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 
 /// LLM 应用题题库统计快照。
 class LlmProblemStats {
@@ -85,14 +86,24 @@ class LlmProblemRepository {
   }
 
   /// 记录一次作答。
-  Future<void> recordAttempt(String id, {required bool correct}) async {
-    final problem = getById(id);
-    if (problem == null) return;
+  Future<void> recordAttempt(String id,
+      {required bool correct, String? activityId,}) async {
+    if (activityId != null) {
+      await ActivitySettlementLedger.runOnce(
+        channel: ActivitySettlementLedger.userStatsChannel,
+        activityId: activityId,
+        action: () => recordAttempt(id, correct: correct),
+      );
+      return;
+    }
+    final stored = getById(id);
+    if (stored == null) return;
+    final problem = LlmProblem.fromSnapshot(stored.toSnapshot());
     problem.attempts++;
     if (correct) problem.correctCount++;
     problem.done = true;
     problem.lastDoneAt = DateTime.now();
-    await problem.save();
+    await HiveBoxes.llmProblems.put(ProfileScope.key(id), problem);
   }
 
   /// 删除单题。

@@ -44,10 +44,10 @@ class UserStatsRepository {
     }
 
     Future<void> add() async {
-      final stats = await getOrCreate();
+      final stats = get().copy();
       stats.totalStars += count;
       stats.level = LevelCalculator.calculate(stats.totalStars);
-      await stats.save();
+      await save(stats);
     }
 
     if (activityId == null) {
@@ -106,14 +106,24 @@ class UserStatsRepository {
   Future<void> recordMathAttempt({
     required bool isCorrect,
     required int bestStreak,
+    String? activityId,
   }) async {
-    final stats = await getOrCreate();
+    if (activityId != null) {
+      await ActivitySettlementLedger.runOnce(
+        channel: ActivitySettlementLedger.userStatsChannel,
+        activityId: activityId,
+        action: () =>
+            recordMathAttempt(isCorrect: isCorrect, bestStreak: bestStreak),
+      );
+      return;
+    }
+    final stats = get().copy();
     stats.mathTotalProblems += 1;
     if (isCorrect) stats.mathTotalCorrect += 1;
     if (bestStreak > stats.mathBestStreak) {
       stats.mathBestStreak = bestStreak;
     }
-    await stats.save();
+    await save(stats);
   }
 
   /// 一次性结算限时挑战的口算统计、连击、星星和等级。

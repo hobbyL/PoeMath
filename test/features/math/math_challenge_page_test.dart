@@ -4,11 +4,19 @@
 // ① 时间进度条比例的纯函数（原 clamp 上下界反转，续命模式倒计时必崩）
 // ② 续命模式真实倒计时 1 秒后页面不抛异常（P0-1 的端到端复现）
 
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/features/math/math_challenge_page.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
+import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/math/widgets/number_keypad.dart';
+import 'package:poemath/features/math/widgets/vertical_calc_widget.dart';
+import 'package:poemath/features/math/widgets/vertical_process_input.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
@@ -99,6 +107,84 @@ void main() {
 
     tearDown(() async {
       await tearDownHiveForTesting();
+    });
+
+    testWidgets('竖式挑战过程错误仍判错，并保存方案、过程和固定册次', (tester) async {
+      await tester.runAsync(() async {
+        await SettingsRepository().setLearningBackground(2, '上');
+        await HiveBoxes.settings.put('math_difficulty', 'medium');
+      });
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(home: MathChallengePage(random: Random(3))),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ChoiceChip, '竖式'));
+      await tester.tap(find.text('固定时间'));
+      await tester.tap(find.text('开始挑战'));
+      await tester.pump();
+      expect(find.byType(VerticalProcessInput), findsOneWidget);
+      expect(find.byType(NumberKeypad), findsOneWidget);
+      expect(
+          tester.widget<IconButton>(find.byTooltip('挑战记录')).onPressed, isNull,);
+      final problem = tester
+          .widget<VerticalCalcWidget>(find.byType(VerticalCalcWidget))
+          .problem;
+      expect(problem.problemText, '32 + 11 = ?');
+      for (final field in [('ones', '3'), ('tens', '4'), ('regroup', '1')]) {
+        await tester.tap(find.byKey(ValueKey('vertical_${field.$1}')));
+        await tester.pump();
+        await tester.tap(find.text(field.$2));
+        await tester.pump();
+      }
+      await tester.runAsync(() async {
+        await tester.tap(find.byIcon(Icons.check_rounded));
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      expect(find.text('已答 1 题 · 正确 0 题'), findsOneWidget);
+      expect(find.text('0 分'), findsOneWidget);
+      final mistake = HiveBoxes.mathMistakes.values.single;
+      expect(mistake.userAnswer, '43');
+      expect(mistake.correctAnswer, '43');
+      expect(mistake.errorType, 'vertical_process');
+      expect((jsonDecode(mistake.attemptJson!) as Map)['regroup'], '1');
+      expect(mistake.problemJson, isNotNull);
+      // 外部浏览状态变化不能改变已开始的挑战题组及最终记录。
+      container.read(mathGradeProvider.notifier).state = 1;
+      container.read(mathSemesterProvider.notifier).state = '下';
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        tester
+            .widget<VerticalCalcWidget>(find.byType(VerticalCalcWidget))
+            .problem
+            .grade,
+        2,
+      );
+      await tester.runAsync(() async {
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      final record = HiveBoxes.challengeRecords.values.single;
+      expect(record.calculationMode, 'vertical');
+      expect(record.grade, 2);
+      expect(record.semester, '上');
+      expect(record.difficulty, 'medium');
+      expect(record.totalAnswered, 1);
+      expect(record.correctCount, 0);
+      expect(tester.takeException(), isNull);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpWidget(const SizedBox.shrink());
     });
 
     testWidgets('续命模式开始挑战后第 1 秒不抛异常且进度条未溢出', (tester) async {
