@@ -4,10 +4,12 @@
 // 职责：云端同步子页面 — 管理 WebDAV 配置，上传/下载备份数据。
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:poemath/features/assistant/assistant_session_provider.dart';
+import 'package:poemath/data/providers/backup_protection_providers.dart';
+import 'package:poemath/features/profile/widgets/backup_import_flow.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/backup_service.dart';
@@ -16,12 +18,9 @@ import 'package:poemath/core/services/webdav_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/webdav_config.dart';
-import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/webdav_config_page.dart';
-import 'package:poemath/features/profile/widgets/backup_passphrase_dialog.dart';
 import 'package:poemath/features/profile/widgets/credential_export_failed_dialog.dart';
-import 'package:poemath/features/profile/widgets/llm_endpoint_confirm_dialog.dart';
 import 'package:poemath/features/profile/widgets/sync_conflict_dialog.dart';
 
 class CloudSyncPage extends ConsumerStatefulWidget {
@@ -44,9 +43,11 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   Future<void> _addConfig() async {
     final result = await Navigator.push<bool>(
       context,
-      fadeSlideRoute(builder: (_) => const WebDavConfigPage()),
+      fadeSlideRoute(
+          builder: (_) =>
+              const ParentAccessBoundary(child: WebDavConfigPage()),),
     );
-    if (result == true) {
+    if (result == true && mounted) {
       ref.invalidate(settingsRepositoryProvider);
       if (mounted) setState(() {});
     }
@@ -62,10 +63,11 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     final result = await Navigator.push<bool>(
       context,
       fadeSlideRoute(
-        builder: (_) => WebDavConfigPage(existing: fullConfig),
+        builder: (_) =>
+            ParentAccessBoundary(child: WebDavConfigPage(existing: fullConfig)),
       ),
     );
-    if (result == true) {
+    if (result == true && mounted) {
       ref.invalidate(settingsRepositoryProvider);
       if (mounted) setState(() {});
     }
@@ -93,7 +95,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
 
     final settingsRepo = ref.read(settingsRepositoryProvider);
     await settingsRepo.deleteWebDavConfig(config.id);
@@ -105,6 +107,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   }
 
   Future<void> _upload() async {
+    if (_uploading || _downloading) return;
     final config = _getSelectedConfig();
     if (config == null) return;
 
@@ -114,12 +117,14 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     final settingsRepo = ref.read(settingsRepositoryProvider);
     final backup = ref.read(backupServiceProvider);
     final webdav = ref.read(webDavServiceProvider);
+    final history = ref.read(backupHistoryProvider);
+    final credentialStore = ref.read(secureCredentialStoreProvider);
 
     try {
+      if (!await ensureParentAccess(context) || !mounted) return;
       final fullConfig =
           await settingsRepo.loadWebDavConfigWithCredentials(config);
-      final passphrase =
-          await ref.read(secureCredentialStoreProvider).readBackupPassphrase();
+      final passphrase = await credentialStore.readBackupPassphrase();
       var degraded = false;
       String json;
       try {
@@ -142,6 +147,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       // 不可比对（老备份无 exportedAt，只能按「无从判断」处理，不拦）。
       final conflict = await _detectUploadConflict(webdav, fullConfig);
       if (conflict == SyncConflictDecision.cancelled) {
+        if (!mounted) return;
         scaffold.clearSnackBars();
         scaffold.showSnackBar(
           const SnackBar(content: Text('已取消上传（云端备份未变更）')),
@@ -149,10 +155,16 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
         return;
       }
 
+      if (!mounted || !await ensureParentAccess(context)) return;
       await webdav.upload(fullConfig, json);
       // 上传成功才推进时间线：失败时留旧值，下次仍会正确判定冲突。
       await settingsRepo.setLastSyncedAt(_exportedAtOf(json) ?? DateTime.now());
-
+      try {
+        await history.markExternalBackup();
+      } on Object catch (error) {
+        AppLogger.e('云端备份成功，提醒日期保存失败', tag: 'Backup', error: error);
+      }
+      if (!mounted) return;
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
         SnackBar(
@@ -166,11 +178,13 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
         ),
       );
     } on WebDavException catch (e) {
+      if (!mounted) return;
       scaffold.clearSnackBars();
       scaffold.showSnackBar(
         SnackBar(content: Text('上传失败: ${e.message}')),
       );
     } on Object catch (e) {
+      if (!mounted) return;
       // `on Object` 兜在具体类型之后：`settingsRepo.setLastSyncedAt` 写
       // `HiveBoxes`，失败抛 `HiveError extends Error`，`on Exception` 接不住。
       // 有 `finally` 复位 `_uploading` 不会卡死，但漏捕会让上传按钮点了
@@ -184,138 +198,107 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     }
   }
 
-  Future<void> _download() async {
+  Future<void> _download({String? versionId}) async {
+    if (_uploading || _downloading) return;
     final config = _getSelectedConfig();
     if (config == null) return;
-
-    // 确认对话框
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('从云端下载'),
-        content: const Text(
-          '下载将覆盖当前所有学习数据，此操作不可撤销。\n\n确定要继续吗？',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确认下载'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
     setState(() => _downloading = true);
-    final scaffold = ScaffoldMessenger.of(context);
-    final settingsRepo = ref.read(settingsRepositoryProvider);
+    final settings = ref.read(settingsRepositoryProvider);
     final webdav = ref.read(webDavServiceProvider);
-    final backup = ref.read(backupServiceProvider);
-    final notifications =
-        widget.notificationService ?? NotificationService.instance;
-
+    final history = ref.read(backupHistoryProvider);
     try {
-      final fullConfig =
-          await settingsRepo.loadWebDavConfigWithCredentials(config);
-      final json = await webdav.download(fullConfig);
-
-      // 备份含加密凭据时先收口令；留空跳过凭据恢复。
-      final hasCredentials = BackupService.jsonHasCredentials(json);
-      String? passphrase;
-      if (hasCredentials) {
-        if (!mounted) return;
-        passphrase = await showBackupPassphraseInputDialog(context);
-        if (passphrase == null) return; // 用户取消
-      }
-
-      // 端点变更预检：LLM 配置随备份迁移（含 baseUrl），恢复前让用户确认
-      // 地址变更，避免恶意备份把真实 API Key 导向攻击者服务器（P1 闸门）。
-      final endpointChanges = BackupService.detectLlmEndpointChanges(json);
-      if (endpointChanges != null && !endpointChanges.isEmpty) {
-        if (!mounted) return;
-        final trusted =
-            await showLlmEndpointConfirmDialog(context, endpointChanges);
-        if (trusted != true) return; // 用户取消 = 中止恢复，数据零变更
-      }
-
-      // 冲突检测（下载方向）：云端 exportedAt 晚于本机上次同步 → 另一台
-      // 设备在本机之后写过云端，本机那边没有这些新数据，恢复前必须知情。
-      final lastSyncedAt = settingsRepo.lastSyncedAt;
-      final remoteExportedAt = BackupService.exportedAt(json);
-      if (lastSyncedAt != null &&
-          remoteExportedAt != null &&
-          remoteExportedAt.isAfter(lastSyncedAt)) {
-        if (!mounted) return;
-        final proceed = await showSyncConflictDialog(
-          context,
-          direction: SyncConflictDirection.download,
-          remoteExportedAt: remoteExportedAt,
-          localSyncedAt: lastSyncedAt,
-        );
-        if (proceed != true) return; // 用户取消 = 中止恢复，数据零变更
-      }
-
-      final session = ref.read(assistantSessionProvider.notifier);
-      final count = await session.whileRestoring(
-          () => backup.restoreFromJson(json, passphrase: passphrase),);
-      final notificationsApplied =
-          await notifications.reconcileWithStoredSettings();
+      if (!await ensureParentAccess(context) || !mounted) return;
+      final full = await settings.loadWebDavConfigWithCredentials(config);
+      final json = versionId == null
+          ? await webdav.download(full)
+          : await webdav.downloadVersion(full, versionId);
       if (!mounted) return;
-
-      // 恢复成功才推进时间线，与上传方向对称。
-      if (remoteExportedAt != null) {
-        await settingsRepo.setLastSyncedAt(remoteExportedAt);
+      final remote = BackupService.exportedAt(json);
+      final local = settings.lastSyncedAt;
+      if (versionId == null &&
+          remote != null &&
+          local != null &&
+          remote.isAfter(local)) {
+        final proceed = await showSyncConflictDialog(context,
+            direction: SyncConflictDirection.download,
+            remoteExportedAt: remote,
+            localSyncedAt: local,);
+        if (proceed != true || !mounted) return;
       }
-
-      // 刷新所有缓存 Provider，使 UI 立即反映恢复的数据
-      invalidateAllHiveProviders(ref.invalidate);
-
-      final credentialMessage = !hasCredentials
-          ? ''
-          : passphrase!.isNotEmpty
-              ? '，凭据已恢复'
-              : '，凭据未恢复（未输入口令）';
-      final notificationMessage = notificationsApplied ? '' : '，但通知设置未完全应用';
-      scaffold.clearSnackBars();
-      scaffold.showSnackBar(
-        SnackBar(
-          content: Text(
-            '恢复成功，共恢复 $count 条记录$credentialMessage$notificationMessage',
-          ),
-        ),
-      );
-    } on WebDavException catch (e) {
-      scaffold.clearSnackBars();
-      scaffold.showSnackBar(
-        SnackBar(content: Text('下载失败: ${e.message}')),
-      );
-    } on FormatException catch (e) {
-      scaffold.clearSnackBars();
-      scaffold.showSnackBar(
-        SnackBar(content: Text('恢复失败: ${e.message}')),
-      );
-    } on BackupRestoreException catch (e) {
-      scaffold.clearSnackBars();
-      scaffold.showSnackBar(
-        SnackBar(content: Text('恢复失败: ${e.message}')),
-      );
-    } on Object catch (e) {
-      // `on Object` 兜在具体类型之后：下载后的恢复流程要成批写 `HiveBoxes`，
-      // 中途失败抛 `HiveError extends Error`，`on Exception` 接不住 ——
-      // 而这正是「恢复写到一半」最需要提示用户的场景。有 `finally` 复位
-      // `_downloading` 不会卡死。
-      scaffold.clearSnackBars();
-      scaffold.showSnackBar(
-        SnackBar(content: Text('下载失败: $e')),
-      );
+      final result = await previewAndRestoreBackup(context, ref, json,
+          notifications: widget.notificationService,
+          source: versionId == null ? 'WebDAV 最新备份' : 'WebDAV 历史版本',);
+      if (result == null) return;
+      if (remote != null) await settings.setLastSyncedAt(remote);
+      try {
+        await history.markExternalBackup();
+      } on Object catch (error) {
+        AppLogger.e('恢复成功，提醒日期保存失败', tag: 'Backup', error: error);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                '恢复成功，共 ${result.count} 条记录${result.notificationsApplied ? '' : '，通知设置未完全应用'}',),),);
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('下载或恢复失败：$error')));
+      }
     } finally {
       if (mounted) setState(() => _downloading = false);
     }
+  }
+
+  Future<void> _versions() async {
+    if (_uploading || _downloading) return;
+    final config = _getSelectedConfig();
+    if (config == null) return;
+    setState(() => _downloading = true);
+    final settings = ref.read(settingsRepositoryProvider);
+    final webdav = ref.read(webDavServiceProvider);
+    String? selected;
+    try {
+      if (!await ensureParentAccess(context) || !mounted) return;
+      final full = await settings.loadWebDavConfigWithCredentials(config);
+      final versions = await webdav.listVersions(full);
+      if (!mounted) return;
+      selected = await showModalBottomSheet<String>(
+          context: context,
+          isScrollControlled: true,
+          builder: (sheet) => SafeArea(
+              child: SizedBox(
+                  height: MediaQuery.sizeOf(sheet).height * .6,
+                  child: versions.isEmpty
+                      ? const Center(child: Text('暂无历史版本，请先上传一次新备份'))
+                      : ListView(
+                          padding: const EdgeInsets.all(SpacingTokens.md),
+                          children: [
+                              Text('选择云端历史版本',
+                                  style: Theme.of(sheet).textTheme.titleMedium,),
+                              for (final version in versions)
+                                AppTile(
+                                    icon: Icons.history,
+                                    iconColor:
+                                        Theme.of(sheet).colorScheme.primary,
+                                    title: version.createdAt
+                                        .toLocal()
+                                        .toString()
+                                        .split('.')
+                                        .first,
+                                    subtitle: '下载后预览确认，不会立即覆盖',
+                                    onTap: () =>
+                                        Navigator.pop(sheet, version.id),),
+                            ],),),),);
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('读取历史失败：$error')));
+      }
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
+    if (selected != null && mounted) await _download(versionId: selected);
   }
 
   WebDavConfig? _getSelectedConfig() {
@@ -409,6 +392,12 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     final busy = _uploading || _downloading;
 
     return Scaffold(
+      floatingActionButton: _selectedId == null
+          ? null
+          : FloatingActionButton.small(
+              tooltip: '云端历史版本',
+              onPressed: busy ? null : _versions,
+              child: const Icon(Icons.history),),
       appBar: AppBar(
         title: const Text('云端同步'),
         actions: [

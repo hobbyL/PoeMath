@@ -77,6 +77,9 @@ const int _backupVersion = 1;
 /// - tencent_asr_credential_fingerprint / tencent_asr_verified_at /
 ///   worker_tts_verified_fingerprint：与凭据绑定的验证状态，凭据不随备份
 ///   走，指纹/时间戳单独迁移会误导验证状态。
+/// - parent_protection_* / cloud_daily_limit_* / daily_snapshot_enabled /
+///   external_backup_reminder：设备家长保护、额度和本机备份策略，保留本机值；
+///   meta 中的云用量、练习草稿与今日计划同样不导出。
 ///
 /// 新增 settings key 时必须同步登记本白名单（并注明类型），否则不会随备份迁移。
 const Map<String, String> _settingsValueType = <String, String>{
@@ -142,6 +145,53 @@ class BackupService {
       : _secureStore = secureStore ?? SecureCredentialStore();
 
   final SecureCredentialStore _secureStore;
+
+  /// 只读预览复用与提交相同的完整校验；固定原始内容，提交时不重读文件。
+  BackupPreview inspectJson(String jsonString) {
+    final data = _decodeAndValidate(jsonString);
+    const labels = <String, String>{
+      'poemProgress': '诗词进度',
+      'poemFavorites': '诗词收藏',
+      'reviewSchedules': '复习计划',
+      'mathMistakes': '错题',
+      'mathSessions': '数学练习',
+      'formulaFavorites': '公式收藏',
+      'achievements': '成就',
+      'checkIns': '每日记录',
+      'userStats': '用户统计',
+      'challengeRecords': '挑战记录',
+      'learningActivities': '学习活动',
+      'llmProblems': '应用题',
+      'conversations': '助手会话',
+      'messages': '助手消息',
+    };
+    return BackupPreview(
+      json: jsonString,
+      exportedAt: exportedAt(jsonString),
+      counts: Map.unmodifiable({
+        for (final entry in labels.entries)
+          entry.value: (data[entry.key] as List<dynamic>?)?.length ?? 0,
+      }),
+      hasCredentials: data.containsKey('credentials'),
+      endpointChanges: detectLlmEndpointChanges(jsonString),
+    );
+  }
+
+  Future<void> validateRestoreCredentials(
+    BackupPreview preview, {
+    String? passphrase,
+  }) async {
+    final normalized = passphrase?.trim() ?? '';
+    if (!preview.hasCredentials || normalized.isEmpty) return;
+    final data = _decodeAndValidate(preview.json);
+    final credentials = await decryptCredentials(
+      data['credentials'] as Map<String, dynamic>,
+      normalized,
+    );
+    if (credentials.containsKey(kCredKeyLlmProviderKeys)) {
+      _decodeProviderKeys(credentials[kCredKeyLlmProviderKeys]!);
+    }
+  }
 
   /// 导出所有用户数据为 JSON 字符串。
   ///
@@ -2174,6 +2224,21 @@ class BackupService {
 }
 
 /// 恢复写入失败；[rollbackError] 非 null 表示回滚也失败。
+class BackupPreview {
+  const BackupPreview({
+    required this.json,
+    required this.exportedAt,
+    required this.counts,
+    required this.hasCredentials,
+    required this.endpointChanges,
+  });
+  final String json;
+  final DateTime? exportedAt;
+  final Map<String, int> counts;
+  final bool hasCredentials;
+  final LlmEndpointChangeSet? endpointChanges;
+}
+
 class BackupRestoreException implements Exception {
   const BackupRestoreException(
     this.message, {

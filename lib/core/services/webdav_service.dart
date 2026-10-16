@@ -5,19 +5,29 @@
 //       使用 http 包发送自定义 HTTP 方法（PROPFIND/MKCOL/PUT/GET）。
 
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
 import 'package:poemath/data/models/webdav_config.dart';
+import 'package:poemath/core/utils/logger.dart';
 
 /// WebDAV 备份文件名。
 const String _backupFileName = 'poemath_backup.json';
+
+class WebDavBackupVersion {
+  const WebDavBackupVersion(this.id, this.createdAt);
+  final String id;
+  final DateTime createdAt;
+}
 
 /// WebDAV 客户端服务。
 class WebDavService {
   WebDavService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
+  static final _versionName =
+      RegExp(r'^poemath_backup_(\d+)_[a-f0-9]{8}\.json$');
 
   /// 释放 HTTP 连接池。
   void dispose() => _client.close();
@@ -56,9 +66,39 @@ class WebDavService {
   /// 自动创建远程目录（如不存在）。
   Future<void> upload(WebDavConfig config, String jsonContent) async {
     _validateConfig(config);
-    final uri = _remoteUri(config, fileName: _backupFileName);
     // 先确保目录存在
     await _ensureDirectory(config);
+    final suffix =
+        Random.secure().nextInt(0x100000000).toRadixString(16).padLeft(8, '0');
+    final version =
+        'poemath_backup_${DateTime.now().microsecondsSinceEpoch}_$suffix.json';
+    // 不可变历史版本先写成功，再发布兼容旧客户端的 latest 文件。
+    await _put(config, version, jsonContent);
+    await _put(config, _backupFileName, jsonContent);
+    // 清理不影响已经成功发布的备份；仅删除本应用严格命名的版本。
+    try {
+      final versions = await listVersions(config);
+      for (final old
+          in versions.where((entry) => entry.id != version).skip(9)) {
+        final response = await _client
+            .delete(_remoteUri(config, fileName: old.id),
+                headers: _authHeaders(config),)
+            .timeout(const Duration(seconds: 15));
+        if (response.statusCode != 200 &&
+            response.statusCode != 204 &&
+            response.statusCode != 404) {
+          throw WebDavException('历史版本清理失败', response.statusCode);
+        }
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.e('备份已上传，云端历史清理未完成',
+          tag: 'WebDAV', error: error, stackTrace: stackTrace,);
+    }
+  }
+
+  Future<void> _put(
+      WebDavConfig config, String fileName, String jsonContent,) async {
+    final uri = _remoteUri(config, fileName: fileName);
 
     final response = await _client
         .put(
@@ -83,8 +123,19 @@ class WebDavService {
 
   /// 从 WebDAV 服务器下载备份 JSON。
   Future<String> download(WebDavConfig config) async {
+    return _downloadFile(config, _backupFileName);
+  }
+
+  Future<String> downloadVersion(WebDavConfig config, String versionId) {
+    if (!_versionName.hasMatch(versionId)) {
+      throw const WebDavException('备份版本标识无效');
+    }
+    return _downloadFile(config, versionId);
+  }
+
+  Future<String> _downloadFile(WebDavConfig config, String fileName) async {
     _validateConfig(config);
-    final uri = _remoteUri(config, fileName: _backupFileName);
+    final uri = _remoteUri(config, fileName: fileName);
     final response = await _client
         .get(
           uri,
@@ -103,6 +154,60 @@ class WebDavService {
     }
 
     return utf8.decode(response.bodyBytes);
+  }
+
+  Future<List<WebDavBackupVersion>> listVersions(WebDavConfig config) async {
+    _validateConfig(config);
+    final directory = _remoteUri(config);
+    final request = http.Request('PROPFIND', directory)
+      ..headers.addAll(_authHeaders(config))
+      ..headers['Depth'] = '1'
+      ..headers['Content-Type'] = 'application/xml; charset=utf-8'
+      ..body = _propfindBody;
+    final response =
+        await _client.send(request).timeout(const Duration(seconds: 30));
+    final body = await response.stream.bytesToString();
+    if (response.statusCode != 207 && response.statusCode != 200) {
+      throw WebDavException('历史版本读取失败', response.statusCode);
+    }
+    // 只取 href，不解释任意远程 XML；严格文件名及 origin/目录边界再次限制。
+    final hrefs = RegExp(
+            r'<(?:[\w.-]+:)?href\b[^>]*>(.*?)</(?:[\w.-]+:)?href\s*>',
+            caseSensitive: false,
+            dotAll: true,)
+        .allMatches(body);
+    final result = <String, WebDavBackupVersion>{};
+    for (final match in hrefs) {
+      final href = match.group(1)!.trim().replaceAll('&amp;', '&');
+      final reference = Uri.tryParse(href);
+      if (reference == null) continue;
+      final uri = directory.resolveUri(reference).normalizePath();
+      if (!uri.hasAuthority ||
+          uri.scheme != directory.scheme ||
+          uri.hasQuery ||
+          uri.hasFragment) {
+        continue;
+      }
+      if (uri.origin != directory.origin ||
+          !uri.path.startsWith(directory.normalizePath().path)) {
+        continue;
+      }
+      final id = uri.pathSegments.lastOrNull;
+      if (id == null) continue;
+      final version = _versionName.firstMatch(id);
+      if (version == null) continue;
+      if (uri.path != '${directory.path}$id') continue;
+      final micros = int.tryParse(version.group(1)!);
+      if (micros == null) continue;
+      try {
+        result[id] = WebDavBackupVersion(
+            id, DateTime.fromMicrosecondsSinceEpoch(micros),);
+      } on ArgumentError {
+        continue;
+      }
+    }
+    return result.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   /// 确保远程目录存在，不存在则创建。

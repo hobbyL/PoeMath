@@ -17,6 +17,7 @@
 // 纯 microtask 的假客户端（`MockClient`）不受影响，所以只有 Hive 侧要包。
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +29,8 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:http/testing.dart';
 
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/backup_history_service.dart';
+import 'package:poemath/data/providers/backup_protection_providers.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
@@ -223,14 +226,22 @@ void main() {
     });
     addTearDown(() => tester.runAsync(tearDownHiveForTesting));
 
+    final historyDir = await tester
+        .runAsync(() => Directory.systemTemp.createTemp('cloud_history_'));
+    addTearDown(
+        () => tester.runAsync(() => historyDir!.delete(recursive: true)),);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          backupHistoryProvider.overrideWith((ref) => BackupHistoryService(
+              backup: ref.read(backupServiceProvider),
+              directoryProvider: () async => historyDir!,),),
           webDavServiceProvider.overrideWithValue(
             WebDavService(client: fake.client),
           ),
           secureCredentialStoreProvider.overrideWithValue(
-              _NoCredentialStore(failExport: failCredentialExport),),
+            _NoCredentialStore(failExport: failCredentialExport),
+          ),
         ],
         child: MaterialApp(
           home: CloudSyncPage(
@@ -263,8 +274,6 @@ void main() {
       },
     );
     await tapAndSettle(tester, find.text('从云端下载'));
-    // 覆盖确认（既有的下载二次确认）→ 通过。
-    await tapAndSettle(tester, find.text('确认下载'));
 
     // 冲突框出现。
     expect(find.text('⚠️ 云端数据比本机新'), findsOneWidget);
@@ -293,10 +302,11 @@ void main() {
       },
     );
     await tapAndSettle(tester, find.text('从云端下载'));
-    await tapAndSettle(tester, find.text('确认下载'));
 
     expect(find.text('⚠️ 云端数据比本机新'), findsOneWidget);
     await tapAndSettle(tester, find.text('仍然下载覆盖'));
+    expect(find.text('备份预览'), findsOneWidget);
+    await tapAndSettle(tester, find.text('确认覆盖'));
 
     expect(HiveBoxes.checkIns.length, 2);
     expect(
@@ -319,9 +329,10 @@ void main() {
       },
     );
     await tapAndSettle(tester, find.text('从云端下载'));
-    await tapAndSettle(tester, find.text('确认下载'));
 
     expect(find.text('⚠️ 云端数据比本机新'), findsNothing);
+    expect(find.text('备份预览'), findsOneWidget);
+    await tapAndSettle(tester, find.text('确认覆盖'));
     expect(HiveBoxes.checkIns.length, 1);
   });
 
@@ -332,9 +343,10 @@ void main() {
 
     await pumpPage(tester, cloud);
     await tapAndSettle(tester, find.text('从云端下载'));
-    await tapAndSettle(tester, find.text('确认下载'));
 
     expect(find.text('⚠️ 云端数据比本机新'), findsNothing);
+    expect(find.text('备份预览'), findsOneWidget);
+    await tapAndSettle(tester, find.text('确认覆盖'));
     expect(HiveBoxes.checkIns.length, 1);
   });
 
@@ -381,7 +393,7 @@ void main() {
     await tapAndSettle(tester, find.text('上传到云端'));
 
     expect(find.text('⚠️ 云端数据比本机新'), findsNothing);
-    expect(cloud.puts, 1);
+    expect(cloud.puts, 2);
   });
 
   testWidgets('上传：云端 exportedAt 无法解析 → 跳过冲突检测，仍可上传', (tester) async {
@@ -405,7 +417,7 @@ void main() {
     await tapAndSettle(tester, find.text('上传到云端'));
 
     expect(find.text('⚠️ 云端数据比本机新'), findsNothing);
-    expect(cloud.puts, 1);
+    expect(cloud.puts, 2);
   });
 
   testWidgets('上传：取消冲突框 → 不发出 PUT，时间线保持原值', (tester) async {
@@ -454,7 +466,7 @@ void main() {
     expect(HiveBoxes.settings.get('last_synced_at'), '2026-10-12T08:00:00.000');
   });
 
-  testWidgets('上传：确认后 PUT 一次，last_synced_at 推进到本次导出时刻', (tester) async {
+  testWidgets('上传：确认后先版本再latest，last_synced_at 推进到本次导出时刻', (tester) async {
     cloud =
         _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
 
@@ -469,7 +481,7 @@ void main() {
     await tapAndSettle(tester, find.text('上传到云端'));
     await tapAndSettle(tester, find.text('仍然上传覆盖'));
 
-    expect(cloud.puts, 1);
+    expect(cloud.puts, 2);
 
     // 精确断言：上传成功后 `last_synced_at` 必须**逐字节等于**本次 PUT 的
     // `exportedAt`（见 `cloud_sync_page.dart` 上传分支 `setLastSyncedAt(
@@ -507,6 +519,6 @@ void main() {
 
     // 冲突检测是辅助闸门，不能反向阻断正常上传。
     expect(find.text('⚠️ 云端数据比本机新'), findsNothing);
-    expect(cloud.puts, 1);
+    expect(cloud.puts, 2);
   });
 }

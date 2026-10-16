@@ -24,6 +24,34 @@ WebDavConfig _config({
 }
 
 void main() {
+  test('历史版本写失败时不会发布latest，历史列表拒绝外部目录与来源', () async {
+    final puts = <Uri>[];
+    final failed = WebDavService(client: MockClient((request) async {
+      if (request.method == 'PROPFIND') return http.Response('', 207);
+      puts.add(request.url);
+      return http.Response('', 500);
+    }),);
+    addTearDown(failed.dispose);
+    await expectLater(
+        failed.upload(_config(), '{}'), throwsA(isA<WebDavException>()),);
+    expect(puts, hasLength(1));
+    expect(puts.single.path, isNot(endsWith('/poemath_backup.json')));
+    const name = 'poemath_backup_1792108800000000_aabbccdd.json';
+    final service =
+        WebDavService(client: MockClient((request) async => http.Response('''
+      <d:multistatus xmlns:d="DAV:">
+      <d:response><d:href>/poemath/$name</d:href></d:response>
+      <d:response><d:href>https://evil.example/poemath/$name</d:href></d:response>
+      <d:response><d:href>/other/$name</d:href></d:response>
+      <d:response><d:href>/poemath/nested/$name</d:href></d:response>
+      <d:response><d:href>/poemath/poemath_backup.json</d:href></d:response>
+      </d:multistatus>''', 207,),),);
+    addTearDown(service.dispose);
+    expect((await service.listVersions(_config())).map((e) => e.id), [name]);
+    expect(() => service.downloadVersion(_config(), '../escape.json'),
+        throwsA(isA<WebDavException>()),);
+  });
+
   test('URL 校验只允许 HTTPS 且拒绝凭据和 query', () {
     expect(WebDavConfig.validateUrl('https://dav.example.com'), isNull);
     expect(
@@ -181,10 +209,12 @@ void main() {
     await service.upload(config, '{"version":1}');
 
     final expectedAuth = 'Basic ${base64Encode(utf8.encode('alice:secret'))}';
-    expect(methods, <String>['PROPFIND', 'PROPFIND', 'PUT']);
+    expect(methods, <String>['PROPFIND', 'PROPFIND', 'PUT', 'PUT', 'PROPFIND']);
+    expect(urls[2].path,
+        matches(RegExp(r'/poemath/poemath_backup_\d+_[a-f0-9]{8}\.json$')),);
     expect(urls[0], Uri.parse('https://dav.example.com/poemath/'));
     expect(
-      urls[2],
+      urls[3],
       Uri.parse('https://dav.example.com/poemath/poemath_backup.json'),
     );
     expect(
