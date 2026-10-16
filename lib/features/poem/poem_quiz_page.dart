@@ -19,6 +19,8 @@ import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/domain/poem_practice_details.dart';
+import 'package:poemath/features/poem/poem_practice_history_page.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
@@ -54,6 +56,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   String? _activityId;
   DateTime? _completedAt;
   int? _settledDuration;
+  String? _detailsJson;
   bool _progressRecorded = false;
   PoemProgress? _recordedProgress;
 
@@ -74,6 +77,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   }
 
   void _initQuiz() {
+    _detailsJson = null;
     // 侧信道纪律：进入时清空，防止上一次练习的陈旧分数被误消费。
     ref.read(lastPracticeScoreProvider.notifier).state = null;
     final poem = ref.read(poemByIdProvider(widget.poemId));
@@ -205,6 +209,23 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
     final session = _session!;
     final activityId = _activityId!;
+    final detailsJson = _detailsJson ??= PoemPracticeDetails(
+      mode: 'quiz',
+      score: session.accuracy,
+      lines: [
+        for (var i = 0; i < session.questions.length; i++)
+          if (session.questions[i].sourceLineIndex != null)
+            PoemLineResult(
+              lineIndex: session.questions[i].sourceLineIndex!,
+              lineText: session.questions[i].sourceLineText!,
+              expected: session.questions[i].correctAnswer,
+              answer: session.userAnswers[i] ?? '',
+              wholeLine: false,
+              passed: normalizePoemAnswer(session.userAnswers[i] ?? '') ==
+                  normalizePoemAnswer(session.questions[i].correctAnswer),
+            ),
+      ],
+    ).encode();
     final stars = LearningRewardCalculator.calculateStars(
       activityType: LearningActivityType.poemQuiz,
       totalItems: session.questions.length,
@@ -237,6 +258,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
         starsEarned: stars,
         durationSeconds: duration,
         completedAt: completedAt,
+        detailsJson: detailsJson,
       );
       if (stars > 0) {
         await statsRepo.addStars(stars, activityId: activityId);
@@ -722,11 +744,11 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final seconds = session.elapsedSeconds % 60;
     final timeText = minutes > 0 ? '$minutes 分 $seconds 秒' : '$seconds 秒';
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(SpacingTokens.lg),
       child: Column(
         children: [
-          const Spacer(),
+          const SizedBox(height: SpacingTokens.lg),
 
           // 评级图标
           Icon(ratingIcon, size: 80, color: ratingColor)
@@ -842,7 +864,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                 curve: Curves.easeOutCubic,
               ),
 
-          const Spacer(),
+          const SizedBox(height: SpacingTokens.lg),
 
           // 操作按钮
           if (_settlementError != null) ...[
@@ -855,6 +877,18 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
               child: const Text('重试保存'),
             ),
           ],
+          TextButton.icon(
+            onPressed: _settled
+                ? () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            PoemPracticeHistoryPage(poemId: widget.poemId),
+                      ),
+                    )
+                : null,
+            icon: const Icon(Icons.history),
+            label: const Text('回看作答与错句'),
+          ),
           Row(
             children: [
               Expanded(

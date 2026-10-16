@@ -32,6 +32,8 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
+import 'package:poemath/domain/poem_practice_details.dart';
+import 'package:poemath/domain/poem_review_history.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
@@ -778,6 +780,7 @@ class BackupService {
         'studyCount': p.studyCount,
         'lastStudiedAt': p.lastStudiedAt?.toIso8601String(),
         'firstStudiedAt': p.firstStudiedAt?.toIso8601String(),
+        'firstMasteredAt': p.firstMasteredAt?.toIso8601String(),
         'stars': p.stars,
       };
     }).toList();
@@ -803,6 +806,7 @@ class BackupService {
         'lastReviewedAt': r.lastReviewedAt?.toIso8601String(),
         'isCompleted': r.isCompleted,
         'lastScore': r.lastScore,
+        'historyJson': r.historyJson,
       };
     }).toList();
   }
@@ -945,6 +949,7 @@ class BackupService {
         'starsEarned': activity.starsEarned,
         'durationSeconds': activity.durationSeconds,
         'completedAt': activity.completedAt.toIso8601String(),
+        'detailsJson': activity.detailsJson,
       };
     }).toList();
   }
@@ -1002,6 +1007,9 @@ class BackupService {
         studyCount: m['studyCount'] as int? ?? 0,
         lastStudiedAt: _parseDateTime(m['lastStudiedAt']),
         firstStudiedAt: _parseDateTime(m['firstStudiedAt']),
+        firstMasteredAt: m['firstMasteredAt'] == null
+            ? null
+            : _parseDateTime(m['firstMasteredAt']),
         stars: m['stars'] as int? ?? 0,
       );
       await box.put('${obj.profileId}_${obj.poemId}', obj);
@@ -1037,6 +1045,7 @@ class BackupService {
         lastReviewedAt: _parseDateTime(m['lastReviewedAt']),
         isCompleted: m['isCompleted'] as bool? ?? false,
         lastScore: (m['lastScore'] as num?)?.toDouble(),
+        historyJson: m['historyJson'] as String?,
       );
       await box.put('${obj.profileId}_${obj.poemId}', obj);
     }
@@ -1226,6 +1235,7 @@ class BackupService {
         starsEarned: m['starsEarned'] as int,
         durationSeconds: m['durationSeconds'] as int,
         completedAt: DateTime.parse(m['completedAt'] as String),
+        detailsJson: m['detailsJson'] as String?,
       );
       await box.put('${activity.profileId}_${activity.id}', activity);
     }
@@ -1598,6 +1608,7 @@ class BackupService {
     _optionalNonNegativeInt(item, 'stars', path);
     _validateOptionalDate(item, 'lastStudiedAt', path);
     _validateOptionalDate(item, 'firstStudiedAt', path);
+    _validateOptionalDate(item, 'firstMasteredAt', path);
   }
 
   void _validatePoemFavorite(Map<String, dynamic> item, String path) {
@@ -1607,6 +1618,12 @@ class BackupService {
   }
 
   void _validateReviewSchedule(Map<String, dynamic> item, String path) {
+    _optionalNullableString(item, 'historyJson', path);
+    try {
+      PoemReviewHistory.decode(item['historyJson'] as String?);
+    } on FormatException {
+      _invalidField('$path.historyJson', '复习历史格式无效');
+    }
     _requiredString(item, 'poemId', path);
     _requiredString(item, 'profileId', path);
     _optionalInt(
@@ -1811,6 +1828,12 @@ class BackupService {
   }
 
   void _validateLearningActivity(Map<String, dynamic> item, String path) {
+    _optionalNullableString(item, 'detailsJson', path);
+    try {
+      PoemPracticeDetails.decode(item['detailsJson'] as String?);
+    } on FormatException {
+      _invalidField('$path.detailsJson', '诗词练习明细格式无效');
+    }
     _requiredString(item, 'id', path);
     _requiredString(item, 'profileId', path);
     final activityType = _requiredString(item, 'activityType', path);

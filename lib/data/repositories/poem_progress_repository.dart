@@ -21,6 +21,12 @@ class PoemProgressRepository {
       progress = PoemIdentity.progress(PoemIdentity.progressMap(progress));
     }
     final key = ProfileScope.key(progress.poemId);
+    final previous = HiveBoxes.poemProgress.get(key);
+    if (progress.status == LearningStatus.mastered &&
+        progress.firstMasteredAt == null &&
+        previous?.status != LearningStatus.mastered) {
+      progress = progress.copyWith(firstMasteredAt: DateTime.now());
+    }
     await HiveBoxes.poemProgress.put(key, progress);
   }
 

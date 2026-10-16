@@ -24,13 +24,14 @@ class ReviewScheduleAdapter extends TypeAdapter<ReviewSchedule> {
       lastReviewedAt: fields[4] as DateTime?,
       isCompleted: fields[5] as bool,
       lastScore: fields[6] as double?,
+      historyJson: fields[7] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ReviewSchedule obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.poemId)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class ReviewScheduleAdapter extends TypeAdapter<ReviewSchedule> {
       ..writeByte(5)
       ..write(obj.isCompleted)
       ..writeByte(6)
-      ..write(obj.lastScore);
+      ..write(obj.lastScore)
+      ..writeByte(7)
+      ..write(obj.historyJson);
   }
 
   @override

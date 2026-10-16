@@ -6,6 +6,7 @@ enum PoemPracticeResult {
   recitationCompleted,
   quizPassed,
   quizFailed,
+  targetedPracticeCompleted,
   cancelled;
 
   bool get completesReview => this == recitationCompleted || this == quizPassed;

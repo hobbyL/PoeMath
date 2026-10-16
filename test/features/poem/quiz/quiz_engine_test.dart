@@ -25,6 +25,27 @@ Poem _makePoem({
 }
 
 void main() {
+  test('重复诗句仍保留准确行号；文史题不生成诗句错题', () {
+    final poem = _makePoem(content: '上句甲\n相同句\n上句乙\n相同句\n末句');
+    for (final questions in [
+      QuizEngine.generateFillBlank(poem, random: Random(1)),
+      QuizEngine.generateMultipleChoice(poem, random: Random(1)),
+    ]) {
+      expect(questions.map((q) => q.sourceLineIndex).toSet(), {1, 3, 4});
+      for (final question in questions) {
+        expect(question.sourceLineText,
+            poem.content.split('\n')[question.sourceLineIndex!],);
+      }
+    }
+    for (final question in [
+      ...QuizEngine.generateChooseAuthor(poem, allPoems: []),
+      ...QuizEngine.generateChooseDynasty(poem, allPoems: []),
+    ]) {
+      expect(question.sourceLineIndex, isNull);
+      expect(question.sourceLineText, isNull);
+    }
+  });
+
   group('QuizEngine - 填空题生成', () {
     test('4行诗生成 2 道填空题', () {
       final poem = _makePoem();

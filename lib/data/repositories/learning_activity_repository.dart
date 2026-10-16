@@ -10,6 +10,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/domain/poem_practice_details.dart';
 
 class LearningActivityRepository {
   static final Map<String, Future<void>> _inFlight = {};
@@ -41,6 +42,24 @@ class LearningActivityRepository {
         .toList();
   }
 
+  List<LearningActivity> forPoem(String poemId) => getAll()
+      .where(
+        (activity) =>
+            activity.poemId != null &&
+            PoemIdentity.canonical(activity.poemId!) ==
+                PoemIdentity.canonical(poemId),
+      )
+      .toList();
+
+  List<PoemLineResult> unresolvedLines(String poemId) {
+    final history = <PoemPracticeDetails>[];
+    for (final activity in forPoem(poemId).reversed) {
+      final details = PoemPracticeDetails.decode(activity.detailsJson);
+      if (details != null) history.add(details);
+    }
+    return unresolvedPoemLines(history);
+  }
+
   /// 写入一次活动。相同 ID 和内容重放返回 false，不同内容复用 ID 时抛错。
   Future<bool> record({
     required String id,
@@ -51,6 +70,7 @@ class LearningActivityRepository {
     required int durationSeconds,
     required DateTime completedAt,
     String? poemId,
+    String? detailsJson,
   }) async {
     final activity = LearningActivity(
       id: id,
@@ -62,6 +82,7 @@ class LearningActivityRepository {
       starsEarned: starsEarned,
       durationSeconds: durationSeconds,
       completedAt: completedAt,
+      detailsJson: detailsJson,
     );
     _validate(activity);
 
@@ -91,6 +112,7 @@ class LearningActivityRepository {
   }
 
   void _validate(LearningActivity activity) {
+    PoemPracticeDetails.decode(activity.detailsJson);
     if (activity.id.trim().isEmpty) {
       throw ArgumentError.value(activity.id, 'id', '不能为空');
     }
@@ -150,6 +172,7 @@ class LearningActivityRepository {
                 : PoemIdentity.canonical(right.poemId!)) &&
         left.starsEarned == right.starsEarned &&
         left.durationSeconds == right.durationSeconds &&
-        left.completedAt == right.completedAt;
+        left.completedAt == right.completedAt &&
+        left.detailsJson == right.detailsJson;
   }
 }

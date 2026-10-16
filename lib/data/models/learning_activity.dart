@@ -42,6 +42,9 @@ class LearningActivity extends HiveObject {
   @HiveField(8)
   final DateTime completedAt;
 
+  @HiveField(9)
+  final String? detailsJson;
+
   LearningActivity({
     required this.id,
     required this.profileId,
@@ -52,6 +55,7 @@ class LearningActivity extends HiveObject {
     required this.durationSeconds,
     required this.completedAt,
     this.poemId,
+    this.detailsJson,
   });
 
   LearningActivityType? get typeOrNull {

@@ -19,6 +19,8 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/domain/poem_practice_details.dart';
+import 'package:poemath/features/poem/poem_practice_history_page.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
@@ -144,6 +146,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   DateTime? _completedAt;
   bool _progressRecorded = false;
   double? _dictationAccuracy;
+  final List<PoemLineResult> _snapshots = [];
+  final List<String> _wrongAnswers = [];
+  String? _detailsJson;
   String? _settlementError;
 
   /// R1 结算防重入：`_onAllLinesComplete` 只结算一次；
@@ -189,7 +194,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final poem = ref.read(poemByIdProvider(widget.poemId));
     if (poem == null) return;
 
-    final lines = poem.content.split('\n').where((l) => l.isNotEmpty).toList();
+    final lines = poemPracticeLines(poem.content);
     final pinyinLines = poem.pinyin.isNotEmpty
         ? poem.pinyin.split('\n')
         : List.filled(lines.length, '');
@@ -227,6 +232,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _showHint = false;
       _hintUsedThisLine = false;
       _wrongAttemptsThisLine = 0;
+      _wrongAnswers.clear();
       _shakeActive = false;
       _correctFlash = false;
       _lineAnimKey++;
@@ -332,6 +338,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       HapticFeedback.mediumImpact();
       setState(() {
         _wrongAttemptsThisLine++;
+        _wrongAnswers.add(char);
         _shakeActive = true;
       });
       Future.delayed(400.ms, () {
@@ -351,6 +358,21 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       stars = 1;
     }
 
+    _snapshots.add(
+      PoemLineResult(
+        lineIndex: _currentLineIndex,
+        lineText: _lines[_currentLineIndex],
+        expected: _blankPositions
+            .map((i) => _lines[_currentLineIndex].characters.elementAt(i))
+            .join(),
+        answer: _blankPositions.map((i) => _filledChars[i] ?? '').join(),
+        passed: _wrongAttemptsThisLine == 0 && !_hintUsedThisLine,
+        wholeLine: _level == ReciteLevel.hard,
+        hintUsed: _hintUsedThisLine,
+        wrongAttempts: _wrongAttemptsThisLine,
+        wrongAnswers: List.of(_wrongAnswers),
+      ),
+    );
     setState(() {
       _totalStars += stars;
       _linesCompleted++;
@@ -387,6 +409,12 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final activityId = _activityId;
     final poemId = widget.poemId;
     final masteryLevel = _level.masteryLevel;
+    final detailsJson = _detailsJson ??= PoemPracticeDetails(
+      mode: _level == ReciteLevel.dictation ? 'reciteDictation' : 'recite',
+      score: _dictationAccuracy,
+      rawAnswer: _level == ReciteLevel.dictation ? _dictController.text : null,
+      lines: List.of(_snapshots),
+    ).encode();
 
     // R2「先捕获后结算」：首个 await 前同步捕获全部 repo 依赖，
     // 之后 await 链只触 repo —— 结算途中退出页面，数据结算仍完整执行。
@@ -415,6 +443,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
         starsEarned: rewardStars,
         durationSeconds: duration,
         completedAt: completedAt,
+        detailsJson: detailsJson,
       );
 
       // 记录星星到全局统计
@@ -516,6 +545,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _completedAt = null;
       _progressRecorded = false;
       _dictationAccuracy = null;
+      _snapshots.clear();
+      _detailsJson = null;
       _settlementError = null;
       _settlementStarted = false; // 新一轮换新 activityId，允许再次结算
       _setupLine(0);
@@ -536,6 +567,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _completedAt = null;
       _progressRecorded = false;
       _dictationAccuracy = null;
+      _snapshots.clear();
+      _detailsJson = null;
       _settlementError = null;
       _settlementStarted = false; // 新一轮换新 activityId，允许再次结算
       _setupLine(0);
@@ -558,6 +591,27 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final inputChars = input.characters
         .where((ch) => !_isPunctuation(ch) && ch.trim().isNotEmpty)
         .toList();
+    if (_snapshots.isEmpty) {
+      var offset = 0;
+      for (var i = 0; i < _lines.length; i++) {
+        final expected = normalizePoemAnswer(_lines[i]);
+        final end =
+            (offset + expected.characters.length).clamp(0, inputChars.length);
+        final answer = offset >= inputChars.length
+            ? ''
+            : inputChars.sublist(offset, end).join();
+        _snapshots.add(
+          PoemLineResult(
+            lineIndex: i,
+            lineText: _lines[i],
+            expected: expected,
+            answer: answer,
+            passed: answer == expected,
+          ),
+        );
+        offset += expected.characters.length;
+      }
+    }
     int correct = 0;
     for (var i = 0; i < origChars.length && i < inputChars.length; i++) {
       if (origChars[i] == inputChars[i]) correct++;
@@ -639,9 +693,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                     children: [
                       Expanded(child: Text(_settlementError!)),
                       TextButton(
-                          onPressed:
-                              _settlementStarted ? null : _onAllLinesComplete,
-                          child: const Text('重试保存'),),
+                        onPressed:
+                            _settlementStarted ? null : _onAllLinesComplete,
+                        child: const Text('重试保存'),
+                      ),
                     ],
                   ),
                 ),
@@ -1208,6 +1263,16 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
             const SizedBox(height: SpacingTokens.xl),
 
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      PoemPracticeHistoryPage(poemId: widget.poemId),
+                ),
+              ),
+              icon: const Icon(Icons.history),
+              label: const Text('回看作答与错句'),
+            ),
             // 操作按钮
             Row(
               children: [

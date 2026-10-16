@@ -102,6 +102,7 @@ class _ImmediateLearningActivityRepository extends LearningActivityRepository {
     required int durationSeconds,
     required DateTime completedAt,
     String? poemId,
+    String? detailsJson,
   }) async {
     recorded = LearningActivity(
       id: id,
@@ -113,6 +114,7 @@ class _ImmediateLearningActivityRepository extends LearningActivityRepository {
       starsEarned: starsEarned,
       durationSeconds: durationSeconds,
       completedAt: completedAt,
+      detailsJson: detailsJson,
     );
     return true;
   }

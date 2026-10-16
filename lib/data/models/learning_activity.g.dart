@@ -26,13 +26,14 @@ class LearningActivityAdapter extends TypeAdapter<LearningActivity> {
       durationSeconds: fields[7] as int,
       completedAt: fields[8] as DateTime,
       poemId: fields[5] as String?,
+      detailsJson: fields[9] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, LearningActivity obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -50,7 +51,9 @@ class LearningActivityAdapter extends TypeAdapter<LearningActivity> {
       ..writeByte(7)
       ..write(obj.durationSeconds)
       ..writeByte(8)
-      ..write(obj.completedAt);
+      ..write(obj.completedAt)
+      ..writeByte(9)
+      ..write(obj.detailsJson);
   }
 
   @override

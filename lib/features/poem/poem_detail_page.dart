@@ -18,6 +18,8 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/poem_author_bios.dart';
+import 'package:poemath/features/poem/poem_practice_history_page.dart';
+import 'package:poemath/domain/poem_review_history.dart';
 import 'package:poemath/features/poem/poem_explain/poem_explain_controller.dart';
 import 'package:poemath/features/poem/poem_explain/poem_explain_models.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -361,9 +363,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     final authorBio = poemAuthorBios[poem.author];
 
     // 注释播放文本：按「词：释义」逐条拼接。
-    final annotationsText = poem.annotations
-        .map((ann) => '${ann.word}：${ann.meaning}')
-        .join('。');
+    final annotationsText =
+        poem.annotations.map((ann) => '${ann.word}：${ann.meaning}').join('。');
     // 名句播放文本：按行拼接。
     final famousLinesText = poem.famousLines.join('。');
 
@@ -536,6 +537,64 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               const SizedBox(height: SpacingTokens.md),
               _buildAiExplainSection(context, poem),
 
+              const SizedBox(height: SpacingTokens.md),
+              AppTile(
+                icon: Icons.history,
+                iconColor: theme.colorScheme.primary,
+                title: '练习结果与错句',
+                subtitle: '回看原句、作答和差异，专项复练错句',
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        PoemPracticeHistoryPage(poemId: widget.poemId),
+                  ),
+                ),
+              ),
+              Builder(
+                builder: (context) {
+                  if (progress == null) return const SizedBox.shrink();
+                  final reviewRepo = ref.watch(reviewRepoProvider);
+                  final schedule = reviewRepo.get(widget.poemId);
+                  if (schedule == null || !schedule.isCompleted) {
+                    return const SizedBox.shrink();
+                  }
+                  final history =
+                      PoemReviewHistory.decode(schedule.historyJson);
+                  return AppTile(
+                    icon: Icons.restart_alt,
+                    iconColor: theme.colorScheme.tertiary,
+                    title: '开启新一轮复习',
+                    subtitle:
+                        '已完成五轮；保留历史，重新安排复习${history == null ? '' : '（历史 ${history.cycles.length + 1} 个周期）'}',
+                    onTap: () async {
+                      try {
+                        await reviewRepo.restartSchedule(widget.poemId);
+                        if (!mounted || !context.mounted) return;
+                        ref.invalidate(reviewRepoProvider);
+                        ref.invalidate(dueReviewCountProvider);
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('新复习周期已开启，今天即可开始')),
+                        );
+                      } on Object catch (error, stack) {
+                        AppLogger.e(
+                          '复习重开失败',
+                          tag: 'PoemDetail',
+                          error: error,
+                          stackTrace: stack,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('开启失败，请重试；历史记录已保留'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  );
+                },
+              ),
               // 学习状态
               if (progress != null) ...[
                 const SizedBox(height: SpacingTokens.md),

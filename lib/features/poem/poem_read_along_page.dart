@@ -11,6 +11,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:poemath/features/poem/poem_answer_difference.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/services/sound_service.dart';
@@ -780,12 +781,39 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     );
   }
 
+  Widget _buildScoreExplanation(ThemeData theme) => ColoredCard(
+        color: theme.colorScheme.tertiary,
+        child: const Text(
+          '参考分按识别文字与原文的顺序匹配比例计算，忽略标点和空格；多读的字不一定扣分。它不评价音准、声调或发音。语音识别可能出错，请核对识别文字和差异，可重录或请家长核对。',
+        ),
+      );
+
+  Future<void> _showParentCheck() => showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('家长核对'),
+          content: const SingleChildScrollView(
+            child: Text(
+              '请对照原文和系统识别文字，结合孩子实际朗读确认是否读对。识别错误不等于读错；本页不评音准或声调。核对后可返回重录，本参考分不替代家长判断。',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('已核对'),
+            ),
+          ],
+        ),
+      );
+
   Widget _buildPracticeView(ThemeData theme) {
     return AnimatedPageBody(
       padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.lg),
       children: [
         const SizedBox(height: SpacingTokens.xl),
 
+        _buildScoreExplanation(theme),
+        const SizedBox(height: SpacingTokens.md),
         // 进度条
         _buildProgressBar(theme),
         const SizedBox(height: SpacingTokens.xl),
@@ -948,6 +976,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
     return Column(
       children: [
+        const Text('内容匹配参考分'),
         // 分数显示
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -959,7 +988,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
             ),
             const SizedBox(width: SpacingTokens.sm),
             Text(
-              '$percent分',
+              '$percent%',
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: _scoreColor(score, theme),
@@ -993,7 +1022,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '识别结果',
+                  '系统识别到的文字',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -1006,6 +1035,17 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
               ],
             ),
           ),
+        const SizedBox(height: SpacingTokens.sm),
+        PoemAnswerDifference(
+          expected: _lines[_currentLine],
+          answer: _recognizedTexts.isEmpty ? '' : _recognizedTexts.last,
+          answerLabel: '系统识别',
+        ),
+        TextButton.icon(
+          onPressed: _showParentCheck,
+          icon: const Icon(Icons.people_outline),
+          label: const Text('请家长核对'),
+        ),
       ],
     );
   }
@@ -1201,9 +1241,13 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
               .fadeIn(duration: 300.ms),
           const SizedBox(height: SpacingTokens.md),
 
+          const Text('内容匹配参考分 · 各句的平均值'),
+          const Text('上方星形为参考评级，不计入累计星星'),
+          const SizedBox(height: SpacingTokens.sm),
+          _buildScoreExplanation(theme),
           // 总分
           Text(
-            '$percent 分',
+            '$percent%',
             style: theme.textTheme.displaySmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: _scoreColor(overall, theme),
@@ -1227,7 +1271,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '各句得分',
+                  '各句文字匹配',
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w600,
@@ -1241,29 +1285,19 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                     padding: const EdgeInsets.only(
                       bottom: SpacingTokens.sm,
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          _scoreIconData(score),
-                          size: 18,
-                          color: _scoreColor(score, theme),
-                        ),
-                        const SizedBox(width: SpacingTokens.sm),
-                        Expanded(
-                          child: Text(
-                            _lines[i],
-                            style: theme.textTheme.bodyMedium,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: SpacingTokens.sm),
                         Text(
-                          '$pct分',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: _scoreColor(score, theme),
-                          ),
+                          '第 ${i + 1} 句 · $pct% 文字匹配',
+                          style: theme.textTheme.titleSmall,
+                        ),
+                        PoemAnswerDifference(
+                          expected: _lines[i],
+                          answer: i < _recognizedTexts.length
+                              ? _recognizedTexts[i]
+                              : '',
+                          answerLabel: '系统识别',
                         ),
                       ],
                     ),
@@ -1274,10 +1308,17 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
           ),
           const SizedBox(height: SpacingTokens.lg),
 
+          TextButton.icon(
+            onPressed: _showParentCheck,
+            icon: const Icon(Icons.people_outline),
+            label: const Text('请家长核对'),
+          ),
           // 操作按钮
           if (_settlementError != null) ...[
-            Text(_settlementError!,
-                style: TextStyle(color: theme.colorScheme.error),),
+            Text(
+              _settlementError!,
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
             TextButton(onPressed: _settleCompletion, child: const Text('重试保存')),
           ],
           Row(

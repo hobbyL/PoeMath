@@ -226,11 +226,11 @@ void main() {
         .whereType<String>()
         .toList();
     expect(
-      find.text('100分', skipOffstage: false),
+      find.text('100%', skipOffstage: false),
       findsOneWidget,
       reason: '$renderedTexts',
     );
-    expect(find.text('识别结果', skipOffstage: false), findsOneWidget);
+    expect(find.text('系统识别到的文字', skipOffstage: false), findsOneWidget);
     expect(find.text('床前明月光', skipOffstage: false), findsOneWidget);
   });
 

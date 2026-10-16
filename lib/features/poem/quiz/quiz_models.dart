@@ -25,6 +25,8 @@ class QuizQuestion {
     required this.promptLine,
     required this.correctAnswer,
     this.options,
+    this.sourceLineIndex,
+    this.sourceLineText,
   });
 
   /// 题型。
@@ -41,6 +43,10 @@ class QuizQuestion {
 
   /// 选择题选项（含正确答案，已打乱），填空题为 null。
   final List<String>? options;
+
+  /// 原诗行定位；作者/朝代题没有诗句作答，不生成错句。
+  final int? sourceLineIndex;
+  final String? sourceLineText;
 }
 
 /// 一次测试会话。
@@ -49,8 +55,8 @@ class QuizSession {
     required this.poemId,
     required this.type,
     required this.questions,
-  }) : userAnswers = List.filled(questions.length, null),
-       _stopwatch = Stopwatch()..start();
+  })  : userAnswers = List.filled(questions.length, null),
+        _stopwatch = Stopwatch()..start();
 
   final String poemId;
   final QuizType type;
@@ -119,8 +125,6 @@ class QuizSession {
 
   /// 去标点、空格后比较。
   static String _normalize(String s) {
-    return s
-        .replaceAll(RegExp('[\\s\\p{P}]', unicode: true), '')
-        .trim();
+    return s.replaceAll(RegExp('[\\s\\p{P}]', unicode: true), '').trim();
   }
 }

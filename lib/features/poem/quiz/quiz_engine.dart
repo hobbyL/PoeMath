@@ -39,6 +39,8 @@ class QuizEngine {
         contextLine: pair.context,
         promptLine: blankResult.prompt,
         correctAnswer: blankResult.answer,
+        sourceLineIndex: pair.lineIndex,
+        sourceLineText: pair.line,
       );
     }).toList();
   }
@@ -84,6 +86,8 @@ class QuizEngine {
         promptLine: pair.context,
         correctAnswer: pair.line,
         options: options,
+        sourceLineIndex: pair.lineIndex,
+        sourceLineText: pair.line,
       );
     }).toList();
   }
@@ -204,7 +208,8 @@ class QuizEngine {
     required Random random,
     required String fallbackPrefix,
   }) {
-    final pool = candidates.where((c) => c != correct).toList()..shuffle(random);
+    final pool = candidates.where((c) => c != correct).toList()
+      ..shuffle(random);
     final result = pool.take(count).toList();
 
     // 不足时补充占位项
@@ -274,12 +279,16 @@ class QuizEngine {
   static List<_LinePair> _buildPairs(List<String> lines) {
     final pairs = <_LinePair>[];
     for (var i = 0; i < lines.length - 1; i += 2) {
-      pairs.add(_LinePair(context: lines[i], line: lines[i + 1]));
+      pairs.add(
+          _LinePair(context: lines[i], line: lines[i + 1], lineIndex: i + 1),);
     }
     // 如果行数为奇数，最后一行用倒数第二行作为 context
     if (lines.length.isOdd && lines.length >= 3) {
       pairs.add(
-        _LinePair(context: lines[lines.length - 2], line: lines.last),
+        _LinePair(
+            context: lines[lines.length - 2],
+            line: lines.last,
+            lineIndex: lines.length - 1,),
       );
     }
     return pairs;
@@ -337,7 +346,10 @@ class QuizEngine {
 
 /// 上下句配对。
 class _LinePair {
-  const _LinePair({required this.context, required this.line});
+  const _LinePair(
+      {required this.context, required this.line, required this.lineIndex,});
+
+  final int lineIndex;
 
   /// 上句（题干/上下文）。
   final String context;

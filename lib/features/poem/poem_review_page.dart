@@ -256,9 +256,10 @@ class PoemReviewPage extends ConsumerWidget {
 
     // 复习轮次标签
     final roundLabel = '第 ${schedule.currentRound + 1} 轮';
-    final intervalLabel = schedule.currentRound < ReviewSchedule.intervals.length
-        ? '${ReviewSchedule.intervals[schedule.currentRound]} 天'
-        : '已完成';
+    final intervalLabel =
+        schedule.currentRound < ReviewSchedule.intervals.length
+            ? '${ReviewSchedule.intervals[schedule.currentRound]} 天'
+            : '已完成';
 
     // 距离下次复习天数
     final now = DateTime.now();
@@ -283,7 +284,8 @@ class PoemReviewPage extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
       child: AppTile(
         icon: isDue ? Icons.notifications_active : Icons.schedule,
-        iconColor: isDue ? theme.colorScheme.primary : theme.colorScheme.secondary,
+        iconColor:
+            isDue ? theme.colorScheme.primary : theme.colorScheme.secondary,
         title: poem.title,
         subtitle: '$roundLabel · 间隔 $intervalLabel · $timeLabel',
         trailing: isDue
@@ -427,6 +429,8 @@ class PoemReviewPage extends ConsumerWidget {
     ReviewSchedule schedule,
     String route,
   ) async {
+    final reviewActivityId =
+        'review:${schedule.poemId}:${DateTime.now().microsecondsSinceEpoch}';
     final result = await context.push<PoemPracticeResult>(route);
 
     // 侧信道纪律：读取即清空，只消费属于本次练习的分数。
@@ -443,7 +447,11 @@ class PoemReviewPage extends ConsumerWidget {
         // 未达及格线：有得分才落库（仓储内部不推进、明天重测）；
         // 无得分不写任何状态。返回 false 中断批量循环（现状语义不变）。
         if (score != null) {
-          await reviewRepo.completeReview(schedule.poemId, score: score);
+          await reviewRepo.completeReview(
+            schedule.poemId,
+            score: score,
+            activityId: reviewActivityId,
+          );
         }
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -458,7 +466,11 @@ class PoemReviewPage extends ConsumerWidget {
         return false;
       }
       // 测试通过：带得分自适应推进（>=0.8 推进轮次）。
-      await reviewRepo.completeReview(schedule.poemId, score: score);
+      await reviewRepo.completeReview(
+        schedule.poemId,
+        score: score,
+        activityId: reviewActivityId,
+      );
     } else if (result?.completesReview != true) {
       return false;
     }
@@ -468,7 +480,10 @@ class PoemReviewPage extends ConsumerWidget {
       final reviewRepo = ref.read(reviewRepoProvider);
       if (!isQuizOutcome) {
         // 背诵完成：无得分路径，走原有推进。
-        await reviewRepo.completeReview(schedule.poemId);
+        await reviewRepo.completeReview(
+          schedule.poemId,
+          activityId: reviewActivityId,
+        );
       }
 
       // 如果复习全部完成，将状态更新为「已掌握」
@@ -476,10 +491,9 @@ class PoemReviewPage extends ConsumerWidget {
       if (nextSchedule != null && nextSchedule.isCompleted) {
         final progressRepo = ref.read(poemProgressRepoProvider);
         final progress = progressRepo.get(schedule.poemId);
-        if (progress != null &&
-            progress.status != LearningStatus.mastered) {
-          progress.status = LearningStatus.mastered;
-          await progressRepo.save(progress);
+        if (progress != null && progress.status != LearningStatus.mastered) {
+          await progressRepo
+              .save(progress.copyWith(status: LearningStatus.mastered));
 
           // 同步更新 UserStats 的已掌握数
           final statsRepo = ref.read(userStatsRepoProvider);

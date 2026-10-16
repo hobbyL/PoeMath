@@ -1,6 +1,7 @@
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/review_schedule.dart';
+import 'package:poemath/domain/poem_review_history.dart';
 
 /// 固定作品身份。旧链接、用户记录和旧备份仍可使用别名。
 class PoemIdentity {
@@ -29,6 +30,7 @@ class PoemIdentity {
         'lastStudiedAt': p.lastStudiedAt?.toIso8601String(),
         'firstStudiedAt': p.firstStudiedAt?.toIso8601String(),
         'stars': p.stars,
+        'firstMasteredAt': p.firstMasteredAt?.toIso8601String(),
       };
 
   static PoemProgress progress(Map<String, dynamic> m) => PoemProgress(
@@ -40,6 +42,7 @@ class PoemIdentity {
         stars: m['stars'] as int? ?? 0,
         firstStudiedAt: _date(m['firstStudiedAt']),
         lastStudiedAt: _date(m['lastStudiedAt']),
+        firstMasteredAt: _date(m['firstMasteredAt']),
       );
 
   static Map<String, dynamic> favoriteMap(PoemFavorite f) => {
@@ -62,6 +65,7 @@ class PoemIdentity {
         'lastReviewedAt': r.lastReviewedAt?.toIso8601String(),
         'isCompleted': r.isCompleted,
         'lastScore': r.lastScore,
+        'historyJson': r.historyJson,
       };
 
   static ReviewSchedule review(Map<String, dynamic> m) => ReviewSchedule(
@@ -72,6 +76,7 @@ class PoemIdentity {
         lastReviewedAt: _date(m['lastReviewedAt']),
         isCompleted: m['isCompleted'] as bool? ?? false,
         lastScore: (m['lastScore'] as num?)?.toDouble(),
+        historyJson: m['historyJson'] as String?,
       );
 
   /// 纯合并：输入是迁移前快照，输出可安全重复写入。
@@ -101,10 +106,19 @@ class PoemIdentity {
         result['firstStudiedAt'] =
             _extremeDate(group, 'firstStudiedAt', earliest: true);
         result['lastStudiedAt'] = _extremeDate(group, 'lastStudiedAt');
+        result['firstMasteredAt'] =
+            _extremeDate(group, 'firstMasteredAt', earliest: true);
       } else if (kind == 'favorite') {
         result['createdAt'] = _extremeDate(group, 'createdAt', earliest: true);
       } else if (kind == 'review') {
         int compare(Map<String, dynamic> a, Map<String, dynamic> b) {
+          final aStarted = PoemReviewHistory.decode(a['historyJson'] as String?)
+              ?.cycleStartedAt;
+          final bStarted = PoemReviewHistory.decode(b['historyJson'] as String?)
+              ?.cycleStartedAt;
+          final cycle =
+              (aStarted ?? DateTime(1)).compareTo(bStarted ?? DateTime(1));
+          if (cycle != 0) return cycle;
           final completed = (a['isCompleted'] == true ? 1 : 0)
               .compareTo(b['isCompleted'] == true ? 1 : 0);
           if (completed != 0) return completed;
@@ -119,6 +133,20 @@ class PoemIdentity {
           if (compare(candidate, result) > 0) {
             result = Map<String, dynamic>.from(candidate);
           }
+        }
+        final winnerHistory =
+            PoemReviewHistory.decode(result['historyJson'] as String?);
+        final allHistories = group
+            .map(
+              (row) => PoemReviewHistory.decode(row['historyJson'] as String?),
+            )
+            .whereType<PoemReviewHistory>()
+            .toList();
+        if (allHistories.isNotEmpty) {
+          result['historyJson'] =
+              (winnerHistory ?? const PoemReviewHistory(cycleId: 'legacy'))
+                  .merge(allHistories)
+                  .encode();
         }
       }
       result['poemId'] = id;

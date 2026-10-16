@@ -19,6 +19,7 @@ import 'package:poemath/data/repositories/learning_activity_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/domain/poem_practice_details.dart';
 import '../../helpers/hive_test_helper.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/poem_dictation_page.dart';
@@ -37,23 +38,32 @@ class _Progress extends PoemProgressRepository {
   Future<PoemProgress> recordStudy(String poemId) async {
     studies++;
     return PoemProgress(
-        poemId: poemId, profileId: 'default', studyCount: studies,);
+      poemId: poemId,
+      profileId: 'default',
+      studyCount: studies,
+    );
   }
 }
 
 class _Activities extends LearningActivityRepository {
   final types = <LearningActivityType>[];
+  String? details;
+  int? stars;
   @override
-  Future<bool> record(
-      {required String id,
-      required LearningActivityType activityType,
-      required int totalItems,
-      required int successfulItems,
-      required int starsEarned,
-      required int durationSeconds,
-      required DateTime completedAt,
-      String? poemId,}) async {
+  Future<bool> record({
+    required String id,
+    required LearningActivityType activityType,
+    required int totalItems,
+    required int successfulItems,
+    required int starsEarned,
+    required int durationSeconds,
+    required DateTime completedAt,
+    String? poemId,
+    String? detailsJson,
+  }) async {
     types.add(activityType);
+    details = detailsJson;
+    stars = starsEarned;
     return true;
   }
 }
@@ -67,13 +77,14 @@ class _Stats extends UserStatsRepository {
 
 class _CheckIn extends CheckInRepository {
   @override
-  Future<void> updateToday(
-      {String? activityId,
-      int? addPoems,
-      int? addMathTotal,
-      int? addMathCorrect,
-      int? addStars,
-      int? addDuration,}) async {}
+  Future<void> updateToday({
+    String? activityId,
+    int? addPoems,
+    int? addMathTotal,
+    int? addMathCorrect,
+    int? addStars,
+    int? addDuration,
+  }) async {}
 }
 
 const _poemId = 'dictation-test-poem';
@@ -119,6 +130,7 @@ void main() {
   Future<ProviderContainer> pumpPage(
     WidgetTester tester, {
     Poem? poem,
+    List<int>? targetLineIndices,
   }) async {
     final container = ProviderContainer(
       overrides: [
@@ -135,7 +147,12 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const MaterialApp(home: PoemDictationPage(poemId: _poemId)),
+        child: MaterialApp(
+          home: PoemDictationPage(
+            poemId: _poemId,
+            targetLineIndices: targetLineIndices,
+          ),
+        ),
       ),
     );
     await tester.pump();
@@ -167,6 +184,30 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
   }
+
+  testWidgets('错句专项只练目标句，保存实际作答且无全诗奖励或复习结果', (tester) async {
+    final container = await pumpPage(tester, targetLineIndices: [1]);
+    await pickChars(tester, '疑是地上霜');
+    await tester.pump(const Duration(milliseconds: 950));
+    await tester.pump();
+    expect(activities.stars, 0);
+    final details = PoemPracticeDetails.decode(activities.details)!;
+    expect(details.targeted, isTrue);
+    expect(details.lines.single.lineIndex, 1);
+    expect(details.lines.single.answer, '疑是地上霜');
+    expect(details.lines.single.passed, isTrue);
+    expect(find.textContaining('全诗掌握和复习轮次保持原值'), findsOneWidget);
+    await tester.ensureVisible(find.text('完成'));
+    await tester.tap(find.text('完成'));
+    await tester.pump();
+    expect(container.read(lastPracticeScoreProvider), isNull);
+    expect(
+      PoemPracticeResult.targetedPracticeCompleted.completesReview,
+      isFalse,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
+  });
 
   testWidgets('进入页面清空侧信道陈旧分数', (tester) async {
     // 先预置陈旧分数，再挂载页面（_initPoem 在 postFrame 内清空）。

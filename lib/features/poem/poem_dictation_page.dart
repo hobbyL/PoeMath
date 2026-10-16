@@ -29,6 +29,8 @@ import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/domain/poem_practice_details.dart';
+import 'package:poemath/features/poem/poem_answer_difference.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 
 /// 中文标点集合（不作为听写目标），口径与背诵页一致。
@@ -96,7 +98,13 @@ const _fallbackPool = [
 const double _kPassLine = 0.8;
 
 class PoemDictationPage extends ConsumerStatefulWidget {
-  const PoemDictationPage({super.key, required this.poemId});
+  const PoemDictationPage({
+    super.key,
+    required this.poemId,
+    this.targetLineIndices,
+  });
+
+  final List<int>? targetLineIndices;
 
   final String poemId;
 
@@ -108,6 +116,10 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
   // ── 诗句数据 ──
   List<String> _lines = [];
   final List<bool> _lineResults = [];
+  List<int> _sourceIndices = [];
+  final List<PoemLineResult> _snapshots = [];
+  String? _detailsJson;
+  bool get _targeted => widget.targetLineIndices != null;
 
   // ── 关卡状态 ──
   int _currentLineIndex = 0;
@@ -163,11 +175,14 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
     final poem = ref.read(poemByIdProvider(widget.poemId));
     if (poem == null) return;
 
-    final lines = poem.content
-        .split('\n')
-        .map((l) => l.trim())
-        .where((l) => l.isNotEmpty)
-        .toList();
+    final allLines = poemPracticeLines(poem.content);
+    _sourceIndices = [
+      for (var i = 0; i < allLines.length; i++)
+        if (widget.targetLineIndices == null ||
+            widget.targetLineIndices!.contains(i))
+          i,
+    ];
+    final lines = _sourceIndices.map((i) => allLines[i]).toList();
 
     setState(() {
       _lines = lines;
@@ -341,12 +356,22 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
     final isCorrect =
         answer.length == target.length && _listEquals(answer, target);
 
+    _snapshots.add(
+      PoemLineResult(
+        lineIndex: _sourceIndices[_currentLineIndex],
+        lineText: _lines[_currentLineIndex],
+        expected: target.join(),
+        answer: _useTyping ? _typeController.text : answer.join(),
+        passed: isCorrect,
+      ),
+    );
     _lineResults.add(isCorrect);
     setState(() => _judging = true);
 
     // 反馈期后推进下一句；末句则出结果。
+    final activityId = _activityId;
     Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
+      if (!mounted || activityId != _activityId) return;
       _setupLine(_currentLineIndex + 1);
     });
   }
@@ -374,11 +399,19 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
     final activityId = _activityId;
     final total = _lineResults.length;
     final successful = _lineResults.where((r) => r).length;
-    final stars = LearningRewardCalculator.calculateStars(
-      activityType: LearningActivityType.poemDictation,
-      totalItems: total,
-      successfulItems: successful,
-    );
+    final stars = _targeted
+        ? 0
+        : LearningRewardCalculator.calculateStars(
+            activityType: LearningActivityType.poemDictation,
+            totalItems: total,
+            successfulItems: successful,
+          );
+    final detailsJson = _detailsJson ??= PoemPracticeDetails(
+      mode: 'dictation',
+      targeted: _targeted,
+      score: _score,
+      lines: List.of(_snapshots),
+    ).encode();
     final progress = ref.read(poemProgressRepoProvider);
     final stats = ref.read(userStatsRepoProvider);
     final activities = ref.read(learningActivityRepositoryProvider);
@@ -398,6 +431,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
         starsEarned: stars,
         durationSeconds: duration,
         completedAt: completedAt,
+        detailsJson: detailsJson,
       );
       if (stars > 0) await stats.addStars(stars, activityId: activityId);
       await checkIn.updateToday(
@@ -434,6 +468,11 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
     _allowResultPop = true;
     // 侧信道纪律：pop 前写入本次最终得分，复习页读取后自适应推进。
     final score = _score;
+    if (_targeted) {
+      ref.read(lastPracticeScoreProvider.notifier).state = null;
+      Navigator.of(context).pop(PoemPracticeResult.targetedPracticeCompleted);
+      return;
+    }
     ref.read(lastPracticeScoreProvider.notifier).state = score;
     final result = score >= _kPassLine
         ? PoemPracticeResult.quizPassed
@@ -451,6 +490,8 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
       _progressRecorded = false;
       _settlementError = null;
       _lineResults.clear();
+      _snapshots.clear();
+      _detailsJson = null;
       _isComplete = false;
       _allowResultPop = false;
       _setupLine(0);
@@ -796,38 +837,15 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
                 ),
               ),
               const SizedBox(height: SpacingTokens.md),
-
-              // 逐句对错清单；错句附原文
-              ..._lineResults.asMap().entries.map((entry) {
-                final i = entry.key;
-                final ok = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-                  child: Row(
-                    children: [
-                      Icon(
-                        ok ? Icons.check_circle : Icons.cancel,
-                        size: 18,
-                        color: ok
-                            ? theme.semantic.success
-                            : theme.colorScheme.error,
-                      ),
-                      const SizedBox(width: SpacingTokens.sm),
-                      Expanded(
-                        child: Text(
-                          '第 ${i + 1} 句${ok ? '' : '：${_lines[i]}'}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: ok
-                                ? theme.colorScheme.onSurface
-                                : theme.colorScheme.error,
-                          ),
-                        ),
-                      ),
-                    ],
+              if (_targeted) const Text('错句专项完成，仅记录练习；全诗掌握和复习轮次保持原值，不发累计星星。'),
+              for (final snapshot in _snapshots)
+                Padding(
+                  padding: const EdgeInsets.only(top: SpacingTokens.sm),
+                  child: PoemAnswerDifference(
+                    expected: snapshot.expected,
+                    answer: snapshot.answer,
                   ),
-                );
-              }),
-
+                ),
               const SizedBox(height: SpacingTokens.lg),
               if (_settlementError != null) ...[
                 Text(

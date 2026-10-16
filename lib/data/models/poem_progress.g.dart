@@ -25,13 +25,14 @@ class PoemProgressAdapter extends TypeAdapter<PoemProgress> {
       lastStudiedAt: fields[5] as DateTime?,
       firstStudiedAt: fields[6] as DateTime?,
       stars: fields[7] as int,
+      firstMasteredAt: fields[8] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, PoemProgress obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.poemId)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class PoemProgressAdapter extends TypeAdapter<PoemProgress> {
       ..writeByte(6)
       ..write(obj.firstStudiedAt)
       ..writeByte(7)
-      ..write(obj.stars);
+      ..write(obj.stars)
+      ..writeByte(8)
+      ..write(obj.firstMasteredAt);
   }
 
   @override

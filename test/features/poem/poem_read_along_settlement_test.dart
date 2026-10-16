@@ -119,6 +119,7 @@ class _CountingActivityRepository extends LearningActivityRepository {
     required int durationSeconds,
     required DateTime completedAt,
     String? poemId,
+    String? detailsJson,
   }) async {
     recordCalls++;
     recorded.add(
@@ -232,14 +233,14 @@ void main() {
 
     // 第一句：满分。
     await recordOneLine(tester);
-    expect(find.text('100分', skipOffstage: false), findsOneWidget);
+    expect(find.text('100%', skipOffstage: false), findsOneWidget);
     await tester.tap(find.text('下一句'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
     // 第二句：0 分。
     await recordOneLine(tester);
-    expect(find.text('0分', skipOffstage: false), findsOneWidget);
+    expect(find.text('0%', skipOffstage: false), findsOneWidget);
 
     // 「查看结果」连点两次：幂等，只结算一次。
     final done = find.text('查看结果');
@@ -268,7 +269,17 @@ void main() {
     expect(statsRepo.starsAdded, 0);
 
     // 完成视图可见。
-    expect(find.text('各句得分'), findsOneWidget);
+    expect(find.text('各句文字匹配'), findsOneWidget);
+    expect(find.textContaining('它不评价音准、声调或发音'), findsOneWidget);
+    expect(find.text('系统识别：床前明月光'), findsNWidgets(2));
+    expect(find.textContaining('未匹配原文字：疑是地上霜'), findsOneWidget);
+    await tester.ensureVisible(find.text('请家长核对'));
+    await tester.tap(find.text('请家长核对'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('家长核对'), findsOneWidget);
+    expect(find.textContaining('识别错误不等于读错'), findsOneWidget);
+    await tester.tap(find.text('已核对'));
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));
@@ -300,6 +311,7 @@ void main() {
     expect(activityRepo.recordCalls, 1);
 
     // 再练一次 → 重新完成 → 新 activityId，允许第二次结算。
+    await tester.ensureVisible(find.text('再练一次'));
     await tester.tap(find.text('再练一次'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));

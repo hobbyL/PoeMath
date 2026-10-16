@@ -35,6 +35,9 @@ class ReviewSchedule extends HiveObject {
   @HiveField(6)
   double? lastScore;
 
+  @HiveField(7)
+  final String? historyJson;
+
   ReviewSchedule({
     required this.poemId,
     required this.profileId,
@@ -43,6 +46,7 @@ class ReviewSchedule extends HiveObject {
     this.lastReviewedAt,
     this.isCompleted = false,
     this.lastScore,
+    this.historyJson,
   });
 
   /// 艾宾浩斯间隔天数：1, 3, 7, 14, 30

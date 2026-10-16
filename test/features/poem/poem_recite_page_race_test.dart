@@ -26,6 +26,7 @@ import 'package:poemath/data/repositories/poem_progress_repository.dart';
 import 'package:poemath/data/repositories/poem_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/domain/poem_practice_details.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
@@ -175,6 +176,7 @@ class _CountingActivityRepository extends LearningActivityRepository {
     required int durationSeconds,
     required DateTime completedAt,
     String? poemId,
+    String? detailsJson,
   }) async {
     recordCalls++;
     recorded.add(
@@ -188,6 +190,7 @@ class _CountingActivityRepository extends LearningActivityRepository {
         starsEarned: starsEarned,
         durationSeconds: durationSeconds,
         completedAt: completedAt,
+        detailsJson: detailsJson,
       ),
     );
     return true;
@@ -354,6 +357,11 @@ void main() {
     expect(progress.recordCalls, 0);
     expect(progress.studyCalls, 1);
     expect(activities.recorded.single.starsEarned, 0);
+    final details =
+        PoemPracticeDetails.decode(activities.recorded.single.detailsJson)!;
+    expect(details.rawAnswer, '错');
+    expect(details.lines.first.answer, '错');
+    expect(details.lines.first.passed, isFalse);
     expect(find.text('已记录练习，达到 80% 后通过'), findsOneWidget);
   });
 
@@ -385,6 +393,7 @@ void main() {
     expect(activities.recorded.last.id, first.id);
     expect(activities.recorded.last.completedAt, first.completedAt);
     expect(activities.recorded.last.durationSeconds, first.durationSeconds);
+    expect(activities.recorded.last.detailsJson, first.detailsJson);
     expect(checkIn.updateCalls, 1);
     expect(find.text('太棒了！完美背诵！'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -596,11 +605,13 @@ void main() {
       expect(find.text('1/1'), findsOneWidget);
       expect(find.text('床'), findsWidgets);
       expect(
-          tester
-              .widget<LinearProgressIndicator>(
-                  find.byType(LinearProgressIndicator),)
-              .value,
-          0,);
+        tester
+            .widget<LinearProgressIndicator>(
+              find.byType(LinearProgressIndicator),
+            )
+            .value,
+        0,
+      );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });

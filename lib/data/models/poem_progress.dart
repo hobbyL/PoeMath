@@ -54,6 +54,10 @@ class PoemProgress extends HiveObject {
   @HiveField(7)
   int stars;
 
+  /// 首次真正达到已掌握的时间；旧记录未知则保持 null。
+  @HiveField(8)
+  DateTime? firstMasteredAt;
+
   PoemProgress({
     required this.poemId,
     required this.profileId,
@@ -63,6 +67,7 @@ class PoemProgress extends HiveObject {
     this.lastStudiedAt,
     this.firstStudiedAt,
     this.stars = 0,
+    this.firstMasteredAt,
   });
 
   /// 修改后再保存，避免 IO 失败时污染 Hive 内存中的旧对象。
@@ -73,6 +78,7 @@ class PoemProgress extends HiveObject {
     DateTime? lastStudiedAt,
     DateTime? firstStudiedAt,
     int? stars,
+    DateTime? firstMasteredAt,
   }) =>
       PoemProgress(
         poemId: poemId,
@@ -83,5 +89,6 @@ class PoemProgress extends HiveObject {
         lastStudiedAt: lastStudiedAt ?? this.lastStudiedAt,
         firstStudiedAt: firstStudiedAt ?? this.firstStudiedAt,
         stars: stars ?? this.stars,
+        firstMasteredAt: firstMasteredAt ?? this.firstMasteredAt,
       );
 }
