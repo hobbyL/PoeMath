@@ -19,15 +19,19 @@ class FormulasImporter {
       final params =
           (map['params'] as List<dynamic>? ?? const <dynamic>[]).map((p) {
         final pm = p as Map<String, dynamic>;
+        if (pm.keys.any((key) => key != 'symbol' && key != 'meaning')) {
+          throw FormatException(
+              '${map['id']}: unknown formula parameter field: ${pm.keys}');
+        }
         return FormulaParam(
           symbol: pm['symbol'] as String,
           meaning: pm['meaning'] as String,
         );
       }).toList();
-      final related = (map['related_formulas'] as List<dynamic>? ??
-              const <dynamic>[])
-          .map((e) => e as String)
-          .toList();
+      final related =
+          (map['related_formulas'] as List<dynamic>? ?? const <dynamic>[])
+              .map((e) => e as String)
+              .toList();
       formulas.add(Formula(
         id: map['id'] as String,
         category: map['category'] as String,

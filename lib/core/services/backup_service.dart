@@ -10,9 +10,14 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'package:poemath/data/poem_identity.dart';
+import 'package:poemath/data/hive/migrations/poem_identity_migration.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/settings_constraints.dart';
 import 'package:poemath/data/models/achievement.dart';
+import 'package:poemath/data/models/assistant_conversation.dart';
+import 'package:poemath/data/models/assistant_message.dart';
 import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/math_mistake.dart';
@@ -155,6 +160,30 @@ class BackupService {
       'challengeRecords': _exportChallengeRecords(),
       'learningActivities': _exportLearningActivities(),
       'llmProblems': _exportLlmProblems(),
+      'conversations': [
+        for (final c in HiveBoxes.conversations.values)
+          {
+            'id': c.id,
+            'profileId': c.profileId,
+            'title': c.title,
+            'createdAt': c.createdAt.toIso8601String(),
+            'updatedAt': c.updatedAt.toIso8601String(),
+            'contextBaseIndex': c.contextBaseIndex,
+          },
+      ],
+      'messages': [
+        for (final m in HiveBoxes.messages.values)
+          {
+            'id': m.id,
+            'profileId': m.profileId,
+            'conversationId': m.conversationId,
+            'role': m.role.name,
+            'content': m.content,
+            'createdAt': m.createdAt.toIso8601String(),
+            'toolName': m.toolName,
+            'toolCallId': m.toolCallId,
+          },
+      ],
       'activitySettlements': ActivitySettlementLedger.completedKeys,
       'settings': _exportSettings(),
     };
@@ -193,6 +222,16 @@ class BackupService {
         // 中找回 key 的归属配置，防止导出后本机切换 active 导致 key 写
         // 进错误槽位。只进加密凭据节，明文备份任何位置不得出现。
         payload[kCredKeyLlmApiKeyHint] = _activeLlmKeyHint();
+      }
+      final providerKeys = <String, String>{};
+      for (final config in LlmProviderConfig.decodeList(
+        HiveBoxes.settings.get('llm_providers') as String?,
+      )) {
+        final key = await _secureStore.readLlmApiKeyFor(config.id);
+        if (key != null && key.isNotEmpty) providerKeys[config.id] = key;
+      }
+      if (providerKeys.isNotEmpty) {
+        payload[kCredKeyLlmProviderKeys] = jsonEncode(providerKeys);
       }
       if (payload.isEmpty) return null;
       return await encryptCredentials(payload, normalized);
@@ -377,8 +416,8 @@ class BackupService {
   /// 备份含 `credentials` 节时：口令留空跳过凭据、口令错误在写入前
   /// 抛 [FormatException]，均不影响其余数据；口令正确则在末尾把凭据
   /// 写入安全存储。
-  /// 恢复失败时自动回滚到恢复前的数据状态（回滚只还原 Hive 数据，
-  /// 不触碰安全存储）。
+  /// 恢复失败时分别补偿 Hive 数据、设置键的存在状态及已写入凭据。
+  /// 补偿失败会通过 [BackupRestoreException.rollbackFailed] 显式报告。
   Future<int> restoreFromJson(String jsonString, {String? passphrase}) async {
     final data = _decodeAndValidate(jsonString);
 
@@ -391,28 +430,59 @@ class BackupService {
           data['credentials'] as Map<String, dynamic>,
           normalized,
         );
+        if (plainCredentials.containsKey(kCredKeyLlmProviderKeys)) {
+          _decodeProviderKeys(plainCredentials[kCredKeyLlmProviderKeys]!);
+        }
       }
     }
 
     // 恢复前先快照当前数据（不含凭据节），失败时用于回滚
     final snapshot = await exportToJson();
+    final settingsSnapshot = <String, dynamic>{
+      for (final key in _settingsValueType.keys)
+        if (HiveBoxes.settings.containsKey(key))
+          key: HiveBoxes.settings.get(key),
+    };
+    final credentialUndo = <Future<void> Function()>[];
 
     try {
       final count = await _doRestore(data);
       if (plainCredentials != null) {
-        await _restoreCredentials(plainCredentials);
+        await _restoreCredentials(plainCredentials, undo: credentialUndo);
       }
       return count;
     } on Object catch (error, stackTrace) {
       // 恢复失败，回滚到快照
+      final rollbackErrors = <Object>[];
       try {
         final rollback = _decodeAndValidate(snapshot);
-        await _doRestore(rollback);
+        await _doRestore(rollback, canonicalize: false);
       } on Object catch (rollbackError) {
+        rollbackErrors.add(rollbackError);
+      }
+      // Hive 数据恢复失败也继续补偿设置和凭据；各存储独立尽力回滚。
+      try {
+        for (final key in _settingsValueType.keys) {
+          if (!settingsSnapshot.containsKey(key)) {
+            await HiveBoxes.settings.delete(key);
+          }
+        }
+        await HiveBoxes.settings.putAll(settingsSnapshot);
+      } on Object catch (rollbackError) {
+        rollbackErrors.add(rollbackError);
+      }
+      for (final undo in credentialUndo.reversed) {
+        try {
+          await undo();
+        } on Object catch (rollbackError) {
+          rollbackErrors.add(rollbackError);
+        }
+      }
+      if (rollbackErrors.isNotEmpty) {
         throw BackupRestoreException(
           '恢复失败，且回滚失败，请检查数据完整性',
           cause: error,
-          rollbackError: rollbackError,
+          rollbackError: rollbackErrors,
         );
       }
       Error.throwWithStackTrace(error, stackTrace);
@@ -420,17 +490,45 @@ class BackupService {
   }
 
   /// 把解密后的凭据写入安全存储（覆盖式）。
-  Future<void> _restoreCredentials(Map<String, String> credentials) async {
+  Future<void> _restoreCredentials(
+    Map<String, String> credentials, {
+    required List<Future<void> Function()> undo,
+  }) async {
     final secretId = credentials[kCredKeyTencentSecretId];
     final secretKey = credentials[kCredKeyTencentSecretKey];
     if (secretId != null && secretKey != null) {
+      final old = await _secureStore.readTencentAsrCredentials();
+      undo.add(
+        () => old == null
+            ? _secureStore.deleteTencentAsrCredentials()
+            : _secureStore.saveTencentAsrCredentials(old),
+      );
       await _secureStore.saveTencentAsrCredentials(
         TencentAsrCredentials(secretId: secretId, secretKey: secretKey),
       );
     }
     final apiKey = credentials[kCredKeyWorkerTtsApiKey];
     if (apiKey != null && apiKey.isNotEmpty) {
+      final old = await _secureStore.readWorkerTtsApiKey();
+      undo.add(
+        () => old == null
+            ? _secureStore.deleteWorkerTtsApiKey()
+            : _secureStore.saveWorkerTtsApiKey(old),
+      );
       await _secureStore.saveWorkerTtsApiKey(apiKey);
+    }
+    final providerPayload = credentials[kCredKeyLlmProviderKeys];
+    if (providerPayload != null) {
+      final keys = _decodeProviderKeys(providerPayload);
+      final ids = LlmProviderConfig.decodeList(
+        HiveBoxes.settings.get('llm_providers') as String?,
+      ).map((c) => c.id).toSet();
+      for (final entry in keys.entries) {
+        if (ids.contains(entry.key)) {
+          await _writeLlmKey(entry.key, entry.value, undo);
+        }
+      }
+      return;
     }
     // legacy 备份无 llm_api_key 字段 → null，跳过（不覆盖现有值）。
     // LLM 配置设备绑定（url/model 不随备份迁移），key 必须找到本机的
@@ -447,16 +545,39 @@ class BackupService {
       if (hint != null && hint.isNotEmpty) {
         final matchedId = _matchLlmProviderByHint(hint);
         if (matchedId != null) {
-          await _secureStore.saveLlmApiKeyFor(matchedId, llmApiKey);
+          await _writeLlmKey(matchedId, llmApiKey, undo);
         }
       } else {
         final activeId =
             HiveBoxes.settings.get('llm_active_provider_id') as String?;
         if (activeId != null && activeId.isNotEmpty) {
-          await _secureStore.saveLlmApiKeyFor(activeId, llmApiKey);
+          await _writeLlmKey(activeId, llmApiKey, undo);
         }
       }
     }
+  }
+
+  Future<void> _writeLlmKey(
+    String id,
+    String value,
+    List<Future<void> Function()> undo,
+  ) async {
+    final old = await _secureStore.readLlmApiKeyFor(id);
+    undo.add(
+      () => old == null
+          ? _secureStore.deleteLlmApiKeyFor(id)
+          : _secureStore.saveLlmApiKeyFor(id, old),
+    );
+    await _secureStore.saveLlmApiKeyFor(id, value);
+  }
+
+  static Map<String, String> _decodeProviderKeys(String raw) {
+    final value = jsonDecode(raw);
+    if (value is! Map<String, dynamic> ||
+        value.entries.any((e) => e.key.isEmpty || e.value is! String)) {
+      throw const FormatException('备份厂商凭据格式无效');
+    }
+    return value.cast<String, String>();
   }
 
   /// 在本机 llm_providers 中按 hint（host|model）匹配配置；
@@ -530,8 +651,26 @@ class BackupService {
   }
 
   /// 执行实际的数据恢复，返回记录总数。
-  Future<int> _doRestore(Map<String, dynamic> data) async {
+  Future<int> _doRestore(
+    Map<String, dynamic> data, {
+    bool canonicalize = true,
+  }) async {
     var count = 0;
+    final hasAliases = canonicalize &&
+        (data['poemProgress'] as List? ?? [])
+            .any((m) => PoemIdentity.aliases.containsKey((m as Map)['poemId']));
+
+    if (canonicalize) {
+      data = Map<String, dynamic>.from(data);
+      for (final entry in {
+        'poemProgress': 'progress',
+        'poemFavorites': 'favorite',
+        'reviewSchedules': 'review',
+      }.entries) {
+        data[entry.key] =
+            PoemIdentity.merge(entry.value, data[entry.key] as List? ?? []);
+      }
+    }
 
     count += await _restorePoemProgress(
       data['poemProgress'] as List<dynamic>? ?? [],
@@ -565,10 +704,44 @@ class BackupService {
     );
     count += await _restoreLearningActivities(
       data['learningActivities'] as List<dynamic>? ?? [],
+      canonicalize: canonicalize,
     );
     count += await _restoreLlmProblems(
       data['llmProblems'] as List<dynamic>? ?? [],
     );
+    // 旧备份未覆盖聊天数据，不能因恢复旧文件清掉本机新增会话。
+    if (data.containsKey('conversations')) {
+      await HiveBoxes.messages.clear();
+      await HiveBoxes.conversations.clear();
+      for (final m
+          in (data['conversations'] as List).cast<Map<String, dynamic>>()) {
+        final c = Conversation(
+          id: m['id'] as String,
+          profileId: m['profileId'] as String,
+          title: m['title'] as String,
+          createdAt: DateTime.parse(m['createdAt'] as String),
+          updatedAt: DateTime.parse(m['updatedAt'] as String),
+          contextBaseIndex: m['contextBaseIndex'] as int? ?? 0,
+        );
+        await HiveBoxes.conversations.put('${c.profileId}_${c.id}', c);
+        count++;
+      }
+      for (final m in (data['messages'] as List).cast<Map<String, dynamic>>()) {
+        final message = Message(
+          id: m['id'] as String,
+          profileId: m['profileId'] as String,
+          conversationId: m['conversationId'] as String,
+          role: MessageRole.values.byName(m['role'] as String),
+          content: m['content'] as String,
+          createdAt: DateTime.parse(m['createdAt'] as String),
+          toolName: m['toolName'] as String?,
+          toolCallId: m['toolCallId'] as String?,
+        );
+        await HiveBoxes.messages
+            .put('${message.profileId}_${message.id}', message);
+        count++;
+      }
+    }
     if (data.containsKey('activitySettlements')) {
       await ActivitySettlementLedger.replaceCompletedKeys(
         (data['activitySettlements'] as List<dynamic>).cast<String>(),
@@ -578,6 +751,7 @@ class BackupService {
       await _restoreSettings(data['settings'] as Map<String, dynamic>);
     }
 
+    if (hasAliases) await PoemIdentityMigration.refreshCounts();
     return count;
   }
 
@@ -1021,7 +1195,10 @@ class BackupService {
     return items.length;
   }
 
-  Future<int> _restoreLearningActivities(List<dynamic> items) async {
+  Future<int> _restoreLearningActivities(
+    List<dynamic> items, {
+    bool canonicalize = true,
+  }) async {
     final box = HiveBoxes.learningActivities;
     await box.clear();
     for (final item in items) {
@@ -1032,7 +1209,11 @@ class BackupService {
         activityType: m['activityType'] as String,
         totalItems: m['totalItems'] as int,
         successfulItems: m['successfulItems'] as int,
-        poemId: m['poemId'] as String?,
+        poemId: m['poemId'] == null
+            ? null
+            : canonicalize
+                ? PoemIdentity.canonical(m['poemId'] as String)
+                : m['poemId'] as String,
         starsEarned: m['starsEarned'] as int,
         durationSeconds: m['durationSeconds'] as int,
         completedAt: DateTime.parse(m['completedAt'] as String),
@@ -1082,6 +1263,7 @@ class BackupService {
       if (expected == null) continue; // 白名单外：跳过
       final value = _normalizeSettingValue(entry.value, expected);
       if (value == null) continue; // 类型不符：跳过
+      if (!SettingsConstraints.accepts(entry.key, value)) continue;
       normalized[entry.key] = value;
     }
 
@@ -1262,6 +1444,7 @@ class BackupService {
     _validateList(data, 'challengeRecords', _validateChallengeRecord);
     _validateList(data, 'learningActivities', _validateLearningActivity);
     _validateList(data, 'llmProblems', _validateLlmProblem);
+    _validateAssistantData(data);
     _validateUniqueLearningActivityIds(data);
     _validateActivitySettlements(data);
 
@@ -1281,6 +1464,68 @@ class BackupService {
     }
 
     return data;
+  }
+
+  void _validateAssistantData(Map<String, dynamic> data) {
+    if (!data.containsKey('conversations') && !data.containsKey('messages')) {
+      return;
+    }
+    if (!data.containsKey('conversations') || !data.containsKey('messages')) {
+      _invalidField('conversations/messages', '会话和消息须一起提供');
+    }
+    final conversations = <String, int>{};
+    final boundaries = <String, int>{};
+    _validateList(data, 'conversations', (m, path) {
+      for (final key in [
+        'id',
+        'profileId',
+        'title',
+        'createdAt',
+        'updatedAt',
+      ]) {
+        _requiredString(m, key, path);
+      }
+      _validateOptionalDate(m, 'createdAt', path);
+      _validateOptionalDate(m, 'updatedAt', path);
+      _optionalNonNegativeInt(m, 'contextBaseIndex', path);
+      final key = '${m['profileId']}_${m['id']}';
+      if (conversations.containsKey(key)) _invalidField(path, '会话 ID 重复');
+      conversations[key] = 0;
+      boundaries[key] = m['contextBaseIndex'] as int? ?? 0;
+    });
+    final ids = <String>{};
+    _validateList(data, 'messages', (m, path) {
+      for (final key in [
+        'id',
+        'profileId',
+        'conversationId',
+        'role',
+        'createdAt',
+      ]) {
+        _requiredString(m, key, path);
+      }
+      if (m['content'] is! String) _invalidField(path, '消息内容类型无效');
+      if (!MessageRole.values.map((r) => r.name).contains(m['role'])) {
+        _invalidField(path, '消息角色无效');
+      }
+      for (final key in ['toolName', 'toolCallId']) {
+        if (m[key] != null && m[key] is! String) {
+          _invalidField(path, '工具字段类型无效');
+        }
+      }
+      _validateOptionalDate(m, 'createdAt', path);
+      if (!ids.add('${m['profileId']}_${m['id']}')) {
+        _invalidField(path, '消息 ID 重复');
+      }
+      final parent = '${m['profileId']}_${m['conversationId']}';
+      if (!conversations.containsKey(parent)) _invalidField(path, '消息对应会话不存在');
+      conversations[parent] = conversations[parent]! + 1;
+    });
+    for (final entry in boundaries.entries) {
+      if (entry.value > conversations[entry.key]!) {
+        _invalidField('contextBaseIndex', '超出消息范围');
+      }
+    }
   }
 
   void _validateActivitySettlements(Map<String, dynamic> data) {
@@ -1566,6 +1811,7 @@ class BackupService {
     final requiresPoem =
         activityType == LearningActivityType.poemRecitation.name ||
             activityType == LearningActivityType.poemQuiz.name ||
+            activityType == LearningActivityType.poemDictation.name ||
             activityType == LearningActivityType.readAlong.name;
     if (requiresPoem && poemId is! String) {
       _invalidField('$path.poemId', '诗词活动必须提供诗词 ID');

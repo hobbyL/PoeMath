@@ -14,6 +14,7 @@ enum LearningActivityType {
   /// 应用题练习。**必须追加在末尾**：Hive 以字符串 `name` 持久化，
   /// 但 `typeOrNull` 之外的代码若按 `index` 取值，插入中间会错位。
   wordProblem,
+  poemDictation,
 }
 
 class LearningRewardCalculator {
@@ -40,6 +41,7 @@ class LearningRewardCalculator {
       LearningActivityType.poemRecitation =>
         _calculateRecitationStars(totalItems, successfulItems),
       LearningActivityType.poemQuiz ||
+      LearningActivityType.poemDictation ||
       LearningActivityType.mathPractice ||
       LearningActivityType.mathChallenge ||
       // 应用题与口算同口径：题量少但正确率标准不应特殊对待。

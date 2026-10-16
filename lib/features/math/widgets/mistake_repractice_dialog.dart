@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
 
 /// 错题重练对话框。
 ///
@@ -36,6 +37,8 @@ class _MistakeRepracticeDialogState extends State<MistakeRepracticeDialog> {
   // ============ 特殊键自适应（correctAnswer 是错题入库时的答案快照） ============
 
   bool get _showEllipsis => widget.correctAnswer.contains('…');
+  bool get _isCompare =>
+      const ['<', '=', '>'].contains(widget.correctAnswer.trim());
 
   bool get _showSlash => widget.correctAnswer.contains('/');
 
@@ -60,8 +63,7 @@ class _MistakeRepracticeDialogState extends State<MistakeRepracticeDialog> {
     if (_answer.isEmpty || _isCorrect != null) return;
     setState(() {
       // 键盘输出为 ASCII '-'；归一只为防御历史 Unicode 负号（U+2212）
-      final answer = _answer.replaceAll('−', '-');
-      _isCorrect = answer == widget.correctAnswer;
+      _isCorrect = MathEngine.answersEquivalent(_answer, widget.correctAnswer);
     });
   }
 
@@ -159,16 +161,31 @@ class _MistakeRepracticeDialogState extends State<MistakeRepracticeDialog> {
               ),
               const SizedBox(height: SpacingTokens.md),
               // 数字键盘（特殊键按正确答案形态自适应）
-              NumberKeypad(
-                onNumberTap: _onNumberTap,
-                onBackspace: _onBackspace,
-                onSubmit: _submit,
-                submitEnabled: _answer.isNotEmpty,
-                showEllipsis: _showEllipsis,
-                showSlash: _showSlash,
-                showDecimal: _showDecimal,
-                showNegative: _showNegative,
-              ),
+              if (_isCompare)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    for (final symbol in const ['<', '=', '>'])
+                      FilledButton(
+                        onPressed: () {
+                          _answer = symbol;
+                          _submit();
+                        },
+                        child: Text(symbol),
+                      ),
+                  ],
+                )
+              else
+                NumberKeypad(
+                  onNumberTap: _onNumberTap,
+                  onBackspace: _onBackspace,
+                  onSubmit: _submit,
+                  submitEnabled: _answer.isNotEmpty,
+                  showEllipsis: _showEllipsis,
+                  showSlash: _showSlash,
+                  showDecimal: _showDecimal,
+                  showNegative: _showNegative,
+                ),
             ],
           ],
         ),

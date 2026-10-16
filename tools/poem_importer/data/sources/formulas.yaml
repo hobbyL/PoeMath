@@ -533,7 +533,7 @@ formulas:
     formula_latex: "a+b>c"
     grade: 4
     params:
-      - {symbol: a,b,c, meaning: 三边长}
+      - {symbol: "a,b,c", meaning: 三边长}
     memory_tip: 能围成三角形，两边和必须大于第三边。
     example: 3、4、5 可以；1、2、3 不可以。
     related_formulas: [formula_triangle_sum]

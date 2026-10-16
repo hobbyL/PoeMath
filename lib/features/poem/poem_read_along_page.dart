@@ -92,6 +92,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
   /// 本次跟读会话的活动 ID（每次进入页面生成；「再练一次」换新）。
   late String _activityId;
+  DateTime? _completedAt;
 
   /// 本次会话开始时间（结算用时）。
   DateTime _startTime = DateTime.now();
@@ -99,6 +100,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   /// R6 完成结算防重入：「查看结果」连点只结算一次；
   /// 「再练一次」换新 activityId 后重置。
   bool _settlementStarted = false;
+  bool _settled = false;
+  String? _settlementError;
 
   @override
   void initState() {
@@ -616,11 +619,12 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   Future<void> _settleCompletion() async {
     if (_settlementStarted) return;
     _settlementStarted = true;
+    _settlementError = null;
 
     // 达标句阈值与音效反馈一致（>= 0.6）。
     final total = _lines.length;
     final qualified = _scores.where((s) => s >= 0.6).length;
-    final completedAt = DateTime.now();
+    final completedAt = _completedAt ??= DateTime.now();
     final duration = completedAt.difference(_startTime).inSeconds;
     // readAlong 星级由 LearningRewardCalculator 策略统一裁决
     // （当前策略明确为 0 星，见 quality-guidelines 奖励策略）。
@@ -663,6 +667,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         addStars: stars,
         addDuration: duration,
       );
+      _settled = true;
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '跟读完成结算失败',
@@ -672,11 +677,14 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       );
       // 复位防重入标记：本次未结算成功，不应阻止后续重试。
       _settlementStarted = false;
+      _settlementError = '学习记录保存失败，请重试';
+      if (mounted) setState(() {});
       return;
     }
 
     // —— 数据结算完毕；以下 UI 部分要求页面仍挂载 ——
     if (!mounted) return;
+    setState(() {});
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayPoemCountProvider);
     ref.invalidate(todayCheckInProvider);
@@ -1064,13 +1072,15 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
             Expanded(
               child: FilledButton.icon(
                 // 未配置腾讯云：按钮灰化外观，点击弹配置引导而非开始录音。
-                onPressed:
-                    _tencentConfigured ? _startRecording : _showTencentConfigDialog,
+                onPressed: _tencentConfigured
+                    ? _startRecording
+                    : _showTencentConfigDialog,
                 style: _tencentConfigured
                     ? null
                     : FilledButton.styleFrom(
-                        backgroundColor:
-                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                         foregroundColor:
                             Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -1265,11 +1275,17 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
           const SizedBox(height: SpacingTokens.lg),
 
           // 操作按钮
+          if (_settlementError != null) ...[
+            Text(_settlementError!,
+                style: TextStyle(color: theme.colorScheme.error),),
+            TextButton(onPressed: _settleCompletion, child: const Text('重试保存')),
+          ],
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
+                    if (!_settled) return;
                     setState(() {
                       _currentLine = 0;
                       _phase = _ReadAlongPhase.idle;
@@ -1277,6 +1293,9 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                       _scores.clear();
                       _startTime = DateTime.now();
                       _activityId = _newActivityId();
+                      _completedAt = null;
+                      _settled = false;
+                      _settlementError = null;
                       _settlementStarted = false; // 新一轮允许再次结算
                     });
                   },

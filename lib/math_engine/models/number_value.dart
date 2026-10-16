@@ -79,7 +79,7 @@ class Fraction {
     if (s.numerator.abs() > s.denominator) {
       // 带分数形式
       final whole = s.numerator ~/ s.denominator;
-      final remainder = (s.numerator % s.denominator).abs();
+      final remainder = s.numerator.abs() % s.denominator;
       return '$whole $remainder/${s.denominator}';
     }
     return '${s.numerator}/${s.denominator}';

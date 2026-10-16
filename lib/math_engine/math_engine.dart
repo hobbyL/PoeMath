@@ -33,6 +33,17 @@ import 'validators/constraint_checker.dart';
 class MathEngine {
   const MathEngine._();
 
+  /// UI 与生成器共享年级、难度对应的模式白名单。
+  static Set<ProblemMode> supportedModes(
+      {required int grade,
+      required String semester,
+      DifficultyLevel? difficulty,}) {
+    final base = GradePresets.get(grade, semester);
+    return Set.unmodifiable(difficulty == null
+        ? base.allowedModes
+        : DifficultyAdjuster.adjust(base, difficulty).allowedModes,);
+  }
+
   /// 生成一道题目。
   ///
   /// [grade] 年级（1-6），[semester] 学期（'上' 或 '下'）。
@@ -50,10 +61,15 @@ class MathEngine {
     if (difficulty != null) {
       config = DifficultyAdjuster.adjust(config, difficulty);
     }
-    final generator = _selectGenerator(config, random: random);
+    if (mode != null && !config.allowedModes.contains(mode)) {
+      throw ArgumentError.value(mode, 'mode', '该学期不支持此练习模式');
+    }
+    final rng = random ?? Random();
+    final generators = _buildGenerators(config, random: rng);
 
     // 约束检查，不通过则重新生成（最多 100 次）
     for (var i = 0; i < 100; i++) {
+      final generator = generators[rng.nextInt(generators.length)];
       final problem = generator.generate();
 
       // 若指定了模式，强制转换
@@ -64,9 +80,26 @@ class MathEngine {
       if (violation == null) return converted;
     }
 
-    // 兜底：不再返回未校验题目，直接生成基础加减法题
-    // （加减法是全学期基础题型，天然满足约束，且不经过模式转换）。
-    return AdditionSubtractionGen(config, random: random).generate();
+    // 兜底也必须兑现请求模式，并通过与常规生成相同的约束。
+    final fallback = AdditionSubtractionGen(config, random: rng);
+    for (var i = 0; i < 100; i++) {
+      final seed = mode == ProblemMode.chain || mode == ProblemMode.withBrackets
+          ? MathProblem(
+              operands: List.generate(3, (_) => NumberValue.fromInt(1)),
+              operators: const [Operator.add, Operator.add],
+              result: NumberValue.fromInt(3),
+              mode: mode!,
+              grade: grade,
+              bracketRange: mode == ProblemMode.withBrackets ? (0, 2) : null,
+            )
+          : fallback.generate();
+      final converted = _applyMode(seed, mode, config, fallback);
+      if (converted != null &&
+          ConstraintChecker.check(converted, config) == null) {
+        return converted;
+      }
+    }
+    throw StateError('无法生成满足所选模式和学期约束的题目');
   }
 
   /// 将题目转换为指定模式。返回 null 表示不兼容需重试。
@@ -92,15 +125,32 @@ class MathEngine {
         if (!config.allowedModes.contains(ProblemMode.vertical)) return null;
         // 竖式只支持 findResult 模式的加减乘法
         if (problem.mode != ProblemMode.findResult) return null;
-        return generator.toVertical(problem);
+        final converted = generator.toVertical(problem);
+        return converted.mode == mode ? converted : null;
       case ProblemMode.findMissing:
         if (!config.allowedModes.contains(ProblemMode.findMissing)) return null;
         // 同 compare：余数题转 findMissing 后答案变成「缺失项…余数」
         // 混合格式（如 38…2），孩子无法作答。
         if (problem.resultForm == ResultForm.withRemainder) return null;
         return generator.toFindMissing(problem);
-      default:
-        return problem;
+      case ProblemMode.findResult:
+        final value = problem.expressionResult ?? problem.result;
+        return MathProblem(
+          operands: problem.operands,
+          operators: problem.operators,
+          result: value,
+          mode: mode,
+          grade: problem.grade,
+          difficulty: problem.difficulty,
+          resultForm: problem.resultForm == ResultForm.withRemainder
+              ? ResultForm.withRemainder
+              : MathProblem.formFor(value),
+          remainder: problem.remainder,
+          bracketRange: problem.bracketRange,
+        );
+      case ProblemMode.chain:
+      case ProblemMode.withBrackets:
+        return null;
     }
   }
 
@@ -153,18 +203,19 @@ class MathEngine {
             ? null
             : MistakeDiagnoser.diagnose(
                 problem,
-                _parseAnswer(userAnswer),
+                parseAnswer(userAnswer.split('…').first) ??
+                    NumberValue.fromInt(-1),
               ),
         correctSteps: steps,
       );
     }
 
-    final userValue = _parseAnswer(userAnswer);
-    final isCorrect = _isAnswerCorrect(problem, userValue);
+    final userValue = parseAnswer(userAnswer);
+    final isCorrect = userValue != null && userValue == problem.result;
 
     return AnswerJudgement(
       isCorrect: isCorrect,
-      diagnosis: isCorrect
+      diagnosis: isCorrect || userValue == null
           ? null
           : MistakeDiagnoser.diagnose(problem, userValue),
       correctSteps: steps,
@@ -177,19 +228,6 @@ class MathEngine {
   }
 
   // ============ 内部方法 ============
-
-  static BaseGenerator _selectGenerator(
-    GradeConfig config, {
-    Random? random,
-  }) {
-    final generators = _buildGenerators(config, random: random);
-    if (generators.isEmpty) {
-      // 回退到加减法
-      return AdditionSubtractionGen(config, random: random);
-    }
-    final r = random ?? Random();
-    return generators[r.nextInt(generators.length)];
-  }
 
   static List<BaseGenerator> _buildGenerators(
     GradeConfig config, {
@@ -210,9 +248,7 @@ class MathEngine {
     }
 
     // 有余数除法（2年级下）
-    if (config.grade == 2 &&
-        config.semester == '下' &&
-        config.allowRemainder) {
+    if (config.grade == 2 && config.semester == '下' && config.allowRemainder) {
       generators.add(RemainderDivisionGen(config, random: random));
     }
 
@@ -224,8 +260,7 @@ class MathEngine {
     }
 
     // 混合运算（3年级及以上，允许乘除法时即可生成两步混合）
-    if (config.grade >= 3 &&
-        config.allowedOperators.length >= 3) {
+    if (config.grade >= 3 && config.allowedOperators.length >= 3) {
       generators.add(MixedOperationGen(config, random: random));
     }
 
@@ -267,21 +302,23 @@ class MathEngine {
     return generators;
   }
 
-  static NumberValue _parseAnswer(String answer) {
+  /// 无效输入返回 null；数字按文本精确解析，不将错误输入或舍入误差视为零。
+  static NumberValue? parseAnswer(String answer) {
     final trimmed = answer.trim();
+    if (trimmed.isEmpty || trimmed.length > 64) return null;
 
     // 带分数格式 "a b/c"（如 '1 1/2'，支持负数 '-1 1/2'）
     final spaced = trimmed.split(RegExp(r'\s+'));
     if (spaced.length == 2 && spaced[1].contains('/')) {
-      final whole = int.tryParse(spaced[0]);
+      final whole = _parseInteger(spaced[0]);
       final fracParts = spaced[1].split('/');
       if (whole != null && fracParts.length == 2) {
-        final n = int.tryParse(fracParts[0]);
-        final d = int.tryParse(fracParts[1]);
-        if (n != null && d != null && d > 0 && n >= 0) {
+        final n = _parseInteger(fracParts[0]);
+        final d = _parseInteger(fracParts[1]);
+        if (n != null && d != null && d > BigInt.zero && n >= BigInt.zero) {
           final numerator = whole.abs() * d + n;
-          return NumberValue.fromFraction(
-            whole < 0 ? -numerator : numerator,
+          return _boundedFraction(
+            spaced[0].startsWith('-') ? -numerator : numerator,
             d,
           );
         }
@@ -292,32 +329,50 @@ class MathEngine {
     if (trimmed.contains('/')) {
       final parts = trimmed.split('/');
       if (parts.length == 2) {
-        final n = int.tryParse(parts[0].trim());
-        final d = int.tryParse(parts[1].trim());
-        if (n != null && d != null && d != 0) {
-          return NumberValue.fromFraction(n, d);
+        final n = _parseInteger(parts[0].trim());
+        final d = _parseInteger(parts[1].trim());
+        if (n != null && d != null && d != BigInt.zero) {
+          return _boundedFraction(n, d);
         }
       }
     }
 
-    // 小数或整数
-    final value = double.tryParse(trimmed);
-    if (value != null) {
-      if (value == value.roundToDouble()) {
-        return NumberValue.fromInt(value.round());
-      }
-      return NumberValue.fromDouble(value);
+    final integer = _parseInteger(trimmed);
+    if (integer != null) return _boundedFraction(integer, BigInt.one);
+    if (!RegExp(r'^[+-]?(?:\d{1,8}\.\d{0,8}|\.\d{1,8})$').hasMatch(trimmed)) {
+      return null;
     }
-
-    return NumberValue.fromInt(0);
+    final parts = trimmed.replaceFirst(RegExp(r'^[+-]'), '').split('.');
+    final denominator = BigInt.from(10).pow(parts[1].length);
+    final numerator =
+        BigInt.tryParse('${parts[0].isEmpty ? '0' : parts[0]}${parts[1]}');
+    if (numerator == null) return null;
+    return _boundedFraction(
+      trimmed.startsWith('-') ? -numerator : numerator,
+      denominator,
+    );
   }
 
-  static bool _isAnswerCorrect(MathProblem problem, NumberValue userValue) {
-    if (problem.resultForm == ResultForm.fraction) {
-      return userValue.asFraction == problem.result.asFraction;
-    }
-    // 允许小数误差
-    final diff = (userValue.asDouble - problem.result.asDouble).abs();
-    return diff < 0.001;
+  static BigInt? _parseInteger(String text) =>
+      RegExp(r'^[+-]?\d+$').hasMatch(text) ? BigInt.tryParse(text) : null;
+
+  static NumberValue? _boundedFraction(BigInt numerator, BigInt denominator) {
+    final gcd = numerator.gcd(denominator);
+    numerator ~/= gcd;
+    denominator ~/= gcd;
+    // 保证原生与 Web 的整数表示均精确，避免带分数乘积和 abs 回绕。
+    final max = BigInt.from(9007199254740991);
+    if (numerator.abs() > max || denominator.abs() > max) return null;
+    return NumberValue.fromFraction(numerator.toInt(), denominator.toInt());
+  }
+
+  /// 用于只有答案快照的历史错题，保持与正式练习的数值判分一致。
+  static bool answersEquivalent(String actual, String expected) {
+    final a = actual.trim().replaceAll('−', '-');
+    final b = expected.trim().replaceAll('−', '-');
+    if (const ['<', '=', '>'].contains(b) || b.contains('…')) return a == b;
+    final value = parseAnswer(a);
+    final correct = parseAnswer(b);
+    return value != null && correct != null && value == correct;
   }
 }

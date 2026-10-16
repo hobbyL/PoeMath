@@ -3,6 +3,7 @@
 // 层级：data/repositories
 // 职责：艾宾浩斯复习调度仓储。Profile-scoped。
 
+import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/review_schedule.dart';
@@ -10,17 +11,22 @@ import 'package:poemath/data/models/review_schedule.dart';
 class ReviewRepository {
   /// 获取某首诗的复习调度
   ReviewSchedule? get(String poemId) {
-    return HiveBoxes.reviewSchedules.get(ProfileScope.key(poemId));
+    return HiveBoxes.reviewSchedules
+        .get(ProfileScope.key(PoemIdentity.canonical(poemId)));
   }
 
   /// 创建或更新复习调度
   Future<void> save(ReviewSchedule schedule) async {
+    if (PoemIdentity.canonical(schedule.poemId) != schedule.poemId) {
+      schedule = PoemIdentity.review(PoemIdentity.reviewMap(schedule));
+    }
     final key = ProfileScope.key(schedule.poemId);
     await HiveBoxes.reviewSchedules.put(key, schedule);
   }
 
   /// 创建新的复习计划（首次背诵完成后调用）
   Future<ReviewSchedule> createSchedule(String poemId) async {
+    poemId = PoemIdentity.canonical(poemId);
     final schedule = ReviewSchedule(
       poemId: poemId,
       profileId: ProfileScope.currentId,
@@ -37,18 +43,21 @@ class ReviewRepository {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     return HiveBoxes.reviewSchedules.values
-        .where((s) =>
-            s.profileId == ProfileScope.currentId &&
-            !s.isCompleted &&
-            !s.nextReviewDate.isAfter(today.add(const Duration(days: 1))),)
+        .where(
+          (s) =>
+              s.profileId == ProfileScope.currentId &&
+              !s.isCompleted &&
+              !s.nextReviewDate.isAfter(today.add(const Duration(days: 1))),
+        )
         .toList();
   }
 
   /// 获取所有未完成的复习计划
   List<ReviewSchedule> getActive() {
     return HiveBoxes.reviewSchedules.values
-        .where((s) =>
-            s.profileId == ProfileScope.currentId && !s.isCompleted,)
+        .where(
+          (s) => s.profileId == ProfileScope.currentId && !s.isCompleted,
+        )
         .toList();
   }
 

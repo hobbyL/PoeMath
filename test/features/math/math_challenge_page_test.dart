@@ -141,5 +141,52 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
     });
+
+    testWidgets('换题前重复提交同一答案只计一次分，换题后可以继续作答', (tester) async {
+      await tester
+          .runAsync(() => HiveBoxes.settings.put('math_difficulty', 'easy'));
+      await _pumpPage(tester);
+      await tester.tap(find.text('开始挑战'));
+      await tester.pump();
+
+      String answer() {
+        final text = tester
+            .widgetList<Text>(find.byType(Text))
+            .map((widget) => widget.data ?? '')
+            .firstWhere((text) => text.endsWith('= ?'));
+        final numbers = RegExp(r'\d+')
+            .allMatches(text)
+            .map((match) => int.parse(match.group(0)!))
+            .toList();
+        expect(numbers, hasLength(2));
+        return '${text.contains('+') ? numbers[0] + numbers[1] : numbers[0] - numbers[1]}';
+      }
+
+      final firstAnswer = answer();
+      await tester.enterText(find.byType(TextField), firstAnswer);
+      await tester.tap(find.byIcon(Icons.send_rounded));
+      await tester.pump();
+      expect(find.text('已答 1 题 · 正确 1 题'), findsOneWidget);
+      expect(find.text('10 分'), findsOneWidget);
+      expect(find.text('63s'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), firstAnswer);
+      await tester.tap(find.byIcon(Icons.send_rounded));
+      await tester.pump(const Duration(milliseconds: 399));
+      expect(find.text('已答 1 题 · 正确 1 题'), findsOneWidget);
+      expect(find.text('10 分'), findsOneWidget);
+      expect(find.text('63s'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.enterText(find.byType(TextField), answer());
+      await tester.tap(find.byIcon(Icons.send_rounded));
+      await tester.pump();
+      expect(find.text('已答 2 题 · 正确 2 题'), findsOneWidget);
+      expect(find.text('20 分'), findsOneWidget);
+      expect(find.text('66s'), findsOneWidget);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   });
 }

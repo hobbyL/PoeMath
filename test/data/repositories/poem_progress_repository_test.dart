@@ -21,6 +21,18 @@ void main() {
   });
 
   group('PoemProgressRepository', () {
+    test('已有进度保存失败不污染旧对象，重试只增加一次学习', () async {
+      await repo.recordStudy('retry');
+      final old = repo.get('retry')!;
+      final flaky = _FailOnceProgressRepository();
+      await expectLater(
+          flaky.recordRecitation('retry', level: 4), throwsStateError,);
+      expect(old.studyCount, 1);
+      expect(repo.get('retry')!.masteryLevel, 0);
+      await flaky.recordRecitation('retry', level: 4);
+      expect(repo.get('retry')!.studyCount, 2);
+      expect(repo.get('retry')!.masteryLevel, 4);
+    });
     test('get 无记录返回 null', () {
       expect(repo.get('poem_001'), isNull);
     });
@@ -43,19 +55,23 @@ void main() {
 
     test('getAll 只返回当前 profile 的数据', () async {
       // 默认 profile
-      await repo.save(PoemProgress(
-        poemId: 'poem_001',
-        profileId: 'default',
-        status: LearningStatus.learning,
-      ),);
+      await repo.save(
+        PoemProgress(
+          poemId: 'poem_001',
+          profileId: 'default',
+          status: LearningStatus.learning,
+        ),
+      );
 
       // 另一个 profile
       ProfileScope.switchTo('kid2');
-      await repo.save(PoemProgress(
-        poemId: 'poem_002',
-        profileId: 'kid2',
-        status: LearningStatus.mastered,
-      ),);
+      await repo.save(
+        PoemProgress(
+          poemId: 'poem_002',
+          profileId: 'kid2',
+          status: LearningStatus.mastered,
+        ),
+      );
 
       // 切回 default
       ProfileScope.reset();
@@ -65,21 +81,27 @@ void main() {
     });
 
     test('byStatus 按学习状态筛选', () async {
-      await repo.save(PoemProgress(
-        poemId: 'p1',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.learning,
-      ),);
-      await repo.save(PoemProgress(
-        poemId: 'p2',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.mastered,
-      ),);
-      await repo.save(PoemProgress(
-        poemId: 'p3',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.learning,
-      ),);
+      await repo.save(
+        PoemProgress(
+          poemId: 'p1',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.learning,
+        ),
+      );
+      await repo.save(
+        PoemProgress(
+          poemId: 'p2',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.mastered,
+        ),
+      );
+      await repo.save(
+        PoemProgress(
+          poemId: 'p3',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.learning,
+        ),
+      );
 
       expect(repo.byStatus(LearningStatus.learning).length, 2);
       expect(repo.byStatus(LearningStatus.mastered).length, 1);
@@ -87,36 +109,46 @@ void main() {
     });
 
     test('learnedCount 排除 notStarted', () async {
-      await repo.save(PoemProgress(
-        poemId: 'p1',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.notStarted,
-      ),);
-      await repo.save(PoemProgress(
-        poemId: 'p2',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.learning,
-      ),);
-      await repo.save(PoemProgress(
-        poemId: 'p3',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.mastered,
-      ),);
+      await repo.save(
+        PoemProgress(
+          poemId: 'p1',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.notStarted,
+        ),
+      );
+      await repo.save(
+        PoemProgress(
+          poemId: 'p2',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.learning,
+        ),
+      );
+      await repo.save(
+        PoemProgress(
+          poemId: 'p3',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.mastered,
+        ),
+      );
 
       expect(repo.learnedCount, 2);
     });
 
     test('masteredCount 只统计 mastered', () async {
-      await repo.save(PoemProgress(
-        poemId: 'p1',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.learning,
-      ),);
-      await repo.save(PoemProgress(
-        poemId: 'p2',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.mastered,
-      ),);
+      await repo.save(
+        PoemProgress(
+          poemId: 'p1',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.learning,
+        ),
+      );
+      await repo.save(
+        PoemProgress(
+          poemId: 'p2',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.mastered,
+        ),
+      );
 
       expect(repo.masteredCount, 1);
     });
@@ -137,11 +169,13 @@ void main() {
     });
 
     test('recordStudy 不改变非 notStarted 的状态', () async {
-      await repo.save(PoemProgress(
-        poemId: 'poem_r',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.reviewing,
-      ),);
+      await repo.save(
+        PoemProgress(
+          poemId: 'poem_r',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.reviewing,
+        ),
+      );
       final progress = await repo.recordStudy('poem_r');
       expect(progress.status, LearningStatus.reviewing);
     });
@@ -164,12 +198,14 @@ void main() {
     });
 
     test('recordRecitation 不覆盖测试通过等级 5', () async {
-      await repo.save(PoemProgress(
-        poemId: 'poem_quiz_passed',
-        profileId: ProfileScope.currentId,
-        status: LearningStatus.reviewing,
-        masteryLevel: 5,
-      ),);
+      await repo.save(
+        PoemProgress(
+          poemId: 'poem_quiz_passed',
+          profileId: ProfileScope.currentId,
+          status: LearningStatus.reviewing,
+          masteryLevel: 5,
+        ),
+      );
 
       final progress = await repo.recordRecitation(
         'poem_quiz_passed',
@@ -192,14 +228,28 @@ void main() {
     });
 
     test('delete 删除指定进度', () async {
-      await repo.save(PoemProgress(
-        poemId: 'poem_del',
-        profileId: ProfileScope.currentId,
-      ),);
+      await repo.save(
+        PoemProgress(
+          poemId: 'poem_del',
+          profileId: ProfileScope.currentId,
+        ),
+      );
       expect(repo.get('poem_del'), isNotNull);
 
       await repo.delete('poem_del');
       expect(repo.get('poem_del'), isNull);
     });
   });
+}
+
+class _FailOnceProgressRepository extends PoemProgressRepository {
+  bool fail = true;
+  @override
+  Future<void> save(PoemProgress progress) async {
+    if (fail) {
+      fail = false;
+      throw StateError('模拟落盘失败');
+    }
+    await super.save(progress);
+  }
 }

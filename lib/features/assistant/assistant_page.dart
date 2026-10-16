@@ -141,9 +141,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
                     chatState.contextBaseIndex < chatState.messages.length &&
                     !chatState.isBusy)
                 ? () {
-                    final cleared = ref
-                        .read(assistantChatControllerProvider.notifier)
-                        .clearContext();
+                    final cleared = _session.clearContext();
                     if (cleared) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -201,9 +199,8 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     // 清除点正好在末尾、且无在途气泡时，补一条末尾分割线项。
     final showTrailingDivider =
         base > 0 && base == messages.length && !hasPending;
-    final itemCount = messages.length +
-        (hasPending ? 1 : 0) +
-        (showTrailingDivider ? 1 : 0);
+    final itemCount =
+        messages.length + (hasPending ? 1 : 0) + (showTrailingDivider ? 1 : 0);
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(
@@ -460,12 +457,17 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.smart_toy_outlined,
-                size: 48, color: theme.colorScheme.primary,),
+            Icon(
+              Icons.smart_toy_outlined,
+              size: 48,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(height: SpacingTokens.md),
-            Text('你好，我是 AI 学习助手',
-                style: theme.textTheme.titleMedium,
-                textAlign: TextAlign.center,),
+            Text(
+              '你好，我是 AI 学习助手',
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
               '可以问我数学题、古诗词，或任何学习上的问题～',
@@ -492,8 +494,11 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         width: double.infinity,
         child: Row(
           children: <Widget>[
-            Icon(Icons.error_outline,
-                color: theme.colorScheme.error, size: 20,),
+            Icon(
+              Icons.error_outline,
+              color: theme.colorScheme.error,
+              size: 20,
+            ),
             const SizedBox(width: SpacingTokens.sm),
             Expanded(
               child: Text(message, style: theme.textTheme.bodySmall),
@@ -521,8 +526,10 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  Icon(Icons.smart_toy_outlined,
-                      color: theme.colorScheme.tertiary,),
+                  Icon(
+                    Icons.smart_toy_outlined,
+                    color: theme.colorScheme.tertiary,
+                  ),
                   const SizedBox(width: SpacingTokens.sm),
                   Expanded(
                     child: Text(

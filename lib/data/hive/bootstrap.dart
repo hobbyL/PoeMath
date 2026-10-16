@@ -11,6 +11,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/constants/hive_keys.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/repositories/poem_repository.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/author.dart';
 import 'package:poemath/data/models/formula.dart';
@@ -31,7 +32,9 @@ class DataBootstrap {
     final storedVersion =
         HiveBoxes.meta.get(HiveKeys.metaDataVersion) as String?;
 
-    if (storedVersion == AppConstants.dataVersion) {
+    if (storedVersion == AppConstants.dataVersion &&
+        HiveBoxes.meta.get('content_revision') ==
+            AppConstants.contentRevision) {
       // 版本一致，跳过导入
       return false;
     }
@@ -67,18 +70,24 @@ class DataBootstrap {
 
     // 5. 标记首次启动（如果是首次）
     if (HiveBoxes.meta.get(HiveKeys.metaFirstLaunch) == null) {
-      await HiveBoxes.meta.put(HiveKeys.metaFirstLaunch, DateTime.now().toIso8601String());
+      await HiveBoxes.meta
+          .put(HiveKeys.metaFirstLaunch, DateTime.now().toIso8601String());
     }
 
+    PoemRepository.resetIndices();
+    await HiveBoxes.meta.put('content_revision', AppConstants.contentRevision);
+
     // 6. 更新数据版本
-    await HiveBoxes.meta.put(HiveKeys.metaDataVersion, AppConstants.dataVersion);
+    await HiveBoxes.meta
+        .put(HiveKeys.metaDataVersion, AppConstants.dataVersion);
     onProgress?.call(1.0);
 
     return true;
   }
 
   static Future<List<Map<String, dynamic>>> _loadJsonList(
-      String assetPath,) async {
+    String assetPath,
+  ) async {
     final jsonString = await rootBundle.loadString(assetPath);
     final decoded = json.decode(jsonString) as List<dynamic>;
     return decoded.cast<Map<String, dynamic>>();

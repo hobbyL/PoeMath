@@ -13,13 +13,68 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/data/models/poem.dart';
+import 'package:poemath/data/models/poem_progress.dart';
+import 'package:poemath/data/repositories/poem_progress_repository.dart';
+import 'package:poemath/data/repositories/learning_activity_repository.dart';
+import 'package:poemath/data/repositories/user_stats_repository.dart';
+import 'package:poemath/data/repositories/check_in_repository.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
+import '../../helpers/hive_test_helper.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/poem_dictation_page.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 class _MockTtsService extends Mock implements TtsService {}
+
+class _Progress extends PoemProgressRepository {
+  int studies = 0;
+  @override
+  int get learnedCount => 1;
+  @override
+  Future<PoemProgress> recordStudy(String poemId) async {
+    studies++;
+    return PoemProgress(
+        poemId: poemId, profileId: 'default', studyCount: studies,);
+  }
+}
+
+class _Activities extends LearningActivityRepository {
+  final types = <LearningActivityType>[];
+  @override
+  Future<bool> record(
+      {required String id,
+      required LearningActivityType activityType,
+      required int totalItems,
+      required int successfulItems,
+      required int starsEarned,
+      required int durationSeconds,
+      required DateTime completedAt,
+      String? poemId,}) async {
+    types.add(activityType);
+    return true;
+  }
+}
+
+class _Stats extends UserStatsRepository {
+  @override
+  Future<void> updatePoemStats({int? learned, int? mastered}) async {}
+  @override
+  Future<void> addStars(int count, {String? activityId}) async {}
+}
+
+class _CheckIn extends CheckInRepository {
+  @override
+  Future<void> updateToday(
+      {String? activityId,
+      int? addPoems,
+      int? addMathTotal,
+      int? addMathCorrect,
+      int? addStars,
+      int? addDuration,}) async {}
+}
 
 const _poemId = 'dictation-test-poem';
 
@@ -38,17 +93,28 @@ Poem _makePoem() {
 
 void main() {
   late _MockTtsService tts;
+  late _Progress progress;
+  late _Activities activities;
 
-  setUp(() {
+  setUp(() async {
+    await setUpHiveForTesting();
+    progress = _Progress();
+    activities = _Activities();
     tts = _MockTtsService();
     // 朗读立即完成、无回调（onReady 不触发 → 遮罩不出现）。
-    when(() => tts.speakLines(any(),
+    when(
+      () => tts.speakLines(
+        any(),
         onLineStart: any(named: 'onLineStart'),
         onReady: any(named: 'onReady'),
-        onComplete: any(named: 'onComplete'),),).thenAnswer((_) async {});
+        onComplete: any(named: 'onComplete'),
+      ),
+    ).thenAnswer((_) async {});
     when(() => tts.stop()).thenAnswer((_) async {});
     when(() => tts.currentSessionId).thenReturn(1);
   });
+
+  tearDown(tearDownHiveForTesting);
 
   Future<ProviderContainer> pumpPage(
     WidgetTester tester, {
@@ -57,8 +123,11 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         ttsServiceProvider.overrideWithValue(tts),
-        poemByIdProvider(_poemId)
-            .overrideWith((ref) => poem ?? _makePoem()),
+        poemProgressRepoProvider.overrideWithValue(progress),
+        learningActivityRepositoryProvider.overrideWithValue(activities),
+        userStatsRepoProvider.overrideWithValue(_Stats()),
+        checkInRepoProvider.overrideWithValue(_CheckIn()),
+        poemByIdProvider(_poemId).overrideWith((ref) => poem ?? _makePoem()),
       ],
     );
     addTearDown(container.dispose);
@@ -122,8 +191,7 @@ void main() {
     expect(container.read(lastPracticeScoreProvider), isNull);
   });
 
-  testWidgets('两句全部拼对：得分 100%，pop quizPassed 且侧信道 1.0',
-      (tester) async {
+  testWidgets('两句全部拼对：得分 100%，pop quizPassed 且侧信道 1.0', (tester) async {
     final container = await pumpPage(tester);
 
     final popResults = <PoemPracticeResult?>[];
@@ -163,8 +231,12 @@ void main() {
     await pickChars(tester, '疑是地上霜');
     await tester.pump(const Duration(milliseconds: 950));
 
+    await tester.pump();
+    expect(activities.types, [LearningActivityType.poemDictation]);
+    expect(progress.studies, 1);
     expect(find.text('听写完成！'), findsOneWidget);
 
+    await tester.pump();
     await tester.tap(find.text('完成'));
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -188,7 +260,9 @@ void main() {
         find.descendant(of: one, matching: find.byType(Text)),
       );
       final char = text.data;
-      if (char != null && char.characters.length == 1 && !exclude.contains(char)) {
+      if (char != null &&
+          char.characters.length == 1 &&
+          !exclude.contains(char)) {
         await tester.tap(one);
         await tester.pump(const Duration(milliseconds: 50));
         return;
@@ -197,8 +271,7 @@ void main() {
     fail('没有找到干扰字候选格');
   }
 
-  testWidgets('拼错一句：得分 50%，pop quizFailed 且侧信道 0.5',
-      (tester) async {
+  testWidgets('拼错一句：得分 50%，pop quizFailed 且侧信道 0.5', (tester) async {
     final container = await pumpPage(tester);
 
     // 第 1 句故意拼错：首字点一个干扰字（必然不属于「床前明月光」），
@@ -214,6 +287,7 @@ void main() {
     // 错句展示原文
     expect(find.textContaining('床前明月光'), findsWidgets);
 
+    await tester.pump();
     await tester.tap(find.text('完成'));
     await tester.pump(const Duration(milliseconds: 100));
 

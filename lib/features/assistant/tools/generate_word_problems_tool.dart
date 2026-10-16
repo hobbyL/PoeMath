@@ -29,8 +29,7 @@ class GenerateWordProblemsTool extends AssistantTool {
   String get name => 'generate_word_problems';
 
   @override
-  String get description =>
-      '为孩子生成一组小学应用题并打开家长预览页确认后入库。'
+  String get description => '为孩子生成一组小学应用题并打开家长预览页确认后入库。'
       '题目的数字与答案在本地生成并校验，模型只负责题面文字。'
       '适用于孩子想练习某个知识点的应用题时。';
 
@@ -69,6 +68,15 @@ class GenerateWordProblemsTool extends AssistantTool {
 
   @override
   Future<ToolResult> execute(Ref ref, Map<String, dynamic> args) async {
+    return executeCancellable(ref, args, isActive: () => true);
+  }
+
+  @override
+  Future<ToolResult> executeCancellable(
+    Ref ref,
+    Map<String, dynamic> args, {
+    required bool Function() isActive,
+  }) async {
     final grade = _asInt(args['grade']);
     final semester = args['semester']?.toString() ?? '';
     final topic = WordProblemTopic.tryParse(args['topic']?.toString() ?? '');
@@ -96,8 +104,10 @@ class GenerateWordProblemsTool extends AssistantTool {
     if (config == null) {
       return const ToolResult.error('还没有配置 AI 出题服务，无法生成题目。');
     }
+    if (!isActive()) return const ToolResult.error('操作已取消');
 
-    final client = LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+    final client =
+        LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
     try {
       final skeletons = ref.read(wordProblemSkeletonProvider)(
         grade: grade,
@@ -138,6 +148,7 @@ class GenerateWordProblemsTool extends AssistantTool {
         );
       }
 
+      if (!isActive()) return const ToolResult.error('操作已取消');
       // 走家长确认预览页（context-free 导航），确认后才入库——绝不静默存。
       ref.read(appRouterProvider).push(
             AppRoutes.wordProblemPreview,

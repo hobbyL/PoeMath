@@ -16,10 +16,12 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
+import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 /// 背诵难度级别。
@@ -139,6 +141,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   bool _isComplete = false;
   DateTime _startTime = DateTime.now();
   late String _activityId;
+  DateTime? _completedAt;
+  bool _progressRecorded = false;
+  double? _dictationAccuracy;
+  String? _settlementError;
 
   /// R1 结算防重入：`_onAllLinesComplete` 只结算一次；
   /// `_restart`/`_changeLevel` 换新 activityId 后重置。
@@ -282,6 +288,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   // ─────────────────────────────────────────────────────────────
 
   void _onCandidateTap(String char) {
+    if (_completedAt != null) return;
     if (_blankPositions.isEmpty || _currentBlankIdx >= _blankPositions.length) {
       return;
     }
@@ -300,8 +307,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       });
 
       // 短暂延迟后检查是否还有下一个空
+      final activityId = _activityId;
       Future.delayed(350.ms, () {
-        if (!mounted) return;
+        if (!mounted || activityId != _activityId) return;
         setState(() => _correctFlash = false);
 
         if (_currentBlankIdx + 1 < _blankPositions.length) {
@@ -349,8 +357,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     });
 
     // 短暂高亮后进入下一句
+    final activityId = _activityId;
     Future.delayed(800.ms, () {
-      if (!mounted) return;
+      if (!mounted || activityId != _activityId) return;
       _setupLine(_currentLineIndex + 1);
     });
   }
@@ -368,8 +377,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     // LearningActivityRepository 的同 ID 异 payload StateError）。
     if (_settlementStarted) return;
     _settlementStarted = true;
+    _settlementError = null;
 
-    final completedAt = DateTime.now();
+    final completedAt = _completedAt ??= DateTime.now();
     final duration = completedAt.difference(_startTime).inSeconds;
     final maxQualityPoints = _maxQualityPoints;
     final qualityPoints = _totalStars.clamp(0, maxQualityPoints);
@@ -386,7 +396,15 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final checkInRepo = ref.read(checkInRepoProvider);
 
     try {
-      await progressRepo.recordRecitation(poemId, level: masteryLevel);
+      if (!_progressRecorded) {
+        if (_level != ReciteLevel.dictation ||
+            (_dictationAccuracy ?? 0) >= 0.8) {
+          await progressRepo.recordRecitation(poemId, level: masteryLevel);
+        } else {
+          await progressRepo.recordStudy(poemId);
+        }
+        _progressRecorded = true;
+      }
       await statsRepo.updatePoemStats(learned: progressRepo.learnedCount);
       await activityRepo.record(
         id: activityId,
@@ -421,6 +439,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       // 复位防重入标记：本次未结算成功，不应阻止后续重试
       //（否则用户再次提交会被 `_settlementStarted` 静默拦住）。
       _settlementStarted = false;
+      _settlementError = '学习记录保存失败，请重试';
+      if (mounted) setState(() {});
       return;
     }
 
@@ -437,7 +457,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     ref.invalidate(filteredPoemsProvider);
 
     // 成就自动检查（内部 await 后同样必须守卫 mounted 再触 ref）
-    final newlyUnlocked = await checkAchievements(ref);
+    final newlyUnlocked = await _checkAchievementsSafely();
     if (!mounted) return;
     ref.invalidate(unlockedAchievementsCountProvider);
 
@@ -457,6 +477,15 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
     _celebrationCtrl.play();
     setState(() => _isComplete = true);
+  }
+
+  Future<List<Achievement>> _checkAchievementsSafely() async {
+    try {
+      return await checkAchievements(ref);
+    } on Object catch (error, stack) {
+      AppLogger.e('成就检查失败', tag: 'PoemRecite', error: error, stackTrace: stack);
+      return const [];
+    }
   }
 
   int get _maxQualityPoints =>
@@ -484,12 +513,17 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _dictController.clear();
       _startTime = DateTime.now();
       _activityId = _newActivityId();
+      _completedAt = null;
+      _progressRecorded = false;
+      _dictationAccuracy = null;
+      _settlementError = null;
       _settlementStarted = false; // 新一轮换新 activityId，允许再次结算
       _setupLine(0);
     });
   }
 
   void _changeLevel(ReciteLevel level) {
+    if (level == _level || _settlementStarted || _completedAt != null) return;
     setState(() {
       _level = level;
       _totalStars = 0;
@@ -499,6 +533,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _dictController.clear();
       _startTime = DateTime.now();
       _activityId = _newActivityId();
+      _completedAt = null;
+      _progressRecorded = false;
+      _dictationAccuracy = null;
+      _settlementError = null;
       _settlementStarted = false; // 新一轮换新 activityId，允许再次结算
       _setupLine(0);
     });
@@ -514,13 +552,18 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     // 简单计分：正确字数 / 总字数
     final original = _lines.join('\n');
     final input = _dictController.text;
-    final origChars = original.characters.toList();
-    final inputChars = input.characters.toList();
+    final origChars = original.characters
+        .where((ch) => !_isPunctuation(ch) && ch.trim().isNotEmpty)
+        .toList();
+    final inputChars = input.characters
+        .where((ch) => !_isPunctuation(ch) && ch.trim().isNotEmpty)
+        .toList();
     int correct = 0;
     for (var i = 0; i < origChars.length && i < inputChars.length; i++) {
       if (origChars[i] == inputChars[i]) correct++;
     }
-    final accuracy = origChars.isEmpty ? 0.0 : correct / origChars.length;
+    final accuracy = _dictationAccuracy ??=
+        origChars.isEmpty ? 0.0 : correct / origChars.length;
 
     // 计算星级
     if (accuracy >= 0.95) {
@@ -528,7 +571,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     } else if (accuracy >= 0.8) {
       _totalStars = 2;
     } else {
-      _totalStars = 1;
+      _totalStars = 0;
     }
 
     await _onAllLinesComplete();
@@ -540,7 +583,17 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     // 非 build 期安全时机），即刻拆除路由，消除 postFrameCallback 帧间隙内
     // canPop 已翻 true 导致第二击 pop(null) 丢失结果的竞态。
     _allowResultPop = true;
-    Navigator.of(context).pop(PoemPracticeResult.recitationCompleted);
+    if (_level == ReciteLevel.dictation) {
+      final score = _dictationAccuracy ?? 0;
+      ref.read(lastPracticeScoreProvider.notifier).state = score;
+      Navigator.of(context).pop(
+        score >= 0.8
+            ? PoemPracticeResult.quizPassed
+            : PoemPracticeResult.quizFailed,
+      );
+    } else {
+      Navigator.of(context).pop(PoemPracticeResult.recitationCompleted);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -577,6 +630,22 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                       : _buildCharSelect(context),
             ),
             ConfettiOverlay(controller: _celebrationCtrl),
+            if (_settlementError != null)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: ColoredCard(
+                  color: Theme.of(context).colorScheme.error,
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(_settlementError!)),
+                      TextButton(
+                          onPressed:
+                              _settlementStarted ? null : _onAllLinesComplete,
+                          child: const Text('重试保存'),),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -880,10 +949,12 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     return KeyedSubtree(
       key: ValueKey(_lineAnimKey),
       child: AutoFitLine(
-        child: lineWidget
-            .animate()
-            .fadeIn(duration: 400.ms)
-            .slideX(begin: 0.15, end: 0, duration: 400.ms, curve: Curves.easeOut),
+        child: lineWidget.animate().fadeIn(duration: 400.ms).slideX(
+              begin: 0.15,
+              end: 0,
+              duration: 400.ms,
+              curve: Curves.easeOut,
+            ),
       ),
     );
   }
@@ -998,8 +1069,12 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final theme = Theme.of(context);
     final original = _lines.join('\n');
     final input = _dictController.text;
-    final origChars = original.characters.toList();
-    final inputChars = input.characters.toList();
+    final origChars = original.characters
+        .where((ch) => !_isPunctuation(ch) && ch.trim().isNotEmpty)
+        .toList();
+    final inputChars = input.characters
+        .where((ch) => !_isPunctuation(ch) && ch.trim().isNotEmpty)
+        .toList();
     final maxLen = max(origChars.length, inputChars.length);
 
     return SingleChildScrollView(
@@ -1053,7 +1128,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
   Widget _buildResultCard(BuildContext context) {
     final theme = Theme.of(context);
-    final elapsed = DateTime.now().difference(_startTime).inSeconds;
+    final elapsed =
+        (_completedAt ?? DateTime.now()).difference(_startTime).inSeconds;
     final maxStars = _level == ReciteLevel.dictation ? 3 : _lines.length * 3;
     final displayStars = _calculateRewardStars();
 
@@ -1091,7 +1167,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
             const SizedBox(height: SpacingTokens.lg),
 
             Text(
-              _resultTitle(displayStars),
+              _level == ReciteLevel.dictation && (_dictationAccuracy ?? 0) < 0.8
+                  ? '已记录练习，达到 80% 后通过'
+                  : _resultTitle(displayStars),
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.primary,

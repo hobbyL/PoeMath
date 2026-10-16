@@ -58,6 +58,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   /// 当前 session ID
   late String _sessionId;
+  DateTime? _completedAt;
+  bool _submitting = false;
 
   /// 当前连续答对数（答错时清零）
   int _consecutiveCorrect = 0;
@@ -72,11 +74,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   void initState() {
     super.initState();
     _startTime = DateTime.now();
-    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    _sessionId = DateTime.now().microsecondsSinceEpoch.toString();
     _confettiController = CelebrationController();
 
     // 延迟到 build 之后初始化题目
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _generateProblems();
     });
   }
@@ -88,11 +91,21 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final batchSize = _sessionBatchSize ??= ref
         .read(mathBatchSizeOverrideProvider.notifier)
         .consumeOr(settingsRepo.mathBatchSize);
-    final practiceMode = ref.read(mathPracticeModeProvider);
+    var practiceMode = ref.read(mathPracticeModeProvider);
     final difficulty = DifficultyLevel.values.firstWhere(
       (d) => d.name == settingsRepo.mathDifficulty,
       orElse: () => DifficultyLevel.medium,
     );
+
+    if (practiceMode != null &&
+        !MathEngine.supportedModes(
+                grade: grade, semester: semester, difficulty: difficulty,)
+            .contains(practiceMode)) {
+      practiceMode = null;
+      ref.read(mathPracticeModeProvider.notifier).state = null;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('所选模式不适用于当前年级或难度，已切换为综合练习')),);
+    }
 
     final problems = MathEngine.generateBatch(
       grade: grade,
@@ -146,7 +159,19 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         _problemRecords.map((r) => r.toJson()).toList(),
       ),
     );
-    unawaited(ref.read(mathSessionRepositoryProvider).save(session));
+    unawaited(
+      ref
+          .read(mathSessionRepositoryProvider)
+          .save(session)
+          .catchError((Object error, StackTrace stack) {
+        AppLogger.e(
+          '练习快照保存失败',
+          tag: 'MathPractice',
+          error: error,
+          stackTrace: stack,
+        );
+      }),
+    );
 
     // 增量更新用户统计（每题 +1），与其余练习页共用同一仓储写入路径。
     unawaited(
@@ -157,15 +182,15 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
             bestStreak: _bestConsecutive,
           )
           .catchError((Object error, StackTrace stackTrace) {
-            // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到；
-            // 此处位于 UI 边界，兜底后仅记日志，不打断答题流程。
-            AppLogger.e(
-              '答题进度落库失败',
-              tag: 'MathPractice',
-              error: error,
-              stackTrace: stackTrace,
-            );
-          }),
+        // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到；
+        // 此处位于 UI 边界，兜底后仅记日志，不打断答题流程。
+        AppLogger.e(
+          '答题进度落库失败',
+          tag: 'MathPractice',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }),
     );
 
     // 刷新 providers
@@ -192,8 +217,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   }
 
   Future<void> _processAnswer(MathProblem problem, String userAnswer) async {
+    if (_submitting) return;
     final judgement = MathEngine.judge(problem, userAnswer);
     setState(() {
+      _submitting = true;
       _judgement = judgement;
       _showSteps = false;
     });
@@ -201,15 +228,6 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     // 音效和触觉反馈
     final sound = ref.read(soundServiceProvider);
     final haptic = ref.read(hapticServiceProvider);
-    if (judgement.isCorrect) {
-      sound.play(SoundEffect.correct);
-      await haptic.medium();
-      _confettiController.play();
-    } else {
-      sound.play(SoundEffect.wrong);
-      await haptic.heavy();
-    }
-
     ref.read(mathAnsweredCountProvider.notifier).update((s) => s + 1);
     if (judgement.isCorrect) {
       ref.read(mathCorrectCountProvider.notifier).update((s) => s + 1);
@@ -219,7 +237,6 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       }
     } else {
       _consecutiveCorrect = 0;
-      await _recordMistake(problem, userAnswer, judgement);
     }
 
     // 记录本题详情
@@ -234,6 +251,28 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     // 每答一题就同步保存到 Hive
     _persistProgress(isCorrect: judgement.isCorrect);
+    try {
+      if (!judgement.isCorrect) {
+        await _recordMistake(problem, userAnswer, judgement);
+      }
+      sound.play(judgement.isCorrect ? SoundEffect.correct : SoundEffect.wrong);
+      if (judgement.isCorrect) {
+        await haptic.medium();
+        if (mounted) _confettiController.play();
+      } else {
+        await haptic.heavy();
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '答题反馈失败',
+        tag: 'MathPractice',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _submitting = false;
+      if (mounted) setState(() {});
+    }
   }
 
   /// 记录错题到 Hive。
@@ -303,6 +342,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   bool _isFinishing = false;
 
   Future<void> _nextProblem() async {
+    if (_submitting || !mounted) return;
     final problems = ref.read(mathProblemsProvider);
     final currentIndex = ref.read(mathCurrentIndexProvider);
 
@@ -339,7 +379,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final grade = ref.read(mathGradeProvider);
     final problems = ref.read(mathProblemsProvider);
     final correctCount = ref.read(mathCorrectCountProvider);
-    final completedAt = DateTime.now();
+    final completedAt = _completedAt ??= DateTime.now();
     final duration = completedAt.difference(_startTime).inSeconds;
 
     final stars = LearningRewardCalculator.calculateStars(
@@ -367,20 +407,22 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     );
 
     final repo = ref.read(mathSessionRepoProvider);
+    final activityRepo = ref.read(learningActivityRepositoryProvider);
+    final statsRepo = ref.read(userStatsRepoProvider);
+    final checkInRepo = ref.read(checkInRepoProvider);
     await repo.save(session);
     final activityId = 'math_practice:${session.id}';
-    await ref.read(learningActivityRepositoryProvider).record(
-          id: activityId,
-          activityType: LearningActivityType.mathPractice,
-          totalItems: problems.length,
-          successfulItems: correctCount,
-          starsEarned: stars,
-          durationSeconds: duration,
-          completedAt: completedAt,
-        );
+    await activityRepo.record(
+      id: activityId,
+      activityType: LearningActivityType.mathPractice,
+      totalItems: problems.length,
+      successfulItems: correctCount,
+      starsEarned: stars,
+      durationSeconds: duration,
+      completedAt: completedAt,
+    );
 
     // 做题数和连对数已在 _persistProgress() 中逐题更新，只需添加星星
-    final statsRepo = ref.read(userStatsRepoProvider);
     final levelBeforeReward = statsRepo.get().level;
     if (stars > 0) {
       await statsRepo.addStars(
@@ -388,13 +430,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         activityId: activityId,
       );
     }
-    await ref.read(checkInRepoProvider).updateToday(
-          activityId: activityId,
-          addMathTotal: problems.length,
-          addMathCorrect: correctCount,
-          addStars: stars,
-          addDuration: duration,
-        );
+    await checkInRepo.updateToday(
+      activityId: activityId,
+      addMathTotal: problems.length,
+      addMathCorrect: correctCount,
+      addStars: stars,
+      addDuration: duration,
+    );
 
     // addStars 会同步重算等级；页面仅负责展示升级反馈。
     final updatedStats = statsRepo.get();
@@ -411,7 +453,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     }
 
     // 成就自动检查
+    if (!mounted) return;
     final newlyUnlocked = await checkAchievements(ref, latestSession: session);
+    if (!mounted) return;
 
     // 刷新首页统计 providers
     ref.invalidate(userStatsProvider);
@@ -475,7 +519,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     _bestConsecutive = 0;
     _isFinishing = false;
     _startTime = DateTime.now();
-    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    _sessionId = DateTime.now().microsecondsSinceEpoch.toString();
+    _completedAt = null;
     setState(() {
       _judgement = null;
       _showSteps = false;
@@ -813,7 +858,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       return SizedBox(
         width: double.infinity,
         child: FilledButton.icon(
-          onPressed: _nextProblem,
+          onPressed: _submitting || _isFinishing ? null : _nextProblem,
           icon: const Icon(Icons.arrow_forward_rounded),
           label: Text(
             ref.read(mathCurrentIndexProvider) + 1 >=

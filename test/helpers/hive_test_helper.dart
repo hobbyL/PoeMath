@@ -33,6 +33,8 @@ Future<void> setUpHiveForTesting() async {
     AppConstants.dataVersion,
   );
 
+  await HiveBoxes.meta.put('content_revision', AppConstants.contentRevision);
+
   // 标记已完成引导，跳过 Onboarding 页面
   await HiveBoxes.settings.put('has_onboarded', true);
 }

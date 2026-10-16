@@ -28,20 +28,68 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 
 /// 中文标点集合（不作为听写目标），口径与背诵页一致。
 const _punctuation = {
-  '，', '。', '！', '？', '、', '；', '：', '“', '”', '‘', '’',
-  '（', '）', '《', '》', '【', '】', '…', '—', '　',
-  ',', '.', '!', '?', ':', ';', '"', "'", '(', ')', ' ',
+  '，',
+  '。',
+  '！',
+  '？',
+  '、',
+  '；',
+  '：',
+  '“',
+  '”',
+  '‘',
+  '’',
+  '（',
+  '）',
+  '《',
+  '》',
+  '【',
+  '】',
+  '…',
+  '—',
+  '　',
+  ',',
+  '.',
+  '!',
+  '?',
+  ':',
+  ';',
+  '"',
+  "'",
+  '(',
+  ')',
+  ' ',
 };
 
 bool _isPunctuation(String ch) => _punctuation.contains(ch);
 
 /// 候选字不够时的兜底字池（与背诵页同款）。
 const _fallbackPool = [
-  '山', '水', '风', '月', '花', '云', '雨', '春', '秋', '雪',
-  '天', '地', '日', '夜', '人', '心', '梦', '鸟', '树', '石',
+  '山',
+  '水',
+  '风',
+  '月',
+  '花',
+  '云',
+  '雨',
+  '春',
+  '秋',
+  '雪',
+  '天',
+  '地',
+  '日',
+  '夜',
+  '人',
+  '心',
+  '梦',
+  '鸟',
+  '树',
+  '石',
 ];
 
 /// 及格线：与 QuizSession.isPassed 同口径。
@@ -53,8 +101,7 @@ class PoemDictationPage extends ConsumerStatefulWidget {
   final String poemId;
 
   @override
-  ConsumerState<PoemDictationPage> createState() =>
-      _PoemDictationPageState();
+  ConsumerState<PoemDictationPage> createState() => _PoemDictationPageState();
 }
 
 class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
@@ -66,6 +113,16 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
   int _currentLineIndex = 0;
   bool _isComplete = false;
   bool _allowResultPop = false;
+  DateTime _startedAt = DateTime.now();
+  late String _activityId = _newActivityId();
+  DateTime? _completedAt;
+  bool _settling = false;
+  bool _settled = false;
+  bool _progressRecorded = false;
+  String? _settlementError;
+
+  String _newActivityId() =>
+      'poem_dictation:${widget.poemId}:${DateTime.now().microsecondsSinceEpoch}';
 
   // ── 输入模式 ──
   bool _useTyping = false;
@@ -100,6 +157,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
   }
 
   void _initPoem() {
+    if (!mounted) return;
     // 侧信道纪律：进入时清空，防止上一次练习的陈旧分数被误消费。
     ref.read(lastPracticeScoreProvider.notifier).state = null;
     final poem = ref.read(poemByIdProvider(widget.poemId));
@@ -242,7 +300,8 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
   void _onCandidateTap(_CandidateTile tile) {
     if (_judging || tile.used) return;
     final target = _targetCharsOf(_lines[_currentLineIndex]);
-    if (_filled.length >= target.length) return;    HapticFeedback.lightImpact();
+    if (_filled.length >= target.length) return;
+    HapticFeedback.lightImpact();
     setState(() {
       tile.used = true;
       _filled.add(tile.char);
@@ -305,13 +364,73 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
     return passed / _lineResults.length;
   }
 
-  void _onAllLinesComplete() {
-    // 末句朗读已在句内完成，直接出结果。
+  Future<void> _onAllLinesComplete() async {
+    if (_settling || _settled) return;
+    _settling = true;
+    _settlementError = null;
     setState(() => _isComplete = true);
+    final completedAt = _completedAt ??= DateTime.now();
+    final duration = completedAt.difference(_startedAt).inSeconds;
+    final activityId = _activityId;
+    final total = _lineResults.length;
+    final successful = _lineResults.where((r) => r).length;
+    final stars = LearningRewardCalculator.calculateStars(
+      activityType: LearningActivityType.poemDictation,
+      totalItems: total,
+      successfulItems: successful,
+    );
+    final progress = ref.read(poemProgressRepoProvider);
+    final stats = ref.read(userStatsRepoProvider);
+    final activities = ref.read(learningActivityRepositoryProvider);
+    final checkIn = ref.read(checkInRepoProvider);
+    try {
+      if (!_progressRecorded) {
+        await progress.recordStudy(widget.poemId);
+        _progressRecorded = true;
+      }
+      await stats.updatePoemStats(learned: progress.learnedCount);
+      await activities.record(
+        id: activityId,
+        activityType: LearningActivityType.poemDictation,
+        totalItems: total,
+        successfulItems: successful,
+        poemId: widget.poemId,
+        starsEarned: stars,
+        durationSeconds: duration,
+        completedAt: completedAt,
+      );
+      if (stars > 0) await stats.addStars(stars, activityId: activityId);
+      await checkIn.updateToday(
+        activityId: activityId,
+        addPoems: 1,
+        addStars: stars,
+        addDuration: duration,
+      );
+      _settled = true;
+    } on Object catch (error, stack) {
+      AppLogger.e(
+        '听写结算失败',
+        tag: 'PoemDictation',
+        error: error,
+        stackTrace: stack,
+      );
+      _settlementError = '学习记录保存失败，请重试';
+    } finally {
+      _settling = false;
+      if (mounted) {
+        ref.invalidate(poemProgressProvider(widget.poemId));
+        ref.invalidate(filteredPoemsProvider);
+        ref.invalidate(learnedCountProvider);
+        ref.invalidate(userStatsProvider);
+        ref.invalidate(todayPoemCountProvider);
+        ref.invalidate(todayCheckInProvider);
+        setState(() {});
+      }
+    }
   }
 
   void _exitWithResult() {
-    if (_allowResultPop) return;
+    if (_allowResultPop || !_settled) return;
     _allowResultPop = true;
     // 侧信道纪律：pop 前写入本次最终得分，复习页读取后自适应推进。
     final score = _score;
@@ -323,7 +442,14 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
   }
 
   void _restart() {
+    if (!_settled) return;
     setState(() {
+      _startedAt = DateTime.now();
+      _activityId = _newActivityId();
+      _completedAt = null;
+      _settled = false;
+      _progressRecorded = false;
+      _settlementError = null;
       _lineResults.clear();
       _isComplete = false;
       _allowResultPop = false;
@@ -574,8 +700,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
                 color: tile.used
                     ? theme.colorScheme.surfaceContainerHighest
                         .withValues(alpha: 0.5)
-                    : theme.colorScheme.primaryContainer
-                        .withValues(alpha: 0.5),
+                    : theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
                 border: Border.all(
                   color: tile.used
@@ -651,18 +776,15 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
               Icon(
                 passed ? Icons.emoji_events_rounded : Icons.refresh_rounded,
                 size: 56,
-                color: passed
-                    ? theme.semantic.success
-                    : theme.semantic.caution,
+                color: passed ? theme.semantic.success : theme.semantic.caution,
               ),
               const SizedBox(height: SpacingTokens.md),
               Text(
                 passed ? '听写完成！' : '再听一遍，会更好！',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: passed
-                      ? theme.semantic.success
-                      : theme.semantic.caution,
+                  color:
+                      passed ? theme.semantic.success : theme.semantic.caution,
                 ),
               ),
               const SizedBox(height: SpacingTokens.sm),
@@ -707,11 +829,21 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
               }),
 
               const SizedBox(height: SpacingTokens.lg),
+              if (_settlementError != null) ...[
+                Text(
+                  _settlementError!,
+                  style: TextStyle(color: theme.colorScheme.error),
+                ),
+                TextButton(
+                  onPressed: _settling ? null : _onAllLinesComplete,
+                  child: const Text('重试保存'),
+                ),
+              ],
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _exitWithResult,
+                      onPressed: _settled ? _exitWithResult : null,
                       icon: const Icon(Icons.arrow_back),
                       label: const Text('完成'),
                     ),
@@ -719,7 +851,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
                   const SizedBox(width: SpacingTokens.md),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: _restart,
+                      onPressed: _settled ? _restart : null,
                       icon: const Icon(Icons.replay),
                       label: const Text('再来一次'),
                     ),

@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
+import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -54,42 +55,45 @@ class _WordProblemGeneratePageState
   Future<void> _generate() async {
     if (_generating) return;
 
-    final config =
-        await ref.read(settingsRepositoryProvider).readLlmConfig();
-    if (config == null) {
-      setState(() => _errorMessage = 'LLM 服务未配置');
-      return;
-    }
-
     setState(() {
       _generating = true;
       _errorMessage = null;
     });
-
-    final client = LlmClient();
+    final grade = _grade;
+    final semester = _semester;
+    final topic = _topic;
+    final count = _count;
+    final settings = ref.read(settingsRepositoryProvider);
+    final createSkeletons = ref.read(wordProblemSkeletonProvider);
+    final client =
+        LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
     try {
+      final config = await settings.readLlmConfig();
+      if (!mounted) return;
+      if (config == null) {
+        setState(() => _errorMessage = 'LLM 服务未配置');
+        return;
+      }
       // 经 provider 调用（测试可注入失败场景，如骨架重试耗尽的 StateError）。
-      final skeletons = ref.read(wordProblemSkeletonProvider)(
-        grade: _grade,
-        semester: _semester,
-        topic: _topic.name,
-        count: _count,
+      final skeletons = createSkeletons(
+        grade: grade,
+        semester: semester,
+        topic: topic.name,
+        count: count,
       );
       final result = await client.generateWordProblems(
         config: config,
         skeletons: skeletons,
-        grade: _grade,
-        semester: _semester,
-        topic: _topic.label,
+        grade: grade,
+        semester: semester,
+        topic: topic.label,
       );
 
       // 按 index 对齐（draft.index 1-based），逐题本地校验。
       final items = <WordProblemPreviewItem>[];
       for (var i = 0; i < skeletons.length; i++) {
         final skeleton = skeletons[i];
-        final draft = result.drafts
-            .where((d) => d.index == i + 1)
-            .firstOrNull;
+        final draft = result.drafts.where((d) => d.index == i + 1).firstOrNull;
         if (draft == null) {
           items.add(
             WordProblemPreviewItem(
@@ -117,9 +121,9 @@ class _WordProblemGeneratePageState
       context.push(
         AppRoutes.wordProblemPreview,
         extra: WordProblemPreviewData(
-          grade: _grade,
-          semester: _semester,
-          topicName: _topic.name,
+          grade: grade,
+          semester: semester,
+          topicName: topic.name,
           items: items,
         ),
       );

@@ -37,6 +37,9 @@ void invalidateAllHiveProviders(void Function(ProviderOrFamily) invalidate) {
   invalidate(isFavoriteProvider);
   invalidate(dueReviewCountProvider);
   invalidate(learnedCountProvider);
+  invalidate(filteredPoemsProvider);
+
+  // 助手由 whileRestoring 排空队列后重载，不能再次失效而清空当前会话。
 
   // ---- 设置 ----
   invalidate(settingsRepositoryProvider);

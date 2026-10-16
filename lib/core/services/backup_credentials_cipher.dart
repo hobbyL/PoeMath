@@ -27,6 +27,7 @@ const String kCredKeyTencentSecretKey = 'tencent_asr_secret_key';
 const String kCredKeyWorkerTtsApiKey = 'worker_tts_api_key';
 const String kCredKeyLlmApiKey = 'llm_api_key';
 const String kCredKeyLlmApiKeyHint = 'llm_api_key_hint';
+const String kCredKeyLlmProviderKeys = 'llm_provider_keys';
 
 /// 本版本可识别的全部载荷键。
 ///
@@ -39,6 +40,7 @@ const List<String> kBackupCredentialKeys = [
   kCredKeyWorkerTtsApiKey,
   kCredKeyLlmApiKey,
   kCredKeyLlmApiKeyHint,
+  kCredKeyLlmProviderKeys,
 ];
 
 /// 用口令加密凭据明文，产出备份 `credentials` 节的 JSON 结构。

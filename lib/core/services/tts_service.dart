@@ -383,7 +383,12 @@ class TtsService {
 
   /// 云端音色试听：强制走云合成，失败上抛具体原因（设置页展示）。
   Future<void> previewCloud(String text) async {
+    final stopping = stop();
+    final generation = _sessionGeneration;
+    await stopping;
+    if (generation != _sessionGeneration) return;
     await _refreshCloudState();
+    if (generation != _sessionGeneration) return;
     if (_cloudClient == null || _cloudConfig == null) {
       throw const WorkerTtsException(
         '请先保存并验证自建语音服务',
@@ -391,6 +396,7 @@ class TtsService {
       );
     }
     final bytes = await _synthesizeStrict(text);
+    if (generation != _sessionGeneration) return;
     await _cloudPlayerResolved.play(bytes);
   }
 

@@ -4,6 +4,7 @@
 
 import '../models/grade_config.dart';
 import '../models/math_problem.dart';
+import '../models/number_value.dart';
 import 'expression_evaluator.dart';
 
 /// 约束校验器。
@@ -15,6 +16,12 @@ class ConstraintChecker {
     // 1. 结果非负（除非允许负数）
     if (!config.allowNegative && problem.result.isNegative) {
       return '结果为负数';
+    }
+    final target = problem.compareTarget;
+    if (target != null &&
+        ((!config.allowNegative && target.isNegative) ||
+            target.asDouble.abs() > config.maxResult)) {
+      return '比较目标超出学期范围';
     }
 
     // 2. 结果不超范围
@@ -58,21 +65,56 @@ class ConstraintChecker {
       return '题目模式未被允许 (${problem.mode.name})';
     }
 
-    // 7. 括号题显示语义一致性：按显示语义精确求值必须等于 result
-    if (problem.mode == ProblemMode.withBrackets &&
-        problem.bracketRange != null) {
+    // 7. 所有模式共享表达式语义，转换后也不能绕过核验。
+    if (problem.resultForm != ResultForm.withRemainder) {
       final evaluated = ExpressionEvaluator.evaluate(
         problem.operands,
         problem.operators,
         bracketRange: problem.bracketRange,
       );
-      if (evaluated == null || evaluated != problem.result.asFraction) {
-        return '括号题答案与显示语义不一致';
+      final expected = problem.mode == ProblemMode.findMissing
+          ? problem.expressionResult
+          : problem.result;
+      if (evaluated == null ||
+          expected == null ||
+          evaluated != expected.asFraction) {
+        return problem.bracketRange != null ? '括号题答案与显示语义不一致' : '题目答案与显示语义不一致';
       }
-      // 整数操作数题额外要求求值结果为整数
-      if (problem.operands.every((o) => o.isInteger) &&
+      if (!config.allowFraction &&
+          !config.allowDecimal &&
+          problem.operands.every((o) => o.isInteger) &&
           !evaluated.isInteger) {
-        return '括号题答案与显示语义不一致';
+        return problem.bracketRange != null ? '括号题答案与显示语义不一致' : '题目答案与显示语义不一致';
+      }
+      if (problem.mode == ProblemMode.findMissing) {
+        final index = problem.missingIndex;
+        if (index == null ||
+            index < 0 ||
+            index >= problem.operands.length ||
+            problem.operands[index] != problem.result) {
+          return '未知项答案不一致';
+        }
+        // 单个未知数只出现一次时，四则表达式是一次分式函数。
+        // 非常数函数在有效定义域内一一对应；另一个有效值仍得到同值即为退化常数题。
+        for (final replacement in [1, 2, 3]) {
+          final value = NumberValue.fromInt(replacement);
+          if (value == problem.result) continue;
+          final operands = List<NumberValue>.of(problem.operands)
+            ..[index] = value;
+          final alternative = ExpressionEvaluator.evaluate(
+              operands, problem.operators,
+              bracketRange: problem.bracketRange,);
+          if (alternative == evaluated) return '未知项不唯一';
+        }
+      }
+      if (problem.mode == ProblemMode.compare) {
+        if (target == null) return '缺少比较目标';
+        final relation = problem.result > target
+            ? CompareRelation.greaterThan
+            : problem.result < target
+                ? CompareRelation.lessThan
+                : CompareRelation.equal;
+        if (problem.compareRelation != relation) return '比较关系与表达式不一致';
       }
     }
 

@@ -103,7 +103,7 @@ class MathProblem {
   /// 比较目标值（仅 compare 模式使用）。
   final NumberValue? compareTarget;
 
-  /// 括号范围（仅 withBrackets 模式使用）。
+  /// 括号范围（包括转换后的比较、挖空和求值题）。
   /// 表示 [start, end) 的操作数索引区间。
   final (int, int)? bracketRange;
 
@@ -128,6 +128,13 @@ class MathProblem {
     this.bracketRange,
     this.displayText,
   });
+
+  /// 根据实际待答值推导输入形态，模式转换后不能沿用原结果形态。
+  static ResultForm formFor(NumberValue value) => value.isInteger
+      ? ResultForm.integer
+      : value.toString().contains('/')
+          ? ResultForm.fraction
+          : ResultForm.decimal;
 
   /// 生成题目文本。
   String get problemText {
@@ -164,45 +171,33 @@ class MathProblem {
   }
 
   String _expressionText() {
-    final buffer = StringBuffer(operands[0].toString());
-    for (var i = 0; i < operators.length; i++) {
-      buffer.write(' ${operators[i].symbol} ${operands[i + 1]}');
-    }
-    return buffer.toString();
+    return _renderExpression();
   }
 
   String _missingProblemText() {
+    final rhs = expressionResult ?? result;
+    return '${_renderExpression(hideMissing: true)} = $rhs';
+  }
+
+  String _renderExpression({bool hideMissing = false}) {
     final buffer = StringBuffer();
     for (var i = 0; i < operands.length; i++) {
       if (i > 0) {
         buffer.write(' ${operators[i - 1].symbol} ');
       }
-      if (i == missingIndex) {
+      if (i == bracketRange?.$1) buffer.write('(');
+      if (hideMissing && i == missingIndex) {
         buffer.write('?');
       } else {
         buffer.write(operands[i].toString());
       }
+      if (i == (bracketRange?.$2 ?? 0) - 1) buffer.write(')');
     }
-    // 使用原始表达式计算结果，而非答案(missing operand)
-    final rhs = expressionResult ?? result;
-    buffer.write(' = $rhs');
     return buffer.toString();
   }
 
   String _bracketExpressionText() {
-    final br = bracketRange;
-    if (br == null) return _expressionText();
-
-    final buffer = StringBuffer();
-    for (var i = 0; i < operands.length; i++) {
-      if (i > 0) {
-        buffer.write(' ${operators[i - 1].symbol} ');
-      }
-      if (i == br.$1) buffer.write('(');
-      buffer.write(operands[i].toString());
-      if (i == br.$2 - 1) buffer.write(')');
-    }
-    return buffer.toString();
+    return _renderExpression();
   }
 
   @override

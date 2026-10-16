@@ -291,12 +291,16 @@ class NotificationService {
       HiveBoxes.settings.get(_keyReminderEnabled, defaultValue: false) as bool;
 
   /// 提醒小时（24h 制），默认 18:00。
-  int get reminderHour =>
-      HiveBoxes.settings.get(_keyReminderHour, defaultValue: 18) as int;
+  int get reminderHour {
+    final value = HiveBoxes.settings.get(_keyReminderHour);
+    return value is int && value >= 0 && value <= 23 ? value : 18;
+  }
 
   /// 提醒分钟，默认 00。
-  int get reminderMinute =>
-      HiveBoxes.settings.get(_keyReminderMinute, defaultValue: 0) as int;
+  int get reminderMinute {
+    final value = HiveBoxes.settings.get(_keyReminderMinute);
+    return value is int && value >= 0 && value <= 59 ? value : 0;
+  }
 
   /// 提醒已开启但系统未能调度（权限被回收、免打扰、厂商 ROM 限制等）。
   ///

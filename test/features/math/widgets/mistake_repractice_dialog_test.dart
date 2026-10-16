@@ -174,6 +174,29 @@ void main() {
   });
 
   group('MistakeRepracticeDialog 判定与取消契约', () {
+    testWidgets('比较题直接选择关系符号并判对', (tester) async {
+      bool? result;
+      await pumpDialog(tester,
+          problemText: '1 + 2 ○ 4',
+          correctAnswer: '<',
+          onResult: (r) => result = r,);
+      await tester.tap(find.text('<'));
+      await tester.pump();
+      expect(find.text('回答正确！'), findsOneWidget);
+      await tester.tap(find.text('关闭'));
+      await tester.pumpAndSettle();
+      expect(result, true);
+    });
+
+    testWidgets('等价分数 2/4 与标准答案 1/2 判分一致', (tester) async {
+      await pumpDialog(tester,
+          problemText: '1/4 + 1/4 = ?', correctAnswer: '1/2', onResult: (_) {},);
+      await tapKeys(tester, ['2', '/', '4']);
+      await tester.tap(find.byIcon(Icons.check_rounded));
+      await tester.pump();
+      expect(find.text('回答正确！'), findsOneWidget);
+    });
+
     testWidgets('答错显示正确答案并返回 false', (tester) async {
       bool? result;
       await pumpDialog(

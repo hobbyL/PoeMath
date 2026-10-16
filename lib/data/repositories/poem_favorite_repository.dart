@@ -3,6 +3,7 @@
 // 层级：data/repositories
 // 职责：诗词收藏仓储。Profile-scoped。
 
+import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
@@ -10,12 +11,14 @@ import 'package:poemath/data/models/poem_favorite.dart';
 class PoemFavoriteRepository {
   /// 判断是否已收藏
   bool isFavorite(String poemId) {
-    return HiveBoxes.poemFavorites.containsKey(ProfileScope.key(poemId));
+    return HiveBoxes.poemFavorites
+        .containsKey(ProfileScope.key(PoemIdentity.canonical(poemId)));
   }
 
   /// 切换收藏状态（收藏/取消收藏）
   Future<bool> toggle(String poemId) async {
-    final key = ProfileScope.key(poemId);
+    poemId = PoemIdentity.canonical(poemId);
+    final key = ProfileScope.key(PoemIdentity.canonical(poemId));
     if (HiveBoxes.poemFavorites.containsKey(key)) {
       await HiveBoxes.poemFavorites.delete(key);
       return false; // 取消收藏

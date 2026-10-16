@@ -1,3 +1,8 @@
+import 'dart:convert';
+import 'dart:async';
+import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/providers/provider_invalidation.dart';
 // test/features/assistant/assistant_session_provider_test.dart
 //
 // 会话衔接层（AssistantSessionController）测试：进入 / 新建 / 切换 /
@@ -65,12 +70,16 @@ class _ScriptedChat extends AssistantChatController {
   void stop() {}
 
   @override
-  void loadConversation(List<ChatMessage> messages) {
+  void loadConversation(
+    List<ChatMessage> messages, {
+    int contextBaseIndex = 0,
+  }) {
     state = AssistantChatState(
       status: messages.isEmpty
           ? AssistantChatStatus.idle
           : AssistantChatStatus.ready,
       messages: List<ChatMessage>.unmodifiable(messages),
+      contextBaseIndex: contextBaseIndex,
     );
   }
 
@@ -122,6 +131,68 @@ void main() {
     await tearDownHiveForTesting();
   });
 
+  /// 排空 session 的串行写链（repo 写入为异步微任务 / 文件 IO）。
+  Future<void> settle() async {
+    for (var i = 0; i < 50; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 2));
+    }
+  }
+
+  test('恢复同 ID 会话后重载消息与上下文切点，随后不混入旧消息', () async {
+    final session = container.read(assistantSessionProvider.notifier);
+    await session.ensureOpen();
+    await session.send('local');
+    await settle();
+    final backup = BackupService();
+    final data =
+        jsonDecode(await backup.exportToJson()) as Map<String, dynamic>;
+    for (final m in data['messages'] as List) {
+      m['content'] = 'remote';
+    }
+    (data['conversations'] as List).single['contextBaseIndex'] = 2;
+    await session
+        .whileRestoring(() => backup.restoreFromJson(jsonEncode(data)));
+    invalidateAllHiveProviders(container.invalidate);
+    await container.pump();
+    expect(
+        container
+            .read(assistantChatControllerProvider)
+            .messages
+            .map((m) => m.content),
+        everyElement('remote'),);
+    expect(container.read(assistantChatControllerProvider).contextBaseIndex, 2);
+    await session.send('new');
+    await settle();
+    expect(HiveBoxes.messages.values.map((m) => m.content),
+        isNot(contains('local')),);
+    expect(HiveBoxes.messages.values.map((m) => m.content), contains('new'));
+  });
+
+  test('恢复期间阻止新会话与消息写入，恢复后继续持久化', () async {
+    final controller = container.read(assistantSessionProvider.notifier);
+    await controller.ensureOpen();
+    final id = container.read(assistantSessionProvider).conversationId;
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    final restoring = controller.whileRestoring(() async {
+      entered.complete();
+      await release.future;
+    });
+    await entered.future;
+    await controller.startNew();
+    await controller.send('during restore');
+    expect(container.read(assistantSessionProvider).conversationId, id);
+    expect(HiveBoxes.messages.isEmpty, isTrue);
+    release.complete();
+    await restoring;
+    await controller.send('after restore');
+    await settle();
+    expect(HiveBoxes.messages.values.map((m) => m.content),
+        contains('after restore'),);
+    expect(HiveBoxes.messages.values.map((m) => m.content),
+        isNot(contains('during restore')),);
+  });
+
   AssistantSessionController session() =>
       container.read(assistantSessionProvider.notifier);
   AssistantSessionState sessionState() =>
@@ -130,13 +201,6 @@ void main() {
       container.read(conversationRepositoryProvider);
   List<ChatMessage> chatMessages() =>
       container.read(assistantChatControllerProvider).messages;
-
-  /// 排空 session 的串行写链（repo 写入为异步微任务 / 文件 IO）。
-  Future<void> settle() async {
-    for (var i = 0; i < 50; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 2));
-    }
-  }
 
   test('ensureOpen 空库：自动新建并打开会话', () async {
     await session().ensureOpen();
@@ -147,22 +211,46 @@ void main() {
     expect(repo().getAll().length, 1);
   });
 
+  test('恢复失败且镜像重载失败仍保留原错误，释放门闩后可继续写入', () async {
+    final flakyRepo = _FailingMirrorRepository();
+    final scoped = ProviderContainer(overrides: [
+      conversationRepositoryProvider.overrideWithValue(flakyRepo),
+      assistantChatControllerProvider.overrideWith(_ScriptedChat.new),
+    ],);
+    addTearDown(scoped.dispose);
+    final controller = scoped.read(assistantSessionProvider.notifier);
+    await controller.ensureOpen();
+    final original = StateError('恢复原始错误');
+    await expectLater(controller.whileRestoring<void>(() async {
+      flakyRepo.failReads = true;
+      throw original;
+    }), throwsA(same(original)),);
+    flakyRepo.failReads = false;
+    await controller.send('门闩已释放');
+    await settle();
+    expect(HiveBoxes.messages.values.map((m) => m.content), contains('门闩已释放'));
+  });
+
   test('ensureOpen 有历史：打开最近会话并载入其消息（升序）', () async {
     final c = await repo().create();
-    await repo().appendMessage(_msg(
-      id: 'm1',
-      conversationId: c.id,
-      role: MessageRole.user,
-      content: '你好',
-      createdAt: DateTime(2026, 10, 1, 9, 0, 0),
-    ),);
-    await repo().appendMessage(_msg(
-      id: 'm2',
-      conversationId: c.id,
-      role: MessageRole.assistant,
-      content: '你也好',
-      createdAt: DateTime(2026, 10, 1, 9, 0, 1),
-    ),);
+    await repo().appendMessage(
+      _msg(
+        id: 'm1',
+        conversationId: c.id,
+        role: MessageRole.user,
+        content: '你好',
+        createdAt: DateTime(2026, 10, 1, 9, 0, 0),
+      ),
+    );
+    await repo().appendMessage(
+      _msg(
+        id: 'm2',
+        conversationId: c.id,
+        role: MessageRole.assistant,
+        content: '你也好',
+        createdAt: DateTime(2026, 10, 1, 9, 0, 1),
+      ),
+    );
 
     await session().ensureOpen();
 
@@ -183,21 +271,25 @@ void main() {
 
   test('switchTo：切换到另一会话并载入其消息', () async {
     final a = await repo().create();
-    await repo().appendMessage(_msg(
-      id: 'a1',
-      conversationId: a.id,
-      role: MessageRole.user,
-      content: 'A 的问题',
-      createdAt: DateTime(2026, 10, 1, 8, 0, 0),
-    ),);
+    await repo().appendMessage(
+      _msg(
+        id: 'a1',
+        conversationId: a.id,
+        role: MessageRole.user,
+        content: 'A 的问题',
+        createdAt: DateTime(2026, 10, 1, 8, 0, 0),
+      ),
+    );
     final b = await repo().create();
-    await repo().appendMessage(_msg(
-      id: 'b1',
-      conversationId: b.id,
-      role: MessageRole.user,
-      content: 'B 的问题',
-      createdAt: DateTime(2026, 10, 1, 8, 5, 0),
-    ),);
+    await repo().appendMessage(
+      _msg(
+        id: 'b1',
+        conversationId: b.id,
+        role: MessageRole.user,
+        content: 'B 的问题',
+        createdAt: DateTime(2026, 10, 1, 8, 5, 0),
+      ),
+    );
     // 显式定序 updatedAt：B 更晚活跃 → getAll 首位为 B（规避时钟分辨率抖动）。
     final ca = repo().getById(a.id)!;
     ca.updatedAt = DateTime(2026, 10, 1, 8, 0);
@@ -296,34 +388,39 @@ void main() {
     expect(repo().messagesOf(id).length, 2);
   });
 
-  test('载入含工具轮次会话：assistant 轮次按后续 role:tool 重建 tool_calls',
-      () async {
+  test('载入含工具轮次会话：assistant 轮次按后续 role:tool 重建 tool_calls', () async {
     final c = await repo().create();
-    await repo().appendMessage(_msg(
-      id: 'u1',
-      conversationId: c.id,
-      role: MessageRole.user,
-      content: '讲讲我的错题',
-      createdAt: DateTime(2026, 10, 1, 9, 0, 0),
-    ),);
+    await repo().appendMessage(
+      _msg(
+        id: 'u1',
+        conversationId: c.id,
+        role: MessageRole.user,
+        content: '讲讲我的错题',
+        createdAt: DateTime(2026, 10, 1, 9, 0, 0),
+      ),
+    );
     // assistant 发起工具调用的轮次：持久层未落 tool_calls（content 为空）。
-    await repo().appendMessage(_msg(
-      id: 'a1',
-      conversationId: c.id,
-      role: MessageRole.assistant,
-      content: '',
-      createdAt: DateTime(2026, 10, 1, 9, 0, 1),
-    ),);
+    await repo().appendMessage(
+      _msg(
+        id: 'a1',
+        conversationId: c.id,
+        role: MessageRole.assistant,
+        content: '',
+        createdAt: DateTime(2026, 10, 1, 9, 0, 1),
+      ),
+    );
     // 工具结果回灌：toolCallId/toolName 已落库（field 6/7）。
-    await repo().appendMessage(_msg(
-      id: 't1',
-      conversationId: c.id,
-      role: MessageRole.tool,
-      content: '题目：25 + 38 = ?',
-      createdAt: DateTime(2026, 10, 1, 9, 0, 2),
-      toolName: 'explain_mistake',
-      toolCallId: 'call_1',
-    ),);
+    await repo().appendMessage(
+      _msg(
+        id: 't1',
+        conversationId: c.id,
+        role: MessageRole.tool,
+        content: '题目：25 + 38 = ?',
+        createdAt: DateTime(2026, 10, 1, 9, 0, 2),
+        toolName: 'explain_mistake',
+        toolCallId: 'call_1',
+      ),
+    );
 
     await session().ensureOpen();
 
@@ -352,8 +449,7 @@ void main() {
     );
     addTearDown(flakyContainer.dispose);
 
-    final flakySession =
-        flakyContainer.read(assistantSessionProvider.notifier);
+    final flakySession = flakyContainer.read(assistantSessionProvider.notifier);
     await flakySession.startNew();
     final id = flakyContainer.read(assistantSessionProvider).conversationId!;
     final revisionAfterOpen =
@@ -410,5 +506,14 @@ class _FlakyAppendRepository extends ConversationRepository {
     }
     persisted.add(message);
     await super.appendMessage(message);
+  }
+}
+
+class _FailingMirrorRepository extends ConversationRepository {
+  bool failReads = false;
+  @override
+  List<Message> messagesOf(String conversationId) {
+    if (failReads) throw StateError('模拟镜像读取失败');
+    return super.messagesOf(conversationId);
   }
 }

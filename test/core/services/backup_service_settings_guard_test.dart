@@ -75,7 +75,7 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       'daily_math_goal': 30,
       'math_batch_size': 20,
       'math_difficulty': 'hard',
-      'math_practice_mode': 'addition',
+      'math_practice_mode': 'findResult',
       'llm_provider_name': 'DeepSeek', // LLM 供应商名称（纯展示，非敏感）
       'has_onboarded': true,
       // 通知设置（notification_service 直读写，随备份迁移）。
@@ -329,7 +329,8 @@ void main() {
     }
   });
 
-  test('AC3 补充：导出 JSON 明文任何位置不含 llm_api_key_hint', () async {    // 预置带 Key 的 LLM 配置（导出端写 hint 的前提条件）。
+  test('AC3 补充：导出 JSON 明文任何位置不含 llm_api_key_hint', () async {
+    // 预置带 Key 的 LLM 配置（导出端写 hint 的前提条件）。
     await HiveBoxes.settings.put(
       'llm_providers',
       jsonEncode([
@@ -431,7 +432,7 @@ void main() {
     expect(HiveBoxes.settings.get('daily_math_goal'), 30);
     expect(HiveBoxes.settings.get('math_batch_size'), 20);
     expect(HiveBoxes.settings.get('math_difficulty'), 'hard');
-    expect(HiveBoxes.settings.get('math_practice_mode'), 'addition');
+    expect(HiveBoxes.settings.get('math_practice_mode'), 'findResult');
     expect(HiveBoxes.settings.get('llm_provider_name'), 'DeepSeek');
     expect(HiveBoxes.settings.get('has_onboarded'), isTrue);
     // 通知设置 4 个白名单 key 还原（AC7 round-trip）。

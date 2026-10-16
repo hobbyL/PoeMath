@@ -76,6 +76,10 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
 
   /// 是否已结束
   bool _finished = false;
+  bool _answerPending = false;
+  Timer? _nextProblemTimer;
+  DateTime? _completedAt;
+  int? _completedElapsed;
 
   /// 当前题目
   MathProblem? _currentProblem;
@@ -114,6 +118,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   @override
   void dispose() {
     _timer?.cancel();
+    _nextProblemTimer?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     _shakeController.dispose();
@@ -169,13 +174,15 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     setState(() {
       _currentProblem = problem;
       _lastCorrect = null;
+      _answerPending = false;
     });
   }
 
   void _submitAnswer() {
-    if (_finished || _currentProblem == null) return;
+    if (_finished || _answerPending || _currentProblem == null) return;
     final userAnswer = _controller.text.trim();
     if (userAnswer.isEmpty) return;
+    _answerPending = true;
 
     final problem = _currentProblem!;
     final judgement = MathEngine.judge(problem, userAnswer);
@@ -224,7 +231,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     _controller.clear();
 
     // 短暂显示反馈后出下一题
-    Future.delayed(const Duration(milliseconds: 400), () {
+    _nextProblemTimer = Timer(const Duration(milliseconds: 400), () {
       if (mounted && !_finished) {
         _generateProblem();
         _focusNode.requestFocus();
@@ -278,8 +285,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
 
   Future<void> _finishChallenge() async {
     if (_finished || _isSaving) return;
+    _nextProblemTimer?.cancel();
 
-    final elapsed = _startedAt != null
+    final elapsed = _completedElapsed ??= _startedAt != null
         ? DateTime.now().difference(_startedAt!).inSeconds
         : _initialSeconds;
     final stars = LearningRewardCalculator.calculateStars(
@@ -366,7 +374,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final semester = ref.read(mathSemesterProvider);
     final settingsRepo = ref.read(settingsRepositoryProvider);
     final difficulty = settingsRepo.mathDifficulty;
-    final completedAt = DateTime.now();
+    final completedAt = _completedAt ??= DateTime.now();
 
     final record = ChallengeRecord(
       id: _challengeId,
@@ -387,16 +395,17 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final repo = ref.read(challengeRecordRepoProvider);
     final statsRepo = ref.read(userStatsRepoProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
+    final activityRepo = ref.read(learningActivityRepositoryProvider);
     await repo.save(record);
-    await ref.read(learningActivityRepositoryProvider).record(
-          id: record.id,
-          activityType: LearningActivityType.mathChallenge,
-          totalItems: _totalAnswered,
-          successfulItems: _correctCount,
-          starsEarned: stars,
-          durationSeconds: elapsed,
-          completedAt: completedAt,
-        );
+    await activityRepo.record(
+      id: record.id,
+      activityType: LearningActivityType.mathChallenge,
+      totalItems: _totalAnswered,
+      successfulItems: _correctCount,
+      starsEarned: stars,
+      durationSeconds: elapsed,
+      completedAt: completedAt,
+    );
     await statsRepo.settleMathChallenge(
       activityId: record.id,
       problems: _totalAnswered,
@@ -1045,6 +1054,10 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   }
 
   void _restartChallenge() {
+    _nextProblemTimer?.cancel();
+    _answerPending = false;
+    _completedAt = null;
+    _completedElapsed = null;
     setState(() {
       _started = false;
       _finished = false;

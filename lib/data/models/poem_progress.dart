@@ -64,4 +64,24 @@ class PoemProgress extends HiveObject {
     this.firstStudiedAt,
     this.stars = 0,
   });
+
+  /// 修改后再保存，避免 IO 失败时污染 Hive 内存中的旧对象。
+  PoemProgress copyWith({
+    LearningStatus? status,
+    int? masteryLevel,
+    int? studyCount,
+    DateTime? lastStudiedAt,
+    DateTime? firstStudiedAt,
+    int? stars,
+  }) =>
+      PoemProgress(
+        poemId: poemId,
+        profileId: profileId,
+        status: status ?? this.status,
+        masteryLevel: masteryLevel ?? this.masteryLevel,
+        studyCount: studyCount ?? this.studyCount,
+        lastStudiedAt: lastStudiedAt ?? this.lastStudiedAt,
+        firstStudiedAt: firstStudiedAt ?? this.firstStudiedAt,
+        stars: stars ?? this.stars,
+      );
 }

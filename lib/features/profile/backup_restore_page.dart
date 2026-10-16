@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:poemath/features/assistant/assistant_session_provider.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -330,8 +331,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
 
       // 端点变更预检：LLM 配置随备份迁移（含 baseUrl），恢复前让用户确认
       // 地址变更，避免恶意备份把真实 API Key 导向攻击者服务器（P1 闸门）。
-      final endpointChanges =
-          BackupService.detectLlmEndpointChanges(fileJson);
+      final endpointChanges = BackupService.detectLlmEndpointChanges(fileJson);
       if (endpointChanges != null && !endpointChanges.isEmpty) {
         if (!context.mounted) return;
         final trusted =
@@ -339,7 +339,9 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
         if (trusted != true) return; // 用户取消 = 中止恢复，数据零变更
       }
 
-      final count = await backup.restoreFromFile(filePath, passphrase: passphrase);
+      final session = ref.read(assistantSessionProvider.notifier);
+      final count = await session.whileRestoring(
+          () => backup.restoreFromFile(filePath, passphrase: passphrase),);
       final notificationsApplied =
           await notifications.reconcileWithStoredSettings();
       if (!context.mounted) return;

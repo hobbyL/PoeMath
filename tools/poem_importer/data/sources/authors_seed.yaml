@@ -3448,3 +3448,57 @@ authors:
     brief: "明诗人/文学家。本应用收录其相关作品 1 首，可供诵读欣赏。"
     representative_works: [poem_exp_446]
     avatar: default_avatar.png
+
+  - id: author_tangyin
+    name: 唐寅
+    dynasty: 明
+    life_years: ""
+    title: ""
+    brief: "明代诗人，本诗词库收录其《画鸡》。"
+    representative_works: [poem_exp_665]
+    avatar: default_avatar.png
+
+  - id: author_qianfu
+    name: 钱福
+    dynasty: 明
+    life_years: ""
+    title: ""
+    brief: "明代诗人，本诗词库收录其《明日歌》。"
+    representative_works: [poem_exp_666]
+    avatar: default_avatar.png
+
+  - id: author_lumeipo
+    name: 卢梅坡
+    dynasty: 宋
+    life_years: ""
+    title: ""
+    brief: "宋代诗人，本诗词库收录其《雪梅》。"
+    representative_works: [poem_exp_667]
+    avatar: default_avatar.png
+
+  - id: author_gaopian
+    name: 高骈
+    dynasty: 唐
+    life_years: ""
+    title: ""
+    brief: "唐代诗人，本诗词库收录其《山亭夏日》。"
+    representative_works: [poem_exp_669]
+    avatar: default_avatar.png
+
+  - id: author_weiyuan
+    name: 魏源
+    dynasty: 清
+    life_years: ""
+    title: ""
+    brief: "清代诗人，本诗词库收录其《晓窗》。"
+    representative_works: [poem_exp_670]
+    avatar: default_avatar.png
+
+  - id: author_wengjuan
+    name: 翁卷
+    dynasty: 宋
+    life_years: ""
+    title: ""
+    brief: "宋代诗人，本诗词库收录其《乡村四月》。"
+    representative_works: [poem_exp_671]
+    avatar: default_avatar.png

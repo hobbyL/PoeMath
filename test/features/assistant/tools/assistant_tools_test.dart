@@ -11,6 +11,7 @@
 //     绝不静默入库；
 //   - Key 安全：工具结果文本不含 apiKey。
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -416,6 +417,37 @@ void main() {
       expect(data.semester, '上');
       expect(data.topicName, 'addition');
       expect(data.items, hasLength(3));
+    });
+
+    test('出题网络等待期间取消，晚到草稿不能打开预览页', () async {
+      final requested = Completer<void>();
+      final response = Completer<http.Response>();
+      final router = _RecordingRouter();
+      final container = containerWith(
+        router: router,
+        httpClient: MockClient((_) {
+          requested.complete();
+          return response.future;
+        }),
+      );
+      await _seedWordProblemProvider(store);
+      final tool = container
+          .read(assistantToolsProvider)
+          .whereType<GenerateWordProblemsTool>()
+          .single;
+      var active = true;
+      final pending = tool.executeCancellable(
+        container.read(_containerRefProvider),
+        {'grade': 2, 'semester': '上', 'topic': 'addition', 'count': 3},
+        isActive: () => active,
+      );
+      await requested.future;
+      active = false;
+      response.complete(_draftsResponse(3));
+      final result = await pending;
+      expect(result.isError, isTrue);
+      expect(result.content, '操作已取消');
+      expect(router.pushes, isEmpty);
     });
 
     test('LLM 服务 5xx → ToolResult.error 友好文本，不 push', () async {

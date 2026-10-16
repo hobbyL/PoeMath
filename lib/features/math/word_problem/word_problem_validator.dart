@@ -21,6 +21,10 @@ const List<String> kSubtractionConflictWords = [
   '少了',
   '用去',
   '花了',
+  '多几个',
+  '少几个',
+  '相差',
+  '减去',
 ];
 
 /// 与减法语义冲突的词（加法/合并情境用语）。
@@ -31,8 +35,7 @@ const List<String> kAdditionConflictWords = ['一共', '总共'];
 /// 覆盖 ASCII 与全角两套：ASCII `+ - * / = ( )`、数学减号 U+2212 `−`、
 /// 乘除号 `×÷`、全角 `＝＋－＊／（）`。ASCII `-`、`*`、`/` 与全角 `＝`
 /// 曾缺失，导致题面「算式是 12 - 4」可绕过铁律 3。
-final RegExp kForbiddenSymbolPattern =
-    RegExp(r'[+\-*/−×÷=()＝＋－＊／（）]');
+final RegExp kForbiddenSymbolPattern = RegExp(r'[+\-*/−×÷=()＝＋－＊／（）]');
 
 /// 全角数字（U+FF10–FF19）。铁律 7 要求数字用（半角）阿拉伯数字；
 /// 全角数字还会绕过 `\d` 提取使答案泄露检测失明，出现即拒绝。
@@ -43,7 +46,17 @@ final RegExp _fullWidthDigitPattern = RegExp(r'[０-９]');
 /// answer > 10 的汉字组合（如「十六」）表述复杂且泄露概率低，
 /// 由家长预览兜底，不做检测。
 const List<String> kChineseDigitWords = [
-  '零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+  '零',
+  '一',
+  '二',
+  '三',
+  '四',
+  '五',
+  '六',
+  '七',
+  '八',
+  '九',
+  '十',
 ];
 
 /// 非整数数字（应用题骨架全为整数，出现小数即违规）。
@@ -86,8 +99,7 @@ class WordProblemValidator {
     final expectedNumbers = List<int>.from(skeleton.operands);
     // 答案泄露：答案不等于任何操作数时，题面不得出现答案。
     // （若答案恰为某操作数，如 3 × 1 = 3，题面必然含该数字，不误报。）
-    final answerIsOperand =
-        skeleton.operands.contains(skeleton.answer);
+    final answerIsOperand = skeleton.operands.contains(skeleton.answer);
     if (!answerIsOperand && textNumbers.contains(skeleton.answer)) {
       return '题面中出现了答案 ${skeleton.answer}';
     }
@@ -109,10 +121,9 @@ class WordProblemValidator {
     if (semanticError != null) return semanticError;
 
     // ---- 3) 数学正确（骨架权威复算，防御骨架被篡改） ----
-    final operands = skeleton.operands
-        .map(NumberValue.fromInt)
-        .toList();
-    final evaluated = ExpressionEvaluator.evaluate(operands, skeleton.operators);
+    final operands = skeleton.operands.map(NumberValue.fromInt).toList();
+    final evaluated =
+        ExpressionEvaluator.evaluate(operands, skeleton.operators);
     if (evaluated == null || !evaluated.isInteger) {
       return '骨架算式无法求出整数结果';
     }
@@ -122,6 +133,17 @@ class WordProblemValidator {
 
     // ---- explanation 数字检查 ----
     if (explanation.trim().isNotEmpty) {
+      final equation = RegExp(r'(\d+)\s*([+\-×÷])\s*(\d+)\s*[=＝]\s*(\d+)');
+      for (final match in equation.allMatches(explanation)) {
+        final a = NumberValue.fromInt(int.parse(match[1]!));
+        final b = NumberValue.fromInt(int.parse(match[3]!));
+        final op = Operator.values.firstWhere((op) => op.symbol == match[2]);
+        final value = ExpressionEvaluator.evaluate([a, b], [op]);
+        if (value == null ||
+            value != NumberValue.fromInt(int.parse(match[4]!)).asFraction) {
+          return '讲解包含错误算式';
+        }
+      }
       // 讲解长度上限：题面限 120 字而讲解原不限——LLM 超长讲解会
       // 撑爆预览/练习页讲解区并长期占存储。
       if (explanation.trim().length > 300) return '讲解超过 300 字';
@@ -132,13 +154,17 @@ class WordProblemValidator {
         return '讲解包含非阿拉伯数字字符';
       }
       final explanationNumbers = _extractNumbers(explanation);
-      final allowed = List<int>.from(skeleton.operands)
-        ..add(skeleton.answer);
+      final allowed = List<int>.from(skeleton.operands)..add(skeleton.answer);
       for (final n in explanationNumbers) {
         if (!allowed.contains(n)) {
           return '讲解引入了新数字 $n（只能引用题目数字与答案）';
         }
       }
+    }
+
+    if (explanation.trim().isNotEmpty) {
+      final explanationError = _checkSemantics(explanation, skeleton.operators);
+      if (explanationError != null) return '讲解运算与骨架冲突：$explanationError';
     }
 
     return null;
@@ -208,4 +234,3 @@ class WordProblemValidator {
     return true;
   }
 }
-

@@ -9,8 +9,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/data/models/poem_progress.dart';
+import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
@@ -46,8 +48,14 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   late final CelebrationController _confettiController;
   bool _allowResultPop = false;
   bool _isFinishing = false;
+  bool _settled = false;
+  String? _settlementError;
   int _starsEarned = 0;
   String? _activityId;
+  DateTime? _completedAt;
+  int? _settledDuration;
+  bool _progressRecorded = false;
+  PoemProgress? _recordedProgress;
 
   @override
   void initState() {
@@ -190,8 +198,9 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   }
 
   Future<void> _finishQuiz() async {
-    if (_isFinishing) return;
+    if (_isFinishing || _settled) return;
     _isFinishing = true;
+    _settlementError = null;
     if (mounted) setState(() {});
 
     final session = _session!;
@@ -201,45 +210,43 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       totalItems: session.questions.length,
       successfulItems: session.correctCount,
     );
-    final completedAt = DateTime.now();
+    final completedAt = _completedAt ??= DateTime.now();
+    final duration = _settledDuration ??= session.elapsedSeconds;
     _starsEarned = stars;
+    final progressRepo = ref.read(poemProgressRepoProvider);
+    final statsRepo = ref.read(userStatsRepoProvider);
+    final activityRepo = ref.read(learningActivityRepositoryProvider);
+    final checkInRepo = ref.read(checkInRepoProvider);
+    final reviewRepo = ref.read(reviewRepoProvider);
     try {
-      // 记录学习
-      final progressRepo = ref.read(poemProgressRepoProvider);
-      final progress = await progressRepo.recordStudy(widget.poemId);
-      ref.invalidate(poemProgressProvider(widget.poemId));
+      if (!_progressRecorded) {
+        _recordedProgress = await progressRepo.recordStudy(widget.poemId);
+        _progressRecorded = true;
+      }
+      final progress = _recordedProgress!.copyWith();
 
       // 更新全局统计
-      final statsRepo = ref.read(userStatsRepoProvider);
       final learnedCount = progressRepo.learnedCount;
       await statsRepo.updatePoemStats(learned: learnedCount);
-      await ref.read(learningActivityRepositoryProvider).record(
-            id: activityId,
-            activityType: LearningActivityType.poemQuiz,
-            totalItems: session.questions.length,
-            successfulItems: session.correctCount,
-            poemId: widget.poemId,
-            starsEarned: stars,
-            durationSeconds: session.elapsedSeconds,
-            completedAt: completedAt,
-          );
+      await activityRepo.record(
+        id: activityId,
+        activityType: LearningActivityType.poemQuiz,
+        totalItems: session.questions.length,
+        successfulItems: session.correctCount,
+        poemId: widget.poemId,
+        starsEarned: stars,
+        durationSeconds: duration,
+        completedAt: completedAt,
+      );
       if (stars > 0) {
         await statsRepo.addStars(stars, activityId: activityId);
       }
-      await ref.read(checkInRepoProvider).updateToday(
-            activityId: activityId,
-            addPoems: 1,
-            addStars: stars,
-            addDuration: session.elapsedSeconds,
-          );
-      ref.invalidate(learnedCountProvider);
-      ref.invalidate(userStatsProvider);
-      ref.invalidate(todayPoemCountProvider);
-      ref.invalidate(todayCheckInProvider);
-      // R5：学习状态筛选下 filteredPoemsProvider 读了进度，
-      // 完成后失效，返回列表时状态及时刷新。
-      ref.invalidate(filteredPoemsProvider);
-
+      await checkInRepo.updateToday(
+        activityId: activityId,
+        addPoems: 1,
+        addStars: stars,
+        addDuration: duration,
+      );
       // 通过时更新掌握等级、状态和复习计划
       if (session.isPassed) {
         var needSave = false;
@@ -257,19 +264,29 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
         if (needSave) {
           await progressRepo.save(progress);
-          ref.invalidate(poemProgressProvider(widget.poemId));
         }
 
         // 首次通过 → 创建艾宾浩斯复习计划
-        final reviewRepo = ref.read(reviewRepoProvider);
         final existing = reviewRepo.get(widget.poemId);
         if (existing == null) {
           await reviewRepo.createSchedule(widget.poemId);
         }
       }
 
+      _settled = true;
+      if (!mounted) return;
+      ref.invalidate(learnedCountProvider);
+      ref.invalidate(userStatsProvider);
+      ref.invalidate(todayPoemCountProvider);
+      ref.invalidate(todayCheckInProvider);
+      // R5：学习状态筛选下 filteredPoemsProvider 读了进度，
+      // 完成后失效，返回列表时状态及时刷新。
+      ref.invalidate(filteredPoemsProvider);
+
+      ref.invalidate(poemProgressProvider(widget.poemId));
       // 成就自动检查
-      final newlyUnlocked = await checkAchievements(ref);
+      final newlyUnlocked = await _checkAchievementsSafely();
+      if (!mounted) return;
       ref.invalidate(unlockedAchievementsCountProvider);
 
       if (mounted && newlyUnlocked.isNotEmpty) {
@@ -281,14 +298,26 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
           subtitle: names,
         );
       }
+    } on Object catch (error, stack) {
+      AppLogger.e('测试结算失败', tag: 'PoemQuiz', error: error, stackTrace: stack);
+      _settlementError = '学习记录保存失败，请重试';
     } finally {
       _isFinishing = false;
       if (mounted) setState(() {});
     }
   }
 
+  Future<List<Achievement>> _checkAchievementsSafely() async {
+    try {
+      return await checkAchievements(ref);
+    } on Object catch (error, stack) {
+      AppLogger.e('成就检查失败', tag: 'PoemQuiz', error: error, stackTrace: stack);
+      return const [];
+    }
+  }
+
   void _exitWithResult() {
-    if (_allowResultPop) return;
+    if (_allowResultPop || !_settled) return;
     final session = _session;
     if (session == null || !session.isFinished) return;
 
@@ -816,20 +845,38 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
           const Spacer(),
 
           // 操作按钮
+          if (_settlementError != null) ...[
+            Text(
+              _settlementError!,
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+            TextButton(
+              onPressed: _isFinishing ? null : _finishQuiz,
+              child: const Text('重试保存'),
+            ),
+          ],
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    // 重新测试
-                    setState(() {
-                      _session = null;
-                      _answered = false;
-                      _allowResultPop = false;
-                      _fillController.clear();
-                    });
-                    _initQuiz();
-                  },
+                  onPressed: !_settled
+                      ? null
+                      : () {
+                          // 重新测试
+                          setState(() {
+                            _completedAt = null;
+                            _settledDuration = null;
+                            _progressRecorded = false;
+                            _recordedProgress = null;
+                            _settled = false;
+                            _settlementError = null;
+                            _session = null;
+                            _answered = false;
+                            _allowResultPop = false;
+                            _fillController.clear();
+                          });
+                          _initQuiz();
+                        },
                   icon: const Icon(Icons.refresh),
                   label: const Text('再测一次'),
                 ),
@@ -837,7 +884,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
               const SizedBox(width: SpacingTokens.md),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: _exitWithResult,
+                  onPressed: _settled ? _exitWithResult : null,
                   icon: const Icon(Icons.check),
                   label: const Text('完成'),
                 ),

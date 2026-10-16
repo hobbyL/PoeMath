@@ -43,12 +43,19 @@ final class TencentSpeechRecognitionService
   final TencentAsrClient _tencentClient;
   final SettingsRepository _settingsRepository;
 
-  final List<int> _pcmBytes = <int>[];
-  StreamSubscription<Uint8List>? _audioSubscription;
-  Completer<void>? _audioDone;
-  Object? _audioError;
-  StackTrace? _audioErrorStackTrace;
+  _RecordingSession? _session;
+  int _generation = 0;
   bool _isRecording = false;
+  bool _starting = false;
+  Future<void> _recorderQueue = Future<void>.value();
+
+  // Only microphone operations are serialized. Cloud recognition may finish
+  // after a new recording starts, but must never stop that new recording.
+  Future<T> _withRecorder<T>(Future<T> Function() operation) {
+    final result = _recorderQueue.then((_) => operation());
+    _recorderQueue = result.then<void>((_) {}, onError: (Object _) {});
+    return result;
+  }
 
   @override
   bool get isRecording => _isRecording;
@@ -60,114 +67,127 @@ final class TencentSpeechRecognitionService
 
   @override
   Future<void> start() async {
-    if (_isRecording) {
+    if (_isRecording || _starting) {
       throw const SpeechRecognitionException('语音识别正在录音');
     }
-    if (!await _recorder.hasPermission()) {
-      throw const SpeechPermissionDeniedException();
-    }
-
-    _pcmBytes.clear();
-    _audioError = null;
-    _audioErrorStackTrace = null;
-    _audioDone = Completer<void>();
-    _isRecording = true;
-
+    _starting = true;
+    final generation = ++_generation;
+    final session = _RecordingSession();
     try {
-      final audioStream = await _recorder.startStream();
-      _audioSubscription = audioStream.listen(
-        _handleAudioChunk,
-        onError: _handleAudioError,
-        onDone: _handleAudioDone,
-        cancelOnError: false,
-      );
+      await _withRecorder(() async {
+        if (!await _recorder.hasPermission()) {
+          throw const SpeechPermissionDeniedException();
+        }
+        if (generation != _generation) return;
+        _session = session;
+        _isRecording = true;
+        final audioStream = await _recorder.startStream();
+        if (generation != _generation) {
+          await audioStream.listen((_) {}).cancel();
+          await _recorder.cancel();
+          return;
+        }
+        session.subscription = audioStream.listen(
+          session.add,
+          onError: (Object error, StackTrace stack) {
+            session.error ??= error;
+            session.stack ??= stack;
+          },
+          onDone: session.finish,
+        );
+      });
     } on Object {
-      _isRecording = false;
-      _clearSessionState();
+      if (identical(_session, session)) {
+        _session = null;
+        _isRecording = false;
+      }
       rethrow;
+    } finally {
+      _starting = false;
     }
-  }
-
-  void _handleAudioChunk(Uint8List bytes) {
-    if (_pcmBytes.length + bytes.length > TencentAsrClient.maxRawBytes) {
-      _audioError ??= const SpeechRecognitionException('录音不能超过 60 秒');
-      return;
-    }
-    _pcmBytes.addAll(bytes);
-  }
-
-  void _handleAudioError(Object error, StackTrace stackTrace) {
-    _audioError ??= error;
-    _audioErrorStackTrace ??= stackTrace;
-  }
-
-  void _handleAudioDone() {
-    final done = _audioDone;
-    if (done != null && !done.isCompleted) done.complete();
   }
 
   @override
   Future<SpeechRecognitionResult> stop() async {
-    if (!_isRecording) {
+    final session = _session;
+    if (!_isRecording || session == null) {
       throw const SpeechRecognitionException('当前没有正在进行的录音');
     }
+    final generation = _generation;
     _isRecording = false;
-
     try {
-      await _recorder.stop();
-      await _audioDone?.future;
-      final audioError = _audioError;
-      if (audioError != null) {
-        Error.throwWithStackTrace(
-          const SpeechRecognitionException('录音失败'),
-          _audioErrorStackTrace ?? StackTrace.current,
-        );
-      }
-
-      final pcmLength =
-          _pcmBytes.length.isEven ? _pcmBytes.length : _pcmBytes.length - 1;
-      final pcmBytes = Uint8List(pcmLength)..setRange(0, pcmLength, _pcmBytes);
-
+      final pcm = await _withRecorder(() async {
+        if (generation != _generation) {
+          throw const SpeechRecognitionException('录音已取消');
+        }
+        await _recorder.stop();
+        await session.done.future;
+        if (generation != _generation) {
+          throw const SpeechRecognitionException('录音已取消');
+        }
+        if (session.error != null) {
+          Error.throwWithStackTrace(
+            const SpeechRecognitionException('录音失败'),
+            session.stack ?? StackTrace.current,
+          );
+        }
+        final length = session.bytes.length - session.bytes.length % 2;
+        return Uint8List(length)..setRange(0, length, session.bytes);
+      });
       final credentials = await _settingsRepository.readTencentAsrCredentials();
+      if (generation != _generation) {
+        throw const SpeechRecognitionException('录音已取消');
+      }
       if (credentials == null) {
         throw const TencentAsrException(
           '请先保存腾讯云密钥',
           kind: TencentAsrErrorKind.authentication,
         );
       }
-
-      final cloudText = await _tencentClient.recognizePcm16(
-        pcmBytes: pcmBytes,
+      final text = await _tencentClient.recognizePcm16(
+        pcmBytes: pcm,
         credentials: credentials,
       );
-      return SpeechRecognitionResult(text: cloudText);
-    } on Object {
-      try {
-        await _recorder.cancel();
-      } on Exception {
-        AppLogger.w('识别失败后取消录音失败', tag: 'Speech');
+      if (generation != _generation) {
+        throw const SpeechRecognitionException('录音已取消');
       }
-      await _audioSubscription?.cancel();
+      return SpeechRecognitionResult(text: text);
+    } on Object {
+      if (generation == _generation) {
+        try {
+          await _withRecorder(() async {
+            if (generation == _generation) await _recorder.cancel();
+          });
+        } on Exception {
+          AppLogger.w('识别失败后取消录音失败', tag: 'Speech');
+        }
+      }
       rethrow;
     } finally {
-      await _audioSubscription?.cancel();
-      _clearSessionState();
+      await session.subscription?.cancel();
+      session.bytes.clear();
+      if (identical(_session, session)) _session = null;
     }
   }
 
   @override
   Future<void> cancel() async {
+    ++_generation;
+    final session = _session;
+    _session = null;
     final wasRecording = _isRecording;
     _isRecording = false;
-    if (wasRecording) {
+    session?.finish();
+    if (wasRecording || _starting) {
       try {
-        await _recorder.cancel();
+        await _withRecorder(_recorder.cancel);
       } on Exception {
         AppLogger.w('取消录音失败', tag: 'Speech');
       }
     }
-    await _audioSubscription?.cancel();
-    _clearSessionState();
+    await session?.subscription?.cancel();
+    session?.finish();
+    session?.bytes.clear();
   }
 
   @override
@@ -175,12 +195,24 @@ final class TencentSpeechRecognitionService
     await cancel();
     await _recorder.dispose();
   }
+}
 
-  void _clearSessionState() {
-    _audioSubscription = null;
-    _audioDone = null;
-    _audioError = null;
-    _audioErrorStackTrace = null;
-    _pcmBytes.clear();
+final class _RecordingSession {
+  final bytes = <int>[];
+  final done = Completer<void>();
+  StreamSubscription<Uint8List>? subscription;
+  Object? error;
+  StackTrace? stack;
+
+  void add(Uint8List chunk) {
+    if (bytes.length + chunk.length > TencentAsrClient.maxRawBytes) {
+      error ??= const SpeechRecognitionException('录音不能超过 60 秒');
+      return;
+    }
+    bytes.addAll(chunk);
+  }
+
+  void finish() {
+    if (!done.isCompleted) done.complete();
   }
 }

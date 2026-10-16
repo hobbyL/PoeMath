@@ -27,6 +27,9 @@ jobs:
           # 默认 fetch-depth=1 下拿不到 tag 历史。
           fetch-depth: 0
 
+      - name: Check Android compatibility declarations
+        run: python3 tools/check_android_compatibility.py
+
       # -------- 从 tag 提取版本号 --------
       - name: Extract version from tag
         id: version

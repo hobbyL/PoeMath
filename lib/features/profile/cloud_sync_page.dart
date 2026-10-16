@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:poemath/features/assistant/assistant_session_provider.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/backup_service.dart';
@@ -119,7 +120,21 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
           await settingsRepo.loadWebDavConfigWithCredentials(config);
       final passphrase =
           await ref.read(secureCredentialStoreProvider).readBackupPassphrase();
-      final json = await backup.exportToJson(passphrase: passphrase);
+      var degraded = false;
+      String json;
+      try {
+        json = await backup.exportToJson(passphrase: passphrase);
+      } on BackupCredentialExportException {
+        if (!mounted) return;
+        final proceed = await showCredentialExportFailedDialog(context);
+        if (proceed != true) {
+          scaffold
+              .showSnackBar(const SnackBar(content: Text('已取消上传（未修改云端备份）')));
+          return;
+        }
+        json = await backup.exportToJson();
+        degraded = true;
+      }
 
       // 冲突检测（上传方向）：本机导出时刻晚于本机上次同步 → 云端也在本机
       // 上次同步之后被其他设备写过。先拉一份云端读它的 exportedAt，两种
@@ -142,31 +157,13 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       scaffold.showSnackBar(
         SnackBar(
           content: Text(
-            passphrase == null ? '上传成功 ✓（未设置备份加密口令，本次备份不含凭据）' : '上传成功 ✓',
+            degraded
+                ? '上传成功 ✓（不含密钥）'
+                : passphrase == null
+                    ? '上传成功 ✓（未设置备份加密口令，本次备份不含凭据）'
+                    : '上传成功 ✓',
           ),
         ),
-      );
-    } on BackupCredentialExportException {
-      // 口令已设但密钥读不出来：不能静默上传一份缺密钥的备份，
-      // 让用户先决定是否接受。
-      if (!mounted) return;
-      final proceed = await showCredentialExportFailedDialog(context);
-      if (proceed != true) {
-        scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('已取消上传（未修改云端备份）')),
-        );
-        return;
-      }
-      // 无口令重导：跳过凭据读取，得到一份不含密钥但其余数据完整的备份。
-      final json = await backup.exportToJson();
-      final fullConfig =
-          await settingsRepo.loadWebDavConfigWithCredentials(config);
-      await webdav.upload(fullConfig, json);
-      await settingsRepo.setLastSyncedAt(_exportedAtOf(json) ?? DateTime.now());
-      scaffold.clearSnackBars();
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('上传成功 ✓（不含密钥）')),
       );
     } on WebDavException catch (e) {
       scaffold.clearSnackBars();
@@ -263,7 +260,9 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
         if (proceed != true) return; // 用户取消 = 中止恢复，数据零变更
       }
 
-      final count = await backup.restoreFromJson(json, passphrase: passphrase);
+      final session = ref.read(assistantSessionProvider.notifier);
+      final count = await session.whileRestoring(
+          () => backup.restoreFromJson(json, passphrase: passphrase),);
       final notificationsApplied =
           await notifications.reconcileWithStoredSettings();
       if (!mounted) return;

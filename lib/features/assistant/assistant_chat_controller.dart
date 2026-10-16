@@ -47,6 +47,8 @@ class AssistantChatController extends Notifier<AssistantChatState> {
 
   @override
   AssistantChatState build() {
+    _disposed = false;
+    _sessionToken++;
     ref.onDispose(() => _disposed = true);
     return const AssistantChatState();
   }
@@ -132,13 +134,17 @@ class AssistantChatController extends Notifier<AssistantChatState> {
   }
 
   /// 载入历史会话（子任务 3 切换会话时调用）；废弃在途请求。
-  void loadConversation(List<ChatMessage> messages) {
+  void loadConversation(
+    List<ChatMessage> messages, {
+    int contextBaseIndex = 0,
+  }) {
     _sessionToken++;
     state = AssistantChatState(
       status: messages.isEmpty
           ? AssistantChatStatus.idle
           : AssistantChatStatus.ready,
       messages: List<ChatMessage>.unmodifiable(messages),
+      contextBaseIndex: contextBaseIndex.clamp(0, messages.length),
     );
   }
 
@@ -201,8 +207,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     LlmClient? client;
     try {
       final repo = ref.read(settingsRepositoryProvider);
-      final config =
-          await repo.readLlmConfigForScenario(LlmScenario.assistant);
+      final config = await repo.readLlmConfigForScenario(LlmScenario.assistant);
       if (token != _sessionToken) return;
       if (config == null) {
         state = state.copyWith(
@@ -229,6 +234,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
       // role:tool，循环（≤4 轮）；无 tool_calls 或到顶即跳出走流式收尾。
       // 从 contextBaseIndex 起取历史：清除上下文后旧消息仅存档、不入请求。
       final base = state.contextBaseIndex.clamp(0, state.messages.length);
+      final prefix = state.messages.sublist(0, base);
       final working = <ChatMessage>[...state.messages.sublist(base)];
       for (var round = 0; round < kAssistantMaxToolRounds; round++) {
         final completion = await client.chatComplete(
@@ -250,7 +256,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
           ),
         );
         for (final call in completion.toolCalls) {
-          final result = await _runTool(toolsByName, call);
+          final result = await _runTool(toolsByName, call, token);
           if (token != _sessionToken) return;
           working.add(
             ChatMessage(
@@ -264,7 +270,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
         // 工具轮次并入 state → UI 渲染工具卡；仍 loading，等流式收尾。
         state = state.copyWith(
           status: AssistantChatStatus.loading,
-          messages: List<ChatMessage>.unmodifiable(working),
+          messages: List<ChatMessage>.unmodifiable([...prefix, ...working]),
           streamingText: '',
         );
       }
@@ -318,6 +324,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
   Future<ToolResult> _runTool(
     Map<String, AssistantTool> toolsByName,
     ToolCall call,
+    int token,
   ) async {
     final tool = toolsByName[call.name];
     if (tool == null) {
@@ -326,14 +333,16 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     Map<String, dynamic> args;
     try {
       final decoded = jsonDecode(call.argumentsJson);
-      args = decoded is Map<String, dynamic>
-          ? decoded
-          : <String, dynamic>{};
+      args = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
     } on FormatException {
       args = const <String, dynamic>{};
     }
     try {
-      return await tool.execute(ref, args);
+      return await tool.executeCancellable(
+        ref,
+        args,
+        isActive: () => !_disposed && token == _sessionToken,
+      );
     } catch (error) {
       // 工具自身兜底之上的最后防线：任何未预期异常都转错误文本回灌。
       AppLogger.e('助手工具执行失败：${call.name}', tag: 'Assistant', error: error);

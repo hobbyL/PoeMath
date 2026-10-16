@@ -303,6 +303,83 @@ void main() {
     await tester.pump();
   });
 
+  testWidgets('通过状态保存失败后重试确实再次持久化掌握等级', (tester) async {
+    final poem = Poem(
+      id: 'quiz_reward',
+      title: '奖励测试诗',
+      author: '测试作者',
+      dynasty: '唐',
+      content: '第一句长长',
+      pinyin: '',
+      layer: 'core',
+      grade: 1,
+    );
+    await tester.runAsync(() async {
+      await HiveBoxes.settings.put('sound_enabled', false);
+      await HiveBoxes.settings.put('haptic_enabled', false);
+    });
+    final statsRepo = _ImmediateStatsRepository();
+    final checkInRepo = _ImmediateCheckInRepository();
+    final activityRepo = _ImmediateLearningActivityRepository();
+    final progressRepo = _FailOnceMasteryRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          poemByIdProvider('quiz_reward').overrideWith((ref) => poem),
+          poemProgressRepoProvider.overrideWith(
+            (ref) => progressRepo,
+          ),
+          reviewRepoProvider.overrideWith(
+            (ref) => _ExistingReviewRepository(),
+          ),
+          checkInRepoProvider.overrideWith((ref) => checkInRepo),
+          userStatsRepoProvider.overrideWith((ref) => statsRepo),
+          learningActivityRepositoryProvider.overrideWith(
+            (ref) => activityRepo,
+          ),
+          achievementRepoProvider.overrideWith(
+            (ref) => _AlreadyUnlockedAchievementRepository(),
+          ),
+        ],
+        child: const MaterialApp(
+          home: PoemQuizPage(
+            poemId: 'quiz_reward',
+            quizType: QuizType.chooseDynasty,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    await tester.tap(find.text('唐'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+    await tester.tap(find.text('查看结果'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+
+    expect(find.text('重试保存'), findsOneWidget);
+    expect(progressRepo.saveCalls, 1);
+    expect(progressRepo.saved, isNull);
+    await tester.tap(find.text('重试保存'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    expect(progressRepo.saveCalls, 2);
+    expect(progressRepo.studyCalls, 1);
+    expect(progressRepo.saved!.masteryLevel, 5);
+    expect(progressRepo.saved!.status, LearningStatus.reviewing);
+    expect(find.text('重试保存'), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
   testWidgets('完成页双击完成：仅 pop 一次且结果为 quizPassed', (tester) async {
     // R3 同步 pop 回归：旧实现经 postFrameCallback 延迟一帧 pop，
     // 双击的第二次 canPop 已恢复，会再 pop(null) 丢结果/误弹上级路由。
@@ -336,7 +413,8 @@ void main() {
         checkInRepoProvider.overrideWith(
           (ref) => _ImmediateCheckInRepository(),
         ),
-        userStatsRepoProvider.overrideWith((ref) => _ImmediateStatsRepository()),
+        userStatsRepoProvider
+            .overrideWith((ref) => _ImmediateStatsRepository()),
         learningActivityRepositoryProvider.overrideWith(
           (ref) => _ImmediateLearningActivityRepository(),
         ),
@@ -411,4 +489,22 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
+}
+
+class _FailOnceMasteryRepository extends _ImmediatePoemProgressRepository {
+  int saveCalls = 0;
+  int studyCalls = 0;
+  PoemProgress? saved;
+  @override
+  Future<PoemProgress> recordStudy(String poemId) async {
+    studyCalls++;
+    return super.recordStudy(poemId);
+  }
+
+  @override
+  Future<void> save(PoemProgress progress) async {
+    saveCalls++;
+    if (saveCalls == 1) throw StateError('模拟掌握状态保存失败');
+    saved = progress;
+  }
 }

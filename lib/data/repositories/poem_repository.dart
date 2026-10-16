@@ -4,6 +4,7 @@
 // 职责：诗词数据仓储。提供按 ID、年级、作者、朝代、标签、层级筛选功能。
 //       内部维护应用层索引 Map（启动时一次性构建）。
 
+import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem.dart';
 
@@ -45,6 +46,7 @@ class PoemRepository {
     final byLayer = <String, List<String>>{};
 
     for (final poem in HiveBoxes.poems.values) {
+      if (PoemIdentity.aliases.containsKey(poem.id)) continue;
       // 年级索引（无 grade 的诗词按 difficulty 推算）
       byGrade.putIfAbsent(poem.effectiveGrade, () => []).add(poem.id);
       // 作者索引
@@ -80,13 +82,15 @@ class PoemRepository {
   // ============ 基础查询 ============
 
   /// 总诗词数
-  int get totalCount => HiveBoxes.poems.length;
+  int get totalCount => getAll().length;
 
   /// 按 ID 获取单首诗词
-  Poem? getById(String id) => HiveBoxes.poems.get(id);
+  Poem? getById(String id) => HiveBoxes.poems.get(PoemIdentity.canonical(id));
 
   /// 获取所有诗词
-  List<Poem> getAll() => HiveBoxes.poems.values.toList();
+  List<Poem> getAll() => HiveBoxes.poems.values
+      .where((p) => !PoemIdentity.aliases.containsKey(p.id))
+      .toList();
 
   // ============ 索引查询 ============
 
@@ -168,11 +172,13 @@ class PoemRepository {
   List<Poem> search(String keyword) {
     if (keyword.isEmpty) return [];
     final lower = keyword.toLowerCase();
-    return HiveBoxes.poems.values
-        .where((p) =>
-            p.title.toLowerCase().contains(lower) ||
-            p.content.toLowerCase().contains(lower) ||
-            p.author.toLowerCase().contains(lower),)
+    return getAll()
+        .where(
+          (p) =>
+              p.title.toLowerCase().contains(lower) ||
+              p.content.toLowerCase().contains(lower) ||
+              p.author.toLowerCase().contains(lower),
+        )
         .toList();
   }
 }

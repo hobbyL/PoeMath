@@ -16734,6 +16734,11 @@ poems:
     - "春天"
     - "唐诗"
   layer: explore
+  annotations:
+    - word: "迟日"
+      meaning: "春日。"
+    - word: "泥融"
+      meaning: "泥土湿润松软。"
 - id: poem_exp_657
   title: "赋得古原草送别"
   author: "白居易"
@@ -16748,12 +16753,17 @@ poems:
     - "送别"
     - "唐诗"
   layer: explore
+  annotations:
+    - word: "离离"
+      meaning: "草木茂盛的样子。"
+    - word: "王孙"
+      meaning: "这里指远行的朋友。"
 - id: poem_exp_658
   title: "四时田园杂兴·其二十五"
   author: "范成大"
   dynasty: "宋"
   content: "梅子金黄杏子肥，麦花雪白菜花稀。\n日长篱落无人过，惟有蜻蜓蛱蝶飞。"
-  translation: "梅子的金黄杏在子肥，麦花的雪白菜在花稀。日长的篱落无在人过，惟有的蜻蜓蛱在蝶飞。"
+  translation: "梅子金黄，杏子饱满，麦花雪白，油菜花渐渐稀疏。白昼漫长，篱笆旁无人经过，只有蜻蜓和蝴蝶飞来飞去。"
   appreciation: "《四时田园杂兴·其二十五》中「日长篱落无人过，惟有蜻蜓蛱蝶飞」最见精神。范成大写田园，画面清楚。"
   background: "宋范成大《四时田园杂兴·其二十五》。"
   famous_lines:
@@ -16762,6 +16772,11 @@ poems:
     - "田园"
     - "宋诗"
   layer: explore
+  annotations:
+    - word: "篱落"
+      meaning: "篱笆。"
+    - word: "蛱蝶"
+      meaning: "蝴蝶的一类。"
 - id: poem_exp_659
   title: "四时田园杂兴·其三十一"
   author: "范成大"
@@ -16777,6 +16792,13 @@ poems:
     - "宋诗"
     - "小学古诗"
   layer: explore
+  annotations:
+    - word: "耘田"
+      meaning: "在田间除草。"
+    - word: "绩麻"
+      meaning: "把麻搓成线。"
+    - word: "童孙"
+      meaning: "小孩子。"
 - id: poem_exp_660
   title: "回乡偶书·其二"
   author: "贺知章"
@@ -16791,6 +16813,11 @@ poems:
     - "思乡"
     - "唐诗"
   layer: explore
+  annotations:
+    - word: "消磨"
+      meaning: "逐渐消逝。"
+    - word: "镜湖"
+      meaning: "湖名，在今浙江绍兴。"
 - id: poem_exp_661
   title: "悯农·其二"
   author: "李绅"
@@ -16806,6 +16833,11 @@ poems:
     - "小学古诗"
     - "哲理"
   layer: explore
+  annotations:
+    - word: "锄禾"
+      meaning: "给禾苗除草松土。"
+    - word: "餐"
+      meaning: "饭食。"
 - id: poem_exp_662
   title: "悯农·其一"
   author: "李绅"
@@ -16821,6 +16853,11 @@ poems:
     - "唐诗"
     - "哲理"
   layer: explore
+  annotations:
+    - word: "粟"
+      meaning: "谷子，泛指粮食。"
+    - word: "四海"
+      meaning: "泛指全国。"
 - id: poem_exp_663
   title: "己亥杂诗·其二百二十"
   author: "龚自珍"
@@ -16835,6 +16872,13 @@ poems:
     - "抒怀"
     - "清诗"
   layer: explore
+  annotations:
+    - word: "恃"
+      meaning: "依靠。"
+    - word: "喑"
+      meaning: "沉默。"
+    - word: "抖擞"
+      meaning: "振作精神。"
 - id: poem_exp_664
   title: "舟夜书所见"
   author: "查慎行"
@@ -16849,6 +16893,11 @@ poems:
     - "写景"
     - "清诗"
   layer: explore
+  annotations:
+    - word: "月黑"
+      meaning: "没有月光，夜色昏暗。"
+    - word: "簇"
+      meaning: "聚集、拥起。"
 - id: poem_exp_665
   title: "画鸡"
   author: "唐寅"
@@ -16863,6 +16912,11 @@ poems:
     - "咏物"
     - "明诗"
   layer: explore
+  annotations:
+    - word: "红冠"
+      meaning: "公鸡头上的红色鸡冠。"
+    - word: "走将来"
+      meaning: "走过来。"
 - id: poem_exp_666
   title: "明日歌"
   author: "钱福"
@@ -16877,6 +16931,11 @@ poems:
     - "哲理"
     - "明诗"
   layer: explore
+  annotations:
+    - word: "蹉跎"
+      meaning: "虚度光阴。"
+    - word: "几何"
+      meaning: "多少。"
 - id: poem_exp_667
   title: "雪梅·其一"
   author: "卢梅坡"
@@ -16891,6 +16950,13 @@ poems:
     - "咏物"
     - "宋诗"
   layer: explore
+  annotations:
+    - word: "骚人"
+      meaning: "诗人。"
+    - word: "评章"
+      meaning: "评议、品评。"
+    - word: "逊"
+      meaning: "逊色，比不上。"
 - id: poem_exp_668
   title: "过华清宫绝句"
   author: "杜牧"
@@ -16905,12 +16971,19 @@ poems:
     - "怀古"
     - "唐诗"
   layer: explore
+  annotations:
+    - word: "次第"
+      meaning: "依次。"
+    - word: "一骑"
+      meaning: "一个骑马的人。"
+    - word: "红尘"
+      meaning: "飞扬的尘土。"
 - id: poem_exp_669
   title: "山亭夏日"
   author: "高骈"
   dynasty: "唐"
   content: "绿树阴浓夏日长，楼台倒影入池塘。\n水晶帘动微风起，满架蔷薇一院香。"
-  translation: "绿树的阴浓夏在日长，楼台的倒影入在池塘。水晶的帘动微在风起，满架的蔷薇一在院香。"
+  translation: "绿树浓荫，夏日悠长，楼台的倒影映入池塘。微风吹动如水晶帘般的水面，满架蔷薇让庭院芳香。"
   appreciation: "《山亭夏日》中「满架蔷薇一院香」最见精神。高骈写夏天，画面清楚。"
   background: "唐高骈《山亭夏日》。"
   famous_lines:
@@ -16919,6 +16992,11 @@ poems:
     - "夏天"
     - "唐诗"
   layer: explore
+  annotations:
+    - word: "阴浓"
+      meaning: "树荫浓密。"
+    - word: "水晶帘"
+      meaning: "晶莹的帘子，这里比喻水面倒影。"
 - id: poem_exp_670
   title: "晓窗"
   author: "魏源"
@@ -16933,6 +17011,11 @@ poems:
     - "哲理"
     - "清诗"
   layer: explore
+  annotations:
+    - word: "少"
+      meaning: "年少时。"
+    - word: "消磨"
+      meaning: "这里指时光逐渐流逝。"
 - id: poem_exp_671
   title: "乡村四月"
   author: "翁卷"
@@ -16947,6 +17030,13 @@ poems:
     - "田园"
     - "宋诗"
   layer: explore
+  annotations:
+    - word: "山原"
+      meaning: "山陵和原野。"
+    - word: "子规"
+      meaning: "杜鹃鸟。"
+    - word: "才了"
+      meaning: "刚刚结束。"
 - id: poem_exp_672
   title: "冬夜读书示子聿"
   author: "陆游"
@@ -16961,6 +17051,11 @@ poems:
     - "哲理"
     - "宋诗"
   layer: explore
+  annotations:
+    - word: "遗"
+      meaning: "留下。"
+    - word: "躬行"
+      meaning: "亲身实践。"
 - id: poem_exp_673
   title: "观书有感·其一"
   author: "朱熹"
@@ -16975,6 +17070,11 @@ poems:
     - "哲理"
     - "宋诗"
   layer: explore
+  annotations:
+    - word: "一鉴"
+      meaning: "一面镜子。"
+    - word: "渠"
+      meaning: "它，这里指方塘。"
 - id: poem_exp_674
   title: "观书有感·其二"
   author: "朱熹"
@@ -16989,3 +17089,11 @@ poems:
     - "哲理"
     - "宋诗"
   layer: explore
+
+  annotations:
+    - word: "蒙冲"
+      meaning: "古代战船，文中指大船。"
+    - word: "向来"
+      meaning: "先前。"
+    - word: "中流"
+      meaning: "江河中央。"

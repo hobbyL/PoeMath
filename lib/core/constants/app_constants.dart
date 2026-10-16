@@ -19,6 +19,9 @@ class AppConstants {
   /// 开发阶段未正式发版前保持 1.0.0；正式发布后变更数据资产时再递增。
   static const String dataVersion = '1.0.0';
 
+  /// 开发期资源修订，确保已安装的数据也获得勘误。
+  static const String contentRevision = '2026-10-16';
+
   /// slogan
   static const String slogan = '读诗、算数，慢慢来';
 

@@ -65,8 +65,7 @@ class ConversationRepository {
     final keys = HiveBoxes.messages.values
         .where(
           (m) =>
-              m.conversationId == id &&
-              m.profileId == ProfileScope.currentId,
+              m.conversationId == id && m.profileId == ProfileScope.currentId,
         )
         .map((m) => ProfileScope.key(m.id))
         .toList();
@@ -93,6 +92,8 @@ class ConversationRepository {
 
   /// 追加一条消息：入库 + 刷新会话 updatedAt + 首条 user 自动标题。
   Future<void> appendMessage(Message message) async {
+    final conversation = getById(message.conversationId);
+    if (conversation == null) return;
     // 自动标题仅在该会话此前无 user 消息时触发（须在 put 之前判断）。
     final isFirstUser = message.role == MessageRole.user &&
         messagesOf(message.conversationId)
@@ -101,12 +102,17 @@ class ConversationRepository {
 
     await HiveBoxes.messages.put(ProfileScope.key(message.id), message);
 
-    final conversation = getById(message.conversationId);
-    if (conversation == null) return;
     conversation.updatedAt = DateTime.now();
     if (isFirstUser) {
       conversation.title = _titleFrom(message.content);
     }
+    await conversation.save();
+  }
+
+  Future<void> setContextBaseIndex(String id, int index) async {
+    final conversation = getById(id);
+    if (conversation == null) return;
+    conversation.contextBaseIndex = index.clamp(0, messagesOf(id).length);
     await conversation.save();
   }
 

@@ -30,6 +30,7 @@ import 'package:http/testing.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/webdav_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/webdav_config.dart';
@@ -40,10 +41,20 @@ import '../../helpers/hive_test_helper.dart';
 
 /// 只报告「凭据不存在」的假安全存储：不触发任何平台通道。
 final class _NoCredentialStore extends SecureCredentialStore {
-  _NoCredentialStore() : super(storage: const _InertSecureStorage());
+  _NoCredentialStore({this.failExport = false})
+      : super(storage: const _InertSecureStorage());
+
+  final bool failExport;
 
   @override
-  Future<String?> readBackupPassphrase() async => null;
+  Future<String?> readBackupPassphrase() async =>
+      failExport ? 'test-pass' : null;
+
+  @override
+  Future<TencentAsrCredentials?> readTencentAsrCredentials() async {
+    if (failExport) throw StateError('模拟安全存储不可读');
+    return null;
+  }
 
   @override
   Future<({String username, String password})?> readWebDavCredentials(
@@ -86,7 +97,8 @@ NotificationService _testNotificationService() {
 /// `null` 还是 `Future<dynamic>`，都会在调用点触发
 /// `type '...' is not a subtype of type 'Future<bool?>'`。
 /// `resolvePlatformSpecificImplementation` 返回 null，让平台专有分支自然跳过。
-final class _InertNotificationsPlugin implements FlutterLocalNotificationsPlugin {
+final class _InertNotificationsPlugin
+    implements FlutterLocalNotificationsPlugin {
   const _InertNotificationsPlugin();
 
   @override
@@ -99,12 +111,13 @@ final class _InertNotificationsPlugin implements FlutterLocalNotificationsPlugin
       true;
 
   @override
-  Future<NotificationAppLaunchDetails?> getNotificationAppLaunchDetails() async =>
-      null;
+  Future<NotificationAppLaunchDetails?>
+      getNotificationAppLaunchDetails() async => null;
 
   @override
   T? resolvePlatformSpecificImplementation<
-      T extends FlutterLocalNotificationsPlatform>() => null;
+          T extends FlutterLocalNotificationsPlatform>() =>
+      null;
 
   @override
   Future<void> zonedSchedule(
@@ -198,6 +211,7 @@ void main() {
     WidgetTester tester,
     _FakeCloud fake, {
     Future<void> Function()? before,
+    bool failCredentialExport = false,
   }) async {
     await tester.runAsync(() async {
       await setUpHiveForTesting();
@@ -215,8 +229,8 @@ void main() {
           webDavServiceProvider.overrideWithValue(
             WebDavService(client: fake.client),
           ),
-          secureCredentialStoreProvider
-              .overrideWithValue(_NoCredentialStore()),
+          secureCredentialStoreProvider.overrideWithValue(
+              _NoCredentialStore(failExport: failCredentialExport),),
         ],
         child: MaterialApp(
           home: CloudSyncPage(
@@ -239,10 +253,15 @@ void main() {
       ),
     );
 
-    await pumpPage(tester, cloud, before: () async {
-      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
-      await HiveBoxes.settings.put('theme_mode', 'dark');
-    },);
+    await pumpPage(
+      tester,
+      cloud,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-12T08:00:00.000');
+        await HiveBoxes.settings.put('theme_mode', 'dark');
+      },
+    );
     await tapAndSettle(tester, find.text('从云端下载'));
     // 覆盖确认（既有的下载二次确认）→ 通过。
     await tapAndSettle(tester, find.text('确认下载'));
@@ -262,11 +281,17 @@ void main() {
 
   testWidgets('下载：用户确认后恢复，last_synced_at 推进到云端 exportedAt', (tester) async {
     final exportedAt = DateTime(2026, 10, 13, 15, 45);
-    cloud = _FakeCloud(content: _backupJson(exportedAt: exportedAt, checkIns: 2));
+    cloud =
+        _FakeCloud(content: _backupJson(exportedAt: exportedAt, checkIns: 2));
 
-    await pumpPage(tester, cloud, before: () async {
-      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
-    },);
+    await pumpPage(
+      tester,
+      cloud,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-12T08:00:00.000');
+      },
+    );
     await tapAndSettle(tester, find.text('从云端下载'));
     await tapAndSettle(tester, find.text('确认下载'));
 
@@ -285,9 +310,14 @@ void main() {
       content: _backupJson(exportedAt: DateTime(2026, 10, 13), checkIns: 1),
     );
 
-    await pumpPage(tester, cloud, before: () async {
-      await HiveBoxes.settings.put('last_synced_at', '2026-10-14T08:00:00.000');
-    },);
+    await pumpPage(
+      tester,
+      cloud,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-14T08:00:00.000');
+      },
+    );
     await tapAndSettle(tester, find.text('从云端下载'));
     await tapAndSettle(tester, find.text('确认下载'));
 
@@ -318,11 +348,17 @@ void main() {
     // 云端被别的设备写过。旧判定会因为恒真条件而弹框；新判定同样弹框，
     // 但语义诚实：覆盖云端前用户应当知情。若将来真的引入数据变更时间戳，
     // 此用例即是要被重新审视的行为契约。
-    cloud = _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
+    cloud =
+        _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
 
-    await pumpPage(tester, cloud, before: () async {
-      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
-    },);
+    await pumpPage(
+      tester,
+      cloud,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-12T08:00:00.000');
+      },
+    );
     await tapAndSettle(tester, find.text('上传到云端'));
 
     expect(find.text('⚠️ 云端数据比本机新'), findsOneWidget);
@@ -331,11 +367,17 @@ void main() {
   testWidgets('上传：云端不比上次同步新 → 不打扰，直接上传', (tester) async {
     // 边界：云端 exportedAt 恰好等于 last_synced_at（同一时刻）时不弹框。
     // `isAfter` 是严格大于，相等不算「被改过」。
-    cloud = _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 12, 8)));
+    cloud =
+        _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 12, 8)));
 
-    await pumpPage(tester, cloud, before: () async {
-      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
-    },);
+    await pumpPage(
+      tester,
+      cloud,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-12T08:00:00.000');
+      },
+    );
     await tapAndSettle(tester, find.text('上传到云端'));
 
     expect(find.text('⚠️ 云端数据比本机新'), findsNothing);
@@ -352,9 +394,14 @@ void main() {
       }),
     );
 
-    await pumpPage(tester, cloud, before: () async {
-      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
-    },);
+    await pumpPage(
+      tester,
+      cloud,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-12T08:00:00.000');
+      },
+    );
     await tapAndSettle(tester, find.text('上传到云端'));
 
     expect(find.text('⚠️ 云端数据比本机新'), findsNothing);
@@ -363,11 +410,17 @@ void main() {
 
   testWidgets('上传：取消冲突框 → 不发出 PUT，时间线保持原值', (tester) async {
     // 云端更晚（另一台设备写的）。
-    cloud = _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
+    cloud =
+        _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
 
-    await pumpPage(tester, cloud, before: () async {
-      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
-    },);
+    await pumpPage(
+      tester,
+      cloud,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-12T08:00:00.000');
+      },
+    );
     await tapAndSettle(tester, find.text('上传到云端'));
 
     expect(find.text('⚠️ 云端数据比本机新'), findsOneWidget);
@@ -381,12 +434,38 @@ void main() {
     );
   });
 
-  testWidgets('上传：确认后 PUT 一次，last_synced_at 推进到本次导出时刻', (tester) async {
-    cloud = _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
+  testWidgets('上传：凭据导出降级后仍执行冲突确认，取消不覆盖云端', (tester) async {
+    cloud =
+        _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
+    await pumpPage(
+      tester,
+      cloud,
+      failCredentialExport: true,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-12T08:00:00.000');
+      },
+    );
+    await tapAndSettle(tester, find.text('上传到云端'));
+    await tapAndSettle(tester, find.text('仍然导出（不含密钥）'));
+    expect(find.text('⚠️ 云端数据比本机新'), findsOneWidget);
+    await tapAndSettle(tester, find.text('取消'));
+    expect(cloud.puts, 0);
+    expect(HiveBoxes.settings.get('last_synced_at'), '2026-10-12T08:00:00.000');
+  });
 
-    await pumpPage(tester, cloud, before: () async {
-      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
-    },);
+  testWidgets('上传：确认后 PUT 一次，last_synced_at 推进到本次导出时刻', (tester) async {
+    cloud =
+        _FakeCloud(content: _backupJson(exportedAt: DateTime(2026, 10, 14)));
+
+    await pumpPage(
+      tester,
+      cloud,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-12T08:00:00.000');
+      },
+    );
     await tapAndSettle(tester, find.text('上传到云端'));
     await tapAndSettle(tester, find.text('仍然上传覆盖'));
 
@@ -416,9 +495,14 @@ void main() {
   testWidgets('上传：云端读取失败 → 跳过冲突检测，仍可正常上传', (tester) async {
     cloud = _FakeCloud(content: '')..failGet = true;
 
-    await pumpPage(tester, cloud, before: () async {
-      await HiveBoxes.settings.put('last_synced_at', '2026-10-12T08:00:00.000');
-    },);
+    await pumpPage(
+      tester,
+      cloud,
+      before: () async {
+        await HiveBoxes.settings
+            .put('last_synced_at', '2026-10-12T08:00:00.000');
+      },
+    );
     await tapAndSettle(tester, find.text('上传到云端'));
 
     // 冲突检测是辅助闸门，不能反向阻断正常上传。

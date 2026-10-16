@@ -6,6 +6,13 @@ import '../models/answer_judgement.dart';
 import '../models/math_problem.dart';
 import '../models/number_value.dart';
 
+bool _nonnegativeIntegers(MathProblem problem, NumberValue answer) =>
+    answer.isInteger &&
+    !answer.isNegative &&
+    problem.result.isInteger &&
+    !problem.result.isNegative &&
+    problem.operands.every((value) => value.isInteger && !value.isNegative);
+
 /// 错因规则抽象接口。
 abstract class MistakeRule {
   /// 规则名称。
@@ -27,6 +34,7 @@ class CarryOmissionRule implements MistakeRule {
 
   @override
   bool matches(MathProblem problem, NumberValue wrongAnswer) {
+    if (!_nonnegativeIntegers(problem, wrongAnswer)) return false;
     if (!problem.operators.contains(Operator.add)) return false;
     final correct = problem.result.asInteger;
     final wrong = wrongAnswer.asInteger;
@@ -50,6 +58,7 @@ class BorrowOmissionRule implements MistakeRule {
 
   @override
   bool matches(MathProblem problem, NumberValue wrongAnswer) {
+    if (!_nonnegativeIntegers(problem, wrongAnswer)) return false;
     if (!problem.operators.contains(Operator.subtract)) return false;
     final correct = problem.result.asInteger;
     final wrong = wrongAnswer.asInteger;
@@ -73,6 +82,7 @@ class MultiplicationTableRule implements MistakeRule {
 
   @override
   bool matches(MathProblem problem, NumberValue wrongAnswer) {
+    if (!_nonnegativeIntegers(problem, wrongAnswer)) return false;
     if (!problem.operators.contains(Operator.multiply)) return false;
     if (problem.operands.length != 2) return false;
 
@@ -113,6 +123,7 @@ class OperationOrderRule implements MistakeRule {
 
   @override
   bool matches(MathProblem problem, NumberValue wrongAnswer) {
+    if (!_nonnegativeIntegers(problem, wrongAnswer)) return false;
     if (problem.operators.length < 2) return false;
 
     final hasMixed = problem.operators.any(
@@ -126,15 +137,17 @@ class OperationOrderRule implements MistakeRule {
 
     // 计算从左到右的结果（不考虑优先级）
     final leftToRight = _evaluateLeftToRight(
-      problem.operands.map((o) => o.asInteger).toList(),
+      problem.operands,
       problem.operators,
     );
 
-    return wrongAnswer.asInteger == leftToRight &&
-        leftToRight != problem.result.asInteger;
+    return wrongAnswer == leftToRight && leftToRight != problem.result;
   }
 
-  int _evaluateLeftToRight(List<int> values, List<Operator> ops) {
+  NumberValue _evaluateLeftToRight(
+    List<NumberValue> values,
+    List<Operator> ops,
+  ) {
     var result = values[0];
     for (var i = 0; i < ops.length; i++) {
       switch (ops[i]) {
@@ -145,7 +158,8 @@ class OperationOrderRule implements MistakeRule {
         case Operator.multiply:
           result *= values[i + 1];
         case Operator.divide:
-          if (values[i + 1] != 0) result ~/= values[i + 1];
+          if (values[i + 1].asFraction.numerator == 0) return result;
+          result = result / values[i + 1];
       }
     }
     return result;

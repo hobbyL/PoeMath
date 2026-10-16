@@ -129,7 +129,10 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
           hasMath: false,
         );
     activityMap[key] = switch (activityType) {
-      LearningActivityType.poemRecitation || LearningActivityType.poemQuiz => (
+      LearningActivityType.poemRecitation ||
+      LearningActivityType.poemQuiz ||
+      LearningActivityType.poemDictation =>
+        (
           poemCount: previous.poemCount + 1,
           poemStars: previous.poemStars + activity.starsEarned,
           poemDuration: previous.poemDuration + activity.durationSeconds,

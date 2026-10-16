@@ -5,6 +5,7 @@
 
 import 'dart:async';
 
+import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/learning_activity.dart';
@@ -57,7 +58,7 @@ class LearningActivityRepository {
       activityType: activityType.name,
       totalItems: totalItems,
       successfulItems: successfulItems,
-      poemId: poemId,
+      poemId: poemId == null ? null : PoemIdentity.canonical(poemId),
       starsEarned: starsEarned,
       durationSeconds: durationSeconds,
       completedAt: completedAt,
@@ -120,6 +121,7 @@ class LearningActivityRepository {
     final requiresPoem = switch (activity.type) {
       LearningActivityType.poemRecitation ||
       LearningActivityType.poemQuiz ||
+      LearningActivityType.poemDictation ||
       LearningActivityType.readAlong =>
         true,
       _ => false,
@@ -142,7 +144,10 @@ class LearningActivityRepository {
         left.activityType == right.activityType &&
         left.totalItems == right.totalItems &&
         left.successfulItems == right.successfulItems &&
-        left.poemId == right.poemId &&
+        (left.poemId == null ? null : PoemIdentity.canonical(left.poemId!)) ==
+            (right.poemId == null
+                ? null
+                : PoemIdentity.canonical(right.poemId!)) &&
         left.starsEarned == right.starsEarned &&
         left.durationSeconds == right.durationSeconds &&
         left.completedAt == right.completedAt;

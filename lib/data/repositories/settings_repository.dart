@@ -15,10 +15,18 @@ import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/settings_constraints.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 
 class SettingsRepository {
+  int _boundedInt(String key, int fallback) {
+    final value = HiveBoxes.settings.get(key);
+    return value is int && SettingsConstraints.accepts(key, value)
+        ? value
+        : fallback;
+  }
+
   SettingsRepository({SecureCredentialStore? credentialStore})
       : _credentialStore = credentialStore ?? SecureCredentialStore();
 
@@ -85,21 +93,33 @@ class SettingsRepository {
   // 本机与云端的同步时间线（设备绑定，不入备份白名单）：见 lastSyncedAt。
   static const String _keyLastSyncedAt = 'last_synced_at';
 
+  Future<void> _putValidated(String key, Object value) async {
+    if (!SettingsConstraints.accepts(key, value)) {
+      throw ArgumentError.value(value, key, '设置值超出允许范围');
+    }
+    await HiveBoxes.settings.put(key, value);
+  }
+
+  String _boundedString(String key, String fallback) {
+    final value = HiveBoxes.settings.get(key);
+    return value is String && SettingsConstraints.accepts(key, value)
+        ? value
+        : fallback;
+  }
+
   // ============ 主题 ============
 
   /// 当前活跃学科主题（'poem' 或 'math'），默认 'poem'。
-  String get activeSubject =>
-      HiveBoxes.settings.get(_keyActiveSubject, defaultValue: 'poem') as String;
+  String get activeSubject => _boundedString(_keyActiveSubject, 'poem');
 
   Future<void> setActiveSubject(String subject) async {
-    await HiveBoxes.settings.put(_keyActiveSubject, subject);
+    await _putValidated(_keyActiveSubject, subject);
   }
 
-  String get themeMode =>
-      HiveBoxes.settings.get(_keyThemeMode, defaultValue: 'system') as String;
+  String get themeMode => _boundedString(_keyThemeMode, 'system');
 
   Future<void> setThemeMode(String mode) async {
-    await HiveBoxes.settings.put(_keyThemeMode, mode);
+    await _putValidated(_keyThemeMode, mode);
   }
 
   // ============ 音效 ============
@@ -122,20 +142,23 @@ class SettingsRepository {
 
   // ============ 选择的年级 ============
 
-  int get selectedGrade =>
-      HiveBoxes.settings.get(_keySelectedGrade, defaultValue: 1) as int;
+  int get selectedGrade => _boundedInt(_keySelectedGrade, 1);
 
   Future<void> setSelectedGrade(int grade) async {
-    await HiveBoxes.settings.put(_keySelectedGrade, grade);
+    await _putValidated(_keySelectedGrade, grade);
   }
 
   // ============ TTS 语速 ============
 
-  double get ttsSpeed =>
-      HiveBoxes.settings.get(_keyTtsSpeed, defaultValue: 0.5) as double;
+  double get ttsSpeed {
+    final value = HiveBoxes.settings.get(_keyTtsSpeed);
+    return value is num && SettingsConstraints.accepts(_keyTtsSpeed, value)
+        ? value.toDouble()
+        : 0.5;
+  }
 
   Future<void> setTtsSpeed(double speed) async {
-    await HiveBoxes.settings.put(_keyTtsSpeed, speed);
+    await _putValidated(_keyTtsSpeed, speed);
   }
 
   // ============ TTS 音色 ============
@@ -632,49 +655,49 @@ class SettingsRepository {
   // ============ 每日目标 ============
 
   /// 每日诗词背诵目标（默认 1 首）
-  int get dailyPoemGoal =>
-      HiveBoxes.settings.get(_keyDailyPoemGoal, defaultValue: 1) as int;
+  int get dailyPoemGoal => _boundedInt(_keyDailyPoemGoal, 1);
 
   Future<void> setDailyPoemGoal(int count) async {
-    await HiveBoxes.settings.put(_keyDailyPoemGoal, count);
+    await _putValidated(_keyDailyPoemGoal, count);
   }
 
   /// 每日口算做题目标（默认 10 题）
-  int get dailyMathGoal =>
-      HiveBoxes.settings.get(_keyDailyMathGoal, defaultValue: 10) as int;
+  int get dailyMathGoal => _boundedInt(_keyDailyMathGoal, 10);
 
   Future<void> setDailyMathGoal(int count) async {
-    await HiveBoxes.settings.put(_keyDailyMathGoal, count);
+    await _putValidated(_keyDailyMathGoal, count);
   }
 
   // ============ 口算练习设置 ============
 
   /// 每组题目数量（默认 10 题）
-  int get mathBatchSize =>
-      HiveBoxes.settings.get(_keyMathBatchSize, defaultValue: 10) as int;
+  int get mathBatchSize => _boundedInt(_keyMathBatchSize, 10);
 
   Future<void> setMathBatchSize(int count) async {
-    await HiveBoxes.settings.put(_keyMathBatchSize, count);
+    await _putValidated(_keyMathBatchSize, count);
   }
 
   /// 口算难度（默认 'medium'）
-  String get mathDifficulty =>
-      HiveBoxes.settings.get(_keyMathDifficulty, defaultValue: 'medium')
-          as String;
+  String get mathDifficulty => _boundedString(_keyMathDifficulty, 'medium');
 
   Future<void> setMathDifficulty(String difficulty) async {
-    await HiveBoxes.settings.put(_keyMathDifficulty, difficulty);
+    await _putValidated(_keyMathDifficulty, difficulty);
   }
 
   /// 口算练习模式（null = 综合，否则为 ProblemMode.name）
-  String? get mathPracticeMode =>
-      HiveBoxes.settings.get(_keyMathPracticeMode) as String?;
+  String? get mathPracticeMode {
+    final value = HiveBoxes.settings.get(_keyMathPracticeMode);
+    return value is String &&
+            SettingsConstraints.accepts(_keyMathPracticeMode, value)
+        ? value
+        : null;
+  }
 
   Future<void> setMathPracticeMode(String? mode) async {
     if (mode == null) {
       await HiveBoxes.settings.delete(_keyMathPracticeMode);
     } else {
-      await HiveBoxes.settings.put(_keyMathPracticeMode, mode);
+      await _putValidated(_keyMathPracticeMode, mode);
     }
   }
 

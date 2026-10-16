@@ -44,6 +44,22 @@ class SchemaValidator {
         expectRequired: false, minimumCount: 500);
     _validateAuthors('$assetDir/authors.json', report);
     _validateFormulas('$assetDir/formulas.json', report);
+    if (File('$assetDir/authors.json').existsSync()) {
+      final names =
+          (jsonDecode(File('$assetDir/authors.json').readAsStringSync())
+                  as List)
+              .map((m) => (m as Map)['name'])
+              .toSet();
+      for (final layer in ['core', 'extended', 'explore']) {
+        final path = '$assetDir/poems_$layer.json';
+        if (!File(path).existsSync()) continue;
+        for (final m in jsonDecode(File(path).readAsStringSync()) as List) {
+          if (!names.contains((m as Map)['author'])) {
+            report.errors.add('${m['id']}: author missing: ${m['author']}');
+          }
+        }
+      }
+    }
     return report;
   }
 
@@ -98,7 +114,27 @@ class SchemaValidator {
       }
       final content = entry['content'] as String?;
       final pinyin = entry['pinyin'] as String?;
+      if (entry['annotations'] is! List ||
+          (entry['annotations'] as List).isEmpty) {
+        report.errors.add('$loc: annotations must not be empty');
+      }
       if (content != null && pinyin != null) {
+        final lines = content.split('\n');
+        final pinyinLines = pinyin.split('\n');
+        if (lines.length != pinyinLines.length) {
+          report.errors.add('$loc: pinyin line count mismatch');
+        } else {
+          for (var line = 0; line < lines.length; line++) {
+            if (lines[line].runes.length !=
+                pinyinLines[line]
+                    .split(RegExp(r'\s+'))
+                    .where((t) => t.isNotEmpty)
+                    .length) {
+              report.errors.add(
+                  '$loc: pinyin character/token mismatch on line ${line + 1}');
+            }
+          }
+        }
         final chineseCount = _chineseCharCount(content);
         final syllableCount = _pinyinSyllableCount(pinyin);
         if (chineseCount > 0 && syllableCount != chineseCount) {

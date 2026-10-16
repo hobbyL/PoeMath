@@ -7,13 +7,10 @@ const Set<String> _punctuation = <String>{
   '（', '）', '「', '」', '『', '』',
   '“', '”', // “ ”
   '‘', '’', // ‘ ’
-  '《', '》', '——', '…', '·',
+  '《', '》', '—', '…', '·',
   ',', '.', '?', '!', ';', ':', '(', ')', '"', '\'',
   '\n', '\r', '\t',
 };
-
-/// Multi-character punctuation kept as-is when scanning.
-const Set<String> _multiCharPunctuation = <String>{'——', '…'};
 
 /// Word-level pinyin overrides for common polyphonic characters where the
 /// context matters. Applied BEFORE the character-level dictionary.
@@ -21,6 +18,7 @@ const Set<String> _multiCharPunctuation = <String>{'——', '…'};
 /// Each key is a Chinese phrase, value is the space-separated pinyin with tone
 /// marks. Downstream we substitute matched phrases prior to running lpinyin.
 const Map<String, String> _wordOverrides = <String, String>{
+  '少年': 'shào nián',
   // "远上寒山石径斜" - 杜牧《山行》"斜" 古音 xiá
   '石径斜': 'shí jìng xiá',
   '径斜': 'jìng xiá',
@@ -67,7 +65,10 @@ String generatePinyin(String text) {
       idx = found + entry.key.length;
     }
   }
-  overrides.sort((a, b) => a.start.compareTo(b.start));
+  overrides.sort((a, b) {
+    final order = a.start.compareTo(b.start);
+    return order != 0 ? order : b.end.compareTo(a.end);
+  });
 
   final buffer = StringBuffer();
   var i = 0;
@@ -84,19 +85,6 @@ String generatePinyin(String text) {
       overrideIdx++;
       continue;
     }
-
-    // Check for multi-char punctuation like ——, …
-    var matchedMulti = false;
-    for (final punc in _multiCharPunctuation) {
-      if (i + punc.length <= text.length &&
-          text.substring(i, i + punc.length) == punc) {
-        _appendWithSpace(buffer, punc);
-        i += punc.length;
-        matchedMulti = true;
-        break;
-      }
-    }
-    if (matchedMulti) continue;
 
     final ch = text[i];
 
@@ -124,7 +112,8 @@ String generatePinyin(String text) {
     if (_isChinese(ch)) {
       final override = _charOverrides[ch];
       final syllable = override ??
-          PinyinHelper.getPinyinE(ch, defPinyin: ch, format: PinyinFormat.WITH_TONE_MARK);
+          PinyinHelper.getPinyinE(ch,
+              defPinyin: ch, format: PinyinFormat.WITH_TONE_MARK);
       _appendWithSpace(buffer, syllable);
       i++;
       continue;

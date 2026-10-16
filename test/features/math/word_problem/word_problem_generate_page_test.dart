@@ -3,17 +3,27 @@
 // 生成页 widget 测试：未配置 LLM 时显示引导态；
 // 骨架生成失败（StateError）时展示中文提示而非英文堆栈。
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
+import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/llm/llm_config.dart';
+import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/math/word_problem/word_problem_generate_page.dart';
+import 'package:poemath/features/math/word_problem/word_problem_preview_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../../helpers/hive_test_helper.dart';
 
@@ -30,6 +40,55 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
       Future.value(_keysByConfigId[configId]);
 }
 
+const _config =
+    LlmConfig(baseUrl: 'https://llm.example.com', apiKey: '', model: 'test');
+
+class _DelayedSettingsRepository extends SettingsRepository {
+  final pending = Completer<LlmConfig?>();
+  var calls = 0;
+
+  @override
+  Future<LlmConfig?> readLlmConfig() {
+    calls++;
+    return pending.future;
+  }
+}
+
+Future<void> _pumpDelayedGenerator(
+  WidgetTester tester,
+  _DelayedSettingsRepository settings, {
+  WordProblemSkeletonGeneratorFn? skeletons,
+  http.Client? client,
+  void Function(WordProblemPreviewData)? onPreview,
+}) async {
+  tester.view.physicalSize = const Size(1200, 2000);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  final router = GoRouter(routes: [
+    GoRoute(path: '/', builder: (_, __) => const WordProblemGeneratePage()),
+    GoRoute(
+        path: AppRoutes.wordProblemPreview,
+        builder: (_, state) {
+          onPreview?.call(state.extra! as WordProblemPreviewData);
+          return const Scaffold(body: Text('预览验证'));
+        },),
+  ],);
+  addTearDown(router.dispose);
+  await tester.pumpWidget(ProviderScope(
+    overrides: [
+      settingsRepositoryProvider.overrideWithValue(settings),
+      llmConfigProvider.overrideWith((ref) async => _config),
+      if (skeletons != null)
+        wordProblemSkeletonProvider.overrideWithValue(skeletons),
+      if (client != null)
+        llmExplainHttpClientProvider.overrideWithValue(client),
+    ],
+    child: MaterialApp.router(routerConfig: router),
+  ),);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
@@ -37,6 +96,129 @@ void main() {
 
   tearDown(() async {
     await tearDownHiveForTesting();
+  });
+
+  testWidgets('配置读取期间同步连点只读取一次，读取失败后允许重试', (tester) async {
+    final settings = _DelayedSettingsRepository();
+    await _pumpDelayedGenerator(tester, settings);
+    final generate = tester
+        .widget<FilledButton>(find.widgetWithText(FilledButton, '生成 10 题'))
+        .onPressed!;
+    generate();
+    generate();
+    expect(settings.calls, 1);
+    settings.pending.completeError(Exception('配置读取测试失败'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('配置读取测试失败'), findsOneWidget);
+    expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, '生成 10 题'))
+            .onPressed,
+        isNotNull,);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('配置读取期间离页，晚到配置不生成骨架、不更新已销毁页面', (tester) async {
+    final settings = _DelayedSettingsRepository();
+    var skeletonCalls = 0;
+    var previewCalls = 0;
+    await _pumpDelayedGenerator(
+      tester,
+      settings,
+      skeletons: (
+          {required int grade,
+          required String semester,
+          required String topic,
+          required int count,}) {
+        skeletonCalls++;
+        return [];
+      },
+      onPreview: (_) => previewCalls++,
+    );
+    await tester.tap(find.text('生成 10 题'));
+    await tester.pump();
+    expect(settings.calls, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    settings.pending.complete(_config);
+    await tester.pump();
+    expect(skeletonCalls, 0);
+    expect(previewCalls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('配置和网络等待时修改选项，骨架请求及预览始终使用发起时快照', (tester) async {
+    final settings = _DelayedSettingsRepository();
+    final response = Completer<http.Response>();
+    http.Request? request;
+    (int, String, String, int)? capturedSkeleton;
+    WordProblemPreviewData? preview;
+    await _pumpDelayedGenerator(
+      tester,
+      settings,
+      skeletons: (
+          {required int grade,
+          required String semester,
+          required String topic,
+          required int count,}) {
+        capturedSkeleton = (grade, semester, topic, count);
+        return WordProblemSkeletonGenerator.generate(
+            grade: grade, semester: semester, topic: topic, count: count,);
+      },
+      client: MockClient((incoming) {
+        request = incoming;
+        return response.future;
+      }),
+      onPreview: (data) => preview = data,
+    );
+    await tester.tap(find.text('生成 10 题'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(ChoiceChip, '3 年级'));
+    await tester.pump();
+    await tester.tap(find.text('下学期'));
+    await tester.pump();
+    settings.pending.complete(_config);
+    await tester.pump();
+    await tester.pump();
+    expect(capturedSkeleton, (2, '上', 'addition', 10));
+    expect(request, isNotNull);
+    await tester.tap(find.widgetWithText(ChoiceChip, '减法'));
+    await tester.pump();
+    final countSelector = tester.widget<Slider>(find.byType(Slider));
+    countSelector.onChanged!(5);
+    await tester.pump();
+    response.complete(http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'content': jsonEncode(List.generate(
+                    10,
+                    (i) => {
+                          'index': i + 1,
+                          'text': '小明有一些苹果，妈妈又给了一些，一共有多少个苹果？',
+                          'unit': '个',
+                          'explanation': '把两部分合起来。',
+                        },),),
+              },
+            }
+          ],
+        }),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},),);
+    await tester.runAsync(
+        () async => Future<void>.delayed(const Duration(milliseconds: 20)),);
+    await tester.pumpAndSettle();
+    final body = jsonDecode(request!.body) as Map<String, dynamic>;
+    final prompt = (body['messages'] as List).last['content'] as String;
+    expect(prompt, contains('小学2年级'));
+    expect(prompt, contains('上学期'));
+    expect(prompt, contains('加法'));
+    expect(preview, isNotNull);
+    expect(preview!.grade, 2);
+    expect(preview!.semester, '上');
+    expect(preview!.topicName, 'addition');
+    expect(preview!.items, hasLength(10));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('未配置 LLM 时显示引导态而非生成表单', (tester) async {
@@ -111,8 +293,7 @@ void main() {
     expect(find.textContaining('StateError'), findsNothing);
   });
 
-  testWidgets('知识点随年级/学期过滤：二上隐藏除法/混合，二下现除法，切回自动回退选中',
-      (tester) async {
+  testWidgets('知识点随年级/学期过滤：二上隐藏除法/混合，二下现除法，切回自动回退选中', (tester) async {
     // 配置就绪才会渲染生成表单（含知识点选择器），按先例在 runAsync 播种。
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_base_url', 'http://localhost:11434');

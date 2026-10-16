@@ -154,9 +154,8 @@ class _WordProblemPreviewPageState
       }
       return;
     }
-    ref.read(llmLibraryVersionProvider.notifier).state++;
-
     if (!mounted) return;
+    ref.read(llmLibraryVersionProvider.notifier).state++;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('已入库 $_selectedCount 题')),
     );
@@ -211,8 +210,15 @@ class _WordProblemPreviewPageState
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(SpacingTokens.md),
-        itemCount: items.length,
+        itemCount: items.length + 1,
         itemBuilder: (context, index) {
+          if (index == 0) {
+            return const Padding(
+              padding: EdgeInsets.only(bottom: SpacingTokens.md),
+              child: Text('规则检查仅辅助筛查。请核对题意、算式和讲解一致后再确认入库。'),
+            );
+          }
+          index -= 1;
           return Padding(
             padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
             child: _buildItemCard(context, index: index, item: items[index]),
@@ -230,8 +236,7 @@ class _WordProblemPreviewPageState
     final theme = Theme.of(context);
     final skeleton = item.skeleton;
     // 骨架自带算式组装（"12 + 4"），此处仅拼答案与单位。
-    final expressionText =
-        '${skeleton.expressionText} = ${skeleton.answer}';
+    final expressionText = '${skeleton.expressionText} = ${skeleton.answer}';
 
     if (!item.accepted) {
       // 被丢弃的题：置灰显示原因
@@ -284,7 +289,8 @@ class _WordProblemPreviewPageState
     return ColoredCard(
       color: theme.colorScheme.primary,
       width: double.infinity,
-      onTap: () => setState(() => _selected[index] = !(_selected[index] ?? true)),
+      onTap: () =>
+          setState(() => _selected[index] = !(_selected[index] ?? true)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

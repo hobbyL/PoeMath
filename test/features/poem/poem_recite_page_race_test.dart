@@ -65,6 +65,13 @@ final _multiPoem = Poem(
 class _BlockingReciteProgressRepository extends PoemProgressRepository {
   final _release = Completer<PoemProgress>();
   var recordCalls = 0;
+  var studyCalls = 0;
+
+  @override
+  Future<PoemProgress> recordStudy(String poemId) async {
+    studyCalls++;
+    return PoemProgress(poemId: poemId, profileId: 'test');
+  }
 
   @override
   Future<PoemProgress> recordRecitation(
@@ -119,6 +126,39 @@ class _CountingCheckInRepository extends CheckInRepository {
     poemsAdded += addPoems ?? 0;
     starsAdded += addStars ?? 0;
   }
+}
+
+class _FailOnceCheckInRepository extends _CountingCheckInRepository {
+  bool fail = true;
+  @override
+  Future<void> updateToday({
+    String? activityId,
+    int? addPoems,
+    int? addMathTotal,
+    int? addMathCorrect,
+    int? addStars,
+    int? addDuration,
+  }) async {
+    if (fail) {
+      fail = false;
+      throw StateError('模拟汇总写入失败');
+    }
+    await super.updateToday(
+      activityId: activityId,
+      addPoems: addPoems,
+      addMathTotal: addMathTotal,
+      addMathCorrect: addMathCorrect,
+      addStars: addStars,
+      addDuration: addDuration,
+    );
+  }
+}
+
+class _FailingAchievementRepository extends AchievementRepository {
+  @override
+  Achievement? getById(String id) => throw StateError('模拟成就写入失败');
+  @override
+  int get unlockedCount => 0;
 }
 
 class _CountingActivityRepository extends LearningActivityRepository {
@@ -237,6 +277,7 @@ void main() {
     required _BlockingReciteProgressRepository progressRepo,
     String poemId = _poemId,
     Poem? poem,
+    AchievementRepository? achievementRepo,
   }) {
     final resolvedPoem = poem ?? _poem;
     return ProviderContainer(
@@ -249,7 +290,7 @@ void main() {
         checkInRepoProvider.overrideWith((ref) => checkInRepo),
         learningActivityRepositoryProvider.overrideWith((ref) => activityRepo),
         achievementRepoProvider.overrideWith(
-          (ref) => _UnlockedAchievementRepository(),
+          (ref) => achievementRepo ?? _UnlockedAchievementRepository(),
         ),
       ],
     );
@@ -294,6 +335,60 @@ void main() {
     await tester.enterText(find.byType(TextField), '床');
     await tester.pump();
   }
+
+  testWidgets('默写全错仅记录练习，不提升掌握等级或获得完成奖励', (tester) async {
+    final progress = _BlockingReciteProgressRepository();
+    final activities = _CountingActivityRepository();
+    final container = createContainer(
+      statsRepo: _CountingStatsRepository(),
+      checkInRepo: _CountingCheckInRepository(),
+      activityRepo: activities,
+      progressRepo: progress,
+    );
+    addTearDown(container.dispose);
+    await prepareDictation(tester, container);
+    await tester.enterText(find.byType(TextField), '错');
+    await tester.tap(find.text('提交默写'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(progress.recordCalls, 0);
+    expect(progress.studyCalls, 1);
+    expect(activities.recorded.single.starsEarned, 0);
+    expect(find.text('已记录练习，达到 80% 后通过'), findsOneWidget);
+  });
+
+  testWidgets('部分结算失败重试重放同一活动，不重复学习且成就失败仍可完成', (tester) async {
+    final progress = _BlockingReciteProgressRepository();
+    final activities = _CountingActivityRepository();
+    final checkIn = _FailOnceCheckInRepository();
+    final container = createContainer(
+      statsRepo: _CountingStatsRepository(),
+      checkInRepo: checkIn,
+      activityRepo: activities,
+      progressRepo: progress,
+      achievementRepo: _FailingAchievementRepository(),
+    );
+    addTearDown(container.dispose);
+    await prepareDictation(tester, container);
+    await tester.tap(find.text('提交默写'));
+    progress.release();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('重试保存'), findsOneWidget);
+    final first = activities.recorded.single;
+    await tester.pump(const Duration(seconds: 3));
+    await tester.tap(find.text('重试保存'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    expect(progress.recordCalls, 1);
+    expect(activities.recorded, hasLength(2));
+    expect(activities.recorded.last.id, first.id);
+    expect(activities.recorded.last.completedAt, first.completedAt);
+    expect(activities.recorded.last.durationSeconds, first.durationSeconds);
+    expect(checkIn.updateCalls, 1);
+    expect(find.text('太棒了！完美背诵！'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('R1 默写提交连点：进度/活动/打卡只结算一次，列表 Provider 失效', (tester) async {
     final statsRepo = _CountingStatsRepository();
@@ -383,8 +478,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         poemByIdProvider(_poemId).overrideWith((ref) => _poem),
-        poemRepoProvider
-            .overrideWith((ref) => _StubPoemRepository([_poem])),
+        poemRepoProvider.overrideWith((ref) => _StubPoemRepository([_poem])),
         poemProgressRepoProvider.overrideWith((ref) => progressRepo),
         userStatsRepoProvider.overrideWith((ref) => statsRepo),
         checkInRepoProvider.overrideWith((ref) => checkInRepo),
@@ -417,7 +511,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('R3 完成页双击返回：仅 pop 一次且结果为 recitationCompleted', (tester) async {
+  testWidgets('R3 完成页双击返回：仅 pop 一次且结果为 quizPassed', (tester) async {
     final popResults = <PoemPracticeResult?>[];
     final statsRepo = _CountingStatsRepository();
     final checkInRepo = _CountingCheckInRepository();
@@ -466,9 +560,51 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     expect(popResults, hasLength(1));
-    expect(popResults.single, PoemPracticeResult.recitationCompleted);
+    expect(popResults.single, PoemPracticeResult.quizPassed);
     expect(tester.takeException(), isNull);
   });
+
+  for (final advanceBeforeSwitch in [
+    Duration.zero,
+    const Duration(milliseconds: 350),
+  ]) {
+    testWidgets(
+        '切级别后旧 ${advanceBeforeSwitch == Duration.zero ? 350 : 800}ms 回调不能推进新一轮',
+        (tester) async {
+      final progressRepo = _BlockingReciteProgressRepository();
+      final activityRepo = _CountingActivityRepository();
+      final container = createContainer(
+        statsRepo: _CountingStatsRepository(),
+        checkInRepo: _CountingCheckInRepository(),
+        activityRepo: activityRepo,
+        progressRepo: progressRepo,
+      );
+      addTearDown(container.dispose);
+      await pumpHost(tester, container);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('床').last);
+      await tester.pump(advanceBeforeSwitch);
+      await tester.tap(find.text('中等'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 900));
+
+      expect(progressRepo.recordCalls, 0);
+      expect(progressRepo.studyCalls, 0);
+      expect(activityRepo.recordCalls, 0);
+      expect(find.text('1/1'), findsOneWidget);
+      expect(find.text('床'), findsWidgets);
+      expect(
+          tester
+              .widget<LinearProgressIndicator>(
+                  find.byType(LinearProgressIndicator),)
+              .value,
+          0,);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   testWidgets('R4 冷却期内误点候选字：不计错误，满星结算', (tester) async {
     final statsRepo = _CountingStatsRepository();

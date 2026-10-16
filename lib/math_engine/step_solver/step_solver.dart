@@ -31,7 +31,12 @@ class StepSolver {
       case Operator.add:
         final aInt = a.asInteger;
         final bInt = b.asInteger;
-        if (aInt < 100 && bInt < 100) {
+        if (a.isInteger &&
+            b.isInteger &&
+            aInt >= 0 &&
+            bInt >= 0 &&
+            aInt < 100 &&
+            bInt < 100) {
           // 个位相加
           final unitsSum = (aInt % 10) + (bInt % 10);
           if (unitsSum >= 10) {
@@ -73,7 +78,13 @@ class StepSolver {
       case Operator.subtract:
         final aInt = a.asInteger;
         final bInt = b.asInteger;
-        if (aInt < 100 && bInt < 100 && aInt >= 0 && bInt >= 0) {
+        if (a.isInteger &&
+            b.isInteger &&
+            aInt >= bInt &&
+            aInt < 100 &&
+            bInt < 100 &&
+            aInt >= 0 &&
+            bInt >= 0) {
           final aUnits = aInt % 10;
           final bUnits = bInt % 10;
           if (aUnits < bUnits) {
@@ -154,8 +165,7 @@ class StepSolver {
 
   static List<SolutionStep> _solveMultiOp(MathProblem problem) {
     final steps = <SolutionStep>[];
-    final isBracket = problem.mode == ProblemMode.withBrackets &&
-        problem.bracketRange != null;
+    final isBracket = problem.bracketRange != null;
     final hasHighPriority = problem.operators.any(
       (op) => op == Operator.multiply || op == Operator.divide,
     );

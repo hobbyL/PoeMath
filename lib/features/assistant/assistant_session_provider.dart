@@ -106,25 +106,33 @@ class AssistantSessionState {
 }
 
 class AssistantSessionController extends Notifier<AssistantSessionState> {
-  late final ConversationRepository _repo;
-  late final AssistantChatController _chat;
+  late ConversationRepository _repo;
+  late AssistantChatController _chat;
 
   /// 已落库消息的 id，顺序对应控制器 messages 的前缀。
   List<String> _persistedIds = <String>[];
+  int _contextBaseIndex = 0;
 
   /// 载入 / 新建会话期间置真：跳过 diff 落库（整列替换非尾部增减）。
   bool _suspend = false;
+  bool _restoring = false;
 
   /// 串行化 repo 写入，保序并集中捕获异常；完成后自增 revision 刷新 UI。
   Future<void> _writeChain = Future<void>.value();
+  int _buildGeneration = 0;
 
   /// 生成消息 id 的单调序号（同一微秒多条不冲突）。
   static int _seq = 0;
 
   @override
   AssistantSessionState build() {
+    _buildGeneration++;
+    ref.onDispose(() => _buildGeneration++);
     _repo = ref.read(conversationRepositoryProvider);
     _chat = ref.read(assistantChatControllerProvider.notifier);
+    _persistedIds = <String>[];
+    _contextBaseIndex = 0;
+    _suspend = false;
     // 监听控制器消息列表增减，增量镜像到 repo。
     ref.listen<AssistantChatState>(
       assistantChatControllerProvider,
@@ -152,7 +160,9 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
       _persistedIds.add(m.id);
       toAppend.add(m);
     }
-    if (toDelete.isEmpty && toAppend.isEmpty) return;
+    final boundaryChanged = _contextBaseIndex != next.contextBaseIndex;
+    _contextBaseIndex = next.contextBaseIndex;
+    if (toDelete.isEmpty && toAppend.isEmpty && !boundaryChanged) return;
     _enqueue(() async {
       for (final id in toDelete) {
         await _repo.deleteMessage(id);
@@ -160,6 +170,7 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
       for (final m in toAppend) {
         await _repo.appendMessage(m);
       }
+      await _repo.setContextBaseIndex(convId, next.contextBaseIndex);
     });
   }
 
@@ -171,17 +182,22 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
   /// 失败那一批消息仍留在 `_persistedIds` 中，不会重试落库——
   /// 代价是丢这一批，换取后续会话继续正常持久化。
   void _enqueue(Future<void> Function() op) {
-    _writeChain = _writeChain.then((_) => op()).then(
-          (_) => _bumpRevision(),
-          onError: (Object error, StackTrace stackTrace) {
-            AppLogger.e(
-              '助手消息落库失败',
-              tag: 'AssistantSession',
-              error: error,
-              stackTrace: stackTrace,
-            );
-          },
+    final generation = _buildGeneration;
+    _writeChain = _writeChain.then((_) {
+      if (generation == _buildGeneration) return op();
+    }).then(
+      (_) {
+        if (generation == _buildGeneration) _bumpRevision();
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        AppLogger.e(
+          '助手消息落库失败',
+          tag: 'AssistantSession',
+          error: error,
+          stackTrace: stackTrace,
         );
+      },
+    );
   }
 
   void _bumpRevision() {
@@ -204,6 +220,7 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
 
   /// 进入页面：已打开且仍存在则保持；否则打开最近一条会话，无则新建。
   Future<void> ensureOpen() async {
+    if (_restoring) return;
     final current = state.conversationId;
     if (current != null && _repo.getById(current) != null) return;
     final all = _repo.getAll(); // updatedAt 倒序
@@ -214,15 +231,54 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
     }
   }
 
+  /// 恢复前停止请求并排空消息写入；恢复后即使页面离开也重载镜像。
+  Future<T> whileRestoring<T>(Future<T> Function() restore) async {
+    if (_restoring) throw StateError('正在恢复数据');
+    _restoring = true;
+    try {
+      _chat.stop();
+      await _writeChain;
+      _suspend = true;
+      return await restore();
+    } finally {
+      try {
+        final current = state.conversationId;
+        if (current != null && _repo.getById(current) != null) {
+          await _open(current);
+        } else {
+          _resetMirror();
+        }
+      } on Object catch (error, stack) {
+        AppLogger.e('恢复后重载会话失败',
+            tag: 'AssistantSession', error: error, stackTrace: stack,);
+        _resetMirror();
+      } finally {
+        _suspend = false;
+        _restoring = false;
+      }
+    }
+  }
+
+  void _resetMirror() {
+    _persistedIds = <String>[];
+    _contextBaseIndex = 0;
+    _chat.loadConversation(const []);
+    state = const AssistantSessionState();
+  }
+
   /// 载入目标会话：读 repo 消息 → 注入控制器（丢弃在途流），重置 _persistedIds。
   Future<void> _open(String id) async {
+    _chat.stop();
+    await _writeChain;
     final models = _repo.messagesOf(id); // createdAt 升序
+    _contextBaseIndex = _repo.getById(id)?.contextBaseIndex ?? 0;
     _persistedIds = models.map((m) => m.id).toList();
     _suspend = true;
     // 回放前重建 assistant 的 tool_calls（持久层未落，见 reconstructToolCalls），
     // 否则续问会把畸形历史发往模型。原地替换不改长度，_persistedIds 仍对齐。
     _chat.loadConversation(
       reconstructToolCalls(models.map(chatMessageFromMessage).toList()),
+      contextBaseIndex: _contextBaseIndex,
     );
     _suspend = false;
     state = state.copyWith(conversationId: id, revision: state.revision + 1);
@@ -230,8 +286,12 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
 
   /// 新建空会话并设为当前。
   Future<void> startNew() async {
+    if (_restoring) return;
+    _chat.stop();
+    await _writeChain;
     final c = await _repo.create();
     _persistedIds = <String>[];
+    _contextBaseIndex = 0;
     _suspend = true;
     _chat.startNewConversation();
     _suspend = false;
@@ -240,31 +300,46 @@ class AssistantSessionController extends Notifier<AssistantSessionState> {
 
   /// 切换到指定会话。
   Future<void> switchTo(String id) async {
+    if (_restoring) return;
     if (id == state.conversationId) return;
     await _open(id);
   }
 
   /// 发送用户消息：由控制器驱动流式回答，持久化经 _syncMessages 自动完成。
-  Future<void> send(String text) => _chat.send(text);
+  Future<void> send(String text) async {
+    if (_restoring) return;
+    await ensureOpen();
+    if (!_restoring) await _chat.send(text);
+  }
 
   /// 重新生成：删末条 assistant（内存+repo 经 _syncMessages）后以末条 user 重跑。
-  Future<void> regenerate() => _chat.regenerate();
+  Future<void> regenerate() async {
+    if (!_restoring) await _chat.regenerate();
+  }
 
   /// 重新发送第 [index] 条用户提问：截掉其后全部消息（内存 + repo 经
   /// _syncMessages 的尾部截断 diff）后重跑。
-  Future<void> resendFrom(int index) => _chat.resendFrom(index);
+  Future<void> resendFrom(int index) async {
+    if (!_restoring) await _chat.resendFrom(index);
+  }
+
+  bool clearContext() => !_restoring && _chat.clearContext();
 
   /// 停止在途流（固化部分内容为 assistant 并落库）。
   void stop() => _chat.stop();
 
   /// 重命名会话（不改 updatedAt / 不改排序）。
   Future<void> rename(String id, String title) async {
+    if (_restoring) return;
     await _repo.rename(id, title);
     _bumpRevision();
   }
 
   /// 删除会话；若删的是当前会话，自动切到最近一条或新建。
   Future<void> delete(String id) async {
+    if (_restoring) return;
+    if (state.conversationId == id) _chat.stop();
+    await _writeChain;
     await _repo.delete(id);
     if (state.conversationId == id) {
       _persistedIds = <String>[];
@@ -288,4 +363,3 @@ final assistantSessionProvider =
     NotifierProvider<AssistantSessionController, AssistantSessionState>(
   AssistantSessionController.new,
 );
-

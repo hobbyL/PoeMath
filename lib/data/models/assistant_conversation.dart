@@ -31,11 +31,16 @@ class Conversation extends HiveObject {
   @HiveField(4)
   DateTime updatedAt;
 
+  /// 保留展示历史，但只将此下标后的消息发送给模型。
+  @HiveField(5, defaultValue: 0)
+  int contextBaseIndex;
+
   Conversation({
     required this.id,
     required this.profileId,
     required this.title,
     required this.createdAt,
     required this.updatedAt,
+    this.contextBaseIndex = 0,
   });
 }

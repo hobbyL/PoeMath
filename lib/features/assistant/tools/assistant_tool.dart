@@ -37,6 +37,16 @@ abstract class AssistantTool {
   /// 实现须自行兜底非法参数并返回 [ToolResult.error]，不得抛异常。
   Future<ToolResult> execute(Ref ref, Map<String, dynamic> args);
 
+  /// 异步工具须在导航/写入等副作用前检查调用仍有效。
+  Future<ToolResult> executeCancellable(
+    Ref ref,
+    Map<String, dynamic> args, {
+    required bool Function() isActive,
+  }) async {
+    if (!isActive()) return const ToolResult.error('操作已取消');
+    return execute(ref, args);
+  }
+
   /// 序列化为 OpenAI tools 数组单项。
   Map<String, Object?> toSchema() => <String, Object?>{
         'type': 'function',

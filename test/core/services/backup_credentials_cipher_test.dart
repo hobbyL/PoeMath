@@ -165,18 +165,25 @@ void main() {
     //
     // 未知键不可能来自篡改：走到白名单校验时 AES-GCM 认证已经通过，
     // 能产出合法密文的人必须知道口令。
-    final node = await encryptCredentials({
-      kCredKeyTencentSecretId: 'id-1',
-      kCredKeyTencentSecretKey: 'key-1',
-      'future_vendor_api_key': 'from-newer-version',
-    }, '正确口令-123',);
+    final node = await encryptCredentials(
+      {
+        kCredKeyTencentSecretId: 'id-1',
+        kCredKeyTencentSecretKey: 'key-1',
+        'future_vendor_api_key': 'from-newer-version',
+      },
+      '正确口令-123',
+    );
 
     final restored = await decryptCredentials(node, '正确口令-123');
 
-    expect(restored, <String, String>{
-      kCredKeyTencentSecretId: 'id-1',
-      kCredKeyTencentSecretKey: 'key-1',
-    }, reason: '已知键必须照常恢复，未知键静默跳过',);
+    expect(
+      restored,
+      <String, String>{
+        kCredKeyTencentSecretId: 'id-1',
+        kCredKeyTencentSecretKey: 'key-1',
+      },
+      reason: '已知键必须照常恢复，未知键静默跳过',
+    );
     expect(
       restored.containsKey('future_vendor_api_key'),
       isFalse,
@@ -204,6 +211,7 @@ void main() {
       kCredKeyWorkerTtsApiKey,
       kCredKeyLlmApiKey,
       kCredKeyLlmApiKeyHint,
+      kCredKeyLlmProviderKeys,
     ]);
     // 2) 常量的字面值也锁定：改动会让已发布版本导出的备份读不出对应项。
     expect(kBackupCredentialKeys, <String>[
@@ -212,6 +220,7 @@ void main() {
       'worker_tts_api_key',
       'llm_api_key',
       'llm_api_key_hint',
+      'llm_provider_keys',
     ]);
 
     // 3) 每个白名单键都必须能真正往返：防止「加进白名单但密码学层处理

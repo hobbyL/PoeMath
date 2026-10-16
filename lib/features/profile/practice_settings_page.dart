@@ -58,6 +58,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
   }
 
   Future<void> _save() async {
+    if (!_supportedModes.contains(_practiceMode)) _practiceMode = null;
     final settings = ref.read(settingsRepositoryProvider);
     await settings.setDailyPoemGoal(_poemGoal);
     await settings.setDailyMathGoal(_mathGoal);
@@ -114,8 +115,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                       return ChoiceChip(
                         label: Text('$n 题'),
                         selected: _batchSize == n,
-                        onSelected: (_) =>
-                            setState(() => _batchSize = n),
+                        onSelected: (_) => setState(() => _batchSize = n),
                       );
                     }).toList(),
                   ),
@@ -158,8 +158,12 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                         avatar: Icon(_difficultyIcon(d), size: 16),
                         label: Text(d.label),
                         selected: _difficulty == d,
-                        onSelected: (_) =>
-                            setState(() => _difficulty = d),
+                        onSelected: (_) => setState(() {
+                          _difficulty = d;
+                          if (!_supportedModes.contains(_practiceMode)) {
+                            _practiceMode = null;
+                          }
+                        }),
                       );
                     }).toList(),
                   ),
@@ -306,8 +310,9 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                 avatar: Icon(icon, size: 16),
                 label: Text(label),
                 selected: _practiceMode == mode,
-                onSelected: (_) =>
-                    setState(() => _practiceMode = mode),
+                onSelected: mode == null || _supportedModes.contains(mode)
+                    ? (_) => setState(() => _practiceMode = mode)
+                    : null,
               );
             }).toList(),
           ),
@@ -322,6 +327,12 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
       ),
     );
   }
+
+  Set<ProblemMode> get _supportedModes => MathEngine.supportedModes(
+        grade: ref.read(mathGradeProvider),
+        semester: ref.read(mathSemesterProvider),
+        difficulty: _difficulty,
+      );
 
   IconData _difficultyIcon(DifficultyLevel d) {
     return switch (d) {

@@ -61,13 +61,15 @@ class _WordProblemPracticePageState
 
   late DateTime _startTime;
   late String _sessionId;
+  DateTime? _completedAt;
+  bool _submitting = false;
   bool _isFinishing = false;
 
   @override
   void initState() {
     super.initState();
     _startTime = DateTime.now();
-    _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    _sessionId = DateTime.now().microsecondsSinceEpoch.toString();
     _confettiController = CelebrationController();
   }
 
@@ -114,7 +116,19 @@ class _WordProblemPracticePageState
         _problemRecords.map((r) => r.toJson()).toList(),
       ),
     );
-    unawaited(ref.read(mathSessionRepositoryProvider).save(session));
+    unawaited(
+      ref
+          .read(mathSessionRepositoryProvider)
+          .save(session)
+          .catchError((Object error, StackTrace stack) {
+        AppLogger.e(
+          '练习快照保存失败',
+          tag: 'MathPractice',
+          error: error,
+          stackTrace: stack,
+        );
+      }),
+    );
 
     // 增量更新用户统计（每题 +1），与口算练习页共用同一仓储写入路径。
     unawaited(
@@ -125,18 +139,19 @@ class _WordProblemPracticePageState
             bestStreak: 0,
           )
           .catchError((Object error, StackTrace stackTrace) {
-            AppLogger.e(
-              '应用题答题进度落库失败',
-              tag: 'WordProblemPractice',
-              error: error,
-              stackTrace: stackTrace,
-            );
-          }),
+        AppLogger.e(
+          '应用题答题进度落库失败',
+          tag: 'WordProblemPractice',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }),
     );
 
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayMathCountProvider);
   }
+
   static String _difficultyLabel(int difficulty) {
     if (difficulty <= 2) return 'easy';
     if (difficulty == 3) return 'medium';
@@ -178,47 +193,59 @@ class _WordProblemPracticePageState
   }
 
   Future<void> _submitAnswer() async {
-    if (_isCorrect != null) return;
+    if (_isCorrect != null || _submitting) return;
     final userAnswer = _answerController.text.trim();
     if (userAnswer.isEmpty) return;
-
+    final problem = _current;
+    final problemRepo = ref.read(llmProblemRepositoryProvider);
     final isCorrect = _judge(userAnswer);
     setState(() {
+      _submitting = true;
       _isCorrect = isCorrect;
       _showExplanation = false;
     });
 
     final sound = ref.read(soundServiceProvider);
     final haptic = ref.read(hapticServiceProvider);
-    if (isCorrect) {
-      sound.play(SoundEffect.correct);
-      await haptic.medium();
-      _confettiController.play();
-      _correctCount++;
-    } else {
-      sound.play(SoundEffect.wrong);
-      await haptic.heavy();
-      await _recordMistake(userAnswer);
-    }
-
+    // 先提交内存状态和逐题持久化，再等待不影响答案归属的反馈。
+    if (isCorrect) _correctCount++;
     _problemRecords.add(
       ProblemRecord(
-        problemText: _current.questionText,
-        answerText: '${_current.answer}${_current.unit}',
+        problemText: problem.questionText,
+        answerText: '${problem.answer}${problem.unit}',
         userAnswer: userAnswer,
         isCorrect: isCorrect,
       ),
     );
-
-    // 记录做题状态（done/attempts/correctCount/lastDoneAt）。
-    await ref
-        .read(llmProblemRepositoryProvider)
-        .recordAttempt(_current.id, correct: isCorrect);
-
     _persistProgress(isCorrect: isCorrect);
+    final mistakeWrite =
+        isCorrect ? Future<void>.value() : _recordMistake(userAnswer);
+    try {
+      await problemRepo.recordAttempt(problem.id, correct: isCorrect);
+      await mistakeWrite;
+      if (isCorrect) {
+        sound.play(SoundEffect.correct);
+        await haptic.medium();
+        if (mounted) _confettiController.play();
+      } else {
+        sound.play(SoundEffect.wrong);
+        await haptic.heavy();
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '应用题答题记录失败',
+        tag: 'WordProblemPractice',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _submitting = false;
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _nextProblem() async {
+    if (_submitting || !mounted) return;
     if (_currentIndex + 1 >= widget.problems.length) {
       if (!_isFinishing) {
         _isFinishing = true;
@@ -248,7 +275,7 @@ class _WordProblemPracticePageState
   Future<void> _settleSession() async {
     final problems = widget.problems;
     final correctCount = _correctCount;
-    final completedAt = DateTime.now();
+    final completedAt = _completedAt ??= DateTime.now();
     final duration = completedAt.difference(_startTime).inSeconds;
     final first = problems.first;
 
@@ -276,31 +303,33 @@ class _WordProblemPracticePageState
     );
 
     final repo = ref.read(mathSessionRepoProvider);
+    final activityRepo = ref.read(learningActivityRepositoryProvider);
+    final statsRepo = ref.read(userStatsRepoProvider);
+    final checkInRepo = ref.read(checkInRepoProvider);
     await repo.save(session);
     final activityId = 'llm_word_practice:${session.id}';
-    await ref.read(learningActivityRepositoryProvider).record(
-          id: activityId,
-          activityType: LearningActivityType.wordProblem,
-          totalItems: problems.length,
-          successfulItems: correctCount,
-          starsEarned: stars,
-          durationSeconds: duration,
-          completedAt: completedAt,
-        );
+    await activityRepo.record(
+      id: activityId,
+      activityType: LearningActivityType.wordProblem,
+      totalItems: problems.length,
+      successfulItems: correctCount,
+      starsEarned: stars,
+      durationSeconds: duration,
+      completedAt: completedAt,
+    );
 
     // 做题数已在 _persistProgress() 中逐题更新，只需添加星星。
-    final statsRepo = ref.read(userStatsRepoProvider);
     final levelBeforeReward = statsRepo.get().level;
     if (stars > 0) {
       await statsRepo.addStars(stars, activityId: activityId);
     }
-    await ref.read(checkInRepoProvider).updateToday(
-          activityId: activityId,
-          addMathTotal: problems.length,
-          addMathCorrect: correctCount,
-          addStars: stars,
-          addDuration: duration,
-        );
+    await checkInRepo.updateToday(
+      activityId: activityId,
+      addMathTotal: problems.length,
+      addMathCorrect: correctCount,
+      addStars: stars,
+      addDuration: duration,
+    );
 
     final updatedStats = statsRepo.get();
     if (updatedStats.level > levelBeforeReward && mounted) {
@@ -313,7 +342,9 @@ class _WordProblemPracticePageState
       );
     }
 
+    if (!mounted) return;
     final newlyUnlocked = await checkAchievements(ref, latestSession: session);
+    if (!mounted) return;
 
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayCheckInProvider);
@@ -372,6 +403,8 @@ class _WordProblemPracticePageState
     _problemRecords.clear();
     _isFinishing = false;
     _startTime = DateTime.now();
+    _sessionId = DateTime.now().microsecondsSinceEpoch.toString();
+    _completedAt = null;
     setState(() {
       _currentIndex = 0;
       _correctCount = 0;
@@ -421,7 +454,6 @@ class _WordProblemPracticePageState
                   borderRadius: BorderRadius.circular(4),
                 ),
                 const SizedBox(height: SpacingTokens.md),
-
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
@@ -443,10 +475,7 @@ class _WordProblemPracticePageState
                                     height: 1.6,
                                     color: theme.colorScheme.onSurface,
                                   ),
-                                )
-                                    .animate()
-                                    .fadeIn(duration: 350.ms)
-                                    .slideX(
+                                ).animate().fadeIn(duration: 350.ms).slideX(
                                       begin: 0.12,
                                       end: 0,
                                       duration: 350.ms,
@@ -474,7 +503,6 @@ class _WordProblemPracticePageState
                     },
                   ),
                 ),
-
                 const SizedBox(height: SpacingTokens.sm),
                 _buildAnswerInput(context),
               ],
@@ -547,9 +575,7 @@ class _WordProblemPracticePageState
                 onPressed: () =>
                     setState(() => _showExplanation = !_showExplanation),
                 icon: Icon(
-                  _showExplanation
-                      ? Icons.expand_less
-                      : Icons.expand_more,
+                  _showExplanation ? Icons.expand_less : Icons.expand_more,
                 ),
                 label: Text(
                   _showExplanation ? '收起讲解' : '查看讲解',
@@ -579,12 +605,10 @@ class _WordProblemPracticePageState
       return SizedBox(
         width: double.infinity,
         child: FilledButton.icon(
-          onPressed: _nextProblem,
+          onPressed: _submitting || _isFinishing ? null : _nextProblem,
           icon: const Icon(Icons.arrow_forward_rounded),
           label: Text(
-            _currentIndex + 1 >= widget.problems.length
-                ? '查看成绩'
-                : '下一题',
+            _currentIndex + 1 >= widget.problems.length ? '查看成绩' : '下一题',
           ),
         ),
       ).animate().fadeIn(duration: 250.ms).slideY(

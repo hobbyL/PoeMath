@@ -51,7 +51,10 @@ class _FakeChat extends AssistantChatController {
   void stop() {}
 
   @override
-  void loadConversation(List<ChatMessage> messages) {}
+  void loadConversation(
+    List<ChatMessage> messages, {
+    int contextBaseIndex = 0,
+  }) {}
 
   @override
   void startNewConversation() {}
@@ -195,8 +198,7 @@ List<_SpeakHandle> _stubSpeakSentences(_MockTtsService tts) {
     () => tts.speakSentences(any(), onReady: any(named: 'onReady')),
   ).thenAnswer((invocation) {
     final sessionId = sessions.next();
-    final onReady =
-        invocation.namedArguments[#onReady] as void Function(int)?;
+    final onReady = invocation.namedArguments[#onReady] as void Function(int)?;
     final completer = Completer<void>();
     handles.add(
       _SpeakHandle(
@@ -332,8 +334,7 @@ void main() {
     await _teardownAnim(tester);
   });
 
-  testWidgets('ready：末条 assistant 显示复制 + 重答，输入栏为发送态',
-      (tester) async {
+  testWidgets('ready：末条 assistant 显示复制 + 重答，输入栏为发送态', (tester) async {
     final h = _harness(
       AssistantChatState(
         status: AssistantChatStatus.ready,
@@ -439,8 +440,7 @@ void main() {
     expect(find.byType(ChatMessageBubble), findsNWidgets(2));
   });
 
-  testWidgets('渲染含 LaTeX 的流式文本不抛异常（streaming + 淡入）',
-      (tester) async {
+  testWidgets('渲染含 LaTeX 的流式文本不抛异常（streaming + 淡入）', (tester) async {
     final h = _harness(
       AssistantChatState(
         status: AssistantChatStatus.streaming,
@@ -508,8 +508,7 @@ void main() {
     expect(h.session.regenerateCount, 1);
   });
 
-  testWidgets('回答失败：用户提问气泡出「重新发送」，点击直接重发（末条不弹确认）',
-      (tester) async {
+  testWidgets('回答失败：用户提问气泡出「重新发送」，点击直接重发（末条不弹确认）', (tester) async {
     final h = _harness(
       AssistantChatState(
         status: AssistantChatStatus.error,
@@ -529,8 +528,7 @@ void main() {
     expect(h.session.resentIndexes, <int>[0]);
   });
 
-  testWidgets('历史提问重发：先弹确认框；确认后转接 resendFrom(该下标)',
-      (tester) async {
+  testWidgets('历史提问重发：先弹确认框；确认后转接 resendFrom(该下标)', (tester) async {
     final h = _harness(
       AssistantChatState(
         status: AssistantChatStatus.ready,
@@ -626,7 +624,8 @@ void main() {
     expect(find.textContaining('回答 0'), findsNothing);
   });
 
-  testWidgets('工具轮次：assistant.toolCalls 与 role:tool 渲染为可折叠工具卡，'
+  testWidgets(
+      '工具轮次：assistant.toolCalls 与 role:tool 渲染为可折叠工具卡，'
       '最终回答仍为气泡', (tester) async {
     final h = _harness(
       AssistantChatState(
@@ -682,8 +681,7 @@ void main() {
       expect(find.byTooltip('朗读'), findsOneWidget);
     });
 
-    testWidgets('点击「朗读」：清洗后文本送 TTS，图标切停止；完成后还原',
-        (tester) async {
+    testWidgets('点击「朗读」：清洗后文本送 TTS，图标切停止；完成后还原', (tester) async {
       final h = _harness(
         AssistantChatState(
           status: AssistantChatStatus.ready,
@@ -856,8 +854,7 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('准备期（首段未就绪）截断正在启动的朗读：同样自动停止',
-        (tester) async {
+    testWidgets('准备期（首段未就绪）截断正在启动的朗读：同样自动停止', (tester) async {
       final h = _harness(
         AssistantChatState(
           status: AssistantChatStatus.ready,
@@ -894,8 +891,3 @@ void main() {
     });
   });
 }
-
-
-
-
-

@@ -3,6 +3,7 @@
 // 层级：data/repositories
 // 职责：诗词学习进度仓储。Profile-scoped。
 
+import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem_progress.dart';
@@ -10,11 +11,15 @@ import 'package:poemath/data/models/poem_progress.dart';
 class PoemProgressRepository {
   /// 获取某首诗的进度
   PoemProgress? get(String poemId) {
-    return HiveBoxes.poemProgress.get(ProfileScope.key(poemId));
+    return HiveBoxes.poemProgress
+        .get(ProfileScope.key(PoemIdentity.canonical(poemId)));
   }
 
   /// 创建或更新进度
   Future<void> save(PoemProgress progress) async {
+    if (PoemIdentity.canonical(progress.poemId) != progress.poemId) {
+      progress = PoemIdentity.progress(PoemIdentity.progressMap(progress));
+    }
     final key = ProfileScope.key(progress.poemId);
     await HiveBoxes.poemProgress.put(key, progress);
   }
@@ -33,16 +38,12 @@ class PoemProgressRepository {
 
   /// 已学习的诗词数
   int get learnedCount {
-    return getAll()
-        .where((p) => p.status != LearningStatus.notStarted)
-        .length;
+    return getAll().where((p) => p.status != LearningStatus.notStarted).length;
   }
 
   /// 已掌握的诗词数
   int get masteredCount {
-    return getAll()
-        .where((p) => p.status == LearningStatus.mastered)
-        .length;
+    return getAll().where((p) => p.status == LearningStatus.mastered).length;
   }
 
   /// 今日学习的诗词数（按 lastStudiedAt 日期判断）
@@ -52,8 +53,7 @@ class PoemProgressRepository {
     return getAll()
         .where(
           (p) =>
-              p.lastStudiedAt != null &&
-              p.lastStudiedAt!.isAfter(todayStart),
+              p.lastStudiedAt != null && p.lastStudiedAt!.isAfter(todayStart),
         )
         .length;
   }
@@ -78,7 +78,8 @@ class PoemProgressRepository {
     String poemId, {
     int? recitationLevel,
   }) async {
-    var progress = get(poemId);
+    poemId = PoemIdentity.canonical(poemId);
+    var progress = get(poemId)?.copyWith();
     progress ??= PoemProgress(
       poemId: poemId,
       profileId: ProfileScope.currentId,
@@ -90,8 +91,7 @@ class PoemProgressRepository {
     if (progress.status == LearningStatus.notStarted) {
       progress.status = LearningStatus.learning;
     }
-    if (recitationLevel != null &&
-        recitationLevel > progress.masteryLevel) {
+    if (recitationLevel != null && recitationLevel > progress.masteryLevel) {
       progress.masteryLevel = recitationLevel;
     }
     await save(progress);
@@ -100,7 +100,7 @@ class PoemProgressRepository {
 
   /// 删除某首诗的进度
   Future<void> delete(String poemId) async {
-    final key = ProfileScope.key(poemId);
+    final key = ProfileScope.key(PoemIdentity.canonical(poemId));
     await HiveBoxes.poemProgress.delete(key);
   }
 }

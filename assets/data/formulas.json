@@ -896,7 +896,7 @@
     "grade": 4,
     "params": [
       {
-        "symbol": "a",
+        "symbol": "a,b,c",
         "meaning": "三边长"
       }
     ],
