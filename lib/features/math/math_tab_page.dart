@@ -13,17 +13,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
-import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/features/math/math_practice_request.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/practice_entry_card.dart';
 import 'package:poemath/features/math/widgets/practice_scheme_selector.dart';
-import 'package:poemath/features/profile/learning_background_page.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 class MathTabPage extends ConsumerWidget {
@@ -196,27 +193,6 @@ class MathTabPage extends ConsumerWidget {
     }
   }
 
-  /// 前往学习背景设置。
-  ///
-  /// 与设置页的入口同构：受家长保护包裹（改册次是家长决策），返回后失效
-  /// `settingsRepositoryProvider` 让口算页立即反映新册次 —— 口算页的
-  /// 年级/学期由该 provider 派生。
-  Future<void> _openLearningBackground(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    await Navigator.push<void>(
-      context,
-      fadeSlideRoute(
-        builder: (_) =>
-            const ParentAccessBoundary(child: LearningBackgroundPage()),
-      ),
-    );
-    if (context.mounted) {
-      ref.invalidate(settingsRepositoryProvider);
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -302,35 +278,10 @@ class MathTabPage extends ConsumerWidget {
                     ],
                   ),
 
-                // 册次已并入 AppBar 标题，此处只留「学习背景」入口 ——
-                // 改册次是家长决策，入口仍受家长保护。
-                const SizedBox(height: SpacingTokens.sm),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => _openLearningBackground(context, ref),
-                    icon: const Icon(Icons.school_outlined, size: 16),
-                    label: const Text('学习背景'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.colorScheme.onSurfaceVariant,
-                      textStyle: theme.textTheme.bodySmall,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpacingTokens.sm,
-                      ),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: SpacingTokens.sm),
-                Text('选择练习', style: theme.textTheme.titleMedium),
-                const SizedBox(height: SpacingTokens.sm),
-
                 if (visible.isEmpty)
                   // 学习背景里把四类全关时会走到这里；仓储层已拦空集合，
                   // 此处是异常数据（如手工改 Hive）的兜底展示。
-                  const Text('尚未开启任何练习类型，请到「学习背景」中至少选择一类。')
+                  const Text('尚未开启任何练习类型，请在设置 → 学习背景中至少选择一类。')
                 else
                   for (var row = 0;
                       row < (visible.length / columns).ceil();

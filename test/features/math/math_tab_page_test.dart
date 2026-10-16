@@ -92,8 +92,10 @@ void main() {
 
     // 册次并入 AppBar 标题（中文数字简写），页内不再有册次卡片。
     expect(find.text('数学练习 · 四下'), findsOneWidget);
-    // 学习背景仍是可达入口（一行轻量文字按钮）。
-    expect(find.text('学习背景'), findsOneWidget);
+    // 页内已无学习背景入口与「选择练习」小标题：册次只在标题里告知，
+    // 入口统一收在设置页（避免同一功能在页内另开一条路径）。
+    expect(find.text('学习背景'), findsNothing);
+    expect(find.text('选择练习'), findsNothing);
     // 旧的年级选择网格（6 张可选卡片）与学期按钮不复存在。
     expect(find.text('1 年级'), findsNothing);
     expect(find.text('6 年级'), findsNothing);
