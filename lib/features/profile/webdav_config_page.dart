@@ -123,9 +123,8 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
     final scaffold = ScaffoldMessenger.of(context);
     try {
       await settingsRepo.saveWebDavConfig(config);
-      ref.invalidate(settingsRepositoryProvider);
-
       if (!mounted) return;
+      ref.invalidate(settingsRepositoryProvider);
       Navigator.pop(context, true);
     } on Object catch (error) {
       if (mounted) {
@@ -240,8 +239,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
                 ),
                 // 与服务层共用同一套路径规则（含编码后的 `..` 等穿越写法），
                 // 避免表单放行、请求时才报错。
-                validator: (v) =>
-                    WebDavConfig.validateRemotePath(v ?? ''),
+                validator: (v) => WebDavConfig.validateRemotePath(v ?? ''),
               ),
               const SizedBox(height: SpacingTokens.xl),
 

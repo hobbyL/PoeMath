@@ -15,7 +15,10 @@ import 'package:mocktail/mocktail.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/core/services/tts_service.dart';
+import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
+
+import '../../helpers/hive_test_helper.dart';
 
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
 
@@ -215,6 +218,27 @@ SettingsRepository _stubSettings({
 }
 
 void main() {
+  test('云额度耗尽时朗读降级本地，已缓存段落仍播放且不计数', () async {
+    await setUpHiveForTesting();
+    addTearDown(tearDownHiveForTesting);
+    final usage = CloudUsageService.instance;
+    await usage.setLimit(CloudUsageKind.tts, 1);
+    final counter = _RequestCounter();
+    final tts = _FakeFlutterTts();
+    final player = _FakeCloudAudioPlayer();
+    final service = TtsService(_stubSettings(cloudEnabled: true),
+        flutterTts: tts, cloudClient: _client(counter), cloudPlayer: player,);
+    addTearDown(service.dispose);
+    await service.speak('床前明月光');
+    await service.speak('床前明月光');
+    expect(counter.value, 1);
+    expect(usage.used(CloudUsageKind.tts), 1);
+    expect(player.played, hasLength(2));
+    await service.speak('疑是地上霜');
+    expect(counter.value, 1);
+    expect(tts.spokenTexts, ['疑是地上霜']);
+  });
+
   test('开关关闭时走系统引擎且不发起云请求', () async {
     final counter = _RequestCounter();
     final tts = _FakeFlutterTts();
@@ -310,8 +334,7 @@ void main() {
     final service = TtsService(
       _stubSettings(cloudEnabled: true),
       flutterTts: tts,
-      cloudClient:
-          _client(counter, failKind: WorkerTtsErrorKind.network),
+      cloudClient: _client(counter, failKind: WorkerTtsErrorKind.network),
       cloudPlayer: _FakeCloudAudioPlayer(),
     );
     var readyCount = 0;

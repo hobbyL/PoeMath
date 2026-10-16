@@ -4,6 +4,8 @@
 // 职责：应用设置页 — 主题、音频、显示等设置项逐行展示。
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
+import 'package:poemath/features/profile/parent_protection_page.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -99,6 +101,19 @@ class SettingsPage extends ConsumerWidget {
             vertical: SpacingTokens.sm,
           ),
           children: <Widget>[
+            if (_section == _SettingsSection.hub) ...[
+              AppTile(
+                  icon: Icons.lock_outline,
+                  iconColor: theme.colorScheme.primary,
+                  title: '家长保护与云额度',
+                  subtitle: '可选 PIN、恢复码与每日请求次数',
+                  onTap: () => Navigator.push<void>(
+                      context,
+                      fadeSlideRoute(
+                          builder: (_) => const ParentAccessBoundary(
+                              child: ParentProtectionPage(),),),),),
+              const SizedBox(height: SpacingTokens.sm),
+            ],
             if (_section == _SettingsSection.hub)
               AppTile(
                 icon: Icons.palette_outlined,
@@ -179,7 +194,8 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(
-                    builder: (_) => const TtsSettingsPage(),
+                    builder: (_) =>
+                        const ParentAccessBoundary(child: TtsSettingsPage()),
                   ),
                 ),
               ),
@@ -195,7 +211,8 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: settingsRepo.pinyinVisible ? '已开启' : '已关闭',
                 trailing: Switch(
                   value: settingsRepo.pinyinVisible,
-                  onChanged: (v) => _writeSetting(context, ref, '拼音显示', () async {
+                  onChanged: (v) =>
+                      _writeSetting(context, ref, '拼音显示', () async {
                     await settingsRepo.setPinyinVisible(v);
                   }),
                 ),
@@ -213,7 +230,8 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(
-                    builder: (_) => const SpeechRecognitionSettingsPage(),
+                    builder: (_) => const ParentAccessBoundary(
+                        child: SpeechRecognitionSettingsPage(),),
                   ),
                 ),
               ),
@@ -246,7 +264,8 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: settingsRepo.hapticEnabled ? '已开启（需真机体验）' : '已关闭',
                 trailing: Switch(
                   value: settingsRepo.hapticEnabled,
-                  onChanged: (v) => _writeSetting(context, ref, '触觉反馈', () async {
+                  onChanged: (v) =>
+                      _writeSetting(context, ref, '触觉反馈', () async {
                     await settingsRepo.setHapticEnabled(v);
                     // 开启时触发一次测试震动
                     if (v) {
@@ -270,7 +289,8 @@ class SettingsPage extends ConsumerWidget {
                   await Navigator.push<void>(
                     context,
                     fadeSlideRoute(
-                      builder: (_) => const LearningBackgroundPage(),
+                      builder: (_) => const ParentAccessBoundary(
+                          child: LearningBackgroundPage(),),
                     ),
                   );
                   if (context.mounted) {
@@ -303,7 +323,8 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(
-                    builder: (_) => const AiSettingsPage(),
+                    builder: (_) =>
+                        const ParentAccessBoundary(child: AiSettingsPage()),
                   ),
                 ),
               ),
@@ -320,7 +341,8 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(
-                    builder: (_) => const BackupRestorePage(),
+                    builder: (_) =>
+                        const ParentAccessBoundary(child: BackupRestorePage()),
                   ),
                 ),
               ),
@@ -337,7 +359,8 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(
-                    builder: (_) => const CloudSyncPage(),
+                    builder: (_) =>
+                        const ParentAccessBoundary(child: CloudSyncPage()),
                   ),
                 ),
               ),
@@ -407,7 +430,9 @@ class SettingsPage extends ConsumerWidget {
   void _openSection(BuildContext context, _SettingsSection section) {
     Navigator.push<void>(
       context,
-      fadeSlideRoute(builder: (_) => SettingsPage._category(section)),
+      fadeSlideRoute(
+          builder: (_) =>
+              ParentAccessBoundary(child: SettingsPage._category(section)),),
     );
   }
 
@@ -553,7 +578,9 @@ class SettingsPage extends ConsumerWidget {
       subtitle: '每组 $batchSize 题 · 诗词 $poemGoal 首 · 口算 $mathGoal 题',
       onTap: () => Navigator.push<void>(
         context,
-        fadeSlideRoute(builder: (_) => const PracticeSettingsPage()),
+        fadeSlideRoute(
+            builder: (_) =>
+                const ParentAccessBoundary(child: PracticeSettingsPage()),),
       ),
     );
   }
@@ -592,7 +619,9 @@ class SettingsPage extends ConsumerWidget {
       subtitle: subtitle,
       onTap: () => Navigator.push<void>(
         context,
-        fadeSlideRoute(builder: (_) => const NotificationSettingsPage()),
+        fadeSlideRoute(
+            builder: (_) =>
+                const ParentAccessBoundary(child: NotificationSettingsPage()),),
       ),
     );
   }

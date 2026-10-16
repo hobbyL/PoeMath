@@ -8,6 +8,7 @@
 //       「去设置」入口），不经过本页。
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/routing/page_transitions.dart';
@@ -46,9 +47,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
             subtitle: assistantEnabled ? '悬浮入口已开启' : '悬浮入口已关闭',
             trailing: Switch(
               value: assistantEnabled,
-              onChanged: (value) => ref
-                  .read(assistantEnabledProvider.notifier)
-                  .setEnabled(value),
+              onChanged: (value) =>
+                  ref.read(assistantEnabledProvider.notifier).setEnabled(value),
             ),
           ),
           const SizedBox(height: SpacingTokens.sm),
@@ -60,7 +60,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
             onTap: () => Navigator.push<void>(
               context,
               fadeSlideRoute(
-                builder: (_) => const LlmProviderSettingsPage(),
+                builder: (_) => const ParentAccessBoundary(
+                    child: LlmProviderSettingsPage(),),
               ),
             ),
           ),
@@ -73,7 +74,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
             onTap: () => Navigator.push<void>(
               context,
               fadeSlideRoute(
-                builder: (_) => const LlmScenarioSettingsPage(),
+                builder: (_) => const ParentAccessBoundary(
+                    child: LlmScenarioSettingsPage(),),
               ),
             ),
           ),
@@ -86,7 +88,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
             onTap: () => Navigator.push<void>(
               context,
               fadeSlideRoute(
-                builder: (_) => const PromptSettingsPage(),
+                builder: (_) =>
+                    const ParentAccessBoundary(child: PromptSettingsPage()),
               ),
             ),
           ),

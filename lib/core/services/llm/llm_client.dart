@@ -13,6 +13,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:poemath/core/services/cloud_usage_service.dart';
 
 import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
@@ -26,11 +27,13 @@ const _jsonContentType = 'application/json; charset=utf-8';
 final class LlmClient {
   LlmClient({
     http.Client? httpClient,
+    CloudUsageService? usage,
     Duration generateTimeout = const Duration(seconds: 60),
     Duration probeTimeout = const Duration(seconds: 15),
     Duration explainTimeout = const Duration(seconds: 60),
     Duration chatTimeout = const Duration(seconds: 90),
-  })  : _httpClient = httpClient ?? http.Client(),
+  })  : _usage = usage ?? CloudUsageService.instance,
+        _httpClient = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _generateTimeout = generateTimeout,
         _probeTimeout = probeTimeout,
@@ -38,6 +41,7 @@ final class LlmClient {
         _chatTimeout = chatTimeout;
 
   final http.Client _httpClient;
+  final CloudUsageService _usage;
   final bool _ownsHttpClient;
   final Duration _generateTimeout;
   final Duration _probeTimeout;
@@ -130,7 +134,8 @@ final class LlmClient {
       return const LlmBatchResult(drafts: <LlmWordProblemDraft>[]);
     }
     final base = normalizeBaseUrl(config.baseUrl);
-    final body = _buildGenerationBody(config, skeletons, grade, semester, topic);
+    final body =
+        _buildGenerationBody(config, skeletons, grade, semester, topic);
 
     Object? lastFormatError;
     for (var attempt = 0; attempt <= _maxFormatRetries; attempt++) {
@@ -199,9 +204,11 @@ final class LlmClient {
         final data = decoded['data'];
         if (data is List<Object?>) {
           final models = data
-              .map((item) => item is Map<Object?, Object?>
-                  ? item['id']?.toString()
-                  : null,)
+              .map(
+                (item) => item is Map<Object?, Object?>
+                    ? item['id']?.toString()
+                    : null,
+              )
               .whereType<String>()
               .where((id) => id.isNotEmpty)
               .toList()
@@ -212,11 +219,13 @@ final class LlmClient {
         // 少数实现直接返回数组（如某些代理）。
         // 仅保留 Map 的 id 与 String 元素；数字/布尔等垃圾条目丢弃。
         final models = decoded
-            .map((item) => item is Map<Object?, Object?>
-                ? item['id']?.toString()
-                : item is String
-                    ? item
-                    : null,)
+            .map(
+              (item) => item is Map<Object?, Object?>
+                  ? item['id']?.toString()
+                  : item is String
+                      ? item
+                      : null,
+            )
             .whereType<String>()
             .where((id) => id.isNotEmpty)
             .toList()
@@ -494,8 +503,7 @@ final class LlmClient {
     String semester,
     String topic,
   ) {
-    final topicLabel =
-        WordProblemTopic.tryParse(topic)?.label ?? topic;
+    final topicLabel = WordProblemTopic.tryParse(topic)?.label ?? topic;
     final systemPrompt = StringBuffer()
       ..writeln('你是一名小学数学应用题作者。')
       ..writeln('我给你一组题目的结构骨架（数字、运算、答案、单位都已确定），')
@@ -513,7 +521,8 @@ final class LlmClient {
       ..writeln()
       ..writeln('只输出严格 JSON 数组，不要输出任何其他文字：')
       ..writeln(
-        '[{"index":1,"text":"题面","unit":"单位","explanation":"讲解"}]',);
+        '[{"index":1,"text":"题面","unit":"单位","explanation":"讲解"}]',
+      );
 
     final userPrompt = StringBuffer()
       ..writeln('年级：小学$grade年级$semester学期')
@@ -521,12 +530,11 @@ final class LlmClient {
       ..writeln('请为以下 $topicLabel 应用题骨架编写题面：');
     for (var i = 0; i < skeletons.length; i++) {
       final s = skeletons[i];
-      userPrompt
-        .writeln(
-          '${i + 1}. 数字 ${jsonEncode(s.operands)}，'
-          '运算 ${jsonEncode(s.operators.map((o) => o.symbol).toList())}，'
-          '答案单位提示：${s.unitHint}',
-        );
+      userPrompt.writeln(
+        '${i + 1}. 数字 ${jsonEncode(s.operands)}，'
+        '运算 ${jsonEncode(s.operators.map((o) => o.symbol).toList())}，'
+        '答案单位提示：${s.unitHint}',
+      );
     }
 
     return jsonEncode(<String, Object>{
@@ -567,6 +575,11 @@ final class LlmClient {
     required Duration timeout,
     required String timeoutMessage,
   }) async {
+    try {
+      await _usage.reserve(CloudUsageKind.llm);
+    } on CloudQuotaExceededException catch (error) {
+      throw LlmNetworkError(error.message);
+    }
     http.Response response;
     try {
       response = await _httpClient
@@ -601,6 +614,11 @@ final class LlmClient {
     required Duration timeout,
     required String timeoutMessage,
   }) async {
+    try {
+      await _usage.reserve(CloudUsageKind.llm);
+    } on CloudQuotaExceededException catch (error) {
+      throw LlmNetworkError(error.message);
+    }
     http.StreamedResponse response;
     try {
       final request = http.Request('POST', uri)

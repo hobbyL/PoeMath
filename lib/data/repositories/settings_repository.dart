@@ -5,6 +5,8 @@
 
 import 'dart:convert';
 
+import 'package:poemath/core/services/parent_access_service.dart';
+
 import 'package:crypto/crypto.dart';
 
 import 'package:poemath/core/services/llm/llm_client.dart';
@@ -205,6 +207,7 @@ class SettingsRepository {
       HiveBoxes.settings.get(_keyTtsCloudEnabled, defaultValue: false) as bool;
 
   Future<void> setTtsCloudEnabled(bool enabled) async {
+    ParentAccessService.instance.assertAllowed();
     await HiveBoxes.settings.put(_keyTtsCloudEnabled, enabled);
   }
 
@@ -215,6 +218,7 @@ class SettingsRepository {
       ) as String;
 
   Future<void> setTtsCloudBaseUrl(String baseUrl) async {
+    ParentAccessService.instance.assertAllowed();
     await HiveBoxes.settings.put(_keyTtsCloudBaseUrl, baseUrl);
   }
 
@@ -225,6 +229,7 @@ class SettingsRepository {
       ) as String;
 
   Future<void> setTtsCloudVoice(String voice) async {
+    ParentAccessService.instance.assertAllowed();
     await HiveBoxes.settings.put(_keyTtsCloudVoice, voice);
   }
 
@@ -234,6 +239,7 @@ class SettingsRepository {
           as String;
 
   Future<void> setTtsCloudStyle(String style) async {
+    ParentAccessService.instance.assertAllowed();
     await HiveBoxes.settings.put(_keyTtsCloudStyle, style);
   }
 
@@ -250,6 +256,7 @@ class SettingsRepository {
     required String baseUrl,
     required String apiKey,
   }) async {
+    ParentAccessService.instance.assertAllowed();
     final normalized = WorkerTtsClient.normalizeBaseUrl(baseUrl);
     final key = apiKey.trim();
     if (key.isEmpty) {
@@ -271,6 +278,7 @@ class SettingsRepository {
 
   /// 标记当前配置已通过验证。
   Future<void> markWorkerTtsVerified() async {
+    ParentAccessService.instance.assertAllowed();
     final config = await readWorkerTtsConfig();
     if (config == null) {
       throw StateError('尚未保存自建语音服务配置');
@@ -283,6 +291,7 @@ class SettingsRepository {
 
   /// 删除已保存的服务配置（Key + 指纹），并关闭云端朗读开关。
   Future<void> deleteWorkerTtsConfig() async {
+    ParentAccessService.instance.assertAllowed();
     await _credentialStore.deleteWorkerTtsApiKey();
     await HiveBoxes.settings.delete(_keyWorkerTtsVerifiedFingerprint);
     await HiveBoxes.settings.delete(_keyTtsCloudBaseUrl);
@@ -323,6 +332,7 @@ class SettingsRepository {
 
   /// 设置生效配置；id 不在列表中抛 [ArgumentError]。
   Future<void> setLlmActiveProvider(String id) async {
+    ParentAccessService.instance.assertAllowed();
     final providers = llmProviders;
     if (!providers.any((p) => p.id == id)) {
       throw ArgumentError('LLM 配置不存在：$id');
@@ -373,6 +383,7 @@ class SettingsRepository {
     LlmScenario scenario,
     String? id,
   ) async {
+    ParentAccessService.instance.assertAllowed();
     if (id == null) {
       await HiveBoxes.settings.delete(scenario.settingsKey);
       // 解绑同时清掉该场景选中的 model（旧 model 属于被解绑的配置）。
@@ -397,6 +408,7 @@ class SettingsRepository {
 
   /// 设置场景选中的模型；[model] 为 null / 空串表示清除（跟随默认）。
   Future<void> setModelForScenario(LlmScenario scenario, String? model) async {
+    ParentAccessService.instance.assertAllowed();
     final trimmed = model?.trim() ?? '';
     if (trimmed.isEmpty) {
       await HiveBoxes.settings.delete(scenario.modelKey);
@@ -412,6 +424,7 @@ class SettingsRepository {
     required String? providerId,
     required String? model,
   }) async {
+    ParentAccessService.instance.assertAllowed();
     await setProviderIdForScenario(scenario, providerId);
     if (providerId != null) {
       await setModelForScenario(scenario, model);
@@ -454,6 +467,7 @@ class SettingsRepository {
     required String apiKey,
     List<String> models = const <String>[],
   }) async {
+    ParentAccessService.instance.assertAllowed();
     // 先校验地址合法（非法抛 FormatException，不落盘）。
     final normalized = LlmClient.normalizeBaseUrl(baseUrl);
     final key = apiKey.trim();
@@ -500,6 +514,7 @@ class SettingsRepository {
   /// 若删除的是生效配置，active 自动切到剩余第一条；无剩余清空 active。
   /// 指向被删配置的场景绑定一并清理（防悬空残留）。
   Future<void> deleteLlmProviderConfig(String id) async {
+    ParentAccessService.instance.assertAllowed();
     await _credentialStore.deleteLlmApiKeyFor(id);
     // 先按原始存储值清理场景绑定（列表写回后无法再判断悬空归属）。
     for (final scenario in LlmScenario.values) {
@@ -537,6 +552,7 @@ class SettingsRepository {
   /// 清除指定配置已保存的 API Key（如从有鉴权服务切到无鉴权服务）；
   /// 不触碰配置本身。无已存 Key 时调用无副作用。
   Future<void> clearLlmApiKey(String id) {
+    ParentAccessService.instance.assertAllowed();
     return _credentialStore.deleteLlmApiKeyFor(id);
   }
 
@@ -600,6 +616,7 @@ class SettingsRepository {
 
   /// 保存诗词讲解覆盖值；[value] trim 后为空 → 删除 key（恢复默认）。
   Future<void> setPoemExplainPrompt(String value) async {
+    ParentAccessService.instance.assertAllowed();
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
       await HiveBoxes.settings.delete(_keyPoemExplainPrompt);
@@ -610,6 +627,7 @@ class SettingsRepository {
 
   /// 一键恢复内置默认：删除覆盖 key，运行时回落编译期常量。
   Future<void> resetPoemExplainPrompt() async {
+    ParentAccessService.instance.assertAllowed();
     await HiveBoxes.settings.delete(_keyPoemExplainPrompt);
   }
 
@@ -622,6 +640,7 @@ class SettingsRepository {
 
   /// 保存口算解析覆盖值；[value] trim 后为空 → 删除 key（恢复默认）。
   Future<void> setMathExplainPrompt(String value) async {
+    ParentAccessService.instance.assertAllowed();
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
       await HiveBoxes.settings.delete(_keyMathExplainPrompt);
@@ -632,6 +651,7 @@ class SettingsRepository {
 
   /// 一键恢复内置默认：删除覆盖 key，运行时回落编译期常量。
   Future<void> resetMathExplainPrompt() async {
+    ParentAccessService.instance.assertAllowed();
     await HiveBoxes.settings.delete(_keyMathExplainPrompt);
   }
 
@@ -644,6 +664,7 @@ class SettingsRepository {
 
   /// 保存 AI 助手覆盖值；[value] trim 后为空 → 删除 key（恢复默认）。
   Future<void> setAssistantPrompt(String value) async {
+    ParentAccessService.instance.assertAllowed();
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
       await HiveBoxes.settings.delete(_keyAssistantPrompt);
@@ -654,6 +675,7 @@ class SettingsRepository {
 
   /// 一键恢复内置默认：删除覆盖 key，运行时回落编译期常量。
   Future<void> resetAssistantPrompt() async {
+    ParentAccessService.instance.assertAllowed();
     await HiveBoxes.settings.delete(_keyAssistantPrompt);
   }
 
@@ -815,6 +837,7 @@ class SettingsRepository {
     required String secretId,
     required String secretKey,
   }) async {
+    ParentAccessService.instance.assertAllowed();
     final credentials = TencentAsrCredentials(
       secretId: secretId.trim(),
       secretKey: secretKey.trim(),
@@ -836,6 +859,7 @@ class SettingsRepository {
     required TencentAsrCredentials testedCredentials,
     DateTime? verifiedAt,
   }) async {
+    ParentAccessService.instance.assertAllowed();
     final current = await readTencentAsrCredentials();
     if (current == null ||
         _credentialFingerprint(current) !=
@@ -860,6 +884,7 @@ class SettingsRepository {
   }
 
   Future<void> deleteTencentAsrCredentials() async {
+    ParentAccessService.instance.assertAllowed();
     await invalidateTencentAsrVerification();
     await _credentialStore.deleteTencentAsrCredentials();
   }
@@ -931,6 +956,7 @@ class SettingsRepository {
   ///
   /// 凭据存入安全存储，非敏感信息存入 Hive。
   Future<void> saveWebDavConfig(WebDavConfig config) async {
+    ParentAccessService.instance.assertAllowed();
     // 凭据 → 安全存储
     await _credentialStore.saveWebDavCredentials(
       configId: config.id,
@@ -959,6 +985,7 @@ class SettingsRepository {
 
   /// 删除一条 WebDAV 配置。
   Future<void> deleteWebDavConfig(String id) async {
+    ParentAccessService.instance.assertAllowed();
     await _credentialStore.deleteWebDavCredentials(id);
     final list = webDavConfigs..removeWhere((c) => c.id == id);
     await _saveConfigsToHive(list);

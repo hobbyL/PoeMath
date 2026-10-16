@@ -6,6 +6,7 @@
 // 依赖：go_router / AppRoutes / MainShell / SplashPage / 各 Tab 页面。
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/config/app_config.dart';
@@ -285,7 +286,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           }
           return fadeSlideTransitionPage(
             state: state,
-            child: WordProblemPreviewPage(data: data),
+            child:
+                ParentAccessBoundary(child: WordProblemPreviewPage(data: data)),
           );
         },
       ),
@@ -345,21 +347,22 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         path: AppRoutes.settings,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: const SettingsPage(),
+          child: const ParentAccessBoundary(child: SettingsPage()),
         ),
       ),
       GoRoute(
         path: AppRoutes.speechRecognitionSettings,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: const SpeechRecognitionSettingsPage(),
+          child: const ParentAccessBoundary(
+              child: SpeechRecognitionSettingsPage(),),
         ),
       ),
       GoRoute(
         path: AppRoutes.llmSettings,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: const LlmProviderSettingsPage(),
+          child: const ParentAccessBoundary(child: LlmProviderSettingsPage()),
         ),
       ),
       // ============ 学习报告（非 Shell 子路由，全屏） ============

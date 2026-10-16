@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:poemath/core/services/cloud_usage_service.dart';
 
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/tencent/tc3_signer.dart';
@@ -31,10 +32,12 @@ final class TencentAsrException extends SpeechRecognitionException {
 final class TencentAsrClient {
   TencentAsrClient({
     http.Client? httpClient,
+    CloudUsageService? usage,
     DateTime Function()? clock,
     Duration timeout = const Duration(seconds: 15),
     Uri? endpoint,
-  })  : _httpClient = httpClient ?? http.Client(),
+  })  : _usage = usage ?? CloudUsageService.instance,
+        _httpClient = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _clock = clock ?? DateTime.now,
         _timeout = timeout,
@@ -50,6 +53,7 @@ final class TencentAsrClient {
   static const int maxBase64Bytes = 3 * 1024 * 1024;
 
   final http.Client _httpClient;
+  final CloudUsageService _usage;
   final bool _ownsHttpClient;
   final DateTime Function() _clock;
   final Duration _timeout;
@@ -122,6 +126,11 @@ final class TencentAsrClient {
     required int timestamp,
     required String host,
   }) async {
+    try {
+      await _usage.reserve(CloudUsageKind.asr);
+    } on CloudQuotaExceededException catch (error) {
+      throw TencentAsrException(error.message, kind: TencentAsrErrorKind.quota);
+    }
     try {
       return await _httpClient
           .post(

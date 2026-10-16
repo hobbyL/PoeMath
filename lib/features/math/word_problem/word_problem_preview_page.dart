@@ -9,6 +9,7 @@
 // 题卡内勾选框靠右，「解题讲解」展开按钮跟在算式行尾。
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -104,6 +105,10 @@ class _WordProblemPreviewPageState
   Future<void> _confirm() async {
     if (_saving || _selectedCount == 0) return;
     setState(() => _saving = true);
+    if (!await ensureParentAccess(context) || !mounted) {
+      if (mounted) setState(() => _saving = false);
+      return;
+    }
 
     final now = DateTime.now();
     // 用微秒时间戳：同毫秒连续确认两批会合并批次，按批删除/筛选混淆。

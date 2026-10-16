@@ -176,9 +176,8 @@ class _LlmProviderEditDialogState
   Future<String?> _fallbackStoredKey() async {
     final editingId = _editingId;
     if (editingId == null) return null;
-    final stored = await ref
-        .read(settingsRepositoryProvider)
-        .readLlmApiKeyFor(editingId);
+    final stored =
+        await ref.read(settingsRepositoryProvider).readLlmApiKeyFor(editingId);
     if (stored == null || stored.trim().isEmpty) return null;
     return stored;
   }
@@ -287,8 +286,7 @@ class _LlmProviderEditDialogState
                             CheckboxListTile(
                               value: chosen.contains(model),
                               title: Text(model),
-                              controlAffinity:
-                                  ListTileControlAffinity.leading,
+                              controlAffinity: ListTileControlAffinity.leading,
                               onChanged: (v) => setSheetState(() {
                                 if (v ?? false) {
                                   chosen.add(model);
@@ -341,6 +339,7 @@ class _LlmProviderEditDialogState
     var configToTest = config;
     if (_apiKeyController.text.trim().isEmpty && _hasStoredKey) {
       final stored = await _fallbackStoredKey();
+      if (!mounted) return;
       configToTest = LlmConfig(
         baseUrl: config.baseUrl,
         apiKey: stored ?? '',
@@ -527,9 +526,7 @@ class _LlmProviderEditDialogState
     final isEditing = _editingId != null;
     final title = config == null
         ? '新增配置'
-        : (config.name.trim().isEmpty
-            ? '编辑配置'
-            : '编辑：${config.name.trim()}');
+        : (config.name.trim().isEmpty ? '编辑配置' : '编辑：${config.name.trim()}');
 
     return ScaffoldMessenger(
       key: _messengerKey,

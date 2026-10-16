@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:poemath/app.dart';
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/services/notification_service.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/speech/legacy_speech_cleanup.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -24,6 +25,11 @@ Future<void> initializeCoreStorage() async {
   await HiveBoxes.init();
   await MathMistakeKeyMigration.run();
   await PoemIdentityMigration.run();
+  try {
+    await ParentAccessService.instance.initialize();
+  } on Object catch (error) {
+    AppLogger.e('家长保护安全存储不可用，家长区保持锁定', tag: 'Startup', error: error);
+  }
 }
 
 Future<void> initializeOptionalServices() async {

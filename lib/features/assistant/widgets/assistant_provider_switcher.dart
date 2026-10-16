@@ -7,6 +7,8 @@
 // 复用：providerDisplayName / providerHostSummary 纯函数（与设置页一致）。
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/services/llm/llm_scenario.dart';
@@ -51,9 +53,8 @@ class _AssistantProviderSwitcherState
       label = '未配置模型';
     } else {
       // 场景选中 model 仅在确有绑定时适用，且须 ∈ 候选，否则回落默认 model。
-      final selected = boundId != null
-          ? repo.modelForScenario(LlmScenario.assistant)
-          : null;
+      final selected =
+          boundId != null ? repo.modelForScenario(LlmScenario.assistant) : null;
       final model = (selected != null && current.models.contains(selected))
           ? selected
           : current.model;
@@ -72,8 +73,8 @@ class _AssistantProviderSwitcherState
         child: Text(
           label,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleSmall
-              ?.copyWith(fontWeight: FontWeight.w600),
+          style:
+              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -83,6 +84,7 @@ class _AssistantProviderSwitcherState
     List<LlmProviderConfig> providers,
     String? boundId,
   ) async {
+    if (!await ensureParentAccess(context) || !mounted) return;
     if (providers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -96,6 +98,7 @@ class _AssistantProviderSwitcherState
     final providerPick = await _pickProviderSheet(providers, boundId);
     if (providerPick == null) return;
     if (providerPick == _followDefaultValue) {
+      if (!mounted || !ParentAccessService.instance.isUnlocked) return;
       await repo.setScenarioSelection(
         LlmScenario.assistant,
         providerId: null,
@@ -122,6 +125,7 @@ class _AssistantProviderSwitcherState
       if (model == null) return; // 取消模型选择 = 不改动
     }
     try {
+      if (!mounted || !ParentAccessService.instance.isUnlocked) return;
       await repo.setScenarioSelection(
         LlmScenario.assistant,
         providerId: providerPick,
@@ -154,9 +158,7 @@ class _AssistantProviderSwitcherState
           final sel = value == groupValue;
           return ListTile(
             leading: Icon(
-              sel
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
+              sel ? Icons.radio_button_checked : Icons.radio_button_unchecked,
               color: sel
                   ? theme.colorScheme.primary
                   : theme.colorScheme.onSurfaceVariant,

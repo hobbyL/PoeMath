@@ -324,6 +324,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
         apiKey: apiKey,
       );
       await _tts.verifyCloud(config);
+      if (!mounted) return;
       await settingsRepo.saveWorkerTtsConfig(
         baseUrl: baseUrl,
         apiKey: apiKey,

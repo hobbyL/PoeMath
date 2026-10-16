@@ -4,6 +4,7 @@
 // 云端开启且服务已验证时云优先，失败静默回退系统音色，朗读不中断。
 
 import 'dart:async';
+import 'package:poemath/core/services/cloud_usage_service.dart';
 
 import 'dart:typed_data';
 
@@ -199,6 +200,9 @@ class TtsService {
     if (!_cloudMode) return null;
     try {
       return await _synthesizeStrict(text);
+    } on CloudQuotaExceededException {
+      _cloudSessionDisabled = true;
+      return null;
     } on WorkerTtsException catch (error) {
       if (error.kind == WorkerTtsErrorKind.authentication) {
         _cloudSessionDisabled = true;

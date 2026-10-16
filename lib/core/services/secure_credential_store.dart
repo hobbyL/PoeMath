@@ -154,6 +154,16 @@ class SecureCredentialStore {
     await _storage.delete(key: _backupPassphraseKey);
   }
 
+  /// 家长验证记录：仅盐、摘要与失败次数，禁止保存 PIN 或恢复码原文。
+  static const _parentIosOptions =
+      IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device);
+  Future<String?> readParentProtection() =>
+      _storage.read(key: 'parent_protection', iOptions: _parentIosOptions);
+  Future<void> saveParentProtection(String record) => _storage.write(
+      key: 'parent_protection', value: record, iOptions: _parentIosOptions,);
+  Future<void> deleteParentProtection() =>
+      _storage.delete(key: 'parent_protection', iOptions: _parentIosOptions);
+
   // ============ 内部 ============
 
   static String _usernameKey(String id) => 'webdav_${id}_username';

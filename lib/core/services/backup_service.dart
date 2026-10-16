@@ -40,6 +40,7 @@ import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 import 'package:poemath/math_engine/validators/expression_evaluator.dart';
@@ -423,6 +424,7 @@ class BackupService {
   /// 恢复失败时分别补偿 Hive 数据、设置键的存在状态及已写入凭据。
   /// 补偿失败会通过 [BackupRestoreException.rollbackFailed] 显式报告。
   Future<int> restoreFromJson(String jsonString, {String? passphrase}) async {
+    ParentAccessService.instance.assertAllowed();
     return PracticeDraftRepository.whileRestoring(
       () => _restoreFromJson(jsonString, passphrase: passphrase),
     );
@@ -446,6 +448,7 @@ class BackupService {
       }
     }
 
+    ParentAccessService.instance.assertAllowed();
     // 恢复前先快照当前数据（不含凭据节），失败时用于回滚
     final snapshot = await exportToJson();
     final settingsSnapshot = <String, dynamic>{

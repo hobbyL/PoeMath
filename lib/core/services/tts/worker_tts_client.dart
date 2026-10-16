@@ -9,6 +9,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:poemath/core/services/cloud_usage_service.dart';
 
 import 'package:poemath/core/services/tts/tts_models.dart';
 
@@ -21,14 +22,17 @@ const _jsonContentType = 'application/json; charset=utf-8';
 final class WorkerTtsClient {
   WorkerTtsClient({
     http.Client? httpClient,
+    CloudUsageService? usage,
     Duration synthesizeTimeout = const Duration(seconds: 30),
     Duration probeTimeout = const Duration(seconds: 10),
-  })  : _httpClient = httpClient ?? http.Client(),
+  })  : _usage = usage ?? CloudUsageService.instance,
+        _httpClient = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _synthesizeTimeout = synthesizeTimeout,
         _probeTimeout = probeTimeout;
 
   final http.Client _httpClient;
+  final CloudUsageService _usage;
   final bool _ownsHttpClient;
   final Duration _synthesizeTimeout;
   final Duration _probeTimeout;
@@ -240,6 +244,7 @@ final class WorkerTtsClient {
     required Duration timeout,
     required String timeoutMessage,
   }) async {
+    await _usage.reserve(CloudUsageKind.tts);
     try {
       return await _httpClient
           .post(

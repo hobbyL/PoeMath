@@ -112,7 +112,7 @@ class _SpeechRecognitionSettingsPageState
     });
     try {
       final credentials = await _saveFormCredentials();
-      if (credentials == null) {
+      if (credentials == null || !mounted) {
         if (mounted) setState(() => _busy = false);
         return;
       }
@@ -133,11 +133,12 @@ class _SpeechRecognitionSettingsPageState
     });
     try {
       final credentials = await _saveFormCredentials();
-      if (credentials == null) {
+      if (credentials == null || !mounted) {
         if (mounted) setState(() => _busy = false);
         return;
       }
       await _speechService.initialize();
+      if (!mounted) return;
       await _speechService.start();
       if (!mounted) {
         await _speechService.cancel();
@@ -177,9 +178,11 @@ class _SpeechRecognitionSettingsPageState
         throw const SpeechRecognitionException('腾讯云密钥已被清空');
       }
       final result = await _speechService.stop();
+      if (!mounted) return;
       await repo.markTencentAsrCredentialsVerified(
         testedCredentials: credentials,
       );
+      if (!mounted) return;
       await _loadSettings();
       if (mounted) {
         _showMessage(
@@ -187,12 +190,15 @@ class _SpeechRecognitionSettingsPageState
         );
       }
     } on TencentAsrException catch (error) {
+      if (!mounted) return;
       await _invalidateAfterFailedTest();
       if (mounted) _showMessage(error.message, isError: true);
     } on SpeechRecognitionException catch (error) {
+      if (!mounted) return;
       await _invalidateAfterFailedTest();
       if (mounted) _showMessage(error.message, isError: true);
     } on Object {
+      if (!mounted) return;
       await _invalidateAfterFailedTest();
       if (mounted) _showMessage('测试失败，请检查网络后重试', isError: true);
     } finally {
@@ -201,6 +207,7 @@ class _SpeechRecognitionSettingsPageState
   }
 
   Future<void> _invalidateAfterFailedTest() async {
+    if (!mounted) return;
     await ref
         .read(settingsRepositoryProvider)
         .invalidateTencentAsrVerification();
@@ -232,6 +239,7 @@ class _SpeechRecognitionSettingsPageState
     setState(() => _busy = true);
     try {
       await ref.read(settingsRepositoryProvider).deleteTencentAsrCredentials();
+      if (!mounted) return;
       _secretIdController.clear();
       _secretKeyController.clear();
       await _loadSettings();
