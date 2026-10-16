@@ -33,6 +33,7 @@ import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
+import 'package:poemath/data/repositories/today_plan_repository.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
 import 'package:poemath/domain/poem_review_history.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
@@ -474,6 +475,16 @@ class BackupService {
       } on Object catch (error, stackTrace) {
         AppLogger.e(
           '学习数据已恢复，练习缓存失效失败',
+          tag: 'Backup',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+      try {
+        await TodayPlanRepository.clearForRestore();
+      } on Object catch (error, stackTrace) {
+        AppLogger.e(
+          '学习数据已恢复，今日计划缓存清理失败',
           tag: 'Backup',
           error: error,
           stackTrace: stackTrace,

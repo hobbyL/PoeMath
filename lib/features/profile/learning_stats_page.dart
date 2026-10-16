@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/profile/providers/stats_chart_providers.dart';
+import 'package:poemath/features/profile/widgets/learning_quality_section.dart';
 
 class LearningStatsPage extends ConsumerStatefulWidget {
   const LearningStatsPage({super.key});
@@ -44,6 +45,9 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
           children: [
             // 周期汇总卡片
             _buildSummaryCard(theme, stats),
+            const SizedBox(height: SpacingTokens.md),
+
+            LearningQualitySection(days: _days),
             const SizedBox(height: SpacingTokens.md),
 
             // 做题数 & 学诗数
@@ -105,9 +109,11 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
     );
     final avgAccuracy =
         totalMath > 0 ? (totalCorrect / totalMath * 100).round() : 0;
-    final activeDays = stats.where(
-      (s) => s.poemCount > 0 || s.mathTotal > 0,
-    ).length;
+    final activeDays = stats
+        .where(
+          (s) => s.poemCount > 0 || s.mathTotal > 0,
+        )
+        .length;
 
     return ColoredCard(
       color: theme.colorScheme.primary,
@@ -182,9 +188,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
               // 宽屏（≥480）一行 6 个，窄屏两行各 3 个
               if (constraints.maxWidth >= 480) {
                 return Row(
-                  children: items
-                      .map((item) => Expanded(child: item))
-                      .toList(),
+                  children: items.map((item) => Expanded(child: item)).toList(),
                 );
               }
 
@@ -313,8 +317,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
                           ? theme.colorScheme.primary
                           : theme.colorScheme.secondary);
                   return Padding(
-                    padding:
-                        const EdgeInsets.only(left: SpacingTokens.sm),
+                    padding: const EdgeInsets.only(left: SpacingTokens.sm),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -351,8 +354,9 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
 
   /// 根据天数计算图表内容宽度，每组柱占固定宽度。
   double _chartWidth(BuildContext context) {
-    final screenWidth =
-        MediaQuery.sizeOf(context).width - SpacingTokens.md * 2 - SpacingTokens.md * 2;
+    final screenWidth = MediaQuery.sizeOf(context).width -
+        SpacingTokens.md * 2 -
+        SpacingTokens.md * 2;
     final minWidth = _days * 36.0; // 每天至少 36px
     return minWidth > screenWidth ? minWidth : screenWidth;
   }
@@ -379,8 +383,8 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
   /// 做题数 + 学诗数（分组柱状图）。
   Widget _buildPracticeChart(ThemeData theme, List<DailyStat> stats) {
     final maxY = stats.fold<double>(0, (prev, s) {
-      final m = (s.mathTotal > s.poemCount ? s.mathTotal : s.poemCount)
-          .toDouble();
+      final m =
+          (s.mathTotal > s.poemCount ? s.mathTotal : s.poemCount).toDouble();
       return m > prev ? m : prev;
     });
 
@@ -494,8 +498,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
   Widget _buildStarsChart(ThemeData theme, List<DailyStat> stats) {
     final maxY = stats.fold<double>(
       0,
-      (prev, s) =>
-          s.starsEarned > prev ? s.starsEarned.toDouble() : prev,
+      (prev, s) => s.starsEarned > prev ? s.starsEarned.toDouble() : prev,
     );
 
     return _scrollableChart(
@@ -528,9 +531,8 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
   Widget _buildDurationChart(ThemeData theme, List<DailyStat> stats) {
     final maxY = stats.fold<double>(
       0,
-      (prev, s) => s.durationMinutes > prev
-          ? s.durationMinutes.toDouble()
-          : prev,
+      (prev, s) =>
+          s.durationMinutes > prev ? s.durationMinutes.toDouble() : prev,
     );
 
     return _scrollableChart(
@@ -563,8 +565,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
   Widget _buildMistakeChart(ThemeData theme, List<DailyStat> stats) {
     final maxY = stats.fold<double>(
       0,
-      (prev, s) =>
-          s.mistakeCount > prev ? s.mistakeCount.toDouble() : prev,
+      (prev, s) => s.mistakeCount > prev ? s.mistakeCount.toDouble() : prev,
     );
 
     return _scrollableChart(
@@ -620,10 +621,8 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
   FlTitlesData _titlesData(ThemeData theme, List<DailyStat> stats) {
     return FlTitlesData(
       topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      rightTitles:
-          const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-      leftTitles:
-          const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       bottomTitles: AxisTitles(
         sideTitles: SideTitles(
           showTitles: true,

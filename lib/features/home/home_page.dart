@@ -23,6 +23,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
+import 'package:poemath/features/home/today_plan_section.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
@@ -92,6 +93,7 @@ class HomePage extends ConsumerWidget {
 
           // 快捷入口
           const PracticeResumeSection(),
+          const TodayPlanSection(),
           Text(
             '快捷入口',
             style: theme.textTheme.titleMedium?.copyWith(
