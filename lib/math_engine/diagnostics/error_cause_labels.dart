@@ -5,9 +5,9 @@
 // 引擎新增错因规则而本表漏更新时，键集一致性测试
 // （test/math_engine/diagnostics/error_cause_labels_test.dart）必须红。
 
-/// 错因 category → 中文标签。
-///
-/// key 对齐 MistakeDiagnoser 规则实例的 name（权威键，见 mistake_rule.dart）。
+import '../models/vertical_attempt.dart';
+
+/// 错因 category → 中文标签，key 对齐 MistakeDiagnoser 规则的 name 及逐列过程判分的错因标识。
 const Map<String, String> kErrorCauseLabels = {
   'carry_omission': '进位遗漏',
   'borrow_omission': '退位遗漏',
@@ -15,6 +15,7 @@ const Map<String, String> kErrorCauseLabels = {
   'operation_order': '运算顺序错误',
   'remainder_mistake': '余数错误',
   'decimal_alignment': '小数对位错误',
+  VerticalAttempt.errorCategory: '竖式过程错误',
 };
 
 /// 查表返回错因中文标签。

@@ -9,6 +9,7 @@ import 'package:crypto/crypto.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_mistake.dart';
+import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 
 /// 一次重练提交的结果，决定 UI 反馈文案。
 enum RepracticeOutcome {
@@ -35,10 +36,8 @@ class MathMistakeRepository {
     required String problemText,
     required String correctAnswer,
   }) {
-    final normalized = problemText
-        .replaceAll('−', '-')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    final normalized =
+        problemText.replaceAll('−', '-').replaceAll(RegExp(r'\s+'), ' ').trim();
     final digest = md5.convert(utf8.encode('$normalized|$correctAnswer'));
     return 'm_$digest';
   }
@@ -60,8 +59,8 @@ class MathMistakeRepository {
         .where((m) => m.profileId == ProfileScope.currentId)
         .toList()
       ..sort(
-        (a, b) =>
-            (b.lastWrongAt ?? b.createdAt).compareTo(a.lastWrongAt ?? a.createdAt),
+        (a, b) => (b.lastWrongAt ?? b.createdAt)
+            .compareTo(a.lastWrongAt ?? a.createdAt),
       );
   }
 
@@ -76,12 +75,36 @@ class MathMistakeRepository {
     required int grade,
     String? errorType,
     String? solutionStepsJson,
+    String? skillId,
+    String? semester,
+    String? problemJson,
+    String? attemptJson,
+    String? activityId,
   }) async {
+    if (activityId != null) {
+      await ActivitySettlementLedger.runOnce(
+        channel: ActivitySettlementLedger.userStatsChannel,
+        activityId: activityId,
+        action: () => recordWrong(
+            problemText: problemText,
+            correctAnswer: correctAnswer,
+            userAnswer: userAnswer,
+            problemType: problemType,
+            grade: grade,
+            errorType: errorType,
+            solutionStepsJson: solutionStepsJson,
+            skillId: skillId,
+            semester: semester,
+            problemJson: problemJson,
+            attemptJson: attemptJson,),
+      );
+      return;
+    }
     final id = problemKey(
       problemText: problemText,
       correctAnswer: correctAnswer,
     );
-    final existing = getById(id);
+    final existing = getById(id)?.copy();
     final now = DateTime.now();
 
     if (existing != null) {
@@ -91,11 +114,17 @@ class MathMistakeRepository {
         ..grade = grade
         ..errorType = errorType
         ..solutionStepsJson = solutionStepsJson ?? existing.solutionStepsJson
+        ..skillId = skillId
+        ..semester = semester
+        ..problemJson = problemJson
+        ..attemptJson = attemptJson
         ..wrongCount += 1
         ..lastWrongAt = now
         // 又错一次就不再算掌握，重新回到待复练队列。
-        ..isResolved = false;
-      await existing.save();
+        ..isResolved = false
+        ..consolidationRound = 0
+        ..nextConsolidationDate = null;
+      await add(existing);
       return;
     }
 
@@ -110,6 +139,10 @@ class MathMistakeRepository {
         grade: grade,
         errorType: errorType,
         solutionStepsJson: solutionStepsJson,
+        skillId: skillId,
+        semester: semester,
+        problemJson: problemJson,
+        attemptJson: attemptJson,
         lastWrongAt: now,
       ),
     );

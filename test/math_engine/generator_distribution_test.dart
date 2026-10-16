@@ -76,9 +76,10 @@ void main() {
         counts[problem.mode] = (counts[problem.mode] ?? 0) + 1;
       }
 
-      // 所有允许的题型都必须出现过：某个模式永远抽不到，说明权重配置
-      // 或生成分支已经死了，而这类回归原先完全没有断言兜住。
-      for (final mode in config.allowedModes) {
+      // 综合为普通方案，竖式由开始时单独选择，其余允许题型必须覆盖。
+      expect(counts[ProblemMode.vertical] ?? 0, 0);
+      for (final mode
+          in config.allowedModes.difference({ProblemMode.vertical})) {
         expect(
           counts[mode] ?? 0,
           greaterThan(0),

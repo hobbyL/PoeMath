@@ -12,6 +12,24 @@ import 'package:poemath/data/repositories/math_session_repository.dart';
 import 'package:poemath/data/repositories/challenge_record_repository.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/features/math/math_practice_request.dart';
+
+class NextMathPracticeRequest extends Notifier<MathPracticeRequest?> {
+  @override
+  MathPracticeRequest? build() => null;
+
+  void setNext(MathPracticeRequest request) => state = request;
+
+  MathPracticeRequest? consume() {
+    final request = state;
+    state = null;
+    return request;
+  }
+}
+
+final nextMathPracticeRequestProvider =
+    NotifierProvider<NextMathPracticeRequest, MathPracticeRequest?>(
+        NextMathPracticeRequest.new,);
 
 // ============ Repositories ============
 //
@@ -154,8 +172,7 @@ final filteredMistakesProvider = Provider<List<MathMistake>>((ref) {
       result.where((m) => m.isUnmastered).toList(),
     MistakeStatusFilter.consolidating =>
       result.where((m) => m.isConsolidating).toList(),
-    MistakeStatusFilter.mastered =>
-      result.where((m) => m.isResolved).toList(),
+    MistakeStatusFilter.mastered => result.where((m) => m.isResolved).toList(),
   };
 
   return result;
@@ -170,9 +187,7 @@ final unresolvedMistakesProvider = Provider<List<MathMistake>>((ref) {
 /// 待重练队列：未掌握 + 今日到期的待巩固（批量重练数据源）
 final repracticeQueueProvider = Provider<List<MathMistake>>((ref) {
   final mistakes = ref.watch(mathMistakesProvider);
-  return mistakes
-      .where((m) => m.isUnmastered || m.isConsolidationDue)
-      .toList();
+  return mistakes.where((m) => m.isUnmastered || m.isConsolidationDue).toList();
 });
 
 /// 错题数量

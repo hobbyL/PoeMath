@@ -5,6 +5,7 @@
 
 export 'math_engine.dart';
 export 'models/models.dart';
+export 'models/math_skill.dart';
 export 'presets/grade_presets.dart';
 export 'diagnostics/error_cause_labels.dart';
 export 'diagnostics/mistake_rule.dart';

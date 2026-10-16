@@ -7,7 +7,7 @@
 //
 // 合并字段口径：
 //   createdAt   取组内最早（首次答错时间）
-//   wrongCount  = 组内条数（每条旧记录视为一次答错）
+//   wrongCount  = 组内已累计的答错次数之和（旧记录默认一次）
 //   lastWrongAt 取组内最晚的 lastWrongAt ?? createdAt
 //   retryCount  取组内最大
 //   作答快照（userAnswer / errorType / grade / problemType / 解题步骤）与
@@ -89,12 +89,18 @@ class MathMistakeKeyMigration {
         grade: latest.grade,
         errorType: latest.errorType,
         solutionStepsJson: latest.solutionStepsJson,
+        skillId: latest.skillId,
+        semester: latest.semester,
+        problemJson: latest.problemJson,
+        attemptJson: latest.attemptJson,
         createdAt: earliest.createdAt,
         isResolved: latest.isResolved,
         retryCount: group
             .map((e) => e.value.retryCount)
             .reduce((a, b) => a > b ? a : b),
-        wrongCount: group.length,
+        wrongCount: group.fold(0, (sum, e) => sum + e.value.wrongCount),
+        consolidationRound: latest.consolidationRound,
+        nextConsolidationDate: latest.nextConsolidationDate,
         lastWrongAt: group
             .map((e) => e.value.lastWrongAt ?? e.value.createdAt)
             .reduce((a, b) => a.isAfter(b) ? a : b),

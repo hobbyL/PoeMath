@@ -826,6 +826,10 @@ class BackupService {
         'lastWrongAt': m.lastWrongAt?.toIso8601String(),
         'consolidationRound': m.consolidationRound,
         'nextConsolidationDate': m.nextConsolidationDate?.toIso8601String(),
+        'skillId': m.skillId,
+        'semester': m.semester,
+        'problemJson': m.problemJson,
+        'attemptJson': m.attemptJson,
       };
     }).toList();
   }
@@ -1061,6 +1065,10 @@ class BackupService {
         lastWrongAt: _parseDateTime(m['lastWrongAt']),
         consolidationRound: m['consolidationRound'] as int? ?? 0,
         nextConsolidationDate: _parseDateTime(m['nextConsolidationDate']),
+        skillId: m['skillId'] as String?,
+        semester: m['semester'] as String?,
+        problemJson: m['problemJson'] as String?,
+        attemptJson: m['attemptJson'] as String?,
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -1641,6 +1649,31 @@ class BackupService {
       max: MathMistakeRepository.consolidationIntervals.length,
     );
     _validateOptionalDate(item, 'nextConsolidationDate', path);
+    for (final key in ['skillId', 'semester', 'problemJson', 'attemptJson']) {
+      _optionalNullableString(item, key, path);
+    }
+    if (item['semester'] != null) {
+      _optionalEnumString(item, 'semester', path, const {'上', '下'});
+    }
+    if (item['problemJson'] != null) {
+      try {
+        MathProblem.fromJson(
+          jsonDecode(item['problemJson'] as String) as Map<String, dynamic>,
+        );
+      } catch (_) {
+        _invalidField('$path.problemJson', '题目快照无效');
+      }
+    }
+    if (item['attemptJson'] != null) {
+      try {
+        if (jsonDecode(item['attemptJson'] as String)
+            is! Map<String, dynamic>) {
+          _invalidField('$path.attemptJson', '过程作答必须为对象');
+        }
+      } catch (_) {
+        _invalidField('$path.attemptJson', '过程作答无效');
+      }
+    }
   }
 
   void _validateMathSession(Map<String, dynamic> item, String path) {

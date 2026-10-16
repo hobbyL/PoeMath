@@ -71,6 +71,18 @@ class MathMistake extends HiveObject {
   @HiveField(15)
   DateTime? nextConsolidationDate;
 
+  @HiveField(16)
+  String? skillId;
+
+  @HiveField(17)
+  String? semester;
+
+  @HiveField(18)
+  String? problemJson;
+
+  @HiveField(19)
+  String? attemptJson;
+
   MathMistake({
     required this.id,
     required this.profileId,
@@ -88,7 +100,34 @@ class MathMistake extends HiveObject {
     this.lastWrongAt,
     this.consolidationRound = 0,
     this.nextConsolidationDate,
+    this.skillId,
+    this.semester,
+    this.problemJson,
+    this.attemptJson,
   }) : createdAt = createdAt ?? DateTime.now();
+
+  MathMistake copy() => MathMistake(
+        id: id,
+        profileId: profileId,
+        problemText: problemText,
+        correctAnswer: correctAnswer,
+        userAnswer: userAnswer,
+        problemType: problemType,
+        grade: grade,
+        errorType: errorType,
+        solutionStepsJson: solutionStepsJson,
+        createdAt: createdAt,
+        isResolved: isResolved,
+        retryCount: retryCount,
+        wrongCount: wrongCount,
+        lastWrongAt: lastWrongAt,
+        consolidationRound: consolidationRound,
+        nextConsolidationDate: nextConsolidationDate,
+        skillId: skillId,
+        semester: semester,
+        problemJson: problemJson,
+        attemptJson: attemptJson,
+      );
 
   // ============ 派生状态（单一真相源：isResolved + consolidationRound）============
 

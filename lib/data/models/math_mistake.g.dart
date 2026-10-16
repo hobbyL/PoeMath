@@ -33,13 +33,17 @@ class MathMistakeAdapter extends TypeAdapter<MathMistake> {
       lastWrongAt: fields[13] as DateTime?,
       consolidationRound: fields[14] as int,
       nextConsolidationDate: fields[15] as DateTime?,
+      skillId: fields[16] as String?,
+      semester: fields[17] as String?,
+      problemJson: fields[18] as String?,
+      attemptJson: fields[19] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, MathMistake obj) {
     writer
-      ..writeByte(16)
+      ..writeByte(20)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -71,7 +75,15 @@ class MathMistakeAdapter extends TypeAdapter<MathMistake> {
       ..writeByte(14)
       ..write(obj.consolidationRound)
       ..writeByte(15)
-      ..write(obj.nextConsolidationDate);
+      ..write(obj.nextConsolidationDate)
+      ..writeByte(16)
+      ..write(obj.skillId)
+      ..writeByte(17)
+      ..write(obj.semester)
+      ..writeByte(18)
+      ..write(obj.problemJson)
+      ..writeByte(19)
+      ..write(obj.attemptJson);
   }
 
   @override

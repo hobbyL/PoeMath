@@ -129,10 +129,19 @@ abstract class BaseGenerator {
   ///
   /// 注意：不透传 [MathProblem.displayText]（取舍同 toFindMissing）。
   MathProblem toVertical(MathProblem problem) {
-    if (problem.operands.length != 2) return problem;
+    if (problem.operands.length != 2 || problem.operators.length != 1) {
+      return problem;
+    }
     final op = problem.operators.first;
     // 竖式只支持加减乘
     if (op == Operator.divide) return problem;
+    if (problem.displayText != null ||
+        problem.resultForm == ResultForm.withRemainder ||
+        problem.resultForm == ResultForm.fraction ||
+        [...problem.operands, problem.result]
+            .any((n) => n.toString().contains('/'))) {
+      return problem;
+    }
     // 负数操作数不适合竖式（"- -20" 视觉混乱），回退横式
     if (problem.operands.any((o) => o.isNegative)) return problem;
     return MathProblem(

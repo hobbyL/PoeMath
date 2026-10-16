@@ -9,6 +9,8 @@ import 'models/answer_judgement.dart';
 import 'models/difficulty_level.dart';
 import 'models/grade_config.dart';
 import 'models/math_problem.dart';
+import 'models/math_skill.dart';
+import 'models/vertical_attempt.dart';
 import 'models/number_value.dart';
 import 'generators/base_generator.dart';
 import 'generators/addition_subtraction_gen.dart';
@@ -34,14 +36,17 @@ class MathEngine {
   const MathEngine._();
 
   /// UI 与生成器共享年级、难度对应的模式白名单。
-  static Set<ProblemMode> supportedModes(
-      {required int grade,
-      required String semester,
-      DifficultyLevel? difficulty,}) {
+  static Set<ProblemMode> supportedModes({
+    required int grade,
+    required String semester,
+    DifficultyLevel? difficulty,
+  }) {
     final base = GradePresets.get(grade, semester);
-    return Set.unmodifiable(difficulty == null
-        ? base.allowedModes
-        : DifficultyAdjuster.adjust(base, difficulty).allowedModes,);
+    return Set.unmodifiable(
+      difficulty == null
+          ? base.allowedModes
+          : DifficultyAdjuster.adjust(base, difficulty).allowedModes,
+    );
   }
 
   /// 生成一道题目。
@@ -56,7 +61,12 @@ class MathEngine {
     ProblemMode? mode,
     DifficultyLevel? difficulty,
     Random? random,
+    String? skillId,
+    bool verticalProcessOnly = false,
   }) {
+    if (verticalProcessOnly && mode != ProblemMode.vertical) {
+      throw ArgumentError('逐列过程练习必须使用竖式模式');
+    }
     var config = GradePresets.get(grade, semester);
     if (difficulty != null) {
       config = DifficultyAdjuster.adjust(config, difficulty);
@@ -65,19 +75,43 @@ class MathEngine {
       throw ArgumentError.value(mode, 'mode', '该学期不支持此练习模式');
     }
     final rng = random ?? Random();
-    final generators = _buildGenerators(config, random: rng);
+    final requestedSkill = MathSkill.fromId(skillId);
+    if (skillId != null && requestedSkill == null) {
+      throw ArgumentError.value(skillId, 'skillId', '未知知识点');
+    }
+    final generators = _buildGenerators(config, random: rng)
+        .where(
+          (g) =>
+              requestedSkill == null ||
+              _generatorSkills(g).contains(requestedSkill),
+        )
+        .toList();
+    if (generators.isEmpty) throw ArgumentError('当前册次不支持此知识点');
 
     // 约束检查，不通过则重新生成（最多 100 次）
-    for (var i = 0; i < 100; i++) {
+    for (var i = 0;
+        i < (requestedSkill == null && !verticalProcessOnly ? 100 : 1000);
+        i++) {
       final generator = generators[rng.nextInt(generators.length)];
       final problem = generator.generate();
 
       // 若指定了模式，强制转换
       final converted = _applyMode(problem, mode, config, generator);
       if (converted == null) continue; // 模式不兼容，重试
+      // 综合属于普通方案；竖式只能由用户明确选择后进入。
+      if (mode == null && converted.mode == ProblemMode.vertical) continue;
+      if (verticalProcessOnly && !VerticalAttempt.supports(converted)) continue;
+      final skill = _classifySkill(generator, converted);
+      if (requestedSkill != null && skill != requestedSkill) continue;
 
       final violation = ConstraintChecker.check(converted, config);
-      if (violation == null) return converted;
+      if (violation == null) {
+        return converted.withContext(skillId: skill.id, semester: semester);
+      }
+    }
+
+    if (requestedSkill != null || verticalProcessOnly) {
+      throw StateError('无法生成满足当前册次、模式和知识点的专项题，请调整选择');
     }
 
     // 兜底也必须兑现请求模式，并通过与常规生成相同的约束。
@@ -95,8 +129,12 @@ class MathEngine {
           : fallback.generate();
       final converted = _applyMode(seed, mode, config, fallback);
       if (converted != null &&
+          (mode != null || converted.mode != ProblemMode.vertical) &&
           ConstraintChecker.check(converted, config) == null) {
-        return converted;
+        return converted.withContext(
+          skillId: _classifySkill(fallback, converted).id,
+          semester: semester,
+        );
       }
     }
     throw StateError('无法生成满足所选模式和学期约束的题目');
@@ -113,6 +151,11 @@ class MathEngine {
 
     // 已经是目标模式
     if (problem.mode == mode) return problem;
+
+    // 专题题面和未知数是所学内容的一部分，不能转成普通求值后继续贴专题标签。
+    if (problem.displayText != null || generator is SimpleEquationGen) {
+      return null;
+    }
 
     switch (mode) {
       case ProblemMode.compare:
@@ -162,6 +205,8 @@ class MathEngine {
     ProblemMode? mode,
     DifficultyLevel? difficulty,
     Random? random,
+    String? skillId,
+    bool verticalProcessOnly = false,
   }) {
     return List.generate(
       count,
@@ -171,6 +216,8 @@ class MathEngine {
         mode: mode,
         difficulty: difficulty,
         random: random,
+        skillId: skillId,
+        verticalProcessOnly: verticalProcessOnly,
       ),
     );
   }
@@ -228,6 +275,45 @@ class MathEngine {
   }
 
   // ============ 内部方法 ============
+
+  static Set<MathSkill> _generatorSkills(BaseGenerator generator) =>
+      switch (generator) {
+        AdditionSubtractionGen() => {
+            MathSkill.addition,
+            MathSkill.additionCarry,
+            MathSkill.subtraction,
+            MathSkill.subtractionBorrow,
+            MathSkill.operationOrder,
+          },
+        MultiplicationTableGen() => {MathSkill.multiplicationTable},
+        RemainderDivisionGen() => {MathSkill.remainderDivision},
+        MultiDigitMulDivGen() => {MathSkill.multiplication, MathSkill.division},
+        MixedOperationGen() => {MathSkill.operationOrder},
+        LawOfOperationGen() => {MathSkill.operationLaw},
+        DecimalGen() => {MathSkill.decimal},
+        FractionGen() => {MathSkill.fraction},
+        PercentageGen() => {MathSkill.percentage},
+        SimpleEquationGen() => {MathSkill.equation},
+        RatioProportionGen() => {MathSkill.ratio},
+        NegativeNumberGen() => {MathSkill.negative},
+        _ => throw StateError('生成器缺少知识点映射'),
+      };
+
+  static MathSkill _classifySkill(BaseGenerator generator, MathProblem p) {
+    if (generator is AdditionSubtractionGen) {
+      if (p.operators.length > 1) return MathSkill.operationOrder;
+      final regrouping = MathSkill.hasRegrouping(p);
+      return p.operators.single == Operator.add
+          ? (regrouping ? MathSkill.additionCarry : MathSkill.addition)
+          : (regrouping ? MathSkill.subtractionBorrow : MathSkill.subtraction);
+    }
+    if (generator is MultiDigitMulDivGen) {
+      return p.operators.single == Operator.multiply
+          ? MathSkill.multiplication
+          : MathSkill.division;
+    }
+    return _generatorSkills(generator).single;
+  }
 
   static List<BaseGenerator> _buildGenerators(
     GradeConfig config, {

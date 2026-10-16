@@ -78,8 +78,7 @@ class MathSession extends HiveObject {
     this.problemsJson,
   }) : startedAt = startedAt ?? DateTime.now();
 
-  double get accuracy =>
-      totalProblems > 0 ? correctCount / totalProblems : 0.0;
+  double get accuracy => totalProblems > 0 ? correctCount / totalProblems : 0.0;
 
   /// 解析每道题的详细记录。
   List<ProblemRecord> get problemRecords {
@@ -108,12 +107,18 @@ class ProblemRecord {
 
   /// 是否正确
   final bool isCorrect;
+  final String? skillId;
+  final Map<String, dynamic>? problem;
+  final Map<String, dynamic>? attempt;
 
   const ProblemRecord({
     required this.problemText,
     required this.answerText,
     required this.userAnswer,
     required this.isCorrect,
+    this.skillId,
+    this.problem,
+    this.attempt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -121,6 +126,9 @@ class ProblemRecord {
         'a': answerText,
         'u': userAnswer,
         'c': isCorrect,
+        if (skillId != null) 'skillId': skillId,
+        if (problem != null) 'problem': problem,
+        if (attempt != null) 'attempt': attempt,
       };
 
   factory ProblemRecord.fromJson(Map<String, dynamic> json) {
@@ -129,6 +137,9 @@ class ProblemRecord {
       answerText: json['a'] as String? ?? '',
       userAnswer: json['u'] as String? ?? '',
       isCorrect: json['c'] as bool? ?? false,
+      skillId: json['skillId'] as String?,
+      problem: json['problem'] as Map<String, dynamic>?,
+      attempt: json['attempt'] as Map<String, dynamic>?,
     );
   }
 }

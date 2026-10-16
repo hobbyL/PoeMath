@@ -111,6 +111,8 @@ class MathProblem {
   /// null 时按 mode 自动渲染。内部运算结构（operands/operators/result）不变，
   /// 判分/讲解仍按内部结构运算（与显示语义数学等价）。
   final String? displayText;
+  final String? skillId;
+  final String? semester;
 
   const MathProblem({
     required this.operands,
@@ -127,7 +129,120 @@ class MathProblem {
     this.compareTarget,
     this.bracketRange,
     this.displayText,
+    this.skillId,
+    this.semester,
   });
+
+  MathProblem withContext(
+          {required String skillId, required String semester,}) =>
+      MathProblem(
+        operands: operands,
+        operators: operators,
+        result: result,
+        mode: mode,
+        grade: grade,
+        difficulty: difficulty,
+        resultForm: resultForm,
+        missingIndex: missingIndex,
+        expressionResult: expressionResult,
+        remainder: remainder,
+        compareRelation: compareRelation,
+        compareTarget: compareTarget,
+        bracketRange: bracketRange,
+        displayText: displayText,
+        skillId: skillId,
+        semester: semester,
+      );
+
+  static Map<String, int> _encodeNumber(NumberValue n) => {
+        'n': n.asFraction.numerator,
+        'd': n.asFraction.denominator,
+      };
+
+  static NumberValue _decodeNumber(Object? value) {
+    final map = value as Map<String, dynamic>;
+    final n = map['n'] as int;
+    final d = map['d'] as int;
+    if (d <= 0 || n.abs() > 9007199254740991 || d > 9007199254740991) {
+      throw const FormatException('题目数值无效');
+    }
+    return NumberValue.fromFraction(n, d);
+  }
+
+  Map<String, dynamic> toJson() => {
+        'operands': operands.map(_encodeNumber).toList(),
+        'operators': operators.map((o) => o.name).toList(),
+        'result': _encodeNumber(result),
+        'mode': mode.name,
+        'grade': grade,
+        'difficulty': difficulty,
+        'resultForm': resultForm.name,
+        'missingIndex': missingIndex,
+        'expressionResult':
+            expressionResult == null ? null : _encodeNumber(expressionResult!),
+        'remainder': remainder,
+        'compareRelation': compareRelation?.name,
+        'compareTarget':
+            compareTarget == null ? null : _encodeNumber(compareTarget!),
+        'bracketRange':
+            bracketRange == null ? null : [bracketRange!.$1, bracketRange!.$2],
+        'displayText': displayText,
+        'skillId': skillId,
+        'semester': semester,
+      };
+
+  factory MathProblem.fromJson(Map<String, dynamic> json) {
+    final operands =
+        (json['operands'] as List<dynamic>).map(_decodeNumber).toList();
+    final operators = (json['operators'] as List<dynamic>)
+        .map((v) => Operator.values.byName(v as String))
+        .toList();
+    final grade = json['grade'] as int;
+    final bracket = json['bracketRange'] as List<dynamic>?;
+    final missing = json['missingIndex'] as int?;
+    final semester = json['semester'] as String?;
+    if (operands.length < 2 ||
+        operands.length > 8 ||
+        operators.length != operands.length - 1 ||
+        grade < 1 ||
+        grade > 6 ||
+        (semester != null && semester != '上' && semester != '下') ||
+        (missing != null && (missing < 0 || missing >= operands.length)) ||
+        (bracket != null &&
+            (bracket.length != 2 ||
+                bracket[0] is! int ||
+                bracket[1] is! int ||
+                (bracket[0] as int) < 0 ||
+                (bracket[1] as int) > operands.length ||
+                (bracket[0] as int) >= (bracket[1] as int)))) {
+      throw const FormatException('题目结构无效');
+    }
+    return MathProblem(
+      operands: operands,
+      operators: operators,
+      result: _decodeNumber(json['result']),
+      mode: ProblemMode.values.byName(json['mode'] as String),
+      grade: grade,
+      difficulty: json['difficulty'] as int? ?? 1,
+      resultForm: ResultForm.values.byName(json['resultForm'] as String),
+      missingIndex: missing,
+      expressionResult: json['expressionResult'] == null
+          ? null
+          : _decodeNumber(json['expressionResult']),
+      remainder: json['remainder'] as int?,
+      compareRelation: json['compareRelation'] == null
+          ? null
+          : CompareRelation.values.byName(json['compareRelation'] as String),
+      compareTarget: json['compareTarget'] == null
+          ? null
+          : _decodeNumber(json['compareTarget']),
+      bracketRange:
+          bracket == null ? null : (bracket[0] as int, bracket[1] as int),
+      displayText: json['displayText'] as String?,
+      skillId: json['skillId'] as String?,
+      semester: semester,
+    );
+  }
 
   /// 根据实际待答值推导输入形态，模式转换后不能沿用原结果形态。
   static ResultForm formFor(NumberValue value) => value.isInteger

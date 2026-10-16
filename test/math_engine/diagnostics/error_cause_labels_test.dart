@@ -1,20 +1,23 @@
 // test/math_engine/diagnostics/error_cause_labels_test.dart
 //
 // 错因标签表与诊断器规则键集一致性守卫：
-// kErrorCauseLabels 的键集必须与 MistakeDiagnoser 全部规则实例的 name
+// kErrorCauseLabels 的键集必须与诊断器规则 name 及过程判分错因的并集
 // 完全一致。引擎新增错因规则而标签表漏更新时，本测试必须红——
 // 否则页面与 AI 讲解 prompt 会回退显示英文原键。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
 import 'package:poemath/math_engine/diagnostics/mistake_rule.dart';
+import 'package:poemath/math_engine/models/vertical_attempt.dart';
 
 void main() {
   group('键集一致性（单一来源闭环）', () {
-    test('kErrorCauseLabels 键集 == 诊断器规则 name 集合', () {
+    test('kErrorCauseLabels 覆盖诊断器规则和过程判分全部错因', () {
       expect(
         kErrorCauseLabels.keys.toSet(),
-        equals(MistakeDiagnoser.categoryNames.toSet()),
+        equals(
+          {...MistakeDiagnoser.categoryNames, VerticalAttempt.errorCategory},
+        ),
       );
     });
 
@@ -46,6 +49,7 @@ void main() {
       expect(errorCauseLabel('operation_order'), '运算顺序错误');
       expect(errorCauseLabel('remainder_mistake'), '余数错误');
       expect(errorCauseLabel('decimal_alignment'), '小数对位错误');
+      expect(errorCauseLabel(VerticalAttempt.errorCategory), '竖式过程错误');
     });
 
     test('未命中回退英文原键（与页面现状一致）', () {
