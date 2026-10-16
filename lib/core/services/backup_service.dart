@@ -97,6 +97,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   'math_batch_size': 'int', // 每组题目数量
   'math_difficulty': 'string', // 练习难度 easy/medium/hard
   'math_practice_mode': 'string', // 练习模式（综合或 ProblemMode.name）
+  'math_entry_kinds': 'string', // 口算页一级入口（逗号分隔的 MathEntryKind.name）
   'llm_provider_name': 'string', // LLM 供应商名称（纯展示，非敏感）
   // LLM 厂商配置与场景绑定（含端点，受恢复前确认闸门约束，见上方说明）。
   'llm_providers': 'string', // LlmProviderConfig.encodeList 的 JSON 字符串

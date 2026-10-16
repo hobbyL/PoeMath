@@ -20,6 +20,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/settings_constraints.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/models/webdav_config.dart';
+import 'package:poemath/domain/math_entry_kind.dart';
 
 class SettingsRepository {
   int _boundedInt(String key, int fallback) {
@@ -58,6 +59,7 @@ class SettingsRepository {
   static const String _keyMathBatchSize = 'math_batch_size';
   static const String _keyMathDifficulty = 'math_difficulty';
   static const String _keyMathPracticeMode = 'math_practice_mode';
+  static const String _keyMathEntryKinds = 'math_entry_kinds';
   static const String _keyHasOnboarded = 'has_onboarded';
   static const String _keyTencentAsrCredentialFingerprint =
       'tencent_asr_credential_fingerprint';
@@ -162,6 +164,33 @@ class SettingsRepository {
       _keySelectedGrade: grade,
       _keySelectedSemester: semester,
     });
+  }
+
+  // ============ 口算页一级入口 ============
+
+  /// 口算页显示哪些一级练习入口。
+  ///
+  /// 缺省（无 key / 解析为空 / 校验不过）回落到 [kDefaultMathEntryKinds]
+  /// 即四类全开 —— 与改造前"三个按钮恒定显示"的旧行为等价，旧数据升级
+  /// 后无感知。校验不过的情况包括空串与连续逗号等脏数据。
+  Set<MathEntryKind> get mathEntryKinds {
+    final raw = HiveBoxes.settings.get(_keyMathEntryKinds);
+    if (raw is! String || !SettingsConstraints.accepts(_keyMathEntryKinds, raw)) {
+      return kDefaultMathEntryKinds;
+    }
+    final parsed = parseMathEntryKinds(raw);
+    return parsed.isEmpty ? kDefaultMathEntryKinds : parsed;
+  }
+
+  /// 保存口算页一级入口集合；空集合视为非法。
+  ///
+  /// 空集合会让口算页无任何入口，故与 [setLearningBackground] 同法在此
+  /// 拒绝（UI 层已拦一道，此处是备份导入等旁路的兜底）。
+  Future<void> setMathEntryKinds(Set<MathEntryKind> kinds) async {
+    if (kinds.isEmpty) {
+      throw ArgumentError.value(kinds, _keyMathEntryKinds, '至少保留一类练习');
+    }
+    await _putValidated(_keyMathEntryKinds, encodeMathEntryKinds(kinds));
   }
 
   // ============ TTS 语速 ============

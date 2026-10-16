@@ -3,6 +3,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
+import 'package:poemath/domain/math_entry_kind.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
@@ -189,6 +190,73 @@ void main() {
       test('整数存值经 num 转 double 读出', () async {
         await HiveBoxes.settings.put('assistant_bubble_dy', 8);
         expect(repo.assistantBubbleDy, 8.0);
+      });
+    });
+
+    group('mathEntryKinds', () {
+      test('无 key 时默认四类全开（等价改造前行为）', () {
+        expect(repo.mathEntryKinds, kDefaultMathEntryKinds);
+        expect(repo.mathEntryKinds.length, 4);
+      });
+
+      test('保存后读回同一集合', () async {
+        await repo.setMathEntryKinds({
+          MathEntryKind.arithmetic,
+          MathEntryKind.challenge,
+        });
+        expect(
+          repo.mathEntryKinds,
+          {MathEntryKind.arithmetic, MathEntryKind.challenge},
+        );
+      });
+
+      test('序列化按枚举顺序输出，与集合插入顺序无关', () async {
+        await repo.setMathEntryKinds({
+          MathEntryKind.challenge,
+          MathEntryKind.arithmetic,
+        });
+        expect(
+          HiveBoxes.settings.get('math_entry_kinds'),
+          'arithmetic,challenge',
+        );
+      });
+
+      test('空集合被拒绝（否则口算页无任何入口）', () async {
+        expect(
+          () => repo.setMathEntryKinds(const <MathEntryKind>{}),
+          throwsA(isA<ArgumentError>()),
+        );
+        expect(HiveBoxes.settings.get('math_entry_kinds'), isNull);
+      });
+
+      test('空串视为脏数据，回落默认四类全开', () async {
+        await HiveBoxes.settings.put('math_entry_kinds', '');
+        expect(repo.mathEntryKinds, kDefaultMathEntryKinds);
+      });
+
+      test('连续逗号（含空项）视为脏数据，回落默认', () async {
+        await HiveBoxes.settings.put('math_entry_kinds', 'arithmetic,,challenge');
+        expect(repo.mathEntryKinds, kDefaultMathEntryKinds);
+      });
+
+      test('全为未知 name 时回落默认', () async {
+        await HiveBoxes.settings.put('math_entry_kinds', 'futureKind,another');
+        expect(repo.mathEntryKinds, kDefaultMathEntryKinds);
+      });
+
+      test('已知项混未知项时保留已知项（前向兼容）', () async {
+        await HiveBoxes.settings.put(
+          'math_entry_kinds',
+          'arithmetic,futureKind',
+        );
+        expect(repo.mathEntryKinds, {MathEntryKind.arithmetic});
+      });
+
+      test('旧备份不含该 key 时不覆盖本机值', () async {
+        await repo.setMathEntryKinds({MathEntryKind.wordProblem});
+        // 模拟旧备份恢复：白名单遍历只删「备份中有效给出」的 key。
+        expect(HiveBoxes.settings.containsKey('math_entry_kinds'), isTrue);
+        expect(repo.mathEntryKinds, {MathEntryKind.wordProblem});
       });
     });
   });
