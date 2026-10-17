@@ -32,6 +32,16 @@ class _FailingSettingsRepository extends SettingsRepository {
   }
 }
 
+/// 定位某设置项行内的开关。
+///
+/// 不再用 `find.byType(Switch)`：同组开关数会随分组调整变化（如「外观与
+/// 反馈」含音效 + 触觉两个），裸 byType 会 ambiguous 失败。按标题定位对
+/// 分组变动免疫。
+Finder _switchOf(String title) => find.descendant(
+      of: find.ancestor(of: find.text(title), matching: find.byType(AppTile)),
+      matching: find.byType(Switch),
+    );
+
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
@@ -41,7 +51,7 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  testWidgets('设置页应只显示五个分类入口', (tester) async {
+  testWidgets('设置页应只显示八个分类入口', (tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -53,10 +63,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(AppTile), findsNWidgets(5));
-    expect(find.text('外观与显示'), findsOneWidget);
-    expect(find.text('声音与交互'), findsOneWidget);
-    expect(find.text('学习与提醒'), findsOneWidget);
+    expect(find.byType(AppTile), findsNWidgets(8));
+    expect(find.text('学习与内容'), findsOneWidget);
+    expect(find.text('AI 设置'), findsOneWidget);
+    expect(find.text('语音与音频'), findsOneWidget);
+    expect(find.text('外观与反馈'), findsOneWidget);
+    expect(find.text('提醒'), findsOneWidget);
     expect(find.text('数据与同步'), findsOneWidget);
     expect(find.text('关于韵算'), findsOneWidget);
     expect(find.text('主题设置'), findsNothing);
@@ -78,29 +90,48 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('外观与显示'));
+    // 学习与内容：学习背景 + 练习参数 + 拼音显示（拼音由外观迁入）。
+    await tester.tap(find.text('学习与内容'));
     await tester.pumpAndSettle();
-    expect(find.text('主题设置'), findsOneWidget);
-    expect(find.text('外观模式'), findsOneWidget);
+    expect(find.text('学习背景'), findsOneWidget);
+    expect(find.text('练习设置'), findsOneWidget);
     expect(find.text('拼音显示'), findsOneWidget);
+    // 通知与 AI 已不在此组。
+    expect(find.text('通知设置'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('声音与交互'));
+    // AI 设置：一级入口，点击直接进枢纽页。
+    await tester.tap(find.text('AI 设置'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // 语音与音频：音频设置 + 语音识别（音效/触觉已移出）。
+    await tester.tap(find.text('语音与音频'));
     await tester.pumpAndSettle();
     expect(find.text('音频设置'), findsOneWidget);
     expect(find.text('语音识别设置'), findsOneWidget);
-    expect(find.text('音效'), findsOneWidget);
-    expect(find.text('触觉反馈'), findsOneWidget);
+    expect(find.text('音效'), findsNothing);
+    expect(find.text('触觉反馈'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('学习与提醒'));
+    // 外观与反馈：主题 + 明暗 + 音效 + 触觉（拼音已移出）。
+    await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
-    expect(find.text('练习设置'), findsOneWidget);
+    expect(find.text('主题设置'), findsOneWidget);
+    expect(find.text('外观模式'), findsOneWidget);
+    expect(find.text('音效'), findsOneWidget);
+    expect(find.text('触觉反馈'), findsOneWidget);
+    expect(find.text('拼音显示'), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // 提醒：通知设置单独成组。
+    await tester.tap(find.text('提醒'));
+    await tester.pumpAndSettle();
     expect(find.text('通知设置'), findsOneWidget);
-    // AI 设置：合并入口（供应商 / 使用场景 / 提示词进枢纽子页）。
-    expect(find.text('AI 设置'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -124,7 +155,7 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.text('外观与显示'));
+    await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('主题设置'));
     await tester.pump(); // 触发 showModalBottomSheet
@@ -159,7 +190,8 @@ void main() {
 
     expect(find.byType(Switch), findsNothing);
 
-    await tester.tap(find.text('外观与显示'));
+    // 拼音显示已由「外观与反馈」迁入「学习与内容」，是该组唯一的开关。
+    await tester.tap(find.text('学习与内容'));
     await tester.pumpAndSettle();
     expect(find.byType(Switch), findsOneWidget);
     final settings = container.read(settingsRepositoryProvider);
@@ -178,7 +210,8 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('声音与交互'));
+    // 音效与触觉反馈已由「声音与交互」迁入「外观与反馈」。
+    await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
     expect(find.byType(Switch), findsNWidgets(2));
     final soundTile = find.ancestor(
@@ -231,9 +264,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('外观与显示'));
+    await tester.tap(find.text('学习与内容'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(Switch));
+    await tester.tap(_switchOf('拼音显示'));
     await tester.pump();
     expect(settings.writeStarted.isCompleted, isTrue);
 
@@ -265,10 +298,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('外观与显示'));
+    await tester.tap(find.text('学习与内容'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(_switchOf('拼音显示'));
     await tester.pumpAndSettle();
 
     // 异常被吞下（不冒泡），并以 SnackBar 告知用户。
@@ -298,7 +331,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('外观与显示'), findsOneWidget);
+    expect(find.text('外观与反馈'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
