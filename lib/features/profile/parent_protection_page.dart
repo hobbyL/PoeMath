@@ -197,7 +197,7 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
             if (kind != CloudUsageKind.values.first)
               const SizedBox(height: SpacingTokens.sm),
             AppTile(
-              icon: Icons.cloud_outlined,
+              icon: _usageIcon(kind),
               iconColor: theme.colorScheme.primary,
               title: kind.label,
               subtitle:
@@ -215,4 +215,18 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
       ),
     );
   }
+
+  /// 三类云用量各自的图标。
+  ///
+  /// 原实现三张卡都用 `Icons.cloud_outlined`，一行看下来毫无辨识度，
+  /// 用户得读文字才知道哪张是哪类。按「做什么」区分：
+  /// - AI：机器人（与全 app 助手/出题的图标一致）
+  /// - 语音识别：麦克风（听用户说）—— 注意不要与 TTS 共用
+  ///   `record_voice_over`，否则两张卡又长得一样
+  /// - 云朗读：人物说话（读给用户听，沿用 TTS 设置页的既有图标）
+  static IconData _usageIcon(CloudUsageKind kind) => switch (kind) {
+        CloudUsageKind.llm => Icons.smart_toy_outlined,
+        CloudUsageKind.asr => Icons.mic_none_rounded,
+        CloudUsageKind.tts => Icons.record_voice_over_outlined,
+      };
 }
