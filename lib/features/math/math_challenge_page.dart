@@ -594,118 +594,131 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     );
   }
 
+  /// 挑战准备页：内容区可滚动，「开始挑战」吸附在底部。
+  ///
+  /// 不用「整页 Center + SingleChildScrollView」：那样内容超出屏幕时
+  /// 按钮会被推到滚动区底部，窄屏大字号下用户得先滚到底才能开始。
+  /// 改为 Column[Expanded(滚动内容), 固定按钮] —— 内容多则滚动，按钮
+  /// 始终可见。
   Widget _buildStart(ThemeData theme) {
-    return Center(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.timer_rounded,
-              size: 64,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            Text(
-              '限时挑战',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              '选择挑战模式',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.lg),
-
-            ColoredCard(
-              color: theme.colorScheme.primary,
-              child: PracticeSchemeSelector(
-                grade: ref.watch(mathGradeProvider),
-                semester: ref.watch(mathSemesterProvider),
-                difficulty: DifficultyLevel.values.byName(
-                  ref.watch(settingsRepositoryProvider).mathDifficulty,
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                Icon(
+                  Icons.timer_rounded,
+                  size: 64,
+                  color: theme.colorScheme.primary,
                 ),
-                vertical: _verticalScheme,
-                onChanged: (value) => setState(() => _verticalScheme = value),
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.md),
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '限时挑战',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.xs),
+                Text(
+                  '选择挑战模式',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.lg),
 
-            // 计时方式
-            _buildModeCard(
-              theme,
-              icon: Icons.hourglass_top_rounded,
-              title: '固定时间',
-              description: '$_initialSeconds 秒倒计时，比拼速度与准确率',
-              mode: 'fixed',
-              color: theme.colorScheme.secondary,
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            _buildModeCard(
-              theme,
-              icon: Icons.add_alarm_rounded,
-              title: '续命模式',
-              description: '答对 +$_bonusSeconds 秒，挑战你的极限',
-              mode: 'extending',
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: SpacingTokens.md),
+                ColoredCard(
+                  color: theme.colorScheme.primary,
+                  child: PracticeSchemeSelector(
+                    grade: ref.watch(mathGradeProvider),
+                    semester: ref.watch(mathSemesterProvider),
+                    difficulty: DifficultyLevel.values.byName(
+                      ref.watch(settingsRepositoryProvider).mathDifficulty,
+                    ),
+                    vertical: _verticalScheme,
+                    onChanged: (value) =>
+                        setState(() => _verticalScheme = value),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
 
-            // 规则说明
-            ColoredCard(
-              color: theme.colorScheme.tertiary,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                // 计时方式
+                _buildModeCard(
+                  theme,
+                  icon: Icons.hourglass_top_rounded,
+                  title: '固定时间',
+                  description: '$_initialSeconds 秒倒计时，比拼速度与准确率',
+                  mode: 'fixed',
+                  color: theme.colorScheme.secondary,
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                _buildModeCard(
+                  theme,
+                  icon: Icons.add_alarm_rounded,
+                  title: '续命模式',
+                  description: '答对 +$_bonusSeconds 秒，挑战你的极限',
+                  mode: 'extending',
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(height: SpacingTokens.md),
+
+                // 规则说明
+                ColoredCard(
+                  color: theme.colorScheme.tertiary,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: theme.colorScheme.tertiary,
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: theme.colorScheme.tertiary,
+                          ),
+                          const SizedBox(width: SpacingTokens.xs),
+                          Text(
+                            '规则说明',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.tertiary,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: SpacingTokens.xs),
+                      const SizedBox(height: SpacingTokens.xs),
                       Text(
-                        '规则说明',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.tertiary,
+                        '• 答对 +10 分，连续$_comboThreshold题正确双倍得分\n'
+                        '${_challengeMode == 'extending' ? '• 答对 +$_bonusSeconds秒，答错不扣时间' : '• 固定$_initialSeconds秒，答对不加时间'}\n'
+                        '• 切到后台会结束并结算；离页需先结束挑战\n'
+                        '• 挑战不支持续练，强制关闭应用可能丢失本次未结算成绩',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.6,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: SpacingTokens.xs),
-                  Text(
-                    '• 答对 +10 分，连续$_comboThreshold题正确双倍得分\n'
-                    '${_challengeMode == 'extending' ? '• 答对 +$_bonusSeconds秒，答错不扣时间' : '• 固定$_initialSeconds秒，答对不加时间'}\n'
-                    '• 切到后台会结束并结算；离页需先结束挑战\n'
-                    '• 挑战不支持续练，强制关闭应用可能丢失本次未结算成绩',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.6,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
             ),
-            const SizedBox(height: SpacingTokens.lg),
-
-            FilledButton.icon(
-              onPressed: _startChallenge,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('开始挑战'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(200, 56),
-                textStyle: theme.textTheme.titleMedium,
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        // 吸附底部：不随内容滚动。
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _startChallenge,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: const Text('开始挑战'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(200, 56),
+              textStyle: theme.textTheme.titleMedium,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -718,13 +731,69 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     required Color color,
   }) {
     final isSelected = _challengeMode == mode;
-    return AppTile(
-      icon: icon,
-      iconColor: isSelected ? color : theme.colorScheme.onSurfaceVariant,
-      title: title,
-      subtitle: description,
-      trailing: isSelected ? Icon(Icons.check_circle, color: color) : null,
+    // 不用 `AppTile`：它在 `trailing` 非空时会把整行的 onTap 置空
+    // （设计假设是"trailing 接管交互"，适用于 Switch 那类，但这里的圈
+    // 是纯展示），表现为只有圈能点、整行点不动。用 ColoredCard 自建，
+    // 整行可点、圈随状态变化。
+    return ColoredCard(
+      color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
       onTap: () => setState(() => _challengeMode = mode),
+      constraints: const BoxConstraints(
+        minHeight: SpacingTokens.minTapTarget + SpacingTokens.md,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.md,
+        vertical: SpacingTokens.sm + 2,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: (isSelected ? color : theme.colorScheme.onSurfaceVariant)
+                  .withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+            ),
+            child: Icon(
+              icon,
+              color:
+                  isSelected ? color : theme.colorScheme.onSurfaceVariant,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: SpacingTokens.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 互斥单选：圈形是标准语汇，未选中态也给出"可选项"的暗示
+          // （`AppTile` 默认的 chevron 只说"可进入"）。选中转主题色。
+          Icon(
+            isSelected
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked,
+            color: isSelected ? color : theme.colorScheme.outline,
+          ),
+        ],
+      ),
     );
   }
 

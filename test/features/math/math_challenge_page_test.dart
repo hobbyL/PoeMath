@@ -127,7 +127,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ChoiceChip, '竖式'));
+      // 计算方案已由 ChoiceChip 改为 SegmentedButton。
+      await tester.tap(find.widgetWithText(SegmentedButton<bool>, '竖式'));
       await tester.tap(find.text('固定时间'));
       await tester.tap(find.text('开始挑战'));
       await tester.pump();

@@ -4,6 +4,9 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 /// 练习和挑战共用的方案选择，开放范围以引擎白名单为准。
+///
+/// 用分段按钮而非 ChoiceChip：普通/竖式是**互斥的二选一**，分段按钮的
+/// 连体外观能直接表达"同一维度的两个取值"，而 chip 组看起来像可多选。
 class PracticeSchemeSelector extends StatelessWidget {
   const PracticeSchemeSelector({
     super.key,
@@ -39,22 +42,19 @@ class PracticeSchemeSelector extends StatelessWidget {
       children: [
         Text('计算方案', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: SpacingTokens.sm),
-        Wrap(
-          spacing: SpacingTokens.sm,
-          runSpacing: SpacingTokens.sm,
-          children: [
-            ChoiceChip(
-              label: const Text('普通'),
-              selected: !selectedVertical,
-              onSelected: (_) => onChanged(false),
-            ),
-            if (available)
-              ChoiceChip(
-                label: const Text('竖式'),
-                selected: selectedVertical,
-                onSelected: (_) => onChanged(true),
-              ),
-          ],
+        SizedBox(
+          width: double.infinity,
+          child: SegmentedButton<bool>(
+            // 竖式不可用时只留「普通」一段：段数随可用性变化，用户一眼
+            // 看出这册次/难度下没有竖式可选，无需先点再被告知。
+            segments: [
+              const ButtonSegment<bool>(value: false, label: Text('普通')),
+              if (available)
+                const ButtonSegment<bool>(value: true, label: Text('竖式')),
+            ],
+            selected: {selectedVertical},
+            onSelectionChanged: (selection) => onChanged(selection.first),
+          ),
         ),
         const SizedBox(height: SpacingTokens.sm),
         Text(

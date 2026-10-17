@@ -36,15 +36,18 @@ void main() {
           ),
         ),
       );
+      // 分段按钮：不可用时该段整个不出现（段数随可用性变化）。
       expect(
-        find.widgetWithText(ChoiceChip, '竖式'),
+        find.widgetWithText(SegmentedButton<bool>, '竖式'),
         sample.$4 ? findsOneWidget : findsNothing,
       );
       expect(
         tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '普通'))
+            .widget<SegmentedButton<bool>>(
+              find.byType(SegmentedButton<bool>),
+            )
             .selected,
-        !sample.$4,
+        {sample.$4},
       );
     });
   }
