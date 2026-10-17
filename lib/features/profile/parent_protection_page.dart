@@ -200,8 +200,12 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
                   style: theme.textTheme.titleMedium,
                 ),
               ),
-              TextButton(
-                onPressed: () => Navigator.push<void>(
+              // 手写 InkWell 而非 TextButton：TextButton 的排版受
+              // `labelLarge` 的 `height`（行高倍数）与 `minimumSize` 影响，
+              // 盒子高度不等于内容高度，"文字 + 图标"这类混排会出现肉眼
+              // 可见的垂直错位。这里把行高、内边距、图标盒全部显式钉死。
+              InkWell(
+                onTap: () => Navigator.push<void>(
                   context,
                   fadeSlideRoute(
                     builder: (_) => const ParentAccessBoundary(
@@ -209,31 +213,40 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
                     ),
                   ),
                 ),
-                // 用 Row 而非 `TextButton.icon`：后者按 labelLarge 的字体
-                // 基线对齐图标，而 chevron 是图形、视觉重心与文字中线不
-                // 重合，会出现肉眼可见的错位。`center` 对齐更稳。
-                // `VisualDensity.compact` 收掉按钮默认的多余内边距，让
-                // 文案与左侧标题行更贴合。
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
+                borderRadius:
+                    BorderRadius.circular(SpacingTokens.radiusSmall),
+                child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: SpacingTokens.sm,
+                    horizontal: SpacingTokens.xs,
+                    vertical: 2,
                   ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Text('查看历史'),
-                    const SizedBox(width: 2),
-                    Icon(
-                      Icons.chevron_right,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '查看历史',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      // 像素实测（扫描墨迹范围）：盒中心虽与文字一致
+                      // （均为 352），但字形墨迹的垂直中心比汉字高 2.5px，
+                      // 表现为箭头"浮在文字上方、底部与汉字中线齐平"。
+                      // 这是 Material Icons 字形在 em 框内的基线偏移，
+                      // 调盒子高度/对齐方式都改不掉 —— 只能显式下移。
+                      // 同时把 size 提到 20，让墨迹高度（原 12px）接近
+                      // 汉字的 15px，视觉等重。
+                      Transform.translate(
+                        offset: const Offset(0, 2.5),
+                        child: Icon(
+                          Icons.chevron_right,
+                          size: 20,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
