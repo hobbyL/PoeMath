@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
+import 'package:poemath/features/profile/cloud_usage_history_page.dart';
 
 class ParentProtectionPage extends StatefulWidget {
   const ParentProtectionPage({super.key});
@@ -188,11 +190,55 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
               child: const Text('关闭保护'),
             ),
           const SizedBox(height: SpacingTokens.lg),
-          Text(
-            '今日云请求用量（${usage.dayKey}）',
-            style: theme.textTheme.titleMedium,
+          // 标题行带「查看历史」入口：本页只显示当天，历史在独立页。
+          // 新页同样包 ParentAccessBoundary —— 用量属家长可见范畴。
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '今日云请求用量（${usage.dayKey}）',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.push<void>(
+                  context,
+                  fadeSlideRoute(
+                    builder: (_) => const ParentAccessBoundary(
+                      child: CloudUsageHistoryPage(),
+                    ),
+                  ),
+                ),
+                // 用 Row 而非 `TextButton.icon`：后者按 labelLarge 的字体
+                // 基线对齐图标，而 chevron 是图形、视觉重心与文字中线不
+                // 重合，会出现肉眼可见的错位。`center` 对齐更稳。
+                // `VisualDensity.compact` 收掉按钮默认的多余内边距，让
+                // 文案与左侧标题行更贴合。
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpacingTokens.sm,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('查看历史'),
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: SpacingTokens.sm),
+          const SizedBox(height: SpacingTokens.xs),
           for (final kind in CloudUsageKind.values) ...[
             if (kind != CloudUsageKind.values.first)
               const SizedBox(height: SpacingTokens.sm),
