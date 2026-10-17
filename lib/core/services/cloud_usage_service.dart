@@ -22,6 +22,20 @@ class CloudQuotaExceededException implements Exception {
   String toString() => message;
 }
 
+/// 某一天的云请求用量快照（三类齐全，缺失的为 0）。
+class DailyCloudUsage {
+  const DailyCloudUsage({required this.date, required this.counts});
+
+  /// 该日零点（只用到年月日）。
+  final DateTime date;
+  final Map<CloudUsageKind, int> counts;
+
+  int of(CloudUsageKind kind) => counts[kind] ?? 0;
+
+  /// 三类合计。
+  int get total => CloudUsageKind.values.fold(0, (sum, k) => sum + of(k));
+}
+
 /// 设备本地的请求次数限制；不是供应商账单，也不随备份恢复归零。
 /// 所有真实发送点在 HTTP 调用之前预留；已发送失败、探测和重试也计数。
 class CloudUsageService {
@@ -33,10 +47,7 @@ class CloudUsageService {
 
   // 纯客户端单元测试可以不启动应用；生产应用在 Hive 就绪前不会创建服务。
   bool get _ready => Hive.isBoxOpen('meta') && Hive.isBoxOpen('settings');
-  String get dayKey {
-    final date = _clock();
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
+  String get dayKey => _dateKey(_clock());
 
   int? limit(CloudUsageKind kind) {
     if (!_ready) return kind.defaultLimit;
@@ -52,6 +63,42 @@ class CloudUsageService {
     final value = HiveBoxes.meta.get('cloud_usage:$dayKey:${kind.key}');
     return value is int && value >= 0 ? value : 0;
   }
+
+  /// 某一天的某类用量。date 为 null 或解析异常按 0。
+  int usedOn(DateTime date, CloudUsageKind kind) {
+    if (!_ready) return 0;
+    final value = HiveBoxes.meta.get(
+      'cloud_usage:${_dateKey(date)}:${kind.key}',
+    );
+    return value is int && value >= 0 ? value : 0;
+  }
+
+  /// 最近 [days] 天的用量，**按日期升序**，含今天。
+  ///
+  /// 缺失的日期补 0 而非跳过：柱状图的 x 轴是等距时间轴，跳过会让柱子
+  /// 错位到相邻日期上，读出来的趋势是错的。注意存储层只保留 32 天
+  /// （见 [reserve] 的清理），days 超过该窗口时更早的日期恒为 0。
+  List<DailyCloudUsage> recentDaily(int days) {
+    assert(days > 0, 'days 必须为正');
+    final today = _clock();
+    return List.generate(days, (i) {
+      // 从最早的一天开始生成，保证升序且末项为今天。
+      final date = DateTime(today.year, today.month, today.day)
+          .subtract(Duration(days: days - 1 - i));
+      return DailyCloudUsage(
+        date: date,
+        counts: {
+          for (final kind in CloudUsageKind.values)
+            kind: usedOn(date, kind),
+        },
+      );
+    });
+  }
+
+  /// 日期键，与 [dayKey] 同格式（`YYYY-MM-DD`，月日补零）。
+  static String _dateKey(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}'
+      '-${date.day.toString().padLeft(2, '0')}';
 
   Future<void> setLimit(CloudUsageKind kind, int? value) async {
     ParentAccessService.instance.assertAllowed();

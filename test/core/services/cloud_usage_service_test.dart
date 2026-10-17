@@ -127,4 +127,78 @@ void main() {
     expect(sends, 1);
     expect(HiveBoxes.meta.get('cloud_usage:${usage.dayKey}:llm'), 1);
   });
+
+  group('recentDaily 历史读取', () {
+    // 固定"今天"为 2026-10-17，便于断言日期序列。
+    final today = DateTime(2026, 10, 17, 9, 30);
+    CloudUsageService svc() => CloudUsageService(clock: () => today);
+
+    String key(DateTime d, CloudUsageKind k) =>
+        'cloud_usage:${d.year}-${d.month.toString().padLeft(2, '0')}'
+        '-${d.day.toString().padLeft(2, '0')}:${k.key}';
+
+    test('返回连续 7 天、升序、末项为今天', () async {
+      final usage = svc();
+      final daily = usage.recentDaily(7);
+
+      expect(daily, hasLength(7));
+      expect(daily.last.date, DateTime(2026, 10, 17));
+      expect(daily.first.date, DateTime(2026, 10, 11));
+      // 连续递增（不能跳日，否则柱状图时间轴错位）。
+      for (var i = 1; i < daily.length; i++) {
+        expect(
+          daily[i].date.difference(daily[i - 1].date).inDays,
+          1,
+          reason: '第 $i 天与前一天应相邻',
+        );
+      }
+    });
+
+    test('缺失日期补 0，不跳过', () async {
+      final usage = svc();
+      // 只在"3 天前"写一条，其余日期无记录。
+      await HiveBoxes.meta.put(key(DateTime(2026, 10, 14), CloudUsageKind.llm), 5);
+
+      final daily = usage.recentDaily(7);
+      expect(daily, hasLength(7), reason: '不能因为缺数据而少返回天数');
+      final at14 = daily.firstWhere((d) => d.date == DateTime(2026, 10, 14));
+      expect(at14.of(CloudUsageKind.llm), 5);
+      expect(at14.of(CloudUsageKind.asr), 0);
+      // 相邻日期仍为 0 且位置正确。
+      final at15 = daily.firstWhere((d) => d.date == DateTime(2026, 10, 15));
+      expect(at15.of(CloudUsageKind.llm), 0);
+    });
+
+    test('三类分别读取，互不串位', () async {
+      final usage = svc();
+      await HiveBoxes.meta.put(key(today, CloudUsageKind.llm), 3);
+      await HiveBoxes.meta.put(key(today, CloudUsageKind.asr), 7);
+      await HiveBoxes.meta.put(key(today, CloudUsageKind.tts), 11);
+
+      final todayUsage = usage.recentDaily(3).last;
+      expect(todayUsage.of(CloudUsageKind.llm), 3);
+      expect(todayUsage.of(CloudUsageKind.asr), 7);
+      expect(todayUsage.of(CloudUsageKind.tts), 11);
+      expect(todayUsage.total, 21);
+    });
+
+    test('存量数据为非数字时按 0 处理', () async {
+      final usage = svc();
+      await HiveBoxes.meta.put(key(today, CloudUsageKind.llm), 'oops');
+      expect(usage.recentDaily(1).last.of(CloudUsageKind.llm), 0);
+    });
+
+    test('负数存量按 0 处理', () async {
+      final usage = svc();
+      await HiveBoxes.meta.put(key(today, CloudUsageKind.llm), -3);
+      expect(usage.recentDaily(1).last.of(CloudUsageKind.llm), 0);
+    });
+
+    test('usedOn 与当日 used 一致', () async {
+      final usage = svc();
+      await HiveBoxes.meta.put(key(today, CloudUsageKind.tts), 4);
+      expect(usage.usedOn(today, CloudUsageKind.tts), 4);
+      expect(usage.used(CloudUsageKind.tts), 4);
+    });
+  });
 }
