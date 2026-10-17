@@ -21,6 +21,10 @@ class NextMathPracticeRequest extends Notifier<MathPracticeRequest?> {
 
   void setNext(MathPracticeRequest request) => state = request;
 
+  /// 只读当前值，不消费。恢复流程需要在弹窗前预判入口意图（口算还是
+  /// 竖式卡片），但真正消费要等用户决定后再发生。
+  MathPracticeRequest? peek() => state;
+
   MathPracticeRequest? consume() {
     final request = state;
     state = null;

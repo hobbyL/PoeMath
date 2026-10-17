@@ -107,9 +107,29 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   Future<void> _initialize() async {
     try {
       final draft = _drafts.get('math');
+      // 本次入口想练什么（口算/竖式卡片各自 setNext 的意图）。
+      // 在弹恢复框**之前**同步捕获：`consume()` 会清空 provider，
+      // 弹窗 await 后再读就拿不到了。peek() 只读不消费。
+      final intent = ref.read(nextMathPracticeRequestProvider.notifier).peek();
       if (draft != null) {
-        final resume =
-            widget.resume ? true : await choosePracticeResume(context, '口算');
+        // 意图分流：从口算/竖式卡片进入时，用户已经选定了方案。
+        // 若待恢复的草稿是**另一种**方案（如从竖式入口遇到普通草稿），
+        // 不弹恢复框、直接丢弃旧草稿开始新练习 —— 恢复它等于劫持入口
+        // 意图（用户点"竖式计算"却被带回普通口算），而静默丢弃 setNext
+        // 的请求还会让"开始新练习"也偏离所选方案。
+        // 首页 `?resume=1` 与无预设请求的进入（intent == null）不受影响，
+        // 仍走原弹窗/直接恢复语义。
+        final draftIsVertical =
+            (draft['request'] as Map<String, dynamic>?)?['mode'] ==
+                ProblemMode.vertical.name;
+        final intentIsVertical = intent?.mode == ProblemMode.vertical;
+        final sameScheme = intent == null || draftIsVertical == intentIsVertical;
+
+        final resume = !sameScheme
+            ? false // 意图不同：丢草稿走新练习（下方 remove）。
+            : widget.resume
+                ? true
+                : await choosePracticeResume(context, '口算');
         if (!mounted) return;
         if (resume == null) {
           if (context.canPop()) {

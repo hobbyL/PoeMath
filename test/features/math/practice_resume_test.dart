@@ -64,6 +64,154 @@ Map<String, dynamic> _checkpoint(MathProblem problem) => {
     };
 
 void main() {
+
+  // 意图分流（从口算/竖式卡片进入时，草稿是另一种方案的处理）。
+  // 复现路径：普通练习退出留草稿 → 从竖式卡片进入 → 原实现弹恢复框，
+  // 点"继续上次"恢复普通题组（劫持入口意图），点"开始新练习"也因
+  // consume() 丢弃 setNext 的竖式请求而练成综合 —— 两个分支都偏。
+  group('入口意图与草稿方案分流', () {
+    /// 返回 container 供断言读取 provider 状态。
+    ///
+    /// `runAsync` 必须 await：它是真实异步区，不等待就返回会让测试在
+    /// build 完成前断言，并在退出时留下未完成的 tester 协程（表现为
+    /// 测试进程挂死、10+ 分钟不退出）。
+    Future<ProviderContainer> pumpWithIntent(
+      WidgetTester tester, {
+      required MathPracticeRequest intent,
+    }) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(nextMathPracticeRequestProvider.notifier).setNext(intent);
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: MathPracticePage()),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      return container;
+    }
+
+    testWidgets('竖式入口遇普通草稿：不弹恢复框，直接开新竖式练习', (tester) async {
+      // 预置一份**普通**草稿（mode 缺省 = 综合）。
+      final draft = _checkpoint(_addition())
+        ..remove('completedAt')
+        ..['input'] = ''
+        ..['records'] = <Object>[];
+      await tester.runAsync(() async {
+        await PracticeDraftRepository().save('math', draft);
+      });
+
+      final container = await pumpWithIntent(
+        tester,
+        intent: const MathPracticeRequest(
+          grade: 2,
+          semester: '上',
+          count: 2,
+          difficulty: DifficultyLevel.medium,
+          mode: ProblemMode.vertical,
+        ),
+      );
+
+      // 不弹恢复框。
+      expect(find.text('还有一组未完成的口算'), findsNothing);
+      // 直接进入竖式练习（新题组，非草稿恢复）。
+      final generated = container.read(mathProblemsProvider);
+      expect(
+        generated.every((p) => p.mode == ProblemMode.vertical),
+        isTrue,
+        reason: '从竖式卡片进入必须练竖式',
+      );
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+    });
+
+    testWidgets('口算入口遇竖式草稿：同样不弹框，直接开普通练习', (tester) async {
+      final draft = _checkpoint(_addition(mode: ProblemMode.vertical))
+        ..remove('completedAt')
+        ..['input'] = ''
+        ..['records'] = <Object>[];
+      // 草稿 request 的 mode 须为 vertical。
+      draft['request'] = const MathPracticeRequest(
+        grade: 2,
+        semester: '上',
+        count: 1,
+        difficulty: DifficultyLevel.medium,
+        mode: ProblemMode.vertical,
+      ).toJson();
+      await tester.runAsync(() async {
+        await PracticeDraftRepository().save('math', draft);
+      });
+
+      final container = await pumpWithIntent(
+        tester,
+        intent: const MathPracticeRequest(
+          grade: 2,
+          semester: '上',
+          count: 2,
+          difficulty: DifficultyLevel.medium,
+          // mode 为 null：口算卡片在偏好非竖式时的常态。
+        ),
+      );
+
+      expect(find.text('还有一组未完成的口算'), findsNothing);
+      final generated = container.read(mathProblemsProvider);
+      expect(
+        generated.every((p) => p.mode != ProblemMode.vertical),
+        isTrue,
+        reason: '从口算卡片进入不应练竖式',
+      );
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+    });
+
+    testWidgets('无预设请求（如首页直达）遇草稿：仍弹恢复框', (tester) async {
+      final draft = _checkpoint(_addition())
+        ..remove('completedAt')
+        ..['input'] = ''
+        ..['records'] = <Object>[];
+      await tester.runAsync(() async {
+        await PracticeDraftRepository().save('math', draft);
+      });
+
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: MathPracticePage()),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+
+      expect(find.text('还有一组未完成的口算'), findsOneWidget);
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+    });
+  });
+
+
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
   for (final mode in [ProblemMode.findResult, ProblemMode.vertical]) {
