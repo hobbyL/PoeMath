@@ -12,7 +12,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
-import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
@@ -45,7 +44,6 @@ enum _SettingsSection {
   ai,
   speech,
   appearance,
-  reminder,
   data,
 }
 
@@ -108,7 +106,6 @@ class SettingsPage extends ConsumerWidget {
       _SettingsSection.ai => 'AI 设置',
       _SettingsSection.speech => '语音与音频',
       _SettingsSection.appearance => '外观与反馈',
-      _SettingsSection.reminder => '提醒',
       _SettingsSection.data => '数据与同步',
     };
 
@@ -184,12 +181,22 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => _openSection(context, _SettingsSection.appearance),
               ),
               const SizedBox(height: SpacingTokens.sm),
+              // 「通知提醒」直接进通知设置页。原实现先开一个只含一个
+              // 入口的「提醒」分组页、再点进去 —— 单入口的中间页纯属
+              // 多一次点击。
               AppTile(
                 icon: Icons.notifications_outlined,
                 iconColor: theme.colorScheme.secondary,
-                title: '提醒',
+                title: '通知提醒',
                 subtitle: '学习提醒与每周报告',
-                onTap: () => _openSection(context, _SettingsSection.reminder),
+                onTap: () => Navigator.push<void>(
+                  context,
+                  fadeSlideRoute(
+                    builder: (_) => const ParentAccessBoundary(
+                      child: NotificationSettingsPage(),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
@@ -362,12 +369,6 @@ class SettingsPage extends ConsumerWidget {
                   }),
                 ),
               ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
-
-            // ==================== 提醒 ====================
-            if (_section == _SettingsSection.reminder) ...[
-              _buildNotificationSettings(context),
               const SizedBox(height: SpacingTokens.md),
             ],
 
@@ -605,47 +606,6 @@ class SettingsPage extends ConsumerWidget {
         fadeSlideRoute(
             builder: (_) =>
                 const ParentAccessBoundary(child: PracticeSettingsPage()),),
-      ),
-    );
-  }
-
-  Widget _buildNotificationSettings(BuildContext context) {
-    final theme = Theme.of(context);
-    final svc = NotificationService.instance;
-    final reminderOn = svc.isReminderEnabled;
-    final weeklyOn = svc.isWeeklyReportEnabled;
-
-    String subtitle;
-    if (reminderOn && weeklyOn) {
-      final h = svc.reminderHour.toString().padLeft(2, '0');
-      final m = svc.reminderMinute.toString().padLeft(2, '0');
-      subtitle = '提醒 $h:$m · 周报已开启';
-    } else if (reminderOn) {
-      final h = svc.reminderHour.toString().padLeft(2, '0');
-      final m = svc.reminderMinute.toString().padLeft(2, '0');
-      subtitle = '提醒 $h:$m · 周报已关闭';
-    } else if (weeklyOn) {
-      subtitle = '提醒已关闭 · 周报已开启';
-    } else {
-      subtitle = '提醒已关闭 · 周报已关闭';
-    }
-
-    // 用户开着提醒、但本机这次没排上（权限被回收 / 免打扰 / ROM 限制）时
-    // 明确告知，否则用户会以为提醒真的生效了，静默漏掉每日任务。
-    if (reminderOn && svc.isReminderDegraded) {
-      subtitle = '提醒未能生效，请检查系统通知权限 · $subtitle';
-    }
-
-    return AppTile(
-      icon: Icons.notifications_outlined,
-      iconColor: theme.colorScheme.secondary,
-      title: '通知设置',
-      subtitle: subtitle,
-      onTap: () => Navigator.push<void>(
-        context,
-        fadeSlideRoute(
-            builder: (_) =>
-                const ParentAccessBoundary(child: NotificationSettingsPage()),),
       ),
     );
   }

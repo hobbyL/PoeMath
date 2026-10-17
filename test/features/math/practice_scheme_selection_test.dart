@@ -50,7 +50,9 @@ void main() {
   }
 
   for (final vertical in [false, true]) {
-    testWidgets('开始${vertical ? '竖式' : '普通'}练习沿用当前册次题量且不改偏好', (tester) async {
+    testWidgets(
+        '卡片直接进入${vertical ? '竖式' : '普通口算'}练习：沿用当前册次题量且不改偏好',
+        (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -58,6 +60,7 @@ void main() {
       await tester.runAsync(() async {
         await HiveBoxes.settings.put('math_batch_size', 10);
         await HiveBoxes.settings.put('math_difficulty', 'medium');
+        // 偏好指向竖式 —— 验证口算卡片不照办（回落综合），竖式卡片照办。
         await HiveBoxes.settings.put('math_practice_mode', 'vertical');
         // 册次只能经学习背景写入（口算页的就地选择已移除），故此处直接
         // 落 Hive —— 保证它在下面的 `before` 快照内，配得出「练习不写盘」。
@@ -84,16 +87,16 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('竖式过程练'), findsNothing);
-      // 口算入口已由底部按钮改为一级卡片。
-      await tester.tap(find.text('口算'));
-      await tester.pumpAndSettle();
-      expect(find.text('练习方案'), findsOneWidget);
-      await tester.tap(find.widgetWithText(ChoiceChip, vertical ? '竖式' : '普通'));
+      // 方案选择弹窗已移除：竖式是独立卡片，点哪张卡片即选定方案。
+      expect(find.text('练习方案'), findsNothing);
+      await tester.tap(find.text(vertical ? '竖式计算' : '口算练习'));
+      // 点击后路由 push + 练习页挂载 + 入场动画（flutter_animate 的
+      // Timer 须推进完，否则测试结束时报 timersPending）。用显式 pump
+      // 而非 pumpAndSettle（见 spec「Widget Tests with Focus and
+      // Animations」）。
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
       await tester.runAsync(() async {
-        await tester.tap(find.text('开始练习'));
-        await tester.pump();
         await Future<void>.delayed(const Duration(milliseconds: 300));
       });
       await tester.pump();
@@ -104,14 +107,16 @@ void main() {
         problems.every((p) => (p.mode == ProblemMode.vertical) == vertical),
         isTrue,
       );
-      expect(container.read(mathGradeProvider), 2);
-      expect(container.read(mathSemesterProvider), '上');
+      // 练习不改写任何偏好（含 math_practice_mode —— 即便口算卡片因偏好
+      // 指向竖式而回落综合，也只是本次请求的 mode，不回写偏好）。
       expect(container.read(mathPracticeModeProvider), ProblemMode.vertical);
       expect(HiveBoxes.settings.toMap(), before);
       await tester.runAsync(() async {
         await tester.pumpWidget(const SizedBox.shrink());
         await Future<void>.delayed(const Duration(milliseconds: 300));
       });
+      // 排空残余动画计时器（卡片 500ms 级联入场）。
+      await tester.pump(const Duration(seconds: 2));
     });
   }
 }

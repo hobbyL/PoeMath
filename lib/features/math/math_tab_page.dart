@@ -20,7 +20,6 @@ import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/features/math/math_practice_request.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/practice_entry_card.dart';
-import 'package:poemath/features/math/widgets/practice_scheme_selector.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 class MathTabPage extends ConsumerWidget {
@@ -67,12 +66,20 @@ class MathTabPage extends ConsumerWidget {
           ),
       };
 
-  /// 进入「口算」：先让用户选普通方案内的题型，再发起练习。
-  Future<void> _startArithmetic(BuildContext context, WidgetRef ref) async {
+  /// 进入「口算练习」：直接用当前册次与设置中的偏好发起，不再弹方案
+  /// 选择框。
+  ///
+  /// 竖式已是独立卡片，方案选择框里的"普通/竖式"二选一失去了意义 ——
+  /// 用户点哪张卡片就已经选完了方案。普通方案内的题型细分（求未知/比
+  /// 大小/连续运算/带括号）在「设置 → 练习设置」里配置，属于偏好而非
+  /// 每次要选的东西。
+  ///
+  /// 偏好若指向竖式（旧数据、或用户曾在练习设置里选过），此处**不照办**
+  /// 而是回落综合（null）：从口算卡片进来就是练普通。
+  void _startArithmetic(BuildContext context, WidgetRef ref) {
     final grade = ref.read(mathGradeProvider);
     final semester = ref.read(mathSemesterProvider);
     final settings = ref.read(settingsRepositoryProvider);
-    final count = settings.mathBatchSize;
     final difficulty = DifficultyLevel.values.byName(settings.mathDifficulty);
     final supported = MathEngine.supportedModes(
       grade: grade,
@@ -80,61 +87,19 @@ class MathTabPage extends ConsumerWidget {
       difficulty: difficulty,
     );
     final preferred = ref.read(mathPracticeModeProvider);
-    var vertical = preferred == ProblemMode.vertical &&
-        supported.contains(ProblemMode.vertical);
-    final selected = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('练习方案'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${GradePresets.get(grade, semester).label} · $count 题 · ${difficulty.label}',
-                ),
-                const SizedBox(height: SpacingTokens.md),
-                PracticeSchemeSelector(
-                  grade: grade,
-                  semester: semester,
-                  difficulty: difficulty,
-                  vertical: vertical,
-                  onChanged: (value) => setDialogState(() => vertical = value),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, vertical),
-              child: const Text('开始练习'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (selected == null || !context.mounted) return;
     ref.read(nextMathPracticeRequestProvider.notifier).setNext(
           MathPracticeRequest(
             grade: grade,
             semester: semester,
-            count: count,
+            count: settings.mathBatchSize,
             difficulty: difficulty,
-            mode: selected
-                ? ProblemMode.vertical
-                : preferred != ProblemMode.vertical &&
-                        supported.contains(preferred)
-                    ? preferred
-                    : null,
+            mode: preferred != ProblemMode.vertical &&
+                    supported.contains(preferred)
+                ? preferred
+                : null,
           ),
         );
-    await context.push(AppRoutes.mathPractice);
+    context.push(AppRoutes.mathPractice);
   }
 
   /// 进入「竖式」：直接用当前册次发起竖式练习，不再二次选择方案。

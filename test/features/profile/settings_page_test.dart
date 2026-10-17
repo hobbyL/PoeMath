@@ -68,7 +68,7 @@ void main() {
     expect(find.text('AI 设置'), findsOneWidget);
     expect(find.text('语音与音频'), findsOneWidget);
     expect(find.text('外观与反馈'), findsOneWidget);
-    expect(find.text('提醒'), findsOneWidget);
+    expect(find.text('通知提醒'), findsOneWidget);
     expect(find.text('数据与同步'), findsOneWidget);
     expect(find.text('关于韵算'), findsOneWidget);
     expect(find.text('主题设置'), findsNothing);
@@ -128,10 +128,11 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // 提醒：通知设置单独成组。
-    await tester.tap(find.text('提醒'));
+    // 通知提醒：hub 直达通知设置页，无中间分组页（点一次即进目标页，
+    // 返回即回 hub）。
+    await tester.tap(find.text('通知提醒'));
     await tester.pumpAndSettle();
-    expect(find.text('通知设置'), findsOneWidget);
+    expect(find.text('通知设置'), findsOneWidget, reason: '应直达通知设置页');
     await tester.pageBack();
     await tester.pumpAndSettle();
 
