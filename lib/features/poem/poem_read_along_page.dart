@@ -412,7 +412,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
           ],
         ),
         content: Text(
-          '跟读评分使用腾讯云语音识别。请家长在「声音与交互 → 语音识别设置」'
+          '跟读评分使用腾讯云语音识别。请家长在「语音与音频 → 语音识别设置」'
           '中填写密钥，并通过真实录音测试后即可使用。',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
