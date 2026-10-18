@@ -370,6 +370,24 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         return;
       }
 
+      // 签名闸门：ready → installing 的前置新增步骤。既有 SHA256 校验与
+      // apkCompatibilityError 的顺序不动，此处只加一道独立信任锚的比对。
+      // 原生 installApk 内部会再比对一次（通道可直接调用，故此处不是安全边界）。
+      setState(() {
+        _phase = _UpdateDialogPhase.installing;
+        _message = '正在校验安装包签名。';
+      });
+      final signatureError = await _verifyApkSignature(file.path, token);
+      if (signatureError != null) {
+        if (!mounted || token != _requestToken) return;
+        setState(() {
+          _phase = _UpdateDialogPhase.error;
+          _message = signatureError;
+        });
+        return;
+      }
+      if (!mounted || token != _requestToken) return;
+
       setState(() {
         _phase = _UpdateDialogPhase.installing;
         _message = '正在打开系统安装器。';
@@ -387,6 +405,22 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         _phase = _UpdateDialogPhase.error;
         _message = friendlyUpdateError(error, fallback: '打开安装器失败，请稍后重试。');
       });
+    }
+  }
+
+  /// 比对已安装应用与待装 APK 的签名指纹；返回 null 表示通过。
+  Future<String?> _verifyApkSignature(String path, int token) async {
+    try {
+      final installed = await widget.installer.getInstalledSignatureSha256();
+      if (!mounted || token != _requestToken) return null;
+      final incoming = await widget.installer.inspectApkSignature(path);
+      if (!mounted || token != _requestToken) return null;
+      return apkSignatureError(
+        installed: installed,
+        incoming: incoming ?? const <String>[],
+      );
+    } on UpdateInstallException catch (error) {
+      return error.message;
     }
   }
 

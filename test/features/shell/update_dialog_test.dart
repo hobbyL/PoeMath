@@ -67,8 +67,19 @@ AppVersionInfo _current() {
 
 const _testChannel = MethodChannel('poemath.test/update_dialog');
 
+/// 与 fake 通道共享的签名指纹 fixture（相同 = 签名闸门通过）。
+const _trustedSignatureConst =
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+final _trustedSignature = _trustedSignatureConst;
+
 /// 注册 fake 安装器通道，返回按序记录的方法调用列表。
-List<String> _installChannelHandler({required bool canInstall}) {
+///
+/// [signatureSha] 是 `inspectApkSignature` 返回的待装 APK 指纹；默认与
+/// `getApkSignatureSha256` 相同（通过）。`null` 表示原生读不出签名。
+List<String> _installChannelHandler({
+  required bool canInstall,
+  String? signatureSha = _trustedSignatureConst,
+}) {
   final calls = <String>[];
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(_testChannel, (call) async {
@@ -80,6 +91,9 @@ List<String> _installChannelHandler({required bool canInstall}) {
           'versionCode': 200,
         },
       'canRequestPackageInstalls' => canInstall,
+      'getApkSignatureSha256' => <String>[_trustedSignature],
+      'inspectApkSignature' =>
+        signatureSha == null ? null : <String>[signatureSha],
       _ => null,
     };
   });
@@ -369,9 +383,53 @@ void main() {
       containsAllInOrder([
         'inspectApk',
         'canRequestPackageInstalls',
+        'getApkSignatureSha256',
+        'inspectApkSignature',
         'installApk',
       ]),
     );
+  });
+
+  // 签名闸门：包名/versionCode 均正确但签名不同的 APK 必须被阻断，
+  // 且不得触达系统安装器。
+  testWidgets('签名不一致时进入错误态并阻止安装', (tester) async {
+    final calls = _installChannelHandler(
+      canInstall: true,
+      signatureSha: 'bb' * 32,
+    );
+    final client = _FakeUpdateClient(digest: 'a' * 64);
+
+    await _openDialog(tester, client: client, installer: _installer());
+
+    await tester.tap(find.text('下载更新'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('立即安装'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('更新失败'), findsOneWidget);
+    expect(
+      find.text('安装包签名与当前应用不一致，已阻止安装。'),
+      findsOneWidget,
+    );
+    expect(calls, contains('inspectApkSignature'));
+    expect(calls, isNot(contains('installApk')));
+  });
+
+  // 原生读不出待装 APK 签名（返回 null）时必须阻止安装，不能静默放行。
+  testWidgets('无法读取安装包签名时阻止安装', (tester) async {
+    final calls = _installChannelHandler(canInstall: true, signatureSha: null);
+    final client = _FakeUpdateClient(digest: 'a' * 64);
+
+    await _openDialog(tester, client: client, installer: _installer());
+
+    await tester.tap(find.text('下载更新'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('立即安装'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('更新失败'), findsOneWidget);
+    expect(find.text('无法读取签名信息，已阻止安装。'), findsOneWidget);
+    expect(calls, isNot(contains('installApk')));
   });
 
   testWidgets('缺少安装权限时进入权限引导分支', (tester) async {

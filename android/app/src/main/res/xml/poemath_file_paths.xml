@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  本路径表只服务应用内更新安装（MainActivity.installApk），新增消费方请先扩这里。
+
+  曾把 cache-path / files-path / external-cache-path 三处整目录（path="."）
+  暴露给 FileProvider，属于过度授权：任何能触达更新通道的代码都能把任意文件
+  转成 content URI。现在只保留下载器实际写入的子目录。
+-->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path
-        name="cache"
-        path="." />
-    <files-path
-        name="files"
-        path="." />
-    <external-cache-path
-        name="external_cache"
-        path="." />
+        name="update"
+        path="poemath_update/" />
 </paths>

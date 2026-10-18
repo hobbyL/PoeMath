@@ -59,6 +59,25 @@ class AndroidUpdateInstaller {
     throw const UpdateInstallException('安装包信息格式不正确');
   }
 
+  /// 当前已安装应用的签名证书 SHA-256 列表（小写 hex）。
+  Future<List<String>> getInstalledSignatureSha256() async {
+    if (!isSupported) {
+      throw const UpdateInstallException('当前平台不支持应用内安装更新');
+    }
+    final value = await _invokeRequired<List<Object?>>('getApkSignatureSha256');
+    return value.map((item) => item! as String).toList(growable: false);
+  }
+
+  /// 待安装 APK 的签名证书 SHA-256 列表；读不出返回 null。
+  Future<List<String>?> inspectApkSignature(String path) async {
+    if (!isSupported) {
+      throw const UpdateInstallException('当前平台不支持读取安装包信息');
+    }
+    final value =
+        await _invokeNullable<List<Object?>>('inspectApkSignature', {'path': path});
+    return value?.map((item) => item! as String).toList(growable: false);
+  }
+
   /// 是否有安装未知来源应用的权限（Android 8+）。
   Future<bool> canRequestPackageInstalls() async {
     if (!isSupported) return false;

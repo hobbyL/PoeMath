@@ -120,6 +120,32 @@ String? apkCompatibilityError({
   return null;
 }
 
+/// APK 签名指纹比对；返回 null 表示通过，否则返回面向用户的中文原因。
+///
+/// 信任锚是**当前已安装版本**的签名证书（原生侧动态读取，不写入源码常量），
+/// 因为 `latest.json` 同时提供 `apkUrl` 与 `apkSha256` —— 单一更新源被劫持时
+/// 两者可被一起替换，SHA256 校验形同虚设；签名证书是唯一的独立锚点。
+///
+/// 判据是**集合交集非空**而非全等：多签名者或 v1+v2+v3 混合签名时，只要存在
+/// 至少一个共同的可信证书即认为同源，避免误拒正常更新。
+///
+/// 这是 Dart 侧的前置闸门（给用户明确原因）；原生 `installApk` 内部会再比对
+/// 一次，通道可直接调用，故 Dart 侧判断不构成安全边界。
+String? apkSignatureError({
+  required List<String> installed,
+  required List<String> incoming,
+}) {
+  if (installed.isEmpty || incoming.isEmpty) {
+    return '无法读取签名信息，已阻止安装。';
+  }
+  final installedSet = installed.map((value) => value.toLowerCase()).toSet();
+  final hasCommon = incoming
+      .map((value) => value.toLowerCase())
+      .any(installedSet.contains);
+  if (!hasCommon) return '安装包签名与当前应用不一致，已阻止安装。';
+  return null;
+}
+
 /// 异常 → 用户可见中文文案；无匹配时返回 [fallback]。
 String friendlyUpdateError(Object error, {required String fallback}) {
   if (error is UpdateConfigurationException) {

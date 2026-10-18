@@ -106,6 +106,63 @@ void main() {
     });
   });
 
+  group('apkSignatureError', () {
+    final trusted = 'aa' * 32;
+
+    test('签名一致时返回 null', () {
+      expect(
+        apkSignatureError(installed: [trusted], incoming: [trusted]),
+        isNull,
+      );
+    });
+
+    test('签名不一致时返回含「签名」的中文提示', () {
+      final error = apkSignatureError(
+        installed: [trusted],
+        incoming: ['bb' * 32],
+      );
+
+      expect(error, '安装包签名与当前应用不一致，已阻止安装。');
+    });
+
+    // 多签名者 / v1+v2+v3 混合签名：只要存在一个共同可信证书即同源，
+    // 全等比对会把这类正常更新误拒。
+    test('存在交集即通过（多签名者不误拒）', () {
+      expect(
+        apkSignatureError(
+          installed: [trusted, 'cc' * 32],
+          incoming: ['dd' * 32, trusted],
+        ),
+        isNull,
+      );
+    });
+
+    test('大小写差异不影响比对', () {
+      expect(
+        apkSignatureError(
+          installed: [trusted.toUpperCase()],
+          incoming: [trusted],
+        ),
+        isNull,
+      );
+    });
+
+    test('已安装或待装指纹为空集时阻止安装', () {
+      expect(
+        apkSignatureError(installed: [], incoming: [trusted]),
+        '无法读取签名信息，已阻止安装。',
+      );
+      expect(
+        apkSignatureError(installed: [trusted], incoming: []),
+        '无法读取签名信息，已阻止安装。',
+      );
+      expect(
+        apkSignatureError(installed: [], incoming: []),
+        '无法读取签名信息，已阻止安装。',
+      );
+    });
+  });
+
   group('friendlyUpdateError', () {
     test('UpdateConfigurationException 返回未配置文案', () {
       expect(
