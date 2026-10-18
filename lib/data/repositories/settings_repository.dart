@@ -13,6 +13,7 @@ import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/core/services/tts/worker_tts_client.dart';
@@ -175,7 +176,8 @@ class SettingsRepository {
   /// 后无感知。校验不过的情况包括空串与连续逗号等脏数据。
   Set<MathEntryKind> get mathEntryKinds {
     final raw = HiveBoxes.settings.get(_keyMathEntryKinds);
-    if (raw is! String || !SettingsConstraints.accepts(_keyMathEntryKinds, raw)) {
+    if (raw is! String ||
+        !SettingsConstraints.accepts(_keyMathEntryKinds, raw)) {
       return kDefaultMathEntryKinds;
     }
     final parsed = parseMathEntryKinds(raw);
@@ -931,9 +933,77 @@ class SettingsRepository {
   final SecureCredentialStore _credentialStore;
 
   /// 所有 WebDAV 同步配置（不含凭据，仅用于列表展示）。
-  List<WebDavConfig> get webDavConfigs {
+  List<WebDavConfig> get webDavConfigs => webDavConfigsDetailed.configs;
+
+  /// 所有 WebDAV 同步配置 + 因不合法被忽略的条数（供列表页提示）。
+  ///
+  /// `skipped` 只统计逐条非法的条目；整串 JSON 损坏时记 0（按「无配置」
+  /// 处理，那是存储项损坏而非「有 N 条不合法」）。凭据为空**不**算非法，
+  /// 详见 `WebDavConfig.tryCreate`。
+  ({List<WebDavConfig> configs, int skipped}) get webDavConfigsDetailed {
     final json = HiveBoxes.settings.get(_keyWebDavConfigs) as String?;
-    return WebDavConfig.decodeList(json);
+    final result = WebDavConfig.decodeListDetailed(json);
+    return (configs: result.configs, skipped: result.skipped);
+  }
+
+  /// 配置列表的**可变副本**，供 `saveWebDavConfig` / `deleteWebDavConfig`
+  /// 就地增删改。
+  ///
+  /// 不能直接改 [webDavConfigs] 的返回值：那来自 `decodeListDetailed` 内部的
+  /// 累加列表，且 `const WebDavConfigDecodeResult([], 0)` 在「无配置」时返回的
+  /// 是**编译期常量空列表**，对它 `add` 会抛
+  /// `Unsupported operation: Cannot add to an unmodifiable list`。
+  /// 也就是说，「保存第一条配置」这条路径此前必然崩溃。
+  List<WebDavConfig> _mutableConfigs() => List<WebDavConfig>.of(webDavConfigs);
+
+  /// 一次性迁移：把 Hive 中仍带明文凭据的配置搬进安全存储并置空。
+  ///
+  /// 启动时对所有配置跑一遍（`saveWebDavConfig` 只覆盖此后写入的配置，
+  /// 历史版本留下的明文凭据需要这里兜底）。
+  ///
+  /// **顺序必须是「先写安全存储成功，再清 Hive」**：任一条写失败就保留该条
+  /// 原值（明文留在 Hive 里仍可被读取，比直接丢失凭据安全），并只记日志、
+  /// 不中断整批迁移。写失败时不落盘，因此 `changed` 为 false 时 Hive 不变。
+  Future<void> migratePlaintextWebDavCredentials() async {
+    final raw = HiveBoxes.settings.get(_keyWebDavConfigs) as String?;
+    final result = WebDavConfig.decodeListDetailed(raw);
+    if (result.configs.isEmpty) return;
+
+    var changed = false;
+    final cleaned = <WebDavConfig>[];
+    for (final config in result.configs) {
+      if (config.username.isEmpty && config.password.isEmpty) {
+        cleaned.add(config);
+        continue;
+      }
+      try {
+        await _credentialStore.saveWebDavCredentials(
+          configId: config.id,
+          username: config.username,
+          password: config.password,
+        );
+        // 安全存储写入成功后，才在 Hive 副本中置空凭据。
+        cleaned.add(
+          WebDavConfig(
+            id: config.id,
+            name: config.name,
+            url: config.url,
+            username: '',
+            password: '',
+            remotePath: config.remotePath,
+          ),
+        );
+        changed = true;
+      } on Object catch (error) {
+        AppLogger.e(
+          'WebDAV 凭据迁移失败，保留 Hive 原值',
+          tag: 'Startup',
+          error: error,
+        );
+        cleaned.add(config);
+      }
+    }
+    if (changed) await _saveConfigsToHive(cleaned);
   }
 
   /// 加载完整的 WebDAV 配置（含凭据）。
@@ -993,7 +1063,12 @@ class SettingsRepository {
       password: config.password,
     );
 
-    // 非敏感信息 → Hive（凭据字段置空）
+    // 非敏感信息 → Hive（凭据字段**刻意**置空）。
+    //
+    // 凭据不落盘是本模块的设计不变量：Hive 中的配置形状永远不含凭据，读取
+    // 时由 loadWebDavConfigWithCredentials 从安全存储重新注入。不要「优化」
+    // 成把 config 原样写入（例如复用同一个对象、或补上 username/password），
+    // 那会让明文密码永久留在未加密的 settings box 里。
     final stripped = WebDavConfig(
       id: config.id,
       name: config.name,
@@ -1002,7 +1077,7 @@ class SettingsRepository {
       password: '',
       remotePath: config.remotePath,
     );
-    final list = webDavConfigs;
+    final list = _mutableConfigs();
     final index = list.indexWhere((c) => c.id == config.id);
     if (index >= 0) {
       list[index] = stripped;
@@ -1016,7 +1091,7 @@ class SettingsRepository {
   Future<void> deleteWebDavConfig(String id) async {
     ParentAccessService.instance.assertAllowed();
     await _credentialStore.deleteWebDavCredentials(id);
-    final list = webDavConfigs..removeWhere((c) => c.id == id);
+    final list = _mutableConfigs()..removeWhere((c) => c.id == id);
     await _saveConfigsToHive(list);
   }
 

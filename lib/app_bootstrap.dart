@@ -16,6 +16,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/hive/hive_registrar.dart';
 import 'package:poemath/data/hive/migrations/math_mistake_key_migration.dart';
 import 'package:poemath/data/hive/migrations/poem_identity_migration.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
 
 typedef AppInitializer = Future<void> Function();
 
@@ -30,6 +31,18 @@ Future<void> initializeCoreStorage() async {
   } on Object catch (error) {
     AppLogger.e('家长保护安全存储不可用，家长区保持锁定', tag: 'Startup', error: error);
   }
+  // 历史 commit 的配置写入会把明文凭据落进 Hive（凭据本就只应存在于
+  // secure storage）。迁移自身已逐条捕获失败（写失败保留原值），这里再整体
+  // 兜底一层，确保凭据问题不阻断启动。
+  try {
+    await _settingsRepository().migratePlaintextWebDavCredentials();
+  } on Object catch (error) {
+    AppLogger.e(
+      'WebDAV 凭据整体迁移失败，明文凭据保留在 Hive',
+      tag: 'Startup',
+      error: error,
+    );
+  }
 }
 
 Future<void> initializeOptionalServices() async {
@@ -37,6 +50,12 @@ Future<void> initializeOptionalServices() async {
   // 清理移除本地语音识别后的遗留模型与设置键；失败不影响启动。
   await LegacySpeechCleanup.run();
 }
+
+/// 迁移用的 `SettingsRepository`：惰性单例，须在 Hive 初始化之后调用
+/// （构造本身不读存储，`migratePlaintextWebDavCredentials` 会）。
+SettingsRepository _settingsRepository() => _settingsRepositoryInstance;
+
+final SettingsRepository _settingsRepositoryInstance = SettingsRepository();
 
 /// 在 Flutter UI 启动后初始化核心存储，并为失败提供重试入口。
 class AppBootstrap extends StatefulWidget {
