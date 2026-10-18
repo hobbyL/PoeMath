@@ -44,8 +44,8 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     final result = await Navigator.push<bool>(
       context,
       fadeSlideRoute(
-          builder: (_) =>
-              const ParentAccessBoundary(child: WebDavConfigPage()),),
+        builder: (_) => const ParentAccessBoundary(child: WebDavConfigPage()),
+      ),
     );
     if (result == true && mounted) {
       ref.invalidate(settingsRepositoryProvider);
@@ -219,15 +219,21 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
           remote != null &&
           local != null &&
           remote.isAfter(local)) {
-        final proceed = await showSyncConflictDialog(context,
-            direction: SyncConflictDirection.download,
-            remoteExportedAt: remote,
-            localSyncedAt: local,);
+        final proceed = await showSyncConflictDialog(
+          context,
+          direction: SyncConflictDirection.download,
+          remoteExportedAt: remote,
+          localSyncedAt: local,
+        );
         if (proceed != true || !mounted) return;
       }
-      final result = await previewAndRestoreBackup(context, ref, json,
-          notifications: widget.notificationService,
-          source: versionId == null ? 'WebDAV 最新备份' : 'WebDAV 历史版本',);
+      final result = await previewAndRestoreBackup(
+        context,
+        ref,
+        json,
+        notifications: widget.notificationService,
+        source: versionId == null ? 'WebDAV 最新备份' : 'WebDAV 历史版本',
+      );
       if (result == null) return;
       if (remote != null) await settings.setLastSyncedAt(remote);
       try {
@@ -236,9 +242,13 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
         AppLogger.e('恢复成功，提醒日期保存失败', tag: 'Backup', error: error);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
             content: Text(
-                '恢复成功，共 ${result.count} 条记录${result.notificationsApplied ? '' : '，通知设置未完全应用'}',),),);
+              '恢复成功，共 ${result.count} 条记录${result.notificationsApplied ? '' : '，通知设置未完全应用'}',
+            ),
+          ),
+        );
       }
     } on Object catch (error) {
       if (mounted) {
@@ -264,32 +274,37 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       final versions = await webdav.listVersions(full);
       if (!mounted) return;
       selected = await showModalBottomSheet<String>(
-          context: context,
-          isScrollControlled: true,
-          builder: (sheet) => SafeArea(
-              child: SizedBox(
-                  height: MediaQuery.sizeOf(sheet).height * .6,
-                  child: versions.isEmpty
-                      ? const Center(child: Text('暂无历史版本，请先上传一次新备份'))
-                      : ListView(
-                          padding: const EdgeInsets.all(SpacingTokens.md),
-                          children: [
-                              Text('选择云端历史版本',
-                                  style: Theme.of(sheet).textTheme.titleMedium,),
-                              for (final version in versions)
-                                AppTile(
-                                    icon: Icons.history,
-                                    iconColor:
-                                        Theme.of(sheet).colorScheme.primary,
-                                    title: version.createdAt
-                                        .toLocal()
-                                        .toString()
-                                        .split('.')
-                                        .first,
-                                    subtitle: '下载后预览确认，不会立即覆盖',
-                                    onTap: () =>
-                                        Navigator.pop(sheet, version.id),),
-                            ],),),),);
+        context: context,
+        isScrollControlled: true,
+        builder: (sheet) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(sheet).height * .6,
+            child: versions.isEmpty
+                ? const Center(child: Text('暂无历史版本，请先上传一次新备份'))
+                : ListView(
+                    padding: const EdgeInsets.all(SpacingTokens.md),
+                    children: [
+                      Text(
+                        '选择云端历史版本',
+                        style: Theme.of(sheet).textTheme.titleMedium,
+                      ),
+                      for (final version in versions)
+                        AppTile(
+                          icon: Icons.history,
+                          iconColor: Theme.of(sheet).colorScheme.primary,
+                          title: version.createdAt
+                              .toLocal()
+                              .toString()
+                              .split('.')
+                              .first,
+                          subtitle: '下载后预览确认，不会立即覆盖',
+                          onTap: () => Navigator.pop(sheet, version.id),
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+      );
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -388,7 +403,9 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final settingsRepo = ref.watch(settingsRepositoryProvider);
-    final configs = settingsRepo.webDavConfigs;
+    final detailed = settingsRepo.webDavConfigsDetailed;
+    final configs = detailed.configs;
+    final skipped = detailed.skipped;
     final busy = _uploading || _downloading;
 
     return Scaffold(
@@ -397,7 +414,8 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
           : FloatingActionButton.small(
               tooltip: '云端历史版本',
               onPressed: busy ? null : _versions,
-              child: const Icon(Icons.history),),
+              child: const Icon(Icons.history),
+            ),
       appBar: AppBar(
         title: const Text('云端同步'),
         actions: [
@@ -409,150 +427,190 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
         ],
       ),
       body: SafeArea(
-        child: configs.isEmpty
-            ? _buildEmptyState(theme)
-            : Column(
-                children: [
-                  // 配置列表
-                  Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.all(SpacingTokens.md),
-                      itemCount: configs.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: SpacingTokens.sm),
-                      itemBuilder: (context, index) {
-                        final config = configs[index];
-                        final selected = _selectedId == config.id;
+        child: Column(
+          children: [
+            // 有配置因校验不合法被跳过时提示一次（见 decodeListDetailed）。
+            // 整串 JSON 损坏属于存储项损坏而非「有 N 条不合法」，skipped 记 0，
+            // 此处自然不提示，按空列表处理即可。
+            if (skipped > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  SpacingTokens.md,
+                  SpacingTokens.md,
+                  SpacingTokens.md,
+                  0,
+                ),
+                child: ColoredCard(
+                  color: theme.semantic.caution,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 20,
+                        color: theme.semantic.caution,
+                      ),
+                      const SizedBox(width: SpacingTokens.sm),
+                      Expanded(
+                        child: Text(
+                          '有 $skipped 条配置因不合法被忽略',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Expanded(
+              child: configs.isEmpty
+                  ? _buildEmptyState(theme)
+                  : Column(
+                      children: [
+                        // 配置列表
+                        Expanded(
+                          child: ListView.separated(
+                            padding: const EdgeInsets.all(SpacingTokens.md),
+                            itemCount: configs.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: SpacingTokens.sm),
+                            itemBuilder: (context, index) {
+                              final config = configs[index];
+                              final selected = _selectedId == config.id;
 
-                        return ColoredCard(
-                          color: selected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.outline,
-                          backgroundOpacity: selected ? 0.12 : 0.04,
-                          onTap: () => setState(() => _selectedId = config.id),
-                          child: Row(
-                            children: [
-                              // 选中标记
-                              Icon(
-                                selected
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_unchecked,
+                              return ColoredCard(
                                 color: selected
                                     ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurfaceVariant,
-                                size: 22,
-                              ),
-                              const SizedBox(width: SpacingTokens.md),
-                              // 配置信息
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                    : theme.colorScheme.outline,
+                                backgroundOpacity: selected ? 0.12 : 0.04,
+                                onTap: () =>
+                                    setState(() => _selectedId = config.id),
+                                child: Row(
                                   children: [
-                                    Text(
-                                      config.name,
-                                      style:
-                                          theme.textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w600,
+                                    // 选中标记
+                                    Icon(
+                                      selected
+                                          ? Icons.radio_button_checked
+                                          : Icons.radio_button_unchecked,
+                                      color: selected
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.onSurfaceVariant,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: SpacingTokens.md),
+                                    // 配置信息
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            config.name,
+                                            style: theme.textTheme.titleSmall
+                                                ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            height: SpacingTokens.xs,
+                                          ),
+                                          Text(
+                                            config.url,
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                              color: theme
+                                                  .colorScheme.onSurfaceVariant,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(
-                                      height: SpacingTokens.xs,
-                                    ),
-                                    Text(
-                                      config.url,
-                                      style:
-                                          theme.textTheme.bodySmall?.copyWith(
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                    // 操作按钮
+                                    PopupMenuButton<String>(
+                                      onSelected: (action) {
+                                        if (action == 'edit') {
+                                          _editConfig(config);
+                                        } else if (action == 'delete') {
+                                          _deleteConfig(config);
+                                        }
+                                      },
+                                      itemBuilder: (_) => [
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Text('编辑'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text('删除'),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ),
-                              // 操作按钮
-                              PopupMenuButton<String>(
-                                onSelected: (action) {
-                                  if (action == 'edit') {
-                                    _editConfig(config);
-                                  } else if (action == 'delete') {
-                                    _deleteConfig(config);
-                                  }
-                                },
-                                itemBuilder: (_) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('编辑'),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('删除'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        )
-                            .animate()
-                            .fadeIn(
-                              delay: (80 * index).ms,
-                              duration: 300.ms,
-                            )
-                            .slideX(
-                              begin: 0.1,
-                              end: 0,
-                              delay: (80 * index).ms,
-                              duration: 300.ms,
-                            );
-                      },
-                    ),
-                  ),
-
-                  // 底部操作按钮（选中配置后显示）
-                  if (_selectedId != null)
-                    Container(
-                      padding: const EdgeInsets.all(SpacingTokens.lg),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        border: Border(
-                          top: BorderSide(
-                            color: theme.colorScheme.outlineVariant,
+                              )
+                                  .animate()
+                                  .fadeIn(
+                                    delay: (80 * index).ms,
+                                    duration: 300.ms,
+                                  )
+                                  .slideX(
+                                    begin: 0.1,
+                                    end: 0,
+                                    delay: (80 * index).ms,
+                                    duration: 300.ms,
+                                  );
+                            },
                           ),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: busy ? null : _upload,
-                              icon: _uploading
-                                  ? const _SmallSpinner()
-                                  : const Icon(Icons.cloud_upload_outlined),
-                              label: Text(
-                                _uploading ? '上传中…' : '上传到云端',
+
+                        // 底部操作按钮（选中配置后显示）
+                        if (_selectedId != null)
+                          Container(
+                            padding: const EdgeInsets.all(SpacingTokens.lg),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              border: Border(
+                                top: BorderSide(
+                                  color: theme.colorScheme.outlineVariant,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: SpacingTokens.md),
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: busy ? null : _download,
-                              icon: _downloading
-                                  ? const _SmallSpinner(light: true)
-                                  : const Icon(
-                                      Icons.cloud_download_outlined,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: busy ? null : _upload,
+                                    icon: _uploading
+                                        ? const _SmallSpinner()
+                                        : const Icon(
+                                            Icons.cloud_upload_outlined,),
+                                    label: Text(
+                                      _uploading ? '上传中…' : '上传到云端',
                                     ),
-                              label: Text(
-                                _downloading ? '下载中…' : '从云端下载',
-                              ),
+                                  ),
+                                ),
+                                const SizedBox(width: SpacingTokens.md),
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: busy ? null : _download,
+                                    icon: _downloading
+                                        ? const _SmallSpinner(light: true)
+                                        : const Icon(
+                                            Icons.cloud_download_outlined,
+                                          ),
+                                    label: Text(
+                                      _downloading ? '下载中…' : '从云端下载',
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
-                ],
-              ),
+            ),
+          ],
+        ),
       ),
     );
   }

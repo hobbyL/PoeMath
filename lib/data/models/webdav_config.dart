@@ -17,6 +17,39 @@ class WebDavConfig {
     this.remotePath = '/poemath/',
   });
 
+  /// 严格构造：非法输入返回 `null`。
+  ///
+  /// 这是**唯一合法的构造入口**（外部输入一律经过这里）：`url` 与
+  /// `remotePath` 在此处一次性校验，构造成功的实例即满足不变量。
+  ///
+  /// 不用它而直接调构造函数，会绕过全部校验 —— 读持久化数据时请走
+  /// [fromJsonOrNull] / [decodeListDetailed]。
+  ///
+  /// `username` / `password` 刻意不校验：Hive 中的配置凭据按设计被置空
+  /// （见 `SettingsRepository.saveWebDavConfig`），把空凭据算作非法会让
+  /// 所有存量配置在读取时被误判丢弃。凭据的非空要求由请求侧
+  /// （`WebDavService._validateConfig`）保证。
+  static WebDavConfig? tryCreate({
+    required String id,
+    required String name,
+    required String url,
+    required String username,
+    required String password,
+    String remotePath = '/poemath/',
+  }) {
+    if (id.trim().isEmpty) return null;
+    if (validateUrl(url) != null) return null;
+    if (validateRemotePath(remotePath) != null) return null;
+    return WebDavConfig(
+      id: id,
+      name: name,
+      url: url,
+      username: username,
+      password: password,
+      remotePath: remotePath,
+    );
+  }
+
   /// 唯一标识（时间戳生成）。
   final String id;
 
@@ -141,30 +174,98 @@ class WebDavConfig {
         'remotePath': remotePath,
       };
 
-  factory WebDavConfig.fromJson(Map<String, dynamic> json) => WebDavConfig(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        url: json['url'] as String,
-        username: json['username'] as String,
-        password: json['password'] as String,
-        remotePath: json['remotePath'] as String? ?? '/poemath/',
-      );
+  /// 从 JSON 对象严格解析，非法条目返回 `null`。
+  ///
+  /// `id` / `name` / `url` 必须是字符串（缺字段或类型不符直接判非法），
+  /// `username` / `password` / `remotePath` 允许缺失，缺失时分别退化为
+  /// `''` / `''` / `/poemath/`（凭据不参与合法性判定，理由见 [tryCreate]）。
+  static WebDavConfig? fromJsonOrNull(Map<String, dynamic> json) {
+    final id = json['id'];
+    final name = json['name'];
+    final url = json['url'];
+    if (id is! String || name is! String || url is! String) return null;
+    final username = json['username'];
+    final password = json['password'];
+    final remotePath = json['remotePath'];
+    return WebDavConfig.tryCreate(
+      id: id,
+      name: name,
+      url: url,
+      username: username is String ? username : '',
+      password: password is String ? password : '',
+      remotePath: remotePath is String ? remotePath : '/poemath/',
+    );
+  }
+
+  /// 从 JSON 对象解析，非法条目抛 [FormatException]。
+  ///
+  /// 已被 [fromJsonOrNull] 取代：读取持久化数据时应当**逐条跳过**非法条目
+  /// （见 [decodeListDetailed]），而不是让一条坏数据炸掉整次读取。
+  /// 保留此方法只为兼容既有调用点，其异常类型从裸 `TypeError`（`as String`
+  /// 转型失败）改为语义明确的 [FormatException]。
+  @Deprecated('改用 fromJsonOrNull / decodeListDetailed，非法条目应跳过而非抛出')
+  factory WebDavConfig.fromJson(Map<String, dynamic> json) {
+    final config = WebDavConfig.fromJsonOrNull(json);
+    if (config == null) {
+      throw const FormatException('WebDAV 配置不合法（id/url/remotePath 校验未通过）');
+    }
+    return config;
+  }
 
   /// 将配置列表序列化为 JSON 字符串。
   static String encodeList(List<WebDavConfig> configs) {
     return jsonEncode(configs.map((c) => c.toJson()).toList());
   }
 
-  /// 从 JSON 字符串反序列化配置列表。
-  static List<WebDavConfig> decodeList(String? jsonString) {
-    if (jsonString == null || jsonString.isEmpty) return [];
-    try {
-      final list = jsonDecode(jsonString) as List<dynamic>;
-      return list
-          .map((e) => WebDavConfig.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } on Exception {
-      return [];
+  /// 解码结果：可用列表 + 被忽略条数。
+  ///
+  /// [skipped] 只统计**逐条非法**的条目（缺字段、URL 非 HTTPS、路径含穿越
+  /// 等），整串 JSON 损坏时按「配置为空」处理、`skipped` 记 0（那属于存储项
+  /// 损坏，不是「有 N 条不合法」）。
+  static WebDavConfigDecodeResult decodeListDetailed(String? jsonString) {
+    if (jsonString == null || jsonString.isEmpty) {
+      return const WebDavConfigDecodeResult([], 0);
     }
+    final List<dynamic> raw;
+    try {
+      final decoded = jsonDecode(jsonString);
+      if (decoded is! List) return const WebDavConfigDecodeResult([], 0);
+      raw = decoded;
+    } on FormatException {
+      return const WebDavConfigDecodeResult([], 0);
+    }
+    final kept = <WebDavConfig>[];
+    var skipped = 0;
+    for (final entry in raw) {
+      if (entry is! Map<String, dynamic>) {
+        skipped++;
+        continue;
+      }
+      final config = WebDavConfig.fromJsonOrNull(entry);
+      if (config == null) {
+        skipped++;
+      } else {
+        kept.add(config);
+      }
+    }
+    return WebDavConfigDecodeResult(kept, skipped);
   }
+
+  /// 从 JSON 字符串反序列化配置列表（兼容包装，丢弃被忽略条数）。
+  ///
+  /// 需要向用户提示「有 N 条被忽略」时请直接用 [decodeListDetailed]。
+  static List<WebDavConfig> decodeList(String? jsonString) {
+    return decodeListDetailed(jsonString).configs;
+  }
+}
+
+/// [WebDavConfig.decodeListDetailed] 的结果：可用配置 + 被忽略条数。
+class WebDavConfigDecodeResult {
+  const WebDavConfigDecodeResult(this.configs, this.skipped);
+
+  /// 通过校验、可安全使用的配置。
+  final List<WebDavConfig> configs;
+
+  /// 因不合法被逐条跳过的条数。
+  final int skipped;
 }
