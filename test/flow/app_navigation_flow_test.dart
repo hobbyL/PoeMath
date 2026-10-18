@@ -33,7 +33,7 @@ void main() {
   });
 
   tearDown(() async {
-    await tearDownHiveForTesting();
+    await tearDownHiveForWidgetTesting();
   });
 
   testWidgets('App 启动后 4 个 Tab 均可切换', (tester) async {
@@ -71,6 +71,9 @@ void main() {
     expect(tester.takeException(), isNull);
     // 消耗剩余 flutter_animate 计时器
     await tester.pump(const Duration(seconds: 2));
+
+    // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。
+    await drainHiveWritesForTesting(tester);
   });
 
   testWidgets('首页显示快捷入口和今日目标', (tester) async {
@@ -92,5 +95,8 @@ void main() {
 
     // 打卡区域
     expect(find.text('打卡'), findsOneWidget);
+
+    // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。
+    await drainHiveWritesForTesting(tester);
   });
 }

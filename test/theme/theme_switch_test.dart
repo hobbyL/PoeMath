@@ -38,7 +38,7 @@ void main() {
     });
 
     tearDown(() async {
-      await tearDownHiveForTesting();
+      await tearDownHiveForWidgetTesting();
     });
 
     test('外观模式从 Hive 恢复并在修改后持久化', () async {
@@ -113,6 +113,9 @@ void main() {
 
       final ThemeData light2 = container.read(lightThemeProvider);
       expect(light2.colorScheme.primary, ColorTokens.mathPurple);
+
+      // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。
+      await drainHiveWritesForTesting(tester);
     });
   });
 }

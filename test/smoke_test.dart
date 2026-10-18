@@ -19,7 +19,7 @@ void main() {
   });
 
   tearDown(() async {
-    await tearDownHiveForTesting();
+    await tearDownHiveForWidgetTesting();
   });
 
   testWidgets('App 冷启动应展示 SplashPage 并在 300ms 后进入 MainShell', (tester) async {
@@ -40,5 +40,8 @@ void main() {
     // 消耗 MainShell IndexedStack 中所有 tab 页面的
     // flutter_animate 入场动画计时器
     await tester.pump(const Duration(seconds: 3));
+
+    // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。
+    await drainHiveWritesForTesting(tester);
   });
 }

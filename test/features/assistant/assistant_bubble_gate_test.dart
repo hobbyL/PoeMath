@@ -27,7 +27,7 @@ void main() {
   });
 
   tearDown(() async {
-    await tearDownHiveForTesting();
+    await tearDownHiveForWidgetTesting();
   });
 
   testWidgets('默认关闭不挂载气泡；开启后出现、关闭后消失', (tester) async {
@@ -56,5 +56,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     expect(find.byType(DraggableAssistantBubble), findsNothing);
+
+    // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。
+    await drainHiveWritesForTesting(tester);
   });
 }
