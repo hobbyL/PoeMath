@@ -32,10 +32,18 @@
 # ---------------------------------------------------------------------------
 # 本项目原生入口
 # ---------------------------------------------------------------------------
-# MainActivity 由 AndroidManifest 以类名字符串声明，
-# app_update MethodChannel 的 handler 也挂在此类上；被混淆后系统无法启动
-# Activity，更新安装通道全部失效。
--keep class com.poemath.app.MainActivity { *; }
+# MainActivity 由 AndroidManifest 以**类名字符串**声明（android:name=".MainActivity"），
+# 被混淆后系统无法实例化，应用直接起不来 —— 故类名必须保留。
+#
+# 但**只保留类名，不保留成员**：`{ *; }` 会把全部私有方法名留在 DEX 里，
+# 实测 `resolveUpdateApk` / `installedSignatures` / `apkSignatures` 都因此明文
+# 可读，等于把签名闸门的实现细节白送给逆向者。通道分发走
+# `when (call.method)` 的**字符串比较**（MainActivity.kt:31-40），方法名是纯
+# 内部符号，R8 改写它不影响任何运行期行为。
+-keep,allowoptimization class com.poemath.app.MainActivity
+-keepclassmembers class com.poemath.app.MainActivity {
+    <init>(...);   # Android 框架按无参构造实例化 Activity
+}
 
 # ---------------------------------------------------------------------------
 # 依赖反射 / 平台入口的插件（仅列实际使用的）
