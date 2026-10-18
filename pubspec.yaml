@@ -4,6 +4,9 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
+  # 下限仅用于满足 pub 的解析要求；实际受支持的构建环境是 FVM / CI 固定的
+  # Flutter 3.44.6 + Dart 3.12.2（见 CLAUDE.md）。低于该版本的 SDK 不在
+  # 受测范围内，遇到运行期而非解析期失败属预期。
   sdk: ">=3.6.0 <4.0.0"
   flutter: ">=3.27.0"
 
