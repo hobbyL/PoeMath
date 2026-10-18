@@ -19,6 +19,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:hive/hive.dart';
 
@@ -41,6 +42,36 @@ enum BoxMigrationOutcome {
   /// 打开（没有 frame 可校验 checksum），把它记成「已加密」是错的说法，
   /// 排查磁盘加密状态时会把「确实是空的」误导成「已经处理过了」。
   empty,
+
+  /// **既非本密钥密文、又非可读明文** —— 数据已不可恢复。
+  ///
+  /// 典型来源：半迁移状态（进程被杀，留下用旧密钥加密的 box），或换机
+  /// 恢复备份带来的异密钥密文。`run()` 会跳过它、继续迁移其余 box，
+  /// 把结论留给调用方。
+  unreadable,
+}
+
+/// 明文 box 文件内容的**内存快照**。
+///
+/// 用途见 `HiveEncryptionMigration._snapshotOf`：`clear()` 会把源文件截成
+/// 0 字节，因此必须在动它之前把原始字节留一份在内存里，稍后写回
+/// `.plaintext.bak`。
+class _PlaintextSnapshot {
+  _PlaintextSnapshot(this.originalPath, this.bytes);
+
+  /// 源文件路径。`clear()` 之后文件名仍在，内容已空。
+  final String originalPath;
+
+  /// `clear()` 之前读到的完整字节。
+  final Uint8List bytes;
+
+  /// 把快照写回 [targetPath]。
+  ///
+  /// 失败即抛：此时原文件已被清空，备份写不出去就意味着**没有回滚留底**，
+  /// 调用方必须据此中止该 box 的迁移（见 `_migrateBox` 的回滚分支）。
+  void restoreTo(String targetPath) {
+    File(targetPath).writeAsBytesSync(bytes, flush: true);
+  }
 }
 
 class HiveEncryptionMigration {
@@ -78,11 +109,31 @@ class HiveEncryptionMigration {
     final results = <String, BoxMigrationOutcome>{};
 
     for (final name in boxNames) {
-      results[name] = await _migrateBox(
-        name: name,
-        cipher: cipher,
-        boxDir: boxDir,
-      );
+      try {
+        results[name] = await _migrateBox(
+          name: name,
+          cipher: cipher,
+          boxDir: boxDir,
+        );
+      } on Object catch (error, stack) {
+        // 单个 box 读不出来（既非本密钥密文、又非可读明文）时**跳过它**，
+        // 继续迁移其余的，而不是让整批作废。
+        //
+        // 为什么不能整批中止：迁移是逐 box 落盘的，进程在中途被杀就会留下
+        // 「部分已密文（旧密钥）、部分仍明文」的目录。这种混存状态下下次
+        // 启动若整批中止，就永远卡在「每次启动都失败、加密始终完不成」。
+        //
+        // 跳过的语义是安全的：该 box 的数据本就已经解不开（否则不会走到
+        // 这里），跳过不会丢任何可读数据；而它会被记为 `unreadable`，
+        // 上层据此决定是否走降级。
+        AppLogger.e(
+          'box「$name」无法迁移，跳过并继续其余 box',
+          tag: _tag,
+          error: error,
+          stackTrace: stack,
+        );
+        results[name] = BoxMigrationOutcome.unreadable;
+      }
     }
 
     final migrated = results.entries
@@ -114,7 +165,28 @@ class HiveEncryptionMigration {
   static Future<bool> canOpenWithKey(String name, List<int> key) =>
       _openProbe(name, HiveAesCipher(key));
 
+  /// 判断 [name] 是否是**可读明文** box（即迁移真的能成功）。
+  ///
+  /// 用途：密钥不存在时，`HiveEncryptionKeyResolver` 需要区分
+  /// 「有明文待迁移」与「有密文但密钥丢了」。**只看文件存在性不够** ——
+  /// 两种情况都是「文件在、密钥不在」，但前者应迁移、后者应降级清空。
+  /// 误判成前者会让迁移失败退回明文模式，而 `Hive.openBox` 的默认
+  /// `crashRecovery` 会把解不开的密文**就地截断成空 box**，再被应用写进
+  /// 新数据 —— 用户数据被静默销毁（真机实测过，见 research 文档场景 3）。
+  ///
+  /// 空文件（0 字节）返回 `true`：它没有内容可迁移，但也没有「解不开的
+  /// 密文」风险，按明文处理是安全的（`_migrateBox` 会判为 `empty` 跳过）。
+  ///
+  /// 必须关 `crashRecovery`，理由同 [canOpenWithKey]；错误隔离见 [_openProbe]。
+  static Future<bool> canOpenAsPlaintext(String name) =>
+      // 探测前确保没有同名 box 处于打开状态：`openBox` 对已打开的 box
+      // 会直接返回缓存实例并**忽略传入的 cipher**，那样探出来的结论是假的。
+      // 调用方（resolver）此时尚未 init 任何 box，这里是防御性处理。
+      Hive.isBoxOpen(name) ? Future.value(false) : _openProbe(name, null);
+
   /// 试着用 [cipher] 打开 [name]，成功返回 true。
+  ///
+  /// [cipher] 为 `null` 表示按**明文**打开（用于 [canOpenAsPlaintext]）。
   ///
   /// 关掉 `crashRecovery` 后 Hive 的**失败路径会把同一个错误上报两次**：
   /// `hive_impl.dart:118` 既 `completer.completeError(error)` 又 `rethrow`，
@@ -128,7 +200,7 @@ class HiveEncryptionMigration {
   ///    结束后才异步送达**的，那时 zone 已销毁、错误会漏出去。
   /// 2. 所以用 `Completer` 让 zone 体自己报告完成，之后再显式等一小段时间
   ///    把迟到的错误排空 —— 这段时间里 zone 仍然存活并接住它。
-  static Future<bool> _openProbe(String name, HiveCipher cipher) =>
+  static Future<bool> _openProbe(String name, HiveCipher? cipher) =>
       _guarded(() async {
         final box = await Hive.openBox<dynamic>(
           name,
@@ -142,12 +214,22 @@ class HiveEncryptionMigration {
   ///
   /// 同样必须关 `crashRecovery`：默认的恢复会把「非明文文件」截断成空 box
   /// 并成功返回，于是迁移会**把用户数据清空后当成功**。
-  static Future<Map<dynamic, dynamic>?> _openAndDump(String name) async {
+  ///
+  /// dump 出来的值会先经 [_unbindDumpedObjects] 解绑，否则 [HiveObject]
+  /// 实例回写时会抛错（见该方法的说明）。
+  static Future<Map<dynamic, dynamic>?> _openAndDump(
+    String name, {
+    required _PlaintextSnapshot? snapshot,
+  }) async {
     Map<dynamic, dynamic>? dump;
     final ok = await _guarded(
       () async {
         final plain = await Hive.openBox<dynamic>(name, crashRecovery: false);
         dump = {for (final k in plain.keys.toList()) k: plain.get(k)};
+        // `clear()` 就地解绑必须发生在 close 之前。它同时会把磁盘文件
+        // 截成 0 字节，所以原始字节已在更早一步由调用方存进了 [snapshot]
+        // （见 [_PlaintextSnapshot]）。
+        await plain.clear();
         await plain.close();
       },
       onError: (error, stack) {
@@ -160,6 +242,44 @@ class HiveEncryptionMigration {
       },
     );
     return ok ? dump : null;
+  }
+
+  /// 明文 box 文件内容的**内存快照**，用于在 `clear()` 之后重建回滚留底。
+  ///
+  /// **为什么需要它**：迁移必须同时满足两个约束，而它们在 Hive 的 API 里
+  /// 互相冲突（探针 F / G / J 三次实测得出）：
+  ///
+  /// | 约束 | 只能用 | 副作用 |
+  /// |---|---|---|
+  /// | 把 [HiveObject] 实例从源 box **解绑**（否则回写抛 `The same instance of an HiveObject cannot be stored in two different boxes.`） | `Box.clear()` | 先把磁盘文件**清成 0 字节** |
+  /// | 保住 `.plaintext.bak` 的**回滚价值** | 不碰磁盘 | 无法解绑 |
+  ///
+  /// `Keystore.clear()` 本可两者兼顾（只清内存），但它被标了 `@protected`
+  /// + `@visibleForTesting`，依赖它等于绑定 hive 的内部实现细节 ——
+  /// 代价不划算。
+  ///
+  /// 于是改为：**动磁盘之前，先把原始字节读进内存**。之后 `clear()` 随便
+  /// 截断文件，最后用这份字节把 `.plaintext.bak` 写回去。探针 K 实证：
+  /// 写回的字节能被当明文 box 正常打开，回滚路径真的可用。
+  ///
+  /// **为什么单测发现不了原始的绑定 bug**：单测的 box 里放的是普通 `Map`，
+  /// 不满足 `value is HiveObjectMixin`，Hive 直接跳过 `init` 分支。只有
+  /// 真机上装了 adapter、box 里是真对象的场景才会踩到。
+  static _PlaintextSnapshot? _snapshotOf(File file) {
+    try {
+      if (!file.existsSync()) return null;
+      return _PlaintextSnapshot(file.path, file.readAsBytesSync());
+    } on Object catch (error, stack) {
+      // 读不出原始字节就没法保住回滚留底。宁可不迁移：留着明文让下次
+      // 启动重试，也好过把用户数据推进一个无法回退的转换里。
+      AppLogger.e(
+        '读取明文 box 备份失败，本次不迁移该 box',
+        tag: _tag,
+        error: error,
+        stackTrace: stack,
+      );
+      return null;
+    }
   }
 
   /// 在隔离 Zone 里执行 [body]，吞掉 Hive 重复上报的错误。
@@ -226,11 +346,18 @@ class HiveEncryptionMigration {
       return BoxMigrationOutcome.alreadyEncrypted;
     }
 
-    // 按明文打开读出全部数据。
+    // 先把原始字节读进内存：`_openAndDump` 里的 `clear()` 会把磁盘文件
+    // 截成 0 字节，到那时就再也读不出回滚留底了。详见 [_PlaintextSnapshot]。
+    final snapshot = _snapshotOf(file);
+    if (snapshot == null) {
+      throw HiveError('box「$name」无法读取原始字节，迁移中止（详见日志）');
+    }
+
+    // 按明文打开读出全部数据，并就地解绑（clear）以便回写到新 box。
     //
     // 走 _openAndDump：它关掉 crashRecovery 并隔离 Hive 的重复上报。
     // 失败时返回 null（错误已在日志里），此处视为文件损坏。
-    final dumped = await _openAndDump(name);
+    final dumped = await _openAndDump(name, snapshot: snapshot);
     if (dumped == null) {
       throw HiveError(
         'box「$name」既非密文也非可读明文，迁移中止（详见日志）',
@@ -240,8 +367,12 @@ class HiveEncryptionMigration {
 
     final backup = File('$boxDir/$name.hive$plaintextBackupSuffix');
 
-    // 1) 旧文件改名留底（**不删**）。
-    await file.rename(backup.path);
+    // 1) 用内存快照重建明文留底（**不删**）。
+    //
+    // 此刻源文件已被 `clear()` 清空，这一步是唯一的回滚依托；写不出去就
+    // 不能继续，直接抛出交由上层回滚（此时磁盘上该 box 已是 0 字节，
+    // 但数据完整保存在 `values` 里，上层会退回明文重写）。
+    snapshot.restoreTo(backup.path);
 
     try {
       // 2) 用 cipher 打开一个全新空 box 并写回全部数据。

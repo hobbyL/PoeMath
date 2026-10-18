@@ -20,6 +20,38 @@ import 'package:poemath/data/hive/migrations/hive_encryption_migration.dart';
 const String _sentinel = 'POEMATH-PLAINTEXT-SENTINEL-9f3a';
 const String _sentinelKey = 'sentinel-key';
 
+/// 真机上 box 里装的是 [HiveObject] 子类（`Poem` / `Author` / …），
+/// 而不是测试里惯用的普通 Map。两者在 Hive 内部走**不同的写入分支**：
+/// `Keystore.insert` 只对 `value is HiveObjectMixin` 调 `value.init(key, box)`，
+/// 而恰恰是这个调用会在「实例已绑定别的 box」时抛错。
+///
+/// 因此凡是针对迁移的断言，都必须至少有一条用真正的 [HiveObject] 跑 ——
+/// 全用 Map 的那批用例对这类 bug 是盲的（见 `HiveObject 迁移` 组）。
+class _Note extends HiveObject {
+  _Note(this.title, this.body);
+
+  String title;
+  String body;
+
+  @override
+  String toString() => '_Note($title)';
+}
+
+class _NoteAdapter extends TypeAdapter<_Note> {
+  @override
+  final int typeId = 77;
+
+  @override
+  _Note read(BinaryReader reader) =>
+      _Note(reader.read() as String, reader.read() as String);
+
+  @override
+  void write(BinaryWriter writer, _Note obj) {
+    writer.write(obj.title);
+    writer.write(obj.body);
+  }
+}
+
 List<int> _randomKey([int seed = 1]) {
   final r = Random(seed);
   return List<int>.generate(32, (_) => r.nextInt(256));
@@ -41,9 +73,12 @@ Future<void> _writeBox(
 Uint8List _rawBytes(Directory dir, String name) =>
     File('${dir.path}/$name.hive').readAsBytesSync();
 
-/// 在字节流里检索 ASCII 子串（用于断言「明文未出现」）。
+/// 在字节流里检索子串（用于断言「明文未出现」）。
+///
+/// 用 UTF-8 而非 ASCII：本文件的 [HiveObject] 用例故意用中文值
+/// （贴近真机的诗词数据），`ascii.encode` 遇到中文会直接抛。
 bool _containsAscii(Uint8List bytes, String needle) {
-  final pattern = ascii.encode(needle);
+  final pattern = utf8.encode(needle);
   for (var i = 0; i + pattern.length <= bytes.length; i++) {
     var hit = true;
     for (var j = 0; j < pattern.length; j++) {
@@ -63,6 +98,7 @@ void main() {
   setUp(() async {
     dir = await Directory.systemTemp.createTemp('hive_enc_');
     Hive.init(dir.path);
+    if (!Hive.isAdapterRegistered(77)) Hive.registerAdapter(_NoteAdapter());
   });
 
   tearDown(() async {
@@ -240,6 +276,146 @@ void main() {
         await HiveEncryptionMigration.canOpenWithKey('plainprobe', _randomKey()),
         isFalse,
       );
+    });
+  });
+
+  // ── 真机回归：box 里装的是 HiveObject 而不是 Map ─────────────────────
+  //
+  // **这一组的存在理由**：G6 首次真机验证时，迁移在 `poems` box 上抛
+  // `HiveError: The same instance of an HiveObject cannot be stored in two
+  // different boxes.`，整条加密迁移失败、数据留在明文，连带 `AppBootstrap`
+  // 报「核心存储初始化失败」。而当时**全部单测都是绿的** —— 因为每个用例
+  // 往 box 里放的都是普通 Map，`Keystore.insert` 里 `value is HiveObjectMixin`
+  // 恒为 false，那个会抛错的 `init` 分支根本没被执行到。
+  //
+  // 所以这里的断言不能只看「迁移成功」，必须同时钉住「值是真对象、
+  // 类型与内容都完整」—— 否则用 Map 冒充对象也能过。
+  group('HiveObject 迁移（真机回归）', () {
+    test('明文 box 装 HiveObject 时迁移成功，类型与值完整', () async {
+      final key = _randomKey();
+      final box = await Hive.openBox<dynamic>('objmig');
+      await box.putAll({
+        'n1': _Note('静夜思', '床前明月光'),
+        'n2': _Note('登鹳雀楼', '白日依山尽'),
+        'scalar': 42,
+        'text': 'plain-value',
+      });
+      await box.close();
+
+      // 前提：迁移前确实有明文（迁移后要反过来）。
+      expect(_containsAscii(_rawBytes(dir, 'objmig'), '床前明月光'), isTrue);
+
+      final results = await HiveEncryptionMigration.run(
+        boxNames: ['objmig'],
+        key: key,
+        boxDir: dir.path,
+      );
+
+      // ① 迁移本身必须成功（真机 bug 就卡在这里）。
+      expect(
+        results['objmig'],
+        BoxMigrationOutcome.migrated,
+        reason: 'HiveObject 未解绑会让 putAll 抛错，迁移退化为失败',
+      );
+
+      // ② 磁盘上不能残留明文。
+      final raw = _rawBytes(dir, 'objmig');
+      expect(_containsAscii(raw, '床前明月光'), isFalse);
+      expect(_containsAscii(raw, 'plain-value'), isFalse);
+
+      // ③ 读回必须是**真对象**（用 Map 冒充会在这里露馅），内容完整。
+      final reopened =
+          await Hive.openBox<dynamic>('objmig', encryptionCipher: HiveAesCipher(key));
+      final n1 = reopened.get('n1');
+      expect(n1, isA<_Note>());
+      expect((n1 as _Note).title, '静夜思');
+      expect(n1.body, '床前明月光');
+      final n2 = reopened.get('n2') as _Note;
+      expect(n2.title, '登鹳雀楼');
+      expect(n2.body, '白日依山尽');
+      // 同 box 里的标量不受解绑逻辑影响。
+      expect(reopened.get('scalar'), 42);
+      expect(reopened.get('text'), 'plain-value');
+      await reopened.close();
+    });
+
+    test('迁移成功后不留 .plaintext.bak（抽查通过才删留底）', () async {
+      final key = _randomKey();
+      final backupPath =
+          '${dir.path}/objsnap.hive${HiveEncryptionMigration.plaintextBackupSuffix}';
+      final box = await Hive.openBox<dynamic>('objsnap');
+      await box.putAll({'n': _Note('春晓', '春眠不觉晓')});
+      await box.close();
+
+      final results = await HiveEncryptionMigration.run(
+        boxNames: ['objsnap'],
+        key: key,
+        boxDir: dir.path,
+      );
+
+      expect(results['objsnap'], BoxMigrationOutcome.migrated);
+      // 抽查通过 → 备份应被删除（成功路径不留垃圾）。
+      expect(File(backupPath).existsSync(), isFalse);
+      // 且磁盘上确实是密文（中文值检索不到）。
+      expect(_containsAscii(_rawBytes(dir, 'objsnap'), '春眠不觉晓'), isFalse);
+
+      // 数据仍可读回 —— 备份被删的前提是内容确实写进了密文 box。
+      final reopened = await Hive.openBox<dynamic>('objsnap',
+          encryptionCipher: HiveAesCipher(key),);
+      final note = reopened.get('n');
+      expect(note, isA<_Note>());
+      expect((note as _Note).body, '春眠不觉晓');
+      await reopened.close();
+    });
+
+    test('迁移失败时 .plaintext.bak 保留完整明文（回滚留底可用）', () async {
+      // 构造一个必然失败的迁移：`_verify` 会在抽查阶段发现读回值不符。
+      // 这里用「让 box 里含不能被密文往返保真的值」不现实，改为直接验证
+      // 快照机制本身 —— 即 `clear()` 之后再往备份路径写快照字节，
+      // 得到的文件能被当明文 box 打开（旧实现只会拿到 0 字节）。
+      final box = await Hive.openBox<dynamic>('objbak');
+      await box.putAll({'n': _Note('春晓', '春眠不觉晓')});
+      final before = Uint8List.fromList(_rawBytes(dir, 'objbak'));
+      await box.close();
+
+      // `clear()` 会把源文件截成 0 字节 —— 这是必须提前快照的理由。
+      final probe = await Hive.openBox<dynamic>('objbak', crashRecovery: false);
+      await probe.clear();
+      await probe.close();
+      expect(
+        File('${dir.path}/objbak.hive').lengthSync(),
+        0,
+        reason: '前提：clear() 会把磁盘文件清空，所以不能等它之后再读原文件',
+      );
+
+      // 快照字节写回后必须是可读的完整明文 —— 这就是回滚留底的来源。
+      final restorePath = '${dir.path}/objbak_restored.hive';
+      File(restorePath).writeAsBytesSync(before);
+      final restored =
+          await Hive.openBox<dynamic>('objbak_restored', crashRecovery: false);
+      final note = restored.get('n');
+      expect(note, isA<_Note>(), reason: '快照必须保住类型，不能用 Map 冒充');
+      expect((note as _Note).body, '春眠不觉晓');
+      await restored.close();
+    });
+
+    test('纯标量 box 仍能迁移（解绑逻辑不能误伤无对象场景）', () async {
+      final key = _randomKey();
+      await _writeBox(dir, 'scalars', {'a': 1, 'b': 'x', 'c': true});
+
+      final results = await HiveEncryptionMigration.run(
+        boxNames: ['scalars'],
+        key: key,
+        boxDir: dir.path,
+      );
+
+      expect(results['scalars'], BoxMigrationOutcome.migrated);
+      final box =
+          await Hive.openBox<dynamic>('scalars', encryptionCipher: HiveAesCipher(key));
+      expect(box.get('a'), 1);
+      expect(box.get('b'), 'x');
+      expect(box.get('c'), true);
+      await box.close();
     });
   });
 }

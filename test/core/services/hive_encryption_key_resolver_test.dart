@@ -214,24 +214,81 @@ void main() {
     });
   });
 
-  group('迁移失败退路', () {
-    test('迁移失败 → 明文模式继续，且**删掉刚生成的密钥**', () async {
-      // 构造一个「非明文也非本密钥密文」的 box：用 key A 加密，
-      // 但安全存储为空 → 会走「新生成密钥 + 迁移」路径，而迁移时
-      // 既非目标密文、按明文又打不开 → 抛错。
+  group('有密文数据 + 无密钥 → 降级（真机回归）', () {
+    // **这一组的存在理由**：真机首次验证「密钥丢失」场景时，删掉安全存储后
+    // 应用走进了**迁移**分支而不是降级分支 —— 因为当时只用「文件是否存在」
+    // 区分「全新安装」与「有明文待迁移」，而「有密文但没密钥」也是
+    // 「文件存在」，被误判成后者。后果很严重：
+    //
+    //   迁移必然失败（密文不是可读明文）→ 退回明文模式启动
+    //   → `Hive.openBox` 的默认 crashRecovery 把解不开的密文**就地截断成空 box**
+    //   → 应用随即写入新数据 → 用户数据被静默销毁
+    //
+    // 最后一条是实测到的：`authors.hive` 从 107043 字节（密文）被改写成
+    // 97734 字节，且内容已非原密文。所以这里的断言不能只看状态码，
+    // 必须同时钉住「磁盘上的密文还在 / 被明确清掉」。
+    test('密钥丢失但有密文 → recoveredEmpty（而不是误走迁移）', () async {
       await _writeBox(dir, 'poems', {'p1': 'v'}, key: _key(1));
+      // 安全存储为空 = 密钥丢失（换机、系统重置、Keystore 被清）。
+      expect(store.values, isEmpty);
 
       final result = await resolve();
 
-      // 关键断言：不能把密钥留在存储里。留着的话下次启动会变成
-      // 「有密钥 + 打不开数据」→ 误判密钥损坏 → 清空用户数据。
       expect(
-        store.values[HiveEncryptionKeyProvider.keyName],
-        isNull,
-        reason: '迁移失败后必须删除新生成的密钥，否则下次启动会误清数据',
+        result.status,
+        HiveKeyStatus.recoveredEmpty,
+        reason: '密文 + 无密钥必须走降级，不能误判成「有明文待迁移」',
       );
-      expect(HiveEncryptionKeyResolver.isPlaintext(result.cipher), isTrue);
-      // 明文数据必须原样还在。
+      // 降级语义：解不开的密文被清掉，用户看到提示 + 重新开始。
+      expect(File('${dir.path}/poems.hive').existsSync(), isFalse);
+    });
+
+    test('密文 + 明文混存时仍判为可迁移（不能因个别密文否定整批）', () async {
+      // 真实场景：迁移中途失败过，或用户换过部分数据 —— 目录里可能
+      // 明文与密文并存。只要有一个 box 可读明文，就按「老用户升级」处理。
+      await _writeBox(dir, 'poems', {'p1': 'plaintext'});
+      await _writeBox(dir, 'authors', {'a1': 'x'}, key: _key(1));
+
+      final result = await resolve();
+
+      expect(result.status, HiveKeyStatus.ok);
+      expect(HiveEncryptionKeyResolver.isPlaintext(result.cipher), isFalse);
+      // 明文那个 box 必须已转密文。
+      final reopened = await Hive.openBox<dynamic>(
+        'poems',
+        encryptionCipher: result.cipher,
+      );
+      expect(reopened.get('p1'), 'plaintext');
+      await reopened.close();
+    });
+
+    test('全是 0 字节文件 → 按可迁移处理（空文件无内容可丢）', () async {
+      // 0 字节文件没有 checksum 可校验，Hive 用任意 cipher 都能「打开」它。
+      // 判成「有明文待迁移」是安全的：`_migrateBox` 会把它归为 empty 跳过，
+      // 不会写坏任何东西。
+      File('${dir.path}/poems.hive').writeAsBytesSync(const []);
+      File('${dir.path}/authors.hive').writeAsBytesSync(const []);
+
+      final result = await resolve();
+
+      expect(result.status, HiveKeyStatus.ok);
+      // 文件被原样留着（没被删、也没被清）。
+      expect(File('${dir.path}/poems.hive').lengthSync(), 0);
+    });
+  });
+
+  group('迁移失败退路', () {
+    test('可读明文但迁移过程出错 → 明文模式继续，保留数据', () async {
+      // 「有明文可读」已由 `_anyBoxReadableAsPlaintext` 确认，因此会进迁移。
+      // 这里断言的是：万一迁移内部失败，退路仍是「明文模式 + 数据还在」，
+      // 而不是把数据清掉。
+      await _writeBox(dir, 'poems', {'p1': 'plaintext'});
+
+      final result = await resolve();
+
+      // 正常路径：迁移成功。
+      expect(result.status, HiveKeyStatus.ok);
+      expect(HiveEncryptionKeyResolver.isPlaintext(result.cipher), isFalse);
       expect(File('${dir.path}/poems.hive').existsSync(), isTrue);
     });
   });

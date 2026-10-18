@@ -99,13 +99,30 @@ class HiveEncryptionKeyResolver {
       return _recoverEmpty(provider: provider, boxDir: boxDir);
     }
 
-    // 本次新生成密钥。此时要区分「全新安装」与「有明文数据待迁移」——
-    // 前者无事发生，后者需要把明文转密文，否则新密钥打不开旧明文 box。
+    // 本次新生成密钥。此时要区分三种情形 —— 它们都是「没有密钥」，
+    // 但后续动作完全不同：
+    //
+    // | 磁盘状态 | 应走 | 理由 |
+    // |---|---|---|
+    // | 无任何文件 | `newInstall` | 全新安装，无事发生 |
+    // | 有**可读明文**文件 | 迁移 | 老用户升级，明文要转密文 |
+    // | 有文件但**读不出明文**（密文） | 降级清空 | 密钥丢了，数据已不可恢复 |
+    //
+    // 第三种最容易被漏掉：只看「文件是否存在」会把它当成「有明文待迁移」，
+    // 而迁移必然失败。失败后退回明文模式，`Hive.openBox` 的默认
+    // `crashRecovery` 会把解不开的密文**就地截断成空 box**，应用随即写入
+    // 新数据 —— 用户数据被静默销毁。真机实测复现过（research 文档场景 3）。
     if (!hasAnyFile) {
       return (
         cipher: HiveAesCipher(existing.key),
         status: HiveKeyStatus.newInstall,
       );
+    }
+
+    if (!await _anyBoxReadableAsPlaintext(boxDir)) {
+      // 有文件但一个都读不出明文 → 这些是密钥丢失后解不开的密文。
+      // 必须降级：让用户看到「记录已重置」的提示，而不是静默丢数据。
+      return _recoverEmpty(provider: provider, boxDir: boxDir);
     }
 
     return _migratePlaintext(
@@ -117,22 +134,32 @@ class HiveEncryptionKeyResolver {
 
   /// 把明文 box 迁移到密文。
   ///
-  /// 迁移失败**不抛异常**：退回明文继续用（此时数据仍可读，只是还没加密），
-  /// 下次启动重试。这比让用户开不了 App 好得多。
+  /// [HiveEncryptionMigration.run] 逐 box 处理并跳过读不出来的（记为
+  /// `unreadable`），因此本方法只需看汇总结果：
+  ///
+  /// - **至少迁移成功一个** → 用新密钥继续。剩下的 `unreadable` box 会被
+  ///   `HiveBoxes.init` 用新密钥打开，Hive 会把它们当空 box（内容已不可
+  ///   恢复，本来也读不出东西），但**其余数据完好**。这比整批降级好。
+  /// - **一个都没迁移成功、但存在 `unreadable`** → 说明磁盘上全是解不开的
+  ///   密文，没有明文可迁移。必须走降级：否则用新密钥开这些 box 会
+  ///   触发 `crashRecovery` 把它们就地截断，用户既丢了数据又看不到提示。
+  ///
+  /// 异常仍兜底捕获：`run()` 内部虽已逐 box 容错，但 `Hive.close()` 等
+  /// 前置步骤仍可能抛。退路是「明文模式继续」，绝不抛到启动路径上。
   static Future<ResolvedCipher> _migratePlaintext({
     required HiveEncryptionKeyProvider provider,
     required List<int> key,
     required String boxDir,
   }) async {
+    Map<String, BoxMigrationOutcome> results;
     try {
-      await HiveEncryptionMigration.run(
+      results = await HiveEncryptionMigration.run(
         boxNames: allBoxNames,
         key: key,
         boxDir: boxDir,
       );
-      return (cipher: HiveAesCipher(key), status: HiveKeyStatus.ok);
     } on Object catch (error, stack) {
-      // 迁移失败：删掉刚生成但没派上用场的密钥，租明文模式继续启动。
+      // 整体失败：删掉刚生成但没派上用场的密钥，退回明文模式继续启动。
       // 不删的话下次启动会「有密钥」，而去开明文 box 会失败，
       // 被误判成密钥损坏 → 降级清空数据 —— 那才是真正的事故。
       AppLogger.e(
@@ -148,6 +175,27 @@ class HiveEncryptionKeyResolver {
       }
       return (cipher: _noCipher, status: HiveKeyStatus.ok);
     }
+
+    final migrated = results.values
+        .where((o) => o == BoxMigrationOutcome.migrated)
+        .length;
+    final unreadable = results.entries
+        .where((e) => e.value == BoxMigrationOutcome.unreadable)
+        .map((e) => e.key)
+        .toList();
+
+    if (migrated == 0 && unreadable.isNotEmpty) {
+      // 没有任何明文被迁移，却有一堆解不开的 box —— 这些是丢失密钥后的
+      // 残骸。走降级：明确清掉并让用户看到提示。
+      AppLogger.e(
+        '无可迁移的明文，且 ${unreadable.length} 个 box 解不开'
+        '（${unreadable.join(', ')}），按密钥丢失处理',
+        tag: _tag,
+      );
+      return _recoverEmpty(provider: provider, boxDir: boxDir);
+    }
+
+    return (cipher: HiveAesCipher(key), status: HiveKeyStatus.ok);
   }
 
   /// 建降级：放弃不可解密的数据，用新密钥空数据继续启动。
@@ -240,6 +288,28 @@ class _PlaintextCipher extends HiveCipher {
 bool _anyBoxFileExists(String boxDir) {
   for (final name in HiveEncryptionKeyResolver.allBoxNames) {
     if (File('$boxDir/$name.hive').existsSync()) return true;
+  }
+  return false;
+}
+
+/// 现存文件中**至少有一个**能按明文打开。
+///
+/// 用于「密钥不存在但有文件」时区分「有明文待迁移」与「有密文但密钥丢了」。
+/// 判据与 [_canOpenAnyExisting] 对称：
+///
+/// - 用「至少一个」而非「全部」：某个 box 损坏不该否定整批可迁移性。
+/// - 0 字节文件按明文可开处理（Hive 对空文件不校验 checksum），
+///   这与 `HiveEncryptionMigration` 把空文件判为 `empty` 是一致的 ——
+///   既没有内容可迁移，也没有「解不开的密文」风险。
+/// - 一个可读文件都没有 → 返回 false，调用方走降级。
+Future<bool> _anyBoxReadableAsPlaintext(String boxDir) async {
+  for (final name in HiveEncryptionKeyResolver.allBoxNames) {
+    final file = File('$boxDir/$name.hive');
+    if (!file.existsSync()) continue;
+    // 空文件：无 checksum 可校验，任何 cipher 都能「打开」，
+    // 因此单独判掉，不浪费一次 openBox。
+    if (file.lengthSync() == 0) return true;
+    if (await HiveEncryptionMigration.canOpenAsPlaintext(name)) return true;
   }
   return false;
 }
