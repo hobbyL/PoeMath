@@ -1,17 +1,24 @@
 // lib/features/profile/about_page.dart
 //
 // 层级：features/profile
-// 职责：关于页面 — 展示应用版本、开发者信息、隐私政策和开源许可。
+// 职责：关于页面 — 展示应用版本、开发者信息、诊断日志导出、隐私政策和开源许可。
 
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 
@@ -28,10 +35,15 @@ class _AboutPageState extends State<AboutPage> {
   /// 缓存隐私政策加载，避免 BottomSheet 重建时重复读 asset。
   Future<String>? _privacyPolicyFuture;
 
+  /// 诊断缓冲当前条数（`initState` / 导出后刷新，供 AppTile 副标题显示）。
+  int _diagnosticCount = 0;
+  bool _exportingDiagnostics = false;
+
   @override
   void initState() {
     super.initState();
     _loadPackageInfo();
+    _diagnosticCount = DiagnosticBuffer.instance.length;
   }
 
   Future<void> _loadPackageInfo() async {
@@ -170,6 +182,25 @@ class _AboutPageState extends State<AboutPage> {
             ),
             const SizedBox(height: SpacingTokens.md),
 
+            // 导出诊断日志（生产环境崩溃/异常排查入口）。
+            //
+            // 刻意**不加家长门禁**：诊断文本已在写入时 scrub，且不含学习数据，
+            // 不构成儿童隐私面；而加门禁恰恰会在用户最需要导出的时刻（应用
+            // 刚崩溃/家长不在场）把他卡住。这与 backup_restore_page.dart 的
+            // 处理有意不同。
+            AppTile(
+              icon: Icons.bug_report_outlined,
+              iconColor: theme.colorScheme.onSurfaceVariant,
+              title: '导出诊断日志',
+              subtitle: _diagnosticCount == 0
+                  ? '暂无可导出的日志'
+                  : '最近 $_diagnosticCount 条记录',
+              onTap: (_diagnosticCount == 0 || _exportingDiagnostics)
+                  ? null
+                  : () => _exportDiagnostics(context),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+
             // 检查更新
             AppTile(
               icon: Icons.system_update_outlined,
@@ -232,6 +263,106 @@ class _AboutPageState extends State<AboutPage> {
         ),
       ),
     );
+  }
+
+  /// 导出诊断缓冲为纯文本文件（保存到设备 / 分享）。
+  ///
+  /// 复用 `backup_restore_page.dart` 的 bottom sheet + 双 `AppTile` 模式。
+  /// 文本已由 `DiagnosticBuffer` 在写入时 scrub；此处不再过滤，因为
+  /// 过滤口径只应有一处（`logging-guidelines.md` 的 Never Log 清单照旧）。
+  Future<void> _exportDiagnostics(BuildContext context) async {
+    if (_exportingDiagnostics) return;
+    setState(() => _exportingDiagnostics = true);
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      final action = await showModalBottomSheet<String>(
+        context: context,
+        builder: (sheet) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppTile(
+                icon: Icons.save_alt_rounded,
+                iconColor: Theme.of(sheet).colorScheme.primary,
+                title: '保存到设备',
+                subtitle: '选择本地目录保存诊断文本',
+                onTap: () => Navigator.pop(sheet, 'save'),
+              ),
+              AppTile(
+                icon: Icons.share_rounded,
+                iconColor: Theme.of(sheet).colorScheme.primary,
+                title: '分享',
+                subtitle: '通过其他应用发送诊断文本',
+                onTap: () => Navigator.pop(sheet, 'share'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (action == null || !mounted) return;
+
+      final text = await _buildDiagnosticsText();
+      final timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .split('.')
+          .first;
+      final fileName = 'poemath_diagnostics_$timestamp.txt';
+
+      if (action == 'save') {
+        await FilePicker.saveFile(
+          dialogTitle: '保存诊断日志',
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['txt'],
+          bytes: Uint8List.fromList(utf8.encode(text)),
+        );
+      } else {
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/$fileName');
+        try {
+          await file.writeAsString(text);
+          if (!mounted) return;
+          await SharePlus.instance
+              .share(ShareParams(files: [XFile(file.path)]));
+        } finally {
+          if (await file.exists()) await file.delete();
+        }
+      }
+      if (!mounted) return;
+      scaffold.showSnackBar(const SnackBar(content: Text('诊断日志导出完成')));
+    } on Object catch (error) {
+      if (mounted) {
+        scaffold.showSnackBar(SnackBar(content: Text('导出失败：$error')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _exportingDiagnostics = false;
+          _diagnosticCount = DiagnosticBuffer.instance.length;
+        });
+      }
+    }
+  }
+
+  /// 诊断导出文本：头部元信息 + 缓冲正文。
+  ///
+  /// 头部带上 `versionName + versionCode + tagName` —— release 包经
+  /// `--obfuscate` 后堆栈不可读，必须靠版本信息在 CI 产物里找到对应的
+  /// `symbols-<tag>` 归档才能还原（design.md §4.3）。
+  Future<String> _buildDiagnosticsText() async {
+    final info = _packageInfo ?? await PackageInfo.fromPlatform();
+    final buffer = StringBuffer()
+      ..writeln('${AppConstants.appName} (${AppConstants.appNameEn}) 诊断日志')
+      ..writeln('版本：v${info.version} (${info.buildNumber})')
+      ..writeln('数据版本：${AppConstants.dataVersion}')
+      ..writeln('导出时间：${DateTime.now().toIso8601String()}')
+      ..writeln('记录条数：${DiagnosticBuffer.instance.length}')
+      ..writeln('搭建于内存缓冲，应用重启即清空')
+      ..writeln('─' * 32)
+      ..writeln();
+    buffer.write(DiagnosticBuffer.instance.exportAsText());
+    return buffer.toString();
   }
 
   void _showPrivacyPolicy(BuildContext context) {

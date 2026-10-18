@@ -14,6 +14,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 
 import '../../helpers/hive_test_helper.dart';
@@ -489,5 +490,48 @@ void main() {
     expect(HiveBoxes.settings.get('reminder_enabled'), isNull);
     // 同备份中类型正确的通知 key 正常还原。
     expect(HiveBoxes.settings.get('weekly_report_enabled'), isTrue);
+  });
+
+  // ── 诊断缓冲排除（10-18-security-hardening 问题 5）──────────────
+  //
+  // 诊断缓冲是**纯内存**结构，根本不在 Hive 里，因此「不登记进
+  // `_settingsValueType`」即自动排除于备份。本组测试锁定这一点，
+  // 防止后人把缓冲改成落盘/落 settings 后随备份跨设备传播。
+  group('诊断缓冲不随备份迁移', () {
+    test('缓冲中的哨兵文本不出现在导出 JSON 中', () async {
+      const sentinel = 'sentinel-诊断哨兵-9f3c1a';
+      DiagnosticBuffer.instance = DiagnosticBuffer();
+      DiagnosticBuffer.instance.record(
+        level: 'E',
+        tag: 'Unit',
+        message: '$sentinel password=hunter2',
+      );
+
+      final json = await backupService.exportToJson();
+
+      expect(json.contains(sentinel), isFalse);
+      expect(json.contains('hunter2'), isFalse);
+      // 缓冲确实有内容 —— 断言不是因为缓冲为空而「碰巧」不出现。
+      expect(DiagnosticBuffer.instance.length, 1);
+    });
+
+    test('恶意备份注入诊断类 settings key 时被跳过', () async {
+      await HiveBoxes.settings.put('local_setting', 'keep-me');
+
+      await backupService.restoreFromJson(
+        await backupWithSettings(<String, dynamic>{
+          'theme_mode': 'dark',
+          'diagnostic_buffer': 'injected-from-hostile-backup',
+          'diagnostics': 'injected-from-hostile-backup',
+        }),
+      );
+
+      // 未登记的 key 一律跳过，本机不被写入。
+      expect(HiveBoxes.settings.get('diagnostic_buffer'), isNull);
+      expect(HiveBoxes.settings.get('diagnostics'), isNull);
+      // 同备份里合法的白名单 key 照常恢复，证明跳过是「逐 key」而非整体失败。
+      expect(HiveBoxes.settings.get('theme_mode'), 'dark');
+      expect(HiveBoxes.settings.get('local_setting'), 'keep-me');
+    });
   });
 }

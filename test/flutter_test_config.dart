@@ -26,7 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// 类型是 `Timeout`（flutter_test 自 widget_tester.dart 转发 test_api 的定义），
 /// 不是 `Duration` —— `defaultTestTimeout` 期望前者。
-final Timeout _testTimeout = Timeout(Duration(seconds: 30));
+final Timeout _testTimeout = const Timeout(Duration(seconds: 30));
 
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   // 必须在 testMain() 之前设置：该值在测试注册时被读取。
