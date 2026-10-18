@@ -47,10 +47,51 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   bool _isInitializing = false;
   Object? _initializationError;
 
+  /// 最短展示时长的定时器。
+  ///
+  /// 必须持有引用以便在 `dispose()` 中取消 —— 早先用的是
+  /// `await Future<void>.delayed(...)`：它内部创建的 Timer **没有取消入口**，
+  /// 页面在最短展示时长内被销毁时，定时器仍留在事件循环上。
+  ///
+  /// 这是真实缺陷（生产环境表现为白跑一次回调），但**不是**那批 widget 测试
+  /// 超时的原因：实测其超时发生在 `tearDown` 的 `Hive.close()`（`meta` box
+  /// 永不返回），与本定时器无关。此处仅修缺陷本身。
+  Timer? _minDisplayTimer;
+
   @override
   void initState() {
     super.initState();
     unawaited(_initializeData());
+  }
+
+  @override
+  void dispose() {
+    _minDisplayTimer?.cancel();
+    _minDisplayTimer = null;
+    super.dispose();
+  }
+
+  /// 可取消的最短展示延时。
+  ///
+  /// 返回 `false` 表示页面在延时期内被销毁，调用方必须据此提前退出
+  /// （不能继续走 `_goHome()`）。
+  Future<bool> _waitMinDisplay() {
+    final completer = Completer<bool>();
+    _minDisplayTimer?.cancel();
+    _minDisplayTimer = Timer(
+      const Duration(milliseconds: AppConstants.splashMinDurationMs),
+      () {
+        _minDisplayTimer = null;
+        if (mounted && !completer.isCompleted) completer.complete(true);
+      },
+    );
+    if (!mounted && !completer.isCompleted) {
+      // 已在销毁后进入（不应发生，但避免悬挂的 Future）。
+      _minDisplayTimer?.cancel();
+      _minDisplayTimer = null;
+      completer.complete(false);
+    }
+    return completer.future;
   }
 
   Future<void> _initializeData() async {
@@ -79,10 +120,11 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       }
 
       if (!didImport) {
-        // 未导入 → 短暂展示 Splash 后跳转
-        await Future<void>.delayed(
-          const Duration(milliseconds: AppConstants.splashMinDurationMs),
-        );
+        // 未导入 → 短暂展示 Splash 后跳转。
+        // 用可取消的 Timer（见 `_waitMinDisplay`），不使用
+        // `Future.delayed` —— 后者创建的定时器无法取消。
+        final completed = await _waitMinDisplay();
+        if (!completed) return; // 页面已销毁，不应再跳转
       }
 
       if (!mounted) return;
