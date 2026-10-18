@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:poemath/app.dart';
 import 'package:poemath/core/constants/app_constants.dart';
+import 'package:poemath/core/constants/hive_keys.dart';
+import 'package:poemath/core/services/hive_encryption_key_resolver.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/speech/legacy_speech_cleanup.dart';
@@ -22,8 +25,30 @@ typedef AppInitializer = Future<void> Function();
 
 Future<void> initializeCoreStorage() async {
   await Hive.initFlutter();
+
+  // Hive 的数据目录就是 `getApplicationDocumentsDirectory()`（hive_flutter
+  // 的 `initFlutter` 内部如此定位，且未传 subDir）。这里自己取一次，因为
+  // 加密迁移要按文件路径直接读写 `.hive` / `.lock`。
+  //
+  // 不用 `package:path` 的 `join`：它不是本项目的直接依赖，为一个固定拼接
+  // 引入依赖不划算（且 Hive 自身也用 '/' 拼接）。
+  final boxDir = (await getApplicationDocumentsDirectory()).path;
+
   registerHiveAdapters();
-  await HiveBoxes.init();
+
+  // 决定本次启动用哪把 cipher，并完成「明文 → 密文」的一次性迁移。
+  //
+  // `resolve` 的第一约束是绝不抛异常（密钥丢失时降级为空数据启动），
+  // 因此这里不包 try —— 包了反而会掩盖它内部已经兜底的降级路径。
+  final resolved = await HiveEncryptionKeyResolver.resolve(boxDir: boxDir);
+  final plaintext = HiveEncryptionKeyResolver.isPlaintext(resolved.cipher);
+
+  await HiveBoxes.init(cipher: plaintext ? null : resolved.cipher);
+
+  // 标记要写进已打开的 meta box，因此放在 init 之后。
+  // 明文模式（迁移失败退路）下不写：那时没有可用密钥状态可言。
+  if (!plaintext) await _markKeyRecoveredIfNeeded(resolved.status);
+
   await MathMistakeKeyMigration.run();
   await PoemIdentityMigration.run();
   try {
@@ -56,6 +81,26 @@ Future<void> initializeOptionalServices() async {
 SettingsRepository _settingsRepository() => _settingsRepositoryInstance;
 
 final SettingsRepository _settingsRepositoryInstance = SettingsRepository();
+
+/// 密钥丢失降级时在 meta 里留一个标记，供 UI 展示一次性提示。
+///
+/// 标记写在 Hive 打开**之后** —— 它本身要落进已加密的 meta box。
+/// 只在 `recoveredEmpty` 时写：`ok` 是正常路径，`newInstall` 是全新安装，
+/// 两者都不该打扰用户。
+///
+/// 写失败只记日志：提示是尽力而为的附加信息，不能反过来阻断启动。
+Future<void> _markKeyRecoveredIfNeeded(HiveKeyStatus status) async {
+  if (status != HiveKeyStatus.recoveredEmpty) return;
+  try {
+    await HiveBoxes.meta.put(HiveKeys.metaHiveKeyRecovered, true);
+  } on Object catch (error) {
+    AppLogger.e(
+      '写入「Hive 密钥丢失」标记失败，用户不会看到提示',
+      tag: 'Startup',
+      error: error,
+    );
+  }
+}
 
 /// 在 Flutter UI 启动后初始化核心存储，并为失败提供重试入口。
 class AppBootstrap extends StatefulWidget {

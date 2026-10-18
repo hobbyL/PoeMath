@@ -78,4 +78,14 @@ class HiveKeys {
 
   /// 错题 key 迁移完成标记
   static const String metaMistakeKeyMigrated = 'mistake_key_migrated';
+
+  /// 「Hive 加密密钥丢失，已重建空数据」标记。
+  ///
+  /// 由 `HiveEncryptionKeyResolver` 在降级路径写入，UI 读一次并展示
+  /// 一次性提示后清除。
+  ///
+  /// **只登记在 `HiveKeys`，不要登记进 `backup_service.dart` 的
+  /// `_settingsValueType`**：这是本机状态，不该随备份迁移 —— 在另一台
+  /// 设备上「上次密钥丢失过」是无关信息，甚至会让用户误以为新设备也丢了数据。
+  static const String metaHiveKeyRecovered = 'hive_key_recovered';
 }

@@ -160,9 +160,37 @@ class SecureCredentialStore {
   Future<String?> readParentProtection() =>
       _storage.read(key: 'parent_protection', iOptions: _parentIosOptions);
   Future<void> saveParentProtection(String record) => _storage.write(
-      key: 'parent_protection', value: record, iOptions: _parentIosOptions,);
+        key: 'parent_protection',
+        value: record,
+        iOptions: _parentIosOptions,
+      );
   Future<void> deleteParentProtection() =>
       _storage.delete(key: 'parent_protection', iOptions: _parentIosOptions);
+
+  // ============ 通用原始键值 ============
+  //
+  // 上面每个方法都绑定一种业务语义（WebDAV / ASR / TTS / 备份口令）。
+  // 需要存「与应用业务无关的密钥材料」时（如 Hive 加密密钥），不要往上面
+  // 那些方法里硬塞，会污染这一层的语义 —— 用下面这组按 key 直读直写的方法。
+  //
+  // `iOptions` 由调用方给：iOS 上不同用途的可访问性要求不同（例如后台要用的
+  // 密钥需 `first_unlock_this_device`，否则设备重启后未解锁时读不到）。
+
+  /// 按 key 读取原始字符串。
+  Future<String?> readRawSecret(String key, {IOSOptions? iOptions}) =>
+      _storage.read(key: key, iOptions: iOptions);
+
+  /// 按 key 写入原始字符串。
+  Future<void> writeRawSecret(
+    String key,
+    String value, {
+    IOSOptions? iOptions,
+  }) =>
+      _storage.write(key: key, value: value, iOptions: iOptions);
+
+  /// 按 key 删除。
+  Future<void> deleteRawSecret(String key, {IOSOptions? iOptions}) =>
+      _storage.delete(key: key, iOptions: iOptions);
 
   // ============ 内部 ============
 
