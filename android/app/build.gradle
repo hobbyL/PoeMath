@@ -117,6 +117,14 @@ android {
             if (hasReleaseSigningConfig) {
                 signingConfig = signingConfigs.release
             }
+            // 压缩 + 混淆：release DEX 的类名与符号不再可读，抬高逆向与定向
+            // 改造（改 latest.json 域名、改 MethodChannel 名）的成本。
+            // shrinkResources 依赖 minifyEnabled，两者必须同时开启。
+            // keep 规则见 android/app/proguard-rules.pro（每条均注明保留理由）。
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"),
+                    "proguard-rules.pro"
         }
     }
 }

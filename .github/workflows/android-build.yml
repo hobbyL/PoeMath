@@ -108,7 +108,22 @@ jobs:
             --target-platform=android-arm64 \
             --build-name=${{ steps.version.outputs.version_name }} \
             --build-number=${{ steps.version.outputs.version_code }} \
+            --obfuscate \
+            --split-debug-info=build/symbols \
             --dart-define=UPDATE_CHECK_URL="${UPDATE_CHECK_URL:-}"
+
+      # 混淆符号表必须归档：release 堆栈经 --obfuscate 后只剩 a.b.c，
+      # 没有对应 tag 的 symbols 产物就无法还原本地诊断缓冲里的堆栈
+      # （见问题 5 的环形缓冲区与 logging-guidelines.md 的还原链路）。
+      # if-no-files-found: error 是刻意的 —— 宁可让构建失败，也不要静默
+      # 产出一个线上永远不可调试的版本。
+      - name: Archive obfuscation symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: symbols-${{ steps.version.outputs.tag }}
+          path: build/symbols
+          if-no-files-found: error
+          retention-days: 90
 
       # -------- 准备发布资产 --------
       - name: Prepare release assets
