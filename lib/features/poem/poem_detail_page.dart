@@ -369,266 +369,366 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     final famousLinesText = poem.famousLines.join('。');
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(poem.title),
-        actions: [
-          // 拼音显隐切换
-          if (poem.pinyin.isNotEmpty)
-            IconButton(
-              icon: Icon(
-                pinyinVisible ? Icons.text_fields : Icons.text_fields_outlined,
-                color: pinyinVisible ? theme.colorScheme.primary : null,
+      // 本页不用 AppBar：顶部原来只放诗题 + 拼音/收藏两个按钮，占掉整条
+      // 高度。改为悬浮条 —— 左返回、中间诗题+作者、右拼音+收藏，与原来
+      // AppBar 的排布一致但不再占独立一行，正文因此多出一屏空间。
+      //
+      // `SafeArea` 负责状态栏避让 —— 原 AppBar 自己处理了这个，去掉后
+      // 必须显式包上，否则悬浮按钮与正文都会顶到状态栏下面。
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: Stack(
+          children: [
+            AnimatedPageBody(
+              // 顶部留出悬浮条的高度：它是「返回 + 诗题/作者 + 拼音/收藏」
+              // 两行文字加图标按钮，比单行按钮条高，正文不能被它压住。
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.lg,
+                SpacingTokens.lg + SpacingTokens.xl + SpacingTokens.md,
+                SpacingTokens.lg,
+                SpacingTokens.lg,
               ),
-              tooltip: pinyinVisible ? '隐藏拼音' : '显示拼音',
-              onPressed: _togglePinyin,
-            ),
-          // 收藏按钮（带弹跳动画）
-          AnimatedFavoriteButton(
-            isFavorite: isFav,
-            onToggle: () async {
-              final repo = ref.read(poemFavoriteRepoProvider);
-              await repo.toggle(widget.poemId);
-              ref.invalidate(isFavoriteProvider(widget.poemId));
-            },
-          ),
-        ],
-      ),
-      // 遮罩只覆盖内容区（不遮挡底部操作栏与 AppBar 返回）。
-      body: Stack(
-        children: [
-          AnimatedPageBody(
-            padding: const EdgeInsets.all(SpacingTokens.lg),
-            children: [
-              // 标题区
-              Center(
-                child: Column(
-                  children: [
-                    Text(
-                      poem.title,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+              children: [
+                const SizedBox(height: SpacingTokens.sm),
+
+                // 正文（整块可点击朗读，逐行显示，朗读时当前行高亮）
+                _buildSection(
+                  context,
+                  onTap: () => _onTapSection(
+                    (section: _sectionContent, playText: poem.content),
+                  ),
+                  child: Center(
+                    child: _buildContentLines(poem, theme),
+                  ),
+                ),
+
+                // 拼音（根据开关控制显隐，不折叠）
+                if (poem.pinyin.isNotEmpty && pinyinVisible) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildLabeledSection(context, '拼音', poem.pinyin),
+                ],
+
+                // === 折叠区块 ===
+
+                // 译文
+                if (poem.translation.isNotEmpty) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildCollapsibleSection(
+                    context,
+                    icon: Icons.translate,
+                    title: '译文',
+                    playTarget: (
+                      section: _sectionTranslation,
+                      playText: poem.translation,
                     ),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text(
-                      '〔${poem.dynasty}〕${poem.author}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                    child: Text(
+                      poem.translation,
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: SpacingTokens.lg),
+                  ),
+                ],
 
-              // 正文（整块可点击朗读，逐行显示，朗读时当前行高亮）
-              _buildSection(
-                context,
-                onTap: () => _onTapSection(
-                  (section: _sectionContent, playText: poem.content),
-                ),
-                child: Center(
-                  child: _buildContentLines(poem, theme),
-                ),
-              ),
+                // 注释
+                if (poem.annotations.isNotEmpty) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildCollapsibleSection(
+                    context,
+                    icon: Icons.edit_note,
+                    title: '注释',
+                    playTarget: (
+                      section: _sectionAnnotations,
+                      playText: annotationsText,
+                    ),
+                    child: _buildAnnotationsList(context, poem),
+                  ),
+                ],
 
-              // 拼音（根据开关控制显隐，不折叠）
-              if (poem.pinyin.isNotEmpty && pinyinVisible) ...[
+                // 赏析
+                if (poem.appreciation.isNotEmpty) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildCollapsibleSection(
+                    context,
+                    icon: Icons.local_florist_outlined,
+                    title: '赏析',
+                    playTarget: (
+                      section: _sectionAppreciation,
+                      playText: poem.appreciation,
+                    ),
+                    child: Text(
+                      poem.appreciation,
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+                    ),
+                  ),
+                ],
+
+                // 背景
+                if (poem.background.isNotEmpty) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildCollapsibleSection(
+                    context,
+                    icon: Icons.history_edu_outlined,
+                    title: '创作背景',
+                    playTarget: (
+                      section: _sectionBackground,
+                      playText: poem.background,
+                    ),
+                    child: Text(
+                      poem.background,
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+                    ),
+                  ),
+                ],
+
+                // 名句
+                if (poem.famousLines.isNotEmpty) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildCollapsibleFamousLines(
+                    context,
+                    poem.famousLines,
+                    famousLinesText,
+                  ),
+                ],
+
+                // 作者简介
+                if (authorBio != null) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildCollapsibleSection(
+                    context,
+                    icon: Icons.person_outline,
+                    title: '作者简介',
+                    child: Text(
+                      authorBio,
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+                    ),
+                  ),
+                ],
+
+                // AI 讲解
                 const SizedBox(height: SpacingTokens.md),
-                _buildLabeledSection(context, '拼音', poem.pinyin),
-              ],
+                _buildAiExplainSection(context, poem),
 
-              // === 折叠区块 ===
-
-              // 译文
-              if (poem.translation.isNotEmpty) ...[
                 const SizedBox(height: SpacingTokens.md),
-                _buildCollapsibleSection(
-                  context,
-                  icon: Icons.translate,
-                  title: '译文',
-                  playTarget: (
-                    section: _sectionTranslation,
-                    playText: poem.translation,
-                  ),
-                  child: Text(
-                    poem.translation,
-                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
-                  ),
-                ),
-              ],
-
-              // 注释
-              if (poem.annotations.isNotEmpty) ...[
-                const SizedBox(height: SpacingTokens.md),
-                _buildCollapsibleSection(
-                  context,
-                  icon: Icons.edit_note,
-                  title: '注释',
-                  playTarget: (
-                    section: _sectionAnnotations,
-                    playText: annotationsText,
-                  ),
-                  child: _buildAnnotationsList(context, poem),
-                ),
-              ],
-
-              // 赏析
-              if (poem.appreciation.isNotEmpty) ...[
-                const SizedBox(height: SpacingTokens.md),
-                _buildCollapsibleSection(
-                  context,
-                  icon: Icons.local_florist_outlined,
-                  title: '赏析',
-                  playTarget: (
-                    section: _sectionAppreciation,
-                    playText: poem.appreciation,
-                  ),
-                  child: Text(
-                    poem.appreciation,
-                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+                AppTile(
+                  icon: Icons.history,
+                  iconColor: theme.colorScheme.primary,
+                  title: '练习结果与错句',
+                  subtitle: '回看原句、作答和差异，专项复练错句',
+                  onTap: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          PoemPracticeHistoryPage(poemId: widget.poemId),
+                    ),
                   ),
                 ),
-              ],
-
-              // 背景
-              if (poem.background.isNotEmpty) ...[
-                const SizedBox(height: SpacingTokens.md),
-                _buildCollapsibleSection(
-                  context,
-                  icon: Icons.history_edu_outlined,
-                  title: '创作背景',
-                  playTarget: (
-                    section: _sectionBackground,
-                    playText: poem.background,
-                  ),
-                  child: Text(
-                    poem.background,
-                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
-                  ),
-                ),
-              ],
-
-              // 名句
-              if (poem.famousLines.isNotEmpty) ...[
-                const SizedBox(height: SpacingTokens.md),
-                _buildCollapsibleFamousLines(
-                  context,
-                  poem.famousLines,
-                  famousLinesText,
-                ),
-              ],
-
-              // 作者简介
-              if (authorBio != null) ...[
-                const SizedBox(height: SpacingTokens.md),
-                _buildCollapsibleSection(
-                  context,
-                  icon: Icons.person_outline,
-                  title: '作者简介',
-                  child: Text(
-                    authorBio,
-                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
-                  ),
-                ),
-              ],
-
-              // AI 讲解
-              const SizedBox(height: SpacingTokens.md),
-              _buildAiExplainSection(context, poem),
-
-              const SizedBox(height: SpacingTokens.md),
-              AppTile(
-                icon: Icons.history,
-                iconColor: theme.colorScheme.primary,
-                title: '练习结果与错句',
-                subtitle: '回看原句、作答和差异，专项复练错句',
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        PoemPracticeHistoryPage(poemId: widget.poemId),
-                  ),
-                ),
-              ),
-              Builder(
-                builder: (context) {
-                  if (progress == null) return const SizedBox.shrink();
-                  final reviewRepo = ref.watch(reviewRepoProvider);
-                  final schedule = reviewRepo.get(widget.poemId);
-                  if (schedule == null || !schedule.isCompleted) {
-                    return const SizedBox.shrink();
-                  }
-                  final history =
-                      PoemReviewHistory.decode(schedule.historyJson);
-                  return AppTile(
-                    icon: Icons.restart_alt,
-                    iconColor: theme.colorScheme.tertiary,
-                    title: '开启新一轮复习',
-                    subtitle:
-                        '已完成五轮；保留历史，重新安排复习${history == null ? '' : '（历史 ${history.cycles.length + 1} 个周期）'}',
-                    onTap: () async {
-                      try {
-                        await reviewRepo.restartSchedule(widget.poemId);
-                        if (!mounted || !context.mounted) return;
-                        ref.invalidate(reviewRepoProvider);
-                        ref.invalidate(dueReviewCountProvider);
-                        setState(() {});
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('新复习周期已开启，今天即可开始')),
-                        );
-                      } on Object catch (error, stack) {
-                        AppLogger.e(
-                          '复习重开失败',
-                          tag: 'PoemDetail',
-                          error: error,
-                          stackTrace: stack,
-                        );
-                        if (context.mounted) {
+                Builder(
+                  builder: (context) {
+                    if (progress == null) return const SizedBox.shrink();
+                    final reviewRepo = ref.watch(reviewRepoProvider);
+                    final schedule = reviewRepo.get(widget.poemId);
+                    if (schedule == null || !schedule.isCompleted) {
+                      return const SizedBox.shrink();
+                    }
+                    final history =
+                        PoemReviewHistory.decode(schedule.historyJson);
+                    return AppTile(
+                      icon: Icons.restart_alt,
+                      iconColor: theme.colorScheme.tertiary,
+                      title: '开启新一轮复习',
+                      subtitle:
+                          '已完成五轮；保留历史，重新安排复习${history == null ? '' : '（历史 ${history.cycles.length + 1} 个周期）'}',
+                      onTap: () async {
+                        try {
+                          await reviewRepo.restartSchedule(widget.poemId);
+                          if (!mounted || !context.mounted) return;
+                          ref.invalidate(reviewRepoProvider);
+                          ref.invalidate(dueReviewCountProvider);
+                          setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('开启失败，请重试；历史记录已保留'),
-                            ),
+                            const SnackBar(content: Text('新复习周期已开启，今天即可开始')),
                           );
+                        } on Object catch (error, stack) {
+                          AppLogger.e(
+                            '复习重开失败',
+                            tag: 'PoemDetail',
+                            error: error,
+                            stackTrace: stack,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('开启失败，请重试；历史记录已保留'),
+                              ),
+                            );
+                          }
                         }
-                      }
-                    },
-                  );
-                },
-              ),
-              // 学习状态
-              if (progress != null) ...[
-                const SizedBox(height: SpacingTokens.md),
-                _buildProgressInfo(context, progress.studyCount),
+                      },
+                    );
+                  },
+                ),
+                // 学习状态
+                if (progress != null) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildProgressInfo(context, progress.studyCount),
+                ],
+                const SizedBox(height: SpacingTokens.xl),
               ],
-              const SizedBox(height: SpacingTokens.xl),
-            ],
-          ),
+            ),
 
-          // 合成中遮罩：模态层而非信息卡片，豁免 ColoredCard 规范。
-          if (_isPreparing)
-            Positioned.fill(
-              // 半透明 Container 在命中测试中拦截点击，天然阻止遮罩期重复触发。
-              child: Container(
-                color: theme.colorScheme.surface.withValues(alpha: 0.6),
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(),
-                    const SizedBox(height: SpacingTokens.md),
-                    // 遮罩文案区分语义：合成期「语音合成中…」、停止挂起期
-                    // 「正在停止…」（缺陷 7：停止窗口期显示合成文案误导）。
-                    Text(
-                      _isStopping ? '正在停止…' : '语音合成中…',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface,
+            // 合成中遮罩：模态层而非信息卡片，豁免 ColoredCard 规范。
+            if (_isPreparing)
+              Positioned.fill(
+                // 半透明 Container 在命中测试中拦截点击，天然阻止遮罩期重复触发。
+                child: Container(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.6),
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: SpacingTokens.md),
+                      // 遮罩文案区分语义：合成期「语音合成中…」、停止挂起期
+                      // 「正在停止…」（缺陷 7：停止窗口期显示合成文案误导）。
+                      Text(
+                        _isStopping ? '正在停止…' : '语音合成中…',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // ===== 悬浮操作条（原 AppBar 的三个按钮）=====
+            //
+            // 放在遮罩之后：合成中遮罩会盖住它们，避免遮罩期误触。
+            //
+            // 结构是「渐变底 → 按钮行」两层：
+            //
+            // - 渐变底（`IgnorePointer` 包住，不拦截点击）从屏幕底色过渡到
+            //   全透明。滚动时内容从按钮下方穿过，穿过途中被这层柔化淡出，
+            //   而不是生硬地贴着按钮边缘被裁断 —— 这是 Material 悬浮按钮
+            //   在可滚动页面上的常见处理。
+            // - 高度用 `xl + lg`：按钮行本身约 `xl`，再往下 `lg` 的过渡距离，
+            //   让淡出是渐进的而非一条硬边。
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              // `IgnorePointer` 必须包在渐变层上：它是一个横跨全宽的实心
+              // 矩形，不包的话会挡住下方内容的点击（正文点击朗读）。
+              // 按钮行单独在外，照常接收点击。
+              child: IgnorePointer(
+                child: Container(
+                  height: MediaQuery.paddingOf(context).top +
+                      SpacingTokens.xl +
+                      SpacingTokens.lg,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        // 顶部先铺一段纯底色（覆盖状态栏区域，让按钮与状态
+                        // 栏之间没有内容透出），再向下淡出到透明。
+                        theme.colorScheme.surface,
+                        theme.colorScheme.surface,
+                        theme.colorScheme.surface.withValues(alpha: 0),
+                      ],
+                      stops: const [0.0, 0.55, 1.0],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-        ],
+            // 标题层独立铺满整宽并居中，**不参与**按钮的 Row 布局。
+            //
+            // 若把标题放进按钮 Row 的中间格（Expanded），它会以「左右按钮
+            // 之间的剩余空间」为基准居中 —— 而左 1 个返回、右 2 个按钮，
+            // 剩余空间本身偏左，标题就跟着偏左。铺满整宽后居中才是相对
+            // **屏幕**居中。
+            //
+            // 与按钮层同高，因此标题较长时也不会被两侧按钮遮挡；
+            // `IgnorePointer` 让点击穿透到下方内容。
+            Positioned(
+              top: SpacingTokens.xs,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: SizedBox(
+                  height: kMinInteractiveDimension,
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            poem.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Flexible(
+                          child: Text(
+                            '〔${poem.dynasty}〕${poem.author}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: SpacingTokens.xs,
+              left: SpacingTokens.xs,
+              right: SpacingTokens.xs,
+              child: Row(
+                children: [
+                  // 返回：原 AppBar 的自动返回按钮。
+                  IconButton(
+                    tooltip: '返回',
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(Icons.arrow_back),
+                  ),
+                  const Spacer(),
+                  // 拼音显隐切换（无拼音的诗词不显示）。
+                  if (poem.pinyin.isNotEmpty)
+                    IconButton(
+                      icon: Icon(
+                        pinyinVisible
+                            ? Icons.text_fields
+                            : Icons.text_fields_outlined,
+                        color: pinyinVisible ? theme.colorScheme.primary : null,
+                      ),
+                      tooltip: pinyinVisible ? '隐藏拼音' : '显示拼音',
+                      onPressed: _togglePinyin,
+                    ),
+                  // 收藏按钮（带弹跳动画）。
+                  AnimatedFavoriteButton(
+                    isFavorite: isFav,
+                    onToggle: () async {
+                      final repo = ref.read(poemFavoriteRepoProvider);
+                      await repo.toggle(widget.poemId);
+                      ref.invalidate(isFavoriteProvider(widget.poemId));
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
