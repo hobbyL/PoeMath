@@ -193,8 +193,16 @@ void main() {
         ),
       ],
     );
+    // 记录 provider 被读取的次数：`_open` 收尾会 `invalidate` 它，
+    // 失效后的重读可作为「`_open` 整条异步链已跑完」的观测点。
+    var planReads = 0;
     final container = ProviderContainer(
-      overrides: [todayPlanProvider.overrideWith((ref) async => plan)],
+      overrides: [
+        todayPlanProvider.overrideWith((ref) async {
+          planReads++;
+          return plan;
+        }),
+      ],
     );
     addTearDown(container.dispose);
     final router = GoRouter(
@@ -237,6 +245,24 @@ void main() {
       await tester.tap(find.text('提交通过'));
       await settled;
     });
+    await tester.pumpAndSettle();
+    // `_open` 在结算之后还要跑 `checkAchievements`（Hive 写入），最后
+    // `ref.invalidate(todayPlanProvider)` 收尾。不等它跑完，这段续体可能
+    // 在 tearDown 关闭 Hive 之后才恢复 —— CI 上因此报
+    // 「Box has already been closed」，并对已销毁的 Scaffold 弹 SnackBar。
+    // provider 失效后的重读就是「整条链已到收尾」的观测点。
+    final readsBefore = planReads;
+    for (var i = 0; i < 100 && planReads == readsBefore; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(planReads, greaterThan(readsBefore), reason: '_open 未走到收尾的 invalidate');
+    // 首次掌握会解锁成就，`_open` 随即弹出自动关闭的庆祝弹窗
+    // （内部是 1.5s 的 `Future.delayed`）。推过去，否则测试结束时
+    // 会留下 pending timer。
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
     expect(ReviewRepository().completedReviewCount('poem'), 1);
     expect(ReviewRepository().get('poem')?.isCompleted, isTrue);
