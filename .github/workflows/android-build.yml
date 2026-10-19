@@ -252,6 +252,64 @@ jobs:
           (update_dir / "latest.json").write_text(content, encoding="utf-8")
           PY
 
+          # 生成 history.json：最近 20 个版本的版本号 + 更新说明。
+          #
+          # 数据源是 **git tag + commit 历史**，不读 GitHub Release body ——
+          # 早期版本的 Release body 多为空（实测 v0.0.1~v0.0.7 均无内容），
+          # 而 `tools/release_notes.py <tag>` 能直接从 commit 重新生成，
+          # 质量更稳定且不依赖发布页是否被人工编辑过。
+          #
+          # 注意 fetch-depth: 0（本 workflow 顶部已设）：浅克隆拿不到 tag 历史。
+          HISTORY_LIMIT=20 python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          limit = int(os.environ.get("HISTORY_LIMIT", "20"))
+          VERSION = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+
+          def git(*args):
+              return subprocess.run(
+                  ["git", *args], capture_output=True, text=True, check=True,
+              ).stdout
+
+          # versionCode 与 CI 的 tag→code 规则保持一致：major*10000 +
+          # minor*100 + patch（0.0.11 → 11）。
+          tags = []
+          for tag in git("tag", "--list", "v*").splitlines():
+              tag = tag.strip()
+              m = VERSION.match(tag)
+              if not m:
+                  continue
+              major, minor, patch = (int(g) for g in m.groups())
+              tags.append((major * 10000 + minor * 100 + patch, tag, major, minor, patch))
+          tags.sort(reverse=True)
+
+          entries = []
+          for code, tag, major, minor, patch in tags[:limit]:
+              notes = subprocess.run(
+                  ["python3", "tools/release_notes.py", tag],
+                  capture_output=True, text=True,
+              ).stdout.strip()
+              entries.append({
+                  "versionName": f"{major}.{minor}.{patch}",
+                  "versionCode": code,
+                  "tagName": tag,
+                  "notes": notes,
+              })
+
+          # 与客户端 `UpdateClient.fetchHistory` 的解析契约：`{versions: [...]}`
+          # 形态，保持降序。
+          out = Path("release/update/history.json")
+          out.write_text(
+              json.dumps({"versions": entries}, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(f"→ history.json: {len(entries)} 个版本")
+          PY
+
           # 配置 ossutil
           oss_config="${RUNNER_TEMP}/ossutilconfig"
           ossutil config \
@@ -274,6 +332,10 @@ jobs:
           # 更新 latest.json（短缓存）
           ossutil cp release/update/latest.json "${bucket_uri}/${oss_prefix}/latest.json" -c "${oss_config}" -f --retry-times 5
           ossutil set-meta "${bucket_uri}/${oss_prefix}/latest.json" "Cache-Control:no-cache,max-age=60#Content-Type:application/json;charset=utf-8" -c "${oss_config}" -f
+
+          # 更新 history.json（短缓存，与 latest 同步刷新）
+          ossutil cp release/update/history.json "${bucket_uri}/${oss_prefix}/history.json" -c "${oss_config}" -f --retry-times 5
+          ossutil set-meta "${bucket_uri}/${oss_prefix}/history.json" "Cache-Control:no-cache,max-age=60#Content-Type:application/json;charset=utf-8" -c "${oss_config}" -f
 
           echo "✅ Published app update: ${download_base}/${oss_prefix}/latest.json"
           echo "✅ APK download URL: ${apk_url}"

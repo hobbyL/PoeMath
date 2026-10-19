@@ -98,6 +98,35 @@ bool _boolOf(Object? value) {
   return false;
 }
 
+/// `history.json` 中的一条历史版本记录。
+///
+/// 由发版 CI 从 git tag + commit 历史生成（见 `.github/workflows/
+/// android-build.yml`），只含展示所需的最小字段。
+class AppVersionHistoryEntry {
+  const AppVersionHistoryEntry({
+    required this.versionName,
+    required this.versionCode,
+    required this.tagName,
+    required this.notes,
+  });
+
+  final String versionName;
+  final int versionCode;
+  final String tagName;
+
+  /// 该版本面向用户的中文说明；可能为空（该版无面向用户的变更）。
+  final String notes;
+
+  factory AppVersionHistoryEntry.fromJson(Map<String, dynamic> json) {
+    return AppVersionHistoryEntry(
+      versionName: _stringOf(json['versionName']),
+      versionCode: _intOf(json['versionCode']),
+      tagName: _stringOf(json['tagName']),
+      notes: _stringOf(json['notes']),
+    );
+  }
+}
+
 /// APK 元数据与远端/本地版本三方一致性校验；返回 null 表示通过。
 String? apkCompatibilityError({
   required AppUpdateInfo latest,

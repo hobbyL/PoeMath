@@ -177,6 +177,59 @@ class UpdateClient {
     );
   }
 
+  /// 拉取版本历史（`history.json`，与 `latest.json` 同目录）。
+  ///
+  /// 返回**已按 versionCode 降序**的列表（最新在前）。任何失败都返回空
+  /// 列表而非抛出 —— 版本历史是**附加信息**，展示不了不该拖垮「检查更新」
+  /// 这条主链路（用户真正关心的是有没有新版本、能不能装）。
+  Future<List<AppVersionHistoryEntry>> fetchHistory() async {
+    // 与 fetchLatest 同源，未配置/非安全地址在此同样不可用。
+    final Uri uri;
+    try {
+      final base = _updateUri();
+      uri = base.replace(
+        pathSegments: [
+          ...base.pathSegments.take(base.pathSegments.length - 1),
+          'history.json',
+        ],
+      );
+    } on Object {
+      return const [];
+    }
+    try {
+      final abortTrigger = Future<void>.delayed(_requestTimeout);
+      final request =
+          http.AbortableRequest('GET', uri, abortTrigger: abortTrigger)
+            ..headers['Accept'] = 'application/json';
+      final streamed = await _client.send(request).timeout(_requestTimeout);
+      final response =
+          await http.Response.fromStream(streamed).timeout(_requestTimeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return const [];
+      }
+      final payload = jsonDecode(response.body);
+      // 接受「裸数组」与「{versions: [...]}」两种形态：前者直观，后者留了
+      // 加字段（如 generatedAt）的余地，两种都不必改客户端。
+      final raw = switch (payload) {
+        final List<dynamic> list => list,
+        final Map<String, dynamic> map when map['versions'] is List =>
+          map['versions'] as List<dynamic>,
+        _ => const <dynamic>[],
+      };
+      final entries = <AppVersionHistoryEntry>[];
+      for (final item in raw) {
+        if (item is! Map<String, dynamic>) continue;
+        final entry = AppVersionHistoryEntry.fromJson(item);
+        if (entry.versionName.isEmpty) continue;
+        entries.add(entry);
+      }
+      entries.sort((a, b) => b.versionCode.compareTo(a.versionCode));
+      return List.unmodifiable(entries);
+    } on Object {
+      return const [];
+    }
+  }
+
   /// 下载 APK 文件到临时目录。
   Future<File> downloadApk(
     AppUpdateInfo update, {

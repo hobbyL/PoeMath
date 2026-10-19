@@ -39,10 +39,23 @@ class _UpdatePageState extends State<UpdatePage> {
   int _requestToken = 0;
   String _message = '正在检查最新版本。';
 
+  /// 版本历史（最近若干版）。拉取失败为空列表 —— 附加信息不影响主链路。
+  List<AppVersionHistoryEntry> _history = const [];
+
+  /// 「查看全部」展开态：默认只显示最近若干条，避免历史长时淹没主内容。
+  bool _historyExpanded = false;
+
   @override
   void initState() {
     super.initState();
     unawaited(_checkForUpdates());
+    unawaited(_loadHistory());
+  }
+
+  Future<void> _loadHistory() async {
+    final entries = await widget.updateClient.fetchHistory();
+    if (!mounted) return;
+    setState(() => _history = entries);
   }
 
   @override
@@ -63,6 +76,10 @@ class _UpdatePageState extends State<UpdatePage> {
             if ((_latest?.notes ?? '').isNotEmpty) ...[
               const SizedBox(height: SpacingTokens.sm),
               _buildNotesCard(context),
+            ],
+            if (_history.isNotEmpty) ...[
+              const SizedBox(height: SpacingTokens.sm),
+              _buildHistoryCard(context),
             ],
           ],
         ),
@@ -159,6 +176,109 @@ class _UpdatePageState extends State<UpdatePage> {
           ),
         ],
       ),
+    );
+  }
+
+  // ---------- 版本历史卡片 ----------
+
+  /// 折叠态显示的条数；超出时给「查看全部」。
+  static const int _historyCollapsedCount = 3;
+
+  Widget _buildHistoryCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final total = _history.length;
+    final collapsed = total > _historyCollapsedCount;
+    final shown = !collapsed || _historyExpanded
+        ? _history
+        : _history.take(_historyCollapsedCount).toList();
+
+    return ColoredCard(
+      color: theme.colorScheme.tertiary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '版本历史',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          for (final (index, entry) in shown.indexed) ...[
+            if (index > 0) const SizedBox(height: SpacingTokens.md),
+            _buildHistoryEntry(context, entry),
+          ],
+          // 收起态另有内容时才给展开入口，避免多一个点了没变化的按钮。
+          if (collapsed) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            Align(
+              alignment: Alignment.center,
+              child: TextButton(
+                onPressed: () =>
+                    setState(() => _historyExpanded = !_historyExpanded),
+                child: Text(
+                  _historyExpanded ? '收起' : '查看全部 $total 个版本',
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryEntry(
+    BuildContext context,
+    AppVersionHistoryEntry entry,
+  ) {
+    final theme = Theme.of(context);
+    final notes = entry.notes.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'V${entry.versionName}',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.tertiary,
+                ),
+              ),
+            ),
+            // 当前安装的版本标出来，用户能一眼定位「我在哪」。
+            if (entry.versionName == _current?.versionName)
+              Padding(
+                padding: const EdgeInsets.only(right: SpacingTokens.xs),
+                child: Text(
+                  '当前版本',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        if (notes.isNotEmpty) ...[
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            notes,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+        ] else ...[
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            '本版无面向用户的变更。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
