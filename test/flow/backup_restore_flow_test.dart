@@ -203,8 +203,11 @@ void main() {
         jsonDecode(await backupService.exportToJson()) as Map<String, dynamic>;
     duplicateBackup['learningActivities'] = [activity, activity];
 
-    expect(
-      () => backupService.restoreFromJson(jsonEncode(duplicateBackup)),
+    // `restoreFromJson` 是 async，永远不同步抛 —— 必须用 `expectLater`
+    // await 这个 Future。原写法 `expect(() => ..., throwsA(...))` 是同步
+    // 匹配，拿到 Future 后与 matcher 比较必然失败（Future 不是异常）。
+    await expectLater(
+      backupService.restoreFromJson(jsonEncode(duplicateBackup)),
       throwsA(isA<FormatException>()),
     );
 
@@ -212,8 +215,8 @@ void main() {
     unknownTypeBackup['learningActivities'] = [
       {...activity, 'activityType': 'unknown'},
     ];
-    expect(
-      () => backupService.restoreFromJson(jsonEncode(unknownTypeBackup)),
+    await expectLater(
+      backupService.restoreFromJson(jsonEncode(unknownTypeBackup)),
       throwsA(isA<FormatException>()),
     );
   });
