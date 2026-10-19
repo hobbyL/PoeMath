@@ -24,12 +24,6 @@ import 'package:poemath/features/poem/poem_explain/poem_explain_controller.dart'
 import 'package:poemath/features/poem/poem_explain/poem_explain_models.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
-/// 拼音显隐状态 Provider（读取 SettingsRepository 的持久化值）。
-final _pinyinVisibleProvider = StateProvider<bool>((ref) {
-  final settings = ref.watch(settingsRepositoryProvider);
-  return settings.pinyinVisible;
-});
-
 /// 可播放区域目标：区域编号 + 播放文本。
 ///
 /// 以单一 record 参数在折叠区构建与点击入口之间传递（R5），
@@ -81,13 +75,16 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   /// 该回调 / 该次 await 是否仍属于当前持有页面播放态的会话。
   bool _isCurrentSession(int sessionId) => sessionId == _activeSessionId;
 
-  /// 区域编号常量：正文为 0，折叠区 1..5。
+  /// 区域编号常量：正文为 0，折叠区 1..6。
   static const int _sectionContent = 0;
   static const int _sectionTranslation = 1;
   static const int _sectionAnnotations = 2;
   static const int _sectionAppreciation = 3;
   static const int _sectionBackground = 4;
   static const int _sectionFamousLines = 5;
+
+  /// 拼音区（可朗读，与其余折叠区同构）。
+  static const int _sectionPinyin = 7;
 
   /// AI 讲解区（可朗读，复用同一套朗读会话纪律）。
   static const int _sectionAiExplain = 6;
@@ -326,14 +323,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     }
   }
 
-  Future<void> _togglePinyin() async {
-    final current = ref.read(_pinyinVisibleProvider);
-    final newValue = !current;
-    ref.read(_pinyinVisibleProvider.notifier).state = newValue;
-    final settings = ref.read(settingsRepositoryProvider);
-    await settings.setPinyinVisible(newValue);
-  }
-
   Future<void> _sharePoem(Poem poem) async {
     final text = '《${poem.title}》\n'
         '${poem.author}·${poem.dynasty}\n'
@@ -349,7 +338,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     final poem = ref.watch(poemByIdProvider(widget.poemId));
     final isFav = ref.watch(isFavoriteProvider(widget.poemId));
     final progress = ref.watch(poemProgressProvider(widget.poemId));
-    final pinyinVisible = ref.watch(_pinyinVisibleProvider);
     final theme = Theme.of(context);
 
     if (poem == null) {
@@ -403,10 +391,25 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   ),
                 ),
 
-                // 拼音（根据开关控制显隐，不折叠）
-                if (poem.pinyin.isNotEmpty && pinyinVisible) ...[
+                // 拼音：与其余折叠区同构（默认收起、点击展开、展开后可
+                // 点击朗读）。原先靠右上角开关控制显隐且不可折叠，与译文/
+                // 注释等区块的处理方式不一致；改为常驻卡片后，开关本身也
+                // 没有存在意义了。
+                if (poem.pinyin.isNotEmpty) ...[
                   const SizedBox(height: SpacingTokens.md),
-                  _buildLabeledSection(context, '拼音', poem.pinyin),
+                  _buildCollapsibleSection(
+                    context,
+                    icon: Icons.abc,
+                    title: '拼音',
+                    playTarget: (
+                      section: _sectionPinyin,
+                      playText: poem.pinyin,
+                    ),
+                    child: Text(
+                      poem.pinyin,
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+                    ),
+                  ),
                 ],
 
                 // === 折叠区块 ===
@@ -703,18 +706,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                     icon: const Icon(Icons.arrow_back),
                   ),
                   const Spacer(),
-                  // 拼音显隐切换（无拼音的诗词不显示）。
-                  if (poem.pinyin.isNotEmpty)
-                    IconButton(
-                      icon: Icon(
-                        pinyinVisible
-                            ? Icons.text_fields
-                            : Icons.text_fields_outlined,
-                        color: pinyinVisible ? theme.colorScheme.primary : null,
-                      ),
-                      tooltip: pinyinVisible ? '隐藏拼音' : '显示拼音',
-                      onPressed: _togglePinyin,
-                    ),
                   // 收藏按钮（带弹跳动画）。
                   AnimatedFavoriteButton(
                     isFavorite: isFav,
@@ -827,34 +818,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       width: double.infinity,
       onTap: onTap,
       child: child,
-    );
-  }
-
-  Widget _buildLabeledSection(
-    BuildContext context,
-    String label,
-    String content,
-  ) {
-    final theme = Theme.of(context);
-    return _buildSection(
-      context,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          Text(
-            content,
-            style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
-          ),
-        ],
-      ),
     );
   }
 

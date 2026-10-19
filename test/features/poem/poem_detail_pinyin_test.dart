@@ -1,7 +1,17 @@
 // test/features/poem/poem_detail_pinyin_test.dart
 //
-// R5 拼音单一事实源回归测试：详情页拼音开关须同步写回 settings
-// （Hive `pinyin_visible`），与设置页/备份白名单的值保持一致。
+// 诗词详情页拼音区：常驻折叠卡片 —— 默认收起、点击展开、展开后点击内容
+// 可朗读。
+//
+// ── 契约变更说明（2026-10-19）────────────────────────────────────────
+//
+// 原先拼音由右上角开关控制**显隐**（状态写回 settings 的 `pinyin_visible`）
+// 且不可折叠，与译文/注释/赏析等区块的处理方式不一致。现改为与它们同构的
+// 折叠卡片，开关本身随之移除。
+//
+// `pinyin_visible` 这个 settings key **仍然存在**：设置页的「显示拼音」
+// 开关仍在读写它（`settings_page_test.dart` 覆盖写回路径），它也仍在备份
+// 白名单里。本文件因此不再断言详情页写回它 —— 这是契约变更，不是覆盖丢失。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +19,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:poemath/core/services/tts_service.dart';
-import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/poem_detail_page.dart';
@@ -32,6 +41,33 @@ final _poem = Poem(
   grade: 1,
 );
 
+Future<_MockTtsService> _pumpPage(WidgetTester tester) async {
+  final tts = _MockTtsService();
+  when(() => tts.stop()).thenAnswer((_) async {});
+  // 页面在发起朗读后同步读 `currentSessionId`；mock 默认返回 null 会在
+  // `as int` 处抛 `type 'Null' is not a subtype of type 'int'`。
+  when(() => tts.currentSessionId).thenReturn(1);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        poemByIdProvider(_poemId).overrideWith((ref) => _poem),
+        ttsServiceProvider.overrideWithValue(tts),
+      ],
+      child: const MaterialApp(home: PoemDetailPage(poemId: _poemId)),
+    ),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+  return tts;
+}
+
+/// 卸载页面并放掉残余定时器（TTS/入场动画），否则框架会以
+/// 「A Timer is still pending even after the widget tree was disposed」判失败。
+Future<void> _unmount(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(seconds: 5));
+}
+
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
@@ -41,45 +77,49 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  testWidgets('详情页拼音开关写回 settings 的 pinyin_visible', (tester) async {
-    final tts = _MockTtsService();
-    when(() => tts.stop()).thenAnswer((_) async {});
+  testWidgets('拼音卡片常驻且默认收起', (tester) async {
+    await _pumpPage(tester);
 
-    // 预置关闭态（默认 getter 为 true，需要从关闭开始才能观察写回）。
-    await tester.runAsync(() async {
-      await HiveBoxes.settings.put('pinyin_visible', false);
-    });
+    // 卡片标题常驻。
+    expect(find.text('拼音'), findsOneWidget);
+    // 默认收起：拼音内容不可见。
+    expect(find.text('chuáng qián míng yuè guāng'), findsNothing);
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          poemByIdProvider(_poemId).overrideWith((ref) => _poem),
-          ttsServiceProvider.overrideWithValue(tts),
-        ],
-        child: const MaterialApp(
-          home: PoemDetailPage(poemId: _poemId),
-        ),
+    await _unmount(tester);
+  });
+
+  testWidgets('点击拼音卡片展开后可见内容', (tester) async {
+    await _pumpPage(tester);
+
+    await tester.tap(find.text('拼音'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('chuáng qián míng yuè guāng'), findsOneWidget);
+
+    await _unmount(tester);
+  });
+
+  testWidgets('展开后点击内容触发拼音朗读', (tester) async {
+    final tts = await _pumpPage(tester);
+    // 非正文区走 `speakSentences`（正文才走 `speakLines`）。
+    when(
+      () => tts.speakSentences(any(), onReady: any(named: 'onReady')),
+    ).thenAnswer((_) async {});
+
+    await tester.tap(find.text('拼音'));
+    await tester.pumpAndSettle();
+
+    // 点击展开后的内容区（不是标题行）应触发朗读。
+    await tester.tap(find.text('chuáng qián míng yuè guāng'));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    verify(
+      () => tts.speakSentences(
+        'chuáng qián míng yuè guāng',
+        onReady: any(named: 'onReady'),
       ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    ).called(1);
 
-    expect(find.byTooltip('显示拼音'), findsOneWidget);
-    expect(HiveBoxes.settings.get('pinyin_visible'), isFalse);
-
-    // Hive 写在 FakeAsync 中不会完成，走 runAsync 真实时序（模式 2）。
-    await tester.runAsync(() async {
-      await tester.tap(find.byTooltip('显示拼音'));
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-    });
-    await tester.pump();
-
-    // UI 反映新状态，且持久化值同步写回（与设置页/备份白名单同源）。
-    expect(find.byTooltip('隐藏拼音'), findsOneWidget);
-    expect(HiveBoxes.settings.get('pinyin_visible'), isTrue);
-
-    // 卸载页面并放掉残余定时器（TTS/动画），避免 timersPending 断言。
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump(const Duration(seconds: 5));
+    await _unmount(tester);
   });
 }
