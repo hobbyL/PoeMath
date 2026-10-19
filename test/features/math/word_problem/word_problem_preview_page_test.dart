@@ -285,7 +285,24 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('确认入库 1 题'));
-    await tester.pump();
+    // `_confirm` 的第一站是 `await ensureParentAccess(context)` →
+    // `access.initialize()`，之后才轮到 addAll 抛错并弹提示。
+    //
+    // `ParentAccessService` 是跨用例共享的全局单例，`initialize()` 串在
+    // `_serial(...)` 队列上。前序用例（如上面那条）用 `runAsync` 发起的
+    // 确认流程把后续挂在了**真实**时钟的定时器上，`tester.pump()` 的
+    // fake 时钟推进对它无效：只有真实时间流逝才能让 `previous` 完成，
+    // 本用例的 `_confirm` 才排得到。
+    //
+    // 因此等待必须发生在真实异步区。不用 `pumpAndSettle`（页面有常驻
+    // 动画，会超时），也不用固定次数 pump（队列深度随执行顺序变化）。
+    for (var i = 0; i < 60; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump();
+      if (find.byType(SnackBar).evaluate().isNotEmpty) break;
+    }
 
     // 失败提示出现，异常被 _confirm 捕获（不成为 unhandled exception）
     expect(find.text('入库失败，请重试'), findsOneWidget);
