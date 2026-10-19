@@ -60,10 +60,6 @@ class _UpdatePageState extends State<UpdatePage> {
           padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
             _buildStatusCard(context),
-            if (_current != null || _latest != null) ...[
-              const SizedBox(height: SpacingTokens.sm),
-              _buildVersionCard(context),
-            ],
             if ((_latest?.notes ?? '').isNotEmpty) ...[
               const SizedBox(height: SpacingTokens.sm),
               _buildNotesCard(context),
@@ -132,44 +128,6 @@ class _UpdatePageState extends State<UpdatePage> {
     );
   }
 
-  // ---------- 版本信息卡片 ----------
-
-  Widget _buildVersionCard(BuildContext context) {
-    final theme = Theme.of(context);
-    final current = _current;
-    final latest = _latest;
-
-    return ColoredCard(
-      color: theme.colorScheme.primary,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '版本信息',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          if (current != null)
-            _InfoRow(
-              label: '当前版本',
-              value: '${current.versionName}+${current.versionCode}',
-            ),
-          if (latest != null) ...[
-            _InfoRow(
-              label: '最新版本',
-              value: '${latest.versionName}+${latest.versionCode}',
-            ),
-            _InfoRow(label: '安装包大小', value: _formatBytes(latest.apkSize)),
-            if (latest.channel.isNotEmpty)
-              _InfoRow(label: '发布通道', value: latest.channel),
-          ],
-        ],
-      ),
-    );
-  }
-
   // ---------- 更新说明卡片 ----------
 
   Widget _buildNotesCard(BuildContext context) {
@@ -180,8 +138,13 @@ class _UpdatePageState extends State<UpdatePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 标题带版本区间（如「更新内容 V0.0.10 → V0.0.11」）。
+          //
+          // 原先版本号单独占一张「版本信息」卡（当前/最新/包大小/通道），
+          // 信息重复且占据首屏。这里只保留最必要的一段：用户在「更新内容」
+          // 标题处就能看到从哪个版本变到哪个版本。
           Text(
-            '更新内容',
+            _notesTitle,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -490,6 +453,18 @@ class _UpdatePageState extends State<UpdatePage> {
 
   // ---------- 辅助方法 ----------
 
+  /// 更新内容卡标题：带版本区间（如「更新内容 V0.0.10 → V0.0.11」）。
+  ///
+  /// 任一版本号缺失时退回纯「更新内容」——不显示「V → V」这种半截文案。
+  String get _notesTitle {
+    final from = _current?.versionName;
+    final to = _latest?.versionName;
+    if (from == null || from.isEmpty || to == null || to.isEmpty) {
+      return '更新内容';
+    }
+    return '更新内容 V$from → V$to';
+  }
+
   String get _phaseTitle => switch (_phase) {
         _UpdatePhase.checking => '正在检查',
         _UpdatePhase.noUpdate => '已是最新',
@@ -543,48 +518,6 @@ class _UpdatePageState extends State<UpdatePage> {
     if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(1)} MB';
     if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
     return '$bytes B';
-  }
-}
-
-// ---------- 版本信息行 ----------
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 88,
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
