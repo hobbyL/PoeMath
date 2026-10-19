@@ -185,7 +185,6 @@ List<String> _highlightedLines(WidgetTester tester) {
 
 Future<void> _pumpPage(WidgetTester tester, TtsService tts) async {
   final settings = _MockSettingsRepository();
-  when(() => settings.pinyinVisible).thenReturn(false);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -658,7 +657,6 @@ void main() {
     // 真实 TtsService 级联：HTTP 恒成功（合成成功）+ 播放器恒抛错
     // → 两行均 skippedCloudPlay → 全跳句上抛 → 页面现有 catch 走 SnackBar。
     final settings = _MockSettingsRepository();
-    when(() => settings.pinyinVisible).thenReturn(false);
     when(() => settings.ttsCloudEnabled).thenReturn(true);
     when(() => settings.ttsCloudVoice).thenReturn(kDefaultWorkerVoice);
     when(() => settings.ttsCloudStyle).thenReturn('poetry-reading');

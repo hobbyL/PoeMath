@@ -502,7 +502,7 @@ void main() {
   test('导出并恢复 Settings KV 数据', () async {
     // 写入设置
     await HiveBoxes.settings.put('tts_speed', 0.8);
-    await HiveBoxes.settings.put('pinyin_visible', true);
+    await HiveBoxes.settings.put('sound_enabled', false);
 
     final json = await backupService.exportToJson();
 
@@ -513,7 +513,7 @@ void main() {
     await backupService.restoreFromJson(json);
 
     expect(HiveBoxes.settings.get('tts_speed'), equals(0.8));
-    expect(HiveBoxes.settings.get('pinyin_visible'), equals(true));
+    expect(HiveBoxes.settings.get('sound_enabled'), equals(false));
   });
 
   test('恢复 settings 会等待写入；备份未给出的白名单 key 保留本机值', () async {

@@ -53,7 +53,6 @@ void main() {
 
   testWidgets('诗词详情朗读失败后恢复朗读按钮并提示', (tester) async {
     final settings = _MockSettingsRepository();
-    when(() => settings.pinyinVisible).thenReturn(true);
     when(
       () => tts.speakLines(
         any<List<String>>(),

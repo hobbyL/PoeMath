@@ -32,8 +32,8 @@ import 'package:poemath/features/profile/ai_settings_page.dart';
 ///
 /// 分组原则是「谁管什么」：同一分区内的项服务同一类决策，不同分区的项
 /// 不应有语义重叠。历史上的 `learning` 曾同时装学习背景、练习参数、通知
-/// 与 AI 配置四件不相干的事，`appearance` 曾装拼音显示（学习内容展示），
-/// 均已按此原则拆开。
+/// 与 AI 配置四件不相干的事，`appearance` 曾装与外观无关的项，均已按
+/// 此原则拆开。
 ///
 /// **本文件内每个分区的 render 代码必须连续排列**（见 `build` 的注释）：
 /// 早先按"功能"顺序撰写，导致同一分区的 widget 散落在数百行之间，新增
@@ -145,7 +145,7 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.menu_book_outlined,
                 iconColor: theme.colorScheme.primary,
                 title: '学习与内容',
-                subtitle: '学习背景、练习参数与拼音显示',
+                subtitle: '学习背景与练习参数',
                 onTap: () => _openSection(context, _SettingsSection.learning),
               ),
               const SizedBox(height: SpacingTokens.sm),
@@ -243,20 +243,6 @@ class SettingsPage extends ConsumerWidget {
               ),
               const SizedBox(height: SpacingTokens.sm),
               _buildPracticeSettings(context, ref),
-              const SizedBox(height: SpacingTokens.sm),
-              AppTile(
-                icon: Icons.text_fields_outlined,
-                iconColor: theme.semantic.success,
-                title: '拼音显示',
-                subtitle: settingsRepo.pinyinVisible ? '已开启' : '已关闭',
-                trailing: Switch(
-                  value: settingsRepo.pinyinVisible,
-                  onChanged: (v) =>
-                      _writeSetting(context, ref, '拼音显示', () async {
-                    await settingsRepo.setPinyinVisible(v);
-                  }),
-                ),
-              ),
               const SizedBox(height: SpacingTokens.md),
             ],
 

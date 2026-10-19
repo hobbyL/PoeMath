@@ -78,17 +78,6 @@ void main() {
       });
     });
 
-    group('pinyinVisible', () {
-      test('默认值为 true', () {
-        expect(repo.pinyinVisible, isTrue);
-      });
-
-      test('setPinyinVisible 保存并读取', () async {
-        await repo.setPinyinVisible(false);
-        expect(repo.pinyinVisible, isFalse);
-      });
-    });
-
     group('AI 讲解提示词覆盖', () {
       test('poemExplainPromptOverride 默认 null（未自定义）', () {
         expect(repo.poemExplainPromptOverride, isNull);

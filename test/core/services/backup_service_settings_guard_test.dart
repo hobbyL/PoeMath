@@ -71,7 +71,6 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       'selected_grade': 3,
       'tts_speed': 0.8,
       'tts_voice': '{"name":"Xiaoxiao","locale":"zh-CN"}',
-      'pinyin_visible': false,
       'daily_poem_goal': 5,
       'daily_math_goal': 30,
       'math_batch_size': 20,
@@ -229,7 +228,7 @@ void main() {
   test('AC2 类型测试：类型不符的 key 跳过，int 语速规范化为 double', () async {
     final count = await backupService.restoreFromJson(
       await backupWithSettings(<String, dynamic>{
-        'pinyin_visible': 'boom', // String 冒充 bool → 跳过
+        'haptic_enabled': 'boom', // String 冒充 bool → 跳过
         'selected_grade': 1.5, // JSON double 冒充 int → 跳过
         'tts_speed': 1, // JSON int 合法化为 1.0
         'sound_enabled': false, // 正常 bool，应恢复
@@ -239,7 +238,7 @@ void main() {
     // 恢复本身成功（不毁整个恢复；settings 节不计入记录数）。
     expect(count, 0);
     // 类型不符的 key 被跳过：不写入坏值。
-    expect(HiveBoxes.settings.get('pinyin_visible'), isNull);
+    expect(HiveBoxes.settings.get('haptic_enabled'), isNull);
     expect(HiveBoxes.settings.get('selected_grade'), isNull);
     // tts_speed int 1 规范化为 double 1.0。
     expect(
@@ -256,13 +255,13 @@ void main() {
   test('AC2 补充：本机无原值时，类型不符 key 恢复后不落盘', () async {
     await backupService.restoreFromJson(
       await backupWithSettings(<String, dynamic>{
-        'pinyin_visible': 'boom',
+        'sound_enabled': 'boom',
         'selected_grade': 1.5,
         'haptic_enabled': 'not-a-bool',
       }),
     );
 
-    expect(HiveBoxes.settings.get('pinyin_visible'), isNull);
+    expect(HiveBoxes.settings.get('sound_enabled'), isNull);
     expect(HiveBoxes.settings.get('selected_grade'), isNull);
     expect(HiveBoxes.settings.get('haptic_enabled'), isNull);
   });
@@ -442,7 +441,6 @@ void main() {
       HiveBoxes.settings.get('tts_voice'),
       '{"name":"Xiaoxiao","locale":"zh-CN"}',
     );
-    expect(HiveBoxes.settings.get('pinyin_visible'), isFalse);
     expect(HiveBoxes.settings.get('daily_poem_goal'), 5);
     expect(HiveBoxes.settings.get('daily_math_goal'), 30);
     expect(HiveBoxes.settings.get('math_batch_size'), 20);

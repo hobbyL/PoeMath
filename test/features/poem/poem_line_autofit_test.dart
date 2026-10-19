@@ -43,7 +43,6 @@ Future<void> _pumpDetailPage(WidgetTester tester) async {
   final tts = _MockTtsService();
   final settings = _MockSettingsRepository();
   when(() => tts.stop()).thenAnswer((_) async {});
-  when(() => settings.pinyinVisible).thenReturn(false);
 
   await tester.pumpWidget(
     ProviderScope(

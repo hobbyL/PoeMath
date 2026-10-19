@@ -18,7 +18,7 @@ class _DelayedSettingsRepository extends SettingsRepository {
   final allowWrite = Completer<void>();
 
   @override
-  Future<void> setPinyinVisible(bool visible) {
+  Future<void> setSoundEnabled(bool enabled) {
     writeStarted.complete();
     return allowWrite.future;
   }
@@ -27,7 +27,7 @@ class _DelayedSettingsRepository extends SettingsRepository {
 /// 模拟 Hive 落盘失败（磁盘满 / Box 损坏）。
 class _FailingSettingsRepository extends SettingsRepository {
   @override
-  Future<void> setPinyinVisible(bool visible) async {
+  Future<void> setSoundEnabled(bool enabled) async {
     throw StateError('磁盘写入失败');
   }
 }
@@ -90,12 +90,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 学习与内容：学习背景 + 练习参数 + 拼音显示（拼音由外观迁入）。
+    // 学习与内容：学习背景 + 练习参数（拼音显示开关已移除）。
     await tester.tap(find.text('学习与内容'));
     await tester.pumpAndSettle();
     expect(find.text('学习背景'), findsOneWidget);
     expect(find.text('练习设置'), findsOneWidget);
-    expect(find.text('拼音显示'), findsOneWidget);
+    expect(find.text('拼音显示'), findsNothing);
     // 通知与 AI 已不在此组。
     expect(find.text('通知设置'), findsNothing);
     await tester.pageBack();
@@ -191,27 +191,10 @@ void main() {
 
     expect(find.byType(Switch), findsNothing);
 
-    // 拼音显示已由「外观与反馈」迁入「学习与内容」，是该组唯一的开关。
-    await tester.tap(find.text('学习与内容'));
-    await tester.pumpAndSettle();
-    expect(find.byType(Switch), findsOneWidget);
     final settings = container.read(settingsRepositoryProvider);
-    final pinyinTile = find.ancestor(
-      of: find.text('拼音显示'),
-      matching: find.byType(AppTile),
-    );
-    await tester.runAsync(() async {
-      await tester.tap(
-        find.descendant(of: pinyinTile, matching: find.byType(Switch)),
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    });
-    await tester.pumpAndSettle();
-    expect(settings.pinyinVisible, isFalse);
 
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    // 音效与触觉反馈已由「声音与交互」迁入「外观与反馈」。
+    // 音效与触觉反馈由「外观与反馈」承载（「学习与内容」已无可即时切换的
+    // 项 —— 拼音显示开关随详情页拼音改折叠卡一并移除）。
     await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
     expect(find.byType(Switch), findsNWidgets(2));
@@ -265,9 +248,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('学习与内容'));
+    await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
-    await tester.tap(_switchOf('拼音显示'));
+    await tester.tap(_switchOf('音效'));
     await tester.pump();
     expect(settings.writeStarted.isCompleted, isTrue);
 
@@ -299,15 +282,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('学习与内容'));
+    await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
 
-    await tester.tap(_switchOf('拼音显示'));
+    await tester.tap(_switchOf('音效'));
     await tester.pumpAndSettle();
 
     // 异常被吞下（不冒泡），并以 SnackBar 告知用户。
     expect(tester.takeException(), isNull);
-    expect(find.text('拼音显示设置保存失败，请重试'), findsOneWidget);
+    expect(find.text('音效设置保存失败，请重试'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();

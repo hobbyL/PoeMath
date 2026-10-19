@@ -53,7 +53,6 @@ class SettingsRepository {
   static const String _keyTtsSpeed = 'tts_speed';
   static const String _keyTtsVoice =
       'tts_voice'; // JSON: {"name":"...", "locale":"..."}
-  static const String _keyPinyinVisible = 'pinyin_visible';
   static const String _keyDailyPoemGoal = 'daily_poem_goal';
   static const String _keyDailyMathGoal = 'daily_math_goal';
   static const String _keyWebDavConfigs = 'webdav_configs';
@@ -708,15 +707,6 @@ class SettingsRepository {
   Future<void> resetAssistantPrompt() async {
     ParentAccessService.instance.assertAllowed();
     await HiveBoxes.settings.delete(_keyAssistantPrompt);
-  }
-
-  // ============ 拼音显示 ============
-
-  bool get pinyinVisible =>
-      HiveBoxes.settings.get(_keyPinyinVisible, defaultValue: true) as bool;
-
-  Future<void> setPinyinVisible(bool visible) async {
-    await HiveBoxes.settings.put(_keyPinyinVisible, visible);
   }
 
   // ============ 每日目标 ============

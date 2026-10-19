@@ -94,7 +94,6 @@ const Map<String, String> _settingsValueType = <String, String>{
   'selected_semester': 'string', // 学习背景学期 上/下
   'tts_speed': 'double', // TTS 语速
   'tts_voice': 'string', // TTS 音色 JSON 字符串
-  'pinyin_visible': 'bool', // 拼音显示开关
   'daily_poem_goal': 'int', // 每日诗词背诵目标
   'daily_math_goal': 'int', // 每日口算做题目标
   'math_batch_size': 'int', // 每组题目数量

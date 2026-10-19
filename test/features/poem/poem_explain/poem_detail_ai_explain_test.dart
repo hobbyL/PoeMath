@@ -144,7 +144,6 @@ void main() {
   /// 已配置场景厂商的 repo mock（诗词讲解走 DeepSeek 配置）。
   SettingsRepository configuredRepo() {
     final settings = _MockSettingsRepository();
-    when(() => settings.pinyinVisible).thenReturn(false);
     when(() => settings.readLlmConfigForScenario(LlmScenario.poemExplain))
         .thenAnswer(
       (_) async => const LlmConfig(
@@ -158,7 +157,6 @@ void main() {
 
   testWidgets('未配置：点「生成讲解」进入引导态（提示 + 去设置）', (tester) async {
     final settings = _MockSettingsRepository();
-    when(() => settings.pinyinVisible).thenReturn(false);
     when(() => settings.readLlmConfigForScenario(any()))
         .thenAnswer((_) async => null);
     var requests = 0;

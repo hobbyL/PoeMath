@@ -9,9 +9,9 @@
 // 且不可折叠，与译文/注释/赏析等区块的处理方式不一致。现改为与它们同构的
 // 折叠卡片，开关本身随之移除。
 //
-// `pinyin_visible` 这个 settings key **仍然存在**：设置页的「显示拼音」
-// 开关仍在读写它（`settings_page_test.dart` 覆盖写回路径），它也仍在备份
-// 白名单里。本文件因此不再断言详情页写回它 —— 这是契约变更，不是覆盖丢失。
+// 相关清理（同一批改动）：`pinyin_visible` settings key 与设置页的
+// 「拼音显示」开关已一并移除 —— 详情页不再消费它，留着只会让用户以为
+// 改了有效果。老备份若含该 key，恢复时因不在白名单而被跳过（不报错）。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
