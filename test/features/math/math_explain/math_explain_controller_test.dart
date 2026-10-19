@@ -22,6 +22,7 @@ import 'package:poemath/features/math/math_explain/math_explain_models.dart';
 import 'package:poemath/features/math/math_explain/math_explain_prompts.dart';
 import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
 import 'package:poemath/math_engine/diagnostics/mistake_rule.dart';
+import 'package:poemath/math_engine/models/vertical_attempt.dart';
 
 import '../../../helpers/hive_test_helper.dart';
 
@@ -411,7 +412,18 @@ void main() {
       kErrorCauseLabels.keys,
       containsAll(MistakeDiagnoser.categoryNames),
     );
-    expect(kErrorCauseLabels.length, MistakeDiagnoser.categoryNames.length);
+
+    // 键集 == 规则名 ∪ 过程判分错因。不能只比长度：标签表的权威定义
+    // （error_cause_labels.dart 第 10 行）除了 6 条规则的 name，还包含
+    // VerticalAttempt.errorCategory（竖式过程错误），共 7 个键。
+    // 早先这里写的是 `length == categoryNames.length`（7 != 6），
+    // 漏掉了过程判分错因，与权威守卫测试的定义冲突。
+    expect(
+      kErrorCauseLabels.keys.toSet(),
+      equals(
+        {...MistakeDiagnoser.categoryNames, VerticalAttempt.errorCategory},
+      ),
+    );
   });
 
   test('system prompt 固定「正确答案以给出为准」铁律', () {

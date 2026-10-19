@@ -134,8 +134,19 @@ void main() {
       await tester.pump();
       expect(find.byType(VerticalProcessInput), findsOneWidget);
       expect(find.byType(NumberKeypad), findsOneWidget);
+      // `find.byTooltip` 命中 Tooltip 内部节点（Flutter 3.44 为
+      // `RawTooltip`），不是外层的 IconButton——直接 widget<IconButton>
+      // 会抛 `type 'RawTooltip' is not a subtype of type 'IconButton'`。
+      // 按祖先关系定位到真正的 IconButton。
       expect(
-          tester.widget<IconButton>(find.byTooltip('挑战记录')).onPressed, isNull,);
+        tester
+            .widget<IconButton>(find.ancestor(
+              of: find.byTooltip('挑战记录'),
+              matching: find.byType(IconButton),
+            ),)
+            .onPressed,
+        isNull,
+      );
       final problem = tester
           .widget<VerticalCalcWidget>(find.byType(VerticalCalcWidget))
           .problem;
