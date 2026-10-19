@@ -94,6 +94,23 @@ Future<void> tearDownHiveForWidgetTesting() async {
 /// >>> TD enter
 /// >>> TD done                       ← close() 正常返回
 /// ```
+///
+/// **若用例体内需要主动 `Hive.close()`，不要在 `runAsync` 里发起。**
+/// `ReadWriteSync` 的 `_writeTask` 指向写入时（fake zone）创建的
+/// `Completer.future`；Dart 按 future 创建时的 zone 调度微任务，因此在
+/// 真实 zone 里 `.then()` 它会把回调排回 fake 队列，而 `runAsync` 内部
+/// 无法 `pump()` —— 死锁。正确做法是在 fake 区发起 close 并轮询推动：
+///
+/// ```dart
+/// var closed = false;
+/// final closing = HiveBoxes.close();
+/// unawaited(closing.then((_) => closed = true));
+/// for (var i = 0; i < 100 && !closed; i++) {
+///   await tester.runAsync(() => Future<void>.delayed(Duration(milliseconds: 20)));
+///   await tester.pump(const Duration(milliseconds: 50));
+/// }
+/// await closing;
+/// ```
 Future<void> drainHiveWritesForTesting(WidgetTester tester) async {
   await tester.runAsync(() async {
     try {
