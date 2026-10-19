@@ -245,7 +245,6 @@ void main() {
       LearningStatus.mastered,
     );
     expect(PoemProgressRepository().get('poem')?.firstMasteredAt, isNotNull);
-    final s = ReviewRepository().get('poem');
     await drainHiveWritesForTesting(tester);
     expect(UserStatsRepository().get().poemsMastered, 1);
     expect(tester.takeException(), isNull);
