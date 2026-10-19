@@ -77,9 +77,14 @@ const int _backupVersion = 1;
 /// - tencent_asr_credential_fingerprint / tencent_asr_verified_at /
 ///   worker_tts_verified_fingerprint：与凭据绑定的验证状态，凭据不随备份
 ///   走，指纹/时间戳单独迁移会误导验证状态。
-/// - parent_protection_* / cloud_daily_limit_* / daily_snapshot_enabled /
-///   external_backup_reminder：设备家长保护、额度和本机备份策略，保留本机值；
-///   meta 中的云用量、练习草稿与今日计划同样不导出。
+/// - last_synced_at：本机与云端的相对时间线，迁到另一台设备会继承一台
+///   机器的时点，制造跨设备冲突误报。
+/// - reminder_degraded / weekly_report_degraded：**本机**通知通道的降级
+///   标记。新机的通道状态未知，搬过去会误报（本机明明正常却显示降级）
+///   或误不报（本机确实坏了却因为备份里是 false 而静默）。
+///
+/// 注：云用量计数存于 meta，是 meta 里唯一随备份走的子集之一，见
+/// `cloudUsage` 一节；练习草稿与今日计划仍不导出。
 ///
 /// 新增 settings key 时必须同步登记本白名单（并注明类型），否则不会随备份迁移。
 const Map<String, String> _settingsValueType = <String, String>{
@@ -124,6 +129,33 @@ const Map<String, String> _settingsValueType = <String, String>{
   'llm_math_explain_prompt': 'string', // 口算解析 system prompt 覆盖
   'llm_assistant_prompt': 'string', // AI 助手 system prompt 覆盖
   'assistant_enabled': 'bool', // AI 助手悬浮气泡开关（默认关闭）
+  // AI 助手悬浮球停留位置（body 坐标系逻辑像素）。
+  //
+  // 换设备后屏幕尺寸不同，坐标可能落到可视区外 —— 消费端
+  // `draggable_assistant_bubble.dart` 的 `_load` 已处理：读存档后检测越界
+  // 并 `_clampToBounds` 到当前边界内。因此这里可以安全同步，无需在恢复侧
+  // 做特殊处理。
+  'assistant_bubble_dx': 'double',
+  'assistant_bubble_dy': 'double',
+  // 家长保护（设备级管控开关，随备份迁移）。
+  //
+  // 纳入理由：换机后孩子应继续受保护，否则家长需要重新设置一遍。
+  //
+  // 经与用户确认：**不加恢复前确认框**。理由是该开关本身不是凭据、不指向
+  // 外部服务（对照 llm_providers 的 P1 端点注入风险），且恢复备份是显式的
+  // 用户操作，家长对自己的设备有完全控制权。
+  'parent_protection_enabled': 'bool',
+  'parent_protection_reset_notice': 'bool',
+  // 云服务每日额度上限（家长设定，随备份迁移换机不丢）。
+  //
+  // 注意与 meta 里的 `cloud_usage:*`（已用计数）区分：上限是**设定**，
+  // 跨机有意义；计数是**本机消耗**，按日期分桶另经 `cloudUsage` 搬运。
+  'cloud_daily_limit_llm': 'int',
+  'cloud_daily_limit_tts': 'int',
+  'cloud_daily_limit_asr': 'int',
+  // 备份策略偏好（用户设定，换机该带走）。
+  'daily_snapshot_enabled': 'bool',
+  'external_backup_reminder': 'bool',
 };
 
 /// 导出口令非空、但安全存储读取失败时抛出。

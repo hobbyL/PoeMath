@@ -87,6 +87,20 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       // AI 讲解提示词覆盖（随备份迁移的个性化内容）。
       'llm_poem_explain_prompt': '自定义诗词讲解提示词',
       'llm_math_explain_prompt': '自定义口算解析提示词',
+      // AI 助手开关与悬浮球位置（坐标消费端会按当前屏幕夹取）。
+      'assistant_enabled': true,
+      'assistant_bubble_dx': 240.0,
+      'assistant_bubble_dy': 520.0,
+      // 家长保护开关（经确认：随备份迁移，不加恢复前确认框）。
+      'parent_protection_enabled': true,
+      'parent_protection_reset_notice': false,
+      // 云每日额度上限（家长设定；与 meta 里的 cloud_usage 计数分开搬运）。
+      'cloud_daily_limit_llm': 25,
+      'cloud_daily_limit_asr': 40,
+      'cloud_daily_limit_tts': 80,
+      // 备份策略偏好。
+      'daily_snapshot_enabled': true,
+      'external_backup_reminder': false,
     };
 
 void main() {

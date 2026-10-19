@@ -49,9 +49,12 @@ void main() {
     final payload = jsonDecode(await history.read(entries.first.id))
         as Map<String, dynamic>;
     expect(payload.containsKey('credentials'), isFalse);
+    // parent_protection_enabled 现随备份迁移（换机后孩子仍受保护），
+    // 因此快照里会出现。快照本身不含凭据这一点不变。
     expect(
-        (payload['settings'] as Map).containsKey('parent_protection_enabled'),
-        isFalse,);
+      (payload['settings'] as Map).containsKey('parent_protection_enabled'),
+      isTrue,
+    );
     await expectLater(history.read('../escape.json'), throwsFormatException);
   });
 
