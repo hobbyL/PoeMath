@@ -47,7 +47,7 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
         .where(
           (poem) =>
               !requiredIds.contains(poem.id) &&
-              poem.effectiveGrade == grade &&
+              poem.effectiveGrades.contains(grade) &&
               (poem.semester == null || poem.semester == semester),
         )
         .toList()

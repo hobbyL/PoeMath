@@ -47,8 +47,11 @@ class PoemRepository {
 
     for (final poem in HiveBoxes.poems.values) {
       if (PoemIdentity.aliases.containsKey(poem.id)) continue;
-      // 年级索引（无 grade 的诗词按 difficulty 推算）
-      byGrade.putIfAbsent(poem.effectiveGrade, () => []).add(poem.id);
+      // 年级索引：一首诗可属于多个年级（低难度诗的区间重叠，见
+      // `Poem.effectiveGrades`），因此逐个登记而非取单一值。
+      for (final g in poem.effectiveGrades) {
+        byGrade.putIfAbsent(g, () => []).add(poem.id);
+      }
       // 作者索引
       byAuthor.putIfAbsent(poem.author, () => []).add(poem.id);
       // 朝代索引

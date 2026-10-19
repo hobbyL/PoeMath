@@ -113,20 +113,32 @@ void main() {
         expect(grade1.map((p) => p.title), containsAll(['静夜思', '春晓']));
       });
 
-      test('byGrade 包含 difficulty 推算的诗词', () {
-        // poem_ext_001: difficulty=2 → effectiveGrade=3
-        final grade3 = repo.byGrade(3);
-        expect(grade3.length, 1);
-        expect(grade3.first.id, 'poem_ext_001');
+      test('byGrade 包含 difficulty 推算的诗词（区间内各年级都能看到）', () {
+        // poem_ext_001: grade=null, difficulty=2 → 区间 {2,3,4}
+        for (final g in [2, 3, 4]) {
+          expect(
+            repo.byGrade(g).map((p) => p.id),
+            contains('poem_ext_001'),
+            reason: 'difficulty 2 的诗应在 $g 年级出现',
+          );
+        }
 
-        // poem_exp_001: difficulty=3 → effectiveGrade=5
-        final grade5 = repo.byGrade(5);
-        expect(grade5.length, 1);
-        expect(grade5.first.id, 'poem_exp_001');
+        // poem_exp_001: grade=null, difficulty=3 → 区间 {5,6}
+        for (final g in [5, 6]) {
+          expect(
+            repo.byGrade(g).map((p) => p.id),
+            contains('poem_exp_001'),
+            reason: 'difficulty 3 的诗应在 $g 年级出现',
+          );
+        }
       });
 
-      test('byGrade 无匹配返回空列表', () {
-        expect(repo.byGrade(6), isEmpty);
+      test('byGrade 区间外不含推算诗词', () {
+        // 夹具里没有 difficulty 4 的诗，也不该有 grade 6 的必背。
+        final grade6 = repo.byGrade(6);
+        expect(grade6.map((p) => p.id), isNot(contains('poem_ext_001')));
+        // 低年级不论文理都不该拿到 difficulty 3 的诗。
+        expect(repo.byGrade(1).map((p) => p.id), isNot(contains('poem_exp_001')));
       });
 
       test('byAuthor 按作者筛选', () {
@@ -162,10 +174,9 @@ void main() {
         expect(explore.length, 1);
       });
 
-      test('availableGrades 已排序（含 difficulty 推算）', () {
-        // poem_ext_001: grade=null, difficulty=2 → effectiveGrade=3
-        // poem_exp_001: grade=null, difficulty=3 → effectiveGrade=5
-        expect(repo.availableGrades, [1, 2, 3, 5]);
+      test('availableGrades 已排序（含 difficulty 推算的区间）', () {
+        // 必背 grade 1..2；poem_ext_001(d2)→{2,3,4}；poem_exp_001(d3)→{5,6}
+        expect(repo.availableGrades, [1, 2, 3, 4, 5, 6]);
       });
 
       test('availableAuthors 已排序', () {

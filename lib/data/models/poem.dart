@@ -121,8 +121,46 @@ class Poem extends HiveObject {
     );
   }
 
-  /// 有效年级：有 grade 取 grade，无 grade 按 difficulty 推算。
-  int get effectiveGrade => grade ?? _gradeFromDifficulty(difficulty);
+  /// 这首诗归属的年级集合。
+  ///
+  /// - **有 `grade`**（教材编排，目前只有 `core` 层）：只属于那一个年级。
+  /// - **无 `grade`**（`extended` / `explore` 层）：按 difficulty 映射到
+  ///   一个**年级区间**，区间内全部年级都能看到它。
+  ///
+  /// 之所以是**集合**而非单个值：低难度诗的区间存在重叠（见
+  /// [_gradesFromDifficulty]），同一首诗出现在相邻两个年级的推荐里是
+  /// 合理的 —— 低年级学生读稍简单的课外诗本就正常。这是刻意允许的
+  /// 跨年级重复，不是数据错误。
+  Set<int> get effectiveGrades =>
+      grade != null ? {grade!} : _gradesFromDifficulty(difficulty);
+
+  /// difficulty → 年级**区间**映射（仅用于无 grade 的诗词）。
+  ///
+  /// 区间由 core 层的真实 difficulty-grade 分布推得（core 是唯一有教材
+  /// 编排依据的层，130 首全部带 `textbook_unit`）：
+  ///
+  /// | difficulty | core 中的真实年级分布 |
+  /// |---|---|
+  /// | 1 | grade1×13, grade2×13 |
+  /// | 2 | grade2×1, grade3×29, grade4×23, grade5×8, grade6×4 |
+  /// | 3 | grade4×8, grade5×17, grade6×13 |
+  /// | 4 | grade6×1 |
+  ///
+  /// 可见同一难度横跨多个年级，因此映射到区间而非单一值。区间刻意重叠：
+  /// 低年级样本太少（difficulty 1 只有 26 首），不重叠会让 1、2 年级
+  /// 各自只剩十几首。
+  ///
+  /// **不要**改回「一档难度 = 一个年级」：那正是修正前的缺陷 ——
+  /// 505 首 difficulty-3 的诗（从汉乐府到宋词都有）被全算成「5 年级」，
+  /// 让 5 年级显示 500+ 首，误导用户以为是教材量。
+  static Set<int> _gradesFromDifficulty(int difficulty) {
+    return switch (difficulty) {
+      1 => const {1, 2},
+      2 => const {2, 3, 4},
+      3 => const {5, 6},
+      _ => const {6},
+    };
+  }
 
   /// 层级中文标签：必背(core) / 扩展(extended) / 拓展(explore)。
   String get layerLabel => switch (layer) {
@@ -130,22 +168,6 @@ class Poem extends HiveObject {
         'extended' => '扩展',
         _ => '拓展',
       };
-
-  /// difficulty → grade 映射（仅用于无 grade 的诗词）。
-  ///
-  /// 基于核心课标诗词的 difficulty-grade 分布推算：
-  /// - difficulty 1 → 低年级（grade 2）
-  /// - difficulty 2 → 中年级（grade 3）
-  /// - difficulty 3 → 高年级（grade 5）
-  /// - difficulty 4 → 高年级（grade 6）
-  static int _gradeFromDifficulty(int difficulty) {
-    return switch (difficulty) {
-      1 => 2,
-      2 => 3,
-      3 => 5,
-      _ => 6,
-    };
-  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
