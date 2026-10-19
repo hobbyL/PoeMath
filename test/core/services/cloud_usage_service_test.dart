@@ -47,20 +47,23 @@ void main() {
     expect(second.used(CloudUsageKind.llm), 3);
   });
 
-  test('额度及用量跨实例保留，跨日重开且恢复备份不重置', () async {
+  test('额度及用量跨实例保留，跨日重开；额度与用量均随备份迁移', () async {
     var now = DateTime(2026, 10, 16, 23, 59);
     final usage = CloudUsageService(clock: () => now);
     await usage.setLimit(CloudUsageKind.asr, 1);
     await usage.reserve(CloudUsageKind.asr);
     final backup = BackupService();
     final json = await backup.exportToJson();
-    expect(json, isNot(contains('cloud_daily_limit')));
-    expect(json, isNot(contains('cloud_usage')));
+    // 额度上限与已用计数都随备份走：上限是家长设定，计数按日期分桶
+    // （key 自带日期，恢复后当天的桶仍是本机自己的）。
+    expect(json, contains('cloud_daily_limit'));
+    expect(json, contains('cloud_usage'));
     await backup.restoreFromJson(json);
     await HiveBoxes.close();
     await HiveBoxes.init();
     final reopened = CloudUsageService(clock: () => now);
     expect(reopened.used(CloudUsageKind.asr), 1);
+    expect(reopened.limit(CloudUsageKind.asr), 1);
     await expectLater(reopened.reserve(CloudUsageKind.asr),
         throwsA(isA<CloudQuotaExceededException>()),);
     now = DateTime(2026, 10, 17);

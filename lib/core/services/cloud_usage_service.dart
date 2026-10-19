@@ -108,6 +108,49 @@ class CloudUsageService {
     await HiveBoxes.settings.put('cloud_daily_limit_${kind.key}', value ?? -1);
   }
 
+  static const String _usagePrefix = 'cloud_usage:';
+
+  /// 导出的全部用量计数（key → 次数），供备份服务搬运。
+  ///
+  /// key 自带日期（`cloud_usage:YYYY-MM-DD:<kind>`），因此跨设备恢复后：
+  ///
+  /// - **今天**的桶永远是本机自己的（备份里不含恢复当天的 key，除非备份
+  ///   恰好是当天导出并当天恢复），不会把别的设备的当日消耗搬过来；
+  /// - 历史的逐日曲线会随备份迁移，这正是「备份同步」的预期。
+  ///
+  /// 恢复侧写回时同样按前缀写入，不触碰 meta 里的结算标记与练习草稿。
+  static Map<String, int> exportCounts() {
+    if (!Hive.isBoxOpen('meta')) return const {};
+    final result = <String, int>{};
+    for (final key in HiveBoxes.meta.keys) {
+      final name = key.toString();
+      if (!name.startsWith(_usagePrefix)) continue;
+      final value = HiveBoxes.meta.get(key);
+      if (value is int && value >= 0) result[name] = value;
+    }
+    return result;
+  }
+
+  /// 用备份里的计数**替换**本机全部用量计数。
+  ///
+  /// 整组替换而非合并：备份语义是「恢复成那份快照」，合并会让两台设备的
+  /// 消耗叠加，反而偏离原状。恢复流程已在更外层包了补偿（失败回滚），
+  /// 此处只需保证只删自己的 key。
+  static Future<void> replaceCounts(Map<String, int> counts) async {
+    final valid = <String, int>{};
+    for (final entry in counts.entries) {
+      if (!entry.key.startsWith(_usagePrefix)) continue;
+      if (entry.value < 0) continue;
+      valid[entry.key] = entry.value;
+    }
+    final existing = HiveBoxes.meta.keys
+        .whereType<String>()
+        .where((key) => key.startsWith(_usagePrefix))
+        .toList();
+    await HiveBoxes.meta.deleteAll(existing);
+    await HiveBoxes.meta.putAll(valid);
+  }
+
   Future<void> reserve(CloudUsageKind kind) {
     if (!_ready) return Future<void>.value();
     final previous = _tail;
@@ -116,7 +159,7 @@ class CloudUsageService {
         await previous;
       } on Object {/* 失败不阻塞下一次请求。 */}
       final maximum = limit(kind);
-      final key = 'cloud_usage:$dayKey:${kind.key}';
+      final key = '$_usagePrefix$dayKey:${kind.key}';
       final saved = HiveBoxes.meta.get(key);
       final current = saved is int && saved >= 0 ? saved : 0;
       if (maximum != null && current >= maximum) {
@@ -126,7 +169,7 @@ class CloudUsageService {
       // 仅保留最近 32 个日期的计数，不触碰结算或练习草稿。
       final cutoff = _clock().subtract(const Duration(days: 32));
       final keys = HiveBoxes.meta.keys.whereType<String>().where((key) {
-        if (!key.startsWith('cloud_usage:')) return false;
+        if (!key.startsWith(_usagePrefix)) return false;
         final date = DateTime.tryParse(key.split(':')[1]);
         return date != null &&
             date.isBefore(DateTime(cutoff.year, cutoff.month, cutoff.day));

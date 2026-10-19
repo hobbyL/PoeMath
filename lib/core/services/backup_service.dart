@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/data/hive/migrations/poem_identity_migration.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/settings_constraints.dart';
 import 'package:poemath/data/models/achievement.dart';
@@ -83,9 +84,6 @@ const int _backupVersion = 1;
 ///   标记。新机的通道状态未知，搬过去会误报（本机明明正常却显示降级）
 ///   或误不报（本机确实坏了却因为备份里是 false 而静默）。
 ///
-/// 注：云用量计数存于 meta，是 meta 里唯一随备份走的子集之一，见
-/// `cloudUsage` 一节；练习草稿与今日计划仍不导出。
-///
 /// 新增 settings key 时必须同步登记本白名单（并注明类型），否则不会随备份迁移。
 const Map<String, String> _settingsValueType = <String, String>{
   'theme_mode': 'string', // 外观模式 system/light/dark
@@ -132,9 +130,9 @@ const Map<String, String> _settingsValueType = <String, String>{
   // AI 助手悬浮球停留位置（body 坐标系逻辑像素）。
   //
   // 换设备后屏幕尺寸不同，坐标可能落到可视区外 —— 消费端
-  // `draggable_assistant_bubble.dart` 的 `_load` 已处理：读存档后检测越界
-  // 并 `_clampToBounds` 到当前边界内。因此这里可以安全同步，无需在恢复侧
-  // 做特殊处理。
+  // `draggable_assistant_bubble.dart` 的 `_clampToBounds` 已处理：读存档后
+  // 检测越界并夹取到当前边界内（见该文件 `_load`）。因此这里可以安全同步，
+  // 无需在恢复侧做特殊处理。
   'assistant_bubble_dx': 'double',
   'assistant_bubble_dy': 'double',
   // 家长保护（设备级管控开关，随备份迁移）。
@@ -148,8 +146,8 @@ const Map<String, String> _settingsValueType = <String, String>{
   'parent_protection_reset_notice': 'bool',
   // 云服务每日额度上限（家长设定，随备份迁移换机不丢）。
   //
-  // 注意与 meta 里的 `cloud_usage:*`（已用计数）区分：上限是**设定**，
-  // 跨机有意义；计数是**本机消耗**，按日期分桶另经 `cloudUsage` 搬运。
+  // 注意与 `meta` 里的 `cloud_usage:*`（已用计数）区分：上限是**设定**，
+  // 跨机有意义；计数是**本机消耗**，按日期分桶存于 meta，另行搬运。
   'cloud_daily_limit_llm': 'int',
   'cloud_daily_limit_tts': 'int',
   'cloud_daily_limit_asr': 'int',
@@ -197,13 +195,19 @@ class BackupService {
       'llmProblems': '应用题',
       'conversations': '助手会话',
       'messages': '助手消息',
+      'cloudUsage': '云用量',
     };
     return BackupPreview(
       json: jsonString,
       exportedAt: exportedAt(jsonString),
       counts: Map.unmodifiable({
         for (final entry in labels.entries)
-          entry.value: (data[entry.key] as List<dynamic>?)?.length ?? 0,
+          entry.value: switch (data[entry.key]) {
+            // 云用量是对象（日期桶 → 次数），其余都是数组。
+            final Map<dynamic, dynamic> map => map.length,
+            final List<dynamic> list => list.length,
+            _ => 0,
+          },
       }),
       hasCredentials: data.containsKey('credentials'),
       endpointChanges: detectLlmEndpointChanges(jsonString),
@@ -274,6 +278,13 @@ class BackupService {
           },
       ],
       'activitySettlements': ActivitySettlementLedger.completedKeys,
+      // 云请求用量计数（`cloud_usage:YYYY-MM-DD:<kind>` → 次数）。
+      //
+      // 存于 meta，是 meta 里**第二个**随备份走的子集（第一个是结算标记）。
+      // key 自带日期：恢复后当天的桶仍是本机自己的，历史曲线随备份迁移。
+      // 与 settings 里的 `cloud_daily_limit_*`（家长设的上限）分工不同 ——
+      // 上限是设定，计数是本机消耗，两者各自搬运。
+      'cloudUsage': CloudUsageService.exportCounts(),
       'settings': _exportSettings(),
     };
     final credentials = await _exportCredentials(passphrase);
@@ -541,6 +552,8 @@ class BackupService {
           key: HiveBoxes.settings.get(key),
     };
     final credentialUndo = <Future<void> Function()>[];
+    // 云用量计数存于 meta，不在 settings 快照里，需单独留存以便回滚。
+    final usageSnapshot = CloudUsageService.exportCounts();
     final hadDraftEpoch = HiveBoxes.meta.containsKey('practice_draft_epoch');
     final oldDraftEpoch =
         HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int;
@@ -593,6 +606,12 @@ class BackupService {
         rollbackErrors.add(rollbackError);
       }
       // Hive 数据恢复失败也继续补偿设置和凭据；各存储独立尽力回滚。
+      // 云用量计数同样在 meta 里，单独整组还原。
+      try {
+        await CloudUsageService.replaceCounts(usageSnapshot);
+      } on Object catch (rollbackError) {
+        rollbackErrors.add(rollbackError);
+      }
       try {
         for (final key in _settingsValueType.keys) {
           if (!settingsSnapshot.containsKey(key)) {
@@ -878,6 +897,20 @@ class BackupService {
       await ActivitySettlementLedger.replaceCompletedKeys(
         (data['activitySettlements'] as List<dynamic>).cast<String>(),
       );
+    }
+    // 云用量计数：旧备份无此节时保留本机计数（与 settings 同策略，
+    // 不能因为恢复一份早期备份就把本机计数清空）。
+    if (data.containsKey('cloudUsage')) {
+      final raw = data['cloudUsage'];
+      if (raw is Map) {
+        await CloudUsageService.replaceCounts(
+          <String, int>{
+            for (final entry in raw.entries)
+              if (entry.key is String && entry.value is int)
+                entry.key as String: entry.value as int,
+          },
+        );
+      }
     }
     if (data.containsKey('settings')) {
       await _restoreSettings(data['settings'] as Map<String, dynamic>);
@@ -1597,6 +1630,7 @@ class BackupService {
     _validateAssistantData(data);
     _validateUniqueLearningActivityIds(data);
     _validateActivitySettlements(data);
+    _validateCloudUsage(data);
 
     if (data.containsKey('settings')) {
       final settings = data['settings'];
@@ -1693,6 +1727,35 @@ class BackupService {
       }
       if (!keys.add(key)) {
         _invalidField('activitySettlements[$index]', '活动结算标记重复');
+      }
+    }
+  }
+
+  /// 云用量计数节：`{ "cloud_usage:YYYY-MM-DD:<kind>": 次数 }`。
+  ///
+  /// 非法条目在这里就拒掉（而不是恢复时静默跳过），因为它是**数字**契约：
+  /// 负数或非整数说明备份被改过，此时拒绝整份备份比带着坏数据恢复更安全。
+  void _validateCloudUsage(Map<String, dynamic> data) {
+    if (!data.containsKey('cloudUsage')) return;
+    final value = data['cloudUsage'];
+    if (value is! Map<String, dynamic>) {
+      _invalidField('cloudUsage', '必须是 JSON 对象');
+    }
+    for (final entry in value.entries) {
+      final key = entry.key;
+      if (!key.startsWith('cloud_usage:')) {
+        _invalidField('cloudUsage.$key', '不是有效的云用量键');
+      }
+      final count = entry.value;
+      if (count is! int || count < 0) {
+        _invalidField('cloudUsage.$key', '次数必须是非负整数');
+      }
+      final parts = key.split(':');
+      if (parts.length != 3 || DateTime.tryParse(parts[1]) == null) {
+        _invalidField('cloudUsage.$key', '日期段不是有效的 YYYY-MM-DD');
+      }
+      if (!CloudUsageKind.values.any((kind) => kind.key == parts[2])) {
+        _invalidField('cloudUsage.$key', '不是受支持的用量类别');
       }
     }
   }
