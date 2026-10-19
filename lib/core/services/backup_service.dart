@@ -2196,6 +2196,13 @@ class BackupService {
     Set<String> allowed,
   ) {
     final value = item[key];
+    // 字段缺失/null 视为「该备份导出于本字段引入之前」，直接放行，
+    // 由反序列化层回退到模型默认值。与 `_optionalDouble`、
+    // `_validateOptionalDate` 的缺失语义保持一致。
+    //
+    // 漏掉这一守卫会拒绝所有旧备份：`null is! String` 为 true，
+    // 缺失的字段会被报成「值无效」。历史缺陷见 1893 行 calculationMode。
+    if (value == null) return;
     if (value is! String || !allowed.contains(value)) {
       _invalidField('$path.$key', '不是受支持的枚举值');
     }
