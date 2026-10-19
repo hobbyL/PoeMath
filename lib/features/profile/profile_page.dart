@@ -36,13 +36,13 @@ class ProfilePage extends ConsumerWidget {
         child: Stack(
           children: <Widget>[
             AnimatedPageBody(
-              // 顶部多留一点，让内容（尤其是密钥丢失提示卡）不与悬浮的
-              // 设置按钮重叠。按钮本身高约 40，这里给到 lg + xs。
+              // 水平用 md（Tab 页统一值，与首页/设置一致）；顶部多留一点，
+              // 让内容不与悬浮的设置按钮重叠（按钮高约 40，给到 lg + xs）。
               padding: const EdgeInsets.fromLTRB(
-                SpacingTokens.lg,
+                SpacingTokens.md,
                 SpacingTokens.lg + SpacingTokens.xs,
-                SpacingTokens.lg,
-                SpacingTokens.lg,
+                SpacingTokens.md,
+                SpacingTokens.md,
               ),
               children: <Widget>[
                 // 密钥丢失降级提示（一次性）。放最顶：它是本次启动唯一需要
@@ -157,7 +157,8 @@ class ProfilePage extends ConsumerWidget {
                     ),
                     const SizedBox(width: SpacingTokens.sm),
                     Expanded(
-                      child: _buildAchievementCard(context, theme, unlockedCount),
+                      child:
+                          _buildAchievementCard(context, theme, unlockedCount),
                     ),
                   ],
                 ),
@@ -334,7 +335,8 @@ class ProfilePage extends ConsumerWidget {
 ///   开始时清除。两条路都只清一次（`_cleared` 兜底）。
 class _HiveKeyRecoveredNotice extends StatefulWidget {
   @override
-  State<_HiveKeyRecoveredNotice> createState() => _HiveKeyRecoveredNoticeState();
+  State<_HiveKeyRecoveredNotice> createState() =>
+      _HiveKeyRecoveredNoticeState();
 }
 
 class _HiveKeyRecoveredNoticeState extends State<_HiveKeyRecoveredNotice> {

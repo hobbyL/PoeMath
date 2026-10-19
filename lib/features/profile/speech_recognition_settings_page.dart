@@ -291,10 +291,7 @@ class _SpeechRecognitionSettingsPageState
       ),
       body: SafeArea(
         child: AnimatedPageBody(
-          padding: const EdgeInsets.symmetric(
-            horizontal: SpacingTokens.md,
-            vertical: SpacingTokens.sm,
-          ),
+          padding: const EdgeInsets.all(SpacingTokens.lg),
           children: <Widget>[
             Text('腾讯云密钥', style: theme.textTheme.titleMedium),
             if (_loadingSettings) ...[

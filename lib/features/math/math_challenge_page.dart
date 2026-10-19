@@ -1006,6 +1006,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
 
     return Center(
       child: AnimatedPageBody(
+        padding: const EdgeInsets.all(SpacingTokens.lg),
         children: [
           const SizedBox(height: SpacingTokens.xl),
           Icon(

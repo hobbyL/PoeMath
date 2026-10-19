@@ -146,6 +146,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       appBar: AppBar(title: const Text('通知设置')),
       body: SafeArea(
         child: AnimatedPageBody(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
             // ============ 学习提醒 ============
             ColoredCard(

@@ -62,6 +62,7 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
       appBar: AppBar(title: const Text('教材学习路线')),
       body: SafeArea(
         child: AnimatedPageBody(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
             ColoredCard(
               color: theme.colorScheme.primary,

@@ -51,6 +51,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
       appBar: AppBar(title: const Text('学习日历')),
       body: SafeArea(
         child: AnimatedPageBody(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
             // 月份导航
             Row(

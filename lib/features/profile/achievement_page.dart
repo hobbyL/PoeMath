@@ -37,7 +37,7 @@ class AchievementPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('成就勋章')),
       body: SafeArea(
         child: AnimatedPageBody(
-          padding: const EdgeInsets.all(SpacingTokens.md),
+          padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
             // 总览卡片
             ColoredCard(

@@ -62,10 +62,7 @@ class _AboutPageState extends State<AboutPage> {
       appBar: AppBar(title: const Text('关于')),
       body: SafeArea(
         child: AnimatedPageBody(
-          padding: const EdgeInsets.symmetric(
-            horizontal: SpacingTokens.md,
-            vertical: SpacingTokens.sm,
-          ),
+          padding: const EdgeInsets.all(SpacingTokens.lg),
           children: <Widget>[
             const SizedBox(height: SpacingTokens.lg),
 
@@ -98,16 +95,14 @@ class _AboutPageState extends State<AboutPage> {
                   Text(
                     AppConstants.slogan,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(height: SpacingTokens.xs),
                   Text(
                     version,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                     ),
                   ),
                 ],
@@ -146,8 +141,8 @@ class _AboutPageState extends State<AboutPage> {
                       '让孩子在轻松愉快的氛围中学习成长。',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         height: 1.6,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.8),
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -206,9 +201,7 @@ class _AboutPageState extends State<AboutPage> {
               icon: Icons.system_update_outlined,
               iconColor: theme.colorScheme.onSurfaceVariant,
               title: '检查更新',
-              subtitle: AppConfig.hasUpdateCheckUrl
-                  ? '查看新版本并下载安装'
-                  : '更新检查未配置',
+              subtitle: AppConfig.hasUpdateCheckUrl ? '查看新版本并下载安装' : '更新检查未配置',
               onTap: AppConfig.hasUpdateCheckUrl
                   ? () => context.push(AppRoutes.update)
                   : null,
@@ -252,8 +245,7 @@ class _AboutPageState extends State<AboutPage> {
                 '数据存储于本地，不收集任何个人信息',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color:
-                      theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
                   height: 1.8,
                 ),
               ),
@@ -389,8 +381,8 @@ class _AboutPageState extends State<AboutPage> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.2),
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -411,8 +403,7 @@ class _AboutPageState extends State<AboutPage> {
                     child: FutureBuilder<String>(
                       future: _privacyPolicyFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState !=
-                            ConnectionState.done) {
+                        if (snapshot.connectionState != ConnectionState.done) {
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
@@ -457,8 +448,7 @@ class _AboutPageState extends State<AboutPage> {
     for (final line in lines) {
       var s = line;
       // 跳过仅含引用提示的仓库维护说明行（应用内无需展示）
-      if (s.startsWith('> 本文档与应用内') ||
-          s.startsWith('> 修改隐私说明时')) {
+      if (s.startsWith('> 本文档与应用内') || s.startsWith('> 修改隐私说明时')) {
         continue;
       }
       s = s.replaceFirst(RegExp(r'^#{1,6}\s*'), '');
@@ -480,8 +470,7 @@ class _AboutPageState extends State<AboutPage> {
     return out.join('\n').trim();
   }
 
-  static const String _privacyPolicyAsset =
-      'assets/legal/privacy_policy.md';
+  static const String _privacyPolicyAsset = 'assets/legal/privacy_policy.md';
 
   /// Asset 加载失败时的精简兜底（与正式政策原则一致，避免空白）。
   static const String _privacyPolicyFallback = '''

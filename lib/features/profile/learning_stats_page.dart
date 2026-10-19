@@ -42,6 +42,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
       ),
       body: SafeArea(
         child: AnimatedPageBody(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
             // 周期汇总卡片
             _buildSummaryCard(theme, stats),

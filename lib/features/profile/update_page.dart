@@ -57,10 +57,7 @@ class _UpdatePageState extends State<UpdatePage> {
       appBar: AppBar(title: const Text('检查更新')),
       body: SafeArea(
         child: AnimatedPageBody(
-          padding: const EdgeInsets.symmetric(
-            horizontal: SpacingTokens.md,
-            vertical: SpacingTokens.sm,
-          ),
+          padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
             _buildStatusCard(context),
             if (_current != null || _latest != null) ...[

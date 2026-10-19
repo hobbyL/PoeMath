@@ -52,6 +52,7 @@ class WeeklyReportPage extends ConsumerWidget {
       ),
       body: SafeArea(
         child: AnimatedPageBody(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
             // 日期范围
             Center(
