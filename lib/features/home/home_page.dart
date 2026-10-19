@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -42,49 +41,18 @@ class HomePage extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppConstants.appName),
-        actions: [
-          // 等级徽章
-          Padding(
-            padding: const EdgeInsets.only(right: SpacingTokens.md),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.sm,
-                  vertical: SpacingTokens.xs,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.semantic.caution.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.stars_rounded,
-                      size: 16,
-                      color: theme.semantic.caution,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      stats.levelName,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.semantic.caution,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      // 本页不用 AppBar：顶部只放应用名 + 等级徽章，占掉整条高度却只承载
+      // 一个「当前等级」的展示。应用名移除（底部导航已标明「首页」，
+      // 无需重复）；等级徽章移入打卡卡片首行 —— 连续天数、打卡状态、
+      // 等级同属「个人进度」，放一起语义一致，且不新增任何高度。
+      //
+      // 顶部留白由 `AnimatedPageBody` 的默认 md 提供（四边一致），
+      // 不需要额外覆盖 —— 去掉 AppBar 后正文紧贴 `MainShell` 的
+      // SafeArea 下沿，md 已经足够且与左右对称。
       body: AnimatedPageBody(
         children: [
           // 打卡 + 连续天数
-          _buildStreakCard(context, streak, isCheckedIn, ref),
+          _buildStreakCard(context, streak, isCheckedIn, stats, ref),
           const SizedBox(height: SpacingTokens.md),
 
           // 学习概览
@@ -136,6 +104,7 @@ class HomePage extends ConsumerWidget {
     BuildContext context,
     int streak,
     bool isCheckedIn,
+    UserStats stats,
     WidgetRef ref,
   ) {
     final theme = Theme.of(context);
@@ -156,11 +125,25 @@ class HomePage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color:
+                            theme.colorScheme.onPrimary.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    const SizedBox(width: SpacingTokens.sm),
+                    // 等级徽章（原 AppBar 右上角）。
+                    //
+                    // 配色刻意用 onPrimary 半透明底 + 白字，而不是沿用原来
+                    // 的 `caution` 黄：本卡背景是 primary 绿色渐变，黄字
+                    // 压在绿底上对比度不足（实测在暗色主题下更糟）。
+                    // 这里用白色系保证在任何主题下都读得清 —— 等级是展示
+                    // 信息，可读性优先于配色一致性。
+                    _LevelBadge(levelName: stats.levelName),
+                  ],
                 ),
                 const SizedBox(height: SpacingTokens.xs),
                 Row(
@@ -695,6 +678,47 @@ class HomePage extends ConsumerWidget {
       );
     }
     return content;
+  }
+}
+
+/// 等级徽章：`⭐ 童生`。
+///
+/// 原先挂在 AppBar 的 actions 里（黄色系，白底）。AppBar 移除后迁入打卡
+/// 卡片的绿色渐变背景上，配色随之改为白色系 —— 见调用点注释。
+class _LevelBadge extends StatelessWidget {
+  const _LevelBadge({required this.levelName});
+
+  final String levelName;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onPrimary = theme.colorScheme.onPrimary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.sm,
+        vertical: SpacingTokens.xs,
+      ),
+      decoration: BoxDecoration(
+        color: onPrimary.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.stars_rounded, size: 14, color: onPrimary),
+          const SizedBox(width: 4),
+          Text(
+            levelName,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: onPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
