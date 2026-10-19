@@ -95,7 +95,9 @@ void main() {
   });
 
   tearDown(() async {
-    await tearDownHiveForTesting();
+    // 用例体末尾已用 `drainHiveWritesForTesting` 排空写链，此处用
+    // widget 版 tearDown（见 helper 注释：fake 时钟下 close() 需要先解链）。
+    await tearDownHiveForWidgetTesting();
   });
 
   testWidgets('配置读取期间同步连点只读取一次，读取失败后允许重试', (tester) async {
@@ -177,8 +179,20 @@ void main() {
     await tester.tap(find.text('下学期'));
     await tester.pump();
     settings.pending.complete(_config);
-    await tester.pump();
-    await tester.pump();
+    // 放行配置读取后，`_generate` 才真正开跑，它将经过
+    // `CloudUsageService.reserve` —— 其中 `HiveBoxes.meta.put` 的完成
+    // 回调挂在 Hive 写链上。fake 时钟只推得动帧、排不动写链，`await`
+    // 后面的 `_httpClient.post` 要到约 1 秒后才排到（`pumpAndSettle`
+    // 在这里也只能空等到 30s 超时）。
+    //
+    // 所以每一轮都在**真实异步区**里等一段真实时长，回到 fake 区再
+    // `pump()` 把写完排下的帧推出去，直到请求真正到达 MockClient。
+    for (var i = 0; i < 40 && request == null; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
     expect(capturedSkeleton, (2, '上', 'addition', 10));
     expect(request, isNotNull);
     await tester.tap(find.widgetWithText(ChoiceChip, '减法'));
@@ -219,6 +233,12 @@ void main() {
     expect(preview!.topicName, 'addition');
     expect(preview!.items, hasLength(10));
     expect(tester.takeException(), isNull);
+
+    // 本用例经 `CloudUsageService.reserve` 写过 `HiveBoxes.meta`
+    // （用量计数）。写帧挂在 Hive 的写链上，tearDown 的 `Hive.close()`
+    // 排在链尾——fake 时钟下写任务的完成回调排不到，close() 会空等到
+    // 30s 超时。回到真实异步区把链推一下即可解开（helper 内有详述）。
+    await drainHiveWritesForTesting(tester);
   });
 
   testWidgets('未配置 LLM 时显示引导态而非生成表单', (tester) async {
