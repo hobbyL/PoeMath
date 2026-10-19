@@ -208,6 +208,27 @@ http.Response completion({bool tool = false}) => http.Response(
       headers: {'content-type': 'application/json'},
     );
 
+/// 反复「真实等待 + pump」，直到 [done] 成立或超出轮数上限。
+///
+/// widget 测试里 `Box.put` 把写帧挂到 Hive 的 `ReadWriteSync` 写链上，
+/// 完成回调排不到 fake 时钟。只在 fake 区 `pump()` 多少帧都没用；
+/// 必须让真实时钟跑一下，写任务才排得到，之后 `pump()` 才能把回调
+/// 里排下的帧推出去。
+Future<void> _waitForWrites(
+  WidgetTester tester,
+  bool Function() done, {
+  int rounds = 50,
+}) async {
+  for (var i = 0; i < rounds && !done(); i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    // 带时长推进 fake 时钟：写链恢复后常会再挂一个需要 timer 才能触发的
+    // 后续步骤，只 `pump()` 零时长推不动它。
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
 void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
@@ -416,10 +437,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('下一题'));
     await tester.pump();
+    // 放行挂起的触觉后，作答记录与结算都经 Hive 写入落库。写帧挂在
+    // Hive 的 `ReadWriteSync` 写链上，fake 时钟推不动，必须借真实
+    // 异步区把链跑起来（每次真实延迟后回到 fake 区 pump 一帧）。
     await tester.runAsync(() async {
       gate.complete();
       await Future<void>.delayed(const Duration(milliseconds: 100));
     });
+    await _waitForWrites(
+      tester,
+      () =>
+          HiveBoxes.llmProblems.get('default_p1')!.attempts == 1 &&
+          HiveBoxes.mathSessions.isNotEmpty,
+    );
     expect(HiveBoxes.llmProblems.get('default_p1')!.attempts, 1);
     expect(HiveBoxes.llmProblems.get('default_p2')!.attempts, 0);
     final session = HiveBoxes.mathSessions.values.single;
@@ -427,6 +457,7 @@ void main() {
     expect(jsonDecode(session.problemsJson!).single['q'], 'first-question');
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 10));
+    await drainHiveWritesForTesting(tester);
   });
 
   testWidgets('应用题入库中离页，完成后不访问已销毁 ref', (tester) async {
@@ -523,44 +554,72 @@ void main() {
     );
     await tester.pumpAndSettle();
     final errors = <Object>[];
+    // `tester.tap` 只把指针事件入队，必须回到 fake 区 `pump()` 才派发；
+    // 而 tap 之后要等的那条链走 Hive 写入，fake 时钟推不动。
+    // 因此统一「fake 区 tap → 真实区等写链 → fake 区 pump」。
+    Future<void> tapAndSettle(Finder finder) async {
+      await tester.tap(finder);
+      await tester.pump();
+      await _waitForWrites(tester, () => false, rounds: 5);
+    }
+
+    /// 「查看成绩」按钮在 `_submitting` 期间 `onPressed` 为 null。
+    /// 必须等它真正可用再点，否则点击被静默丢弃。
+    bool resultButtonEnabled() {
+      final finder = find.ancestor(
+        of: find.text('查看成绩'),
+        matching: find.byType(FilledButton),
+      );
+      if (finder.evaluate().isEmpty) return false;
+      return tester.widget<FilledButton>(finder).onPressed != null;
+    }
+
     Future<void> answerAndFinish({bool capture = false}) async {
       await tester.tap(find.text('8').last);
       await tester.pump();
-      await tester.runAsync(() async {
-        await tester.tap(find.byIcon(Icons.check_rounded));
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      });
-      await tester.pump();
+      await tapAndSettle(find.byIcon(Icons.check_rounded));
       await tester.pump(const Duration(milliseconds: 300));
-      await tester.runAsync(() async {
-        if (capture) {
-          await runZonedGuarded(
-            () async {
-              await tester.tap(find.text('查看成绩'));
-            },
-            (e, s) {
-              errors.add(e);
-            },
-          );
-        } else {
-          await tester.tap(find.text('查看成绩'));
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      });
-      for (var i = 0; i < 5; i++) {
-        await tester.pump(const Duration(seconds: 1));
+      await _waitForWrites(tester, resultButtonEnabled, rounds: 100);
+      if (capture) {
+        await runZonedGuarded(
+          () => tapAndSettle(find.text('查看成绩')),
+          (e, s) {
+            errors.add(e);
+          },
+        );
+      } else {
+        await tapAndSettle(find.text('查看成绩'));
       }
     }
 
-    await answerAndFinish();
+    // 结算链（`_settleSession`）里 `addStars` / `updateToday` /
+    // `checkAchievements` 全是 Hive 写入，fake 时钟推不动写链，
+    // `SessionResultDialog` 永远弹不出来。必须在真实异步区反复推，
+    // 直到弹窗真正出现——「写进 mathSessions」只是链的中段，不能用它
+    // 当等待条件。
+    Future<void> waitForResultDialog() async {
+      await _waitForWrites(
+        tester,
+        () => find.text('再练一组').evaluate().isNotEmpty,
+        rounds: 100,
+      );
+    }
+
+    Future<void> finishRound({bool capture = false}) async {
+      await answerAndFinish();
+      await waitForResultDialog();
+    }
+
+    await finishRound();
     final firstId = HiveBoxes.mathSessions.values.single.id;
     expect(find.text('再练一组'), findsOneWidget);
-    await tester.runAsync(() async {
-      await tester.tap(find.text('再练一组'));
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+    await tapAndSettle(find.text('再练一组'));
     await tester.pumpAndSettle();
-    await answerAndFinish(capture: true);
+    await finishRound(capture: true);
+    await _waitForWrites(
+      tester,
+      () => HiveBoxes.mathSessions.length == 2,
+    );
     expect(HiveBoxes.mathSessions.length, 2);
     expect(
       HiveBoxes.mathSessions.values.map((s) => s.id).toSet(),
@@ -570,6 +629,18 @@ void main() {
     expect(errors, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
+    // 本用例两轮结算在 fake 区发起了大量 Hive 写入。`ReadWriteSync` 把
+    // `_writeTask` 指向写入时创建的 `Completer.future` —— 该 future 属于
+    // **fake 时钟 zone**。Dart 按 future 创建时的 zone 调度微任务，所以
+    // 之后若在 `runAsync` 的真实 zone 里调用 `close()`，它 `.then()` 这个
+    // future 时会排进 fake 队列，而 runAsync 内部无法 pump → 死锁。
+    //
+    // 因此在 fake 区发起 `close()`，再用「真实等待 + pump」交替把它推完。
+    var closed = false;
+    final closing = HiveBoxes.close();
+    unawaited(closing.then((_) => closed = true));
+    await _waitForWrites(tester, () => closed, rounds: 100);
+    expect(closed, isTrue, reason: 'Hive 未能在真实异步区推完关闭');
   });
 
   test('同轮活动重放幂等，异 payload 仍拒绝', () async {
