@@ -320,8 +320,9 @@ void main() {
     // 打开 p1 编辑弹窗（表单载入 baseUrl + model），直接点测试连接。
     await tester.tap(find.byTooltip('编辑此配置').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('测试连接'));
-    await tester.pumpAndSettle();
+    // `_testConnection` 经 LlmClient 发真实 HTTP。fake 时钟下这个 future
+    // 不会完成，`pumpAndSettle` 只能等到超时；必须在真实异步区触发点击。
+    await _tapReal(tester, find.text('测试连接'));
 
     expect(authHeader, 'Bearer key-p1');
     expect(find.text('连接成功，模型可用'), findsOneWidget);
