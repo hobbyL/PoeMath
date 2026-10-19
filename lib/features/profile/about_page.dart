@@ -15,7 +15,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
@@ -197,14 +196,21 @@ class _AboutPageState extends State<AboutPage> {
             const SizedBox(height: SpacingTokens.sm),
 
             // 检查更新
+            //
+            // 入口**始终可点**：是否配置更新地址由更新页自己告知
+            //（`UpdateClient.fetchLatest` 未配置时抛
+            // `UpdateConfigurationException`，页面经 `friendlyUpdateError`
+            // 显示「当前安装包未配置更新检查地址。」）。
+            //
+            // 早先此处按 `hasUpdateCheckUrl` 把 `onTap` 设为 null，未配置的
+            // 构建（如本地 debug，`UPDATE_CHECK_URL` 未经 --dart-define 注入）
+            // 点上去毫无反应，用户无法区分「坏了」与「没配」。
             AppTile(
               icon: Icons.system_update_outlined,
               iconColor: theme.colorScheme.onSurfaceVariant,
               title: '检查更新',
-              subtitle: AppConfig.hasUpdateCheckUrl ? '查看新版本并下载安装' : '更新检查未配置',
-              onTap: AppConfig.hasUpdateCheckUrl
-                  ? () => context.push(AppRoutes.update)
-                  : null,
+              subtitle: '查看新版本并下载安装',
+              onTap: () => context.push(AppRoutes.update),
             ),
             const SizedBox(height: SpacingTokens.sm),
 

@@ -85,35 +85,28 @@ class _UpdatePageState extends State<UpdatePage> {
     return ColoredCard(
       color: _phaseColor(theme),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        // 整卡内容水平居中：图标、标题、说明、操作按钮的中轴对齐，
+        // 比原先「图标 + 左对齐文字」更聚焦 —— 这个卡片在任意时刻只有
+        // 一个状态，居中后视线落点唯一。
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(_phaseIcon, color: _phaseColor(theme)),
-              const SizedBox(width: SpacingTokens.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _phaseTitle,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text(
-                      _message,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Icon(_phaseIcon, color: _phaseColor(theme)),
+          const SizedBox(height: SpacingTokens.sm),
+          Text(
+            _phaseTitle,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            _message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.45,
+            ),
           ),
           if (_phase == _UpdatePhase.downloading) ...[
             const SizedBox(height: SpacingTokens.md),
@@ -121,6 +114,7 @@ class _UpdatePageState extends State<UpdatePage> {
             const SizedBox(height: SpacingTokens.xs),
             Text(
               _downloadProgressText,
+              textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -130,6 +124,7 @@ class _UpdatePageState extends State<UpdatePage> {
           Wrap(
             spacing: SpacingTokens.sm,
             runSpacing: SpacingTokens.sm,
+            alignment: WrapAlignment.center,
             children: _buildActions(),
           ),
         ],
