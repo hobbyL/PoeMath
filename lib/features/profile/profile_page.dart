@@ -28,148 +28,163 @@ class ProfilePage extends ConsumerWidget {
     final keyRecovered = ref.watch(hiveKeyRecoveredProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('我的'),
-        actions: <Widget>[
-          IconButton(
-            tooltip: '设置',
-            onPressed: () => context.push(AppRoutes.settings),
-            icon: const Icon(Icons.settings_rounded),
-          ),
-          const SizedBox(width: SpacingTokens.sm),
-        ],
-      ),
+      // 本页不用 AppBar：顶部只放一个「我的」标题，占掉整条导航栏的
+      // 高度却不承载任何交互。改为内容顶格显示 + 设置按钮悬浮右上角
+      // （见下方 Stack）。返回由底部导航栏承担，本页是 4 个 Tab 之一，
+      // 本就不需要返回按钮。
       body: SafeArea(
-        child: AnimatedPageBody(
-          padding: const EdgeInsets.all(SpacingTokens.lg),
+        child: Stack(
           children: <Widget>[
-            // 密钥丢失降级提示（一次性）。放最顶：它是本次启动唯一需要
-            // 用户知道的事，不能压在统计卡片下面。
-            if (keyRecovered) ...[
-              _HiveKeyRecoveredNotice(),
-              const SizedBox(height: SpacingTokens.md),
-            ],
+            AnimatedPageBody(
+              // 顶部多留一点，让内容（尤其是密钥丢失提示卡）不与悬浮的
+              // 设置按钮重叠。按钮本身高约 40，这里给到 lg + xs。
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.lg,
+                SpacingTokens.lg + SpacingTokens.xs,
+                SpacingTokens.lg,
+                SpacingTokens.lg,
+              ),
+              children: <Widget>[
+                // 密钥丢失降级提示（一次性）。放最顶：它是本次启动唯一需要
+                // 用户知道的事，不能压在统计卡片下面。
+                if (keyRecovered) ...[
+                  _HiveKeyRecoveredNotice(),
+                  const SizedBox(height: SpacingTokens.md),
+                ],
 
-            // 用户头像 + 等级
-            Center(
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor:
-                        theme.colorScheme.primary.withValues(alpha: 0.15),
-                    child: Text(
-                      stats.levelName,
-                      style: theme.textTheme.headlineSmall?.copyWith(
+                // 用户头像 + 等级
+                Center(
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor:
+                            theme.colorScheme.primary.withValues(alpha: 0.15),
+                        child: Text(
+                          stats.levelName,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: SpacingTokens.sm),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SpacingTokens.md,
+                          vertical: SpacingTokens.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.semantic.caution.withValues(alpha: 0.12),
+                          borderRadius:
+                              BorderRadius.circular(SpacingTokens.radiusPill),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.stars_rounded,
+                              size: 16,
+                              color: theme.semantic.caution,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${stats.totalStars} 颗星星',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: theme.semantic.caution,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.lg),
+
+                // 统计面板
+                _buildStatsPanel(context, stats, streak),
+                const SizedBox(height: SpacingTokens.md),
+
+                // 学习报告 + 学习日历 + 成就勋章（一行三个卡片）
+                Row(
+                  children: [
+                    Expanded(
+                      child: ColoredCard(
                         color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.bold,
+                        onTap: () => context.push(AppRoutes.learningStats),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.bar_chart_rounded,
+                              size: 32,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(height: SpacingTokens.sm),
+                            Text(
+                              '学习报告',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: SpacingTokens.sm),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpacingTokens.md,
-                      vertical: SpacingTokens.xs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.semantic.caution.withValues(alpha: 0.12),
-                      borderRadius:
-                          BorderRadius.circular(SpacingTokens.radiusPill),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.stars_rounded,
-                          size: 16,
-                          color: theme.semantic.caution,
+                    const SizedBox(width: SpacingTokens.sm),
+                    Expanded(
+                      child: ColoredCard(
+                        color: theme.semantic.caution,
+                        onTap: () => context.push(AppRoutes.learningCalendar),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.calendar_month_rounded,
+                              size: 32,
+                              color: theme.semantic.caution,
+                            ),
+                            const SizedBox(height: SpacingTokens.sm),
+                            Text(
+                              '学习日历',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${stats.totalStars} 颗星星',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.semantic.caution,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.lg),
+                    const SizedBox(width: SpacingTokens.sm),
+                    Expanded(
+                      child: _buildAchievementCard(context, theme, unlockedCount),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: SpacingTokens.sm),
 
-            // 统计面板
-            _buildStatsPanel(context, stats, streak),
-            const SizedBox(height: SpacingTokens.md),
-
-            // 学习报告 + 学习日历 + 成就勋章（一行三个卡片）
-            Row(
-              children: [
-                Expanded(
-                  child: ColoredCard(
-                    color: theme.colorScheme.primary,
-                    onTap: () => context.push(AppRoutes.learningStats),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.bar_chart_rounded,
-                          size: 32,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(height: SpacingTokens.sm),
-                        Text(
-                          '学习报告',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                // 本周学习周报
+                AppTile(
+                  icon: Icons.insert_chart_outlined,
+                  iconColor: theme.colorScheme.tertiary,
+                  title: '本周学习周报',
+                  subtitle: '查看本周学习汇总与趋势',
+                  onTap: () => context.push(AppRoutes.weeklyReport),
                 ),
-                const SizedBox(width: SpacingTokens.sm),
-                Expanded(
-                  child: ColoredCard(
-                    color: theme.semantic.caution,
-                    onTap: () => context.push(AppRoutes.learningCalendar),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.calendar_month_rounded,
-                          size: 32,
-                          color: theme.semantic.caution,
-                        ),
-                        const SizedBox(height: SpacingTokens.sm),
-                        Text(
-                          '学习日历',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: SpacingTokens.sm),
-                Expanded(
-                  child: _buildAchievementCard(context, theme, unlockedCount),
-                ),
+                const SizedBox(height: SpacingTokens.md),
               ],
             ),
-            const SizedBox(height: SpacingTokens.sm),
-
-            // 本周学习周报
-            AppTile(
-              icon: Icons.insert_chart_outlined,
-              iconColor: theme.colorScheme.tertiary,
-              title: '本周学习周报',
-              subtitle: '查看本周学习汇总与趋势',
-              onTap: () => context.push(AppRoutes.weeklyReport),
+            // 设置按钮悬浮固定右上角：
+            // 不随内容滚动，任何滚动位置都够得着。
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                tooltip: '设置',
+                onPressed: () => context.push(AppRoutes.settings),
+                icon: const Icon(Icons.settings_rounded),
+              ),
             ),
-            const SizedBox(height: SpacingTokens.md),
           ],
         ),
       ),
