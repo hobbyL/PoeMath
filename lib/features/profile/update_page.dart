@@ -67,20 +67,40 @@ class _UpdatePageState extends State<UpdatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('检查更新')),
+      // 本页不用 AppBar：顶部只放一个「检查更新」标题，占掉整条高度却不
+      // 承载交互。改为内容顶格 + 返回按钮浮动左上角（见下方 Positioned）。
       body: SafeArea(
-        child: AnimatedPageBody(
-          padding: const EdgeInsets.all(SpacingTokens.lg),
+        child: Stack(
           children: [
-            _buildStatusCard(context),
-            if ((_latest?.notes ?? '').isNotEmpty) ...[
-              const SizedBox(height: SpacingTokens.sm),
-              _buildNotesCard(context),
-            ],
-            if (_history.isNotEmpty) ...[
-              const SizedBox(height: SpacingTokens.sm),
-              _buildHistoryCard(context),
-            ],
+            AnimatedPageBody(
+              // 顶部与首页一致：返回按钮是浮动层、不占流，故顶部只需
+              // md —— 与首页「今日待打卡」卡到状态栏的距离相同。
+              padding: const EdgeInsets.all(SpacingTokens.lg).copyWith(
+                top: SpacingTokens.md,
+              ),
+              children: [
+                _buildStatusCard(context),
+                if ((_latest?.notes ?? '').isNotEmpty) ...[
+                  const SizedBox(height: SpacingTokens.sm),
+                  _buildNotesCard(context),
+                ],
+                if (_history.isNotEmpty) ...[
+                  const SizedBox(height: SpacingTokens.sm),
+                  _buildHistoryCard(context),
+                ],
+              ],
+            ),
+
+            // 返回按钮浮动固定在左上角（原 AppBar 的自动返回）。
+            Positioned(
+              top: SpacingTokens.xs,
+              left: SpacingTokens.xs,
+              child: IconButton(
+                tooltip: '返回',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back),
+              ),
+            ),
           ],
         ),
       ),

@@ -58,205 +58,216 @@ class _AboutPageState extends State<AboutPage> {
         : 'v${AppConstants.appVersion}';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('关于')),
+      // 本页不用 AppBar：顶部只放一个「关于」标题，占掉整条高度却不承载
+      // 交互。改为内容顶格 + 返回按钮浮动左上角（见下方 Positioned）。
+      //
+      // `SafeArea` 必须有：本页是顶级全屏路由，没有它内容会顶到状态栏下。
       body: SafeArea(
-        child: AnimatedPageBody(
-          padding: const EdgeInsets.all(SpacingTokens.lg),
-          children: <Widget>[
-            const SizedBox(height: SpacingTokens.lg),
-
-            // 品牌 Logo + 名称
-            Center(
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.auto_stories_rounded,
-                    size: 72,
-                    color: theme.colorScheme.primary,
-                  )
-                      .animate()
-                      .scaleXY(
-                        begin: 0.8,
-                        end: 1.0,
-                        duration: 500.ms,
-                        curve: Curves.easeOutBack,
-                      )
-                      .fadeIn(duration: 400.ms),
-                  const SizedBox(height: SpacingTokens.md),
-                  Text(
-                    AppConstants.appName,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: SpacingTokens.xs),
-                  Text(
-                    AppConstants.slogan,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  const SizedBox(height: SpacingTokens.xs),
-                  Text(
-                    version,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                    ),
-                  ),
-                ],
+        child: Stack(
+          children: [
+            AnimatedPageBody(
+              // 顶部留出浮动返回按钮那一行的高度。
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.lg,
+                SpacingTokens.sm,
+                SpacingTokens.lg,
+                SpacingTokens.lg,
               ),
-            ),
-            const SizedBox(height: SpacingTokens.xl),
-
-            // 应用介绍
-            ColoredCard(
-              color: theme.colorScheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(SpacingTokens.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 20,
+              children: <Widget>[
+                // 品牌 Logo + 名称
+                Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.auto_stories_rounded,
+                        size: 72,
+                        color: theme.colorScheme.primary,
+                      )
+                          .animate()
+                          .scaleXY(
+                            begin: 0.8,
+                            end: 1.0,
+                            duration: 500.ms,
+                            curve: Curves.easeOutBack,
+                          )
+                          .fadeIn(duration: 400.ms),
+                      const SizedBox(height: SpacingTokens.md),
+                      Text(
+                        AppConstants.appName,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
                           color: theme.colorScheme.primary,
                         ),
-                        const SizedBox(width: SpacingTokens.sm),
+                      ),
+                      const SizedBox(height: SpacingTokens.xs),
+                      Text(
+                        AppConstants.slogan,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6),
+                        ),
+                      ),
+                      const SizedBox(height: SpacingTokens.xs),
+                      Text(
+                        version,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+
+                // 应用介绍
+                ColoredCard(
+                  color: theme.colorScheme.primaryContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(SpacingTokens.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      // 不再单设「应用介绍」标题行：这张卡里只有一段文案，
+                      // 标题只是把同一件事说两遍（卡片位置已表明它是什么）。
+                      children: [
                         Text(
-                          '应用介绍',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
+                          '韵算是一款专为小学生设计的学习应用，将古诗文背诵和口算练习融合在一起。'
+                          '通过科学的复习算法、有趣的成就系统和丰富的动画反馈，'
+                          '让孩子在轻松愉快的氛围中学习成长。',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            height: 1.6,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.8),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: SpacingTokens.sm),
-                    Text(
-                      '韵算是一款专为小学生设计的学习应用，将古诗文背诵和口算练习融合在一起。'
-                      '通过科学的复习算法、有趣的成就系统和丰富的动画反馈，'
-                      '让孩子在轻松愉快的氛围中学习成长。',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        height: 1.6,
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-
-            // 功能信息
-            AppTile(
-              icon: Icons.history_edu_outlined,
-              iconColor: theme.colorScheme.primary,
-              title: '诗词学习',
-              subtitle: '小学必背古诗文，科学复习记忆法',
-              onTap: () => context.go(AppRoutes.poemTab),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            AppTile(
-              icon: Icons.calculate_outlined,
-              iconColor: theme.colorScheme.secondary,
-              title: '口算练习',
-              subtitle: '多难度分级，错题本自动归纳',
-              onTap: () => context.go(AppRoutes.mathTab),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            AppTile(
-              icon: Icons.emoji_events_outlined,
-              iconColor: theme.colorScheme.tertiary,
-              title: '成就体系',
-              subtitle: '44枚成就勋章，记录成长足迹',
-              onTap: () => context.push(AppRoutes.achievements),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-
-            // 导出诊断日志（生产环境崩溃/异常排查入口）。
-            //
-            // 刻意**不加家长门禁**：诊断文本已在写入时 scrub，且不含学习数据，
-            // 不构成儿童隐私面；而加门禁恰恰会在用户最需要导出的时刻（应用
-            // 刚崩溃/家长不在场）把他卡住。这与 backup_restore_page.dart 的
-            // 处理有意不同。
-            AppTile(
-              icon: Icons.bug_report_outlined,
-              iconColor: theme.colorScheme.onSurfaceVariant,
-              title: '导出诊断日志',
-              subtitle: _diagnosticCount == 0
-                  ? '暂无可导出的日志'
-                  : '最近 $_diagnosticCount 条记录',
-              onTap: (_diagnosticCount == 0 || _exportingDiagnostics)
-                  ? null
-                  : () => _exportDiagnostics(context),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-
-            // 检查更新
-            //
-            // 入口**始终可点**：是否配置更新地址由更新页自己告知
-            //（`UpdateClient.fetchLatest` 未配置时抛
-            // `UpdateConfigurationException`，页面经 `friendlyUpdateError`
-            // 显示「当前安装包未配置更新检查地址。」）。
-            //
-            // 早先此处按 `hasUpdateCheckUrl` 把 `onTap` 设为 null，未配置的
-            // 构建（如本地 debug，`UPDATE_CHECK_URL` 未经 --dart-define 注入）
-            // 点上去毫无反应，用户无法区分「坏了」与「没配」。
-            AppTile(
-              icon: Icons.system_update_outlined,
-              iconColor: theme.colorScheme.onSurfaceVariant,
-              title: '检查更新',
-              subtitle: '查看新版本并下载安装',
-              onTap: () => context.push(AppRoutes.update),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-
-            // 隐私政策 & 开源许可
-            AppTile(
-              icon: Icons.privacy_tip_outlined,
-              iconColor: theme.colorScheme.primary,
-              title: '隐私政策',
-              subtitle: '了解我们如何保护您的数据',
-              onTap: () => _showPrivacyPolicy(context),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            AppTile(
-              icon: Icons.description_outlined,
-              iconColor: theme.colorScheme.secondary,
-              title: '开源许可',
-              subtitle: '查看使用的第三方库及许可',
-              onTap: () => showLicensePage(
-                context: context,
-                applicationName: AppConstants.appName,
-                applicationVersion: version,
-                applicationIcon: Padding(
-                  padding: const EdgeInsets.all(SpacingTokens.md),
-                  child: Icon(
-                    Icons.auto_stories_rounded,
-                    size: 48,
-                    color: theme.colorScheme.primary,
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.xl),
+                const SizedBox(height: SpacingTokens.md),
 
-            // 底部版权声明
-            Center(
-              child: Text(
-                '© 2024-2026 韵算 PoeMath\n'
-                '数据存储于本地，不收集任何个人信息',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                  height: 1.8,
+                // 功能信息
+                AppTile(
+                  icon: Icons.history_edu_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: '诗词学习',
+                  subtitle: '小学必背古诗文，科学复习记忆法',
+                  onTap: () => context.go(AppRoutes.poemTab),
                 ),
+                const SizedBox(height: SpacingTokens.sm),
+                AppTile(
+                  icon: Icons.calculate_outlined,
+                  iconColor: theme.colorScheme.secondary,
+                  title: '口算练习',
+                  subtitle: '多难度分级，错题本自动归纳',
+                  onTap: () => context.go(AppRoutes.mathTab),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                AppTile(
+                  icon: Icons.emoji_events_outlined,
+                  iconColor: theme.colorScheme.tertiary,
+                  title: '成就体系',
+                  subtitle: '44枚成就勋章，记录成长足迹',
+                  onTap: () => context.push(AppRoutes.achievements),
+                ),
+                // 与其他 AppTile 之间保持一致（sm）；这里原为 md，导致
+                // 「成就体系 → 导出诊断日志」明显比别处疏。
+                const SizedBox(height: SpacingTokens.sm),
+
+                // 导出诊断日志（生产环境崩溃/异常排查入口）。
+                //
+                // 刻意**不加家长门禁**：诊断文本已在写入时 scrub，且不含学习数据，
+                // 不构成儿童隐私面；而加门禁恰恰会在用户最需要导出的时刻（应用
+                // 刚崩溃/家长不在场）把他卡住。这与 backup_restore_page.dart 的
+                // 处理有意不同。
+                AppTile(
+                  icon: Icons.bug_report_outlined,
+                  iconColor: theme.colorScheme.onSurfaceVariant,
+                  title: '导出诊断日志',
+                  subtitle: _diagnosticCount == 0
+                      ? '暂无可导出的日志'
+                      : '最近 $_diagnosticCount 条记录',
+                  onTap: (_diagnosticCount == 0 || _exportingDiagnostics)
+                      ? null
+                      : () => _exportDiagnostics(context),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+
+                // 检查更新
+                //
+                // 入口**始终可点**：是否配置更新地址由更新页自己告知
+                //（`UpdateClient.fetchLatest` 未配置时抛
+                // `UpdateConfigurationException`，页面经 `friendlyUpdateError`
+                // 显示「当前安装包未配置更新检查地址。」）。
+                //
+                // 早先此处按 `hasUpdateCheckUrl` 把 `onTap` 设为 null，未配置的
+                // 构建（如本地 debug，`UPDATE_CHECK_URL` 未经 --dart-define 注入）
+                // 点上去毫无反应，用户无法区分「坏了」与「没配」。
+                AppTile(
+                  icon: Icons.system_update_outlined,
+                  iconColor: theme.colorScheme.onSurfaceVariant,
+                  title: '检查更新',
+                  subtitle: '查看新版本并下载安装',
+                  onTap: () => context.push(AppRoutes.update),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+
+                // 隐私政策 & 开源许可
+                AppTile(
+                  icon: Icons.privacy_tip_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: '隐私政策',
+                  subtitle: '了解我们如何保护您的数据',
+                  onTap: () => _showPrivacyPolicy(context),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                AppTile(
+                  icon: Icons.description_outlined,
+                  iconColor: theme.colorScheme.secondary,
+                  title: '开源许可',
+                  subtitle: '查看使用的第三方库及许可',
+                  onTap: () => showLicensePage(
+                    context: context,
+                    applicationName: AppConstants.appName,
+                    applicationVersion: version,
+                    applicationIcon: Padding(
+                      padding: const EdgeInsets.all(SpacingTokens.md),
+                      child: Icon(
+                        Icons.auto_stories_rounded,
+                        size: 48,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.xl),
+
+                // 底部版权声明
+                Center(
+                  child: Text(
+                    '© 2024-2026 韵算 PoeMath\n'
+                    '数据存储于本地，不收集任何个人信息',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      height: 1.8,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.lg),
+              ],
+            ),
+
+            // 返回按钮浮动固定在左上角（原 AppBar 的自动返回）。
+            Positioned(
+              top: SpacingTokens.xs,
+              left: SpacingTokens.xs,
+              child: IconButton(
+                tooltip: '返回',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back),
               ),
             ),
-            const SizedBox(height: SpacingTokens.lg),
           ],
         ),
       ),
