@@ -46,56 +46,60 @@ class HomePage extends ConsumerWidget {
       // 无需重复）；等级徽章移入打卡卡片首行 —— 连续天数、打卡状态、
       // 等级同属「个人进度」，放一起语义一致，且不新增任何高度。
       //
-      // 顶部留白由 `AnimatedPageBody` 的默认 md 提供（四边一致），
-      // 不需要额外覆盖 —— 去掉 AppBar 后正文紧贴 `MainShell` 的
-      // SafeArea 下沿，md 已经足够且与左右对称。
-      body: AnimatedPageBody(
-        children: [
-          // 打卡 + 连续天数
-          _buildStreakCard(context, streak, isCheckedIn, stats, ref),
-          const SizedBox(height: SpacingTokens.md),
+      // 必须包 `SafeArea`：`MainShell` 的 Scaffold 直接用 `Stack` 装子页，
+      // 没有 SafeArea，去掉 AppBar 后首张卡片会直接顶到状态栏下面。
+      // 仅靠 `AnimatedPageBody` 的 padding 不够 —— 它是相对屏幕物理顶边
+      // 的，量不出状态栏那 40px。`ProfilePage` 一直有 SafeArea，本页补上
+      // 才与其他 Tab 一致。
+      body: SafeArea(
+        child: AnimatedPageBody(
+          children: [
+            // 打卡 + 连续天数
+            _buildStreakCard(context, streak, isCheckedIn, stats, ref),
+            const SizedBox(height: SpacingTokens.md),
 
-          // 学习概览
-          _buildStatsOverview(context, stats, learnedPoems),
-          const SizedBox(height: SpacingTokens.lg),
+            // 学习概览
+            _buildStatsOverview(context, stats, learnedPoems),
+            const SizedBox(height: SpacingTokens.lg),
 
-          // 快捷入口
-          const PracticeResumeSection(),
-          const TodayPlanSection(),
-          Text(
-            '快捷入口',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          _buildQuickActions(context, mistakeCount),
-          const SizedBox(height: SpacingTokens.lg),
-
-          // 今日推荐
-          if (recommendedPoem != null) ...[
+            // 快捷入口
+            const PracticeResumeSection(),
+            const TodayPlanSection(),
             Text(
-              '今日推荐',
+              '快捷入口',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: SpacingTokens.sm),
-            _buildDailyRecommendation(context, recommendedPoem),
+            _buildQuickActions(context, mistakeCount),
             const SizedBox(height: SpacingTokens.lg),
-          ],
 
-          // 复习提醒（有待复习时显示）
-          if (dueReviews > 0) ...[
-            _buildReviewReminder(context, dueReviews),
-            const SizedBox(height: SpacingTokens.lg),
-          ],
+            // 今日推荐
+            if (recommendedPoem != null) ...[
+              Text(
+                '今日推荐',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              _buildDailyRecommendation(context, recommendedPoem),
+              const SizedBox(height: SpacingTokens.lg),
+            ],
 
-          // 今日目标
-          _buildDailyGoal(context, dueReviews, ref),
-          // 底部留白：为底部导航栏预留空间
-          const SizedBox(height: 100),
-        ],
+            // 复习提醒（有待复习时显示）
+            if (dueReviews > 0) ...[
+              _buildReviewReminder(context, dueReviews),
+              const SizedBox(height: SpacingTokens.lg),
+            ],
+
+            // 今日目标
+            _buildDailyGoal(context, dueReviews, ref),
+            // 底部留白：为底部导航栏预留空间
+            const SizedBox(height: 100),
+          ],
+        ),
       ),
     );
   }
