@@ -376,15 +376,15 @@ class _HiveKeyRecoveredNoticeState extends State<_HiveKeyRecoveredNotice> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '本地学习记录已重置',
+                  '部分本地记录暂时无法读取',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: SpacingTokens.xs),
                 Text(
-                  '设备的加密密钥丢失，之前的学习记录已无法读取，'
-                  '已为你重新开始。若曾有备份，可在「设置 - 备份与恢复」中导入。',
+                  '部分文件无法解密或已损坏，原始文件已隔离保留。'
+                  '其余记录仍可使用；若曾有备份，可在「设置 - 备份与恢复」中导入。',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

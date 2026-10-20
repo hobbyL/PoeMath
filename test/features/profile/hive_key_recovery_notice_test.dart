@@ -57,7 +57,7 @@ import 'package:poemath/features/profile/providers/hive_key_recovery_providers.d
 import '../../helpers/day_key_override.dart';
 import '../../helpers/hive_test_helper.dart';
 
-const String _title = '本地学习记录已重置';
+const String _title = '部分本地记录暂时无法读取';
 
 /// 同步读回标记（`box.get` 不 await，不受 fake clock 影响）。
 Object? _marker() => HiveBoxes.meta.get(HiveKeys.metaHiveKeyRecovered);
@@ -159,7 +159,7 @@ void main() {
 
         expect(find.text(_title), findsOneWidget);
         // 文案必须给出原因与出路，不能只丢一句「出错了」。
-        expect(find.textContaining('加密密钥丢失'), findsOneWidget);
+        expect(find.textContaining('原始文件已隔离保留'), findsOneWidget);
         expect(find.textContaining('备份与恢复'), findsOneWidget);
       });
     });

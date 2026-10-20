@@ -1,14 +1,6 @@
 // test/core/services/hive_encryption_key_resolver_test.dart
 //
-// G6 最重要的闸门：启动时「用哪把 cipher + 什么状态」的判定顺序
-// （design.md §7.3），以及密钥丢失时**降级而不是抛异常**（§7.4）。
-//
-// 这是本任务唯一会「删用户数据」的代码路径，因此每条分支都要有测试：
-//   - 密钥丢失 → 删不可读密文 + 新密钥空数据 + 标记 recoveredEmpty
-//   - 全新安装 → 生成密钥、不标记
-//   - 明文数据 + 无密钥 → 迁移成密文
-//   - 迁移失败 → 退回明文模式且**删掉刚生成的密钥**（否则下次启动会
-//     把明文 box 误判成「密钥损坏」，进而清空数据）
+// 验证启动逐 box 迁移、失败重试以及不可读文件的完整留底。
 
 import 'dart:convert';
 import 'dart:io';
@@ -40,8 +32,11 @@ final class _MemoryStore extends SecureCredentialStore {
       values[key];
 
   @override
-  Future<void> writeRawSecret(String key, String value,
-      {IOSOptions? iOptions,}) async {
+  Future<void> writeRawSecret(
+    String key,
+    String value, {
+    IOSOptions? iOptions,
+  }) async {
     values[key] = value;
   }
 
@@ -91,8 +86,10 @@ void main() {
     if (dir.existsSync()) dir.deleteSync(recursive: true);
   });
 
-  Future<ResolvedCipher> resolve() =>
-      HiveEncryptionKeyResolver.resolve(boxDir: dir.path, credentialStore: store);
+  Future<ResolvedCipher> resolve() => HiveEncryptionKeyResolver.resolve(
+        boxDir: dir.path,
+        credentialStore: store,
+      );
 
   group('全新安装', () {
     test('无密钥、无文件 → newInstall，生成密钥', () async {
@@ -118,24 +115,28 @@ void main() {
   });
 
   group('密钥丢失（降级，不抛异常）', () {
-    test('密钥存在但解不开数据 → recoveredEmpty，删掉不可读文件', () async {
+    test('密钥存在但解不开数据 → 保留密钥并隔离完整文件', () async {
       // 数据用 key A 加密，安全存储里却是 key B（换机恢复备份、
       // 安全存储被清后重新生成等情形）。
       await _writeBox(dir, 'poems', {'p1': 'data'}, key: _key(1));
-      store.values[HiveEncryptionKeyProvider.keyName] =
-          base64Encode(_key(2));
+      store.values[HiveEncryptionKeyProvider.keyName] = base64Encode(_key(2));
 
+      final before = await File('${dir.path}/poems.hive').readAsBytes();
       final result = await resolve();
 
       expect(result.status, HiveKeyStatus.recoveredEmpty);
       expect(HiveEncryptionKeyResolver.isPlaintext(result.cipher), isFalse);
       // 不可读的密文应被清掉，为新数据让路。
       expect(File('${dir.path}/poems.hive').existsSync(), isFalse);
-      // 密钥应被换成新的（不是原来那把解不开的）。
+      // 已存密钥不覆盖，原始文件完整留在隔离目录。
       expect(
         base64Decode(store.values[HiveEncryptionKeyProvider.keyName]!),
-        isNot(_key(2)),
+        _key(2),
       );
+      final files =
+          Directory('${dir.path}/hive_recovery').listSync().whereType<File>();
+      expect(files, hasLength(1));
+      expect(await files.single.readAsBytes(), before);
     });
 
     test('降级后同一把新密钥可开新 box（自洽）', () async {
@@ -251,7 +252,7 @@ void main() {
 
       final result = await resolve();
 
-      expect(result.status, HiveKeyStatus.ok);
+      expect(result.status, HiveKeyStatus.recoveredEmpty);
       expect(HiveEncryptionKeyResolver.isPlaintext(result.cipher), isFalse);
       // 明文那个 box 必须已转密文。
       final reopened = await Hive.openBox<dynamic>(
@@ -277,19 +278,34 @@ void main() {
     });
   });
 
-  group('迁移失败退路', () {
-    test('可读明文但迁移过程出错 → 明文模式继续，保留数据', () async {
-      // 「有明文可读」已由 `_anyBoxReadableAsPlaintext` 确认，因此会进迁移。
-      // 这里断言的是：万一迁移内部失败，退路仍是「明文模式 + 数据还在」，
-      // 而不是把数据清掉。
-      await _writeBox(dir, 'poems', {'p1': 'plaintext'});
-
+  group('中断迁移恢复', () {
+    test('已有密钥和密文时仍补迁移余下明文', () async {
+      final key = _key();
+      store.values[HiveEncryptionKeyProvider.keyName] = base64Encode(key);
+      await _writeBox(dir, 'poems', {'p': 'encrypted'}, key: key);
+      await _writeBox(dir, 'settings', {'s': 'plaintext'});
       final result = await resolve();
-
-      // 正常路径：迁移成功。
       expect(result.status, HiveKeyStatus.ok);
-      expect(HiveEncryptionKeyResolver.isPlaintext(result.cipher), isFalse);
-      expect(File('${dir.path}/poems.hive').existsSync(), isTrue);
+      final box = await Hive.openBox<dynamic>(
+        'settings',
+        encryptionCipher: result.cipher,
+        crashRecovery: false,
+      );
+      expect(box.get('s'), 'plaintext');
+    });
+
+    test('备份阶段失败保留完整源文件，重试可迁移', () async {
+      await _writeBox(dir, 'poems', {'p': 'original'});
+      final original = await File('${dir.path}/poems.hive').readAsBytes();
+      final blocker =
+          await Directory('${dir.path}/poems.hive.plaintext.bak.pending')
+              .create();
+      await expectLater(resolve(), throwsA(isA<HiveError>()));
+      expect(await File('${dir.path}/poems.hive').readAsBytes(), original);
+      final key = store.values[HiveEncryptionKeyProvider.keyName];
+      await blocker.delete();
+      expect((await resolve()).status, HiveKeyStatus.ok);
+      expect(store.values[HiveEncryptionKeyProvider.keyName], key);
     });
   });
 

@@ -1,9 +1,6 @@
 // test/core/services/hive_encryption_key_provider_test.dart
 //
-// G6 的闸门：密钥的生成、持久化与「损坏/丢失」的降级判定。
-//
-// 这一层的每个失败方向都必须落在「当作没有密钥」而不是「抛异常」上：
-// 它在启动路径上，抛出去 = 永久重试页 = 用户连界面都进不去（design.md P6）。
+// 读取失败不得覆盖密钥；成功读取的损坏编码与缺失值单独处理。
 
 import 'dart:convert';
 
@@ -28,17 +25,22 @@ final class _MemoryStore extends SecureCredentialStore {
         super(storage: const _InertSecureStorage());
 
   final Set<String> _throwOnRead;
+  Object? readError;
   final Map<String, String> values = {};
 
   @override
   Future<String?> readRawSecret(String key, {IOSOptions? iOptions}) async {
+    if (readError != null) throw readError!;
     if (_throwOnRead.contains(key)) throw StateError('模拟安全存储不可读');
     return values[key];
   }
 
   @override
-  Future<void> writeRawSecret(String key, String value,
-      {IOSOptions? iOptions,}) async {
+  Future<void> writeRawSecret(
+    String key,
+    String value, {
+    IOSOptions? iOptions,
+  }) async {
     values[key] = value;
   }
 
@@ -76,10 +78,10 @@ void main() {
     });
 
     test('两次生成（不同实例、空存储）得到不同密钥', () async {
-      final a = await HiveEncryptionKeyProvider(store: _MemoryStore())
-          .loadOrCreate();
-      final b = await HiveEncryptionKeyProvider(store: _MemoryStore())
-          .loadOrCreate();
+      final a =
+          await HiveEncryptionKeyProvider(store: _MemoryStore()).loadOrCreate();
+      final b =
+          await HiveEncryptionKeyProvider(store: _MemoryStore()).loadOrCreate();
       expect(a.key, isNot(b.key));
     });
 
@@ -87,6 +89,17 @@ void main() {
       final result =
           await HiveEncryptionKeyProvider(store: _MemoryStore()).loadOrCreate();
       expect(result.key.every((b) => b >= 0 && b <= 255), isTrue);
+    });
+
+    test('平台读取抛 FormatException 不能当作已读出的损坏编码覆盖密钥', () async {
+      final store = _MemoryStore();
+      final raw = base64Encode(List<int>.filled(32, 8));
+      store.values[HiveEncryptionKeyProvider.keyName] = raw;
+      store.readError = const FormatException('platform decode failed');
+      await expectLater(HiveEncryptionKeyProvider(store: store).loadOrCreate(), throwsA(isA<HiveKeyUnavailable>()));
+      expect(store.values[HiveEncryptionKeyProvider.keyName], raw);
+      store.readError = null;
+      expect((await HiveEncryptionKeyProvider(store: store).loadOrCreate()).key, List<int>.filled(32, 8));
     });
 
     group('损坏的密钥按「丢失」处理，不抛异常', () {
@@ -119,17 +132,20 @@ void main() {
         expect(result.key, hasLength(32));
       });
 
-      test('安全存储读取抛错 → 当作无密钥，不向上抛', () async {
-        final store = _MemoryStore(throwOnRead: {
-          HiveEncryptionKeyProvider.keyName,
-        },);
+      test('安全存储读取抛错 → 保留旧密钥并允许重试', () async {
+        final store = _MemoryStore(
+          throwOnRead: {
+            HiveEncryptionKeyProvider.keyName,
+          },
+        );
 
-        // 不 expect throws：这一层必须吞掉，否则启动直接失败。
-        final result =
-            await HiveEncryptionKeyProvider(store: store).loadOrCreate();
-
-        expect(result.isNew, isTrue);
-        expect(result.key, hasLength(32));
+        final old = base64Encode(List<int>.filled(32, 8));
+        store.values[HiveEncryptionKeyProvider.keyName] = old;
+        await expectLater(
+          HiveEncryptionKeyProvider(store: store).loadOrCreate(),
+          throwsA(isA<HiveKeyUnavailable>()),
+        );
+        expect(store.values[HiveEncryptionKeyProvider.keyName], old);
       });
     });
   });

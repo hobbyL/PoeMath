@@ -14,6 +14,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 
+import 'package:poemath/data/hive/hive_value_snapshot.dart';
 import 'package:poemath/data/hive/migrations/hive_encryption_migration.dart';
 
 /// 明文哨兵：一段绝不会出现在密文里、且容易在字节流里检索的 ASCII。
@@ -98,7 +99,10 @@ void main() {
   setUp(() async {
     dir = await Directory.systemTemp.createTemp('hive_enc_');
     Hive.init(dir.path);
-    if (!Hive.isAdapterRegistered(77)) Hive.registerAdapter(_NoteAdapter());
+    if (!Hive.isAdapterRegistered(77)) {
+      Hive.registerAdapter(_NoteAdapter());
+      HiveValueSnapshot.registerAdapter<_Note>(_NoteAdapter());
+    }
   });
 
   tearDown(() async {
@@ -123,7 +127,8 @@ void main() {
       );
 
       // ② 同 key 读回一致。
-      final box = await Hive.openBox<dynamic>('probe', encryptionCipher: cipher);
+      final box =
+          await Hive.openBox<dynamic>('probe', encryptionCipher: cipher);
       expect(box.get(_sentinelKey), _sentinel);
       expect(box.get('n'), 42);
       expect(box.get('b'), true);
@@ -142,8 +147,12 @@ void main() {
 
     test('异 key 打不开（不是静默返回空数据）', () async {
       final key = _randomKey(1);
-      await _writeBox(dir, 'probe', {_sentinelKey: _sentinel},
-          cipher: HiveAesCipher(key),);
+      await _writeBox(
+        dir,
+        'probe',
+        {_sentinelKey: _sentinel},
+        cipher: HiveAesCipher(key),
+      );
       await Hive.close();
 
       final otherKey = _randomKey(2);
@@ -158,7 +167,10 @@ void main() {
         isFalse,
       );
       // 原 key 仍能开，证明上一条的 false 是「密钥不对」而非「文件坏了」。
-      expect(await HiveEncryptionMigration.canOpenWithKey('probe', key), isTrue);
+      expect(
+        await HiveEncryptionMigration.canOpenWithKey('probe', key),
+        isTrue,
+      );
     });
   });
 
@@ -184,8 +196,10 @@ void main() {
         isFalse,
       );
 
-      final box =
-          await Hive.openBox<dynamic>('mig', encryptionCipher: HiveAesCipher(key));
+      final box = await Hive.openBox<dynamic>(
+        'mig',
+        encryptionCipher: HiveAesCipher(key),
+      );
       expect(box.get('a'), 1);
       expect(box.get('b'), 'text');
       expect(box.get('c'), true);
@@ -203,8 +217,10 @@ void main() {
       );
 
       expect(results['enc'], BoxMigrationOutcome.alreadyEncrypted);
-      final box =
-          await Hive.openBox<dynamic>('enc', encryptionCipher: HiveAesCipher(key));
+      final box = await Hive.openBox<dynamic>(
+        'enc',
+        encryptionCipher: HiveAesCipher(key),
+      );
       expect(box.get('x'), 'keep');
       await box.close();
     });
@@ -222,8 +238,11 @@ void main() {
 
     test('空明文 box（0 字节）判为 empty，不误报为已加密', () async {
       await _writeBox(dir, 'empty', const {});
-      expect(File('${dir.path}/empty.hive').lengthSync(), 0,
-          reason: '前提：空 box 落盘就是 0 字节文件',);
+      expect(
+        File('${dir.path}/empty.hive').lengthSync(),
+        0,
+        reason: '前提：空 box 落盘就是 0 字节文件',
+      );
 
       final results = await HiveEncryptionMigration.run(
         boxNames: ['empty'],
@@ -261,7 +280,10 @@ void main() {
       // 不关掉的话下面的「异 key 不可开」会命中缓存而误判为可开。
       await Hive.close();
 
-      expect(await HiveEncryptionMigration.canOpenWithKey('probe', key), isTrue);
+      expect(
+        await HiveEncryptionMigration.canOpenWithKey('probe', key),
+        isTrue,
+      );
       expect(
         await HiveEncryptionMigration.canOpenWithKey('probe', _randomKey(8)),
         isFalse,
@@ -273,7 +295,10 @@ void main() {
       await Hive.close();
 
       expect(
-        await HiveEncryptionMigration.canOpenWithKey('plainprobe', _randomKey()),
+        await HiveEncryptionMigration.canOpenWithKey(
+          'plainprobe',
+          _randomKey(),
+        ),
         isFalse,
       );
     });
@@ -324,8 +349,10 @@ void main() {
       expect(_containsAscii(raw, 'plain-value'), isFalse);
 
       // ③ 读回必须是**真对象**（用 Map 冒充会在这里露馅），内容完整。
-      final reopened =
-          await Hive.openBox<dynamic>('objmig', encryptionCipher: HiveAesCipher(key));
+      final reopened = await Hive.openBox<dynamic>(
+        'objmig',
+        encryptionCipher: HiveAesCipher(key),
+      );
       final n1 = reopened.get('n1');
       expect(n1, isA<_Note>());
       expect((n1 as _Note).title, '静夜思');
@@ -360,43 +387,75 @@ void main() {
       expect(_containsAscii(_rawBytes(dir, 'objsnap'), '春眠不觉晓'), isFalse);
 
       // 数据仍可读回 —— 备份被删的前提是内容确实写进了密文 box。
-      final reopened = await Hive.openBox<dynamic>('objsnap',
-          encryptionCipher: HiveAesCipher(key),);
+      final reopened = await Hive.openBox<dynamic>(
+        'objsnap',
+        encryptionCipher: HiveAesCipher(key),
+      );
       final note = reopened.get('n');
       expect(note, isA<_Note>());
       expect((note as _Note).body, '春眠不觉晓');
       await reopened.close();
     });
 
-    test('迁移失败时 .plaintext.bak 保留完整明文（回滚留底可用）', () async {
-      // 构造一个必然失败的迁移：`_verify` 会在抽查阶段发现读回值不符。
-      // 这里用「让 box 里含不能被密文往返保真的值」不现实，改为直接验证
-      // 快照机制本身 —— 即 `clear()` 之后再往备份路径写快照字节，
-      // 得到的文件能被当明文 box 打开（旧实现只会拿到 0 字节）。
+    test('临时密文写入失败后完整源文件与留底都可恢复', () async {
       final box = await Hive.openBox<dynamic>('objbak');
-      await box.putAll({'n': _Note('春晓', '春眠不觉晓')});
-      final before = Uint8List.fromList(_rawBytes(dir, 'objbak'));
+      await box.put('n', _Note('春晓', '春眠不觉晓'));
       await box.close();
-
-      // `clear()` 会把源文件截成 0 字节 —— 这是必须提前快照的理由。
-      final probe = await Hive.openBox<dynamic>('objbak', crashRecovery: false);
-      await probe.clear();
-      await probe.close();
-      expect(
-        File('${dir.path}/objbak.hive').lengthSync(),
-        0,
-        reason: '前提：clear() 会把磁盘文件清空，所以不能等它之后再读原文件',
+      final before = _rawBytes(dir, 'objbak');
+      final blocker =
+          await Directory('${dir.path}/__migration_target_objbak.hive')
+              .create();
+      final results = await HiveEncryptionMigration.run(
+        boxNames: ['objbak'],
+        key: _randomKey(),
+        boxDir: dir.path,
       );
+      expect(results['objbak'], BoxMigrationOutcome.failed);
+      expect(_rawBytes(dir, 'objbak'), before);
+      expect(
+        await File('${dir.path}/objbak.hive.plaintext.bak').readAsBytes(),
+        before,
+      );
+      await blocker.delete();
+      final retry = await HiveEncryptionMigration.run(
+        boxNames: ['objbak'],
+        key: _randomKey(),
+        boxDir: dir.path,
+      );
+      expect(retry['objbak'], BoxMigrationOutcome.migrated);
+      final reopened = await Hive.openBox<dynamic>(
+        'objbak',
+        encryptionCipher: HiveAesCipher(_randomKey()),
+        crashRecovery: false,
+      );
+      expect((reopened.get('n') as _Note).body, '春眠不觉晓');
+    });
 
-      // 快照字节写回后必须是可读的完整明文 —— 这就是回滚留底的来源。
-      final restorePath = '${dir.path}/objbak_restored.hive';
-      File(restorePath).writeAsBytesSync(before);
-      final restored =
-          await Hive.openBox<dynamic>('objbak_restored', crashRecovery: false);
-      final note = restored.get('n');
-      expect(note, isA<_Note>(), reason: '快照必须保住类型，不能用 Map 冒充');
-      expect((note as _Note).body, '春眠不觉晓');
-      await restored.close();
+    test('中断后优先恢复完整明文留底', () async {
+      await _writeBox(dir, 'journal', {'n': _Note('春晓', '春眠不觉晓')});
+      final file = File('${dir.path}/journal.hive');
+      await File('${file.path}.plaintext.bak')
+          .writeAsBytes(await file.readAsBytes(), flush: true);
+      await file.writeAsBytes([1, 2, 3]);
+      final results = await HiveEncryptionMigration.run(
+        boxNames: ['journal'],
+        key: _randomKey(),
+        boxDir: dir.path,
+      );
+      expect(results['journal'], BoxMigrationOutcome.migrated);
+      final box = await Hive.openBox<dynamic>(
+        'journal',
+        encryptionCipher: HiveAesCipher(_randomKey()),
+        crashRecovery: false,
+      );
+      expect((box.get('n') as _Note).body, '春眠不觉晓');
+    });
+
+    test('迁移校验包含 toString 未暴露的字段', () {
+      expect(
+        HiveValueSnapshot.encode(_Note('相同标题', '原文')),
+        isNot(HiveValueSnapshot.encode(_Note('相同标题', '损坏正文'))),
+      );
     });
 
     test('纯标量 box 仍能迁移（解绑逻辑不能误伤无对象场景）', () async {
@@ -410,8 +469,10 @@ void main() {
       );
 
       expect(results['scalars'], BoxMigrationOutcome.migrated);
-      final box =
-          await Hive.openBox<dynamic>('scalars', encryptionCipher: HiveAesCipher(key));
+      final box = await Hive.openBox<dynamic>(
+        'scalars',
+        encryptionCipher: HiveAesCipher(key),
+      );
       expect(box.get('a'), 1);
       expect(box.get('b'), 'x');
       expect(box.get('c'), true);

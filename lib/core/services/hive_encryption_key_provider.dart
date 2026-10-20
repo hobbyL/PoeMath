@@ -15,6 +15,14 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/utils/logger.dart';
 
+/// 安全存储暂时不可访问；启动应保留原密钥和文件，允许重试。
+class HiveKeyUnavailable implements Exception {
+  const HiveKeyUnavailable();
+
+  @override
+  String toString() => '加密密钥暂时无法读取，请解锁设备后重试。原有记录已保留。';
+}
+
 /// Hive 加密密钥的读写。
 ///
 /// **只负责「取到一把密钥」，不负责判断这把密钥能不能解开现有 box** ——
@@ -29,14 +37,14 @@ class HiveEncryptionKeyProvider {
   static const int keyLengthBytes = 32;
 
   /// 安全存储中的键名。**不要改名**：改名等于丢掉密钥，用户全部学习记录
-  /// 会走「密钥丢失」降级路径被清空。
+  /// 会使原有密文无法读取。
   static const String keyName = 'hive_encryption_key';
 
   /// iOS 可访问性：`first_unlock_this_device`。
   ///
   /// - `first_unlock*`：设备重启后首次解锁即可读。启动流程要读它来开 box，
   ///   用更严的 `unlocked*` 会让「重启后未解锁就被后台唤醒」读不到密钥，
-  ///   从而误判成密钥丢失并清空数据。
+  ///   因此读取失败必须保留原状并重试。
   /// - `*_this_device`：不随 iCloud 钥匙串同步到其他设备。密钥必须设备本机
   ///   持有 —— 同步过去会让「云端备份里的密文 + 另一台设备的密钥」变成
   ///   可解密组合，等于把加密的意义抹掉。
@@ -51,8 +59,8 @@ class HiveEncryptionKeyProvider {
   /// 「有明文 box 却没有密钥」这一首启迁移场景（见 design.md §7.3）。
   ///
   /// 安全存储里存在但格式损坏（非 base64 / 长度不对）时**当作不存在**：
-  /// 重新生成一把新密钥，让上层走「密钥丢失」降级。不抛异常 —— 抛了会被
-  /// `AppBootstrap` 变成永久重试页，用户连界面都进不去（P6）。
+  /// 重新生成密钥后，上层隔离保留无法读取的文件。平台读取异常则抛出
+  /// `HiveKeyUnavailable`，启动显示可重试提示，绝不覆盖旧密钥。
   Future<({List<int> key, bool isNew})> loadOrCreate() async {
     final existing = await _read();
     if (existing != null) return (key: existing, isNew: false);
@@ -78,37 +86,26 @@ class HiveEncryptionKeyProvider {
       _store.deleteRawSecret(keyName, iOptions: _iosOptions);
 
   Future<List<int>?> _read() async {
+    final String? raw;
     try {
-      final raw = await _store.readRawSecret(keyName, iOptions: _iosOptions);
-      if (raw == null) return null;
-
-      final decoded = base64Decode(raw);
-      if (decoded.length != keyLengthBytes) {
-        AppLogger.e(
-          'Hive 加密密钥长度异常（${decoded.length} 字节，应为 $keyLengthBytes），按密钥丢失处理',
-          tag: 'Hive',
-        );
-        return null;
-      }
-      return decoded;
-    } on FormatException catch (error) {
-      // base64 解不开：存储项损坏。
-      AppLogger.e(
-        'Hive 加密密钥不是合法 base64，按密钥丢失处理',
-        tag: 'Hive',
-        error: error,
-      );
-      return null;
+      raw = await _store.readRawSecret(keyName, iOptions: _iosOptions);
     } on Object catch (error) {
-      // 安全存储本身不可用（如 Keystore 异常）。同样走丢失路径：
-      // 这里必须吞掉，否则启动直接失败。
       AppLogger.e(
-        'Hive 加密密钥读取失败，按密钥丢失处理',
+        'Hive 加密密钥暂时无法读取，保留现有密钥并等待重试',
         tag: 'Hive',
         error: error,
       );
-      return null;
+      throw const HiveKeyUnavailable();
     }
+    if (raw == null) return null;
+    try {
+      final decoded = base64Decode(raw);
+      if (decoded.length == keyLengthBytes) return decoded;
+      AppLogger.e('Hive 加密密钥长度异常，原文件将隔离保留', tag: 'Hive');
+    } on FormatException {
+      AppLogger.e('Hive 加密密钥格式异常，原文件将隔离保留', tag: 'Hive');
+    }
+    return null;
   }
 
   Future<void> _write(List<int> key) async {

@@ -61,55 +61,110 @@ class HiveBoxes {
   /// **生产路径必须传 cipher** —— 见 `database-guidelines.md` 的
   /// 「Hive 加密」一节；漏传会让全部用户数据以明文 JSON 落盘。
   ///
-  /// 19 处 `openBox` 逐处显式写 `encryptionCipher: cipher`，**故意不抽
+  /// 19 处 `openBox` 逐处显式写 `crashRecovery: false, encryptionCipher: cipher`，**故意不抽
   /// 辅助函数**：机械重复反而让「哪一个 box 漏加了 cipher」在 review 时
   /// 一眼可见；抽成 `open<T>(name)` 会把这种遗漏藏进一行里。
   static Future<void> init({HiveCipher? cipher}) async {
     // 静态数据
-    poems =
-        await Hive.openBox<Poem>(HiveKeys.poemBox, encryptionCipher: cipher);
-    authors = await Hive.openBox<Author>(HiveKeys.authorBox,
-        encryptionCipher: cipher,);
-    formulas = await Hive.openBox<Formula>(HiveKeys.formulaBox,
-        encryptionCipher: cipher,);
+    poems = await Hive.openBox<Poem>(
+      HiveKeys.poemBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    authors = await Hive.openBox<Author>(
+      HiveKeys.authorBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    formulas = await Hive.openBox<Formula>(
+      HiveKeys.formulaBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
 
     // 动态数据
-    poemProgress = await Hive.openBox<PoemProgress>(HiveKeys.progressBox,
-        encryptionCipher: cipher,);
-    poemFavorites = await Hive.openBox<PoemFavorite>(HiveKeys.poemFavoriteBox,
-        encryptionCipher: cipher,);
-    reviewSchedules = await Hive.openBox<ReviewSchedule>(HiveKeys.reviewBox,
-        encryptionCipher: cipher,);
-    mathMistakes = await Hive.openBox<MathMistake>(HiveKeys.mistakeBox,
-        encryptionCipher: cipher,);
-    mathSessions = await Hive.openBox<MathSession>(HiveKeys.mathSessionBox,
-        encryptionCipher: cipher,);
+    poemProgress = await Hive.openBox<PoemProgress>(
+      HiveKeys.progressBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    poemFavorites = await Hive.openBox<PoemFavorite>(
+      HiveKeys.poemFavoriteBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    reviewSchedules = await Hive.openBox<ReviewSchedule>(
+      HiveKeys.reviewBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    mathMistakes = await Hive.openBox<MathMistake>(
+      HiveKeys.mistakeBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    mathSessions = await Hive.openBox<MathSession>(
+      HiveKeys.mathSessionBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
     formulaFavorites = await Hive.openBox<FormulaFavorite>(
-        HiveKeys.formulaFavoriteBox,
-        encryptionCipher: cipher,);
-    achievements = await Hive.openBox<Achievement>(HiveKeys.achievementBox,
-        encryptionCipher: cipher,);
-    checkIns = await Hive.openBox<CheckIn>(HiveKeys.checkInBox,
-        encryptionCipher: cipher,);
-    userStats = await Hive.openBox<UserStats>(HiveKeys.userStatsBox,
-        encryptionCipher: cipher,);
+      HiveKeys.formulaFavoriteBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    achievements = await Hive.openBox<Achievement>(
+      HiveKeys.achievementBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    checkIns = await Hive.openBox<CheckIn>(
+      HiveKeys.checkInBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    userStats = await Hive.openBox<UserStats>(
+      HiveKeys.userStatsBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
     challengeRecords = await Hive.openBox<ChallengeRecord>(
-        HiveKeys.challengeRecordBox,
-        encryptionCipher: cipher,);
+      HiveKeys.challengeRecordBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
     learningActivities = await Hive.openBox<LearningActivity>(
-        HiveKeys.learningActivityBox,
-        encryptionCipher: cipher,);
-    llmProblems = await Hive.openBox<LlmProblem>(HiveKeys.llmProblemBox,
-        encryptionCipher: cipher,);
-    conversations = await Hive.openBox<Conversation>(HiveKeys.conversationBox,
-        encryptionCipher: cipher,);
-    messages = await Hive.openBox<Message>(HiveKeys.messageBox,
-        encryptionCipher: cipher,);
+      HiveKeys.learningActivityBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    llmProblems = await Hive.openBox<LlmProblem>(
+      HiveKeys.llmProblemBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    conversations = await Hive.openBox<Conversation>(
+      HiveKeys.conversationBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    messages = await Hive.openBox<Message>(
+      HiveKeys.messageBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
 
     // KV
-    settings =
-        await Hive.openBox(HiveKeys.settingsBox, encryptionCipher: cipher);
-    meta = await Hive.openBox(HiveKeys.metaBox, encryptionCipher: cipher);
+    settings = await Hive.openBox(
+      HiveKeys.settingsBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    meta = await Hive.openBox(
+      HiveKeys.metaBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
   }
 
   /// 关闭所有 Box（通常在 App 退出时调用）。

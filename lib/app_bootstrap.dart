@@ -8,6 +8,7 @@ import 'package:poemath/app.dart';
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/constants/hive_keys.dart';
 import 'package:poemath/core/services/hive_encryption_key_resolver.dart';
+import 'package:poemath/core/services/hive_encryption_key_provider.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/speech/legacy_speech_cleanup.dart';
@@ -38,8 +39,7 @@ Future<void> initializeCoreStorage() async {
 
   // 决定本次启动用哪把 cipher，并完成「明文 → 密文」的一次性迁移。
   //
-  // `resolve` 的第一约束是绝不抛异常（密钥丢失时降级为空数据启动），
-  // 因此这里不包 try —— 包了反而会掩盖它内部已经兜底的降级路径。
+  // 暂时读取失败或迁移写入失败交给 AppBootstrap 显示可重试界面。
   final resolved = await HiveEncryptionKeyResolver.resolve(boxDir: boxDir);
   final plaintext = HiveEncryptionKeyResolver.isPlaintext(resolved.cipher);
 
@@ -188,7 +188,9 @@ class _AppBootstrapState extends State<AppBootstrap> {
       home: Scaffold(
         body: _error != null
             ? StartupFailureView(
-                message: '本地数据暂时无法打开，请检查设备存储空间后重试。',
+                message: _error is HiveKeyUnavailable
+                    ? _error.toString()
+                    : '本地数据暂时无法打开，原有文件已保留。请检查设备存储空间后重试。',
                 onRetry: _initialize,
                 isRetrying: _isInitializing,
               )
