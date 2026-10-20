@@ -83,6 +83,10 @@ class MathMistake extends HiveObject {
   @HiveField(19)
   String? attemptJson;
 
+  /// 与业务值同次落盘的活动结算事实，避免 meta 写入失败后重复累加。
+  @HiveField(20, defaultValue: <String>[])
+  List<String> appliedActivityIds;
+
   MathMistake({
     required this.id,
     required this.profileId,
@@ -104,7 +108,9 @@ class MathMistake extends HiveObject {
     this.semester,
     this.problemJson,
     this.attemptJson,
-  }) : createdAt = createdAt ?? DateTime.now();
+    List<String> appliedActivityIds = const [],
+  })  : createdAt = createdAt ?? DateTime.now(),
+        appliedActivityIds = List.of(appliedActivityIds);
 
   MathMistake copy() => MathMistake(
         id: id,
@@ -127,6 +133,7 @@ class MathMistake extends HiveObject {
         semester: semester,
         problemJson: problemJson,
         attemptJson: attemptJson,
+        appliedActivityIds: List.of(appliedActivityIds),
       );
 
   // ============ 派生状态（单一真相源：isResolved + consolidationRound）============

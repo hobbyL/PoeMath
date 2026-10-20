@@ -975,6 +975,7 @@ class BackupService {
   List<Map<String, dynamic>> _exportMathMistakes() {
     return HiveBoxes.mathMistakes.values.map((m) {
       return <String, dynamic>{
+        'appliedActivityIds': m.appliedActivityIds,
         'id': m.id,
         'profileId': m.profileId,
         'problemText': m.problemText,
@@ -1015,6 +1016,7 @@ class BackupService {
         'semester': s.semester,
         'difficulty': s.difficulty,
         'problemsJson': s.problemsJson,
+        'isComplete': s.isComplete,
       };
     }).toList();
   }
@@ -1047,6 +1049,7 @@ class BackupService {
   List<Map<String, dynamic>> _exportCheckIns() {
     return HiveBoxes.checkIns.values.map((c) {
       return <String, dynamic>{
+        'appliedActivityIds': c.appliedActivityIds,
         'profileId': c.profileId,
         'date': c.date,
         'poemCount': c.poemCount,
@@ -1063,6 +1066,7 @@ class BackupService {
   List<Map<String, dynamic>> _exportUserStats() {
     return HiveBoxes.userStats.values.map((s) {
       return <String, dynamic>{
+        'appliedActivityIds': s.appliedActivityIds,
         'profileId': s.profileId,
         'totalStars': s.totalStars,
         'currentStreak': s.currentStreak,
@@ -1119,6 +1123,7 @@ class BackupService {
   List<Map<String, dynamic>> _exportLlmProblems() {
     return HiveBoxes.llmProblems.values.map((p) {
       return <String, dynamic>{
+        'appliedActivityIds': p.appliedActivityIds,
         'id': p.id,
         'profileId': p.profileId,
         'questionText': p.questionText,
@@ -1240,6 +1245,8 @@ class BackupService {
         semester: m['semester'] as String?,
         problemJson: m['problemJson'] as String?,
         attemptJson: m['attemptJson'] as String?,
+        appliedActivityIds:
+            (m['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -1265,6 +1272,7 @@ class BackupService {
         semester: m['semester'] as String?,
         difficulty: m['difficulty'] as String?,
         problemsJson: m['problemsJson'] as String?,
+        isComplete: m['isComplete'] as bool? ?? true,
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -1321,6 +1329,8 @@ class BackupService {
         durationSeconds: m['durationSeconds'] as int? ?? 0,
         isCheckedIn: m['isCheckedIn'] as bool? ?? true,
         activitySources: m['activitySources'] as int? ?? 0,
+        appliedActivityIds:
+            (m['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
       );
       await box.put('${obj.profileId}_${obj.date}', obj);
     }
@@ -1344,6 +1354,8 @@ class BackupService {
         level: m['level'] as int? ?? 0,
         createdAt: _parseDateTime(m['createdAt']),
         mathBestStreak: m['mathBestStreak'] as int? ?? 0,
+        appliedActivityIds:
+            (m['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
       );
       await box.put('${obj.profileId}_stats', obj);
     }
@@ -1429,6 +1441,8 @@ class BackupService {
         attempts: m['attempts'] as int? ?? 0,
         correctCount: m['correctCount'] as int? ?? 0,
         lastDoneAt: _parseDateTime(m['lastDoneAt']),
+        appliedActivityIds:
+            (m['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -1832,7 +1846,18 @@ class BackupService {
     _optionalScore(item, 'lastScore', path);
   }
 
+  void _validateAppliedActivityIds(Map<String, dynamic> item, String path) {
+    final ids = item['appliedActivityIds'];
+    if (ids != null &&
+        (ids is! List ||
+            ids.any((id) => id is! String || id.trim().isEmpty) ||
+            ids.toSet().length != ids.length)) {
+      _invalidField('$path.appliedActivityIds', '必须为非空活动 ID 字符串数组');
+    }
+  }
+
   void _validateMathMistake(Map<String, dynamic> item, String path) {
+    _validateAppliedActivityIds(item, path);
     for (final key in <String>[
       'id',
       'profileId',
@@ -1887,6 +1912,7 @@ class BackupService {
   }
 
   void _validateMathSession(Map<String, dynamic> item, String path) {
+    _optionalBool(item, 'isComplete', path);
     for (final key in <String>['id', 'profileId', 'problemType']) {
       _requiredString(item, key, path);
     }
@@ -1940,6 +1966,7 @@ class BackupService {
   }
 
   void _validateCheckIn(Map<String, dynamic> item, String path) {
+    _validateAppliedActivityIds(item, path);
     _requiredString(item, 'profileId', path);
     _requiredString(item, 'date', path);
     for (final key in <String>[
@@ -1960,6 +1987,7 @@ class BackupService {
   }
 
   void _validateUserStats(Map<String, dynamic> item, String path) {
+    _validateAppliedActivityIds(item, path);
     _requiredString(item, 'profileId', path);
     for (final key in <String>[
       'totalStars',
@@ -2080,6 +2108,7 @@ class BackupService {
   }
 
   void _validateLlmProblem(Map<String, dynamic> item, String path) {
+    _validateAppliedActivityIds(item, path);
     for (final key in <String>[
       'id',
       'profileId',

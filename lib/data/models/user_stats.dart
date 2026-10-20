@@ -56,6 +56,10 @@ class UserStats extends HiveObject {
   @HiveField(10, defaultValue: 0)
   int mathBestStreak;
 
+  /// 与业务值同次落盘的活动结算事实，避免 meta 写入失败后重复累加。
+  @HiveField(11, defaultValue: <String>[])
+  List<String> appliedActivityIds;
+
   UserStats({
     required this.profileId,
     this.totalStars = 0,
@@ -68,7 +72,9 @@ class UserStats extends HiveObject {
     this.level = 0,
     this.mathBestStreak = 0,
     DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+    List<String> appliedActivityIds = const [],
+  })  : createdAt = createdAt ?? DateTime.now(),
+        appliedActivityIds = List.of(appliedActivityIds);
 
   /// 等级名称映射
   static const List<String> levelNames = [
@@ -99,5 +105,6 @@ class UserStats extends HiveObject {
         level: level,
         mathBestStreak: mathBestStreak,
         createdAt: createdAt,
+        appliedActivityIds: List.of(appliedActivityIds),
       );
 }

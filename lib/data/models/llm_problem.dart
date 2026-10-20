@@ -83,6 +83,10 @@ class LlmProblem extends HiveObject {
   @HiveField(17)
   DateTime? lastDoneAt;
 
+  /// 与业务值同次落盘的活动结算事实，避免 meta 写入失败后重复累加。
+  @HiveField(18, defaultValue: <String>[])
+  List<String> appliedActivityIds;
+
   LlmProblem({
     required this.id,
     required this.profileId,
@@ -102,7 +106,8 @@ class LlmProblem extends HiveObject {
     this.attempts = 0,
     this.correctCount = 0,
     this.lastDoneAt,
-  });
+    List<String> appliedActivityIds = const [],
+  }) : appliedActivityIds = List.of(appliedActivityIds);
 
   /// 组装算式显示文本（如 "12 + 4 = ?"）。
   Map<String, dynamic> toSnapshot() => {
@@ -124,6 +129,7 @@ class LlmProblem extends HiveObject {
         'attempts': attempts,
         'correctCount': correctCount,
         'lastDoneAt': lastDoneAt?.toIso8601String(),
+        'appliedActivityIds': appliedActivityIds,
       };
 
   factory LlmProblem.fromSnapshot(Map<String, dynamic> json) => LlmProblem(
@@ -145,6 +151,8 @@ class LlmProblem extends HiveObject {
         attempts: json['attempts'] as int? ?? 0,
         correctCount: json['correctCount'] as int? ?? 0,
         lastDoneAt: DateTime.tryParse(json['lastDoneAt'] as String? ?? ''),
+        appliedActivityIds:
+            (json['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
       );
 
   /// 组装算式显示文本（如 "12 + 4 = ?"）。

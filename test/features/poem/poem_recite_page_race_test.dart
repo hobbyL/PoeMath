@@ -115,7 +115,8 @@ class _CountingCheckInRepository extends CheckInRepository {
   int starsAdded = 0;
 
   @override
-  Future<void> updateToday({
+  Future<void> updateForDate(
+    DateTime date, {
     String? activityId,
     int? addPoems,
     int? addMathTotal,
@@ -132,7 +133,8 @@ class _CountingCheckInRepository extends CheckInRepository {
 class _FailOnceCheckInRepository extends _CountingCheckInRepository {
   bool fail = true;
   @override
-  Future<void> updateToday({
+  Future<void> updateForDate(
+    DateTime date, {
     String? activityId,
     int? addPoems,
     int? addMathTotal,
@@ -144,7 +146,8 @@ class _FailOnceCheckInRepository extends _CountingCheckInRepository {
       fail = false;
       throw StateError('模拟汇总写入失败');
     }
-    await super.updateToday(
+    await super.updateForDate(
+      date,
       activityId: activityId,
       addPoems: addPoems,
       addMathTotal: addMathTotal,

@@ -47,36 +47,47 @@ class UserStatsRepository {
       final stats = get().copy();
       stats.totalStars += count;
       stats.level = LevelCalculator.calculate(stats.totalStars);
+      if (activityId != null) {
+        stats.appliedActivityIds = [...stats.appliedActivityIds, activityId];
+      }
       await save(stats);
     }
 
     if (activityId == null) {
-      await add();
+      await ActivitySettlementLedger.serial(
+          ActivitySettlementLedger.userStatsChannel, add,);
       return;
     }
     await ActivitySettlementLedger.runOnce(
       channel: ActivitySettlementLedger.userStatsChannel,
       activityId: activityId,
       action: add,
+      isApplied: () => get().appliedActivityIds.contains(activityId),
     );
   }
 
   /// 更新连续打卡
   Future<void> updateStreak(int currentStreak) async {
-    final stats = await getOrCreate();
-    stats.currentStreak = currentStreak;
-    if (currentStreak > stats.longestStreak) {
-      stats.longestStreak = currentStreak;
-    }
-    await stats.save();
+    await ActivitySettlementLedger.serial(
+        ActivitySettlementLedger.userStatsChannel, () async {
+      final stats = get().copy();
+      stats.currentStreak = currentStreak;
+      if (currentStreak > stats.longestStreak) {
+        stats.longestStreak = currentStreak;
+      }
+      await save(stats);
+    });
   }
 
   /// 更新诗词学习统计
   Future<void> updatePoemStats({int? learned, int? mastered}) async {
-    final stats = await getOrCreate();
-    if (learned != null) stats.poemsLearned = learned;
-    if (mastered != null) stats.poemsMastered = mastered;
-    await stats.save();
+    await ActivitySettlementLedger.serial(
+        ActivitySettlementLedger.userStatsChannel, () async {
+      final stats = get().copy();
+      if (learned != null) stats.poemsLearned = learned;
+      if (mastered != null) stats.poemsMastered = mastered;
+      await save(stats);
+    });
   }
 
   /// 更新口算统计
@@ -84,19 +95,25 @@ class UserStatsRepository {
     required int problems,
     required int correct,
   }) async {
-    final stats = await getOrCreate();
-    stats.mathTotalProblems += problems;
-    stats.mathTotalCorrect += correct;
-    await stats.save();
+    await ActivitySettlementLedger.serial(
+        ActivitySettlementLedger.userStatsChannel, () async {
+      final stats = get().copy();
+      stats.mathTotalProblems += problems;
+      stats.mathTotalCorrect += correct;
+      await save(stats);
+    });
   }
 
   /// 更新口算最佳连续答对数（仅在新纪录超过旧纪录时更新）
   Future<void> updateMathBestStreak(int streak) async {
-    final stats = await getOrCreate();
-    if (streak > stats.mathBestStreak) {
-      stats.mathBestStreak = streak;
-      await stats.save();
-    }
+    await ActivitySettlementLedger.serial(
+        ActivitySettlementLedger.userStatsChannel, () async {
+      final stats = get().copy();
+      if (streak > stats.mathBestStreak) {
+        stats.mathBestStreak = streak;
+        await save(stats);
+      }
+    });
   }
 
   /// 记录一道口算题的作答结果（做题数 +1，答对时正确数 +1，并刷新连对纪录）。
@@ -108,22 +125,28 @@ class UserStatsRepository {
     required int bestStreak,
     String? activityId,
   }) async {
-    if (activityId != null) {
-      await ActivitySettlementLedger.runOnce(
-        channel: ActivitySettlementLedger.userStatsChannel,
-        activityId: activityId,
-        action: () =>
-            recordMathAttempt(isCorrect: isCorrect, bestStreak: bestStreak),
-      );
+    Future<void> record() async {
+      final stats = get().copy();
+      stats.mathTotalProblems += 1;
+      if (isCorrect) stats.mathTotalCorrect += 1;
+      if (bestStreak > stats.mathBestStreak) stats.mathBestStreak = bestStreak;
+      if (activityId != null) {
+        stats.appliedActivityIds = [...stats.appliedActivityIds, activityId];
+      }
+      await save(stats);
+    }
+
+    if (activityId == null) {
+      await ActivitySettlementLedger.serial(
+          ActivitySettlementLedger.userStatsChannel, record,);
       return;
     }
-    final stats = get().copy();
-    stats.mathTotalProblems += 1;
-    if (isCorrect) stats.mathTotalCorrect += 1;
-    if (bestStreak > stats.mathBestStreak) {
-      stats.mathBestStreak = bestStreak;
-    }
-    await save(stats);
+    await ActivitySettlementLedger.runOnce(
+      channel: ActivitySettlementLedger.userStatsChannel,
+      activityId: activityId,
+      action: record,
+      isApplied: () => get().appliedActivityIds.contains(activityId),
+    );
   }
 
   /// 一次性结算限时挑战的口算统计、连击、星星和等级。
@@ -149,8 +172,9 @@ class UserStatsRepository {
 
     Future<void> settle() async {
       final key = ProfileScope.key('stats');
-      final stats = HiveBoxes.userStats.get(key) ??
-          UserStats(profileId: ProfileScope.currentId);
+      final stats = (HiveBoxes.userStats.get(key) ??
+              UserStats(profileId: ProfileScope.currentId))
+          .copy();
       stats.mathTotalProblems += problems;
       stats.mathTotalCorrect += correct;
       if (bestStreak > stats.mathBestStreak) {
@@ -158,16 +182,21 @@ class UserStatsRepository {
       }
       stats.totalStars += stars;
       stats.level = LevelCalculator.calculate(stats.totalStars);
+      if (activityId != null) {
+        stats.appliedActivityIds = [...stats.appliedActivityIds, activityId];
+      }
       await HiveBoxes.userStats.put(key, stats);
     }
 
     if (activityId == null) {
-      await settle();
+      await ActivitySettlementLedger.serial(
+          ActivitySettlementLedger.userStatsChannel, settle,);
     } else {
       await ActivitySettlementLedger.runOnce(
         channel: ActivitySettlementLedger.userStatsChannel,
         activityId: activityId,
         action: settle,
+        isApplied: () => get().appliedActivityIds.contains(activityId),
       );
     }
     return get();

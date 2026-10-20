@@ -90,7 +90,8 @@ class _CountingCheckInRepository extends CheckInRepository {
   int durationAdded = 0;
 
   @override
-  Future<void> updateToday({
+  Future<void> updateForDate(
+    DateTime date, {
     String? activityId,
     int? addPoems,
     int? addMathTotal,

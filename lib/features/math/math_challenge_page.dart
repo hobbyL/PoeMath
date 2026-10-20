@@ -516,7 +516,8 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       bestStreak: _bestCombo,
       stars: stars,
     );
-    await checkInRepo.updateToday(
+    await checkInRepo.updateForDate(
+      record.createdAt,
       activityId: record.id,
       addMathTotal: _totalAnswered,
       addMathCorrect: _correctCount,
@@ -757,8 +758,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
             ),
             child: Icon(
               icon,
-              color:
-                  isSelected ? color : theme.colorScheme.onSurfaceVariant,
+              color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
               size: 22,
             ),
           ),

@@ -81,6 +81,8 @@ class MathMistakeKeyMigration {
       // 因此换 key 必须换实例：先删旧 key 释放旧实例，再写入聚合拷贝。
       final migrated = MathMistake(
         id: newId,
+        appliedActivityIds:
+            group.expand((e) => e.value.appliedActivityIds).toSet().toList(),
         profileId: earliest.profileId,
         problemText: earliest.problemText,
         correctAnswer: earliest.correctAnswer,

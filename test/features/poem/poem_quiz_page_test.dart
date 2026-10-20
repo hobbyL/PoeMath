@@ -60,7 +60,8 @@ class _ImmediateCheckInRepository extends CheckInRepository {
   var starsAdded = 0;
 
   @override
-  Future<void> updateToday({
+  Future<void> updateForDate(
+    DateTime date, {
     String? activityId,
     int? addPoems,
     int? addMathTotal,

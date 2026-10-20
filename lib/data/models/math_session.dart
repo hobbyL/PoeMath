@@ -62,6 +62,10 @@ class MathSession extends HiveObject {
   @HiveField(12)
   String? problemsJson;
 
+  /// 是否已完成结算；false 是逐题保存的运行中检查点。
+  @HiveField(13, defaultValue: true)
+  final bool isComplete;
+
   MathSession({
     required this.id,
     required this.profileId,
@@ -76,6 +80,7 @@ class MathSession extends HiveObject {
     this.semester,
     this.difficulty,
     this.problemsJson,
+    this.isComplete = true,
   }) : startedAt = startedAt ?? DateTime.now();
 
   double get accuracy => totalProblems > 0 ? correctCount / totalProblems : 0.0;

@@ -86,24 +86,42 @@ class LlmProblemRepository {
   }
 
   /// 记录一次作答。
-  Future<void> recordAttempt(String id,
-      {required bool correct, String? activityId,}) async {
-    if (activityId != null) {
-      await ActivitySettlementLedger.runOnce(
-        channel: ActivitySettlementLedger.userStatsChannel,
-        activityId: activityId,
-        action: () => recordAttempt(id, correct: correct),
+  Future<void> recordAttempt(
+    String id, {
+    required bool correct,
+    String? activityId,
+  }) async {
+    Future<void> record() async {
+      final stored = getById(id);
+      if (stored == null) return;
+      final problem = LlmProblem.fromSnapshot(stored.toSnapshot());
+      if (activityId != null) {
+        problem.appliedActivityIds = [
+          ...problem.appliedActivityIds,
+          activityId,
+        ];
+      }
+      problem.attempts++;
+      if (correct) problem.correctCount++;
+      problem.done = true;
+      problem.lastDoneAt = DateTime.now();
+      await HiveBoxes.llmProblems.put(ProfileScope.key(id), problem);
+    }
+
+    if (activityId == null) {
+      await ActivitySettlementLedger.serial(
+        ActivitySettlementLedger.userStatsChannel,
+        record,
       );
       return;
     }
-    final stored = getById(id);
-    if (stored == null) return;
-    final problem = LlmProblem.fromSnapshot(stored.toSnapshot());
-    problem.attempts++;
-    if (correct) problem.correctCount++;
-    problem.done = true;
-    problem.lastDoneAt = DateTime.now();
-    await HiveBoxes.llmProblems.put(ProfileScope.key(id), problem);
+    await ActivitySettlementLedger.runOnce(
+      channel: ActivitySettlementLedger.userStatsChannel,
+      activityId: activityId,
+      action: record,
+      isApplied: () =>
+          getById(id)?.appliedActivityIds.contains(activityId) ?? false,
+    );
   }
 
   /// 删除单题。

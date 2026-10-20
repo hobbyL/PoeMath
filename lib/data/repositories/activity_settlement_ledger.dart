@@ -59,10 +59,27 @@ class ActivitySettlementLedger {
     await HiveBoxes.meta.putAll({for (final key in replacement) key: true});
   }
 
+  static Future<T> serial<T>(
+      String channel, Future<T> Function() action,) async {
+    final lockKey = ProfileScope.key('settlement_lock:$channel');
+    while (_inFlight[lockKey] != null) {
+      await _inFlight[lockKey];
+    }
+    final done = Completer<void>();
+    _inFlight[lockKey] = done.future;
+    try {
+      return await action();
+    } finally {
+      _inFlight.remove(lockKey);
+      done.complete();
+    }
+  }
+
   static Future<bool> runOnce({
     required String channel,
     required String activityId,
     required Future<void> Function() action,
+    bool Function()? isApplied,
   }) async {
     if (channel.trim().isEmpty) {
       throw ArgumentError.value(channel, 'channel', '不能为空');
@@ -76,26 +93,13 @@ class ActivitySettlementLedger {
 
     final key = ProfileScope.key('activity_settlement:$channel:$activityId');
 
-    while (true) {
-      final pending = _inFlight[key];
-      if (pending != null) {
-        await pending;
-        continue;
+    return serial(channel, () async {
+      if (HiveBoxes.meta.get(key) == true || (isApplied?.call() ?? false)) {
+        return false;
       }
-      if (HiveBoxes.meta.get(key) == true) return false;
-
-      final completer = Completer<void>();
-      _inFlight[key] = completer.future;
-      try {
-        // 在当前 isolate 设置锁后再次检查，兼容外部刚写入的标记。
-        if (HiveBoxes.meta.get(key) == true) return false;
-        await action();
-        await HiveBoxes.meta.put(key, true);
-        return true;
-      } finally {
-        _inFlight.remove(key);
-        completer.complete();
-      }
-    }
+      await action();
+      await HiveBoxes.meta.put(key, true);
+      return true;
+    });
   }
 }

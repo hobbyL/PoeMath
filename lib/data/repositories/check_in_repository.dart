@@ -23,14 +23,16 @@ class CheckInRepository {
   CheckIn? getToday() => getByDate(DateTime.now());
 
   /// 记录今日打卡（创建或更新）
-  Future<CheckIn> checkInToday() async {
-    final record = await _getOrCreateToday(isCheckedIn: true);
-    if (!record.isCheckedIn) {
-      record.isCheckedIn = true;
-      await record.save();
-    }
-    return record;
-  }
+  Future<CheckIn> checkInToday() => ActivitySettlementLedger.serial(
+          ActivitySettlementLedger.dailySummaryChannel, () async {
+        final record = await _getOrCreateToday(isCheckedIn: true);
+        if (!record.isCheckedIn) {
+          final next = record.copy()..isCheckedIn = true;
+          await HiveBoxes.checkIns.put(ProfileScope.key(next.date), next);
+          return next;
+        }
+        return record;
+      });
 
   Future<CheckIn> _getOrCreateToday({required bool isCheckedIn}) async {
     final now = DateTime.now();
@@ -58,8 +60,35 @@ class CheckInRepository {
     int? addStars,
     int? addDuration,
   }) async {
+    await updateForDate(
+      DateTime.now(),
+      activityId: activityId,
+      addPoems: addPoems,
+      addMathTotal: addMathTotal,
+      addMathCorrect: addMathCorrect,
+      addStars: addStars,
+      addDuration: addDuration,
+    );
+  }
+
+  Future<void> updateForDate(
+    DateTime date, {
+    String? activityId,
+    int? addPoems,
+    int? addMathTotal,
+    int? addMathCorrect,
+    int? addStars,
+    int? addDuration,
+  }) async {
+    final dateStr = _dateKey(date);
+    final key = ProfileScope.key(dateStr);
     Future<void> update() async {
-      final record = await _getOrCreateToday(isCheckedIn: false);
+      final record = HiveBoxes.checkIns.get(key)?.copy() ??
+          CheckIn(
+            profileId: ProfileScope.currentId,
+            date: dateStr,
+            isCheckedIn: false,
+          );
       if (addPoems != null) {
         record.poemCount += addPoems;
         record.activitySources |= CheckIn.poemActivitySource;
@@ -71,17 +100,27 @@ class CheckInRepository {
       if (addMathCorrect != null) record.mathCorrectCount += addMathCorrect;
       if (addStars != null) record.starsEarned += addStars;
       if (addDuration != null) record.durationSeconds += addDuration;
-      await record.save();
+      if (activityId != null) {
+        record.appliedActivityIds = [...record.appliedActivityIds, activityId];
+      }
+      await HiveBoxes.checkIns.put(key, record);
     }
 
     if (activityId == null) {
-      await update();
+      await ActivitySettlementLedger.serial(
+          ActivitySettlementLedger.dailySummaryChannel, update,);
       return;
     }
     await ActivitySettlementLedger.runOnce(
       channel: ActivitySettlementLedger.dailySummaryChannel,
       activityId: activityId,
       action: update,
+      isApplied: () =>
+          HiveBoxes.checkIns
+              .get(key)
+              ?.appliedActivityIds
+              .contains(activityId) ??
+          false,
     );
   }
 
@@ -107,14 +146,12 @@ class CheckInRepository {
 
   /// 获取某月的打卡记录（用于日历显示）
   List<CheckIn> getByMonth(int year, int month) {
-    return HiveBoxes.checkIns.values
-        .where((c) {
-          if (c.profileId != ProfileScope.currentId) return false;
-          final parts = c.date.split('-');
-          if (parts.length != 3) return false;
-          return int.parse(parts[0]) == year && int.parse(parts[1]) == month;
-        })
-        .toList();
+    return HiveBoxes.checkIns.values.where((c) {
+      if (c.profileId != ProfileScope.currentId) return false;
+      final parts = c.date.split('-');
+      if (parts.length != 3) return false;
+      return int.parse(parts[0]) == year && int.parse(parts[1]) == month;
+    }).toList();
   }
 
   /// 当月打卡天数

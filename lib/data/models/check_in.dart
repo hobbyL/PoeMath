@@ -47,6 +47,10 @@ class CheckIn extends HiveObject {
   static const int poemActivitySource = 1;
   static const int mathActivitySource = 2;
 
+  /// 与业务值同次落盘的活动结算事实，避免 meta 写入失败后重复累加。
+  @HiveField(9, defaultValue: <String>[])
+  List<String> appliedActivityIds;
+
   CheckIn({
     required this.profileId,
     required this.date,
@@ -57,13 +61,25 @@ class CheckIn extends HiveObject {
     this.isCheckedIn = true,
     this.mathTotalCount = 0,
     this.activitySources = 0,
-  });
+    List<String> appliedActivityIds = const [],
+  }) : appliedActivityIds = List.of(appliedActivityIds);
 
-  bool get hasPoemActivitySummary =>
-      activitySources & poemActivitySource != 0;
+  CheckIn copy() => CheckIn(
+        profileId: profileId,
+        date: date,
+        poemCount: poemCount,
+        mathCorrectCount: mathCorrectCount,
+        starsEarned: starsEarned,
+        durationSeconds: durationSeconds,
+        isCheckedIn: isCheckedIn,
+        mathTotalCount: mathTotalCount,
+        activitySources: activitySources,
+        appliedActivityIds: List.of(appliedActivityIds),
+      );
 
-  bool get hasMathActivitySummary =>
-      activitySources & mathActivitySource != 0;
+  bool get hasPoemActivitySummary => activitySources & poemActivitySource != 0;
+
+  bool get hasMathActivitySummary => activitySources & mathActivitySource != 0;
 
   bool get hasActivitySummary => activitySources != 0;
 

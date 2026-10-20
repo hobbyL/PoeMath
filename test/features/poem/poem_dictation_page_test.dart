@@ -77,7 +77,8 @@ class _Stats extends UserStatsRepository {
 
 class _CheckIn extends CheckInRepository {
   @override
-  Future<void> updateToday({
+  Future<void> updateForDate(
+    DateTime date, {
     String? activityId,
     int? addPoems,
     int? addMathTotal,

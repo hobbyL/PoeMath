@@ -434,7 +434,8 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
         detailsJson: detailsJson,
       );
       if (stars > 0) await stats.addStars(stars, activityId: activityId);
-      await checkIn.updateToday(
+      await checkIn.updateForDate(
+        completedAt,
         activityId: activityId,
         addPoems: 1,
         addStars: stars,

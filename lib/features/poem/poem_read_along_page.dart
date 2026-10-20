@@ -662,7 +662,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       if (stars > 0) {
         await statsRepo.addStars(stars, activityId: activityId);
       }
-      await checkInRepo.updateToday(
+      await checkInRepo.updateForDate(
+        completedAt,
         activityId: activityId,
         addPoems: 1,
         addStars: stars,

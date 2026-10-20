@@ -558,7 +558,10 @@ void main() {
     // 而 tap 之后要等的那条链走 Hive 写入，fake 时钟推不动。
     // 因此统一「fake 区 tap → 真实区等写链 → fake 区 pump」。
     Future<void> tapAndSettle(Finder finder) async {
-      await tester.tap(finder);
+      await tester.runAsync(() async {
+        await tester.tap(finder);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      });
       await tester.pump();
       await _waitForWrites(tester, () => false, rounds: 5);
     }
@@ -575,8 +578,7 @@ void main() {
     }
 
     Future<void> answerAndFinish({bool capture = false}) async {
-      await tester.tap(find.text('8').last);
-      await tester.pump();
+      await tapAndSettle(find.text('8').last);
       await tapAndSettle(find.byIcon(Icons.check_rounded));
       await tester.pump(const Duration(milliseconds: 300));
       await _waitForWrites(tester, resultButtonEnabled, rounds: 100);

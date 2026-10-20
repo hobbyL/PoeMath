@@ -123,7 +123,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
             (draft['request'] as Map<String, dynamic>?)?['mode'] ==
                 ProblemMode.vertical.name;
         final intentIsVertical = intent?.mode == ProblemMode.vertical;
-        final sameScheme = intent == null || draftIsVertical == intentIsVertical;
+        final sameScheme =
+            intent == null || draftIsVertical == intentIsVertical;
 
         final resume = !sameScheme
             ? false // 意图不同：丢草稿走新练习（下方 remove）。
@@ -394,6 +395,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       starsEarned: 0,
       startedAt: _startTime,
       finishedAt: DateTime.now(),
+      isComplete: false,
       semester: _request!.semester,
       difficulty: _request!.difficulty.name,
       problemsJson: jsonEncode(
@@ -678,7 +680,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       );
     }
     await _drafts.guard(
-      () => checkInRepo.updateToday(
+      () => checkInRepo.updateForDate(
+        completedAt,
         activityId: activityId,
         addMathTotal: problems.length,
         addMathCorrect: correctCount,

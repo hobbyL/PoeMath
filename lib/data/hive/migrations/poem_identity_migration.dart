@@ -71,14 +71,15 @@ class PoemIdentityMigration {
   }
 
   static Future<void> refreshCounts() async {
-    for (final s in HiveBoxes.userStats.values.toList()) {
+    for (final entry in HiveBoxes.userStats.toMap().entries) {
+      final s = entry.value.copy();
       final records = HiveBoxes.poemProgress.values
           .where((p) => p.profileId == s.profileId);
       s.poemsLearned =
           records.where((p) => p.status != LearningStatus.notStarted).length;
       s.poemsMastered =
           records.where((p) => p.status == LearningStatus.mastered).length;
-      await s.save();
+      await HiveBoxes.userStats.put(entry.key, s);
     }
   }
 }

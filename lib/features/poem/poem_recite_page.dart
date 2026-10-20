@@ -451,7 +451,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
         await statsRepo.addStars(rewardStars, activityId: activityId);
       }
 
-      await checkInRepo.updateToday(
+      await checkInRepo.updateForDate(
+        completedAt,
         activityId: activityId,
         addPoems: 1,
         addStars: rewardStars,

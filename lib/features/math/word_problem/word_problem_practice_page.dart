@@ -271,6 +271,7 @@ class _WordProblemPracticePageState
       starsEarned: 0,
       startedAt: _startTime,
       finishedAt: DateTime.now(),
+      isComplete: false,
       semester: first.semester,
       difficulty: _difficultyLabel(first.difficulty),
       problemsJson: jsonEncode(
@@ -483,7 +484,8 @@ class _WordProblemPracticePageState
           .guard(() => statsRepo.addStars(stars, activityId: activityId));
     }
     await _drafts.guard(
-      () => checkInRepo.updateToday(
+      () => checkInRepo.updateForDate(
+        completedAt,
         activityId: activityId,
         addMathTotal: problems.length,
         addMathCorrect: correctCount,

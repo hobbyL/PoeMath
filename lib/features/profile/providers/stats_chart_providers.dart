@@ -64,9 +64,19 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
   // 旧版回退：普通口算会话按完成日期聚合。
   final sessionMap =
       <String, ({int total, int correct, int stars, int duration})>{};
+  final partialMap = <String, ({int total, int correct, int duration})>{};
   for (final s in HiveBoxes.mathSessions.values) {
     if (s.profileId != ProfileScope.currentId || s.finishedAt == null) continue;
     final key = _dateKey(s.finishedAt!);
+    if (!s.isComplete) {
+      final prev = partialMap[key] ?? (total: 0, correct: 0, duration: 0);
+      partialMap[key] = (
+        total: prev.total + s.totalProblems,
+        correct: prev.correct + s.correctCount,
+        duration: prev.duration + s.durationSeconds
+      );
+      continue;
+    }
     final prev =
         sessionMap[key] ?? (total: 0, correct: 0, stars: 0, duration: 0);
     sessionMap[key] = (
@@ -177,6 +187,7 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
 
     final summary = summaryMap[key];
     final session = sessionMap[key];
+    final partial = partialMap[key];
     final challenge = challengeMap[key];
     final activity = activityMap[key];
     final mistakes = mistakeMap[key] ?? 0;
@@ -208,15 +219,19 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
       DailyStat(
         date: date,
         poemCount: hasPoemSummary ? summary!.poemCount : fallbackPoemCount,
-        mathTotal: hasMathSummary ? summary!.mathTotalCount : fallbackMathTotal,
+        mathTotal:
+            (hasMathSummary ? summary!.mathTotalCount : fallbackMathTotal) +
+                (partial?.total ?? 0),
         mathCorrect:
-            hasMathSummary ? summary!.mathCorrectCount : fallbackMathCorrect,
+            (hasMathSummary ? summary!.mathCorrectCount : fallbackMathCorrect) +
+                (partial?.correct ?? 0),
         starsEarned: (summary?.starsEarned ?? 0) +
             (hasPoemSummary ? 0 : fallbackPoemStars) +
             (hasMathSummary ? 0 : fallbackMathStars),
         durationSeconds: (summary?.durationSeconds ?? 0) +
             (hasPoemSummary ? 0 : fallbackPoemDuration) +
-            (hasMathSummary ? 0 : fallbackMathDuration),
+            (hasMathSummary ? 0 : fallbackMathDuration) +
+            (partial?.duration ?? 0),
         mistakeCount: mistakes,
       ),
     );

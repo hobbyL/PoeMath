@@ -81,70 +81,73 @@ class MathMistakeRepository {
     String? attemptJson,
     String? activityId,
   }) async {
-    if (activityId != null) {
-      await ActivitySettlementLedger.runOnce(
-        channel: ActivitySettlementLedger.userStatsChannel,
-        activityId: activityId,
-        action: () => recordWrong(
-            problemText: problemText,
-            correctAnswer: correctAnswer,
-            userAnswer: userAnswer,
-            problemType: problemType,
-            grade: grade,
-            errorType: errorType,
-            solutionStepsJson: solutionStepsJson,
-            skillId: skillId,
-            semester: semester,
-            problemJson: problemJson,
-            attemptJson: attemptJson,),
+    final id =
+        problemKey(problemText: problemText, correctAnswer: correctAnswer);
+    Future<void> record() async {
+      final existing = getById(id)?.copy();
+      final now = DateTime.now();
+
+      if (existing != null) {
+        existing
+          ..userAnswer = userAnswer
+          ..problemType = problemType
+          ..grade = grade
+          ..errorType = errorType
+          ..solutionStepsJson = solutionStepsJson ?? existing.solutionStepsJson
+          ..skillId = skillId
+          ..semester = semester
+          ..problemJson = problemJson
+          ..attemptJson = attemptJson
+          ..wrongCount += 1
+          ..lastWrongAt = now
+          // 又错一次就不再算掌握，重新回到待复练队列。
+          ..isResolved = false
+          ..consolidationRound = 0
+          ..nextConsolidationDate = null;
+        if (activityId != null) {
+          existing.appliedActivityIds = [
+            ...existing.appliedActivityIds,
+            activityId,
+          ];
+        }
+        await add(existing);
+        return;
+      }
+
+      await add(
+        MathMistake(
+          id: id,
+          profileId: ProfileScope.currentId,
+          problemText: problemText,
+          correctAnswer: correctAnswer,
+          userAnswer: userAnswer,
+          problemType: problemType,
+          grade: grade,
+          errorType: errorType,
+          solutionStepsJson: solutionStepsJson,
+          skillId: skillId,
+          semester: semester,
+          problemJson: problemJson,
+          attemptJson: attemptJson,
+          lastWrongAt: now,
+          appliedActivityIds: activityId == null ? const [] : [activityId],
+        ),
+      );
+    }
+
+    if (activityId == null) {
+      await ActivitySettlementLedger.serial(
+        ActivitySettlementLedger.userStatsChannel,
+        record,
       );
       return;
     }
-    final id = problemKey(
-      problemText: problemText,
-      correctAnswer: correctAnswer,
-    );
-    final existing = getById(id)?.copy();
-    final now = DateTime.now();
-
-    if (existing != null) {
-      existing
-        ..userAnswer = userAnswer
-        ..problemType = problemType
-        ..grade = grade
-        ..errorType = errorType
-        ..solutionStepsJson = solutionStepsJson ?? existing.solutionStepsJson
-        ..skillId = skillId
-        ..semester = semester
-        ..problemJson = problemJson
-        ..attemptJson = attemptJson
-        ..wrongCount += 1
-        ..lastWrongAt = now
-        // 又错一次就不再算掌握，重新回到待复练队列。
-        ..isResolved = false
-        ..consolidationRound = 0
-        ..nextConsolidationDate = null;
-      await add(existing);
-      return;
-    }
-
-    await add(
-      MathMistake(
-        id: id,
-        profileId: ProfileScope.currentId,
-        problemText: problemText,
-        correctAnswer: correctAnswer,
-        userAnswer: userAnswer,
-        problemType: problemType,
-        grade: grade,
-        errorType: errorType,
-        solutionStepsJson: solutionStepsJson,
-        skillId: skillId,
-        semester: semester,
-        problemJson: problemJson,
-        attemptJson: attemptJson,
-        lastWrongAt: now,
-      ),
+    await ActivitySettlementLedger.runOnce(
+      channel: ActivitySettlementLedger.userStatsChannel,
+      activityId: activityId,
+      action: record,
+      isApplied: () =>
+          getById(id)?.appliedActivityIds.contains(activityId) ?? false,
     );
   }
 
@@ -171,13 +174,13 @@ class MathMistakeRepository {
   /// 手动标记错题已解决，不计入重练次数。
   /// 家长逃生口：跳过巩固直接出列，巩固轮次一并清零。
   Future<void> resolve(String id) async {
-    final mistake = getById(id);
+    final mistake = getById(id)?.copy();
     if (mistake == null) return;
     mistake
       ..isResolved = true
       ..consolidationRound = 0
       ..nextConsolidationDate = null;
-    await mistake.save();
+    await add(mistake);
   }
 
   /// 记录一次已提交的重练结果，推进巩固状态机：
@@ -192,7 +195,7 @@ class MathMistakeRepository {
     String id, {
     required bool isCorrect,
   }) async {
-    final mistake = getById(id);
+    final mistake = getById(id)?.copy();
     if (mistake == null) return null;
 
     mistake.retryCount++;
@@ -202,7 +205,7 @@ class MathMistakeRepository {
         ..isResolved = false
         ..consolidationRound = 0
         ..nextConsolidationDate = null;
-      await mistake.save();
+      await add(mistake);
       return RepracticeOutcome.reset;
     }
 
@@ -225,7 +228,7 @@ class MathMistakeRepository {
           : RepracticeOutcome.advanced;
     }
 
-    await mistake.save();
+    await add(mistake);
     return outcome;
   }
 
