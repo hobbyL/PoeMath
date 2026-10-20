@@ -87,16 +87,21 @@ class _WordProblemLibraryPageState
           ? _buildEmptyState(context)
           : Column(
               children: [
-                // 统计卡（与口算练习页统计卡同款：共用 StatOverviewCard）
-                StatOverviewCard(
-                  items: [
-                    StatOverviewItem(value: '${stats.total}', label: '总题数'),
-                    StatOverviewItem(value: '${stats.done}', label: '已做'),
-                    StatOverviewItem(
-                      value: '${(stats.accuracy * 100).toStringAsFixed(0)}%',
-                      label: '正确率',
-                    ),
-                  ],
+                // 统计卡（与口算练习页统计卡同款：共用 StatOverviewCard）。
+                // 卡片自身不带外边距（见组件注释），本页 Column 无横向
+                // padding，这里补上与下方列表一致的 md。
+                Padding(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  child: StatOverviewCard(
+                    items: [
+                      StatOverviewItem(value: '${stats.total}', label: '总题数'),
+                      StatOverviewItem(value: '${stats.done}', label: '已做'),
+                      StatOverviewItem(
+                        value: '${(stats.accuracy * 100).toStringAsFixed(0)}%',
+                        label: '正确率',
+                      ),
+                    ],
+                  ),
                 ),
 
                 // 批次分组列表
@@ -177,6 +182,7 @@ class _WordProblemLibraryPageState
               setState(fn);
               setSheetState(() {});
             }
+
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(SpacingTokens.md),
@@ -226,13 +232,12 @@ class _WordProblemLibraryPageState
                     Row(
                       children: [
                         TextButton(
-                          onPressed:
-                              _topicFilter == null && _doneFilter == null
-                                  ? null
-                                  : () => apply(() {
-                                        _topicFilter = null;
-                                        _doneFilter = null;
-                                      }),
+                          onPressed: _topicFilter == null && _doneFilter == null
+                              ? null
+                              : () => apply(() {
+                                    _topicFilter = null;
+                                    _doneFilter = null;
+                                  }),
                           child: const Text('重置'),
                         ),
                         const Spacer(),
@@ -293,8 +298,8 @@ class _WordProblemLibraryPageState
   ) {
     final theme = Theme.of(context);
     final first = problems.first;
-    final topicLabel = WordProblemTopic.tryParse(first.topic)?.label ??
-        first.topic;
+    final topicLabel =
+        WordProblemTopic.tryParse(first.topic)?.label ?? first.topic;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: SpacingTokens.md),

@@ -51,7 +51,10 @@ class StatOverviewCard extends StatelessWidget {
     }
 
     return Container(
-      margin: const EdgeInsets.all(SpacingTokens.md),
+      // 不自带外边距：嵌入方（页面/列表）的 padding 已统一为 md，
+      // 自带 margin 会与页面 padding **叠加**，让本卡比同页其他卡
+      // 左右各多缩进 16（口算练习页顶部统计卡与下方练习卡的错位即此）。
+      // 需要留白的调用方自行包 Padding。
       padding: const EdgeInsets.all(SpacingTokens.md),
       decoration: BoxDecoration(
         gradient: LinearGradient(
