@@ -27,9 +27,13 @@ const int kMathExplainMaxTokens = 500;
 class MathExplainNotifier extends Notifier<MathExplainState> {
   /// 会话代际令牌：reset / 新请求都会使旧请求的回调失效。
   int _sessionToken = 0;
+  LlmClient? _activeClient;
 
   @override
-  MathExplainState build() => const MathExplainState();
+  MathExplainState build() {
+    ref.onDispose(() => _activeClient?.close());
+    return const MathExplainState();
+  }
 
   /// 为一道题生成解析。重复调用在请求中被守卫拦截。
   ///
@@ -65,7 +69,8 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
         return;
       }
 
-      client = LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+      client = _activeClient =
+          LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
       final buffer = StringBuffer();
       await for (final chunk in client.explainStream(
         config: config,
@@ -139,11 +144,13 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
     } finally {
       // 注入的 client 不被关闭（LlmClient 不持有所有权）。
       client?.close();
+      if (identical(_activeClient, client)) _activeClient = null;
     }
   }
 
   /// 复位为初始态（换题等非 dispose 场景调用）；同时废弃在途请求。
   void reset() {
+    _activeClient?.close();
     _sessionToken++;
     state = const MathExplainState();
   }
@@ -154,6 +161,7 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
   /// 残留状态由下次打开弹层时的 generate 覆盖（其首行同步切
   /// loading，不展示旧题内容）。
   void discardPending() {
+    _activeClient?.close();
     _sessionToken++;
   }
 }

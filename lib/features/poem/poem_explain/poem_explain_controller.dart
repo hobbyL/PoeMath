@@ -28,9 +28,13 @@ const int kPoemExplainMaxTokens = 800;
 class PoemExplainNotifier extends Notifier<PoemExplainState> {
   /// 会话代际令牌：reset / 新请求都会使旧请求的回调失效。
   int _sessionToken = 0;
+  LlmClient? _activeClient;
 
   @override
-  PoemExplainState build() => const PoemExplainState();
+  PoemExplainState build() {
+    ref.onDispose(() => _activeClient?.close());
+    return const PoemExplainState();
+  }
 
   /// 为 [poem] 生成讲解。重复调用在请求中被守卫拦截。
   Future<void> generate(Poem poem) async {
@@ -58,7 +62,8 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
         return;
       }
 
-      client = LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+      client = _activeClient =
+          LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
       final buffer = StringBuffer();
       await for (final chunk in client.explainStream(
         config: config,
@@ -123,11 +128,13 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
     } finally {
       // 注入的 client 不被关闭（LlmClient 不持有所有权）。
       client?.close();
+      if (identical(_activeClient, client)) _activeClient = null;
     }
   }
 
   /// 复位为初始态（进入页面调用）；同时废弃在途请求的回调。
   void reset() {
+    _activeClient?.close();
     _sessionToken++;
     state = const PoemExplainState();
   }
@@ -139,6 +146,7 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
   /// 断言（widget 测试抓到的真实缺陷）。残留内容由页面的 poemId
   /// 过滤兜底，下次进入页面时 [reset]。
   void discardPending() {
+    _activeClient?.close();
     _sessionToken++;
   }
 }

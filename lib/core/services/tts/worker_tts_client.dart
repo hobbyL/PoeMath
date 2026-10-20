@@ -9,6 +9,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:poemath/core/services/bounded_http_client.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 
 import 'package:poemath/core/services/tts/tts_models.dart';
@@ -26,16 +27,21 @@ final class WorkerTtsClient {
     Duration synthesizeTimeout = const Duration(seconds: 30),
     Duration probeTimeout = const Duration(seconds: 10),
   })  : _usage = usage ?? CloudUsageService.instance,
-        _httpClient = httpClient ?? http.Client(),
+        _httpClient = BoundedHttpClient(
+          httpClient ?? http.Client(),
+          timeout: synthesizeTimeout,
+          maxResponseBytes: 8 * 1024 * 1024,
+        ),
         _ownsHttpClient = httpClient == null,
         _synthesizeTimeout = synthesizeTimeout,
         _probeTimeout = probeTimeout;
 
-  final http.Client _httpClient;
+  final BoundedHttpClient _httpClient;
   final CloudUsageService _usage;
   final bool _ownsHttpClient;
   final Duration _synthesizeTimeout;
   final Duration _probeTimeout;
+  int _requestGeneration = 0;
 
   static const String _ttsPath = '/api/v1/tts';
   static const String _voicesPath = '/api/v1/voices';
@@ -157,10 +163,12 @@ final class WorkerTtsClient {
     final uri = base.resolve('$_voicesPath?locale=zh-CN');
     http.Response response;
     try {
-      response = await _httpClient.get(
+      response = await _httpClient.request(
+        'GET',
         uri,
+        deadline: _probeTimeout,
         headers: const <String, String>{'Accept': _jsonContentType},
-      ).timeout(_probeTimeout);
+      );
     } on TimeoutException {
       throw const WorkerTtsException(
         '获取在线音色超时',
@@ -222,8 +230,15 @@ final class WorkerTtsClient {
     return voices;
   }
 
+  void cancelPending() {
+    _requestGeneration++;
+    _httpClient.cancelPending();
+  }
+
   void close() {
-    if (_ownsHttpClient) _httpClient.close();
+    _requestGeneration++;
+    _httpClient.close();
+    if (_ownsHttpClient) _httpClient.inner.close();
   }
 
   // ============ 内部 ============
@@ -244,18 +259,20 @@ final class WorkerTtsClient {
     required Duration timeout,
     required String timeoutMessage,
   }) async {
+    final generation = _requestGeneration;
     await _usage.reserve(CloudUsageKind.tts);
     try {
-      return await _httpClient
-          .post(
-            uri,
-            headers: <String, String>{
-              'Authorization': 'Bearer $apiKey',
-              'Content-Type': _jsonContentType,
-            },
-            body: body,
-          )
-          .timeout(timeout);
+      if (generation != _requestGeneration) throw http.RequestAbortedException(uri);
+      return await _httpClient.request(
+        'POST',
+        uri,
+        deadline: timeout,
+        headers: <String, String>{
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': _jsonContentType,
+        },
+        body: body,
+      );
     } on TimeoutException {
       throw WorkerTtsException(
         timeoutMessage,

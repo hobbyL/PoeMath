@@ -41,6 +41,7 @@ const int kAssistantMaxToolRounds = 4;
 class AssistantChatController extends Notifier<AssistantChatState> {
   /// 会话代际令牌：send / stop / regenerate / 切换会话都会使旧请求失效。
   int _sessionToken = 0;
+  LlmClient? _activeClient;
 
   /// provider 是否已销毁（微任务收敛前的写入防抖）。
   bool _disposed = false;
@@ -48,8 +49,12 @@ class AssistantChatController extends Notifier<AssistantChatState> {
   @override
   AssistantChatState build() {
     _disposed = false;
+    _activeClient?.close();
     _sessionToken++;
-    ref.onDispose(() => _disposed = true);
+    ref.onDispose(() {
+      _disposed = true;
+      _activeClient?.close();
+    });
     return const AssistantChatState();
   }
 
@@ -114,6 +119,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
   /// assistant 消息（允许部分回答），无增量则回 ready。
   void stop() {
     if (!state.isBusy) return;
+    _activeClient?.close();
     _sessionToken++;
     final partial = state.streamingText.trim();
     if (partial.isEmpty) {
@@ -138,6 +144,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     List<ChatMessage> messages, {
     int contextBaseIndex = 0,
   }) {
+    _activeClient?.close();
     _sessionToken++;
     state = AssistantChatState(
       status: messages.isEmpty
@@ -150,6 +157,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
 
   /// 开启新会话：清空历史、废弃在途请求。
   void startNewConversation() {
+    _activeClient?.close();
     _sessionToken++;
     state = const AssistantChatState();
   }
@@ -175,6 +183,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
   /// 收敛须延后到微任务：页面 unmount 期间同步写 state 会触发 defunct
   /// element markNeedsBuild 断言；微任务时点 unmount 已完成。
   void discardPending() {
+    _activeClient?.close();
     _sessionToken++;
     if (!state.isBusy) return;
     final snapshot = state;
@@ -228,7 +237,8 @@ class AssistantChatController extends Notifier<AssistantChatState> {
         for (final tool in tools) tool.name: tool,
       };
 
-      client = LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+      client = _activeClient =
+          LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
 
       // 工具循环：非流式 chatComplete 判定是否调工具；有则执行并回灌
       // role:tool，循环（≤4 轮）；无 tool_calls 或到顶即跳出走流式收尾。
@@ -316,6 +326,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     } finally {
       // 注入的 client 不被关闭（LlmClient 不持有所有权）。
       client?.close();
+      if (identical(_activeClient, client)) _activeClient = null;
     }
   }
 

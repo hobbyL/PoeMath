@@ -106,7 +106,8 @@ class DiagnosticBuffer {
   int get length => _records.length;
 
   /// 只读快照，最旧在前。
-  List<DiagnosticRecord> snapshot() => List<DiagnosticRecord>.unmodifiable(_records);
+  List<DiagnosticRecord> snapshot() =>
+      List<DiagnosticRecord>.unmodifiable(_records);
 
   /// 记录一条。**绝不允许抛出** —— 任何内部异常都被吞掉并降级为无操作。
   void record({
@@ -129,7 +130,7 @@ class DiagnosticBuffer {
       final entry = DiagnosticRecord(
         at: _now(),
         level: level,
-        tag: tag,
+        tag: _truncate(scrub(tag), maxMessageChars),
         message: body,
         stackTrace: (stack == null || stack.isEmpty) ? null : stack,
       );
@@ -158,11 +159,15 @@ class DiagnosticBuffer {
   ///
   /// 这是**兜底**防线；调用方仍须遵守 `logging-guidelines.md` 的 Never Log 清单。
   static String scrub(String input) {
-    var output = input;
+    var output = input.replaceAllMapped(
+      RegExp(r'''(["']?Authorization["']?\s*[:=]\s*)[^\r\n,;}\]]*''',
+          caseSensitive: false,),
+      (match) => '${match.group(1)}***',
+    );
     for (final key in _sensitiveKeys) {
       output = output.replaceAllMapped(
         _patternFor(key),
-        (match) => '${match.group(1)}${match.group(2)}***',
+        (match) => '${match.group(1)}***',
       );
     }
     return output;
@@ -175,21 +180,25 @@ class DiagnosticBuffer {
     'apiKey',
     'token',
     'secret',
-    'Authorization',
+    'secretId',
+    'secretKey',
+    'secret_id',
+    'secret_key',
+    'access_token',
+    'refresh_token',
   ];
 
   /// 构造单个 key 的匹配式，覆盖三种常见书写：
   /// `password=abc`、`"password": "abc"`、`password: abc`。
   ///
   /// group(1) = key（可含引号包裹）与其后的分隔符；
-  /// group(2) = 值前引号（可为空）；group(3) = 值本身。
+  /// 引号内的空格也是凭据的一部分，不能只清洗第一个单词。
   static RegExp _patternFor(String key) {
     final escaped = RegExp.escape(key);
-    // 值形如 "abc" 或 'abc' 或裸值（停在空白 / 逗号 / 引号 / 括号）。
+    // 裸值允许空格；以行尾、逗号、分号或结构结束符为边界。
     return RegExp(
       '(["\']?$escaped["\']?\\s*[:=]\\s*)'
-      '(["\']?)'
-      '([^"\'\\s,;})]+)',
+      r'''(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\r\n,;})\]]+)''',
       caseSensitive: false,
     );
   }

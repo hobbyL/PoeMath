@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
+import 'package:poemath/core/services/bounded_http_client.dart';
 
 import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -23,14 +24,31 @@ class WebDavBackupVersion {
 
 /// WebDAV 客户端服务。
 class WebDavService {
-  WebDavService({http.Client? client}) : _client = client ?? http.Client();
+  WebDavService({
+    http.Client? client,
+    Duration timeout = const Duration(seconds: 30),
+  })  : _client = BoundedHttpClient(
+          client ?? http.Client(),
+          timeout: timeout,
+          maxResponseBytes: 32 * 1024 * 1024,
+        ),
+        _ownsClient = client == null;
 
-  final http.Client _client;
+  final BoundedHttpClient _client;
+  final bool _ownsClient;
+  Duration _deadline(int seconds) {
+    final normal = Duration(seconds: seconds);
+    return _client.timeout < normal ? _client.timeout : normal;
+  }
+
   static final _versionName =
       RegExp(r'^poemath_backup_(\d+)_[a-f0-9]{8}\.json$');
 
   /// 释放 HTTP 连接池。
-  void dispose() => _client.close();
+  void dispose() {
+    _client.close();
+    if (_ownsClient) _client.inner.close();
+  }
 
   /// 测试 WebDAV 连接。
   ///
@@ -47,9 +65,8 @@ class WebDavService {
       request.headers['Content-Type'] = 'application/xml; charset=utf-8';
       request.body = _propfindBody;
 
-      final response = await _client.send(request).timeout(
-            const Duration(seconds: 10),
-          );
+      final response =
+          await _client.sendBounded(request, deadline: _deadline(10));
       final statusCode = response.statusCode;
       await response.stream.drain<void>();
       // 207 Multi-Status = WebDAV 成功
@@ -80,10 +97,12 @@ class WebDavService {
       final versions = await listVersions(config);
       for (final old
           in versions.where((entry) => entry.id != version).skip(9)) {
-        final response = await _client
-            .delete(_remoteUri(config, fileName: old.id),
-                headers: _authHeaders(config),)
-            .timeout(const Duration(seconds: 15));
+        final response = await _client.request(
+          'DELETE',
+          _remoteUri(config, fileName: old.id),
+          headers: _authHeaders(config),
+          deadline: _deadline(15),
+        );
         if (response.statusCode != 200 &&
             response.statusCode != 204 &&
             response.statusCode != 404) {
@@ -91,25 +110,32 @@ class WebDavService {
         }
       }
     } on Object catch (error, stackTrace) {
-      AppLogger.e('备份已上传，云端历史清理未完成',
-          tag: 'WebDAV', error: error, stackTrace: stackTrace,);
+      AppLogger.e(
+        '备份已上传，云端历史清理未完成',
+        tag: 'WebDAV',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
   Future<void> _put(
-      WebDavConfig config, String fileName, String jsonContent,) async {
+    WebDavConfig config,
+    String fileName,
+    String jsonContent,
+  ) async {
     final uri = _remoteUri(config, fileName: fileName);
 
-    final response = await _client
-        .put(
-          uri,
-          headers: {
-            ..._authHeaders(config),
-            'Content-Type': 'application/json; charset=utf-8',
-          },
-          body: utf8.encode(jsonContent),
-        )
-        .timeout(const Duration(seconds: 30));
+    final response = await _client.request(
+      'PUT',
+      uri,
+      headers: {
+        ..._authHeaders(config),
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: utf8.encode(jsonContent),
+      deadline: _deadline(30),
+    );
 
     if (response.statusCode != 200 &&
         response.statusCode != 201 &&
@@ -136,12 +162,12 @@ class WebDavService {
   Future<String> _downloadFile(WebDavConfig config, String fileName) async {
     _validateConfig(config);
     final uri = _remoteUri(config, fileName: fileName);
-    final response = await _client
-        .get(
-          uri,
-          headers: _authHeaders(config),
-        )
-        .timeout(const Duration(seconds: 30));
+    final response = await _client.request(
+      'GET',
+      uri,
+      headers: _authHeaders(config),
+      deadline: _deadline(30),
+    );
 
     if (response.statusCode == 404) {
       throw const WebDavException('云端暂无备份文件', 404);
@@ -165,17 +191,17 @@ class WebDavService {
       ..headers['Content-Type'] = 'application/xml; charset=utf-8'
       ..body = _propfindBody;
     final response =
-        await _client.send(request).timeout(const Duration(seconds: 30));
+        await _client.sendBounded(request, deadline: _deadline(30));
     final body = await response.stream.bytesToString();
     if (response.statusCode != 207 && response.statusCode != 200) {
       throw WebDavException('历史版本读取失败', response.statusCode);
     }
     // 只取 href，不解释任意远程 XML；严格文件名及 origin/目录边界再次限制。
     final hrefs = RegExp(
-            r'<(?:[\w.-]+:)?href\b[^>]*>(.*?)</(?:[\w.-]+:)?href\s*>',
-            caseSensitive: false,
-            dotAll: true,)
-        .allMatches(body);
+      r'<(?:[\w.-]+:)?href\b[^>]*>(.*?)</(?:[\w.-]+:)?href\s*>',
+      caseSensitive: false,
+      dotAll: true,
+    ).allMatches(body);
     final result = <String, WebDavBackupVersion>{};
     for (final match in hrefs) {
       final href = match.group(1)!.trim().replaceAll('&amp;', '&');
@@ -201,7 +227,9 @@ class WebDavService {
       if (micros == null) continue;
       try {
         result[id] = WebDavBackupVersion(
-            id, DateTime.fromMicrosecondsSinceEpoch(micros),);
+          id,
+          DateTime.fromMicrosecondsSinceEpoch(micros),
+        );
       } on ArgumentError {
         continue;
       }
@@ -224,9 +252,8 @@ class WebDavService {
       final checkReq = http.Request('PROPFIND', uri);
       checkReq.headers.addAll(_authHeaders(config));
       checkReq.headers['Depth'] = '0';
-      final checkResp = await _client.send(checkReq).timeout(
-            const Duration(seconds: 10),
-          );
+      final checkResp =
+          await _client.sendBounded(checkReq, deadline: _deadline(10));
       final checkStatus = checkResp.statusCode;
       await checkResp.stream.drain<void>();
 
@@ -234,9 +261,8 @@ class WebDavService {
         // 不存在，创建
         final mkcolReq = http.Request('MKCOL', uri);
         mkcolReq.headers.addAll(_authHeaders(config));
-        final mkcolResp = await _client.send(mkcolReq).timeout(
-              const Duration(seconds: 10),
-            );
+        final mkcolResp =
+            await _client.sendBounded(mkcolReq, deadline: _deadline(10));
         final mkcolStatus = mkcolResp.statusCode;
         await mkcolResp.stream.drain<void>();
         if (mkcolStatus != 201 && mkcolStatus != 405) {

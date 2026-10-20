@@ -13,6 +13,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:poemath/core/services/bounded_http_client.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 
 import 'package:poemath/core/services/llm/chat_completion.dart';
@@ -33,14 +34,18 @@ final class LlmClient {
     Duration explainTimeout = const Duration(seconds: 60),
     Duration chatTimeout = const Duration(seconds: 90),
   })  : _usage = usage ?? CloudUsageService.instance,
-        _httpClient = httpClient ?? http.Client(),
+        _httpClient = BoundedHttpClient(
+          httpClient ?? http.Client(),
+          timeout: chatTimeout,
+          maxResponseBytes: 2 * 1024 * 1024,
+        ),
         _ownsHttpClient = httpClient == null,
         _generateTimeout = generateTimeout,
         _probeTimeout = probeTimeout,
         _explainTimeout = explainTimeout,
         _chatTimeout = chatTimeout;
 
-  final http.Client _httpClient;
+  final BoundedHttpClient _httpClient;
   final CloudUsageService _usage;
   final bool _ownsHttpClient;
   final Duration _generateTimeout;
@@ -175,12 +180,12 @@ final class LlmClient {
     final base = normalizeBaseUrl(config.baseUrl);
     http.Response response;
     try {
-      response = await _httpClient
-          .get(
-            _join(base, _modelsPath),
-            headers: _headersFor(config.apiKey, acceptOnly: true),
-          )
-          .timeout(_probeTimeout);
+      response = await _httpClient.request(
+        'GET',
+        _join(base, _modelsPath),
+        deadline: _probeTimeout,
+        headers: _headersFor(config.apiKey, acceptOnly: true),
+      );
     } on TimeoutException {
       throw const LlmModelsUnavailable('获取模型列表超时');
     } on SocketException {
@@ -334,15 +339,16 @@ final class LlmClient {
     // stream.transform(utf8.decoder) 在 chunk 边界保留不完整多字节尾字节，
     // 中文跨分片不乱码；逐 chunk utf8.decode 则会乱码。
     // .timeout 作用于字节流：两事件间隔超 timeout → TimeoutException。
-    final lines = response.stream
-        .timeout(
-          _explainTimeout,
-          onTimeout: (sink) => sink.addError(
-            TimeoutException('AI 讲解生成超时，请稍后重试'),
-          ),
-        )
-        .transform(utf8.decoder)
-        .transform(const LineSplitter());
+    final lines = boundedLines(
+      response.stream
+          .timeout(
+            _explainTimeout,
+            onTimeout: (sink) => sink.addError(
+              TimeoutException('AI 讲解生成超时，请稍后重试'),
+            ),
+          )
+          .transform(utf8.decoder),
+    );
 
     try {
       await for (final line in lines) {
@@ -393,7 +399,7 @@ final class LlmClient {
       'model': config.model,
       'messages': <Map<String, Object?>>[
         {'role': 'system', 'content': systemPrompt},
-        for (final message in messages) message.toJson(),
+        for (final message in boundedChatContext(messages)) message.toJson(),
       ],
       'max_tokens': maxTokens,
       'stream': true,
@@ -409,15 +415,16 @@ final class LlmClient {
     var emitted = false;
     // 同 explainStream：transform(utf8.decoder) 保留跨 chunk 的多字节尾
     // 字节，中文不乱码；.timeout 作用于字节流，两事件间隔超时即报错。
-    final lines = response.stream
-        .timeout(
-          _chatTimeout,
-          onTimeout: (sink) => sink.addError(
-            TimeoutException('AI 助手响应超时，请稍后重试'),
-          ),
-        )
-        .transform(utf8.decoder)
-        .transform(const LineSplitter());
+    final lines = boundedLines(
+      response.stream
+          .timeout(
+            _chatTimeout,
+            onTimeout: (sink) => sink.addError(
+              TimeoutException('AI 助手响应超时，请稍后重试'),
+            ),
+          )
+          .transform(utf8.decoder),
+    );
 
     try {
       await for (final line in lines) {
@@ -446,7 +453,8 @@ final class LlmClient {
   }
 
   void close() {
-    if (_ownsHttpClient) _httpClient.close();
+    _httpClient.close();
+    if (_ownsHttpClient) _httpClient.inner.close();
   }
 
   /// 非流式工具调用（function calling）：一次性取回 `choices[0].message` 的
@@ -476,7 +484,7 @@ final class LlmClient {
       'model': config.model,
       'messages': <Map<String, Object?>>[
         {'role': 'system', 'content': systemPrompt},
-        for (final message in messages) message.toJson(),
+        for (final message in boundedChatContext(messages)) message.toJson(),
       ],
       'max_tokens': maxTokens,
       if (tools.isNotEmpty) ...<String, Object?>{
@@ -575,6 +583,9 @@ final class LlmClient {
     required Duration timeout,
     required String timeoutMessage,
   }) async {
+    if (body.length > 1024 * 1024 || utf8.encode(body).length > 1024 * 1024) {
+      throw const LlmResponseFormatError('请求内容过长，请缩短后重试');
+    }
     try {
       await _usage.reserve(CloudUsageKind.llm);
     } on CloudQuotaExceededException catch (error) {
@@ -582,9 +593,13 @@ final class LlmClient {
     }
     http.Response response;
     try {
-      response = await _httpClient
-          .post(uri, headers: _headersFor(apiKey), body: body)
-          .timeout(timeout);
+      response = await _httpClient.request(
+        'POST',
+        uri,
+        headers: _headersFor(apiKey),
+        body: body,
+        deadline: timeout,
+      );
     } on TimeoutException {
       throw LlmNetworkError(timeoutMessage);
     } on SocketException {
@@ -614,6 +629,9 @@ final class LlmClient {
     required Duration timeout,
     required String timeoutMessage,
   }) async {
+    if (body.length > 1024 * 1024 || utf8.encode(body).length > 1024 * 1024) {
+      throw const LlmResponseFormatError('请求内容过长，请缩短后重试');
+    }
     try {
       await _usage.reserve(CloudUsageKind.llm);
     } on CloudQuotaExceededException catch (error) {
@@ -624,7 +642,7 @@ final class LlmClient {
       final request = http.Request('POST', uri)
         ..headers.addAll(_headersFor(apiKey))
         ..body = body;
-      response = await _httpClient.send(request).timeout(timeout);
+      response = await _httpClient.sendBounded(request, deadline: timeout);
     } on TimeoutException {
       throw LlmNetworkError(timeoutMessage);
     } on SocketException {
@@ -633,6 +651,9 @@ final class LlmClient {
       throw const LlmNetworkError('网络请求失败');
     }
 
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      await response.stream.listen((_) {}).cancel();
+    }
     if (response.statusCode == 401 || response.statusCode == 403) {
       throw LlmAuthError('API Key 无效或未授权（HTTP ${response.statusCode}）');
     }
@@ -643,6 +664,35 @@ final class LlmClient {
       throw LlmServerError('LLM 服务请求失败（HTTP ${response.statusCode}）');
     }
     return response;
+  }
+
+  /// Keep whole user turns, including their tool calls/results, within a finite budget.
+  static List<ChatMessage> boundedChatContext(List<ChatMessage> messages) {
+    const maxBytes = 256 * 1024;
+    const maxMessages = 100;
+    if (messages.isEmpty) return const [];
+    final starts = <int>[
+      0,
+      for (var i = 1; i < messages.length; i++)
+        if (messages[i].role == ChatRole.user) i,
+    ];
+    var start = messages.length;
+    var bytes = 0;
+    for (var i = starts.length - 1; i >= 0; i--) {
+      final group = messages.sublist(starts[i], start);
+      final size =
+          utf8.encode(jsonEncode(group.map((m) => m.toJson()).toList())).length;
+      if (bytes + size > maxBytes ||
+          messages.length - starts[i] > maxMessages) {
+        if (start == messages.length) {
+          throw const LlmResponseFormatError('本轮内容过长，请缩短问题或新建会话');
+        }
+        break;
+      }
+      bytes += size;
+      start = starts[i];
+    }
+    return messages.sublist(start);
   }
 
   /// 提取 `choices[0].message.content`；缺失或非 200 结构抛格式错误。

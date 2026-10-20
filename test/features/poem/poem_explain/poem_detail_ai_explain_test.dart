@@ -280,7 +280,7 @@ void main() {
     );
 
     await tester.tap(find.text('生成讲解'));
-    await tester.pumpAndSettle();
+    await settleSse(tester);
 
     // 鉴权失败文案展示，且不泄露 Key。
     expect(find.text('API Key 无效或未授权（HTTP 401）'), findsOneWidget);

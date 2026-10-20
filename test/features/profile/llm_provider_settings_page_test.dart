@@ -277,8 +277,7 @@ void main() {
     },
   );
 
-  testWidgets('编辑已存配置拉取模型：用回显的已存 Key（Authorization 头）',
-      (tester) async {
+  testWidgets('编辑已存配置拉取模型：用回显的已存 Key（Authorization 头）', (tester) async {
     final store = _MemoryCredentialStore();
     await _seedTwo(tester, store);
     String? authHeader;
@@ -300,8 +299,7 @@ void main() {
     expect(find.text('选择模型（可多选）'), findsOneWidget);
   });
 
-  testWidgets('测试连接：用回显的已存 Key 请求 chat 接口',
-      (tester) async {
+  testWidgets('测试连接：用回显的已存 Key 请求 chat 接口', (tester) async {
     final store = _MemoryCredentialStore();
     await _seedTwo(tester, store);
     String? authHeader;
@@ -323,6 +321,13 @@ void main() {
     // `_testConnection` 经 LlmClient 发真实 HTTP。fake 时钟下这个 future
     // 不会完成，`pumpAndSettle` 只能等到超时；必须在真实异步区触发点击。
     await _tapReal(tester, find.text('测试连接'));
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    while (find.text('连接成功，模型可用').evaluate().isEmpty &&
+        DateTime.now().isBefore(deadline)) {
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),);
+      await tester.pump();
+    }
 
     expect(authHeader, 'Bearer key-p1');
     expect(find.text('连接成功，模型可用'), findsOneWidget);
@@ -412,8 +417,7 @@ void main() {
     );
   });
 
-  testWidgets('拉取中按钮显示加载态且防重入（重复点击不发第二次请求）',
-      (tester) async {
+  testWidgets('拉取中按钮显示加载态且防重入（重复点击不发第二次请求）', (tester) async {
     var requests = 0;
     final completer = Completer<http.Response>();
     final client = MockClient((_) async {
@@ -447,9 +451,7 @@ void main() {
     expect(requests, 1);
   });
 
-  testWidgets(
-      '删除配置：编辑弹窗内确认后清除配置与 Key；删除生效配置切到剩余第一条',
-      (tester) async {
+  testWidgets('删除配置：编辑弹窗内确认后清除配置与 Key；删除生效配置切到剩余第一条', (tester) async {
     final store = _MemoryCredentialStore();
     await _seedTwo(tester, store);
     await _pumpPage(tester, credentialStore: store);

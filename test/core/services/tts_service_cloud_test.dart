@@ -119,6 +119,7 @@ class _ScriptedHttpClient extends http.BaseClient {
     this.failKind,
     this.failFirstOnly = false,
     this.synthGate,
+    this.audioSize,
   });
 
   final _RequestCounter counter;
@@ -127,6 +128,7 @@ class _ScriptedHttpClient extends http.BaseClient {
 
   /// 合成闸门：非空时每个请求先挂起直到闸门完成（模拟合成 await 窗口）。
   final Completer<void>? synthGate;
+  final int? audioSize;
 
   final List<Map<String, dynamic>> bodies = <Map<String, dynamic>>[];
 
@@ -163,7 +165,8 @@ class _ScriptedHttpClient extends http.BaseClient {
       }
     }
     return http.StreamedResponse(
-      http.ByteStream.fromBytes(_audioBytes),
+      http.ByteStream.fromBytes(
+          audioSize == null ? _audioBytes : Uint8List(audioSize!),),
       200,
       headers: const {'content-type': 'audio/mpeg'},
     );
@@ -218,6 +221,42 @@ SettingsRepository _stubSettings({
 }
 
 void main() {
+  test('云端缓存按总字节淘汰旧段，停止立即取消在途合成', () async {
+    await setUpHiveForTesting();
+    addTearDown(tearDownHiveForTesting);
+    await CloudUsageService.instance.setLimit(CloudUsageKind.tts, null);
+    final counter = _RequestCounter();
+    final client = WorkerTtsClient(
+        httpClient:
+            _ScriptedHttpClient(counter: counter, audioSize: 5 * 1024 * 1024),);
+    addTearDown(client.close);
+    final service = TtsService(_stubSettings(cloudEnabled: true),
+        flutterTts: _FakeFlutterTts(),
+        cloudClient: client,
+        cloudPlayer: _FakeCloudAudioPlayer(),);
+    addTearDown(service.dispose);
+    await service.previewCloud('第一段');
+    await service.previewCloud('第二段');
+    await service.previewCloud('第一段');
+    expect(counter.value, 3, reason: '两段各 5 MiB 超过缓存 8 MiB，第一段应重新请求');
+
+    final sent = Completer<void>();
+    final aborted = Completer<void>();
+    final blocked =
+        WorkerTtsClient(httpClient: _BlockingHttpClient(sent, aborted));
+    addTearDown(blocked.close);
+    final stopped = TtsService(_stubSettings(cloudEnabled: true),
+        flutterTts: _FakeFlutterTts(),
+        cloudClient: blocked,
+        cloudPlayer: _FakeCloudAudioPlayer(),);
+    addTearDown(stopped.dispose);
+    final preview = stopped.previewCloud('停止测试');
+    await sent.future;
+    await stopped.stop();
+    await preview;
+    await aborted.future;
+  });
+
   test('云额度耗尽时朗读降级本地，已缓存段落仍播放且不计数', () async {
     await setUpHiveForTesting();
     addTearDown(tearDownHiveForTesting);
@@ -226,8 +265,12 @@ void main() {
     final counter = _RequestCounter();
     final tts = _FakeFlutterTts();
     final player = _FakeCloudAudioPlayer();
-    final service = TtsService(_stubSettings(cloudEnabled: true),
-        flutterTts: tts, cloudClient: _client(counter), cloudPlayer: player,);
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: tts,
+      cloudClient: _client(counter),
+      cloudPlayer: player,
+    );
     addTearDown(service.dispose);
     await service.speak('床前明月光');
     await service.speak('床前明月光');
@@ -681,4 +724,18 @@ void main() {
     await service.speak('快速');
     expect(scripted.bodies.last['rate'], '+100');
   });
+}
+
+class _BlockingHttpClient extends http.BaseClient {
+  _BlockingHttpClient(this.sent, this.aborted);
+  final Completer<void> sent;
+  final Completer<void> aborted;
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    (request as http.AbortableRequest)
+        .abortTrigger!
+        .then((_) => aborted.complete());
+    sent.complete();
+    return Completer<http.StreamedResponse>().future;
+  }
 }

@@ -7,6 +7,8 @@
 //   * 导出文本不含原始凭据
 // 断言力求有咬合力：删掉被测实现行后必须变红。
 
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
@@ -82,11 +84,8 @@ void main() {
       expect(messages.last, endsWith('#9'));
       expect(messages.any((m) => m.endsWith('#0')), isFalse);
 
-      // 字节预算确实生效：总字节不超过上限（按导出文本近似）。
-      final totalBytes = buffer
-          .snapshot()
-          .fold<int>(0, (sum, r) => sum + r.toText().runes.length * 3);
-      expect(totalBytes, lessThan(2500 * 3));
+      expect(
+          utf8.encode(buffer.exportAsText()).length, lessThanOrEqualTo(2500),);
     });
 
     test('clear 清空缓冲', () {
@@ -168,10 +167,47 @@ void main() {
         'Authorization=Bearer abcdefghijklmnop',
         'apiKey = "AIzaSyABCDEFGH"',
       ];
-      for (final sample in samples) {
+      for (var i = 0; i < samples.length; i++) {
+        final sample = samples[i];
         final scrubbed = DiagnosticBuffer.scrub(sample);
-        expect(scrubbed, isNot(equals(sample)), reason: '应发生替换：$sample');
+        const secrets = [
+          '我的口令',
+          'tok_123456',
+          's3cr3t-value',
+          'abcdefghijklmnop',
+          'AIzaSyABCDEFGH',
+        ];
+        expect(scrubbed, isNot(contains(secrets[i])), reason: '不得残留原始凭据');
         expect(scrubbed, contains('***'), reason: '应含 ***：$sample');
+      }
+    });
+
+    test('含空格口令和 JSON 凭据不得残留尾部', () {
+      for (final sample in [
+        'password=alpha beta gamma',
+        '{"passphrase":"alpha beta gamma"}',
+      ]) {
+        final clean = DiagnosticBuffer.scrub(sample);
+        for (final secret in ['alpha', 'beta', 'gamma']) {
+          expect(clean, isNot(contains(secret)));
+        }
+      }
+    });
+
+    test('Authorization 的完整 Bearer 和 Basic 凭据均不进入导出', () {
+      for (final value in [
+        'Bearer synthetic-token',
+        'Basic c3ludGhldGlj',
+        '"Bearer synthetic-token"',
+      ]) {
+        final buffer = DiagnosticBuffer();
+        buffer.record(
+            level: 'E',
+            tag: 'Authorization: $value',
+            message: '{"Authorization": "$value"}',);
+        final raw = buffer.exportAsText();
+        expect(raw, isNot(contains('synthetic-token')));
+        expect(raw, isNot(contains('c3ludGhldGlj')));
       }
     });
 

@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:poemath/core/services/bounded_http_client.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:poemath/core/services/update/update_models.dart';
@@ -140,17 +141,11 @@ class UpdateClient {
     final uri = _updateUri();
     final http.Response response;
     try {
-      final abortTrigger = Future<void>.delayed(_requestTimeout);
-      final request = http.AbortableRequest(
+      response =
+          await BoundedHttpClient(_client, timeout: _requestTimeout).request(
         'GET',
         uri,
-        abortTrigger: abortTrigger,
-      )..headers['Accept'] = 'application/json';
-      final streamedResponse = await _client.send(request).timeout(
-            _requestTimeout,
-          );
-      response = await http.Response.fromStream(streamedResponse).timeout(
-        _requestTimeout,
+        headers: const {'Accept': 'application/json'},
       );
     } on http.RequestAbortedException {
       throw const UpdateException('检查更新超时');
@@ -197,13 +192,12 @@ class UpdateClient {
       return const [];
     }
     try {
-      final abortTrigger = Future<void>.delayed(_requestTimeout);
-      final request =
-          http.AbortableRequest('GET', uri, abortTrigger: abortTrigger)
-            ..headers['Accept'] = 'application/json';
-      final streamed = await _client.send(request).timeout(_requestTimeout);
       final response =
-          await http.Response.fromStream(streamed).timeout(_requestTimeout);
+          await BoundedHttpClient(_client, timeout: _requestTimeout).request(
+        'GET',
+        uri,
+        headers: const {'Accept': 'application/json'},
+      );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return const [];
       }

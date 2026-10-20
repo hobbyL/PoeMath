@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:poemath/core/services/bounded_http_client.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
@@ -37,7 +38,11 @@ final class TencentAsrClient {
     Duration timeout = const Duration(seconds: 15),
     Uri? endpoint,
   })  : _usage = usage ?? CloudUsageService.instance,
-        _httpClient = httpClient ?? http.Client(),
+        _httpClient = BoundedHttpClient(
+          httpClient ?? http.Client(),
+          timeout: timeout,
+          maxResponseBytes: 2 * 1024 * 1024,
+        ),
         _ownsHttpClient = httpClient == null,
         _clock = clock ?? DateTime.now,
         _timeout = timeout,
@@ -52,7 +57,7 @@ final class TencentAsrClient {
   static const int maxRawBytes = sampleRate * 2 * maxSeconds;
   static const int maxBase64Bytes = 3 * 1024 * 1024;
 
-  final http.Client _httpClient;
+  final BoundedHttpClient _httpClient;
   final CloudUsageService _usage;
   final bool _ownsHttpClient;
   final DateTime Function() _clock;
@@ -247,6 +252,7 @@ final class TencentAsrClient {
   }
 
   void close() {
-    if (_ownsHttpClient) _httpClient.close();
+    _httpClient.close();
+    if (_ownsHttpClient) _httpClient.inner.close();
   }
 }

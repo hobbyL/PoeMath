@@ -39,6 +39,8 @@ class TtsService {
 
   /// 云端合成内存 LRU 容量（行级 mp3，< 2MB）。
   static const int _cloudCacheCapacity = 32;
+  static const int _cloudCacheByteLimit = 8 * 1024 * 1024;
+  int _cloudCacheBytes = 0;
 
   /// 云端全跳句（所有段合成成功但播放均失败）时上抛的异常消息。
   static const String _cloudAllPlaySkippedMessage = '云端音频播放失败，请稍后重试';
@@ -182,6 +184,7 @@ class TtsService {
       return cached;
     }
 
+    final generation = _sessionGeneration;
     final bytes = await _cloudClient!.synthesize(
       config: _cloudConfig!,
       text: text,
@@ -189,7 +192,7 @@ class TtsService {
       style: style,
       rate: rate,
     );
-    _storeCache(cacheKey, bytes);
+    if (generation == _sessionGeneration) _storeCache(cacheKey, bytes);
     return bytes;
   }
 
@@ -216,11 +219,13 @@ class TtsService {
   }
 
   void _storeCache(String key, Uint8List bytes) {
-    _cloudCache
-      ..remove(key)
-      ..[key] = bytes;
-    while (_cloudCache.length > _cloudCacheCapacity) {
-      _cloudCache.remove(_cloudCache.keys.first);
+    _cloudCacheBytes -= _cloudCache.remove(key)?.length ?? 0;
+    if (bytes.length > _cloudCacheByteLimit) return;
+    _cloudCache[key] = bytes;
+    _cloudCacheBytes += bytes.length;
+    while (_cloudCache.length > _cloudCacheCapacity ||
+        _cloudCacheBytes > _cloudCacheByteLimit) {
+      _cloudCacheBytes -= _cloudCache.remove(_cloudCache.keys.first)!.length;
     }
   }
 
@@ -399,7 +404,13 @@ class TtsService {
         kind: WorkerTtsErrorKind.authentication,
       );
     }
-    final bytes = await _synthesizeStrict(text);
+    final Uint8List bytes;
+    try {
+      bytes = await _synthesizeStrict(text);
+    } on Object {
+      if (generation != _sessionGeneration) return;
+      rethrow;
+    }
     if (generation != _sessionGeneration) return;
     await _cloudPlayerResolved.play(bytes);
   }
@@ -606,6 +617,7 @@ class TtsService {
   /// 停止朗读（云端与系统引擎均停止）。
   Future<void> stop() async {
     _stopRequested = true;
+    _cloudClient?.cancelPending();
     // 会话令牌递增：所有在途会话（含引擎 stop 失败后仍挂起的旧循环）
     // 在下一次迭代 / 段发起前按代际退出——即使后续新入口复位
     // `_stopRequested`，旧会话也不会复活（缺陷 1 根治点）。
@@ -636,6 +648,9 @@ class TtsService {
   /// 释放资源。
   void dispose() {
     _stopRequested = true;
+    _cloudClient?.cancelPending();
+    _cloudCache.clear();
+    _cloudCacheBytes = 0;
     _sessionGeneration++; // 使所有在途会话失效。
     _isSpeaking = false;
     final player = _cloudPlayer;
