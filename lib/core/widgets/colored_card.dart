@@ -34,6 +34,7 @@ class ColoredCard extends StatelessWidget {
     this.color,
     this.gradient,
     this.boxShadow,
+    this.border,
     required this.child,
     this.onTap,
     this.padding,
@@ -53,6 +54,8 @@ class ColoredCard extends StatelessWidget {
 
   /// 可选阴影；null = 无阴影（默认，维持原视觉）。
   final List<BoxShadow>? boxShadow;
+
+  final BoxBorder? border;
 
   /// 卡片内容。
   final Widget child;
@@ -75,11 +78,11 @@ class ColoredCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final decoration = BoxDecoration(
-      color: gradient == null
-          ? color!.withValues(alpha: backgroundOpacity)
-          : null,
+      color:
+          gradient == null ? color!.withValues(alpha: backgroundOpacity) : null,
       gradient: gradient,
       boxShadow: boxShadow,
+      border: border,
       borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
     );
 

@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 
 class PracticeEntryCard extends StatelessWidget {
   const PracticeEntryCard({
@@ -27,46 +28,39 @@ class PracticeEntryCard extends StatelessWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
 
-    return InkWell(
+    return ColoredCard(
+      color: primary,
+      backgroundOpacity: 0.06,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: SpacingTokens.md,
-          vertical: SpacingTokens.sm,
-        ),
-        decoration: BoxDecoration(
-          color: primary.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 28, color: primary),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
+      padding: const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.md, vertical: SpacingTokens.sm,),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 28, color: primary),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
             ),
-            const SizedBox(height: 2),
-            Text(
-              description,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontSize: 10,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            description,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 10,
             ),
-          ],
-        ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

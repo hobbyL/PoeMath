@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 
 class GradeSemesterCard extends StatelessWidget {
   const GradeSemesterCard({
@@ -39,50 +40,41 @@ class GradeSemesterCard extends StatelessWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
 
-    return InkWell(
+    return ColoredCard(
+      color: primary,
+      backgroundOpacity: 0.06,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: SpacingTokens.md,
-          vertical: SpacingTokens.sm,
-        ),
-        decoration: BoxDecoration(
-          color: primary.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-          border: isSelected ? Border.all(color: primary, width: 2) : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _gradeIcons[grade] ?? Icons.school,
-              size: 28,
-              color: isSelected
-                  ? primary
-                  : theme.colorScheme.onSurfaceVariant,
+      padding: const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.md, vertical: SpacingTokens.sm,),
+      border: isSelected ? Border.all(color: primary, width: 2) : null,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _gradeIcons[grade] ?? Icons.school,
+            size: 28,
+            color: isSelected ? primary : theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            label,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: isSelected ? primary : theme.colorScheme.onSurface,
             ),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              label,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: isSelected ? primary : theme.colorScheme.onSurface,
-              ),
+          ),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            description,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 10,
             ),
-            const SizedBox(height: 2),
-            Text(
-              description,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontSize: 10,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
