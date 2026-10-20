@@ -353,7 +353,11 @@ class _WordProblemLibraryPageState
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            _summarize(problem.questionText),
+                            problem.questionText,
+                            // 按可用宽度截断：宽屏能放下更多字，
+                            // 只有真放不下才出省略号（替代旧的 24 字硬切）。
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
@@ -383,10 +387,6 @@ class _WordProblemLibraryPageState
         ],
       ),
     );
-  }
-
-  String _summarize(String text) {
-    return text.length > 24 ? '${text.substring(0, 24)}…' : text;
   }
 
   String _formatDate(DateTime date) {
