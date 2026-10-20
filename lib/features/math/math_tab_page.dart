@@ -120,7 +120,8 @@ class MathTabPage extends ConsumerWidget {
     if (!supported.contains(ProblemMode.vertical)) {
       // 区分两种不可用原因：册次本身没开放 vs 当前难度收窄掉了。
       final atOtherDifficulty = DifficultyLevel.values.any(
-        (level) => level != difficulty &&
+        (level) =>
+            level != difficulty &&
             MathEngine.supportedModes(
               grade: grade,
               semester: semester,
@@ -130,7 +131,8 @@ class MathTabPage extends ConsumerWidget {
       final reason = atOtherDifficulty
           ? '当前「${difficulty.label}」难度不包含竖式，可在设置中调高难度后重试。'
           : '${GradePresets.get(grade, semester).label}暂未开放竖式练习。';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(reason)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(reason)));
       return;
     }
     ref.read(nextMathPracticeRequestProvider.notifier).setNext(
@@ -228,7 +230,14 @@ class MathTabPage extends ConsumerWidget {
             final columns = (gridWidth / 160).floor().clamp(2, 4);
 
             return ListView(
-              padding: const EdgeInsets.all(SpacingTokens.md),
+              // 顶部 0：统计卡与 AppBar 下沿之间不留白。左右保持 md
+              //（Tab 页统一值）。
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.md,
+                0,
+                SpacingTokens.md,
+                SpacingTokens.md,
+              ),
               children: [
                 // 统计概览
                 if (totalProblems > 0)
@@ -242,6 +251,9 @@ class MathTabPage extends ConsumerWidget {
                       StatOverviewItem(value: '$mistakeCount', label: '错题'),
                     ],
                   ),
+                // 统计卡与下方入口的间距：卡片自带 margin 已去掉
+                //（见 StatOverviewCard 注释），这里显式给出。
+                const SizedBox(height: SpacingTokens.md),
 
                 if (visible.isEmpty)
                   // 学习背景里把四类全关时会走到这里；仓储层已拦空集合，
