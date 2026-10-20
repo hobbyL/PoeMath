@@ -1,3 +1,4 @@
+import 'package:poemath/core/services/backup_payload_cipher.dart';
 // lib/core/services/backup_service.dart
 //
 // 层级：core/services
@@ -146,7 +147,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   // 云服务每日额度上限（家长设定，随备份迁移换机不丢）。
   //
   // 注意与 `meta` 里的 `cloud_usage:*`（已用计数）区分：上限是**设定**，
-  // 跨机有意义；计数是**本机消耗**，按日期分桶存于 meta，另行搬运。
+  // 跨机有意义；计数是**本机消耗**，按日期分桶存于 meta，不随备份迁移。
   'cloud_daily_limit_llm': 'int',
   'cloud_daily_limit_tts': 'int',
   'cloud_daily_limit_asr': 'int',
@@ -194,7 +195,6 @@ class BackupService {
       'llmProblems': '应用题',
       'conversations': '助手会话',
       'messages': '助手消息',
-      'cloudUsage': '云用量',
     };
     return BackupPreview(
       json: jsonString,
@@ -236,7 +236,10 @@ class BackupService {
   ///
   /// 口令非空但读取凭据失败时抛 [BackupCredentialExportException]，
   /// **不再**静默产出缺凭据的备份（见该类文档）。
-  Future<String> exportToJson({String? passphrase}) async {
+  Future<String> exportToJson(
+      {String? passphrase,
+      bool encryptPayload = false,
+      bool includeCredentials = true,}) async {
     final data = <String, dynamic>{
       'version': _backupVersion,
       'exportedAt': DateTime.now().toIso8601String(),
@@ -277,20 +280,18 @@ class BackupService {
           },
       ],
       'activitySettlements': ActivitySettlementLedger.completedKeys,
-      // 云请求用量计数（`cloud_usage:YYYY-MM-DD:<kind>` → 次数）。
-      //
-      // 存于 meta，是 meta 里**第二个**随备份走的子集（第一个是结算标记）。
-      // key 自带日期：恢复后当天的桶仍是本机自己的，历史曲线随备份迁移。
-      // 与 settings 里的 `cloud_daily_limit_*`（家长设的上限）分工不同 ——
-      // 上限是设定，计数是本机消耗，两者各自搬运。
-      'cloudUsage': CloudUsageService.exportCounts(),
       'settings': _exportSettings(),
     };
-    final credentials = await _exportCredentials(passphrase);
+    final credentials =
+        includeCredentials ? await _exportCredentials(passphrase) : null;
     if (credentials != null) {
       data['credentials'] = credentials;
     }
-    return const JsonEncoder.withIndent('  ').convert(data);
+    final json = const JsonEncoder.withIndent('  ').convert(data);
+    validateBackupSize(json);
+    return encryptPayload
+        ? encryptBackupPayload(json, passphrase: passphrase)
+        : json;
   }
 
   /// 读取安全存储凭据并加密。
@@ -348,7 +349,10 @@ class BackupService {
 
   /// 导出并保存到临时文件，返回文件路径。
   Future<String> exportToFile({String? passphrase}) async {
-    final json = await exportToJson(passphrase: passphrase);
+    final json = await exportToJson(
+      passphrase: passphrase,
+      encryptPayload: passphrase?.trim().isNotEmpty == true,
+    );
     final dir = await getTemporaryDirectory();
     final timestamp =
         DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
@@ -360,7 +364,7 @@ class BackupService {
   /// 探测备份 JSON 是否含 `credentials` 节（决定导入/下载前是否弹口令框）。
   static bool jsonHasCredentials(String jsonString) {
     try {
-      final decoded = jsonDecode(jsonString);
+      final decoded = decodeBackupJson(jsonString);
       return decoded is Map && decoded.containsKey('credentials');
     } on FormatException {
       return false;
@@ -376,7 +380,7 @@ class BackupService {
   static DateTime? exportedAt(String jsonString) {
     final Object? decoded;
     try {
-      decoded = jsonDecode(jsonString);
+      decoded = decodeBackupJson(jsonString);
     } on FormatException {
       return null;
     }
@@ -405,7 +409,7 @@ class BackupService {
   static LlmEndpointChangeSet? detectLlmEndpointChanges(String jsonString) {
     final Object? decoded;
     try {
-      decoded = jsonDecode(jsonString);
+      decoded = decodeBackupJson(jsonString);
     } on FormatException {
       return null;
     }
@@ -525,6 +529,10 @@ class BackupService {
   }
 
   Future<int> _restoreFromJson(String jsonString, {String? passphrase}) async {
+    if (isEncryptedBackup(jsonString)) {
+      jsonString =
+          await decryptBackupPayload(jsonString, passphrase: passphrase);
+    }
     final data = _decodeAndValidate(jsonString);
 
     // 凭据解密在快照与任何写入之前完成：口令错误时数据零变更。
@@ -551,8 +559,6 @@ class BackupService {
           key: HiveBoxes.settings.get(key),
     };
     final credentialUndo = <Future<void> Function()>[];
-    // 云用量计数存于 meta，不在 settings 快照里，需单独留存以便回滚。
-    final usageSnapshot = CloudUsageService.exportCounts();
     final hadDraftEpoch = HiveBoxes.meta.containsKey('practice_draft_epoch');
     final oldDraftEpoch =
         HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int;
@@ -605,12 +611,6 @@ class BackupService {
         rollbackErrors.add(rollbackError);
       }
       // Hive 数据恢复失败也继续补偿设置和凭据；各存储独立尽力回滚。
-      // 云用量计数同样在 meta 里，单独整组还原。
-      try {
-        await CloudUsageService.replaceCounts(usageSnapshot);
-      } on Object catch (rollbackError) {
-        rollbackErrors.add(rollbackError);
-      }
       try {
         for (final key in _settingsValueType.keys) {
           if (!settingsSnapshot.containsKey(key)) {
@@ -897,20 +897,7 @@ class BackupService {
         (data['activitySettlements'] as List<dynamic>).cast<String>(),
       );
     }
-    // 云用量计数：旧备份无此节时保留本机计数（与 settings 同策略，
-    // 不能因为恢复一份早期备份就把本机计数清空）。
-    if (data.containsKey('cloudUsage')) {
-      final raw = data['cloudUsage'];
-      if (raw is Map) {
-        await CloudUsageService.replaceCounts(
-          <String, int>{
-            for (final entry in raw.entries)
-              if (entry.key is String && entry.value is int)
-                entry.key as String: entry.value as int,
-          },
-        );
-      }
-    }
+    // 云用量是本机消耗；包括旧备份在内均不导入或回滚它。
     if (data.containsKey('settings')) {
       await _restoreSettings(data['settings'] as Map<String, dynamic>);
     }
@@ -925,7 +912,7 @@ class BackupService {
     if (!file.existsSync()) {
       throw const FormatException('备份文件不存在');
     }
-    final json = await file.readAsString();
+    final json = await readBackupFile(file);
     return restoreFromJson(json, passphrase: passphrase);
   }
 
@@ -1602,7 +1589,7 @@ class BackupService {
   Map<String, dynamic> _decodeAndValidate(String jsonString) {
     final Object? decoded;
     try {
-      decoded = jsonDecode(jsonString);
+      decoded = decodeBackupJson(jsonString);
     } on FormatException {
       throw const FormatException('无效的备份文件格式');
     }
@@ -1619,6 +1606,9 @@ class BackupService {
       data[entry.key as String] = entry.value;
     }
 
+    if (['format', 'kdf', 'ciphertext'].any(data.containsKey)) {
+      throw const FormatException('请先验证并解密整包加密备份');
+    }
     final version = data['version'];
     if (version != null && (version is! int || version < 0)) {
       throw const FormatException('备份文件版本号无效');

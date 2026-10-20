@@ -229,13 +229,18 @@ void main() {
     final historyDir = await tester
         .runAsync(() => Directory.systemTemp.createTemp('cloud_history_'));
     addTearDown(
-        () => tester.runAsync(() => historyDir!.delete(recursive: true)),);
+      () => tester.runAsync(() => historyDir!.delete(recursive: true)),
+    );
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          backupHistoryProvider.overrideWith((ref) => BackupHistoryService(
+          backupHistoryProvider.overrideWith(
+            (ref) => BackupHistoryService(
+              keyProvider: () async => List<int>.generate(32, (i) => i),
               backup: ref.read(backupServiceProvider),
-              directoryProvider: () async => historyDir!,),),
+              directoryProvider: () async => historyDir!,
+            ),
+          ),
           webDavServiceProvider.overrideWithValue(
             WebDavService(client: fake.client),
           ),
@@ -460,6 +465,13 @@ void main() {
     );
     await tapAndSettle(tester, find.text('上传到云端'));
     await tapAndSettle(tester, find.text('仍然导出（不含密钥）'));
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (find.text('⚠️ 云端数据比本机新').evaluate().isEmpty &&
+        DateTime.now().isBefore(deadline)) {
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),);
+      await tester.pump();
+    }
     expect(find.text('⚠️ 云端数据比本机新'), findsOneWidget);
     await tapAndSettle(tester, find.text('取消'));
     expect(cloud.puts, 0);

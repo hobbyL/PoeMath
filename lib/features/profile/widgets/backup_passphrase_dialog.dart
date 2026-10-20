@@ -11,10 +11,12 @@ import 'package:poemath/core/theme/design_tokens.dart';
 /// 恢复备份时的口令输入对话框（可留空跳过凭据）。
 ///
 /// 返回约定：`null` = 用户取消；`''` = 留空跳过凭据恢复；非空 = 口令。
-Future<String?> showBackupPassphraseInputDialog(BuildContext context) {
+Future<String?> showBackupPassphraseInputDialog(BuildContext context,
+    {bool requiredForPayload = false,}) {
   return showDialog<String>(
     context: context,
-    builder: (_) => const _PassphraseInputDialog(),
+    builder: (_) =>
+        _PassphraseInputDialog(requiredForPayload: requiredForPayload),
   );
 }
 
@@ -33,7 +35,8 @@ Future<String?> showBackupPassphraseSetupDialog(
 }
 
 class _PassphraseInputDialog extends StatefulWidget {
-  const _PassphraseInputDialog();
+  const _PassphraseInputDialog({required this.requiredForPayload});
+  final bool requiredForPayload;
 
   @override
   State<_PassphraseInputDialog> createState() => _PassphraseInputDialogState();
@@ -41,6 +44,7 @@ class _PassphraseInputDialog extends StatefulWidget {
 
 class _PassphraseInputDialogState extends State<_PassphraseInputDialog> {
   final _controller = TextEditingController();
+  String? _error;
 
   @override
   void dispose() {
@@ -60,18 +64,21 @@ class _PassphraseInputDialogState extends State<_PassphraseInputDialog> {
               controller: _controller,
               autofocus: true,
               obscureText: true,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
+                errorText: _error,
                 labelText: '备份加密口令',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
-              '该备份包含加密的凭据\n'
-              '（腾讯云 AK/SK、TTS API Key、LLM API Key）。\n'
-              'TTS/大模型服务地址等配置不随备份同步，'
-              '新设备需重新填写。\n'
-              '留空将跳过凭据恢复，其余数据正常恢复。',
+              widget.requiredForPayload
+                  ? '该备份的全部学习记录和聊天内容均已加密，需要口令才能预览和恢复。'
+                  : '该备份包含加密的凭据\n'
+                      '（腾讯云 AK/SK、TTS API Key、LLM API Key）。\n'
+                      'TTS/大模型服务地址等配置不随备份同步，'
+                      '新设备需重新填写。\n'
+                      '留空将跳过凭据恢复，其余数据正常恢复。',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -85,7 +92,13 @@ class _PassphraseInputDialogState extends State<_PassphraseInputDialog> {
           child: const Text('取消'),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text),
+          onPressed: () {
+            if (widget.requiredForPayload && _controller.text.trim().isEmpty) {
+              setState(() => _error = '请输入备份加密口令');
+              return;
+            }
+            Navigator.pop(context, _controller.text);
+          },
           child: const Text('恢复'),
         ),
       ],
@@ -117,7 +130,7 @@ class _PassphraseSetupDialogState extends State<_PassphraseSetupDialog> {
   void _submit() {
     final first = _firstController.text;
     final second = _secondController.text;
-    if (first.isEmpty) {
+    if (first.trim().isEmpty) {
       setState(() => _errorText = '口令不能为空（如需清除请点「清除口令」）');
       return;
     }
@@ -133,7 +146,7 @@ class _PassphraseSetupDialogState extends State<_PassphraseSetupDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('清除口令'),
-        content: const Text('清除后导出的备份将不再包含凭据，确定继续吗？'),
+        content: const Text('清除后导出的备份将以明文保存学习和聊天内容，也不包含凭据，确定继续吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -183,11 +196,10 @@ class _PassphraseSetupDialogState extends State<_PassphraseSetupDialog> {
             ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
-              '口令用于加密备份中的腾讯云 AK/SK、'
-              'TTS API Key 与 LLM API Key。\n'
+              '口令用于加密整份备份，包括学习记录、聊天内容以及凭据。\n'
               'TTS/大模型服务地址等配置不随备份同步，'
               '新设备需重新填写。\n'
-              '忘记口令 = 凭据无法恢复，重新填写即可。',
+              '请妥善保存口令；忘记口令将无法恢复该加密备份。',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

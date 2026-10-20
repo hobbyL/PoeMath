@@ -110,15 +110,7 @@ class CloudUsageService {
 
   static const String _usagePrefix = 'cloud_usage:';
 
-  /// 导出的全部用量计数（key → 次数），供备份服务搬运。
-  ///
-  /// key 自带日期（`cloud_usage:YYYY-MM-DD:<kind>`），因此跨设备恢复后：
-  ///
-  /// - **今天**的桶永远是本机自己的（备份里不含恢复当天的 key，除非备份
-  ///   恰好是当天导出并当天恢复），不会把别的设备的当日消耗搬过来；
-  /// - 历史的逐日曲线会随备份迁移，这正是「备份同步」的预期。
-  ///
-  /// 恢复侧写回时同样按前缀写入，不触碰 meta 里的结算标记与练习草稿。
+  /// 读取本机全部用量计数，供本机诊断及测试使用；不随备份导出。
   static Map<String, int> exportCounts() {
     if (!Hive.isBoxOpen('meta')) return const {};
     final result = <String, int>{};
@@ -131,11 +123,8 @@ class CloudUsageService {
     return result;
   }
 
-  /// 用备份里的计数**替换**本机全部用量计数。
-  ///
-  /// 整组替换而非合并：备份语义是「恢复成那份快照」，合并会让两台设备的
-  /// 消耗叠加，反而偏离原状。恢复流程已在更外层包了补偿（失败回滚），
-  /// 此处只需保证只删自己的 key。
+  /// 内部替换本机计数（显式本机重置/测试用途）。
+  /// 备份恢复不得调用：当日已消耗额度是设备事实，不能由备份覆盖。
   static Future<void> replaceCounts(Map<String, int> counts) async {
     final valid = <String, int>{};
     for (final entry in counts.entries) {

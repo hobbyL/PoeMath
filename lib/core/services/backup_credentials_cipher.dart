@@ -101,8 +101,9 @@ Future<Map<String, String>> decryptCredentials(
   if (kdfAlgorithm != _kdfAlgorithm ||
       iterations is! int ||
       iterations < 1000 ||
-      iterations > 10000000 ||
-      saltB64 is! String) {
+      iterations > 600000 ||
+      saltB64 is! String ||
+      saltB64.length > 64) {
     throw const FormatException('备份凭据节加密参数无效');
   }
 
@@ -111,7 +112,8 @@ Future<Map<String, String>> decryptCredentials(
   final ciphertextB64 = cipherNode['ciphertext'];
   if (cipherAlgorithm != _cipherAlgorithm ||
       nonceB64 is! String ||
-      ciphertextB64 is! String) {
+      ciphertextB64 is! String ||
+      ciphertextB64.length > 2 * 1024 * 1024) {
     throw const FormatException('备份凭据节加密参数无效');
   }
 
@@ -119,7 +121,10 @@ Future<Map<String, String>> decryptCredentials(
   final nonce = _decodeBase64(nonceB64, 'nonce');
   final combined = _decodeBase64(ciphertextB64, 'ciphertext');
   // combined = nonce(12) + cipherText + mac(16)，短于 28 必然结构损坏。
-  if (nonce.length != 12 || combined.length < 28) {
+  if (salt.length != 16 ||
+      nonce.length != 12 ||
+      combined.length < 28 ||
+      base64Encode(combined.sublist(0, 12)) != base64Encode(nonce)) {
     throw const FormatException('备份凭据节加密参数无效');
   }
 

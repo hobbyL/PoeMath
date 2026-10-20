@@ -22,10 +22,12 @@ void main() {
     backup = BackupService();
     now = DateTime(2026, 10, 16);
     history = BackupHistoryService(
-        backup: backup,
-        directoryProvider: () async => directory,
-        clock: () => now,
-        retention: 3,);
+      keyProvider: () async => List<int>.generate(32, (i) => i),
+      backup: backup,
+      directoryProvider: () async => directory,
+      clock: () => now,
+      retention: 3,
+    );
   });
   tearDown(() async {
     await directory.delete(recursive: true);
@@ -60,24 +62,27 @@ void main() {
 
   test('预览纯读，协调恢复先保护旧数据且刷新镜像；历史可再恢复', () async {
     await HiveBoxes.settings.put('theme_mode', 'dark');
-    final preview = backup.inspectJson(jsonEncode({
-      'version': 1,
-      'exportedAt': '2026-10-01T00:00:00Z',
-      'settings': {'theme_mode': 'light'},
-    }),);
+    final preview = backup.inspectJson(
+      jsonEncode({
+        'version': 1,
+        'exportedAt': '2026-10-01T00:00:00Z',
+        'settings': {'theme_mode': 'light'},
+      }),
+    );
     expect(HiveBoxes.settings.get('theme_mode'), 'dark');
     expect(await history.list(), isEmpty);
     var refreshes = 0;
     var notifications = 0;
     final coordinator = RestoreCoordinator(
-        backup: backup,
-        history: history,
-        assistantBarrier: (action) => action(),
-        reconcile: () async {
-          notifications++;
-          return true;
-        },
-        invalidate: () => refreshes++,);
+      backup: backup,
+      history: history,
+      assistantBarrier: (action) => action(),
+      reconcile: () async {
+        notifications++;
+        return true;
+      },
+      invalidate: () => refreshes++,
+    );
     await coordinator.restore(preview);
     expect(HiveBoxes.settings.get('theme_mode'), 'light');
     expect(notifications, 1);
@@ -107,20 +112,25 @@ void main() {
     final drafts = PracticeDraftRepository();
     await drafts.save('math', {'sessionId': 'original'});
     final unavailable = BackupHistoryService(
-        backup: backup,
-        directoryProvider: () async =>
-            throw const FileSystemException('disk unavailable'),);
+      keyProvider: () async => List<int>.generate(32, (i) => i),
+      backup: backup,
+      directoryProvider: () async =>
+          throw const FileSystemException('disk unavailable'),
+    );
     var refreshes = 0;
     final coordinator = RestoreCoordinator(
-        backup: backup,
-        history: unavailable,
-        assistantBarrier: (action) => action(),
-        reconcile: () async => true,
-        invalidate: () => refreshes++,);
+      backup: backup,
+      history: unavailable,
+      assistantBarrier: (action) => action(),
+      reconcile: () async => true,
+      invalidate: () => refreshes++,
+    );
     await expectLater(
-        coordinator.restore(backup
-            .inspectJson('{"version":1,"settings":{"theme_mode":"light"}}'),),
-        throwsA(isA<FileSystemException>()),);
+      coordinator.restore(
+        backup.inspectJson('{"version":1,"settings":{"theme_mode":"light"}}'),
+      ),
+      throwsA(isA<FileSystemException>()),
+    );
     expect(HiveBoxes.settings.get('theme_mode'), 'dark');
     expect(drafts.get('math')?['sessionId'], 'original');
     expect(refreshes, 0);
@@ -129,13 +139,15 @@ void main() {
   test('通知刷新失败仍报告数据恢复成功并刷新界面镜像', () async {
     var refreshed = false;
     final coordinator = RestoreCoordinator(
-        backup: backup,
-        history: history,
-        assistantBarrier: (action) => action(),
-        reconcile: () async => throw StateError('notification unavailable'),
-        invalidate: () => refreshed = true,);
+      backup: backup,
+      history: history,
+      assistantBarrier: (action) => action(),
+      reconcile: () async => throw StateError('notification unavailable'),
+      invalidate: () => refreshed = true,
+    );
     final result = await coordinator.restore(
-        backup.inspectJson('{"version":1,"settings":{"theme_mode":"light"}}'),);
+      backup.inspectJson('{"version":1,"settings":{"theme_mode":"light"}}'),
+    );
     expect(result.notificationsApplied, isFalse);
     expect(HiveBoxes.settings.get('theme_mode'), 'light');
     expect(refreshed, isTrue);

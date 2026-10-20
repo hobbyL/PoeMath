@@ -79,7 +79,7 @@ void main() {
       expect(result.value, isNull);
     });
 
-    testWidgets('描述文案补全 LLM API Key 并说明服务配置不同步', (tester) async {
+    testWidgets('旧凭据输入描述 LLM API Key 与服务配置迁移边界', (tester) async {
       await pumpAndOpen(tester, showBackupPassphraseInputDialog);
       final description = find.textContaining('LLM API Key');
       expect(description, findsOneWidget);
@@ -176,13 +176,14 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('描述文案补全 LLM API Key 并说明服务配置不同步', (tester) async {
+    testWidgets('设置描述整份备份加密、口令保管与服务配置迁移边界', (tester) async {
       await pumpAndOpen(
         tester,
         (context) =>
             showBackupPassphraseSetupDialog(context, hasExisting: false),
       );
-      expect(find.textContaining('LLM API Key'), findsOneWidget);
+      expect(find.textContaining('加密整份备份'), findsOneWidget);
+      expect(find.textContaining('忘记口令将无法恢复'), findsOneWidget);
       expect(find.textContaining('不随备份同步'), findsOneWidget);
     });
 

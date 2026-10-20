@@ -128,7 +128,9 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       var degraded = false;
       String json;
       try {
-        json = await backup.exportToJson(passphrase: passphrase);
+        json = await backup.exportToJson(
+            passphrase: passphrase,
+            encryptPayload: passphrase?.trim().isNotEmpty ?? false,);
       } on BackupCredentialExportException {
         if (!mounted) return;
         final proceed = await showCredentialExportFailedDialog(context);
@@ -137,7 +139,10 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
               .showSnackBar(const SnackBar(content: Text('已取消上传（未修改云端备份）')));
           return;
         }
-        json = await backup.exportToJson();
+        json = await backup.exportToJson(
+            passphrase: passphrase,
+            encryptPayload: passphrase?.trim().isNotEmpty ?? false,
+            includeCredentials: false,);
         degraded = true;
       }
 
@@ -583,7 +588,8 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                                     icon: _uploading
                                         ? const _SmallSpinner()
                                         : const Icon(
-                                            Icons.cloud_upload_outlined,),
+                                            Icons.cloud_upload_outlined,
+                                          ),
                                     label: Text(
                                       _uploading ? '上传中…' : '上传到云端',
                                     ),

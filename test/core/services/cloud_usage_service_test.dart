@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -47,17 +48,20 @@ void main() {
     expect(second.used(CloudUsageKind.llm), 3);
   });
 
-  test('额度及用量跨实例保留，跨日重开；额度与用量均随备份迁移', () async {
+  test('额度及用量跨实例保留，备份只迁移额度而保留本机用量', () async {
     var now = DateTime(2026, 10, 16, 23, 59);
     final usage = CloudUsageService(clock: () => now);
     await usage.setLimit(CloudUsageKind.asr, 1);
     await usage.reserve(CloudUsageKind.asr);
     final backup = BackupService();
     final json = await backup.exportToJson();
-    // 额度上限与已用计数都随备份走：上限是家长设定，计数按日期分桶
-    // （key 自带日期，恢复后当天的桶仍是本机自己的）。
+    // 家长额度配置可迁移，用量是设备事实，恢复不能降低本机已用量。
     expect(json, contains('cloud_daily_limit'));
-    expect(json, contains('cloud_usage'));
+    expect(json, isNot(contains('cloud_usage')));
+    final legacy = jsonDecode(json) as Map<String, dynamic>;
+    legacy['cloudUsage'] = {'cloud_usage:2026-10-16:asr': 0};
+    await backup.restoreFromJson(jsonEncode(legacy));
+    expect(usage.used(CloudUsageKind.asr), 1);
     await backup.restoreFromJson(json);
     await HiveBoxes.close();
     await HiveBoxes.init();

@@ -36,7 +36,6 @@ const Set<String> _travelingFields = {
   'conversations',
   'messages',
   'activitySettlements',
-  'cloudUsage',
   'settings',
   // credentials 仅在提供口令时出现，不在此断言。
 };
@@ -54,8 +53,8 @@ void main() {
   });
 
   test('导出的顶层字段与契约清单逐项一致', () async {
-    final data =
-        jsonDecode(await BackupService().exportToJson()) as Map<String, dynamic>;
+    final data = jsonDecode(await BackupService().exportToJson())
+        as Map<String, dynamic>;
     final actual = data.keys.toSet();
 
     expect(
@@ -74,8 +73,8 @@ void main() {
   test('每个动态数据 box 要么随备份走，要么在清单里显式排除', () async {
     // 空数据下导出，只校验「字段名存在与否」这一层契约。
     // 具体内容正确性由各 collection 的专项测试负责。
-    final data =
-        jsonDecode(await BackupService().exportToJson()) as Map<String, dynamic>;
+    final data = jsonDecode(await BackupService().exportToJson())
+        as Map<String, dynamic>;
 
     expect(data['poemProgress'], isEmpty);
     expect(data['mathMistakes'], isEmpty);
@@ -89,7 +88,7 @@ void main() {
     );
   });
 
-  test('meta box 里只有结算标记与云用量随备份走，其余本机状态不外泄', () async {
+  test('meta box 里只有结算标记随备份走，其余本机状态不外泄', () async {
     // 往 meta 写入三类「本机状态」，都不应出现在导出里。
     await HiveBoxes.meta.put(
       'practice_draft:word',
@@ -100,7 +99,7 @@ void main() {
       jsonEncode({'dailyPoemGoal': 3}),
     );
     await HiveBoxes.meta.put('last_external_backup', '2026-10-01T00:00:00Z');
-    // 这两类必须随备份走：
+    // 结算标记随备份走，用量保持本机：
     await HiveBoxes.meta.put(
       'default_activity_settlement:user_stats:act-1',
       true,
@@ -119,29 +118,25 @@ void main() {
       contains('default_activity_settlement:user_stats:act-1'),
     );
     expect(
-      decoded['cloudUsage'],
-      containsPair('cloud_usage:2026-10-18:llm', 7),
+      decoded.containsKey('cloudUsage'),
+      isFalse,
     );
   });
 
-  test('云用量键自带日期：恢复旧备份不会污染恢复当天的桶', () async {
-    // 这是「换机后今天该从 0 开始」的契约：备份里只有导出当天的 key，
-    // 恢复后今天读的是今天的桶，恒为 0。
+  test('恢复同日旧备份保留本机今日和历史用量', () async {
     final service = BackupService();
+    final now = DateTime.now();
+    final day =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    await HiveBoxes.meta.put('cloud_usage:$day:llm', 2);
     await HiveBoxes.meta.put('cloud_usage:2026-10-18:llm', 9);
-    final json = await service.exportToJson();
-
-    // 模拟新机：清空本机计数后再恢复。
-    await CloudUsageService.replaceCounts(const {});
-    await service.restoreFromJson(json);
-
-    expect(
-      CloudUsageService.exportCounts()['cloud_usage:2026-10-18:llm'],
-      9,
-      reason: '导出当天的历史计数应随备份迁移',
-    );
-    // 恢复当天的桶（用真实 today 计算）不受影响。
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
+    final before = CloudUsageService.exportCounts();
+    final data =
+        jsonDecode(await service.exportToJson()) as Map<String, dynamic>;
+    data['cloudUsage'] = {'cloud_usage:$day:llm': 0};
+    await service.restoreFromJson(jsonEncode(data));
+    expect(CloudUsageService.exportCounts(), before);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
   });
 
   test('云用量节非法（负数/坏日期/未知类别）时拒绝整份备份', () async {
@@ -155,8 +150,7 @@ void main() {
       '未知类别': {'cloud_usage:2026-10-18:unknown': 3},
       '错误前缀': {'other_prefix:2026-10-18:llm': 3},
     }.entries) {
-      final node = Map<String, dynamic>.from(base)
-        ..['cloudUsage'] = bad.value;
+      final node = Map<String, dynamic>.from(base)..['cloudUsage'] = bad.value;
       await expectLater(
         service.restoreFromJson(jsonEncode(node)),
         throwsA(isA<FormatException>()),

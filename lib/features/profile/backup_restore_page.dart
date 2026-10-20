@@ -1,3 +1,4 @@
+import 'package:poemath/core/services/backup_payload_cipher.dart';
 // lib/features/profile/backup_restore_page.dart
 //
 // 层级：features/profile
@@ -66,8 +67,10 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
     final secureStore = ref.read(secureCredentialStoreProvider);
     try {
       if (!await ensureParentAccess(context) || !mounted) return;
-      final result = await showBackupPassphraseSetupDialog(context,
-          hasExisting: _hasPassphrase ?? false,);
+      final result = await showBackupPassphraseSetupDialog(
+        context,
+        hasExisting: _hasPassphrase ?? false,
+      );
       if (result == null || !mounted) return;
       ParentAccessService.instance.assertAllowed();
       if (result.isEmpty) {
@@ -78,8 +81,11 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       final passphrase = await secureStore.readBackupPassphrase();
       if (!mounted) return;
       setState(() => _hasPassphrase = passphrase != null);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(result.isEmpty ? '备份加密口令已清除' : '备份加密口令已保存 ✓'),),);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.isEmpty ? '备份加密口令已清除' : '备份加密口令已保存 ✓'),
+        ),
+      );
     } on Object catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -148,9 +154,9 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
               iconColor: theme.colorScheme.primary,
               title: '备份加密口令',
               subtitle: switch (_hasPassphrase) {
-                true => '已设置，凭据将加密随备份携带',
-                false => '未设置，备份不包含凭据',
-                null => '用于加密备份中的腾讯云 AK/SK 与 TTS Key',
+                true => '已设置，整份备份将加密保存',
+                false => '未设置，学习和聊天内容以明文导出',
+                null => '用于加密学习记录、聊天内容和凭据',
               },
               onTap: _configurePassphrase,
             ),
@@ -196,22 +202,29 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
     try {
       if (!await ensureParentAccess(context) || !context.mounted) return;
       final action = await showModalBottomSheet<String>(
-          context: context,
-          builder: (sheet) => SafeArea(
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                AppTile(
-                    icon: Icons.save_alt_rounded,
-                    iconColor: Theme.of(sheet).colorScheme.primary,
-                    title: '保存到设备',
-                    subtitle: '选择本地目录保存备份文件',
-                    onTap: () => Navigator.pop(sheet, 'save'),),
-                AppTile(
-                    icon: Icons.share_rounded,
-                    iconColor: Theme.of(sheet).colorScheme.primary,
-                    title: '分享',
-                    subtitle: '通过其他应用发送备份文件',
-                    onTap: () => Navigator.pop(sheet, 'share'),),
-              ],),),);
+        context: context,
+        builder: (sheet) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppTile(
+                icon: Icons.save_alt_rounded,
+                iconColor: Theme.of(sheet).colorScheme.primary,
+                title: '保存到设备',
+                subtitle: '选择本地目录保存备份文件',
+                onTap: () => Navigator.pop(sheet, 'save'),
+              ),
+              AppTile(
+                icon: Icons.share_rounded,
+                iconColor: Theme.of(sheet).colorScheme.primary,
+                title: '分享',
+                subtitle: '通过其他应用发送备份文件',
+                onTap: () => Navigator.pop(sheet, 'share'),
+              ),
+            ],
+          ),
+        ),
+      );
       if (action == null || !context.mounted) return;
       final passphrase = await store.readBackupPassphrase();
       if (!context.mounted) return;
@@ -225,11 +238,12 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
           .first;
       if (action == 'save') {
         final path = await FilePicker.saveFile(
-            dialogTitle: '保存备份文件',
-            fileName: 'poemath_backup_$timestamp.json',
-            type: FileType.custom,
-            allowedExtensions: ['json'],
-            bytes: Uint8List.fromList(utf8.encode(json)),);
+          dialogTitle: '保存备份文件',
+          fileName: 'poemath_backup_$timestamp.json',
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          bytes: Uint8List.fromList(utf8.encode(json)),
+        );
         if (path == null) return;
         await history.markExternalBackup();
       } else {
@@ -264,19 +278,24 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
 
   /// 导出 JSON；凭据读取失败时让用户选「仍然导出（不含密钥）」或取消。
   ///
-  /// 返回 `null` 表示用户选择取消。重试导出时不带口令，安全存储读取
-  /// 随即被跳过 —— 这是唯一能拿到「其余数据照常导出」的路径。
+  /// 返回 `null` 表示用户选择取消。重试时跳过凭据读取，
+  /// 保留原口令加密整份学习备份。
   Future<String?> _exportAcceptingCredentialFailure(
     BackupService backup,
     String? passphrase,
   ) async {
     try {
-      return await backup.exportToJson(passphrase: passphrase);
+      return await backup.exportToJson(
+          passphrase: passphrase,
+          encryptPayload: passphrase?.trim().isNotEmpty ?? false,);
     } on BackupCredentialExportException {
       if (!mounted) return null;
       final proceed = await showCredentialExportFailedDialog(context);
       if (proceed != true) return null;
-      return backup.exportToJson();
+      return backup.exportToJson(
+          passphrase: passphrase,
+          encryptPayload: passphrase?.trim().isNotEmpty ?? false,
+          includeCredentials: false,);
     }
   }
 
@@ -286,11 +305,13 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
     try {
       if (!await ensureParentAccess(context) || !context.mounted) return;
       final result = await FilePicker.pickFiles(
-          type: FileType.custom, allowedExtensions: ['json'],);
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
       if (result == null || result.files.isEmpty || !context.mounted) return;
       final path = result.files.single.path;
       if (path == null) return;
-      final json = await File(path).readAsString();
+      final json = await readBackupFile(File(path));
       if (!context.mounted) return;
       await _restoreJson(json, source: '备份文件');
     } on Object catch (error) {
@@ -304,14 +325,23 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
   }
 
   Future<void> _restoreJson(String json, {required String source}) async {
-    final result = await previewAndRestoreBackup(context, ref, json,
-        notifications: widget.notificationService, source: source,);
+    final result = await previewAndRestoreBackup(
+      context,
+      ref,
+      json,
+      notifications: widget.notificationService,
+      source: source,
+    );
     if (!mounted) return;
     setState(() => _history = ref.read(backupHistoryProvider).list());
     if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
           content: Text(
-              '恢复成功，共 ${result.count} 条记录${result.notificationsApplied ? '' : '，通知设置未完全应用'}',),),);
+            '恢复成功，共 ${result.count} 条记录${result.notificationsApplied ? '' : '，通知设置未完全应用'}',
+          ),
+        ),
+      );
     }
   }
 
@@ -358,90 +388,107 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
   Widget _historySection(BuildContext context) {
     final theme = Theme.of(context);
     final history = ref.read(backupHistoryProvider);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      AppTile(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppTile(
           icon: Icons.history,
           iconColor: theme.colorScheme.primary,
           title: '本地保护历史',
           subtitle: '最多保留 10 份，不含安全凭据；卸载应用会丢失',
           trailing: TextButton(
-              onPressed: _busy
-                  ? null
-                  : () async {
-                      if (_busy) return;
-                      setState(() => _busy = true);
-                      try {
-                        if (!await ensureParentAccess(context) || !mounted) {
-                          return;
-                        }
-                        await history.create();
-                      } on Object catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('快照失败：$error')),);
-                        }
-                      } finally {
-                        if (mounted) {
-                          setState(() {
-                            _busy = false;
-                            _history = history.list();
-                          });
-                        }
+            onPressed: _busy
+                ? null
+                : () async {
+                    if (_busy) return;
+                    setState(() => _busy = true);
+                    try {
+                      if (!await ensureParentAccess(context) || !mounted) {
+                        return;
                       }
-                    },
-              child: const Text('立即快照'),),),
-      AppTile(
+                      await history.create();
+                    } on Object catch (error) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('快照失败：$error')),
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _busy = false;
+                          _history = history.list();
+                        });
+                      }
+                    }
+                  },
+            child: const Text('立即快照'),
+          ),
+        ),
+        AppTile(
           icon: Icons.schedule,
           iconColor: theme.colorScheme.primary,
           title: '每日本地快照',
           subtitle: '开启后，每天启动或回到应用时保存一次',
           trailing: Switch(
-              value: history.dailyEnabled,
-              onChanged: _busy
-                  ? null
-                  : (value) async {
-                      await _changeHistoryPreference(() async {
-                        await history.setDailyEnabled(value);
-                        await history.maybeCreateDaily();
-                      });
-                    },),),
-      AppTile(
+            value: history.dailyEnabled,
+            onChanged: _busy
+                ? null
+                : (value) async {
+                    await _changeHistoryPreference(() async {
+                      await history.setDailyEnabled(value);
+                      await history.maybeCreateDaily();
+                    });
+                  },
+          ),
+        ),
+        AppTile(
           icon: Icons.notification_important_outlined,
           iconColor: theme.colorScheme.primary,
           title: '外部备份提醒',
           subtitle: '超过 7 天未导出或云端备份时在此提醒',
           trailing: Switch(
-              value: history.reminderEnabled,
-              onChanged: (value) async {
-                await _changeHistoryPreference(
-                    () => history.setReminderEnabled(value),);
-              },),),
-      if (history.externalBackupDue)
-        ColoredCard(
+            value: history.reminderEnabled,
+            onChanged: (value) async {
+              await _changeHistoryPreference(
+                () => history.setReminderEnabled(value),
+              );
+            },
+          ),
+        ),
+        if (history.externalBackupDue)
+          ColoredCard(
             color: theme.colorScheme.tertiary,
-            child: const Text('请将备份保存到应用之外或上传 WebDAV。本地快照不能防止卸载或设备丢失。'),),
-      FutureBuilder<List<BackupSnapshot>>(
+            child: const Text('请将备份保存到应用之外或上传 WebDAV。本地快照不能防止卸载或设备丢失。'),
+          ),
+        FutureBuilder<List<BackupSnapshot>>(
           future: _history,
           builder: (context, snapshot) {
             if (snapshot.hasError) return const Text('本地历史暂时无法读取，可稍后重试');
             final entries = snapshot.data ?? [];
             if (entries.isEmpty) {
               return const Padding(
-                  padding: EdgeInsets.all(SpacingTokens.md),
-                  child: Text('暂无保护快照'),);
+                padding: EdgeInsets.all(SpacingTokens.md),
+                child: Text('暂无保护快照'),
+              );
             }
-            return Column(children: [
-              for (final entry in entries)
-                AppTile(
+            return Column(
+              children: [
+                for (final entry in entries)
+                  AppTile(
                     icon: Icons.restore,
                     iconColor: theme.colorScheme.primary,
                     title: entry.label,
                     subtitle:
                         entry.createdAt.toLocal().toString().split('.').first,
-                    onTap: _busy ? null : () => _restoreSnapshot(entry),),
-            ],);
-          },),
-    ],);
+                    onTap: _busy ? null : () => _restoreSnapshot(entry),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
   }
 }
 
