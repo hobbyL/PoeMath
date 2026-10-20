@@ -8,6 +8,7 @@ import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/constants/hive_keys.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/hive/hive_registrar.dart';
+import 'package:poemath/data/repositories/poem_repository.dart';
 
 import 'support/app_journey_suite.dart';
 
@@ -42,10 +43,16 @@ Future<void> _setUpIntegrationStorage() async {
     HiveBoxes.challengeRecords.clear(),
     HiveBoxes.settings.clear(),
     HiveBoxes.meta.clear(),
+    HiveBoxes.learningActivities.clear(),
+    HiveBoxes.llmProblems.clear(),
+    HiveBoxes.conversations.clear(),
+    HiveBoxes.messages.clear(),
   ]);
   await HiveBoxes.meta.put(
     HiveKeys.metaDataVersion,
     AppConstants.dataVersion,
   );
   await HiveBoxes.settings.put('has_onboarded', true);
+  await HiveBoxes.meta.put('content_revision', AppConstants.contentRevision);
+  PoemRepository.resetIndices();
 }

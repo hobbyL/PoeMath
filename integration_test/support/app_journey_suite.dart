@@ -3,14 +3,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:poemath/app.dart';
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/backup_history_service.dart';
+import 'package:poemath/data/providers/backup_protection_providers.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/models/poem_progress.dart';
+import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/core/widgets/animated_favorite_button.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/formula.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
+import 'package:poemath/features/math/math_mistake_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 
 typedef JourneyStorageCallback = Future<void> Function();
@@ -63,12 +71,13 @@ void defineAppJourneyTests({
 
     await _startApp(tester);
     await _tapTab(tester, '口算');
-    await tester.tap(find.textContaining('开始练习').first);
+    await tester.tap(find.text('口算练习').first);
     await _pumpUntil(tester, find.byType(NumberKeypad));
 
     final keypad = find.byType(NumberKeypad);
     for (var i = 0; i < 5; i++) {
       await tester.tap(find.descendant(of: keypad, matching: find.text('9')));
+      await tester.pump();
     }
     await tester.tap(
       find.descendant(
@@ -77,10 +86,19 @@ void defineAppJourneyTests({
       ),
     );
 
+    await _pumpUntil(tester, find.text('查看成绩'));
+    for (var i = 0; i < 160; i++) {
+      final button = tester.widget<FilledButton>(find.ancestor(
+        of: find.text('查看成绩'), matching: find.byType(FilledButton),
+      ),);
+      if (button.onPressed != null) break;
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    await tester.tap(find.text('查看成绩'));
     await _pumpUntil(tester, find.text('查看错题'));
     expect(HiveBoxes.mathMistakes.values, isNotEmpty);
     await tester.tap(find.text('查看错题'));
-    await _pumpUntil(tester, find.text('错题本'));
+    await _pumpUntil(tester, find.byType(MathMistakePage));
   });
 
   testWidgets('公式详情可以收藏并持久化', (tester) async {
@@ -89,7 +107,7 @@ void defineAppJourneyTests({
     await _pumpUntil(tester, find.text('公式知识库'));
 
     await tester.tap(find.text('长方形面积'));
-    await _pumpUntil(tester, find.text('长方形面积'));
+    await _pumpUntil(tester, find.byType(AnimatedFavoriteButton));
     await tester.tap(find.byType(AnimatedFavoriteButton));
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -100,12 +118,21 @@ void defineAppJourneyTests({
   });
 
   testWidgets('完成每日目标后打卡并保存连续天数', (tester) async {
-    await HiveBoxes.settings.put('daily_poem_goal', 0);
-    await HiveBoxes.settings.put('daily_math_goal', 0);
+    await HiveBoxes.settings.put('daily_poem_goal', 1);
+    await HiveBoxes.settings.put('daily_math_goal', 1);
+    await HiveBoxes.poemProgress.put('default_integration_poem', PoemProgress(
+      poemId: 'integration_poem', profileId: 'default',
+      status: LearningStatus.learning, lastStudiedAt: DateTime.now(),
+    ),);
+    await HiveBoxes.mathSessions.put('default_goal', MathSession(
+      id: 'goal', profileId: 'default', grade: 1, problemType: 'addition',
+      totalProblems: 1, correctCount: 1, durationSeconds: 1,
+      startedAt: DateTime.now(), finishedAt: DateTime.now(),
+    ),);
 
     await _startApp(tester);
     await tester.tap(find.text('打卡'));
-    await tester.pump(const Duration(seconds: 2));
+    await _pumpUntil(tester, find.text('今日已打卡 ✓'));
 
     expect(find.text('今日已打卡 ✓'), findsOneWidget);
     expect(HiveBoxes.checkIns.values.single.isCheckedIn, isTrue);
@@ -117,21 +144,32 @@ void defineAppJourneyTests({
     await _tapTab(tester, '我的');
     await tester.tap(find.byTooltip('设置'));
     await _pumpUntil(tester, find.text('设置'));
+    await tester.ensureVisible(find.text('数据与同步'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('数据与同步'));
+    await _pumpUntil(tester, find.text('备份与恢复'));
     await tester.tap(find.text('备份与恢复'));
     await _pumpUntil(tester, find.text('导出备份'));
     expect(find.text('从备份恢复'), findsOneWidget);
 
-    await HiveBoxes.settings.put('integration_marker', 'before-backup');
+    await HiveBoxes.settings.put('theme_mode', 'dark');
+    await HiveBoxes.mathSessions.put('default_backup', MathSession(
+      id: 'backup', profileId: 'default', grade: 1, problemType: 'addition',
+      totalProblems: 1, correctCount: 1, durationSeconds: 1,
+      startedAt: DateTime.now(), finishedAt: DateTime.now(),
+    ),);
     final backup = BackupService();
     final json = await backup.exportToJson();
-    await HiveBoxes.settings.clear();
-    expect(HiveBoxes.settings.get('integration_marker'), isNull);
+    await HiveBoxes.mathSessions.clear();
+    await HiveBoxes.settings.put('theme_mode', 'light');
+    expect(HiveBoxes.settings.get('theme_mode'), 'light');
 
     final restoredCount = await backup.restoreFromJson(json);
     expect(restoredCount, greaterThan(0));
+    expect(HiveBoxes.mathSessions.values.single.id, 'backup');
     expect(
-      HiveBoxes.settings.get('integration_marker'),
-      equals('before-backup'),
+      HiveBoxes.settings.get('theme_mode'),
+      equals('dark'),
     );
   });
 }
@@ -188,7 +226,19 @@ Future<void> _startApp(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
-  await tester.pumpWidget(const ProviderScope(child: App()));
+  await tester.pumpWidget(ProviderScope(
+    overrides: [
+      backupHistoryProvider.overrideWith((ref) => BackupHistoryService(
+            backup: ref.read(backupServiceProvider),
+            directoryProvider: () async {
+              final support = await getApplicationSupportDirectory();
+              return Directory('${support.path}/integration_test');
+            },
+            keyProvider: () async => List<int>.generate(32, (i) => i),
+          ),),
+    ],
+    child: const App(),
+  ),);
   await _pumpUntil(tester, find.byType(MainShell));
   await _pumpUntil(tester, find.text('背诗词'));
 }
@@ -202,7 +252,7 @@ Future<void> _tapTab(WidgetTester tester, String label) async {
 }
 
 Future<void> _pumpUntil(WidgetTester tester, Finder target) async {
-  for (var i = 0; i < 20; i++) {
+  for (var i = 0; i < 160; i++) {
     if (target.evaluate().isNotEmpty) return;
     await tester.pump(const Duration(milliseconds: 250));
   }

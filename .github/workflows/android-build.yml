@@ -6,7 +6,11 @@ on:
       - 'v*' # 仅在打 v 开头的 tag 时触发，如 v0.0.1, v1.0.0
 
 jobs:
+  android-integration:
+    uses: ./.github/workflows/android-integration.yml
+
   build:
+    needs: android-integration
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -34,14 +38,7 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          TAG=${GITHUB_REF#refs/tags/v}
-          echo "version_name=$TAG" >> $GITHUB_OUTPUT
-          # 用 tag 中的数字生成 versionCode: 0.0.1 → 1, 1.2.3 → 10203
-          IFS='.' read -r major minor patch <<< "$TAG"
-          VERSION_CODE=$(( ${major:-0} * 10000 + ${minor:-0} * 100 + ${patch:-0} ))
-          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "tag=v$TAG" >> $GITHUB_OUTPUT
-          echo "→ versionName=$TAG, versionCode=$VERSION_CODE"
+          python3 tools/release_version.py "$GITHUB_REF_NAME" --github-output "$GITHUB_OUTPUT"
 
       # -------- 环境准备 --------
       - name: Set up Java 21
@@ -61,6 +58,9 @@ jobs:
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           echo -n "$KEYSTORE_BASE64" | base64 --decode > android/app/poemath-release.jks
           # 校验 jks 文件完整性
@@ -70,12 +70,14 @@ jobs:
             echo "::error::Keystore file too small (${FILE_SIZE} bytes) — KEYSTORE_BASE64 secret may be corrupted"
             exit 1
           fi
-          printf 'storeFile=poemath-release.jks\nstorePassword=${{ secrets.KEYSTORE_PASSWORD }}\nkeyAlias=${{ secrets.KEY_ALIAS }}\nkeyPassword=${{ secrets.KEY_PASSWORD }}\n' > android/key.properties
+          python3 tools/write_signing_properties.py
 
       - name: Verify keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           keytool -list -keystore android/app/poemath-release.jks \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -storetype PKCS12 || {
+            -storepass:env KEYSTORE_PASSWORD -storetype PKCS12 || {
             echo "::error::Keystore verification failed — check KEYSTORE_PASSWORD secret"
             exit 1
           }
@@ -95,6 +97,19 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Check project and release contracts
+        run: |
+          python3 tools/check_project_contracts.py
+          python3 -m unittest discover -s tools -p '*_test.py'
+          python3 tools/release_notes_test.py
+
+      - name: Install content validator dependencies
+        working-directory: tools/poem_importer
+        run: dart pub get
+
+      - name: Validate bundled content
+        run: dart run tools/poem_importer/bin/poem_importer.dart validate
 
       - name: Run analyze
         run: flutter analyze
@@ -268,7 +283,9 @@ jobs:
           from pathlib import Path
 
           limit = int(os.environ.get("HISTORY_LIMIT", "20"))
-          VERSION = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+          import sys
+          sys.path.insert(0, "tools")
+          from release_version import parse_tag
 
           def git(*args):
               return subprocess.run(
@@ -280,11 +297,12 @@ jobs:
           tags = []
           for tag in git("tag", "--list", "v*").splitlines():
               tag = tag.strip()
-              m = VERSION.match(tag)
-              if not m:
+              try:
+                  name, code = parse_tag(tag)
+              except ValueError:
                   continue
-              major, minor, patch = (int(g) for g in m.groups())
-              tags.append((major * 10000 + minor * 100 + patch, tag, major, minor, patch))
+              major, minor, patch = map(int, name.split("."))
+              tags.append((code, tag, major, minor, patch))
           tags.sort(reverse=True)
 
           entries = []
