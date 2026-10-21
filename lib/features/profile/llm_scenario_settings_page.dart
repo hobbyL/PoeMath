@@ -332,6 +332,8 @@ class _LlmScenarioSettingsPageState
                   settingsRepo.providerIdForScenario(scenario),
                 ),
               ),
+              if (scenario != LlmScenario.values.last)
+                const SizedBox(height: SpacingTokens.sm),
             ],
           ],
         ],
