@@ -5,6 +5,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/domain/completion_sound.dart';
+import 'package:poemath/domain/answer_feedback_sound.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
@@ -62,6 +63,30 @@ void main() {
           await HiveBoxes.settings.put(CompletionSound.settingsKey, badValue);
           expect(repo.completionSound, CompletionSound.ensemble);
           expect(HiveBoxes.settings.get(CompletionSound.settingsKey), badValue);
+        }
+      });
+    });
+
+    group('answerFeedbackSound', () {
+      test('旧安装保留经典音效，选择关闭重开后保持', () async {
+        expect(repo.answerFeedbackSound, AnswerFeedbackSound.classic);
+        for (final sound in AnswerFeedbackSound.values) {
+          await repo.setAnswerFeedbackSound(sound);
+          await HiveBoxes.close();
+          await HiveBoxes.init();
+          expect(SettingsRepository().answerFeedbackSound, sound);
+        }
+      });
+
+      test('未知或错误类型只读回落，不改写数据', () async {
+        for (final badValue in <Object>['future', '', 42, true]) {
+          await HiveBoxes.settings
+              .put(AnswerFeedbackSound.settingsKey, badValue);
+          expect(repo.answerFeedbackSound, AnswerFeedbackSound.classic);
+          expect(
+            HiveBoxes.settings.get(AnswerFeedbackSound.settingsKey),
+            badValue,
+          );
         }
       });
     });

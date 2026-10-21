@@ -1,0 +1,21 @@
+童趣答题语音
+
+作者：雨多多
+作品：《答对咯》《答错啦》
+许可：CC-BY（保留署名，来源页面未注明具体版本）
+许可说明：https://www.ear0.com/home/info/keyword-license
+
+《答对咯》来源：
+https://www.ear0.com/sound/show/soundid-34357
+https://www.tosound.com/sound/sound-vVyx8jzr
+
+《答错啦》来源：
+https://www.ear0.com/sound/show/soundid-34358
+https://www.tosound.com/sound/sound-5dJx0JaV
+
+PoeMath 使用说明：直接使用用户下载的原始 MP3，仅修改文件名。
+未转换格式、裁剪、调整音量、语速或音高。
+child_correct.mp3 对应《答对咯》（用户提供的 right.mp3）。
+child_wrong.mp3 对应《答错啦》（用户提供的 wrong.mp3）。
+
+使用这些作品须保留作者署名、来源及许可信息，并说明修改。

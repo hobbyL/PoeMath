@@ -342,8 +342,9 @@ class SettingsPage extends ConsumerWidget {
               AppTile(
                 icon: Icons.celebration_outlined,
                 iconColor: theme.colorScheme.tertiary,
-                title: '完成提示音',
-                subtitle: settingsRepo.completionSound.label,
+                title: '练习音效',
+                subtitle:
+                    '${settingsRepo.answerFeedbackSound.label} · ${settingsRepo.completionSound.label}',
                 onTap: () => showModalBottomSheet<void>(
                   context: context,
                   isScrollControlled: true,

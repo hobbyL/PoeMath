@@ -7,6 +7,7 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/completion_sound.dart';
+import 'package:poemath/domain/answer_feedback_sound.dart';
 
 class CompletionSoundPicker extends ConsumerStatefulWidget {
   const CompletionSoundPicker({super.key, this.previewService});
@@ -42,6 +43,17 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
     if (sound == null || _saving) return;
     final settings = ref.read(settingsRepositoryProvider);
     if (sound == settings.completionSound) return;
+    await _save(() => settings.setCompletionSound(sound));
+  }
+
+  Future<void> _selectAnswerFeedback(AnswerFeedbackSound? sound) async {
+    if (sound == null || _saving) return;
+    final settings = ref.read(settingsRepositoryProvider);
+    if (sound == settings.answerFeedbackSound) return;
+    await _save(() => settings.setAnswerFeedbackSound(sound));
+  }
+
+  Future<void> _save(Future<void> Function() write) async {
     // ProviderContainer 的寿命覆盖面板，关闭面板后保存完成仍刷新设置页。
     final container = ProviderScope.containerOf(context, listen: false);
     setState(() {
@@ -49,11 +61,11 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
       _error = null;
     });
     try {
-      await settings.setCompletionSound(sound);
+      await write();
       container.invalidate(settingsRepositoryProvider);
     } on Object catch (error, stackTrace) {
       AppLogger.e(
-        '完成提示音设置保存失败',
+        '练习音效设置保存失败',
         tag: 'Settings',
         error: error,
         stackTrace: stackTrace,
@@ -64,13 +76,13 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
     }
   }
 
-  Future<void> _listen(CompletionSound sound) async {
+  Future<void> _listen(Future<bool> Function() preview) async {
     if (_startingPreview) return;
     setState(() {
       _startingPreview = true;
       _error = null;
     });
-    final success = await _preview.previewCompletion(sound);
+    final success = await preview();
     if (!mounted) return;
     setState(() {
       _startingPreview = false;
@@ -90,7 +102,7 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '完成提示音',
+              '练习音效',
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
@@ -105,6 +117,49 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
               ),
               const SizedBox(height: SpacingTokens.md),
             ],
+            Text('答题反馈', style: theme.textTheme.titleSmall),
+            const SizedBox(height: SpacingTokens.sm),
+            RadioGroup<AnswerFeedbackSound>(
+              groupValue: settings.answerFeedbackSound,
+              onChanged: _saving ? (_) {} : _selectAnswerFeedback,
+              child: Column(
+                children: [
+                  for (final sound in AnswerFeedbackSound.values) ...[
+                    AppTile(
+                      iconColor: theme.colorScheme.tertiary,
+                      title: sound.label,
+                      subtitle: sound.description,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Semantics(
+                            label: '使用${sound.label}',
+                            child: Radio<AnswerFeedbackSound>(
+                              value: sound,
+                              enabled: !_saving,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: '试听${sound.label}',
+                            onPressed: _startingPreview
+                                ? null
+                                : () => _listen(
+                                      () =>
+                                          _preview.previewAnswerFeedback(sound),
+                                    ),
+                            icon: const Icon(Icons.play_arrow_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            Text('完成提示音', style: theme.textTheme.titleSmall),
+            const SizedBox(height: SpacingTokens.sm),
             RadioGroup<CompletionSound>(
               groupValue: settings.completionSound,
               onChanged: _saving ? (_) {} : _select,
@@ -127,8 +182,11 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
                           ),
                           IconButton(
                             tooltip: '试听${sound.label}',
-                            onPressed:
-                                _startingPreview ? null : () => _listen(sound),
+                            onPressed: _startingPreview
+                                ? null
+                                : () => _listen(
+                                      () => _preview.previewCompletion(sound),
+                                    ),
                             icon: const Icon(Icons.play_arrow_rounded),
                           ),
                         ],

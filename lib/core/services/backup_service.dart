@@ -40,6 +40,7 @@ import 'package:poemath/domain/poem_practice_details.dart';
 import 'package:poemath/domain/poem_review_history.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/domain/completion_sound.dart';
+import 'package:poemath/domain/answer_feedback_sound.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
@@ -92,6 +93,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   'active_subject': 'string', // 当前主题 poem/math
   'sound_enabled': 'bool', // 音效开关
   CompletionSound.settingsKey: 'string', // 练习完成提示音，跨设备用户偏好
+  AnswerFeedbackSound.settingsKey: 'string', // 答题反馈音，跨设备用户偏好
   'haptic_enabled': 'bool', // 触觉反馈开关
   'selected_grade': 'int', // 选中年级
   'selected_semester': 'string', // 学习背景学期 上/下

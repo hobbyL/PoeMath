@@ -23,6 +23,7 @@ import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/domain/completion_sound.dart';
+import 'package:poemath/domain/answer_feedback_sound.dart';
 
 class SettingsRepository {
   int _boundedInt(String key, int fallback) {
@@ -146,6 +147,17 @@ class SettingsRepository {
 
   Future<void> setCompletionSound(CompletionSound sound) async {
     await _putValidated(CompletionSound.settingsKey, sound.id);
+  }
+
+  /// 旧安装保留经典音效；损坏值只读回落，不改写历史数据。
+  AnswerFeedbackSound get answerFeedbackSound =>
+      AnswerFeedbackSound.fromId(
+        HiveBoxes.settings.get(AnswerFeedbackSound.settingsKey),
+      ) ??
+      AnswerFeedbackSound.defaultSound;
+
+  Future<void> setAnswerFeedbackSound(AnswerFeedbackSound sound) async {
+    await _putValidated(AnswerFeedbackSound.settingsKey, sound.id);
   }
 
   // ============ 触觉反馈 ============

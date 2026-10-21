@@ -68,6 +68,7 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       'active_subject': 'math',
       'sound_enabled': false,
       'completion_sound': 'pizzicato',
+      'answer_feedback_sound': 'child_voice',
       'haptic_enabled': true,
       'selected_grade': 3,
       'tts_speed': 0.8,
@@ -500,6 +501,22 @@ void main() {
       await backupWithSettings({'completion_sound': 'arcade'}),
     );
     expect(HiveBoxes.settings.get('completion_sound'), 'arcade');
+  });
+
+  test('答题反馈备份缺键或坏值保留本机选择，有效值覆盖', () async {
+    await HiveBoxes.settings.put('answer_feedback_sound', 'child_voice');
+    for (final settings in <Map<String, dynamic>>[
+      {},
+      {'answer_feedback_sound': 'unknown'},
+      {'answer_feedback_sound': 123},
+    ]) {
+      await backupService.restoreFromJson(await backupWithSettings(settings));
+      expect(HiveBoxes.settings.get('answer_feedback_sound'), 'child_voice');
+    }
+    await backupService.restoreFromJson(
+      await backupWithSettings({'answer_feedback_sound': 'classic'}),
+    );
+    expect(HiveBoxes.settings.get('answer_feedback_sound'), 'classic');
   });
 
   test('AC7 类型测试：通知 key 类型不符时跳过不落盘', () async {
