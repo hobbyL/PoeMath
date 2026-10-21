@@ -198,12 +198,27 @@ void main() {
   /// 再用裸 `pump()` 收尾，是项目里已验证的写法
   /// （见 `word_problem_preview_page_test.dart`）。
   Future<void> tapAndSettle(WidgetTester tester, Finder target) async {
+    final confirmingRestore = target.evaluate().any((element) =>
+        element.widget is Text && (element.widget as Text).data == '确认覆盖',);
     await tester.runAsync(() async {
       await tester.tap(target);
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
+    if (confirmingRestore) {
+      // 恢复需先写保护快照、再替换多个 box；全量并发时不能以300ms
+      // 代替完成信号。推进真实IO及页面帧，等到恢复结果再断言数据。
+      for (var i = 0; i < 100; i++) {
+        if (find.textContaining('恢复成功，共').evaluate().isNotEmpty ||
+            find.textContaining('下载或恢复失败：').evaluate().isNotEmpty) {
+          return;
+        }
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await tester.pump();
+      }
+      fail('确认覆盖后未收到恢复结果');
+    }
   }
 
   /// 装好 Hive、渲染页面、选中唯一配置（底部操作按钮随之出现）。

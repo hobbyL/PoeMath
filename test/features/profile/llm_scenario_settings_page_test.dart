@@ -170,6 +170,17 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
+    final selectedProviderLabel = find.descendant(
+      of: find.widgetWithText(AppTile, '诗词讲解'),
+      matching: find.textContaining('配置 2'),
+    );
+    // 绑定包含多个异步Hive写入；全量并发时写入150ms后可能尚未
+    // 调用setState。等待实际副标题刷新，同时继续推进真实IO和帧。
+    for (var i = 0; i < 100 && selectedProviderLabel.evaluate().isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+    }
+
     expect(find.text('诗词讲解使用厂商'), findsNothing);
     var repo = _repoOf(tester);
     expect(repo.providerIdForScenario(LlmScenario.poemExplain), 'p2');
