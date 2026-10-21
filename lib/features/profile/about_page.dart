@@ -225,7 +225,7 @@ class _AboutPageState extends State<AboutPage> {
                   icon: Icons.description_outlined,
                   iconColor: theme.colorScheme.secondary,
                   title: '开源许可',
-                  subtitle: '查看使用的第三方库及许可',
+                  subtitle: '查看第三方库、音效及许可',
                   onTap: () => showLicensePage(
                     context: context,
                     applicationName: AppConstants.appName,

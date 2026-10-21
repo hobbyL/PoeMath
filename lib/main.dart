@@ -7,6 +7,7 @@
 //   4. 由 AppBootstrap 初始化 Hive，并在失败时提供重试。
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -49,8 +50,23 @@ void installGlobalErrorHandlers() {
   };
 }
 
+/// 将随应用打包的音效署名加入「关于 → 开源许可」。
+/// 注册时不读文件，打开许可页后才加载正文。
+void registerAssetLicenses() {
+  LicenseRegistry.addLicense(() async* {
+    for (final (name, path) in [
+      ('童趣答题语音 — 雨多多', 'assets/sounds/LICENSE-child-voice.txt'),
+      ('完成提示音 — Kenney', 'assets/sounds/LICENSE-completion.txt'),
+    ]) {
+      final text = await rootBundle.loadString(path);
+      yield LicenseEntryWithLineBreaks([name], text);
+    }
+  });
+}
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   installGlobalErrorHandlers();
+  registerAssetLicenses();
   runApp(const ProviderScope(child: AppBootstrap()));
 }
