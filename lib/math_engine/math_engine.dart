@@ -100,7 +100,9 @@ class MathEngine {
       if (converted == null) continue; // 模式不兼容，重试
       // 综合属于普通方案；竖式只能由用户明确选择后进入。
       if (mode == null && converted.mode == ProblemMode.vertical) continue;
-      if (verticalProcessOnly && !VerticalAttempt.supports(converted)) continue;
+      if (verticalProcessOnly && !VerticalAttempt.supportsProcess(converted)) {
+        continue;
+      }
       final skill = _classifySkill(generator, converted);
       if (requestedSkill != null && skill != requestedSkill) continue;
 

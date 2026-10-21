@@ -66,8 +66,8 @@ Future<void> tapKeys(WidgetTester tester, List<String> keys) async {
 }
 
 void main() {
-  for (final regroup in ['0', '1']) {
-    testWidgets('竖式重练结果 83 相同，进位 $regroup 决定是否通过', (tester) async {
+  for (final tens in ['7', '8']) {
+    testWidgets('竖式重练仅填结果，十位 $tens 判分正确', (tester) async {
       final problem = MathProblem(
         operands: [NumberValue.fromInt(38), NumberValue.fromInt(45)],
         operators: const [Operator.add],
@@ -83,10 +83,10 @@ void main() {
         problem: problem,
         onResult: (value) => result = value,
       );
+      expect(find.byKey(const ValueKey('vertical_regroup')), findsNothing);
       for (final field in [
         ('ones', '3'),
-        ('tens', '8'),
-        ('regroup', regroup),
+        ('tens', tens),
       ]) {
         await tester.tap(find.byKey(ValueKey('vertical_${field.$1}')));
         await tester.pump();
@@ -94,11 +94,11 @@ void main() {
       }
       await tester.tap(find.byIcon(Icons.check_rounded));
       await tester.pump();
-      expect(find.text(regroup == '1' ? '回答正确！' : '还是答错了'), findsOneWidget);
-      if (regroup == '0') expect(find.text('个位写 3，进位记 1'), findsOneWidget);
+      expect(find.text(tens == '8' ? '回答正确！' : '还是答错了'), findsOneWidget);
+      if (tens == '7') expect(find.text('个位写 3，向十位进 1'), findsOneWidget);
       await tester.tap(find.text('关闭'));
       await tester.pumpAndSettle();
-      expect(result, regroup == '1');
+      expect(result, tens == '8');
     });
   }
 

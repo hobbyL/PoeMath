@@ -18,7 +18,7 @@ MathMistake _mistake() => MathMistake(
     );
 
 void main() {
-  test('快照读取保留原题与真实错误过程，结果相同仍然判错', () {
+  test('旧快照保留进位记录，新的判分只检查结果各数位', () {
     final problem = MathProblem(
       operands: [NumberValue.fromInt(38), NumberValue.fromInt(45)],
       operators: const [Operator.add],
@@ -35,8 +35,10 @@ void main() {
     expect(mistake.originalProblem!.toJson(), problem.toJson());
     expect(mistake.originalAttempt!.toJson(), attempt.toJson());
     expect(mistake.originalAttempt!.answer(mistake.originalProblem!), '83');
-    expect(mistake.originalAttempt!.judge(mistake.originalProblem!).isCorrect,
-        isFalse,);
+    expect(
+      mistake.originalAttempt!.judge(mistake.originalProblem!).isCorrect,
+      isTrue,
+    );
   });
 
   test('缺少快照的旧错题不伪造过程', () {

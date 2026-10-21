@@ -67,7 +67,7 @@ Future<void> _pumpDetail(WidgetTester tester, MathMistake mistake) async {
 }
 
 void main() {
-  testWidgets('结果正确但进位错误时展示真实过程与中文错因', (tester) async {
+  testWidgets('旧进位错误记录保留历史信息，重练文案只要求结果各数位', (tester) async {
     final problem = MathProblem(
       operands: [NumberValue.fromInt(38), NumberValue.fromInt(45)],
       operators: const [Operator.add],
@@ -86,12 +86,13 @@ void main() {
       errorType: VerticalAttempt.errorCategory,
       problemJson: jsonEncode(problem.toJson()),
       attemptJson: jsonEncode(
-          const VerticalAttempt(ones: '3', tens: '8', regroup: '0').toJson(),),
+        const VerticalAttempt(ones: '3', tens: '8', regroup: '0').toJson(),
+      ),
     );
     await _pumpDetail(tester, mistake);
     expect(find.text('错因：竖式过程错误'), findsOneWidget);
-    expect(find.text('本题同时检查结果与进退位，结果相同也可能出现过程错误。'), findsOneWidget);
-    expect(find.textContaining('个位进位：0'), findsOneWidget);
+    expect(find.text('重练时只需填写结果各数位，进位或借位无需填写。'), findsOneWidget);
+    expect(find.text('十位：8 · 个位：3 · 历史个位进位：0'), findsOneWidget);
   });
 
   testWidgets('首次答错显示累计答错 1 次', (tester) async {

@@ -12,6 +12,7 @@ import 'package:poemath/features/math/practice_clock.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/math_engine/models/vertical_attempt.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import '../../helpers/hive_test_helper.dart';
@@ -417,6 +418,247 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
     }
   });
+  for (final (a, b, op, answer, fields) in [
+    (6, 5, Operator.multiply, '30', ['tens', 'ones']),
+    (95, 27, Operator.add, '122', ['hundreds', 'tens', 'ones']),
+    (
+      95,
+      27,
+      Operator.multiply,
+      '2565',
+      ['thousands', 'hundreds', 'tens', 'ones']
+    ),
+  ]) {
+    testWidgets('竖式$a${op.symbol}$b显示所有结果数位，只填结果即可提交', (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final result = op == Operator.add ? a + b : a * b;
+      final problem = MathProblem(
+        operands: [NumberValue.fromInt(a), NumberValue.fromInt(b)],
+        operators: [op],
+        result: NumberValue.fromInt(result),
+        mode: ProblemMode.vertical,
+        grade: 2,
+        semester: '上',
+      );
+      await tester.runAsync(() async {
+        await HiveBoxes.settings.put('sound_enabled', false);
+        await HiveBoxes.settings.put('haptic_enabled', false);
+        await PracticeDraftRepository().save('math', {
+          'sessionId': 'vertical-input-$result',
+          'startedAt': DateTime.now().toIso8601String(),
+          'elapsedMilliseconds': 0,
+          'index': 0,
+          'request': const MathPracticeRequest(
+            grade: 2,
+            semester: '上',
+            count: 1,
+            difficulty: DifficultyLevel.medium,
+            mode: ProblemMode.vertical,
+          ).toJson(),
+          'problems': [problem.toJson()],
+          'records': <Map<String, dynamic>>[],
+        });
+        await tester.pumpWidget(
+          const ProviderScope(
+            child: MaterialApp(home: MathPracticePage(resume: true)),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('输入答案'), findsNothing);
+      expect(find.byKey(const ValueKey('vertical_regroup')), findsNothing);
+      for (var i = 0; i < fields.length; i++) {
+        final selector = find.byKey(ValueKey('vertical_${fields[i]}'));
+        expect(selector, findsOneWidget);
+        await tester.ensureVisible(selector);
+        await tester.tap(selector);
+        await tester.pump();
+        final key = find.descendant(
+          of: find.byType(NumberKeypad),
+          matching: find.text(answer[i]),
+        );
+        await tester.tap(key);
+        await tester.pump();
+      }
+      await tester.runAsync(() async {
+        await tester.tap(find.byIcon(Icons.check_rounded));
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('回答正确！'), findsOneWidget);
+      final record = HiveBoxes.mathSessions.values.single.problemRecords.single;
+      expect(record.userAnswer, answer);
+      expect(record.isCorrect, isTrue);
+      expect(HiveBoxes.mathMistakes.values, isEmpty);
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump(const Duration(seconds: 5));
+    });
+  }
+
+  for (final legacy in [true, false]) {
+    testWidgets('恢复乘法${legacy ? '旧完整答案' : '新高位作答'}草稿，数位内容可见且可直接提交',
+        (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final problem = MathProblem(
+        operands: [NumberValue.fromInt(95), NumberValue.fromInt(27)],
+        operators: [Operator.multiply],
+        result: NumberValue.fromInt(2565),
+        mode: ProblemMode.vertical,
+        grade: 2,
+        semester: '上',
+      );
+      final attempt = legacy
+          ? const VerticalAttempt()
+          : const VerticalAttempt(ones: '5', tens: '6', hundreds: '5')
+              .withField('thousands', '2');
+      await tester.runAsync(() async {
+        await HiveBoxes.settings.put('sound_enabled', false);
+        await HiveBoxes.settings.put('haptic_enabled', false);
+        await PracticeDraftRepository().save('math', {
+          'sessionId': 'restore-multiplication-$legacy',
+          'startedAt': DateTime.now().toIso8601String(),
+          'elapsedMilliseconds': 0,
+          'index': 0,
+          // 新数位作答优先，不能被残留的完整答案覆盖。
+          'input': legacy ? '2565' : '9999',
+          'verticalAttempt': attempt.toJson(),
+          'verticalField': legacy ? 'ones' : 'thousands',
+          'request': const MathPracticeRequest(
+            grade: 2,
+            semester: '上',
+            count: 1,
+            difficulty: DifficultyLevel.medium,
+            mode: ProblemMode.vertical,
+          ).toJson(),
+          'problems': [problem.toJson()],
+          'records': <Map<String, dynamic>>[],
+        });
+        await tester.pumpWidget(
+          const ProviderScope(
+            child: MaterialApp(home: MathPracticePage(resume: true)),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      for (final label in ['千位：2', '百位：5', '十位：6', '个位：5']) {
+        expect(find.text(label), findsOneWidget);
+      }
+      expect(
+        tester
+            .widget<ChoiceChip>(
+              find.byKey(ValueKey('vertical_${legacy ? 'ones' : 'thousands'}')),
+            )
+            .selected,
+        isTrue,
+      );
+      await tester.runAsync(() async {
+        await tester.tap(find.byIcon(Icons.check_rounded));
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('回答正确！'), findsOneWidget);
+      final record = HiveBoxes.mathSessions.values.single.problemRecords.single;
+      expect(record.userAnswer, '2565');
+      expect(record.isCorrect, isTrue);
+      expect(
+        VerticalAttempt.fromJson(record.attempt!).higherDigits,
+        {'thousands': '2'},
+      );
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump(const Duration(seconds: 5));
+    });
+  }
+
+  testWidgets('恢复旧进位判错记录保留历史判定和统计，重开不重复写入', (tester) async {
+    final problem = MathProblem(
+      operands: [NumberValue.fromInt(38), NumberValue.fromInt(45)],
+      operators: [Operator.add],
+      result: NumberValue.fromInt(83),
+      mode: ProblemMode.vertical,
+      grade: 2,
+      semester: '上',
+    );
+    final attempt =
+        const VerticalAttempt(ones: '3', tens: '8', regroup: '0').toJson();
+    await tester.runAsync(() async {
+      await HiveBoxes.settings.put('sound_enabled', false);
+      await HiveBoxes.settings.put('haptic_enabled', false);
+      await PracticeDraftRepository().save('math', {
+        'sessionId': 'legacy-vertical-answer',
+        'startedAt': DateTime(2026, 10, 16).toIso8601String(),
+        'elapsedMilliseconds': 5000,
+        'index': 0,
+        'verticalField': 'regroup',
+        'verticalAttempt': attempt,
+        'request': const MathPracticeRequest(
+          grade: 2,
+          semester: '上',
+          count: 1,
+          difficulty: DifficultyLevel.medium,
+          mode: ProblemMode.vertical,
+        ).toJson(),
+        'problems': [problem.toJson()],
+        'records': [
+          ProblemRecord(
+            problemText: problem.problemText,
+            answerText: '83',
+            userAnswer: '83',
+            isCorrect: false,
+            problem: problem.toJson(),
+            attempt: attempt,
+          ).toJson(),
+        ],
+      });
+    });
+    for (var run = 0; run < 2; run++) {
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          const ProviderScope(
+            child: MaterialApp(home: MathPracticePage(resume: true)),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('再想想'), findsOneWidget);
+      expect(find.text('这道题按原练习规则记录为答错；重新练习只检查结果各数位。'), findsOneWidget);
+      expect(
+        HiveBoxes.mathSessions.values.single.problemRecords.single.isCorrect,
+        isFalse,
+      );
+      expect(
+        HiveBoxes.mathMistakes.values.single.errorType,
+        VerticalAttempt.errorCategory,
+      );
+      expect(HiveBoxes.mathMistakes.values.single.wrongCount, 1);
+      expect(HiveBoxes.userStats.get('default_stats')!.mathTotalProblems, 1);
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump(const Duration(seconds: 5));
+    }
+  });
+
   testWidgets('前台时钟暂停期间不累计，结算后不能重新启动', (tester) async {
     final clock = PracticeClock();
     addTearDown(clock.dispose);
@@ -437,98 +679,105 @@ void main() {
         .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
     expect(clock.elapsedMilliseconds, finished);
   });
-  testWidgets('窄屏大字号逐列作答：结果83但进位填0不能通过，草稿和错题保留过程', (tester) async {
-    tester.view.physicalSize = const Size(320, 640);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final p = MathProblem(
-      operands: [NumberValue.fromInt(38), NumberValue.fromInt(45)],
-      operators: [Operator.add],
-      result: NumberValue.fromInt(83),
-      mode: ProblemMode.vertical,
-      grade: 2,
-      semester: '上',
-      skillId: 'addition_carry',
-    );
-    await tester.runAsync(() async {
-      await HiveBoxes.settings.put('sound_enabled', false);
-      await HiveBoxes.settings.put('haptic_enabled', false);
-      await PracticeDraftRepository().save('math', {
-        'sessionId': 'vertical-fixture',
-        'startedAt': DateTime.now().toIso8601String(),
-        'elapsedMilliseconds': 5000,
-        'index': 0,
-        'input': '',
-        'request': const MathPracticeRequest(
-          grade: 2,
-          semester: '上',
-          count: 1,
-          difficulty: DifficultyLevel.medium,
-          mode: ProblemMode.vertical,
-        ).toJson(),
-        'problems': [p.toJson()],
-        'records': <Map<String, dynamic>>[],
-      });
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(textScaler: const TextScaler.linear(1.6)),
-              child: child!,
-            ),
-            home: const MathPracticePage(resume: true),
-          ),
-        ),
+  for (final tens in ['7', '8']) {
+    testWidgets('窄屏大字恢复旧进位选中项，十位$tens按结果判分并保存草稿', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final p = MathProblem(
+        operands: [NumberValue.fromInt(38), NumberValue.fromInt(45)],
+        operators: [Operator.add],
+        result: NumberValue.fromInt(83),
+        mode: ProblemMode.vertical,
+        grade: 2,
+        semester: '上',
+        skillId: 'addition_carry',
       );
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await tester.runAsync(() async {
+        await HiveBoxes.settings.put('sound_enabled', false);
+        await HiveBoxes.settings.put('haptic_enabled', false);
+        await PracticeDraftRepository().save('math', {
+          'sessionId': 'vertical-fixture',
+          'startedAt': DateTime.now().toIso8601String(),
+          'elapsedMilliseconds': 5000,
+          'index': 0,
+          'input': '',
+          'verticalField': 'regroup',
+          'request': const MathPracticeRequest(
+            grade: 2,
+            semester: '上',
+            count: 1,
+            difficulty: DifficultyLevel.medium,
+            mode: ProblemMode.vertical,
+          ).toJson(),
+          'problems': [p.toJson()],
+          'records': <Map<String, dynamic>>[],
+        });
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: const TextScaler.linear(1.6)),
+                child: child!,
+              ),
+              home: const MathPracticePage(resume: true),
+            ),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('vertical_regroup')), findsNothing);
+      expect(
+        tester
+            .widget<ChoiceChip>(find.byKey(const ValueKey('vertical_ones')))
+            .selected,
+        isTrue,
+      );
+      await tester.runAsync(() async {
+        // 不点选个位，直接输入以验证旧 regroup 选中项已恢复到个位。
+        await tester.ensureVisible(find.text('3').last);
+        await tester.tap(find.text('3').last);
+        await tester.pump();
+        await tester.ensureVisible(find.byKey(const ValueKey('vertical_tens')));
+        await tester.tap(find.byKey(const ValueKey('vertical_tens')));
+        await tester.pump();
+        await tester.ensureVisible(find.text(tens).last);
+        await tester.tap(find.text(tens).last);
+        await tester.pump();
+        await tester.ensureVisible(find.byIcon(Icons.check_rounded));
+        await tester.tap(find.byIcon(Icons.check_rounded));
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      final record = HiveBoxes.mathSessions.values.single.problemRecords.single;
+      expect(record.userAnswer, '${tens}3');
+      expect(record.isCorrect, tens == '8');
+      expect(record.attempt!['ones'], '3');
+      expect(record.attempt!['tens'], tens);
+      expect(record.attempt!['regroup'], isEmpty);
+      if (tens == '7') {
+        expect(
+          HiveBoxes.mathMistakes.values.single.attemptJson,
+          contains('"tens":"7"'),
+        );
+      } else {
+        expect(HiveBoxes.mathMistakes.values, isEmpty);
+      }
+      expect(
+        PracticeDraftRepository().get('math')!['verticalAttempt'],
+        record.attempt,
+      );
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump(const Duration(seconds: 5));
     });
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-    expect(tester.takeException(), isNull);
-    await tester.runAsync(() async {
-      await tester.ensureVisible(find.byKey(const ValueKey('vertical_ones')));
-      await tester.tap(find.byKey(const ValueKey('vertical_ones')));
-      await tester.pump();
-      await tester.ensureVisible(find.text('3').last);
-      await tester.tap(find.text('3').last);
-      await tester.pump();
-      await tester.ensureVisible(find.byKey(const ValueKey('vertical_tens')));
-      await tester.tap(find.byKey(const ValueKey('vertical_tens')));
-      await tester.pump();
-      await tester.ensureVisible(find.text('8').last);
-      await tester.tap(find.text('8').last);
-      await tester.pump();
-      await tester
-          .ensureVisible(find.byKey(const ValueKey('vertical_regroup')));
-      await tester.tap(find.byKey(const ValueKey('vertical_regroup')));
-      await tester.pump();
-      await tester.ensureVisible(find.text('0').last);
-      await tester.tap(find.text('0').last);
-      await tester.pump();
-      await tester.ensureVisible(find.byIcon(Icons.check_rounded));
-      await tester.tap(find.byIcon(Icons.check_rounded));
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-    final record = HiveBoxes.mathSessions.values.single.problemRecords.single;
-    expect(record.userAnswer, '83');
-    expect(record.isCorrect, isFalse);
-    expect(record.attempt!['regroup'], '0');
-    expect(
-      HiveBoxes.mathMistakes.values.single.attemptJson,
-      contains('"regroup":"0"'),
-    );
-    expect(
-      PracticeDraftRepository().get('math')!['verticalAttempt'],
-      record.attempt,
-    );
-    await tester.runAsync(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump(const Duration(seconds: 5));
-  });
+  }
 }

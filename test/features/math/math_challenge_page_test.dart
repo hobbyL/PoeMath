@@ -109,7 +109,7 @@ void main() {
       await tearDownHiveForTesting();
     });
 
-    testWidgets('竖式挑战过程错误仍判错，并保存方案、过程和固定册次', (tester) async {
+    testWidgets('竖式挑战无需填进退位，错误结果保存各数位和固定册次', (tester) async {
       await tester.runAsync(() async {
         await SettingsRepository().setLearningBackground(2, '上');
         await HiveBoxes.settings.put('math_difficulty', 'medium');
@@ -140,10 +140,12 @@ void main() {
       // 按祖先关系定位到真正的 IconButton。
       expect(
         tester
-            .widget<IconButton>(find.ancestor(
-              of: find.byTooltip('挑战记录'),
-              matching: find.byType(IconButton),
-            ),)
+            .widget<IconButton>(
+              find.ancestor(
+                of: find.byTooltip('挑战记录'),
+                matching: find.byType(IconButton),
+              ),
+            )
             .onPressed,
         isNull,
       );
@@ -151,7 +153,8 @@ void main() {
           .widget<VerticalCalcWidget>(find.byType(VerticalCalcWidget))
           .problem;
       expect(problem.problemText, '32 + 11 = ?');
-      for (final field in [('ones', '3'), ('tens', '4'), ('regroup', '1')]) {
+      expect(find.byKey(const ValueKey('vertical_regroup')), findsNothing);
+      for (final field in [('ones', '4'), ('tens', '4')]) {
         await tester.tap(find.byKey(ValueKey('vertical_${field.$1}')));
         await tester.pump();
         await tester.tap(find.text(field.$2));
@@ -165,10 +168,13 @@ void main() {
       expect(find.text('已答 1 题 · 正确 0 题'), findsOneWidget);
       expect(find.text('0 分'), findsOneWidget);
       final mistake = HiveBoxes.mathMistakes.values.single;
-      expect(mistake.userAnswer, '43');
+      expect(mistake.userAnswer, '44');
       expect(mistake.correctAnswer, '43');
       expect(mistake.errorType, 'vertical_process');
-      expect((jsonDecode(mistake.attemptJson!) as Map)['regroup'], '1');
+      final attempt = jsonDecode(mistake.attemptJson!) as Map;
+      expect(attempt['ones'], '4');
+      expect(attempt['tens'], '4');
+      expect(attempt['regroup'], isEmpty);
       expect(mistake.problemJson, isNotNull);
       // 外部册次变化（现只能经学习背景写 Hive）不能改变已开始的挑战
       // 题组及最终记录。

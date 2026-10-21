@@ -202,7 +202,30 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     if (draft['verticalAttempt'] case final Map<String, dynamic> attempt) {
       _verticalAttempt = VerticalAttempt.fromJson(attempt);
     }
-    _verticalField = draft['verticalField'] as String? ?? 'ones';
+    final currentProblem = problems[index];
+    if (VerticalAttempt.supports(currentProblem) &&
+        !VerticalAttempt.supportsProcess(currentProblem)) {
+      final fields = VerticalAttempt.fieldsFor(currentProblem);
+      final legacyInput = _answerController.text;
+      // 原先乘法等竖式使用完整答案框，空的逐位草稿需接回已输入的结果。
+      if (fields.every((entry) => _verticalAttempt.field(entry.$1).isEmpty) &&
+          RegExp(r'^\d+$').hasMatch(legacyInput) &&
+          legacyInput.length <= fields.length) {
+        final digits = legacyInput.padLeft(fields.length, '0');
+        for (var i = 0; i < fields.length; i++) {
+          _verticalAttempt =
+              _verticalAttempt.withField(fields[i].$1, digits[i]);
+        }
+        _answerController.clear();
+      }
+    }
+    // 旧草稿可能停留在已移除的进退位栏，恢复到可填写的结果数位。
+    final savedField = draft['verticalField'] as String?;
+    _verticalField = VerticalAttempt.supports(problems[index]) &&
+            VerticalAttempt.fieldsFor(problems[index])
+                .any((entry) => entry.$1 == savedField)
+        ? savedField!
+        : 'ones';
     ref.read(mathProblemsProvider.notifier).state = problems;
     ref.read(mathCurrentIndexProvider.notifier).state = index;
     ref.read(mathAnsweredCountProvider.notifier).state = records.length;
@@ -210,10 +233,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         records.where((r) => r.isCorrect).length;
     if (records.length > index) {
       final record = records[index];
-      _judgement =
-          VerticalAttempt.supports(problems[index]) && record.attempt != null
-              ? VerticalAttempt.fromJson(record.attempt!).judge(problems[index])
-              : MathEngine.judge(problems[index], record.userAnswer);
+      _judgement = _judgeRecordedAnswer(problems[index], record);
     }
     _submitting = true;
     if (mounted) setState(() => _ready = true);
@@ -224,6 +244,28 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       _submitting = false;
       if (mounted) setState(() {});
     }
+  }
+
+  AnswerJudgement _judgeRecordedAnswer(
+    MathProblem problem,
+    ProblemRecord record,
+  ) {
+    if (!VerticalAttempt.supports(problem) || record.attempt == null) {
+      return MathEngine.judge(problem, record.userAnswer);
+    }
+    final judgement = VerticalAttempt.fromJson(record.attempt!).judge(problem);
+    if (judgement.isCorrect == record.isCorrect) return judgement;
+    // 已答题的历史判定与统计保持一致，新规则仅用于之后的作答和重练。
+    return AnswerJudgement(
+      isCorrect: record.isCorrect,
+      diagnosis: record.isCorrect
+          ? null
+          : const MistakeDiagnosis(
+              category: VerticalAttempt.errorCategory,
+              template: '这道题按原练习规则记录为答错；重新练习只检查结果各数位。',
+            ),
+      correctSteps: judgement.correctSteps,
+    );
   }
 
   Future<void> _saveDraft() async {
@@ -416,10 +458,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       final record = _problemRecords[i];
       if (!record.isCorrect) {
         final problem = _sessionProblems[i];
-        final judgement =
-            VerticalAttempt.supports(problem) && record.attempt != null
-                ? VerticalAttempt.fromJson(record.attempt!).judge(problem)
-                : MathEngine.judge(problem, record.userAnswer);
+        final judgement = _judgeRecordedAnswer(problem, record);
         await _drafts.guard(
           () => mistakes.recordWrong(
             problemText: problem.problemText,
@@ -1263,7 +1302,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           Padding(
             padding: const EdgeInsets.only(top: SpacingTokens.xs),
             child: Text(
-              '本题为结果练习；两位数加减法支持逐列过程练习。',
+              '请使用下方键盘填写完整结果。',
               style: theme.textTheme.bodySmall,
             ),
           ),

@@ -116,15 +116,15 @@ class MathMistakeDetailPage extends ConsumerWidget {
 
                   if (problem != null && VerticalAttempt.supports(problem)) ...[
                     const SizedBox(height: SpacingTokens.sm),
-                    const Text('本题同时检查结果与进退位，结果相同也可能出现过程错误。'),
+                    const Text('重练时只需填写结果各数位，进位或借位无需填写。'),
                     if (attempt != null)
                       Text(
                         [
-                          if (VerticalAttempt.needsHundreds(problem))
-                            '百位：${attempt.hundreds}',
-                          '十位：${attempt.tens}',
-                          '个位：${attempt.ones}',
-                          '${problem.operators.single == Operator.add ? '个位进位' : '十位借位'}：${attempt.regroup}',
+                          for (final (field, title)
+                              in VerticalAttempt.fieldsFor(problem))
+                            '$title：${attempt.field(field)}',
+                          if (attempt.regroup.isNotEmpty)
+                            '历史${problem.operators.single == Operator.add ? '个位进位' : '十位借位'}：${attempt.regroup}',
                         ].join(' · '),
                       ),
                   ],
