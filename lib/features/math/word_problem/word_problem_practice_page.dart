@@ -538,6 +538,7 @@ class _WordProblemPracticePageState
       if (!mounted) return;
     }
 
+    ref.read(soundServiceProvider).playCompletion();
     final action = await showDialog<String>(
       context: context,
       // 允许点击空白收起：返回值 null 与右上角关闭图标同为「返回题库」。

@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
+import 'package:poemath/domain/completion_sound.dart';
 
 /// 音效类型枚举。
 enum SoundEffect {
@@ -27,12 +28,14 @@ enum SoundEffect {
 /// 音效文件放在 `assets/sounds/` 目录下。
 class SoundService {
   final SettingsRepository _settings;
+  final AudioPlayer Function() _playerFactory;
   AudioPlayer? _player;
 
   /// 已记录过失败的音效类型，避免答题过程中同一音效反复刷日志。
-  final Set<SoundEffect> _loggedFailures = <SoundEffect>{};
+  final Set<String> _loggedFailures = <String>{};
 
-  SoundService(this._settings);
+  SoundService(this._settings, {AudioPlayer Function()? playerFactory})
+      : _playerFactory = playerFactory ?? AudioPlayer.new;
 
   @visibleForTesting
   bool get hasPlayer => _player != null;
@@ -50,21 +53,37 @@ class SoundService {
   /// `logger.dart` —— `AppLogger.w` 只收 message+tag）：这是可降级的体验缺失、
   /// 不影响数据，但它是**持久性**失败，用户每次答题都在失去反馈，
   /// 需要栈信息才能定位是 asset 解包还是平台通道。为避免答题时刷屏，
-  /// 同一 [SoundEffect] 只记一次（`_loggedFailures`）。
+  /// 同一素材路径只记一次（`_loggedFailures`）。
   Future<void> play(SoundEffect effect) async {
     if (!_settings.soundEnabled) return;
+    await _playAsset(effect.assetPath);
+  }
+
+  /// 完成一组练习后读取当前选择；全局开关关闭时跳过。
+  Future<void> playCompletion() async {
+    if (!_settings.soundEnabled) return;
+    await _playAsset(_settings.completionSound.assetPath);
+  }
+
+  /// 用户主动试听不改变音效开关，由选择面板的独立服务管理播放器。
+  Future<bool> previewCompletion(CompletionSound sound) =>
+      _playAsset(sound.assetPath);
+
+  Future<bool> _playAsset(String assetPath) async {
     try {
-      final player = _player ??= AudioPlayer();
-      await player.play(AssetSource(effect.assetPath));
+      final player = _player ??= _playerFactory();
+      await player.play(AssetSource(assetPath));
+      return true;
     } on Object catch (error, stackTrace) {
-      if (_loggedFailures.add(effect)) {
+      if (_loggedFailures.add(assetPath)) {
         AppLogger.e(
-          '音效播放失败（后续同类不再重复记录）：${effect.assetPath}',
+          '音效播放失败（后续同类不再重复记录）：$assetPath',
           tag: 'Sound',
           error: error,
           stackTrace: stackTrace,
         );
       }
+      return false;
     }
   }
 

@@ -12,6 +12,8 @@ import 'package:poemath/features/math/practice_clock.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/core/services/sound_service.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
 import '../../helpers/hive_test_helper.dart';
 
 class _FailFinalSessionOnce extends MathSessionRepository {
@@ -25,6 +27,13 @@ class _FailFinalSessionOnce extends MathSessionRepository {
     }
     await super.save(session);
   }
+}
+
+class _RecordingSoundService extends SoundService {
+  _RecordingSoundService() : super(SettingsRepository());
+  int completions = 0;
+  @override
+  Future<void> playCompletion() async => completions++;
 }
 
 MathProblem _addition({ProblemMode mode = ProblemMode.findResult}) =>
@@ -64,7 +73,6 @@ Map<String, dynamic> _checkpoint(MathProblem problem) => {
     };
 
 void main() {
-
   // 意图分流（从口算/竖式卡片进入时，草稿是另一种方案的处理）。
   // 复现路径：普通练习退出留草稿 → 从竖式卡片进入 → 原实现弹恢复框，
   // 点"继续上次"恢复普通题组（劫持入口意图），点"开始新练习"也因
@@ -211,7 +219,6 @@ void main() {
     });
   });
 
-
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
   for (final mode in [ProblemMode.findResult, ProblemMode.vertical]) {
@@ -271,12 +278,14 @@ void main() {
   }
   testWidgets('口算恢复后结算失败保留重试，时间和统计不重复', (tester) async {
     final sessions = _FailFinalSessionOnce();
+    final sound = _RecordingSoundService();
     await tester.runAsync(() async {
       await PracticeDraftRepository().save('math', _checkpoint(_addition()));
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             mathSessionRepositoryProvider.overrideWithValue(sessions),
+            soundServiceProvider.overrideWithValue(sound),
           ],
           child: const MaterialApp(home: MathPracticePage(resume: true)),
         ),
@@ -286,6 +295,7 @@ void main() {
     await tester.pump();
     expect(find.text('练习已恢复，进度或结算暂未保存，请重试'), findsOneWidget);
     expect(find.text('查看成绩'), findsOneWidget);
+    expect(sound.completions, 0, reason: '保存失败不播放完成音');
     expect(HiveBoxes.userStats.get('default_stats')!.mathTotalProblems, 1);
     await tester.runAsync(() async {
       await tester.tap(find.text('查看成绩'));
@@ -294,6 +304,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     final saved = HiveBoxes.mathSessions.values.single;
+    expect(sound.completions, 1, reason: '重试成功只播放一次完成音');
     expect(saved.durationSeconds, 60);
     expect(saved.finishedAt, DateTime(2026, 10, 16, 10, 1));
     expect(HiveBoxes.learningActivities.length, 1);

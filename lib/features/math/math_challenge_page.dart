@@ -431,6 +431,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       ref.invalidate(overallAccuracyProvider);
 
       setState(() => _isSaving = false);
+      ref.read(soundServiceProvider).playCompletion();
 
       final updatedStats = statsRepo.get();
       if (updatedStats.level > levelBeforeReward) {

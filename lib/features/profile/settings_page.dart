@@ -27,6 +27,7 @@ import 'package:poemath/features/profile/learning_background_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 import 'package:poemath/features/profile/tts_settings_page.dart';
 import 'package:poemath/features/profile/ai_settings_page.dart';
+import 'package:poemath/features/profile/widgets/completion_sound_picker.dart';
 
 /// 设置页分区。
 ///
@@ -305,7 +306,7 @@ class SettingsPage extends ConsumerWidget {
 
             // ==================== 外观与反馈 ====================
             // 主题/明暗 + 操作反馈（音效、触觉）。共同点是"即时生效的观感
-            // 与反馈开关"，无子页。
+            // 与反馈"，轻量选项使用底部面板。
             if (_section == _SettingsSection.appearance) ...[
               AppTile(
                 icon: Icons.palette_outlined,
@@ -335,6 +336,21 @@ class SettingsPage extends ConsumerWidget {
                   onChanged: (v) => _writeSetting(context, ref, '音效', () async {
                     await settingsRepo.setSoundEnabled(v);
                   }),
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              AppTile(
+                icon: Icons.celebration_outlined,
+                iconColor: theme.colorScheme.tertiary,
+                title: '完成提示音',
+                subtitle: settingsRepo.completionSound.label,
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+                  ),
+                  builder: (_) => const CompletionSoundPicker(),
                 ),
               ),
               const SizedBox(height: SpacingTokens.sm),
@@ -442,8 +458,9 @@ class SettingsPage extends ConsumerWidget {
     Navigator.push<void>(
       context,
       fadeSlideRoute(
-          builder: (_) =>
-              ParentAccessBoundary(child: SettingsPage._category(section)),),
+        builder: (_) =>
+            ParentAccessBoundary(child: SettingsPage._category(section)),
+      ),
     );
   }
 
@@ -590,8 +607,9 @@ class SettingsPage extends ConsumerWidget {
       onTap: () => Navigator.push<void>(
         context,
         fadeSlideRoute(
-            builder: (_) =>
-                const ParentAccessBoundary(child: PracticeSettingsPage()),),
+          builder: (_) =>
+              const ParentAccessBoundary(child: PracticeSettingsPage()),
+        ),
       ),
     );
   }

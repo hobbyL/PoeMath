@@ -1,0 +1,15 @@
+Completion sounds
+
+Original assets: Music Jingles by Kenney Vleugels (Kenney.nl)
+Source: https://kenney.nl/assets/music-jingles
+License: Creative Commons Zero (CC0)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+You may use these assets in personal and commercial projects.
+Credit (Kenney or www.kenney.nl) would be nice but is not mandatory.
+
+completion_arcade.wav: jingles_NES03.ogg, converted to PCM WAV; peak normalized.
+completion_pizzicato.wav: jingles_PIZZI10.ogg, converted to PCM WAV; peak normalized.
+completion_steel_drum.wav: jingles_STEEL10.ogg, converted to PCM WAV; peak normalized.
+completion_ensemble.wav: PoeMath arrangement using a steel-drum note sampled
+from jingles_STEEL10.ogg, with an ascending arpeggio and a resolving C-major chord.

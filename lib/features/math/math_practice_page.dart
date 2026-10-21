@@ -740,6 +740,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       if (!mounted) return;
     }
 
+    ref.read(soundServiceProvider).playCompletion();
     final action = await showDialog<String>(
       context: context,
       // 允许点击空白收起：返回值 null 走 else 分支（返回上一页）。

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
+import 'package:poemath/domain/completion_sound.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
@@ -42,6 +43,26 @@ void main() {
       test('setSoundEnabled 保存并读取', () async {
         await repo.setSoundEnabled(false);
         expect(repo.soundEnabled, isFalse);
+      });
+    });
+
+    group('completionSound', () {
+      test('旧安装默认小合奏，四种选择关闭重开后保持', () async {
+        expect(repo.completionSound, CompletionSound.ensemble);
+        for (final sound in CompletionSound.values) {
+          await repo.setCompletionSound(sound);
+          await HiveBoxes.close();
+          await HiveBoxes.init();
+          expect(SettingsRepository().completionSound, sound);
+        }
+      });
+
+      test('未知或损坏的历史值回落默认且不改写数据', () async {
+        for (final badValue in <Object>['future_sound', '', 42, true]) {
+          await HiveBoxes.settings.put(CompletionSound.settingsKey, badValue);
+          expect(repo.completionSound, CompletionSound.ensemble);
+          expect(HiveBoxes.settings.get(CompletionSound.settingsKey), badValue);
+        }
       });
     });
 
@@ -224,7 +245,8 @@ void main() {
       });
 
       test('连续逗号（含空项）视为脏数据，回落默认', () async {
-        await HiveBoxes.settings.put('math_entry_kinds', 'arithmetic,,challenge');
+        await HiveBoxes.settings
+            .put('math_entry_kinds', 'arithmetic,,challenge');
         expect(repo.mathEntryKinds, kDefaultMathEntryKinds);
       });
 

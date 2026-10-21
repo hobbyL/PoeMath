@@ -22,6 +22,7 @@ import 'package:poemath/data/settings_constraints.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
+import 'package:poemath/domain/completion_sound.dart';
 
 class SettingsRepository {
   int _boundedInt(String key, int fallback) {
@@ -134,6 +135,17 @@ class SettingsRepository {
 
   Future<void> setSoundEnabled(bool enabled) async {
     await HiveBoxes.settings.put(_keySoundEnabled, enabled);
+  }
+
+  /// 用户偏好，随备份迁移；缺失或未知值回落默认，不在读取时写盘。
+  CompletionSound get completionSound =>
+      CompletionSound.fromId(
+        HiveBoxes.settings.get(CompletionSound.settingsKey),
+      ) ??
+      CompletionSound.defaultSound;
+
+  Future<void> setCompletionSound(CompletionSound sound) async {
+    await _putValidated(CompletionSound.settingsKey, sound.id);
   }
 
   // ============ 触觉反馈 ============

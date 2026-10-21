@@ -1,4 +1,5 @@
 import 'package:poemath/domain/math_entry_kind.dart';
+import 'package:poemath/domain/completion_sound.dart';
 
 /// UI、备份导入与历史读取共用的普通设置范围。
 class SettingsConstraints {
@@ -18,6 +19,7 @@ class SettingsConstraints {
       return value is int && value >= range.$1 && value <= range.$2;
     }
     return switch (key) {
+      CompletionSound.settingsKey => CompletionSound.fromId(value) != null,
       'tts_speed' =>
         value is num && value.isFinite && value >= 0.1 && value <= 1.0,
       'theme_mode' => const ['system', 'light', 'dark'].contains(value),
