@@ -45,36 +45,49 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
       }
     }
 
-    final monthLabel = '${_currentMonth.year} 年 ${_currentMonth.month} 月';
+    final monthLabel = '${_currentMonth.year}年${_currentMonth.month}月';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('学习日历')),
-      body: SafeArea(
-        child: AnimatedPageBody(
-          padding: const EdgeInsets.all(SpacingTokens.lg),
+      appBar: AppBar(
+        centerTitle: true,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 月份导航
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  onPressed: _previousMonth,
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Text(
+            IconButton(
+              onPressed: _previousMonth,
+              icon: const Icon(Icons.chevron_left),
+              tooltip: '上个月',
+            ),
+            Flexible(
+              child: AutoFitLine(
+                child: Text(
                   monthLabel,
-                  style: theme.textTheme.titleMedium?.copyWith(
+                  maxLines: 1,
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                IconButton(
-                  onPressed: _isCurrentMonth ? null : _nextMonth,
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: SpacingTokens.sm),
-
+            IconButton(
+              onPressed: _isCurrentMonth ? null : _nextMonth,
+              icon: const Icon(Icons.chevron_right),
+              tooltip: '下个月',
+            ),
+          ],
+        ),
+        // 与左侧返回按钮保持对称，月份导航在页面中间显示。
+        actions: const [SizedBox(width: kToolbarHeight)],
+      ),
+      body: SafeArea(
+        child: AnimatedPageBody(
+          padding: const EdgeInsets.fromLTRB(
+            SpacingTokens.lg,
+            SpacingTokens.sm,
+            SpacingTokens.lg,
+            SpacingTokens.lg,
+          ),
+          children: [
             // 统计概览
             ColoredCard(
               color: theme.colorScheme.primary,
@@ -122,8 +135,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
 
   bool get _isCurrentMonth {
     final now = DateTime.now();
-    return _currentMonth.year == now.year &&
-        _currentMonth.month == now.month;
+    return _currentMonth.year == now.year && _currentMonth.month == now.month;
   }
 
   void _previousMonth() {
@@ -155,8 +167,8 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
       _currentMonth.month,
     ).weekday;
     final today = DateTime.now();
-    final isThisMonth = _currentMonth.year == today.year &&
-        _currentMonth.month == today.month;
+    final isThisMonth =
+        _currentMonth.year == today.year && _currentMonth.month == today.month;
 
     const weekLabels = ['一', '二', '三', '四', '五', '六', '日'];
 
@@ -217,9 +229,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
     final bgColor = _levelColor(theme, level);
 
     return GestureDetector(
-      onTap: checkIn != null
-          ? () => _showDayDetail(theme, day, checkIn)
-          : null,
+      onTap: checkIn != null ? () => _showDayDetail(theme, day, checkIn) : null,
       child: Container(
         height: 44,
         margin: const EdgeInsets.all(2),
