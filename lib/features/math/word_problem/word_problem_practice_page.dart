@@ -555,34 +555,65 @@ class _WordProblemPracticePageState
     if (action == 'review') {
       context.pushReplacement(AppRoutes.mathMistake);
     } else if (action == 'retry') {
-      _retrySession();
+      await _retrySession();
     } else {
-      // null（关闭图标 / 点击空白）→ 返回题库。
-      // 栈内没有上一页时（深链直达 / 进程恢复）pop 会断言失败，改为直接去题库。
-      if (context.canPop()) {
-        context.pop();
-      } else {
-        context.go(AppRoutes.wordProblemLibrary);
-      }
+      _returnToLibrary();
     }
   }
 
-  /// 重置答题状态并重新开始同一套题。
-  void _retrySession() {
-    _draftDisabled = false;
-    _clock.start();
+  void _returnToLibrary() {
+    // 栈内没有上一页时（深链直达 / 进程恢复）直接去题库。
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.wordProblemLibrary);
+    }
+  }
+
+  /// 从当前档案题库换一组：保持练习背景，优先未做题，排除刚完成的题。
+  Future<void> _retrySession() async {
+    final contexts =
+        _problems.map((p) => (p.grade, p.semester, p.topic)).toSet();
+    final completedIds = _problems.map((p) => p.id).toSet();
+    final completedTexts = _problems.map((p) => p.questionText.trim()).toSet();
+    final candidates = ref
+        .read(llmProblemRepositoryProvider)
+        .getAll()
+        .where(
+          (p) =>
+              contexts.contains((p.grade, p.semester, p.topic)) &&
+              !completedIds.contains(p.id) &&
+              !completedTexts.contains(p.questionText.trim()),
+        )
+        .toList();
+    final nextProblems = [
+      ...candidates.where((p) => !p.done),
+      ...candidates.where((p) => p.done),
+    ].take(_problems.length).toList();
+    if (nextProblems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('同类题目已练完，可以在题库选择其他题目或生成新题')),
+      );
+      _returnToLibrary();
+      return;
+    }
+
+    _draftTimer?.cancel();
     _answerController.clear();
     _problemRecords.clear();
-    _isFinishing = false;
     _startTime = DateTime.now();
     _sessionId = DateTime.now().microsecondsSinceEpoch.toString();
     _completedAt = null;
+    _clock.start();
     setState(() {
+      _problems = nextProblems;
       _currentIndex = 0;
       _correctCount = 0;
       _isCorrect = null;
       _showExplanation = false;
     });
+    _draftDisabled = false;
+    await _saveDraft();
   }
 
   @override
@@ -872,7 +903,9 @@ class _WordProblemPracticePageState
             });
           },
           onSubmit: _submitAnswer,
-          submitEnabled: _answerController.text.isNotEmpty,
+          submitEnabled: _answerController.text.isNotEmpty &&
+              !_submitting &&
+              !_isFinishing,
         ),
       ],
     );

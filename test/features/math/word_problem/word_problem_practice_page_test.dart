@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/haptic_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/llm_problem.dart';
@@ -20,6 +21,7 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/data/repositories/math_session_repository.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/word_problem/word_problem_practice_page.dart';
 
 import '../../../helpers/hive_test_helper.dart';
@@ -40,10 +42,16 @@ LlmProblem _problem({
   required int answer,
   List<int> operands = const [12, 4],
   List<String> operators = const ['-'],
+  String profileId = 'default',
+  int grade = 2,
+  String semester = '上',
+  String topic = 'subtraction',
+  bool done = false,
+  DateTime? createdAt,
 }) {
   return LlmProblem(
     id: id,
-    profileId: 'default',
+    profileId: profileId,
     questionText: questionText,
     unit: '个',
     operands: operands,
@@ -51,11 +59,12 @@ LlmProblem _problem({
     answer: answer,
     explanation: '讲解：用减法计算。',
     batchId: 'batch_1',
-    createdAt: DateTime(2026, 10, 1),
-    grade: 2,
-    semester: '上',
-    topic: 'subtraction',
+    createdAt: createdAt ?? DateTime(2026, 10, 1),
+    grade: grade,
+    semester: semester,
+    topic: topic,
     difficulty: 2,
+    done: done,
   );
 }
 
@@ -76,6 +85,10 @@ Widget _wrap(Widget child, {MathSessionRepository? sessions}) {
     initialLocation: '/',
     routes: [
       GoRoute(path: '/', builder: (_, __) => child),
+      GoRoute(
+        path: AppRoutes.wordProblemLibrary,
+        builder: (_, __) => const Scaffold(body: Text('返回应用题题库')),
+      ),
     ],
   );
   return ProviderScope(
@@ -95,11 +108,78 @@ Future<void> _answer(WidgetTester tester, String digits) async {
       await tester.tap(find.text(digit).last);
       await tester.pump();
     }
+  });
+  await _waitUntil(
+    tester,
+    () => tester.widget<NumberKeypad>(find.byType(NumberKeypad)).submitEnabled,
+  );
+  await tester.runAsync(() async {
     await tester.tap(find.byIcon(Icons.check_rounded));
     await Future<void>.delayed(const Duration(milliseconds: 150));
   });
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 300));
+}
+
+Future<void> _waitUntil(
+  WidgetTester tester,
+  bool Function() completed,
+) async {
+  await tester.pump();
+  for (var i = 0; i < 100 && !completed(); i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+  expect(completed(), isTrue, reason: '练习异步流程未完成');
+}
+
+Future<void> _startPractice(
+  WidgetTester tester, {
+  required List<LlmProblem> current,
+  required List<LlmProblem> library,
+}) async {
+  await tester.runAsync(() async {
+    await HiveBoxes.settings.put('sound_enabled', false);
+    await HiveBoxes.settings.put('haptic_enabled', false);
+    for (final p in library) {
+      await HiveBoxes.llmProblems.put('${p.profileId}_${p.id}', p);
+    }
+    await tester.pumpWidget(_wrap(WordProblemPracticePage(problems: current)));
+  });
+  await _waitUntil(tester, () => PracticeDraftRepository().get('word') != null);
+}
+
+Future<void> _finishRound(WidgetTester tester, List<int> answers) async {
+  for (var i = 0; i < answers.length; i++) {
+    await _waitUntil(
+      tester,
+      () => find.byIcon(Icons.check_rounded).evaluate().isNotEmpty,
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await _answer(tester, '${answers[i]}');
+    final label = i == answers.length - 1 ? '查看成绩' : '下一题';
+    final button = find.widgetWithText(FilledButton, label);
+    await _waitUntil(
+      tester,
+      () =>
+          button.evaluate().isNotEmpty &&
+          tester.widget<FilledButton>(button).onPressed != null,
+    );
+    await tester.runAsync(() => tester.tap(button));
+    await tester.pump();
+  }
+  await _waitUntil(tester, () => find.text('再练一组').evaluate().isNotEmpty);
+  await tester.pump(const Duration(seconds: 1));
+}
+
+Future<void> _closePractice(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+  await tester.runAsync(() => tester.pumpWidget(const SizedBox.shrink()));
+  await tester.pump();
+  await drainHiveWritesForTesting(tester);
 }
 
 void main() {
@@ -111,6 +191,152 @@ void main() {
 
   tearDown(() async {
     await tearDownHiveForTesting();
+  });
+
+  testWidgets('单题再练换成同类未做题，排除原题及同题面并保存新草稿', (tester) async {
+    final first = _problem(id: 'first', questionText: '第一道苹果题', answer: 8);
+    final next = _problem(id: 'next', questionText: '第二道蝴蝶题', answer: 7);
+    final old = _problem(
+      id: 'old',
+      questionText: '已经做过的题',
+      answer: 6,
+      done: true,
+      createdAt: DateTime(2026, 10, 2),
+    );
+    await _startPractice(
+      tester,
+      current: [
+        first,
+      ],
+      library: [
+        first,
+        old,
+        next,
+        _problem(id: 'duplicate', questionText: first.questionText, answer: 8),
+        _problem(id: 'grade', questionText: '其他年级', answer: 8, grade: 3),
+        _problem(
+          id: 'semester',
+          questionText: '其他学期',
+          answer: 8,
+          semester: '下',
+        ),
+        _problem(
+          id: 'topic',
+          questionText: '其他知识点',
+          answer: 8,
+          topic: 'addition',
+        ),
+        _problem(
+          id: 'profile',
+          questionText: '其他档案',
+          answer: 8,
+          profileId: 'other',
+        ),
+      ],
+    );
+    await _finishRound(tester, [8]);
+    final firstSession = HiveBoxes.mathSessions.values.single.id;
+    expect(PracticeDraftRepository().get('word'), isNull);
+
+    await tester.runAsync(() => tester.tap(find.text('再练一组')));
+    await _waitUntil(
+      tester,
+      () => PracticeDraftRepository().get('word') != null,
+    );
+    expect(find.text(next.questionText), findsOneWidget);
+    expect(find.text(first.questionText), findsNothing);
+    expect(find.text('输入答案'), findsOneWidget);
+    expect(find.text('✓ 0'), findsOneWidget);
+    final draft = PracticeDraftRepository().get('word')!;
+    expect((draft['problems'] as List).single['id'], next.id);
+    expect(draft['sessionId'], isNot(firstSession));
+    expect(draft['index'], 0);
+    expect(draft['input'], '');
+    expect(draft['records'], isEmpty);
+    expect(draft['completedAt'], isNull);
+
+    await _finishRound(tester, [7]);
+    expect(HiveBoxes.mathSessions.length, 2);
+    expect(HiveBoxes.llmProblems.get('default_first')!.attempts, 1);
+    expect(HiveBoxes.llmProblems.get('default_next')!.attempts, 1);
+    expect(HiveBoxes.userStats.get('default_stats')!.mathTotalProblems, 2);
+    expect(HiveBoxes.userStats.get('default_stats')!.mathTotalCorrect, 2);
+    await _closePractice(tester);
+  });
+
+  testWidgets('题组再练保持题数并换掉整组，未做题先于已做题', (tester) async {
+    final first = _problem(id: 'first', questionText: '原题一', answer: 8);
+    final second = _problem(id: 'second', questionText: '原题二', answer: 7);
+    final next = _problem(id: 'next', questionText: '未做题', answer: 6);
+    final old = _problem(
+      id: 'old',
+      questionText: '较新的已做题',
+      answer: 5,
+      done: true,
+      createdAt: DateTime(2026, 10, 2),
+    );
+    final extra = _problem(
+      id: 'extra',
+      questionText: '较早的已做题',
+      answer: 4,
+      done: true,
+      createdAt: DateTime(2026, 9, 1),
+    );
+    await _startPractice(
+      tester,
+      current: [first, second],
+      library: [first, second, next, old, extra],
+    );
+    await _finishRound(tester, [8, 7]);
+    await tester.runAsync(() => tester.tap(find.text('再练一组')));
+    await _waitUntil(
+      tester,
+      () => PracticeDraftRepository().get('word') != null,
+    );
+    final draft = PracticeDraftRepository().get('word')!;
+    expect((draft['problems'] as List).map((p) => p['id']), [next.id, old.id]);
+    expect(find.text('1 / 2'), findsOneWidget);
+    expect(find.text(next.questionText), findsOneWidget);
+    await _closePractice(tester);
+  });
+
+  testWidgets('同类题不足原题数时只练剩余题，不用原题补足', (tester) async {
+    final first = _problem(id: 'first', questionText: '原题一', answer: 8);
+    final second = _problem(id: 'second', questionText: '原题二', answer: 7);
+    final next = _problem(id: 'next', questionText: '剩余题', answer: 6);
+    await _startPractice(
+      tester,
+      current: [first, second],
+      library: [first, second, next],
+    );
+    await _finishRound(tester, [8, 7]);
+    await tester.runAsync(() => tester.tap(find.text('再练一组')));
+    await _waitUntil(
+      tester,
+      () => PracticeDraftRepository().get('word') != null,
+    );
+    expect(find.text('1 / 1'), findsOneWidget);
+    expect(find.text(next.questionText), findsOneWidget);
+    expect(
+      (PracticeDraftRepository().get('word')!['problems'] as List).length,
+      1,
+    );
+    await _closePractice(tester);
+  });
+
+  testWidgets('没有其他同类题时返回题库并提示，不重建原题草稿', (tester) async {
+    final first = _problem(id: 'first', questionText: '唯一题目', answer: 8);
+    await _startPractice(tester, current: [first], library: [first]);
+    await _finishRound(tester, [8]);
+    await tester.runAsync(() => tester.tap(find.text('再练一组')));
+    await _waitUntil(tester, () => find.text('返回应用题题库').evaluate().isNotEmpty);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('同类题目已练完，可以在题库选择其他题目或生成新题'), findsOneWidget);
+    expect(find.text(first.questionText), findsNothing);
+    expect(PracticeDraftRepository().get('word'), isNull);
+    expect(HiveBoxes.mathSessions.length, 1);
+    expect(HiveBoxes.llmProblems.get('default_first')!.attempts, 1);
+    await _closePractice(tester);
   });
 
   testWidgets('答对判定正确并记录做题状态', (tester) async {
@@ -331,16 +557,19 @@ void main() {
         'problems': [problem.toSnapshot()],
         'records': [
           const ProblemRecord(
-                  problemText: '还剩几个苹果？',
-                  answerText: '8个',
-                  userAnswer: '8',
-                  isCorrect: true,)
-              .toJson(),
+            problemText: '还剩几个苹果？',
+            answerText: '8个',
+            userAnswer: '8',
+            isCorrect: true,
+          ).toJson(),
         ],
       });
-      await tester.pumpWidget(_wrap(
+      await tester.pumpWidget(
+        _wrap(
           const WordProblemPracticePage(problems: [], resume: true),
-          sessions: sessions,),);
+          sessions: sessions,
+        ),
+      );
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await tester.pump();
@@ -354,8 +583,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     expect(HiveBoxes.mathSessions.values.single.durationSeconds, 60);
-    expect(HiveBoxes.mathSessions.values.single.finishedAt,
-        DateTime(2026, 10, 16, 10, 1),);
+    expect(
+      HiveBoxes.mathSessions.values.single.finishedAt,
+      DateTime(2026, 10, 16, 10, 1),
+    );
     expect(HiveBoxes.learningActivities.length, 1);
     expect(HiveBoxes.userStats.get('default_stats')!.mathTotalProblems, 1);
     expect(PracticeDraftRepository().get('word'), isNull);

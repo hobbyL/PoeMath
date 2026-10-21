@@ -463,9 +463,15 @@ void main() {
   testWidgets('应用题入库中离页，完成后不访问已销毁 ref', (tester) async {
     final repo = GatedProblemRepo();
     final plan = WordProblemPlanGenerator.withScene(
-      const ProblemSkeleton(operands: [12, 4], operators: [Operator.subtract],
-        answer: 8, unitHint: '个', difficulty: 2,),
-      WordProblemRelation.decrease, 'apples',
+      const ProblemSkeleton(
+        operands: [12, 4],
+        operators: [Operator.subtract],
+        answer: 8,
+        unitHint: '个',
+        difficulty: 2,
+      ),
+      WordProblemRelation.decrease,
+      'apples',
     );
     final rendered = WordProblemRenderer.render(plan);
     final data = WordProblemPreviewData(
@@ -482,8 +488,10 @@ void main() {
             explanation: rendered.explanation,
           ),
           rejectReason: null,
-          generationMetadataJson: WordProblemMetadata(plan: plan,
-            source: WordProblemSource.aiScene,).encode(),
+          generationMetadataJson: WordProblemMetadata(
+            plan: plan,
+            source: WordProblemSource.aiScene,
+          ).encode(),
         ),
       ],
     );
@@ -542,9 +550,11 @@ void main() {
   testWidgets('应用题连续完成两轮，使用不同 ID 且均结算成功', (tester) async {
     final gate = Completer<void>()..complete();
     final p = problem('p1', 'one-question');
+    final next = problem('p2', 'another-question');
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('sound_enabled', false);
       await HiveBoxes.llmProblems.put('default_p1', p);
+      await HiveBoxes.llmProblems.put('default_p2', next);
     });
     await tester.pumpWidget(
       routed(
@@ -619,6 +629,8 @@ void main() {
     expect(find.text('再练一组'), findsOneWidget);
     await tapAndSettle(find.text('再练一组'));
     await tester.pumpAndSettle();
+    expect(find.text(next.questionText), findsOneWidget);
+    expect(find.text(p.questionText), findsNothing);
     await finishRound(capture: true);
     await _waitForWrites(
       tester,
