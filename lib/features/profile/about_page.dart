@@ -287,24 +287,37 @@ class _AboutPageState extends State<AboutPage> {
       final action = await showModalBottomSheet<String>(
         context: context,
         builder: (sheet) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppTile(
-                icon: Icons.save_alt_rounded,
-                iconColor: Theme.of(sheet).colorScheme.primary,
-                title: '保存到设备',
-                subtitle: '选择本地目录保存诊断文本',
-                onTap: () => Navigator.pop(sheet, 'save'),
-              ),
-              AppTile(
-                icon: Icons.share_rounded,
-                iconColor: Theme.of(sheet).colorScheme.primary,
-                title: '分享',
-                subtitle: '通过其他应用发送诊断文本',
-                onTap: () => Navigator.pop(sheet, 'share'),
-              ),
-            ],
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '导出诊断日志',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(sheet).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+                AppTile(
+                  icon: Icons.save_alt_rounded,
+                  iconColor: Theme.of(sheet).colorScheme.primary,
+                  title: '保存到设备',
+                  subtitle: '选择本地目录保存诊断文本',
+                  onTap: () => Navigator.pop(sheet, 'save'),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                AppTile(
+                  icon: Icons.share_rounded,
+                  iconColor: Theme.of(sheet).colorScheme.primary,
+                  title: '分享',
+                  subtitle: '通过其他应用发送诊断文本',
+                  onTap: () => Navigator.pop(sheet, 'share'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -390,20 +403,7 @@ class _AboutPageState extends State<AboutPage> {
             return SafeArea(
               child: Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: SpacingTokens.sm,
-                    ),
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: SpacingTokens.md),
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: SpacingTokens.md,

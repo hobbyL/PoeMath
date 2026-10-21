@@ -336,12 +336,6 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                             ],
                           ),
                         ],
-                        // 无「保存」按钮：调整即生效，关闭 sheet 时统一落盘。
-                        const SizedBox(height: SpacingTokens.sm),
-                        Text(
-                          '调整后关闭本页即已保存。',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
                       ],
                     ),
                   ),

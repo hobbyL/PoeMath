@@ -59,8 +59,7 @@ class MathAiExplainSheet extends ConsumerStatefulWidget {
   final String? diagnosisCategory;
 
   @override
-  ConsumerState<MathAiExplainSheet> createState() =>
-      _MathAiExplainSheetState();
+  ConsumerState<MathAiExplainSheet> createState() => _MathAiExplainSheetState();
 }
 
 class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
@@ -170,39 +169,42 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.auto_awesome_outlined,
-                    size: 18,
-                    color: theme.colorScheme.tertiary,
+              SizedBox(
+                height: MediaQuery.textScalerOf(context)
+                    .scale(SpacingTokens.minTapTarget),
+                child: NavigationToolbar(
+                  centerMiddle: true,
+                  middleSpacing: SpacingTokens.sm,
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_outlined,
+                        size: 18,
+                        color: theme.colorScheme.tertiary,
+                      ),
+                      if (playing) ...[
+                        const SizedBox(width: SpacingTokens.xs),
+                        Icon(
+                          Icons.graphic_eq,
+                          size: 16,
+                          color: theme.colorScheme.tertiary,
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(width: SpacingTokens.sm),
-                  Text(
+                  middle: Text(
                     'AI 解析',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (playing) ...[
-                    const SizedBox(width: SpacingTokens.xs),
-                    Icon(
-                      Icons.graphic_eq,
-                      size: 16,
-                      color: theme.colorScheme.tertiary,
-                    ),
-                  ],
-                  const SizedBox(width: SpacingTokens.sm),
-                  actionTag,
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: '关闭',
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
+                  trailing: actionTag,
+                ),
               ),
-              const SizedBox(height: SpacingTokens.sm),
+              const SizedBox(height: SpacingTokens.md),
               Flexible(
                 child: SingleChildScrollView(
                   child: ColoredCard(

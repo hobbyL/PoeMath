@@ -204,24 +204,37 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       final action = await showModalBottomSheet<String>(
         context: context,
         builder: (sheet) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppTile(
-                icon: Icons.save_alt_rounded,
-                iconColor: Theme.of(sheet).colorScheme.primary,
-                title: '保存到设备',
-                subtitle: '选择本地目录保存备份文件',
-                onTap: () => Navigator.pop(sheet, 'save'),
-              ),
-              AppTile(
-                icon: Icons.share_rounded,
-                iconColor: Theme.of(sheet).colorScheme.primary,
-                title: '分享',
-                subtitle: '通过其他应用发送备份文件',
-                onTap: () => Navigator.pop(sheet, 'share'),
-              ),
-            ],
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '导出备份',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(sheet).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+                AppTile(
+                  icon: Icons.save_alt_rounded,
+                  iconColor: Theme.of(sheet).colorScheme.primary,
+                  title: '保存到设备',
+                  subtitle: '选择本地目录保存备份文件',
+                  onTap: () => Navigator.pop(sheet, 'save'),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                AppTile(
+                  icon: Icons.share_rounded,
+                  iconColor: Theme.of(sheet).colorScheme.primary,
+                  title: '分享',
+                  subtitle: '通过其他应用发送备份文件',
+                  onTap: () => Navigator.pop(sheet, 'share'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -286,16 +299,18 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
   ) async {
     try {
       return await backup.exportToJson(
-          passphrase: passphrase,
-          encryptPayload: passphrase?.trim().isNotEmpty ?? false,);
+        passphrase: passphrase,
+        encryptPayload: passphrase?.trim().isNotEmpty ?? false,
+      );
     } on BackupCredentialExportException {
       if (!mounted) return null;
       final proceed = await showCredentialExportFailedDialog(context);
       if (proceed != true) return null;
       return backup.exportToJson(
-          passphrase: passphrase,
-          encryptPayload: passphrase?.trim().isNotEmpty ?? false,
-          includeCredentials: false,);
+        passphrase: passphrase,
+        encryptPayload: passphrase?.trim().isNotEmpty ?? false,
+        includeCredentials: false,
+      );
     }
   }
 

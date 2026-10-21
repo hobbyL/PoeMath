@@ -129,8 +129,9 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       String json;
       try {
         json = await backup.exportToJson(
-            passphrase: passphrase,
-            encryptPayload: passphrase?.trim().isNotEmpty ?? false,);
+          passphrase: passphrase,
+          encryptPayload: passphrase?.trim().isNotEmpty ?? false,
+        );
       } on BackupCredentialExportException {
         if (!mounted) return;
         final proceed = await showCredentialExportFailedDialog(context);
@@ -140,9 +141,10 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
           return;
         }
         json = await backup.exportToJson(
-            passphrase: passphrase,
-            encryptPayload: passphrase?.trim().isNotEmpty ?? false,
-            includeCredentials: false,);
+          passphrase: passphrase,
+          encryptPayload: passphrase?.trim().isNotEmpty ?? false,
+          includeCredentials: false,
+        );
         degraded = true;
       }
 
@@ -291,8 +293,12 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                     children: [
                       Text(
                         '选择云端历史版本',
-                        style: Theme.of(sheet).textTheme.titleMedium,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(sheet).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
+                      const SizedBox(height: SpacingTokens.md),
                       for (final version in versions)
                         AppTile(
                           icon: Icons.history,

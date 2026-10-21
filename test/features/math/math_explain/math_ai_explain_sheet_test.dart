@@ -212,7 +212,9 @@ void main() {
     // loading 中关闭：discardPending 使晚到回调失效，dispose 不写状态。
     // 出场动画期间 busy 转圈仍在树上（无限动画），不能 pumpAndSettle，
     // 推过出场时长（modal 反向动画 ~200ms）即可。
-    await tester.tap(find.byTooltip('关闭'));
+    await Navigator.of(
+      tester.element(find.byType(MathAiExplainSheet)),
+    ).maybePop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -262,7 +264,9 @@ void main() {
     expect(captured.headers['authorization'], 'Bearer secret-key-math');
 
     // 关闭弹层：不写 provider 状态，无 defunct 断言崩溃。
-    await tester.tap(find.byTooltip('关闭'));
+    await Navigator.of(
+      tester.element(find.byType(MathAiExplainSheet)),
+    ).maybePop();
     await tester.pumpAndSettle();
     expect(find.text('AI 解析'), findsNothing);
   });
@@ -336,8 +340,10 @@ void main() {
       }),
     );
 
-    expect(find.text('还没有配置 AI 服务，配置后即可使用 AI 解析。'),
-        findsOneWidget,);
+    expect(
+      find.text('还没有配置 AI 服务，配置后即可使用 AI 解析。'),
+      findsOneWidget,
+    );
     // 未配置态主操作收敛为「去设置」tag（非按钮）。
     expect(find.widgetWithText(AiActionTag, '去设置'), findsOneWidget);
     // 未配置不发任何网络请求。
@@ -350,9 +356,7 @@ void main() {
     expect(find.text('AI 解析'), findsNothing);
   });
 
-  testWidgets(
-      'R1 死锁回归：loading 中关弹层 → 再开新弹层 → 第二次请求发出且到达终态',
-      (tester) async {
+  testWidgets('R1 死锁回归：loading 中关弹层 → 再开新弹层 → 第二次请求发出且到达终态', (tester) async {
     var calls = 0;
     final firstGate = Completer<http.Response>();
     await pumpSheet(
@@ -374,7 +378,9 @@ void main() {
 
     // loading 中关闭：discardPending 废令牌，但 provider state 仍残留
     // loading（dispose 不写状态）。出场动画期间转圈仍在，只推帧。
-    await tester.tap(find.byTooltip('关闭'));
+    await Navigator.of(
+      tester.element(find.byType(MathAiExplainSheet)),
+    ).maybePop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('AI 解析'), findsNothing);
@@ -400,9 +406,39 @@ void main() {
     await settleSse(tester);
   });
 
+  testWidgets('窄屏大字号标题居中，点击外部可关闭，状态操作仍可用', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 600));
+    tester.platformDispatcher.textScaleFactorTestValue = 1.8;
+    addTearDown(() async {
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+      await tester.binding.setSurfaceSize(null);
+    });
+    final settings = _MockSettingsRepository();
+    when(() => settings.readLlmConfigForScenario(any()))
+        .thenAnswer((_) async => null);
+    await pumpSheet(tester, settings: settings);
+
+    expect(tester.takeException(), isNull);
+    final toolbar = find.byType(NavigationToolbar);
+    expect(
+      tester.getCenter(find.text('AI 解析')).dx,
+      closeTo(tester.getCenter(toolbar).dx, 1),
+    );
+    expect(find.byTooltip('关闭'), findsNothing);
+    final sheetBounds = tester.getRect(find.byType(BottomSheet));
+    await tester.tapAt(Offset(sheetBounds.center.dx, sheetBounds.top / 2));
+    await tester.pumpAndSettle();
+    expect(find.byType(MathAiExplainSheet), findsNothing);
+
+    await tester.tap(find.text('打开 AI 解析'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('去设置'));
+    await tester.pumpAndSettle();
+    expect(find.text('llm-settings-stub'), findsOneWidget);
+  });
+
   group('错题详情页入口', () {
-    testWidgets('「AI 帮我讲」存在且点击弹出解析弹层（题面/答案入 prompt）',
-        (tester) async {
+    testWidgets('「AI 帮我讲」存在且点击弹出解析弹层（题面/答案入 prompt）', (tester) async {
       final repo = _FakeMistakeRepo([
         MathMistake(
           id: 'm1',
@@ -451,8 +487,8 @@ void main() {
       // 「14」「15」子串的数字都能让断言凭空通过（把 max_tokens 从 800
       // 改成 1500，contains('15') 立刻变成恒真）。现在只在 messages 的
       // content 文本里断言，确保数字真的进了 prompt。
-      final body = jsonDecode(utf8.decode(captured.bodyBytes))
-          as Map<String, dynamic>;
+      final body =
+          jsonDecode(utf8.decode(captured.bodyBytes)) as Map<String, dynamic>;
       final promptText = (body['messages'] as List)
           .map((m) => (m as Map)['content'])
           .join('\n');
