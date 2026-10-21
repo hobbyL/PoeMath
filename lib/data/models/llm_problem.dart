@@ -1,9 +1,9 @@
 // lib/data/models/llm_problem.dart
 //
 // 层级：data/models
-// 职责：LLM 生成的应用题入库模型（typeId 16）。Profile-scoped。
-//       数学内容（operands/operators/answer）来自本地生成器并经
-//       WordProblemValidator 校验；questionText/explanation 来自 LLM。
+// 职责：家长确认后的应用题入库模型（typeId 16）。Profile-scoped。
+//       新题的数学内容、题面和讲解来自本地计划与模板；
+//       generationMetadataJson 为空的历史题保留旧数据。
 
 import 'package:hive/hive.dart';
 
@@ -19,7 +19,7 @@ class LlmProblem extends HiveObject {
   @HiveField(1)
   final String profileId;
 
-  /// 题面文本（LLM 生成，已通过四重校验）。
+  /// 题面文本（新题由本地关系模板生成）。
   @HiveField(2)
   final String questionText;
 
@@ -39,7 +39,7 @@ class LlmProblem extends HiveObject {
   @HiveField(6)
   final int answer;
 
-  /// 解题讲解（LLM 生成）。
+  /// 解题讲解（新题由本地数量关系推导）。
   @HiveField(7)
   final String explanation;
 
@@ -87,6 +87,10 @@ class LlmProblem extends HiveObject {
   @HiveField(18, defaultValue: <String>[])
   List<String> appliedActivityIds;
 
+  /// 版本化本地题意快照，空字符串表示旧版自由题面。
+  @HiveField(19, defaultValue: '')
+  final String generationMetadataJson;
+
   LlmProblem({
     required this.id,
     required this.profileId,
@@ -107,6 +111,7 @@ class LlmProblem extends HiveObject {
     this.correctCount = 0,
     this.lastDoneAt,
     List<String> appliedActivityIds = const [],
+    this.generationMetadataJson = '',
   }) : appliedActivityIds = List.of(appliedActivityIds);
 
   /// 组装算式显示文本（如 "12 + 4 = ?"）。
@@ -130,6 +135,7 @@ class LlmProblem extends HiveObject {
         'correctCount': correctCount,
         'lastDoneAt': lastDoneAt?.toIso8601String(),
         'appliedActivityIds': appliedActivityIds,
+        'generationMetadataJson': generationMetadataJson,
       };
 
   factory LlmProblem.fromSnapshot(Map<String, dynamic> json) => LlmProblem(
@@ -153,6 +159,7 @@ class LlmProblem extends HiveObject {
         lastDoneAt: DateTime.tryParse(json['lastDoneAt'] as String? ?? ''),
         appliedActivityIds:
             (json['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
+        generationMetadataJson: json['generationMetadataJson'] as String? ?? '',
       );
 
   /// 组装算式显示文本（如 "12 + 4 = ?"）。

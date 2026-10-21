@@ -8,3 +8,4 @@ export 'grade_config.dart';
 export 'math_problem.dart';
 export 'number_value.dart';
 export 'problem_skeleton.dart';
+export 'word_problem_plan.dart';

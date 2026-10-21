@@ -10,6 +10,8 @@ import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/llm_problem_repository.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/core/services/llm/llm_client.dart';
+import 'word_problem_generation_service.dart';
 
 /// 骨架生成函数签名（与 [WordProblemSkeletonGenerator.generate] 一致，
 /// 省略可选 random）。
@@ -24,6 +26,13 @@ typedef WordProblemSkeletonGeneratorFn = List<ProblemSkeleton> Function({
 final wordProblemSkeletonProvider =
     Provider<WordProblemSkeletonGeneratorFn>((ref) {
   return WordProblemSkeletonGenerator.generate;
+});
+
+final wordProblemGenerationServiceProvider =
+    Provider<WordProblemGenerationService Function(LlmClient)>((ref) {
+  final skeletonFactory = ref.watch(wordProblemSkeletonProvider);
+  return (client) => WordProblemGenerationService(
+      client: client, skeletonFactory: skeletonFactory,);
 });
 
 /// 应用题题库 repository。

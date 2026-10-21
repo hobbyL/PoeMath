@@ -65,27 +65,32 @@ Future<void> _pumpDelayedGenerator(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-  final router = GoRouter(routes: [
-    GoRoute(path: '/', builder: (_, __) => const WordProblemGeneratePage()),
-    GoRoute(
+  final router = GoRouter(
+    routes: [
+      GoRoute(path: '/', builder: (_, __) => const WordProblemGeneratePage()),
+      GoRoute(
         path: AppRoutes.wordProblemPreview,
         builder: (_, state) {
           onPreview?.call(state.extra! as WordProblemPreviewData);
           return const Scaffold(body: Text('预览验证'));
-        },),
-  ],);
-  addTearDown(router.dispose);
-  await tester.pumpWidget(ProviderScope(
-    overrides: [
-      settingsRepositoryProvider.overrideWithValue(settings),
-      llmConfigProvider.overrideWith((ref) async => _config),
-      if (skeletons != null)
-        wordProblemSkeletonProvider.overrideWithValue(skeletons),
-      if (client != null)
-        llmExplainHttpClientProvider.overrideWithValue(client),
+        },
+      ),
     ],
-    child: MaterialApp.router(routerConfig: router),
-  ),);
+  );
+  addTearDown(router.dispose);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        settingsRepositoryProvider.overrideWithValue(settings),
+        llmConfigProvider.overrideWith((ref) async => _config),
+        if (skeletons != null)
+          wordProblemSkeletonProvider.overrideWithValue(skeletons),
+        if (client != null)
+          llmExplainHttpClientProvider.overrideWithValue(client),
+      ],
+      child: MaterialApp.router(routerConfig: router),
+    ),
+  );
   await tester.pumpAndSettle();
 }
 
@@ -113,10 +118,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('配置读取测试失败'), findsOneWidget);
     expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, '生成 10 题'))
-            .onPressed,
-        isNotNull,);
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '生成 10 题'))
+          .onPressed,
+      isNotNull,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -127,11 +133,12 @@ void main() {
     await _pumpDelayedGenerator(
       tester,
       settings,
-      skeletons: (
-          {required int grade,
-          required String semester,
-          required String topic,
-          required int count,}) {
+      skeletons: ({
+        required int grade,
+        required String semester,
+        required String topic,
+        required int count,
+      }) {
         skeletonCalls++;
         return [];
       },
@@ -148,6 +155,88 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('整批AI素材经本地渲染与讲解后通过校验并进入预览', (tester) async {
+    // 在真实 zone 创建已完成配置 Future，让完整请求（含静态用量写链）
+    // 都能在真实 zone 收尾，不把本用例的 FakeAsync 留给后续用例。
+    final settings = (await tester.runAsync(() async {
+      final repository = _DelayedSettingsRepository();
+      repository.pending.complete(_config);
+      return repository;
+    }))!;
+    WordProblemPreviewData? preview;
+    await _pumpDelayedGenerator(
+      tester,
+      settings,
+      skeletons: ({
+        required int grade,
+        required String semester,
+        required String topic,
+        required int count,
+      }) =>
+          List.filled(
+        count,
+        const ProblemSkeleton(
+          operands: [12, 4],
+          operators: [Operator.add],
+          answer: 16,
+          unitHint: '支',
+          difficulty: 1,
+        ),
+      ),
+      client: MockClient(
+        (_) async => http.Response.bytes(
+          utf8.encode(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'content': jsonEncode(
+                      List.generate(
+                        10,
+                        (i) => {
+                          'index': i + 1,
+                          'sceneId': 'pencils',
+                          'variantId': 'standard',
+                        },
+                      ),
+                    ),
+                  },
+                },
+              ],
+            }),
+          ),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        ),
+      ),
+      onPreview: (data) => preview = data,
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.text('生成 10 题'));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump();
+    // 用量预留经过 Hive 写链，交替推进真实 IO 和 fake 微任务直到跳转。
+    for (var i = 0; i < 100 && preview == null; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(preview, isNotNull);
+    expect(preview!.items, hasLength(10));
+    expect(
+        preview!.items.map((item) => item.rejectReason), everyElement(isNull),);
+    expect(preview!.items.map((item) => item.accepted), everyElement(isTrue));
+    expect(preview!.items.map((item) => item.draft!.explanation),
+        everyElement(contains('12 + 4 = 16')),);
+    expect(tester.takeException(), isNull);
+    await drainHiveWritesForTesting(tester);
+  });
+
   testWidgets('配置和网络等待时修改选项，骨架请求及预览始终使用发起时快照', (tester) async {
     final settings = _DelayedSettingsRepository();
     final response = Completer<http.Response>();
@@ -157,14 +246,19 @@ void main() {
     await _pumpDelayedGenerator(
       tester,
       settings,
-      skeletons: (
-          {required int grade,
-          required String semester,
-          required String topic,
-          required int count,}) {
+      skeletons: ({
+        required int grade,
+        required String semester,
+        required String topic,
+        required int count,
+      }) {
         capturedSkeleton = (grade, semester, topic, count);
         return WordProblemSkeletonGenerator.generate(
-            grade: grade, semester: semester, topic: topic, count: count,);
+          grade: grade,
+          semester: semester,
+          topic: topic,
+          count: count,
+        );
       },
       client: MockClient((incoming) {
         request = incoming;
@@ -200,27 +294,33 @@ void main() {
     final countSelector = tester.widget<Slider>(find.byType(Slider));
     countSelector.onChanged!(5);
     await tester.pump();
-    response.complete(http.Response(
+    response.complete(
+      http.Response(
         jsonEncode({
           'choices': [
             {
               'message': {
-                'content': jsonEncode(List.generate(
+                'content': jsonEncode(
+                  List.generate(
                     10,
                     (i) => {
-                          'index': i + 1,
-                          'text': '小明有一些苹果，妈妈又给了一些，一共有多少个苹果？',
-                          'unit': '个',
-                          'explanation': '把两部分合起来。',
-                        },),),
+                      'index': i + 1,
+                      'sceneId': 'apples',
+                      'variantId': 'standard',
+                    },
+                  ),
+                ),
               },
             }
           ],
         }),
         200,
-        headers: {'content-type': 'application/json; charset=utf-8'},),);
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
     await tester.runAsync(
-        () async => Future<void>.delayed(const Duration(milliseconds: 20)),);
+      () async => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
     await tester.pumpAndSettle();
     final body = jsonDecode(request!.body) as Map<String, dynamic>;
     final prompt = (body['messages'] as List).last['content'] as String;

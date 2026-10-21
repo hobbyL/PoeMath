@@ -12,3 +12,8 @@ export 'diagnostics/mistake_rule.dart';
 export 'step_solver/step_solver.dart';
 export 'validators/constraint_checker.dart';
 export 'word_problem_skeleton.dart';
+export 'word_problem_catalog.dart';
+export 'word_problem_plan_generator.dart';
+export 'word_problem_plan_rules.dart';
+export 'word_problem_renderer.dart';
+export 'word_problem_metadata.dart';

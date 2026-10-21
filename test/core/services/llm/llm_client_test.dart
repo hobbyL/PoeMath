@@ -198,8 +198,46 @@ void main() {
       expect(userContent, contains('[12,4]'));
       expect(userContent, contains('支'));
       expect(userContent, contains('小学3年级上学期'));
+      expect(userContent, contains('答案 16（仅供讲解使用）'));
+      expect(userContent, contains('答案 12（仅供讲解使用）'));
       // API Key 不得出现在请求体。
       expect(captured.body, isNot(contains(_apiKey)));
+    });
+
+    test('混合运算请求提供本地复算的答案和中间结果', () async {
+      late http.Request captured;
+      final client = LlmClient(
+        httpClient: MockClient((request) async {
+          captured = request;
+          return _chatResponse(_normalArray);
+        }),
+      );
+      final skeletons = [
+        const ProblemSkeleton(
+          operands: [12, 4, 5],
+          operators: [Operator.add, Operator.multiply],
+          answer: 32,
+          unitHint: '支',
+          difficulty: 2,
+        ),
+      ];
+
+      await client.generateWordProblems(
+        config: _config,
+        skeletons: skeletons,
+        grade: 3,
+        semester: '上',
+        topic: 'mixed',
+      );
+
+      final body = jsonDecode(captured.body) as Map<String, dynamic>;
+      final messages = body['messages'] as List<dynamic>;
+      final systemPrompt = messages[0]['content'] as String;
+      final userPrompt = messages[1]['content'] as String;
+      expect(systemPrompt, contains('第一步、第二步、第三步'));
+      expect(userPrompt, contains('答案 32（仅供讲解使用）'));
+      expect(userPrompt, contains('正确中间结果 [20]'));
+      expect(userPrompt, contains('数字 [12,4,5]'));
     });
 
     test('code fence 包裹与前后杂质文本可解析', () async {

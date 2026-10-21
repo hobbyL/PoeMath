@@ -462,26 +462,28 @@ void main() {
 
   testWidgets('应用题入库中离页，完成后不访问已销毁 ref', (tester) async {
     final repo = GatedProblemRepo();
-    final data = const WordProblemPreviewData(
+    final plan = WordProblemPlanGenerator.withScene(
+      const ProblemSkeleton(operands: [12, 4], operators: [Operator.subtract],
+        answer: 8, unitHint: '个', difficulty: 2,),
+      WordProblemRelation.decrease, 'apples',
+    );
+    final rendered = WordProblemRenderer.render(plan);
+    final data = WordProblemPreviewData(
       grade: 2,
       semester: '上',
       topicName: 'subtraction',
       items: [
         WordProblemPreviewItem(
-          skeleton: ProblemSkeleton(
-            operands: [12, 4],
-            operators: [Operator.subtract],
-            answer: 8,
-            unitHint: '个',
-            difficulty: 2,
-          ),
+          skeleton: plan.skeleton,
           draft: LlmWordProblemDraft(
             index: 1,
-            text: '小明有12个苹果，吃了4个，还剩几个？',
+            text: rendered.text,
             unit: '个',
-            explanation: '',
+            explanation: rendered.explanation,
           ),
           rejectReason: null,
+          generationMetadataJson: WordProblemMetadata(plan: plan,
+            source: WordProblemSource.aiScene,).encode(),
         ),
       ],
     );

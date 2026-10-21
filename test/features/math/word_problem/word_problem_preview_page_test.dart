@@ -15,6 +15,7 @@ import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/repositories/llm_problem_repository.dart';
 import 'package:poemath/features/math/word_problem/word_problem_preview_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
+import 'package:poemath/features/math/word_problem/word_problem_generation_service.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../../helpers/hive_test_helper.dart';
@@ -70,6 +71,29 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) {
   );
 }
 
+WordProblemPreviewItem _validItem(
+    {int index = 1,
+    List<int> operands = const [12, 4],
+    String scene = 'apples',
+    WordProblemSource source = WordProblemSource.aiScene,}) {
+  final plan = WordProblemPlanGenerator.withScene(
+    _skeleton(operands: operands, answer: operands[0] - operands[1]),
+    WordProblemRelation.decrease,
+    scene,
+  );
+  final rendered = WordProblemRenderer.render(plan);
+  return WordProblemPreviewItem.fromGenerated(
+    GeneratedWordProblem(
+      plan: plan,
+      source: source,
+      text: rendered.text,
+      explanation: rendered.explanation,
+      validation: WordProblemPlanRules.validate(plan),
+    ),
+    index: index,
+  );
+}
+
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
@@ -79,28 +103,47 @@ void main() {
     await tearDownHiveForTesting();
   });
 
+  testWidgets('全部素材失效的本地批次明确说明来源', (tester) async {
+    await tester.pumpWidget(_wrap(WordProblemPreviewPage(
+      data: _previewData([_validItem(source: WordProblemSource.localTemplate)]),
+    ),),);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('AI 未返回可用素材，本批使用本地生成。'), findsOneWidget);
+    expect(find.text('本地生成 · 数量关系与计算已校验'), findsOneWidget);
+    expect(find.text('确认入库 1 题'), findsOneWidget);
+  });
+
+  testWidgets('旧自由题面需要复核，篡改新版题面不可使用，两者均不默认选中', (tester) async {
+    final valid = _validItem();
+    final legacy = WordProblemPreviewItem(
+        skeleton: valid.skeleton, draft: valid.draft, rejectReason: null,);
+    final tampered = WordProblemPreviewItem(
+      skeleton: valid.skeleton,
+      draft: LlmWordProblemDraft(
+        index: 2,
+        text: '妈妈又给12个苹果，原来有4个，问小红有多少个？',
+        unit: valid.draft!.unit,
+        explanation: valid.draft!.explanation,
+      ),
+      rejectReason: null,
+      generationMetadataJson: valid.generationMetadataJson,
+    );
+    await tester.pumpWidget(
+        _wrap(WordProblemPreviewPage(data: _previewData([legacy, tampered]))),);
+    await tester.pumpAndSettle();
+    expect(find.text('需要复核'), findsOneWidget);
+    expect(find.text('不可使用'), findsOneWidget);
+    expect(find.byType(Checkbox), findsNothing);
+    expect(find.text('确认入库 0 题'), findsOneWidget);
+    expect(HiveBoxes.llmProblems, isEmpty);
+    expect(legacy.validation.status, WordProblemValidationStatus.needsReview);
+    expect(tampered.validation.status, WordProblemValidationStatus.rejected);
+  });
+
   testWidgets('通过项默认全选，取消一项后入库数量减少', (tester) async {
     final items = [
-      WordProblemPreviewItem(
-        skeleton: _skeleton(),
-        draft: const LlmWordProblemDraft(
-          index: 1,
-          text: '小明有 12 个苹果，吃了 4 个，还剩几个？',
-          unit: '个',
-          explanation: '12 - 4 = 8',
-        ),
-        rejectReason: null,
-      ),
-      WordProblemPreviewItem(
-        skeleton: _skeleton(operands: const [5, 3], answer: 8),
-        draft: const LlmWordProblemDraft(
-          index: 2,
-          text: '花园里有 5 朵红花和 3 朵黄花，一共有几朵花？',
-          unit: '朵',
-          explanation: '5 + 3 = 8',
-        ),
-        rejectReason: null,
-      ),
+      _validItem(),
+      _validItem(index: 2, operands: [5, 3], scene: 'flowers'),
     ];
 
     await tester.pumpWidget(
@@ -129,7 +172,14 @@ void main() {
 
     expect(HiveBoxes.llmProblems.length, equals(1));
     final stored = HiveBoxes.llmProblems.values.single;
-    expect(stored.questionText, contains('红花'));
+    expect(stored.questionText, contains('鲜花'));
+    expect(stored.answer, 2);
+    expect(stored.unit, '朵');
+    expect(
+        WordProblemMetadata.decode(stored.generationMetadataJson)!
+            .plan
+            .relation,
+        WordProblemRelation.decrease,);
     expect(stored.topic, equals('subtraction'));
     expect(stored.profileId, isNotEmpty);
     expect(stored.done, isFalse);
@@ -137,16 +187,7 @@ void main() {
 
   testWidgets('丢弃题显示违规原因且不入库', (tester) async {
     final items = [
-      WordProblemPreviewItem(
-        skeleton: _skeleton(),
-        draft: const LlmWordProblemDraft(
-          index: 1,
-          text: '小明有 12 个苹果，吃了 4 个，还剩几个？',
-          unit: '个',
-          explanation: '12 - 4 = 8',
-        ),
-        rejectReason: null,
-      ),
+      _validItem(),
       WordProblemPreviewItem(
         skeleton: _skeleton(operands: const [6, 2], answer: 4),
         draft: const LlmWordProblemDraft(
@@ -167,7 +208,7 @@ void main() {
     // 概要统计文案已移除，丢弃信息只体现在列表卡片上
     //（「丢弃原因：」在卡片内属预期展示，概要的「丢弃 N 题」不得再出现）。
     expect(find.textContaining('丢弃 '), findsNothing);
-    expect(find.text('已丢弃'), findsOneWidget);
+    expect(find.text('不可使用'), findsOneWidget);
     expect(find.textContaining('单位与骨架不一致'), findsOneWidget);
     // 丢弃题无勾选框
     expect(find.byType(Checkbox), findsOneWidget);
@@ -191,16 +232,7 @@ void main() {
   testWidgets('batchId 使用微秒时间戳，连续两批入库不同', (tester) async {
     // 同一测试内两次入库：第一次确认后页面替换为题库页，
     // 经 router 重新进入预览页再入一批，比对两批 batchId。
-    final item = WordProblemPreviewItem(
-      skeleton: _skeleton(),
-      draft: const LlmWordProblemDraft(
-        index: 1,
-        text: '小明有 12 个苹果，吃了 4 个，还剩几个？',
-        unit: '个',
-        explanation: '',
-      ),
-      rejectReason: null,
-    );
+    final item = _validItem();
     final router = GoRouter(
       initialLocation: '/',
       routes: [
@@ -259,16 +291,7 @@ void main() {
   });
 
   testWidgets('addAll 失败时提示入库失败、按钮恢复可点击（W2）', (tester) async {
-    final item = WordProblemPreviewItem(
-      skeleton: _skeleton(),
-      draft: const LlmWordProblemDraft(
-        index: 1,
-        text: '小明有 12 个苹果，吃了 4 个，还剩几个？',
-        unit: '个',
-        explanation: '',
-      ),
-      rejectReason: null,
-    );
+    final item = _validItem();
 
     // 注入 addAll 恒抛异常的假仓储：交互链在微任务内完成，
     // 无真实 Hive 写入，不需要 runAsync。

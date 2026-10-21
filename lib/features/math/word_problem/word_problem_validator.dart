@@ -1,16 +1,12 @@
 // lib/features/math/word_problem/word_problem_validator.dart
 //
-// 应用题草稿四重校验器（design §3.3）：LLM 输出不可信，入库前必须通过：
-// 1) 数字一致性（多重集合与 operands 完全相等，题面不得出现答案，
-//    含全角数字拒绝与小答案汉字表述泄露检测）
-// 2) 语义一致（运算用词与运算类型不冲突）
-// 3) 数学正确（ExpressionEvaluator 复算 == 答案）
-// 4) 形态约束（长度、无运算符号、单位一致）
-// 返回 null = 通过；返回 String = 违规原因（供家长预览页提示）。
+// 旧自由草稿的兼容筛查。数字和关键词不能证明题意正确；
+// 生产生成、预览和保存使用 WordProblemPlanRules 与本地模板。
 
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 import 'package:poemath/math_engine/validators/expression_evaluator.dart';
+import 'package:poemath/math_engine/validators/word_problem_equations.dart';
 
 // ============ 词表常量 ============
 
@@ -62,9 +58,30 @@ const List<String> kChineseDigitWords = [
 /// 非整数数字（应用题骨架全为整数，出现小数即违规）。
 final RegExp _decimalPattern = RegExp(r'\d+\.\d+');
 
+/// 仅识别行首或句末标点后的步骤标记，避免把正文里的数量当作编号。
+/// 讲解约定分 2–3 步；编号不是参与运算的数字。
+final RegExp _explanationStepMarkerPattern = RegExp(
+  r'(^|[。；;])[ \t]*(?:(?:第[ \t]*[1-3][ \t]*步|步骤[ \t]*[1-3])'
+  r'[ \t]*[:：]?|[（(][ \t]*[1-3][ \t]*[)）][ \t]*[:：]?|'
+  r'[1-3][ \t]*[.、．)）:：])[ \t]*',
+  multiLine: true,
+);
+
 /// 应用题草稿校验器。
 class WordProblemValidator {
   const WordProblemValidator._();
+
+  /// 旧自由题面无法仅凭数字/词表证明题意；新版使用计划与模板验证。
+  static WordProblemValidationResult validateResult({
+    required LlmWordProblemDraft draft,
+    required ProblemSkeleton skeleton,
+  }) {
+    final reason = validate(draft: draft, skeleton: skeleton);
+    return WordProblemValidationResult(
+      WordProblemValidationStatus.needsReview,
+      [WordProblemIssue('legacy', reason ?? '旧版题面尚未核验数量关系')],
+    );
+  }
 
   /// 校验单题草稿。返回 null = 通过；返回 String = 违规原因。
   ///
@@ -122,27 +139,21 @@ class WordProblemValidator {
 
     // ---- 3) 数学正确（骨架权威复算，防御骨架被篡改） ----
     final operands = skeleton.operands.map(NumberValue.fromInt).toList();
-    final evaluated =
-        ExpressionEvaluator.evaluate(operands, skeleton.operators);
-    if (evaluated == null || !evaluated.isInteger) {
+    final trace =
+        ExpressionEvaluator.evaluateWithSteps(operands, skeleton.operators);
+    if (trace == null || !trace.value.isInteger) {
       return '骨架算式无法求出整数结果';
     }
-    if (evaluated.asInteger != skeleton.answer) {
+    if (trace.value.asInteger != skeleton.answer) {
       return '骨架算式求值与答案不一致';
     }
 
     // ---- explanation 数字检查 ----
     if (explanation.trim().isNotEmpty) {
-      final equation = RegExp(r'(\d+)\s*([+\-×÷])\s*(\d+)\s*[=＝]\s*(\d+)');
-      for (final match in equation.allMatches(explanation)) {
-        final a = NumberValue.fromInt(int.parse(match[1]!));
-        final b = NumberValue.fromInt(int.parse(match[3]!));
-        final op = Operator.values.firstWhere((op) => op.symbol == match[2]);
-        final value = ExpressionEvaluator.evaluate([a, b], [op]);
-        if (value == null ||
-            value != NumberValue.fromInt(int.parse(match[4]!)).asFraction) {
-          return '讲解包含错误算式';
-        }
+      if (WordProblemEquations.hasInvalidEquation(
+        _stripExplanationStepMarkers(explanation),
+      )) {
+        return '讲解包含错误算式';
       }
       // 讲解长度上限：题面限 120 字而讲解原不限——LLM 超长讲解会
       // 撑爆预览/练习页讲解区并长期占存储。
@@ -153,11 +164,18 @@ class WordProblemValidator {
       if (_fullWidthDigitPattern.hasMatch(explanation)) {
         return '讲解包含非阿拉伯数字字符';
       }
-      final explanationNumbers = _extractNumbers(explanation);
-      final allowed = List<int>.from(skeleton.operands)..add(skeleton.answer);
+      final explanationContent = _stripExplanationStepMarkers(explanation);
+      final explanationNumbers = _extractNumbers(explanationContent);
+      // 中间结果只采信本地求值轨迹，不能因为 LLM 写了一个数字就放行。
+      final allowed = <int>{
+        ...skeleton.operands,
+        skeleton.answer,
+        for (final step in trace.steps)
+          if (step.value.isInteger) step.value.asInteger,
+      };
       for (final n in explanationNumbers) {
         if (!allowed.contains(n)) {
-          return '讲解引入了新数字 $n（只能引用题目数字与答案）';
+          return '讲解引入了新数字 $n（只能引用题目数字、答案与正确的中间结果）';
         }
       }
     }
@@ -181,6 +199,9 @@ class WordProblemValidator {
     }
     return numbers;
   }
+
+  static String _stripExplanationStepMarkers(String text) => text
+      .replaceAllMapped(_explanationStepMarkerPattern, (match) => match[1]!);
 
   /// 语义一致性：
   /// - 含加/乘 → 禁减法情境词（还剩/找回/少了/用去/花了）；

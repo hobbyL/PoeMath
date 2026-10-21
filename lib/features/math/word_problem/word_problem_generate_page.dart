@@ -2,7 +2,7 @@
 //
 // 层级：features/math/word_problem
 // 职责：应用题 AI 出题生成页 —— 选择年级/学期/知识点/数量，
-//       本地骨架 + LLM 题面 → 逐题校验 → 跳预览页由家长确认入库。
+//       本地计划 + AI 素材选择 → 本地题面/讲解 → 家长预览确认入库。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,7 +17,6 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/math/word_problem/word_problem_preview_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
-import 'package:poemath/features/math/word_problem/word_problem_validator.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 class WordProblemGeneratePage extends ConsumerStatefulWidget {
@@ -64,7 +63,7 @@ class _WordProblemGeneratePageState
     final topic = _topic;
     final count = _count;
     final settings = ref.read(settingsRepositoryProvider);
-    final createSkeletons = ref.read(wordProblemSkeletonProvider);
+    final createService = ref.read(wordProblemGenerationServiceProvider);
     final client =
         LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
     try {
@@ -75,47 +74,18 @@ class _WordProblemGeneratePageState
         return;
       }
       // 经 provider 调用（测试可注入失败场景，如骨架重试耗尽的 StateError）。
-      final skeletons = createSkeletons(
-        grade: grade,
-        semester: semester,
-        topic: topic.name,
-        count: count,
-      );
-      final result = await client.generateWordProblems(
+      final generated = await createService(client).generate(
         config: config,
-        skeletons: skeletons,
         grade: grade,
         semester: semester,
-        topic: topic.label,
+        topic: topic,
+        count: count,
+        isActive: () => mounted,
       );
-
-      // 按 index 对齐（draft.index 1-based），逐题本地校验。
-      final items = <WordProblemPreviewItem>[];
-      for (var i = 0; i < skeletons.length; i++) {
-        final skeleton = skeletons[i];
-        final draft = result.drafts.where((d) => d.index == i + 1).firstOrNull;
-        if (draft == null) {
-          items.add(
-            WordProblemPreviewItem(
-              skeleton: skeleton,
-              draft: null,
-              rejectReason: 'LLM 未返回该题',
-            ),
-          );
-          continue;
-        }
-        final reason = WordProblemValidator.validate(
-          draft: draft,
-          skeleton: skeleton,
-        );
-        items.add(
-          WordProblemPreviewItem(
-            skeleton: skeleton,
-            draft: draft,
-            rejectReason: reason,
-          ),
-        );
-      }
+      final items = [
+        for (var i = 0; i < generated.length; i++)
+          WordProblemPreviewItem.fromGenerated(generated[i], index: i + 1),
+      ];
 
       if (!mounted) return;
       context.push(
@@ -187,9 +157,9 @@ class _WordProblemGeneratePageState
                     ),
                     const SizedBox(height: SpacingTokens.sm),
                     Text(
-                      '应用题由 AI 把算式包装成生活情境。需家长先配置一个 '
+                      'AI 为应用题选择生活情境，题目与讲解在本地生成。需家长先配置一个 '
                       'OpenAI 兼容的大模型服务（地址、模型与 API Key），'
-                      '题目数学内容在本地生成并校验，不依赖服务准确性。',
+                      '生成后请核对题意、算式和讲解，再确认入库。',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

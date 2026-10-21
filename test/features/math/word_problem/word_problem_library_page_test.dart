@@ -44,6 +44,7 @@ LlmProblem _problem({
   bool done = false,
   int attempts = 0,
   int correctCount = 0,
+  String generationMetadataJson = '',
 }) {
   return LlmProblem(
     id: id,
@@ -64,6 +65,7 @@ LlmProblem _problem({
     attempts: attempts,
     correctCount: correctCount,
     lastDoneAt: done ? DateTime(2026, 10, 2) : null,
+    generationMetadataJson: generationMetadataJson,
   );
 }
 
@@ -105,6 +107,19 @@ void main() {
 
     expect(find.text('题库还是空的'), findsOneWidget);
     expect(find.text('去生成'), findsOneWidget);
+  });
+
+  testWidgets('未知未来版本保留题目并提示不能校验', (tester) async {
+    final repo = _MemoryLlmProblemRepository()
+      ..store['default_future'] = _problem(
+          id: 'future',
+          questionText: '未来版本的历史题目',
+          generationMetadataJson: '{"schemaVersion":2}',);
+    await tester.pumpWidget(_wrap(repo));
+    await tester.pumpAndSettle();
+    expect(find.text('未来版本的历史题目'), findsOneWidget);
+    expect(find.text('题目版本暂不支持校验 · 请核对题意'), findsOneWidget);
+    expect(repo.store.length, 1);
   });
 
   testWidgets('显示统计与批次分组，筛选未做后仅显示未做题', (tester) async {

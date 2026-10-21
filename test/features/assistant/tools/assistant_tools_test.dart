@@ -101,9 +101,8 @@ http.Response _draftsResponse(int count) => http.Response.bytes(
                     count,
                     (i) => <String, Object?>{
                       'index': i + 1,
-                      'text': '小明有一些苹果，妈妈又给了他一些，现在一共有多少个苹果？',
-                      'unit': '个',
-                      'explanation': '把两部分合起来。',
+                      'sceneId': 'apples',
+                      'variantId': 'standard',
                     },
                   ),
                 ),
@@ -417,6 +416,8 @@ void main() {
       expect(data.semester, '上');
       expect(data.topicName, 'addition');
       expect(data.items, hasLength(3));
+      expect(data.items.every((item) => item.accepted), isTrue);
+      expect(data.items.every((item) => item.generationMetadataJson.isNotEmpty), isTrue);
     });
 
     test('出题网络等待期间取消，晚到草稿不能打开预览页', () async {

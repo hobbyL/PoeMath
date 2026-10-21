@@ -14,7 +14,6 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
-import 'package:poemath/math_engine/models/problem_skeleton.dart';
 
 class WordProblemLibraryPage extends ConsumerStatefulWidget {
   const WordProblemLibraryPage({super.key});
@@ -26,6 +25,18 @@ class WordProblemLibraryPage extends ConsumerStatefulWidget {
 
 class _WordProblemLibraryPageState
     extends ConsumerState<WordProblemLibraryPage> {
+  String? _reviewLabel(LlmProblem problem) {
+    if (problem.generationMetadataJson.isEmpty) return '旧版题目 · 请核对题意';
+    try {
+      if (WordProblemMetadata.decode(problem.generationMetadataJson) == null) {
+        return '题目版本暂不支持校验 · 请核对题意';
+      }
+    } on FormatException {
+      return '题意信息无法校验 · 请核对题意';
+    }
+    return null;
+  }
+
   /// 筛选状态；null = 不过滤。
   WordProblemTopic? _topicFilter;
   bool? _doneFilter;
@@ -362,6 +373,15 @@ class _WordProblemLibraryPageState
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if (_reviewLabel(problem) != null) ...[
+                            const SizedBox(height: SpacingTokens.xs),
+                            Text(
+                              _reviewLabel(problem)!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                           if (problem.done) ...[
                             const SizedBox(height: 2),
                             Text(

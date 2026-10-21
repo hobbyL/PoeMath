@@ -236,10 +236,11 @@ class BackupService {
   ///
   /// 口令非空但读取凭据失败时抛 [BackupCredentialExportException]，
   /// **不再**静默产出缺凭据的备份（见该类文档）。
-  Future<String> exportToJson(
-      {String? passphrase,
-      bool encryptPayload = false,
-      bool includeCredentials = true,}) async {
+  Future<String> exportToJson({
+    String? passphrase,
+    bool encryptPayload = false,
+    bool includeCredentials = true,
+  }) async {
     final data = <String, dynamic>{
       'version': _backupVersion,
       'exportedAt': DateTime.now().toIso8601String(),
@@ -1111,6 +1112,7 @@ class BackupService {
     return HiveBoxes.llmProblems.values.map((p) {
       return <String, dynamic>{
         'appliedActivityIds': p.appliedActivityIds,
+        'generationMetadataJson': p.generationMetadataJson,
         'id': p.id,
         'profileId': p.profileId,
         'questionText': p.questionText,
@@ -1430,6 +1432,7 @@ class BackupService {
         lastDoneAt: _parseDateTime(m['lastDoneAt']),
         appliedActivityIds:
             (m['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
+        generationMetadataJson: m['generationMetadataJson'] as String? ?? '',
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -2167,6 +2170,35 @@ class BackupService {
         !evaluated.isInteger ||
         evaluated.asInteger != answer) {
       _invalidField('$path.answer', '与算式求值不一致');
+    }
+    final rawMetadata = item['generationMetadataJson'];
+    if (rawMetadata != null && rawMetadata is! String) {
+      _invalidField('$path.generationMetadataJson', '必须是字符串');
+    }
+    if (rawMetadata is String && rawMetadata.isNotEmpty) {
+      try {
+        final metadata = WordProblemMetadata.decode(rawMetadata);
+        if (metadata != null &&
+                !metadata.matches(
+                  text: item['questionText'] as String,
+                  explanation: item['explanation'] as String? ?? '',
+                  operands: operandValues,
+                  operators: operators.cast<String>(),
+                  answer: answer,
+                  unit: item['unit'] as String,
+                  difficulty: item['difficulty'] as int,
+                ) ||
+            metadata != null &&
+                !metadata.matchesContext(
+                  grade: item['grade'] as int,
+                  semester: item['semester'] as String,
+                  topic: item['topic'] as String,
+                )) {
+          _invalidField('$path.generationMetadataJson', '与题面、讲解、答案或单位不一致');
+        }
+      } on FormatException {
+        _invalidField('$path.generationMetadataJson', '题意快照格式或数量关系无效');
+      }
     }
   }
 

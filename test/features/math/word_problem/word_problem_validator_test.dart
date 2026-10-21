@@ -86,9 +86,9 @@ void main() {
     test('乘法题面通过', () {
       final error = WordProblemValidator.validate(
         draft: _draft(
-          text: '每朵花有6片花瓣，这样的7朵花一共有多少片花瓣？',
+          text: '每盒有6朵花，这样的7盒一共有多少朵花？',
           unit: '朵',
-          explanation: '6片乘7等于42片。',
+          explanation: '6乘7等于42朵。',
         ),
         skeleton: multiplicationSkeleton,
       );
@@ -404,6 +404,119 @@ void main() {
   });
 
   group('讲解数字检查', () {
+    for (final markers in [
+      ['1.', '2.'],
+      ['1、', '2、'],
+      ['1）', '2）'],
+      ['(1)', '(2)'],
+      ['（1）', '（2）'],
+      ['第1步：', '第2步：'],
+      ['步骤1：', '步骤2：'],
+    ]) {
+      test('讲解步骤编号 ${markers.join(' / ')} 不算新增题目数字', () {
+        final error = WordProblemValidator.validate(
+          draft: _draft(
+            text: '小明有12支铅笔，妈妈又买了4支，现在有多少支？',
+            explanation: '${markers[0]} 把12支和4支合起来。\n'
+                '${markers[1]} 12 + 4 = 16，所以有16支。',
+          ),
+          skeleton: additionSkeleton,
+        );
+        expect(error, isNull);
+      });
+    }
+
+    test('去掉步骤编号后仍拒绝正文中的新数字', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '小明有12支铅笔，妈妈又买了4支，现在有多少支？',
+          explanation: '1. 先取3支。\n2. 12加4等于16支。',
+        ),
+        skeleton: additionSkeleton,
+      );
+      expect(error, '讲解引入了新数字 3（只能引用题目数字、答案与正确的中间结果）');
+    });
+
+    test('正文中的数字 1 不因可作步骤编号而被放行', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '小明有12支铅笔，妈妈又买了4支，现在有多少支？',
+          explanation: '先取1支，再把12支和4支合起来得到16支。',
+        ),
+        skeleton: additionSkeleton,
+      );
+      expect(error, '讲解引入了新数字 1（只能引用题目数字、答案与正确的中间结果）');
+    });
+
+    test('同一行的中文步骤标记不算新增题目数字', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '小明有12支铅笔，妈妈又买了4支，现在有多少支？',
+          explanation: '第1步：把12支和4支合起来。第2步：12加4等于16支。',
+        ),
+        skeleton: additionSkeleton,
+      );
+      expect(error, isNull);
+    });
+
+    test('步骤编号后的错误算式仍被拒绝', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '小明有12支铅笔，妈妈又买了4支，现在有多少支？',
+          explanation: '1. 把12支和4支合起来。\n2. 12 + 4 = 12。',
+        ),
+        skeleton: additionSkeleton,
+      );
+      expect(error, '讲解包含错误算式');
+    });
+
+    test('步骤标记不能掩盖小数数量', () {
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '小明有12支铅笔，妈妈又买了4支，现在有多少支？',
+          explanation: '1.5支与12支、4支合并得到16支。',
+        ),
+        skeleton: additionSkeleton,
+      );
+      expect(error, '讲解包含非整数数字');
+    });
+
+    test('混合运算讲解允许本地复算的中间结果', () {
+      const skeleton = ProblemSkeleton(
+        operands: [12, 4, 5],
+        operators: [Operator.add, Operator.multiply],
+        answer: 32,
+        unitHint: '支',
+        difficulty: 2,
+      );
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '小明有12支铅笔，又买了4盒，每盒5支，现在有多少支？',
+          explanation: '先算4 × 5 = 20，再算12 + 20 = 32，所以有32支。',
+        ),
+        skeleton: skeleton,
+      );
+      expect(error, isNull);
+    });
+
+    test('混合运算讲解仍拒绝未经本地复算的中间结果', () {
+      const skeleton = ProblemSkeleton(
+        operands: [12, 4, 5],
+        operators: [Operator.add, Operator.multiply],
+        answer: 32,
+        unitHint: '支',
+        difficulty: 2,
+      );
+      final error = WordProblemValidator.validate(
+        draft: _draft(
+          text: '小明有12支铅笔，又买了4盒，每盒5支，现在有多少支？',
+          explanation: '先得到19支，再和12支合起来得到32支。',
+        ),
+        skeleton: skeleton,
+      );
+      expect(error, '讲解引入了新数字 19（只能引用题目数字、答案与正确的中间结果）');
+    });
+
     test('讲解引入新数字被拒', () {
       final error = WordProblemValidator.validate(
         draft: _draft(

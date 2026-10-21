@@ -1,8 +1,8 @@
 // lib/features/math/word_problem/word_problem_preview_page.dart
 //
 // 层级：features/math/word_problem
-// 职责：家长预览页 —— 展示 LLM 草稿与本地校验结果，通过项默认全选，
-//       家长确认后入库（batchId 此刻落定）；不自动补生成被丢弃的题。
+// 职责：家长预览页 —— 展示本地生成题目、素材来源和校验结果，
+//       通过项默认全选，家长确认后入库（batchId 此刻落定）。
 //
 // 布局约定：概要统计卡与底部整宽按钮不展示——确认按钮收敛到 AppBar 右上角
 //（窄屏图标 / 宽屏图标+「确认入库 N 题」，与全 App 响应式 AppBar 按钮一致）；
@@ -21,24 +21,82 @@ import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'word_problem_generation_service.dart';
 
-/// 单题预览项：skeleton（本地可信）+ draft（LLM 输出）+ 校验结论。
+/// 单题预览项：本地骨架、最终题面、题意快照与校验结论。
 class WordProblemPreviewItem {
   const WordProblemPreviewItem({
     required this.skeleton,
     required this.draft,
     required this.rejectReason,
+    this.generationMetadataJson = '',
   });
+
+  factory WordProblemPreviewItem.fromGenerated(GeneratedWordProblem generated,
+          {required int index,}) =>
+      WordProblemPreviewItem(
+        skeleton: generated.plan.skeleton,
+        draft: LlmWordProblemDraft(
+          index: index,
+          text: generated.text,
+          unit: generated.plan.skeleton.unitHint,
+          explanation: generated.explanation,
+        ),
+        rejectReason: generated.validation.canSave
+            ? null
+            : generated.validation.issues.first.message,
+        generationMetadataJson: generated.metadataJson,
+      );
 
   final ProblemSkeleton skeleton;
 
-  /// LLM 草稿；null = LLM 未返回该题。
+  /// 最终题面；兼容展示旧自由草稿，null 表示没有可展示的题目。
   final LlmWordProblemDraft? draft;
 
   /// 校验违规原因；null = 通过校验。
   final String? rejectReason;
+  final String generationMetadataJson;
 
-  bool get accepted => rejectReason == null && draft != null;
+  WordProblemValidationResult get validation {
+    if (rejectReason != null || draft == null) {
+      return WordProblemValidationResult(
+        WordProblemValidationStatus.rejected,
+        [WordProblemIssue('draft', rejectReason ?? '未返回题目')],
+      );
+    }
+    try {
+      final metadata = WordProblemMetadata.decode(generationMetadataJson);
+      if (metadata == null) {
+        return WordProblemValidationResult(
+          WordProblemValidationStatus.needsReview,
+          [const WordProblemIssue('legacy', '旧版题面尚未核验数量关系')],
+        );
+      }
+      if (!metadata.matches(
+            text: draft!.text,
+            explanation: draft!.explanation,
+            operands: skeleton.operands,
+            operators: skeleton.operators.map((op) => op.symbol).toList(),
+            answer: skeleton.answer,
+            unit: draft!.unit,
+            difficulty: skeleton.difficulty,
+          ) ||
+          draft!.unit != skeleton.unitHint) {
+        return WordProblemValidationResult(
+          WordProblemValidationStatus.rejected,
+          [const WordProblemIssue('mismatch', '题面、讲解或单位与数量关系不一致')],
+        );
+      }
+      return WordProblemValidationResult(WordProblemValidationStatus.verified);
+    } on FormatException {
+      return WordProblemValidationResult(
+        WordProblemValidationStatus.rejected,
+        [const WordProblemIssue('metadata', '题目数量关系信息无效')],
+      );
+    }
+  }
+
+  bool get accepted => validation.canSave;
 }
 
 /// 预览页数据（生成页 → 预览页 extra 传参）。
@@ -54,6 +112,18 @@ class WordProblemPreviewData {
   final String semester;
   final String topicName;
   final List<WordProblemPreviewItem> items;
+
+  WordProblemValidationResult validationFor(WordProblemPreviewItem item) {
+    final result = item.validation;
+    if (!result.canSave) return result;
+    final metadata = WordProblemMetadata.decode(item.generationMetadataJson)!;
+    return WordProblemPlanRules.validateContext(
+      metadata.plan,
+      grade: grade,
+      semester: semester,
+      topic: topicName,
+    );
+  }
 }
 
 class WordProblemPreviewPage extends ConsumerStatefulWidget {
@@ -81,7 +151,7 @@ class _WordProblemPreviewPageState
     super.initState();
     _selected = {
       for (var i = 0; i < widget.data.items.length; i++)
-        if (widget.data.items[i].accepted) i: true,
+        if (widget.data.validationFor(widget.data.items[i]).canSave) i: true,
     };
   }
 
@@ -118,11 +188,14 @@ class _WordProblemPreviewPageState
     final batchId = _nextBatchId(now);
     final profileId = ProfileScope.currentId;
 
+    final repository = ref.read(llmProblemRepositoryProvider);
     final problems = <LlmProblem>[];
     var seq = 0;
     for (var i = 0; i < widget.data.items.length; i++) {
       final item = widget.data.items[i];
-      if (!item.accepted || !(_selected[i] ?? false)) continue;
+      if (!widget.data.validationFor(item).canSave || !(_selected[i] ?? false)) {
+        continue;
+      }
       problems.add(
         LlmProblem(
           id: '${now.microsecondsSinceEpoch}_${seq++}',
@@ -135,6 +208,7 @@ class _WordProblemPreviewPageState
           ],
           answer: item.skeleton.answer,
           explanation: item.draft!.explanation,
+          generationMetadataJson: item.generationMetadataJson,
           batchId: batchId,
           createdAt: now,
           grade: widget.data.grade,
@@ -146,7 +220,7 @@ class _WordProblemPreviewPageState
     }
 
     try {
-      await ref.read(llmProblemRepositoryProvider).addAll(problems);
+      await repository.addAll(problems);
     } on Object catch (_) {
       // addAll 是 Hive 循环 put、不吞异常（磁盘满/Box 损坏会抛出）：
       // 不加防护时 _saving 永久为 true，确认按钮永久禁用。
@@ -218,9 +292,12 @@ class _WordProblemPreviewPageState
         itemCount: items.length + 1,
         itemBuilder: (context, index) {
           if (index == 0) {
-            return const Padding(
-              padding: EdgeInsets.only(bottom: SpacingTokens.md),
-              child: Text('规则检查仅辅助筛查。请核对题意、算式和讲解一致后再确认入库。'),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+              child: Text(
+                '${items.isNotEmpty && items.every((item) => item.accepted && WordProblemMetadata.decode(item.generationMetadataJson)!.source == WordProblemSource.localTemplate) ? 'AI 未返回可用素材，本批使用本地生成。' : ''}'
+                '请核对题意、算式和讲解一致后再确认入库。',
+              ),
             );
           }
           index -= 1;
@@ -243,7 +320,10 @@ class _WordProblemPreviewPageState
     // 骨架自带算式组装（"12 + 4"），此处仅拼答案与单位。
     final expressionText = '${skeleton.expressionText} = ${skeleton.answer}';
 
-    if (!item.accepted) {
+    final validation = widget.data.validationFor(item);
+    if (!validation.canSave) {
+      final needsReview =
+          validation.status == WordProblemValidationStatus.needsReview;
       // 被丢弃的题：置灰显示原因
       return ColoredCard(
         color: theme.colorScheme.outline,
@@ -260,7 +340,7 @@ class _WordProblemPreviewPageState
                 ),
                 const SizedBox(width: SpacingTokens.xs),
                 Text(
-                  '已丢弃',
+                  needsReview ? '需要复核' : '不可使用',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -279,7 +359,7 @@ class _WordProblemPreviewPageState
             ],
             Text(
               '算式：$expressionText${skeleton.unitHint}\n'
-              '丢弃原因：${item.rejectReason}',
+              '原因：${validation.issues.map((issue) => issue.message).join('；')}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.semantic.caution,
               ),
@@ -299,6 +379,15 @@ class _WordProblemPreviewPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            WordProblemMetadata.decode(item.generationMetadataJson)!.source ==
+                    WordProblemSource.localTemplate
+                ? '本地生成 · 数量关系与计算已校验'
+                : 'AI 情境 · 数量关系与计算已校验',
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: SpacingTokens.xs),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

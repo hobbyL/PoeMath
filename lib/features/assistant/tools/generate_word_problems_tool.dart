@@ -1,11 +1,11 @@
 // lib/features/assistant/tools/generate_word_problems_tool.dart
 //
 // 层级：features/assistant/tools
-// 职责：出题工具。复用应用题出题管线（本地骨架 + LLM 题面 + 本地校验链），
+// 职责：出题工具。复用应用题管线（本地计划 + AI 素材选择 + 本地模板），
 //       经家长确认预览页入库——绝不静默入库。
 //
-// 安全边界：数学内容来自本地骨架生成器，LLM 只产出不可信题面；
-//       草稿必经 WordProblemValidator 校验，入库由家长在预览页确认。
+// 安全边界：数量关系、题面及讲解来自本地，LLM 仅选择受控素材；
+//       保存前重新核验计划与实际题目，入库由家长在预览页确认。
 //       出题使用「AI 出题」场景配置（LlmScenario.wordProblem），非助手配置。
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,7 +20,6 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/assistant/tools/assistant_tool.dart';
 import 'package:poemath/features/math/word_problem/word_problem_preview_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
-import 'package:poemath/features/math/word_problem/word_problem_validator.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 /// 出题工具：生成一组应用题草稿并打开家长预览页确认入库。
@@ -109,44 +108,19 @@ class GenerateWordProblemsTool extends AssistantTool {
     final client =
         LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
     try {
-      final skeletons = ref.read(wordProblemSkeletonProvider)(
-        grade: grade,
-        semester: semester,
-        topic: topic.name,
-        count: count,
-      );
-      final result = await client.generateWordProblems(
-        config: config,
-        skeletons: skeletons,
-        grade: grade,
-        semester: semester,
-        topic: topic.label,
-      );
-
-      // 按 index（1-based）对齐骨架，逐题本地校验（复用出题页同管线）。
-      final items = <WordProblemPreviewItem>[];
-      for (var i = 0; i < skeletons.length; i++) {
-        final skeleton = skeletons[i];
-        final draft = _draftForIndex(result.drafts, i + 1);
-        if (draft == null) {
-          items.add(
-            WordProblemPreviewItem(
-              skeleton: skeleton,
-              draft: null,
-              rejectReason: 'LLM 未返回该题',
-            ),
-          );
-          continue;
-        }
-        items.add(
-          WordProblemPreviewItem(
-            skeleton: skeleton,
-            draft: draft,
-            rejectReason:
-                WordProblemValidator.validate(draft: draft, skeleton: skeleton),
-          ),
-        );
-      }
+      final generated =
+          await ref.read(wordProblemGenerationServiceProvider)(client).generate(
+                config: config,
+                grade: grade,
+                semester: semester,
+                topic: topic,
+                count: count,
+                isActive: isActive,
+              );
+      final items = [
+        for (var i = 0; i < generated.length; i++)
+          WordProblemPreviewItem.fromGenerated(generated[i], index: i + 1),
+      ];
 
       if (!isActive()) return const ToolResult.error('操作已取消');
       // 走家长确认预览页（context-free 导航），确认后才入库——绝不静默存。
@@ -165,6 +139,8 @@ class GenerateWordProblemsTool extends AssistantTool {
         '已生成 ${items.length} 道${topic.label}题（其中 $accepted 道通过校验），'
         '并打开了家长预览页，确认后才会入库。',
       );
+    } on LlmGenerationCancelled {
+      return const ToolResult.error('操作已取消');
     } on LlmException catch (e) {
       return ToolResult.error('生成题目失败：${e.message}');
     } on ArgumentError catch (e) {
@@ -174,17 +150,6 @@ class GenerateWordProblemsTool extends AssistantTool {
     } finally {
       client.close();
     }
-  }
-
-  /// 从草稿列表取指定 1-based index 的草稿；无则 null。
-  static LlmWordProblemDraft? _draftForIndex(
-    List<LlmWordProblemDraft> drafts,
-    int index,
-  ) {
-    for (final d in drafts) {
-      if (d.index == index) return d;
-    }
-    return null;
   }
 
   /// 宽松解析整数（模型可能回 int/double/数字字符串）。

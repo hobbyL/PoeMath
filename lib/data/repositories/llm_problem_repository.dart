@@ -7,6 +7,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
+import 'package:poemath/math_engine/word_problem_metadata.dart';
 
 /// LLM 应用题题库统计快照。
 class LlmProblemStats {
@@ -36,6 +37,28 @@ class LlmProblemStats {
 class LlmProblemRepository {
   /// 批量入库（家长确认后调用）。
   Future<void> addAll(List<LlmProblem> problems) async {
+    for (final problem in problems) {
+      if (problem.generationMetadataJson.isEmpty) continue; // 兼容旧题导入。
+      final metadata =
+          WordProblemMetadata.decode(problem.generationMetadataJson);
+      if (metadata == null ||
+          !metadata.matches(
+            text: problem.questionText,
+            explanation: problem.explanation,
+            operands: problem.operands,
+            operators: problem.operators,
+            answer: problem.answer,
+            unit: problem.unit,
+            difficulty: problem.difficulty,
+          ) ||
+          !metadata.matchesContext(
+            grade: problem.grade,
+            semester: problem.semester,
+            topic: problem.topic,
+          )) {
+        throw const FormatException('题目与本地数量关系不一致');
+      }
+    }
     for (final problem in problems) {
       await HiveBoxes.llmProblems.put(
         ProfileScope.key(problem.id),

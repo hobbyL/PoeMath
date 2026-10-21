@@ -4,8 +4,7 @@
 // 职责：LLM 生成管线的轻量数据模型（草稿/批次结果）与错误分类。
 //       纯 Dart，无 Hive/Flutter 依赖。
 
-
-/// LLM 返回的单题草稿（尚未通过本地校验，内容不可信）。
+/// 预览文本载体；也兼容旧 LLM 自由草稿，不能据此认定题意正确。
 class LlmWordProblemDraft {
   const LlmWordProblemDraft({
     required this.index,
@@ -17,13 +16,13 @@ class LlmWordProblemDraft {
   /// 对应 skeleton 的序号（1-based）。
   final int index;
 
-  /// 题面文本（LLM 输出）。
+  /// 题面文本（新版由本地模板生成）。
   final String text;
 
-  /// 单位（LLM 输出，必须与 skeleton.unitHint 一致）。
+  /// 答案单位（必须与本地所求量一致）。
   final String unit;
 
-  /// 解题讲解（LLM 输出）。
+  /// 解题讲解（新版由本地数量关系推导）。
   final String explanation;
 }
 
@@ -32,6 +31,31 @@ class LlmBatchResult {
   const LlmBatchResult({required this.drafts});
 
   final List<LlmWordProblemDraft> drafts;
+}
+
+/// 模型仅选择本地候选素材，不提供数学内容。
+class LlmWordProblemSceneChoice {
+  const LlmWordProblemSceneChoice({
+    required this.index,
+    required this.sceneId,
+    required this.variantId,
+  });
+  final int index;
+  final String sceneId;
+  final String variantId;
+}
+
+class LlmWordProblemSceneResult {
+  LlmWordProblemSceneResult({
+    required List<LlmWordProblemSceneChoice> choices,
+    required this.requestCount,
+  }) : choices = List.unmodifiable(choices);
+  final List<LlmWordProblemSceneChoice> choices;
+  final int requestCount;
+}
+
+class LlmGenerationCancelled extends LlmException {
+  const LlmGenerationCancelled() : super('操作已取消');
 }
 
 /// 自由文本讲解结果（诗词讲解 / 算数题解析共用）。

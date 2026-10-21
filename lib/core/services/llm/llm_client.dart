@@ -1,12 +1,12 @@
 // lib/core/services/llm/llm_client.dart
 //
-// OpenAI 兼容 Chat Completions 客户端：应用题情境文本生成 / 模型列表 / 连通性测试。
+// OpenAI 兼容 Chat Completions 客户端：应用题素材选择 / 讲解 / 助手。
 // 端点契约：POST {base}/chat/completions、GET {base}/models。
 //
 // 安全边界：API Key 仅出现在 `Authorization: Bearer` 请求头；
 // 异常 message、toString、日志均不得包含 API Key。
-// 数学内容（操作数/答案）永远来自本地生成器，本客户端只产出不可信草稿，
-// 草稿必须经 WordProblemValidator 校验后才能入库。
+// 新版应用题仅选择本地候选素材；数学内容、题面和讲解由本地计划生成。
+// 自由草稿接口仅供旧格式兼容测试，生产入口不再调用。
 
 import 'dart:async';
 import 'dart:convert';
@@ -21,6 +21,7 @@ import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/math_engine/validators/expression_evaluator.dart';
 
 const _jsonContentType = 'application/json; charset=utf-8';
 
@@ -172,10 +173,128 @@ final class LlmClient {
     );
   }
 
-  /// 拉取模型列表；接口不支持或网络失败抛 [LlmModelsUnavailable]。
-  ///
-  /// 部分兼容实现（如 Ollama 旧版）不提供 /v1/models，调用方应捕获并
-  /// 退化为手填模型名。
+  /// 只选择候选情境；部分有效结果保留，格式修复共用最多三次请求。
+  Future<LlmWordProblemSceneResult> chooseWordProblemScenes({
+    required LlmConfig config,
+    required List<WordProblemPlan> plans,
+    required int grade,
+    required String semester,
+    required String topic,
+    required bool Function() isActive,
+  }) async {
+    if (plans.isEmpty) {
+      return LlmWordProblemSceneResult(choices: [], requestCount: 0);
+    }
+    final base = normalizeBaseUrl(config.baseUrl);
+    final accepted = <int, LlmWordProblemSceneChoice>{};
+    var requestCount = 0;
+    for (var attempt = 0; attempt <= _maxFormatRetries; attempt++) {
+      if (!isActive()) throw const LlmGenerationCancelled();
+      final remaining = <Map<String, Object?>>[
+        for (var i = 0; i < plans.length; i++)
+          if (!accepted.containsKey(i + 1))
+            {
+              'index': i + 1,
+              'relation': plans[i].relation.name,
+              'sceneCandidates': [
+                for (final scene
+                    in WordProblemCatalog.forRelation(plans[i].relation))
+                  {
+                    'sceneId': scene.id,
+                    'object': scene.object,
+                    'unit': scene.unit,
+                  },
+              ],
+              'variantCandidates': WordProblemCatalog.variantIds,
+            },
+      ];
+      final body = jsonEncode({
+        'model': config.model,
+        'temperature': 0.8,
+        'max_tokens': remaining.length * 100 + 400,
+        'messages': [
+          {
+            'role': 'system',
+            'content': '为小学应用题选择多样的生活情境素材。'
+                '只返回JSON数组，每项严格包含index、sceneId、variantId。'
+                '必须从每题候选中选择，不输出题面、数量、单位、算式、答案或讲解。',
+          },
+          {
+            'role': 'user',
+            'content': '小学$grade年级$semester学期，$topic。'
+                '请逐题选择素材：${jsonEncode(remaining)}',
+          },
+        ],
+      });
+      requestCount++;
+      final response = await _send(
+        uri: _join(base, _chatPath),
+        body: body,
+        apiKey: config.apiKey,
+        timeout: _generateTimeout,
+        timeoutMessage: '生成应用题请求超时',
+      );
+      if (!isActive()) throw const LlmGenerationCancelled();
+      try {
+        final decoded =
+            jsonDecode(_extractJsonArray(_extractAssistantContent(response)));
+        if (decoded is! List<Object?>) throw const FormatException('素材不是数组');
+        final choices = <int, LlmWordProblemSceneChoice>{};
+        final seen = <int>{};
+        final duplicated = <int>{};
+        for (final item in decoded) {
+          if (item is! Map<String, dynamic>) continue;
+          final rawIndex = item['index'];
+          final index = rawIndex is int
+              ? rawIndex
+              : rawIndex is String
+                  ? int.tryParse(rawIndex)
+                  : null;
+          if (index == null ||
+              index < 1 ||
+              index > plans.length ||
+              accepted.containsKey(index)) {
+            continue;
+          }
+          if (!seen.add(index)) duplicated.add(index);
+          final sceneId = item['sceneId'];
+          final variantId = item['variantId'];
+          if (item.length != 3 ||
+              sceneId is! String ||
+              variantId is! String ||
+              !WordProblemCatalog.forRelation(plans[index - 1].relation)
+                  .any((s) => s.id == sceneId) ||
+              !WordProblemCatalog.variantIds.contains(variantId)) {
+            continue;
+          }
+          choices[index] = LlmWordProblemSceneChoice(
+            index: index,
+            sceneId: sceneId,
+            variantId: variantId,
+          );
+        }
+        for (final index in duplicated) {
+          choices.remove(index);
+        }
+        accepted.addAll(choices);
+      } on FormatException {
+        // 只消耗本批格式预算，不再套服务层重试。
+      } on LlmResponseFormatError {
+        // 预算耗尽后生成服务本地补齐并标注来源。
+      }
+      if (accepted.length == plans.length) break;
+    }
+    if (!isActive()) throw const LlmGenerationCancelled();
+    return LlmWordProblemSceneResult(
+      choices: [
+        for (var i = 1; i <= plans.length; i++)
+          if (accepted.containsKey(i)) accepted[i]!,
+      ],
+      requestCount: requestCount,
+    );
+  }
+
+  /// 拉取模型列表；接口不支持时调用方可退化为手填模型名。
   Future<List<String>> listModels(LlmConfig config) async {
     final base = normalizeBaseUrl(config.baseUrl);
     http.Response response;
@@ -518,11 +637,12 @@ final class LlmClient {
       ..writeln('你只为每道题编写生活化的题面、单位与解题讲解。')
       ..writeln()
       ..writeln('铁律（违反任何一条该题作废）：')
-      ..writeln('1. 只能使用给定骨架中的数字，不得增加、删减或改动任何数字；')
+      ..writeln('1. 题面必须使用给定骨架中的全部数字，每个数字的出现次数与骨架一致，不得增加、删减或改动；')
       ..writeln('2. 题面中不得出现答案本身；')
       ..writeln('3. 题面中不得出现任何运算符号（+ - × ÷ =）和算式；')
       ..writeln('4. 不得出现"第几个"这类序数表述；')
-      ..writeln('5. 讲解分 2-3 步，只引用给定数字与答案，不得引入新数字；')
+      ..writeln('5. 讲解分 2-3 步，用“第一步、第二步、第三步”标记步骤；')
+      ..writeln('   讲解只引用题目数字、给定答案和给定的正确中间结果，不得增加其他数量或计算；')
       ..writeln('6. 题面用词必须与运算语义一致：加法/乘法用"一共/共有"，')
       ..writeln('   减法用"还剩/找回/少了"，除法用"平均/每份"；')
       ..writeln('7. 所有数字用阿拉伯数字表示。')
@@ -538,9 +658,20 @@ final class LlmClient {
       ..writeln('请为以下 $topicLabel 应用题骨架编写题面：');
     for (var i = 0; i < skeletons.length; i++) {
       final s = skeletons[i];
+      final trace = ExpressionEvaluator.evaluateWithSteps(
+        s.operands.map(NumberValue.fromInt).toList(),
+        s.operators,
+      );
+      final intermediateResults = <int>{
+        if (trace != null && trace.steps.isNotEmpty)
+          for (final step in trace.steps.take(trace.steps.length - 1))
+            if (step.value.isInteger) step.value.asInteger,
+      }.toList();
       userPrompt.writeln(
         '${i + 1}. 数字 ${jsonEncode(s.operands)}，'
         '运算 ${jsonEncode(s.operators.map((o) => o.symbol).toList())}，'
+        '答案 ${s.answer}（仅供讲解使用），'
+        '正确中间结果 ${jsonEncode(intermediateResults)}，'
         '答案单位提示：${s.unitHint}',
       );
     }

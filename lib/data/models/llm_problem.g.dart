@@ -37,13 +37,14 @@ class LlmProblemAdapter extends TypeAdapter<LlmProblem> {
       lastDoneAt: fields[17] as DateTime?,
       appliedActivityIds:
           fields[18] == null ? [] : (fields[18] as List).cast<String>(),
+      generationMetadataJson: fields[19] == null ? '' : fields[19] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, LlmProblem obj) {
     writer
-      ..writeByte(19)
+      ..writeByte(20)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -81,7 +82,9 @@ class LlmProblemAdapter extends TypeAdapter<LlmProblem> {
       ..writeByte(17)
       ..write(obj.lastDoneAt)
       ..writeByte(18)
-      ..write(obj.appliedActivityIds);
+      ..write(obj.appliedActivityIds)
+      ..writeByte(19)
+      ..write(obj.generationMetadataJson);
   }
 
   @override
