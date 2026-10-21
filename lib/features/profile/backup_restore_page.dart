@@ -106,22 +106,6 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
         child: AnimatedPageBody(
           padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
-            Text(
-              '数据安全',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              '定期备份学习数据，防止意外丢失',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.lg),
-
             // 两个并排卡片
             Row(
               children: [
@@ -471,11 +455,6 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
             },
           ),
         ),
-        if (history.externalBackupDue)
-          ColoredCard(
-            color: theme.colorScheme.tertiary,
-            child: const Text('请将备份保存到应用之外或上传 WebDAV。本地快照不能防止卸载或设备丢失。'),
-          ),
         FutureBuilder<List<BackupSnapshot>>(
           future: _history,
           builder: (context, snapshot) {
