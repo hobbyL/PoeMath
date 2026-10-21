@@ -145,7 +145,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
               onTap: _configurePassphrase,
             ),
 
-            const SizedBox(height: SpacingTokens.lg),
+            const SizedBox(height: SpacingTokens.sm),
             _historySection(context),
             const SizedBox(height: SpacingTokens.lg),
             // 提示信息
@@ -424,6 +424,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
             child: const Text('立即快照'),
           ),
         ),
+        const SizedBox(height: SpacingTokens.sm),
         AppTile(
           icon: Icons.schedule,
           iconColor: theme.colorScheme.primary,
@@ -441,6 +442,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
                   },
           ),
         ),
+        const SizedBox(height: SpacingTokens.sm),
         AppTile(
           icon: Icons.notification_important_outlined,
           iconColor: theme.colorScheme.primary,
@@ -455,6 +457,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
             },
           ),
         ),
+        const SizedBox(height: SpacingTokens.sm),
         FutureBuilder<List<BackupSnapshot>>(
           future: _history,
           builder: (context, snapshot) {
@@ -468,7 +471,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
             }
             return Column(
               children: [
-                for (final entry in entries)
+                for (final entry in entries) ...[
                   AppTile(
                     icon: Icons.restore,
                     iconColor: theme.colorScheme.primary,
@@ -477,6 +480,9 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
                         entry.createdAt.toLocal().toString().split('.').first,
                     onTap: _busy ? null : () => _restoreSnapshot(entry),
                   ),
+                  if (entry != entries.last)
+                    const SizedBox(height: SpacingTokens.sm),
+                ],
               ],
             );
           },
