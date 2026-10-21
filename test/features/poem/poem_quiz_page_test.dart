@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/recording_sound_service.dart';
+
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/data/models/learning_activity.dart';
@@ -148,90 +150,98 @@ class _AlreadyUnlockedAchievementRepository extends AchievementRepository {
 }
 
 void main() {
+  late RecordingSoundService sound;
   setUp(() async {
     await setUpHiveForTesting();
+    sound = RecordingSoundService();
   });
 
   tearDown(() async {
     await tearDownHiveForTesting();
   });
 
-  testWidgets('最后一题结算期间避免重复写入', (tester) async {
-    final poem = Poem(
-      id: 'quiz_guard',
-      title: '测试诗',
-      author: '测试作者',
-      dynasty: '唐',
-      content: '第一句长长',
-      pinyin: '',
-      layer: 'core',
-      grade: 1,
-    );
-    await tester.runAsync(() async {
-      await HiveBoxes.settings.put('sound_enabled', false);
-      await HiveBoxes.settings.put('haptic_enabled', false);
-    });
-    final progressRepo = _BlockingPoemProgressRepository();
-    final activityRepo = _ImmediateLearningActivityRepository();
+  for (final exitWhileSaving in [false, true]) {
+    testWidgets('最后一题结算防重复，保存中退出=$exitWhileSaving', (tester) async {
+      final poem = Poem(
+        id: 'quiz_guard',
+        title: '测试诗',
+        author: '测试作者',
+        dynasty: '唐',
+        content: '第一句长长',
+        pinyin: '',
+        layer: 'core',
+        grade: 1,
+      );
+      await tester.runAsync(() async {
+        await HiveBoxes.settings.put('sound_enabled', false);
+        await HiveBoxes.settings.put('haptic_enabled', false);
+      });
+      final progressRepo = _BlockingPoemProgressRepository();
+      final activityRepo = _ImmediateLearningActivityRepository();
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          poemByIdProvider('quiz_guard').overrideWith((ref) => poem),
-          poemProgressRepoProvider.overrideWith((ref) => progressRepo),
-          checkInRepoProvider.overrideWith(
-            (ref) => _ImmediateCheckInRepository(),
-          ),
-          userStatsRepoProvider.overrideWith(
-            (ref) => _ImmediateStatsRepository(),
-          ),
-          learningActivityRepositoryProvider.overrideWith(
-            (ref) => activityRepo,
-          ),
-          achievementRepoProvider.overrideWith(
-            (ref) => _AlreadyUnlockedAchievementRepository(),
-          ),
-        ],
-        child: const MaterialApp(
-          home: PoemQuizPage(
-            poemId: 'quiz_guard',
-            quizType: QuizType.chooseDynasty,
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            soundServiceProvider.overrideWithValue(sound),
+            poemByIdProvider('quiz_guard').overrideWith((ref) => poem),
+            poemProgressRepoProvider.overrideWith((ref) => progressRepo),
+            checkInRepoProvider.overrideWith(
+              (ref) => _ImmediateCheckInRepository(),
+            ),
+            userStatsRepoProvider.overrideWith(
+              (ref) => _ImmediateStatsRepository(),
+            ),
+            learningActivityRepositoryProvider.overrideWith(
+              (ref) => activityRepo,
+            ),
+            achievementRepoProvider.overrideWith(
+              (ref) => _AlreadyUnlockedAchievementRepository(),
+            ),
+          ],
+          child: const MaterialApp(
+            home: PoemQuizPage(
+              poemId: 'quiz_guard',
+              quizType: QuizType.chooseDynasty,
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pump();
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
 
-    // 朝1 是引擎保证存在的错误干扰项，不触发撒花动画。
-    expect(find.text('朝1'), findsOneWidget);
-    await tester.tap(find.text('朝1'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
+      // 朝1 是引擎保证存在的错误干扰项，不触发撒花动画。
+      expect(find.text('朝1'), findsOneWidget);
+      await tester.tap(find.text('朝1'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump();
 
-    final resultButton = find.text('查看结果');
-    expect(resultButton, findsOneWidget);
+      final resultButton = find.text('查看结果');
+      expect(resultButton, findsOneWidget);
 
-    // 两次点击之间不重建 UI，模拟用户快速重复点击。
-    await tester.tap(resultButton);
-    await tester.tap(resultButton);
-    expect(progressRepo.recordStudyCalls, 1);
+      // 两次点击之间不重建 UI，模拟用户快速重复点击。
+      await tester.tap(resultButton);
+      await tester.tap(resultButton);
+      expect(progressRepo.recordStudyCalls, 1);
+      expect(sound.completions, 0);
+      if (exitWhileSaving) await tester.pumpWidget(const SizedBox.shrink());
 
-    progressRepo.release(
-      PoemProgress(
-        poemId: poem.id,
-        profileId: 'test',
-        status: LearningStatus.learning,
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-  });
+      progressRepo.release(
+        PoemProgress(
+          poemId: poem.id,
+          profileId: 'test',
+          status: LearningStatus.learning,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(sound.completions, exitWhileSaving ? 0 : 1);
+      await tester.pump();
+    });
+  }
 
   testWidgets('满分诗词测试统一奖励三颗星并写入今日汇总', (tester) async {
     final poem = Poem(
@@ -255,6 +265,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          soundServiceProvider.overrideWithValue(sound),
           poemByIdProvider('quiz_reward').overrideWith((ref) => poem),
           poemProgressRepoProvider.overrideWith(
             (ref) => _ImmediatePoemProgressRepository(),
@@ -301,6 +312,18 @@ void main() {
     expect(activity.successfulItems, 1);
     expect(activity.starsEarned, 3);
     expect(find.text('获得 3 颗星星'), findsOneWidget);
+    expect(sound.completions, 1);
+
+    await tester.ensureVisible(find.text('再测一次'));
+    await tester.tap(find.text('再测一次'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.tap(find.text('唐'));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.tap(find.text('查看结果'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    expect(sound.completions, 2);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -329,6 +352,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          soundServiceProvider.overrideWithValue(sound),
           poemByIdProvider('quiz_reward').overrideWith((ref) => poem),
           poemProgressRepoProvider.overrideWith(
             (ref) => progressRepo,
@@ -368,11 +392,13 @@ void main() {
 
     expect(find.text('重试保存'), findsOneWidget);
     expect(progressRepo.saveCalls, 1);
+    expect(sound.completions, 0);
     expect(progressRepo.saved, isNull);
     await tester.tap(find.text('重试保存'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 3));
     expect(progressRepo.saveCalls, 2);
+    expect(sound.completions, 1);
     expect(progressRepo.studyCalls, 1);
     expect(progressRepo.saved!.masteryLevel, 5);
     expect(progressRepo.saved!.status, LearningStatus.reviewing);
@@ -407,6 +433,7 @@ void main() {
     // 在 fake-async 区挂起；同时验证 ④ 侧信道双端纪律。
     final scoreContainer = ProviderContainer(
       overrides: [
+        soundServiceProvider.overrideWithValue(sound),
         poemByIdProvider('quiz_back_double').overrideWith((ref) => poem),
         poemByIdProvider('quiz_back_double').overrideWith((ref) => poem),
         poemProgressRepoProvider.overrideWith(
@@ -485,6 +512,7 @@ void main() {
 
     expect(popResults, hasLength(1));
     expect(popResults.single, PoemPracticeResult.quizPassed);
+    expect(sound.completions, 1);
     // 侧信道纪律：pop 前写入本次最终得分（单题全对 = 1.0）。
     expect(scoreContainer.read(lastPracticeScoreProvider), 1.0);
     expect(tester.takeException(), isNull);

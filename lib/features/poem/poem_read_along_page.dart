@@ -686,6 +686,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
     // —— 数据结算完毕；以下 UI 部分要求页面仍挂载 ——
     if (!mounted) return;
+    unawaited(ref.read(soundServiceProvider).playCompletion());
     setState(() {});
     ref.invalidate(userStatsProvider);
     ref.invalidate(todayPoemCountProvider);

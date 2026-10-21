@@ -442,6 +442,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
         addDuration: duration,
       );
       _settled = true;
+      if (mounted) unawaited(ref.read(soundServiceProvider).playCompletion());
     } on Object catch (error, stack) {
       AppLogger.e(
         '听写结算失败',

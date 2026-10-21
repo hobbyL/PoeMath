@@ -9,6 +9,8 @@
 
 import 'dart:async';
 
+import '../../helpers/recording_sound_service.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -276,6 +278,9 @@ void main() {
     await tearDownHiveForTesting();
   });
 
+  late RecordingSoundService sound;
+  setUp(() => sound = RecordingSoundService());
+
   ProviderContainer createContainer({
     required _CountingStatsRepository statsRepo,
     required _CountingCheckInRepository checkInRepo,
@@ -288,6 +293,7 @@ void main() {
     final resolvedPoem = poem ?? _poem;
     return ProviderContainer(
       overrides: [
+        soundServiceProvider.overrideWithValue(sound),
         poemByIdProvider(poemId).overrideWith((ref) => resolvedPoem),
         poemRepoProvider
             .overrideWith((ref) => _StubPoemRepository([resolvedPoem])),
@@ -386,6 +392,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('重试保存'), findsOneWidget);
+    expect(sound.completions, 0);
     final first = activities.recorded.single;
     await tester.pump(const Duration(seconds: 3));
     await tester.tap(find.text('重试保存'));
@@ -399,6 +406,7 @@ void main() {
     expect(activities.recorded.last.detailsJson, first.detailsJson);
     expect(checkIn.updateCalls, 1);
     expect(find.text('太棒了！完美背诵！'), findsOneWidget);
+    expect(sound.completions, 1);
     expect(tester.takeException(), isNull);
   });
 
@@ -446,6 +454,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('太棒了！完美背诵！'), findsOneWidget);
     expect(filteredRebuilds, 1, reason: 'R5 完成结算后 filteredPoemsProvider 应失效');
+    expect(sound.completions, 1);
   });
 
   testWidgets('R2 结算途中退出页面：repo 层四通道仍完整落库，无 ref dispose 断言', (tester) async {
@@ -478,6 +487,7 @@ void main() {
     expect(statsRepo.starsAdded, 3);
     expect(checkInRepo.updateCalls, 1);
     // 未挂载时不得再触 ref（否则抛 "Cannot use ref after dispose"）。
+    expect(sound.completions, 0);
     expect(tester.takeException(), isNull);
   });
 
@@ -489,6 +499,7 @@ void main() {
     final achievementRepo = _HangingAchievementRepository();
     final container = ProviderContainer(
       overrides: [
+        soundServiceProvider.overrideWithValue(sound),
         poemByIdProvider(_poemId).overrideWith((ref) => _poem),
         poemRepoProvider.overrideWith((ref) => _StubPoemRepository([_poem])),
         poemProgressRepoProvider.overrideWith((ref) => progressRepo),
@@ -517,6 +528,7 @@ void main() {
 
     // 结算数据完整；成就检查返回后 mounted 为 false，不得再触 ref
     // （否则抛 "Cannot use ref after the widget was disposed"）。
+    expect(sound.completions, 0);
     expect(activityRepo.recordCalls, 1);
     expect(checkInRepo.updateCalls, 1);
     expect(statsRepo.starsAdded, 3);

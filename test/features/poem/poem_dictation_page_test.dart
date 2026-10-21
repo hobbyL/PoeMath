@@ -21,6 +21,7 @@ import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/recording_sound_service.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/poem_dictation_page.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
@@ -76,6 +77,9 @@ class _Stats extends UserStatsRepository {
 }
 
 class _CheckIn extends CheckInRepository {
+  bool failNext = false;
+  Completer<void>? pending;
+  int calls = 0;
   @override
   Future<void> updateForDate(
     DateTime date, {
@@ -85,7 +89,14 @@ class _CheckIn extends CheckInRepository {
     int? addMathCorrect,
     int? addStars,
     int? addDuration,
-  }) async {}
+  }) async {
+    if (failNext) {
+      failNext = false;
+      throw StateError('模拟汇总保存失败');
+    }
+    if (pending != null) await pending!.future;
+    calls++;
+  }
 }
 
 const _poemId = 'dictation-test-poem';
@@ -104,14 +115,18 @@ Poem _makePoem() {
 }
 
 void main() {
+  late RecordingSoundService sound;
   late _MockTtsService tts;
   late _Progress progress;
   late _Activities activities;
+  late _CheckIn checkIn;
 
   setUp(() async {
     await setUpHiveForTesting();
+    sound = RecordingSoundService();
     progress = _Progress();
     activities = _Activities();
+    checkIn = _CheckIn();
     tts = _MockTtsService();
     // 朗读立即完成、无回调（onReady 不触发 → 遮罩不出现）。
     when(
@@ -135,11 +150,12 @@ void main() {
   }) async {
     final container = ProviderContainer(
       overrides: [
+        soundServiceProvider.overrideWithValue(sound),
         ttsServiceProvider.overrideWithValue(tts),
         poemProgressRepoProvider.overrideWithValue(progress),
         learningActivityRepositoryProvider.overrideWithValue(activities),
         userStatsRepoProvider.overrideWithValue(_Stats()),
-        checkInRepoProvider.overrideWithValue(_CheckIn()),
+        checkInRepoProvider.overrideWithValue(checkIn),
         poemByIdProvider(_poemId).overrideWith((ref) => poem ?? _makePoem()),
       ],
     );
@@ -210,6 +226,38 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
+  testWidgets('听写保存失败不播放，成功重试播放一次', (tester) async {
+    checkIn.failNext = true;
+    await pumpPage(tester, targetLineIndices: [0]);
+    await pickChars(tester, '床前明月光');
+    await tester.pump(const Duration(milliseconds: 950));
+    await tester.pump();
+    expect(sound.completions, 0);
+    await tester.ensureVisible(find.text('重试保存'));
+    await tester.tap(find.text('重试保存'));
+    await tester.pump();
+    expect(sound.completions, 1);
+    expect(checkIn.calls, 1);
+    expect(progress.studies, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('听写保存途中退出，保存完成后不播放', (tester) async {
+    checkIn.pending = Completer<void>();
+    await pumpPage(tester, targetLineIndices: [0]);
+    await pickChars(tester, '床前明月光');
+    await tester.pump(const Duration(milliseconds: 950));
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    checkIn.pending!.complete();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    expect(sound.completions, 0);
+    expect(checkIn.calls, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('进入页面清空侧信道陈旧分数', (tester) async {
     // 先预置陈旧分数，再挂载页面（_initPoem 在 postFrame 内清空）。
     final container = ProviderContainer(
@@ -277,12 +325,14 @@ void main() {
     expect(activities.types, [LearningActivityType.poemDictation]);
     expect(progress.studies, 1);
     expect(find.text('听写完成！'), findsOneWidget);
+    expect(sound.completions, 1);
 
     await tester.pump();
     await tester.tap(find.text('完成'));
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(popResults.single, PoemPracticeResult.quizPassed);
+    expect(sound.completions, 1);
     expect(container.read(lastPracticeScoreProvider), 1.0);
   });
 
@@ -326,6 +376,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 950));
 
     expect(find.text('再听一遍，会更好！'), findsOneWidget);
+    expect(sound.completions, 1);
     // 错句展示原文
     expect(find.textContaining('床前明月光'), findsWidgets);
 
@@ -360,5 +411,6 @@ void main() {
     await tester.pump();
 
     verify(() => tts.stop()).called(greaterThanOrEqualTo(1));
+    expect(sound.completions, 0);
   });
 }

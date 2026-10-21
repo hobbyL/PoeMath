@@ -8,7 +8,11 @@
 // - 星星走 LearningRewardCalculator 的 readAlong 策略（当前明确 0 星）；
 // - 「查看结果」连点不双记（activityId 幂等）。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../helpers/recording_sound_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -88,6 +92,8 @@ class _CountingCheckInRepository extends CheckInRepository {
   int poemsAdded = 0;
   int starsAdded = 0;
   int durationAdded = 0;
+  bool failNext = false;
+  Completer<void>? pending;
 
   @override
   Future<void> updateForDate(
@@ -99,6 +105,11 @@ class _CountingCheckInRepository extends CheckInRepository {
     int? addStars,
     int? addDuration,
   }) async {
+    if (failNext) {
+      failNext = false;
+      throw StateError('模拟汇总保存失败');
+    }
+    if (pending != null) await pending!.future;
     updateCalls++;
     poemsAdded += addPoems ?? 0;
     starsAdded += addStars ?? 0;
@@ -158,10 +169,12 @@ const _verifiedSettings = SpeechRecognitionSettingsState(
 );
 
 void main() {
+  late RecordingSoundService sound;
   late _MockTtsService tts;
   late _MockSettingsRepository settings;
 
   setUp(() {
+    sound = RecordingSoundService();
     tts = _MockTtsService();
     settings = _MockSettingsRepository();
     when(() => tts.stop()).thenAnswer((_) async {});
@@ -181,6 +194,7 @@ void main() {
     return tester.pumpWidget(
       ProviderScope(
         overrides: [
+          soundServiceProvider.overrideWithValue(sound),
           settingsRepositoryProvider.overrideWithValue(settings),
           ttsServiceProvider.overrideWithValue(tts),
           poemByIdProvider(_poemId).overrideWith((ref) => _poem),
@@ -254,6 +268,7 @@ void main() {
 
     // 一条 readAlong 活动记录。
     expect(activityRepo.recordCalls, 1);
+    expect(sound.completions, 1);
     final activity = activityRepo.recorded.single;
     expect(activity.activityType, 'readAlong');
     expect(activity.poemId, _poemId);
@@ -284,6 +299,58 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('跟读保存失败时静默，重试成功只播放一次', (tester) async {
+    final checkIn = _CountingCheckInRepository()..failNext = true;
+    await pumpPage(
+      tester,
+      speech: _FakeSpeechRecognitionService(recognizedText: '床前明月光'),
+      statsRepo: _CountingStatsRepository(),
+      checkInRepo: checkIn,
+      activityRepo: _CountingActivityRepository(),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await recordOneLine(tester);
+    await tester.tap(find.text('下一句'));
+    await tester.pump();
+    await recordOneLine(tester);
+    await tester.tap(find.text('查看结果'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(sound.completions, 0);
+    await tester.ensureVisible(find.text('重试保存'));
+    await tester.tap(find.text('重试保存'));
+    await tester.pump();
+    expect(sound.completions, 1);
+    expect(checkIn.updateCalls, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('跟读保存途中退出，不启动完成音效', (tester) async {
+    final checkIn = _CountingCheckInRepository()..pending = Completer<void>();
+    await pumpPage(
+      tester,
+      speech: _FakeSpeechRecognitionService(recognizedText: '床前明月光'),
+      statsRepo: _CountingStatsRepository(),
+      checkInRepo: checkIn,
+      activityRepo: _CountingActivityRepository(),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    await recordOneLine(tester);
+    await tester.tap(find.text('下一句'));
+    await tester.pump();
+    await recordOneLine(tester);
+    await tester.tap(find.text('查看结果'));
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    checkIn.pending!.complete();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
+    expect(checkIn.updateCalls, 1);
+    expect(sound.completions, 0);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('「再练一次」后重新完成，按新一轮 activityId 再次结算', (tester) async {
@@ -327,6 +394,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     expect(activityRepo.recordCalls, 2);
+    expect(sound.completions, 2);
     expect(activityRepo.recorded.map((a) => a.id).toSet(), hasLength(2));
     expect(checkInRepo.updateCalls, 2);
     expect(checkInRepo.poemsAdded, 2);

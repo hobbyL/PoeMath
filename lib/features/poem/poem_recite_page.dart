@@ -3,6 +3,7 @@
 // 背诵练习页：逐句选字闯关 + 默写模式。
 // 动画基于 flutter_animate，撒花复用 ConfettiOverlay。
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -505,6 +506,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       if (!mounted) return;
     }
 
+    unawaited(ref.read(soundServiceProvider).playCompletion());
     _celebrationCtrl.play();
     setState(() => _isComplete = true);
   }

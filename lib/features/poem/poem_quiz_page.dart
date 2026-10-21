@@ -2,6 +2,7 @@
 //
 // 诗词测试页：填空测试 + 选择题，逐题作答，即时反馈，完成后显示结果。
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -298,6 +299,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
       _settled = true;
       if (!mounted) return;
+      unawaited(ref.read(soundServiceProvider).playCompletion());
       ref.invalidate(learnedCountProvider);
       ref.invalidate(userStatsProvider);
       ref.invalidate(todayPoemCountProvider);
