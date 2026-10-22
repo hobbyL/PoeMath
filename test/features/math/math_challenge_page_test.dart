@@ -17,6 +17,8 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/widgets/vertical_calc_widget.dart';
 import 'package:poemath/features/math/widgets/vertical_process_input.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/math_engine/models/vertical_attempt.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
@@ -152,12 +154,27 @@ void main() {
       final problem = tester
           .widget<VerticalCalcWidget>(find.byType(VerticalCalcWidget))
           .problem;
-      expect(problem.problemText, '32 + 11 = ?');
+      expect(problem.mode, ProblemMode.vertical);
+      final a = problem.operands[0].asInteger;
+      final b = problem.operands[1].asInteger;
+      final correctAnswer = switch (problem.operators.single) {
+        Operator.add => a + b,
+        Operator.subtract => a - b,
+        Operator.multiply => a * b,
+        Operator.divide => throw StateError('竖式挑战不应生成除法'),
+      };
+      final fields = VerticalAttempt.fieldsFor(problem);
+      final wrongAnswer = (correctAnswer == 44 ? 45 : 44)
+          .toString()
+          .padLeft(fields.length, '0');
       expect(find.byKey(const ValueKey('vertical_regroup')), findsNothing);
-      for (final field in [('ones', '4'), ('tens', '4')]) {
-        await tester.tap(find.byKey(ValueKey('vertical_${field.$1}')));
+      for (var i = 0; i < fields.length; i++) {
+        await tester.tap(find.byKey(ValueKey('vertical_${fields[i].$1}')));
         await tester.pump();
-        await tester.tap(find.text(field.$2));
+        await tester.tap(find.descendant(
+          of: find.byType(NumberKeypad),
+          matching: find.text(wrongAnswer[i]),
+        ),);
         await tester.pump();
       }
       await tester.runAsync(() async {
@@ -168,12 +185,13 @@ void main() {
       expect(find.text('已答 1 题 · 正确 0 题'), findsOneWidget);
       expect(find.text('0 分'), findsOneWidget);
       final mistake = HiveBoxes.mathMistakes.values.single;
-      expect(mistake.userAnswer, '44');
-      expect(mistake.correctAnswer, '43');
+      expect(mistake.userAnswer, wrongAnswer);
+      expect(mistake.correctAnswer, '$correctAnswer');
       expect(mistake.errorType, 'vertical_process');
       final attempt = jsonDecode(mistake.attemptJson!) as Map;
-      expect(attempt['ones'], '4');
-      expect(attempt['tens'], '4');
+      for (var i = 0; i < fields.length; i++) {
+        expect(attempt[fields[i].$1], wrongAnswer[i]);
+      }
       expect(attempt['regroup'], isEmpty);
       expect(mistake.problemJson, isNotNull);
       // 外部册次变化（现只能经学习背景写 Hive）不能改变已开始的挑战

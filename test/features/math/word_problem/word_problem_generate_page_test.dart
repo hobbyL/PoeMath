@@ -500,7 +500,7 @@ void main() {
     expect(find.textContaining('StateError'), findsNothing);
   });
 
-  testWidgets('知识点随年级/学期过滤：二上隐藏除法/混合，二下现除法，切回自动回退选中', (tester) async {
+  testWidgets('二年级上下学期均可选除法，切换一年级自动回退选中', (tester) async {
     // 配置就绪才会渲染生成表单（含知识点选择器），按先例在 runAsync 播种。
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_base_url', 'http://localhost:11434');
@@ -534,28 +534,35 @@ void main() {
     ChoiceChip chip(String label) =>
         tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label));
 
-    // 默认二年级上学期：加/减/乘 可见，除法与混合运算隐藏。
+    // 默认二年级上学期：加/减/乘/除可见，混合运算隐藏。
     expect(find.text('知识点'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '加法'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '减法'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '乘法'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '除法'), findsNothing);
+    expect(find.widgetWithText(ChoiceChip, '除法'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '混合运算'), findsNothing);
     expect(chip('加法').selected, isTrue);
 
-    // 切到二年级下学期：除法出现，混合运算仍无。
+    // 二年级上学期即可选中除法。
+    await tester.tap(find.widgetWithText(ChoiceChip, '除法'));
+    await tester.pumpAndSettle();
+    expect(chip('除法').selected, isTrue);
+
+    // 切到二年级下学期保留除法选中态，混合运算仍无。
     await tester.tap(find.text('下学期'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(ChoiceChip, '除法'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '混合运算'), findsNothing);
 
-    // 选中除法。
-    await tester.tap(find.widgetWithText(ChoiceChip, '除法'));
+    expect(chip('除法').selected, isTrue);
+
+    // 切回二年级上学期仍保留除法选中态。
+    await tester.tap(find.text('上学期'));
     await tester.pumpAndSettle();
     expect(chip('除法').selected, isTrue);
 
-    // 切回二年级上学期：除法隐藏，选中态自动回退为加法（无不可用残留）。
-    await tester.tap(find.text('上学期'));
+    // 一年级尚未开放除法，选中态自动回退为加法。
+    await tester.tap(find.widgetWithText(ChoiceChip, '1 年级'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(ChoiceChip, '除法'), findsNothing);
     expect(chip('加法').selected, isTrue);

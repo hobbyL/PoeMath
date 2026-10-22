@@ -6,6 +6,7 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/math_engine/math_engine.dart';
+import 'package:poemath/math_engine/models/difficulty_level.dart';
 import 'package:poemath/math_engine/models/math_problem.dart';
 import 'package:poemath/math_engine/models/number_value.dart';
 
@@ -42,16 +43,39 @@ void main() {
       expect(j.correctSteps, isNotEmpty);
     });
 
-    test('二年级上 乘法范围正确', () {
-      for (var i = 0; i < 20; i++) {
-        final p = MathEngine.generate(
+    for (final difficulty in [
+      null,
+      DifficultyLevel.medium,
+      DifficultyLevel.hard,
+    ]) {
+      test('二年级上 ${difficulty?.label ?? '默认'}综合练习可出表内整除且不出余数', () {
+        final problems = MathEngine.generateBatch(
           grade: 2,
           semester: '上',
-          random: Random(200 + i),
+          difficulty: difficulty,
+          count: 100,
+          random: Random(200),
         );
-        expect(p.result.asDouble.abs(), lessThanOrEqualTo(100));
-      }
-    });
+        final divisions = problems.where(
+          (p) => p.operators.single == Operator.divide,
+        );
+        expect(divisions, isNotEmpty);
+        for (final p in problems) {
+          expect(p.result.asDouble.abs(), lessThanOrEqualTo(100));
+          expect(p.resultForm, isNot(ResultForm.withRemainder));
+          expect(MathEngine.judge(p, p.answerText).isCorrect, isTrue);
+        }
+        for (final p in divisions) {
+          final dividend = p.operands[0].asInteger;
+          final divisor = p.operands[1].asInteger;
+          expect(dividend, inInclusiveRange(1, 81));
+          expect(divisor, inInclusiveRange(1, 9));
+          expect(dividend % divisor, 0);
+          expect(dividend ~/ divisor, inInclusiveRange(1, 9));
+          expect(p.skillId, 'division');
+        }
+      });
+    }
 
     test('二年级下 可能出现余数', () {
       var hasRemainder = false;

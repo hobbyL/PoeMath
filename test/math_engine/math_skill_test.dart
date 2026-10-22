@@ -35,6 +35,9 @@ void main() {
     (1, '下', MathSkill.additionCarry),
     (2, '上', MathSkill.subtractionBorrow),
     (2, '上', MathSkill.multiplicationTable),
+    (2, '上', MathSkill.division),
+    (2, '下', MathSkill.multiplicationTable),
+    (2, '下', MathSkill.division),
     (2, '下', MathSkill.remainderDivision),
     (3, '下', MathSkill.multiplication),
     (3, '下', MathSkill.division),
@@ -80,13 +83,53 @@ void main() {
         if (skill == MathSkill.multiplicationTable) {
           expect(
               p.operands.every(
-                  (n) => n.isInteger && n.asInteger >= 1 && n.asInteger <= 81,),
+                  (n) => n.isInteger && n.asInteger >= 1 && n.asInteger <= 9,),
               isTrue,);
-          expect(
-              p.operators.single, isIn([Operator.multiply, Operator.divide]),);
+          expect(p.operators, [Operator.multiply]);
+        }
+        if (skill == MathSkill.division) {
+          expect(p.operators, [Operator.divide]);
+          expect(p.resultForm, ResultForm.integer);
+          final dividend = p.operands[0].asInteger;
+          final divisor = p.operands[1].asInteger;
+          expect(divisor, greaterThan(0));
+          expect(dividend % divisor, 0);
+          expect((p.expressionResult ?? p.result).asInteger,
+              dividend ~/ divisor,);
+          if (grade == 2) {
+            expect(dividend, inInclusiveRange(1, 81));
+            expect(divisor, inInclusiveRange(1, 9));
+            expect(dividend ~/ divisor, inInclusiveRange(1, 9));
+          }
         }
       }
     });
+  }
+
+  for (final difficulty in [DifficultyLevel.medium, DifficultyLevel.hard]) {
+    for (final mode in [
+      ProblemMode.findResult,
+      ProblemMode.findMissing,
+      ProblemMode.compare,
+    ]) {
+      test('二年级上整除专项 ${difficulty.name}/${mode.name} 不回退到乘法', () {
+        for (var seed = 0; seed < 20; seed++) {
+          final p = MathEngine.generate(
+            grade: 2,
+            semester: '上',
+            difficulty: difficulty,
+            mode: mode,
+            skillId: MathSkill.division.id,
+            random: Random(seed),
+          );
+          expect(p.operators, [Operator.divide]);
+          expect(p.skillId, MathSkill.division.id);
+          expect(p.mode, mode);
+          expect(p.resultForm, ResultForm.integer);
+          expect(MathEngine.judge(p, p.answerText).isCorrect, isTrue);
+        }
+      });
+    }
   }
 
   test('未知和不支持专项明确拒绝，不走通用加减兜底', () {
@@ -96,6 +139,14 @@ void main() {
         () => MathEngine.generate(
             grade: 1, semester: '上', skillId: MathSkill.fraction.id,),
         throwsArgumentError,);
+    expect(
+      () => MathEngine.generate(
+        grade: 2,
+        semester: '上',
+        skillId: MathSkill.remainderDivision.id,
+      ),
+      throwsArgumentError,
+    );
     expect(
       () => MathEngine.generate(
         grade: 5,

@@ -290,7 +290,7 @@ class _WordProblemGeneratePageState
 
   Widget _buildTopicSelector(ThemeData theme) {
     // 只渲染当前「年级+学期」实际教授的知识点，不学的直接隐藏，
-    // 避免用户选中一个随后无法生成的知识点（如二年级上的除法）。
+    // 避免用户选中一个随后无法生成的知识点（如一年级的除法）。
     final topics = WordProblemSkeletonGenerator.availableTopics(
       grade: _grade,
       semester: _semester,

@@ -287,7 +287,10 @@ class MathEngine {
             MathSkill.subtractionBorrow,
             MathSkill.operationOrder,
           },
-        MultiplicationTableGen() => {MathSkill.multiplicationTable},
+        MultiplicationTableGen() => {
+            MathSkill.multiplicationTable,
+            MathSkill.division,
+          },
         RemainderDivisionGen() => {MathSkill.remainderDivision},
         MultiDigitMulDivGen() => {MathSkill.multiplication, MathSkill.division},
         MixedOperationGen() => {MathSkill.operationOrder},
@@ -309,6 +312,11 @@ class MathEngine {
           ? (regrouping ? MathSkill.additionCarry : MathSkill.addition)
           : (regrouping ? MathSkill.subtractionBorrow : MathSkill.subtraction);
     }
+    if (generator is MultiplicationTableGen) {
+      return p.operators.single == Operator.multiply
+          ? MathSkill.multiplicationTable
+          : MathSkill.division;
+    }
     if (generator is MultiDigitMulDivGen) {
       return p.operators.single == Operator.multiply
           ? MathSkill.multiplication
@@ -329,7 +337,7 @@ class MathEngine {
       generators.add(AdditionSubtractionGen(config, random: random));
     }
 
-    // 乘法口诀（2年级）
+    // 乘法口诀与表内除法（2年级）
     if (config.grade == 2 &&
         config.allowedOperators.contains(Operator.multiply)) {
       generators.add(MultiplicationTableGen(config, random: random));

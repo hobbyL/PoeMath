@@ -1,6 +1,6 @@
 // lib/math_engine/presets/grade_presets.dart
 //
-// 1-6 年级 12 学期出题预设（人教版对齐）。
+// 1-6 年级 12 学期出题预设（以人教版为基础，兼顾实际学习进度）。
 
 import '../models/grade_config.dart';
 import '../models/math_problem.dart';
@@ -52,7 +52,7 @@ class GradePresets {
     allowBorrow: true,
   );
 
-  /// 二年级上：100 以内加减法、乘法口诀（1-9 × 1-9）。
+  /// 二年级上：100 以内加减法、乘法口诀（1-9 × 1-9）、表内除法。
   static const grade2a = GradeConfig(
     grade: 2,
     semester: '上',
@@ -61,6 +61,7 @@ class GradePresets {
       Operator.add,
       Operator.subtract,
       Operator.multiply,
+      Operator.divide,
     },
     allowedModes: _extendedModes,
     minOperand: 0,
@@ -69,6 +70,7 @@ class GradePresets {
     allowCarry: true,
     allowBorrow: true,
     maxMultiplier: 9,
+    maxDividend: 81,
   );
 
   /// 二年级下：万以内加减、表内除法、有余数除法。

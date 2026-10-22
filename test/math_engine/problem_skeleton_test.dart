@@ -127,7 +127,7 @@ void main() {
       });
     }
 
-    // ============ division（2 年级下起） ============
+    // ============ division（2 年级上起） ============
     for (final config in GradePresets.all
         .where((c) => c.allowedOperators.contains(Operator.divide))) {
       test('division ${config.label} × 20 例整除不变量', () {
@@ -207,18 +207,19 @@ void main() {
   });
 
   group('WordProblemSkeletonGenerator.availableTopics / isTopicAvailable', () {
-    test('二年级上：加/减/乘，隐藏除法与混合运算', () {
+    test('二年级上：加/减/乘/除，隐藏混合运算', () {
       expect(
         WordProblemSkeletonGenerator.availableTopics(grade: 2, semester: '上'),
         const [
           WordProblemTopic.addition,
           WordProblemTopic.subtraction,
           WordProblemTopic.multiplication,
+          WordProblemTopic.division,
         ],
       );
     });
 
-    test('二年级下：出现除法，仍无混合运算', () {
+    test('二年级下：继续支持除法，仍无混合运算', () {
       final topics = WordProblemSkeletonGenerator.availableTopics(
         grade: 2,
         semester: '下',

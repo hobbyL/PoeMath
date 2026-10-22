@@ -47,10 +47,13 @@ void main() {
       expect(c.allowBorrow, isTrue);
     });
 
-    test('二年级上 - 含乘法', () {
+    test('二年级上 - 含乘法和表内整除', () {
       final c = GradePresets.grade2a;
       expect(c.allowedOperators.contains(Operator.multiply), isTrue);
+      expect(c.allowedOperators.contains(Operator.divide), isTrue);
       expect(c.maxResult, 100);
+      expect(c.maxDividend, 81);
+      expect(c.allowRemainder, isFalse);
     });
 
     test('二年级下 - 含除法和余数', () {
