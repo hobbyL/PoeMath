@@ -608,7 +608,7 @@ class _LlmProviderEditDialogState
                 controller: _modelController,
                 decoration: InputDecoration(
                   labelText: '默认模型',
-                  hintText: '手动填写或点右侧拉取；留空取候选第一个',
+                  hintText: '手动填写，或点击下方候选模型',
                   prefixIcon: const Icon(Icons.model_training_outlined),
                   border: const OutlineInputBorder(),
                   suffixIcon: _fetchingModels
@@ -636,13 +636,13 @@ class _LlmProviderEditDialogState
                   return null;
                 },
               ),
-              // 候选模型清单（配置时可多选；用时各功能里从中切换）。
+              // 点击候选模型设为默认；候选清单仍保留供各功能切换。
               if (_models.isNotEmpty) ...[
                 const SizedBox(height: SpacingTokens.sm),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    '候选模型（用时可在各功能里切换；点 × 移除）',
+                    '候选模型（点击设为默认；点 × 移除）',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -656,6 +656,10 @@ class _LlmProviderEditDialogState
                     for (final m in _models)
                       InputChip(
                         label: Text(m),
+                        selected: _modelController.text.trim() == m,
+                        onSelected: _saving
+                            ? null
+                            : (_) => setState(() => _modelController.text = m),
                         onDeleted: () => setState(() {
                           _models.remove(m);
                           if (_modelController.text.trim() == m) {

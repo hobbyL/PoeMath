@@ -2,7 +2,7 @@
 //
 // 供应商设置页 widget 测试（拆分版）：配置列表与空态引导、点行切换生效、
 // 新增/编辑全屏弹窗（保存更新、Key 留空保留、删除确认与生效切换、
-// 拉取模型弹层回填、拉取失败手填、拉取/连接防重入、清除 Key）、
+// 候选模型点击设为默认、拉取模型弹层回填、拉取失败手填、拉取/连接防重入、清除 Key）、
 // 旧单配置迁移。场景绑定测试见 llm_scenario_settings_page_test.dart。
 //
 // 测试环境无平台安全存储通道，凭据与 LLM 网络均注入内存/HTTP mock。
@@ -277,6 +277,58 @@ void main() {
     },
   );
 
+  testWidgets('编辑配置：点击候选模型切换默认，保存后保留候选和 Key，重开保持选中', (tester) async {
+    final store = _MemoryCredentialStore();
+    await tester.runAsync(() async {
+      await SettingsRepository(credentialStore: store).saveLlmProviderConfig(
+        id: 'p1',
+        name: 'DeepSeek',
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-chat',
+        models: ['deepseek-chat', 'deepseek-reasoner'],
+        apiKey: 'key-p1',
+      );
+    });
+    await _pumpPage(tester, credentialStore: store);
+
+    await tester.tap(find.byTooltip('编辑此配置'));
+    await tester.pumpAndSettle();
+
+    final chatChip = find.widgetWithText(InputChip, 'deepseek-chat');
+    final reasonerChip = find.widgetWithText(InputChip, 'deepseek-reasoner');
+    expect(tester.widget<InputChip>(chatChip).selected, isTrue);
+    expect(tester.widget<InputChip>(reasonerChip).selected, isFalse);
+
+    await tester.ensureVisible(reasonerChip);
+    await tester.tap(reasonerChip);
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextFormField>(find.widgetWithText(TextFormField, '默认模型'))
+          .controller
+          ?.text,
+      'deepseek-reasoner',
+    );
+    expect(tester.widget<InputChip>(chatChip).selected, isFalse);
+    expect(tester.widget<InputChip>(reasonerChip).selected, isTrue);
+    expect(_repoOf(tester).llmProviders.single.model, 'deepseek-chat');
+
+    await tester.ensureVisible(find.text('保存配置'));
+    await _tapReal(tester, find.text('保存配置'));
+
+    final saved = _repoOf(tester).llmProviders.single;
+    expect(saved.id, 'p1');
+    expect(saved.model, 'deepseek-reasoner');
+    expect(saved.models, ['deepseek-reasoner', 'deepseek-chat']);
+    expect(store.llmApiKeysByConfigId['p1'], 'key-p1');
+
+    await tester.tap(find.byTooltip('编辑此配置'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<InputChip>(reasonerChip).selected, isTrue);
+    expect(tester.widget<InputChip>(chatChip).selected, isFalse);
+  });
+
   testWidgets('编辑已存配置拉取模型：用回显的已存 Key（Authorization 头）', (tester) async {
     final store = _MemoryCredentialStore();
     await _seedTwo(tester, store);
@@ -333,7 +385,7 @@ void main() {
     expect(find.text('连接成功，模型可用'), findsOneWidget);
   });
 
-  testWidgets('拉取成功弹出底部模型列表，多选加入候选并回填默认', (tester) async {
+  testWidgets('新增配置：拉取多选回填默认，点击候选切换默认并保存', (tester) async {
     final client = MockClient((request) async {
       expect(request.url.path, endsWith('/models'));
       return http.Response(
@@ -354,22 +406,59 @@ void main() {
     await tester.tap(find.byTooltip('从服务拉取模型列表（可多选）'));
     await tester.pumpAndSettle();
 
-    // 底部弹层多选：勾选一个模型，点「加入」。
+    // 底部弹层多选：勾选两个模型，点「加入」。
     expect(find.text('选择模型（可多选）'), findsOneWidget);
     expect(find.text('qwen2.5:7b'), findsOneWidget);
+    await tester.tap(find.text('qwen2.5:7b'));
     await tester.tap(find.text('gpt-4o-mini'));
     await tester.pump();
     await tester.tap(find.textContaining('加入'));
     await tester.pumpAndSettle();
 
-    // 弹层关闭；默认模型回填为选中项，候选清单出现该模型 chip。
+    // 默认取第一个加入的候选；点击另一个候选后，默认输入框和选中态同步。
     expect(find.text('选择模型（可多选）'), findsNothing);
     final modelField = find.widgetWithText(TextFormField, '默认模型');
+    final qwenChip = find.widgetWithText(InputChip, 'qwen2.5:7b');
+    final gptChip = find.widgetWithText(InputChip, 'gpt-4o-mini');
+    expect(
+      tester.widget<TextFormField>(modelField).controller?.text,
+      'qwen2.5:7b',
+    );
+    expect(tester.widget<InputChip>(qwenChip).selected, isTrue);
+    expect(tester.widget<InputChip>(gptChip).selected, isFalse);
+
+    await tester.ensureVisible(gptChip);
+    await tester.tap(gptChip);
+    await tester.pump();
     expect(
       (tester.widget<TextFormField>(modelField).controller)?.text,
       'gpt-4o-mini',
     );
-    expect(find.widgetWithText(InputChip, 'gpt-4o-mini'), findsOneWidget);
+    expect(tester.widget<InputChip>(qwenChip).selected, isFalse);
+    expect(tester.widget<InputChip>(gptChip).selected, isTrue);
+
+    // 再点当前默认不取消选择；手动输入已有候选时，选中态也同步。
+    await tester.tap(gptChip);
+    await tester.pump();
+    expect(tester.widget<InputChip>(gptChip).selected, isTrue);
+    expect(
+      tester.widget<TextFormField>(modelField).controller?.text,
+      'gpt-4o-mini',
+    );
+    await tester.enterText(modelField, 'qwen2.5:7b');
+    await tester.pump();
+    expect(tester.widget<InputChip>(qwenChip).selected, isTrue);
+    expect(tester.widget<InputChip>(gptChip).selected, isFalse);
+
+    await tester.ensureVisible(gptChip);
+    await tester.tap(gptChip);
+    await tester.pump();
+    await tester.ensureVisible(find.text('保存配置'));
+    await _tapReal(tester, find.text('保存配置'));
+
+    final saved = _repoOf(tester).llmProviders.single;
+    expect(saved.model, 'gpt-4o-mini');
+    expect(saved.models, ['gpt-4o-mini', 'qwen2.5:7b']);
   });
 
   testWidgets('未填服务地址点拉取：SnackBar 提示、不发网络请求', (tester) async {
