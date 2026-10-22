@@ -37,9 +37,12 @@ final class LlmClient {
     Duration chatTimeout = const Duration(seconds: 90),
     bool Function()? isActive,
     Future<void> Function(LlmConfig config, String model)? onModelSucceeded,
+    Future<void> Function(LlmConfig request, LlmConfig successful)?
+        onSelectionSucceeded,
   })  : _usage = usage ?? CloudUsageService.instance,
         _isActive = isActive,
         _onModelSucceeded = onModelSucceeded,
+        _onSelectionSucceeded = onSelectionSucceeded,
         _httpClient = BoundedHttpClient(
           httpClient ?? http.Client(),
           timeout: chatTimeout,
@@ -60,10 +63,14 @@ final class LlmClient {
   final bool Function()? _isActive;
   final Future<void> Function(LlmConfig config, String model)?
       _onModelSucceeded;
+  final Future<void> Function(LlmConfig request, LlmConfig successful)?
+      _onSelectionSucceeded;
   bool _closed = false;
   final Map<LlmConfig, String> _preferredModels = {};
   final Map<LlmConfig, Set<String>> _failedModels = {};
   final Map<LlmConfig, LlmException> _lastErrors = {};
+  final Map<LlmConfig, LlmConfig> _preferredProviders = {};
+  final Set<LlmConfig> _unavailableProviders = {};
 
   void _checkActive() {
     if (_closed || !(_isActive?.call() ?? true)) {
@@ -78,11 +85,28 @@ final class LlmClient {
       if (preferred != null) preferred,
       ...config.candidateModels,
     }.where((model) => !failed.contains(model)).toList();
-    if (models.isEmpty) {
-      throw _lastErrors[config] ?? const LlmResponseFormatError('没有可用的模型');
-    }
     return models;
   }
+
+  List<({LlmConfig provider, String model})> _attemptsFor(LlmConfig config) {
+    final preferred = _preferredProviders[config];
+    final providers = <LlmConfig>{
+      if (preferred != null) preferred,
+      config,
+      ...config.fallbacks,
+    };
+    final attempts = [
+      for (final provider in providers)
+        if (!_unavailableProviders.contains(provider))
+          for (final model in _modelsFor(provider))
+            (provider: provider, model: model),
+    ];
+    if (attempts.isEmpty) _throwExhausted(config);
+    return attempts;
+  }
+
+  Never _throwExhausted(LlmConfig config) =>
+      throw _lastErrors[config] ?? const LlmResponseFormatError('没有可用的模型');
 
   void _recordFailure(LlmConfig config, String model, LlmException error) {
     (_failedModels[config] ??= {}).add(model);
@@ -90,12 +114,40 @@ final class LlmClient {
     if (_preferredModels[config] == model) _preferredModels.remove(config);
   }
 
-  Future<void> _reportSuccess(LlmConfig config, String model) async {
+  void _recordAttemptFailure(
+    LlmConfig request,
+    LlmConfig provider,
+    String model,
+    LlmException error,
+  ) {
+    if (!error.retryable && error is! LlmAuthError) throw error;
+    _recordFailure(provider, model, error);
+    _lastErrors[request] = error;
+    // 401 是整家供应商的凭据失败；403 仍可能只限制当前模型。
+    if (error is LlmAuthError && !error.retryable) {
+      _unavailableProviders.add(provider);
+    }
+  }
+
+  void _rememberSuccess(LlmConfig request, LlmConfig provider, String model) {
+    _preferredProviders[request] = provider;
+    _preferredModels[provider] = model;
+  }
+
+  Future<void> _reportSuccess(
+    LlmConfig request,
+    LlmConfig provider,
+    String model,
+  ) async {
     _checkActive();
-    _preferredModels[config] = model;
-    if (model == config.model || _onModelSucceeded == null) return;
+    _rememberSuccess(request, provider, model);
+    if (identical(provider, request) && model == request.model) return;
     try {
-      await _onModelSucceeded(config, model);
+      if (_onSelectionSucceeded != null) {
+        await _onSelectionSucceeded(request, provider.withModel(model));
+      } else {
+        await _onModelSucceeded?.call(provider, model);
+      }
     } on Object {
       // 自动保存是附加效果，不得丢弃已经取得的回答或泄漏存储异常内容。
       AppLogger.e('自动保存可用模型失败', tag: 'LLM');
@@ -108,36 +160,36 @@ final class LlmClient {
     Future<T> Function(LlmConfig candidate) request, {
     bool reportSuccess = true,
   }) async {
-    final models = _modelsFor(config);
-    for (final model in models) {
+    final attempts = _attemptsFor(config);
+    for (final (:provider, :model) in attempts) {
       _checkActive();
+      if (_unavailableProviders.contains(provider)) continue;
       try {
-        final result = await request(config.withModel(model));
+        final result = await request(provider.withModel(model));
         _checkActive();
-        _preferredModels[config] = model;
-        if (reportSuccess) await _reportSuccess(config, model);
+        _rememberSuccess(config, provider, model);
+        if (reportSuccess) await _reportSuccess(config, provider, model);
         return result;
       } on LlmException catch (error) {
         _checkActive();
-        if (!error.retryable) rethrow;
-        _recordFailure(config, model, error);
-        if (model == models.last) rethrow;
+        _recordAttemptFailure(config, provider, model, error);
       }
     }
-    throw StateError('模型候选遍历未结束');
+    _throwExhausted(config);
   }
 
   Stream<String> _streamWithModels(
     LlmConfig config,
     Stream<String> Function(LlmConfig candidate) request,
   ) async* {
-    final models = _modelsFor(config);
-    for (final model in models) {
+    final attempts = _attemptsFor(config);
+    for (final (:provider, :model) in attempts) {
       _checkActive();
+      if (_unavailableProviders.contains(provider)) continue;
       var visible = false;
       final whitespace = StringBuffer();
       try {
-        await for (final chunk in request(config.withModel(model))) {
+        await for (final chunk in request(provider.withModel(model))) {
           _checkActive();
           if (!visible) {
             whitespace.write(chunk);
@@ -149,15 +201,15 @@ final class LlmClient {
           }
         }
         if (!visible) throw const LlmResponseFormatError('模型输出内容为空');
-        await _reportSuccess(config, model);
+        await _reportSuccess(config, provider, model);
         return;
       } on LlmException catch (error) {
         _checkActive();
-        if (visible || !error.retryable) rethrow;
-        _recordFailure(config, model, error);
-        if (model == models.last) rethrow;
+        if (visible) rethrow;
+        _recordAttemptFailure(config, provider, model, error);
       }
     }
+    _throwExhausted(config);
   }
 
   /// 对话档位超时：略长于 [_explainTimeout]，容忍多轮上下文下更长的
@@ -172,7 +224,7 @@ final class LlmClient {
   static Uri _join(Uri base, String path) =>
       base.replace(path: '${base.path}$path');
 
-  /// 整批共享的额外格式修复机会；应用题总预算为候选模型数 + 此值。
+  /// 整批共享的额外格式修复机会；应用题总预算为供应商/模型组合数 + 此值。
   static const int _maxFormatRetries = 2;
 
   /// 合法 host 字符（域名 / IPv4 / localhost）。
@@ -280,7 +332,7 @@ final class LlmClient {
     );
   }
 
-  /// 只选择候选情境；N 个模型共享 N + 2 次请求，保留部分有效结果。
+  /// 只选择候选情境；N 个供应商/模型组合共享 N + 2 次请求，保留有效结果。
   Future<LlmWordProblemSceneResult> chooseWordProblemScenes({
     required LlmConfig config,
     required List<WordProblemPlan> plans,
@@ -292,22 +344,24 @@ final class LlmClient {
     if (plans.isEmpty) {
       return LlmWordProblemSceneResult(choices: [], requestCount: 0);
     }
-    final base = normalizeBaseUrl(config.baseUrl);
     final accepted = <int, LlmWordProblemSceneChoice>{};
-    final models = _modelsFor(config);
-    final pending = [...models];
-    String? repairModel;
-    String? contributingModel;
+    final attempts = _attemptsFor(config);
+    final pending = [...attempts];
+    ({LlmConfig provider, String model})? repair;
+    ({LlmConfig provider, String model})? contributing;
     var requestCount = 0;
     void checkActive() {
       _checkActive();
       if (!isActive()) throw const LlmGenerationCancelled();
     }
 
-    while (requestCount < models.length + _maxFormatRetries) {
+    while (requestCount < attempts.length + _maxFormatRetries) {
       checkActive();
-      final model = pending.isNotEmpty ? pending.removeAt(0) : repairModel;
-      if (model == null) break;
+      final attempt = pending.isNotEmpty ? pending.removeAt(0) : repair;
+      if (attempt == null) break;
+      final (:provider, :model) = attempt;
+      if (_unavailableProviders.contains(provider)) continue;
+      final base = normalizeBaseUrl(provider.baseUrl);
       final remaining = <Map<String, Object?>>[
         for (var i = 0; i < plans.length; i++)
           if (!accepted.containsKey(i + 1))
@@ -350,20 +404,29 @@ final class LlmClient {
         response = await _send(
           uri: _join(base, _chatPath),
           body: body,
-          apiKey: config.apiKey,
+          apiKey: provider.apiKey,
           timeout: _generateTimeout,
           timeoutMessage: '生成应用题请求超时',
         );
       } on LlmException catch (error) {
         checkActive();
-        if (!error.retryable) rethrow;
-        _recordFailure(config, model, error);
-        if (repairModel == model) repairModel = null;
-        if (pending.isEmpty && repairModel == null) rethrow;
+        _recordAttemptFailure(config, provider, model, error);
+        if (repair == attempt ||
+            (repair != null &&
+                _unavailableProviders.contains(repair.provider))) {
+          repair = null;
+        }
+        if (!pending.any(
+              (next) => !_unavailableProviders.contains(next.provider),
+            ) &&
+            repair == null) {
+          if (accepted.isEmpty) rethrow;
+          break;
+        }
         continue;
       }
       checkActive();
-      repairModel = model;
+      repair = attempt;
       try {
         final decoded =
             jsonDecode(_extractJsonArray(_extractAssistantContent(response)));
@@ -406,7 +469,7 @@ final class LlmClient {
           choices.remove(index);
         }
         accepted.addAll(choices);
-        if (choices.isNotEmpty) contributingModel = model;
+        if (choices.isNotEmpty) contributing = attempt;
       } on FormatException {
         // 只消耗本批格式预算，不再套服务层重试。
       } on LlmResponseFormatError {
@@ -415,9 +478,12 @@ final class LlmClient {
       if (accepted.length == plans.length) break;
     }
     checkActive();
-    if (contributingModel != null) {
+    if (contributing != null &&
+        !_unavailableProviders.contains(contributing.provider) &&
+        !(_failedModels[contributing.provider]?.contains(contributing.model) ??
+            false)) {
       // 正常结束且有 AI 素材才提升；完全本地补齐不算模型成功。
-      await _reportSuccess(config, contributingModel);
+      await _reportSuccess(config, contributing.provider, contributing.model);
       checkActive();
     }
     return LlmWordProblemSceneResult(

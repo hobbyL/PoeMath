@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
@@ -108,6 +109,275 @@ void main() {
       models: const ['gpt-4o', 'gpt-4o-mini'],
     );
   }
+
+  group('跨供应商成功选择', () {
+    test('备用凭据读取失败时保留当前供应商且日志不含底层异常', () async {
+      await saveTwo();
+      var reads = 0;
+      credentialStore.beforeRead = () async {
+        if (++reads == 2) throw StateError('private-credential-value');
+      };
+      final diagnostics = DiagnosticBuffer.instance;
+      diagnostics.clear();
+      addTearDown(diagnostics.clear);
+
+      final config = (await repository.readLlmConfig())!;
+
+      expect(config.selection!.providerId, 'p1');
+      expect(config.apiKey, 'key-p1');
+      expect(config.fallbacks, isEmpty);
+      expect(diagnostics.snapshot().single.message, '读取备用 LLM 供应商配置失败');
+      expect(
+        diagnostics.exportAsText(),
+        isNot(contains('private-credential-value')),
+      );
+    });
+
+    test('当前供应商优先，其余按列表排序且使用各自凭据和默认模型', () async {
+      await saveTwo();
+      await repository.setLlmActiveProvider('p2');
+      final config = (await repository.readLlmConfig())!;
+      expect(config.selection!.providerId, 'p2');
+      expect(config.model, 'qwen-plus');
+      expect(config.apiKey, 'key-p2');
+      expect(
+        config.fallbacks.map((item) => item.selection!.providerId),
+        ['p1'],
+      );
+      expect(config.fallbacks.single.apiKey, 'key-p1');
+      expect(config.fallbacks.single.model, 'deepseek-chat');
+    });
+
+    for (final explicit in [false, true]) {
+      test('${explicit ? '显式场景' : '跟随默认'}成功后保存供应商与模型，重开仍生效', () async {
+        await saveTwo();
+        await repository.saveLlmProviderConfig(
+          id: 'p2',
+          name: '通义千问',
+          baseUrl: 'https://dashscope.example.com',
+          model: 'qwen-plus',
+          models: ['qwen-plus', 'qwen-turbo'],
+          apiKey: '',
+        );
+        if (explicit) {
+          await repository.setScenarioSelection(
+            LlmScenario.assistant,
+            providerId: 'p1',
+            model: 'deepseek-chat',
+          );
+        }
+        await repository.setScenarioSelection(
+          LlmScenario.mathExplain,
+          providerId: 'p1',
+          model: 'deepseek-chat',
+        );
+        final config =
+            (await repository.readLlmConfigForScenario(LlmScenario.assistant))!;
+        await HiveBoxes.settings.put('parent_protection_enabled', true);
+        ParentAccessService.instance.lock();
+        expect(
+          await repository.promoteSuccessfulLlmSelection(
+            config,
+            config.fallbacks.single.withModel('qwen-turbo'),
+            isActive: () => true,
+          ),
+          isTrue,
+        );
+        await HiveBoxes.close();
+        await HiveBoxes.init();
+        final reopened = SettingsRepository(credentialStore: credentialStore);
+        expect(reopened.llmActiveProviderId, explicit ? 'p1' : 'p2');
+        expect(
+          reopened.providerIdForScenario(LlmScenario.assistant),
+          explicit ? 'p2' : null,
+        );
+        expect(
+          reopened.modelForScenario(LlmScenario.assistant),
+          explicit ? 'qwen-turbo' : null,
+        );
+        expect(reopened.providerIdForScenario(LlmScenario.mathExplain), 'p1');
+        expect(
+          reopened.modelForScenario(LlmScenario.mathExplain),
+          'deepseek-chat',
+        );
+        expect(reopened.llmProviders.last.model, 'qwen-turbo');
+        expect(reopened.llmProviders.last.models, ['qwen-turbo', 'qwen-plus']);
+        expect(
+          (await reopened.readLlmConfigForScenario(LlmScenario.assistant))!
+              .model,
+          'qwen-turbo',
+        );
+        expect(await reopened.readLlmApiKeyFor('p1'), 'key-p1');
+        expect(await reopened.readLlmApiKeyFor('p2'), 'key-p2');
+        await expectLater(
+          reopened.setLlmActiveProvider('p2'),
+          throwsA(isA<ParentAccessDenied>()),
+        );
+      });
+    }
+
+    for (final id in ['p1', 'p2']) {
+      for (final change in ['删除', '地址', '默认模型', '候选', '密钥']) {
+        test('请求后修改$id的$change，跨供应商成功不覆盖手动设置', () async {
+          await saveTwo();
+          final config = (await repository.readLlmConfig())!;
+          final candidate = config.fallbacks.single;
+          final old =
+              repository.llmProviders.firstWhere((item) => item.id == id);
+          if (change == '删除') {
+            await repository.deleteLlmProviderConfig(id);
+          } else {
+            await repository.saveLlmProviderConfig(
+              id: id,
+              name: old.name,
+              baseUrl: change == '地址' ? 'https://new.example' : old.baseUrl,
+              model: change == '默认模型' ? 'new-model' : old.model,
+              models: change == '候选' ? [old.model, 'new-model'] : old.models,
+              apiKey: change == '密钥' ? 'changed-key' : '',
+            );
+          }
+          final before = HiveBoxes.settings.toMap();
+          expect(
+            await repository.promoteSuccessfulLlmSelection(
+              config,
+              candidate,
+              isActive: () => true,
+            ),
+            isFalse,
+          );
+          expect(HiveBoxes.settings.toMap(), before);
+        });
+      }
+    }
+
+    test('手动切换场景或全局供应商，旧成功结果不回写', () async {
+      await saveTwo();
+      for (final explicit in [false, true]) {
+        await repository.setLlmActiveProvider('p1');
+        await repository.setScenarioSelection(
+          LlmScenario.assistant,
+          providerId: explicit ? 'p1' : null,
+          model: null,
+        );
+        final config =
+            (await repository.readLlmConfigForScenario(LlmScenario.assistant))!;
+        if (explicit) {
+          await repository.setScenarioSelection(
+            LlmScenario.assistant,
+            providerId: 'p2',
+            model: null,
+          );
+        } else {
+          await repository.setLlmActiveProvider('p2');
+        }
+        final before = HiveBoxes.settings.toMap();
+        expect(
+          await repository.promoteSuccessfulLlmSelection(
+            config,
+            config.fallbacks.single,
+            isActive: () => true,
+          ),
+          isFalse,
+        );
+        expect(HiveBoxes.settings.toMap(), before);
+      }
+    });
+
+    test('异步凭据复核期间原供应商只改密钥，也不能覆盖新设置', () async {
+      await saveTwo();
+      final config = (await repository.readLlmConfig())!;
+      var reads = 0;
+      credentialStore.beforeRead = () async {
+        if (++reads == 2) {
+          await SettingsRepository(credentialStore: credentialStore)
+              .saveLlmProviderConfig(
+            id: 'p1',
+            name: 'DeepSeek',
+            baseUrl: config.baseUrl,
+            model: config.model,
+            models: config.models,
+            apiKey: 'new-key',
+          );
+        }
+      };
+      expect(
+        await repository.promoteSuccessfulLlmSelection(
+          config,
+          config.fallbacks.single,
+          isActive: () => true,
+        ),
+        isFalse,
+      );
+      expect(repository.llmActiveProviderId, 'p1');
+      expect(credentialStore.llmApiKeysByConfigId['p1'], 'new-key');
+    });
+
+    test('未捕获的供应商/模型与取消不改变选择', () async {
+      await saveTwo();
+      final config = (await repository.readLlmConfig())!;
+      final candidate = config.fallbacks.single;
+      final before = HiveBoxes.settings.toMap();
+      expect(
+        await repository.promoteSuccessfulLlmSelection(
+          config,
+          candidate.withModel('unknown'),
+          isActive: () => true,
+        ),
+        isFalse,
+      );
+      expect(
+        await repository.promoteSuccessfulLlmSelection(
+          config,
+          candidate,
+          isActive: () => false,
+        ),
+        isFalse,
+      );
+      final isolated = LlmConfig(
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+        model: config.model,
+        selection: config.selection,
+      );
+      expect(
+        await repository.promoteSuccessfulLlmSelection(
+          isolated,
+          candidate,
+          isActive: () => true,
+        ),
+        isFalse,
+      );
+      expect(HiveBoxes.settings.toMap(), before);
+    });
+
+    test('并发成功只有第一次回写且保留无关供应商新增', () async {
+      await saveTwo();
+      final config = (await repository.readLlmConfig())!;
+      await repository.saveLlmProviderConfig(
+        id: 'p3',
+        name: '',
+        baseUrl: 'https://third.example',
+        model: 'third',
+        apiKey: '',
+      );
+      final results = await Future.wait(
+        List.generate(
+          2,
+          (_) => repository.promoteSuccessfulLlmSelection(
+            config,
+            config.fallbacks.single,
+            isActive: () => true,
+          ),
+        ),
+      );
+      expect(results.where((value) => value), hasLength(1));
+      expect(
+        repository.llmProviders.map((provider) => provider.id),
+        ['p1', 'p2', 'p3'],
+      );
+      expect(repository.llmActiveProviderId, 'p2');
+    });
+  });
 
   group('运行时成功模型提升', () {
     test('候选当前模型优先；提升默认和当前显式场景，其他显式选择不变且重开仍生效', () async {

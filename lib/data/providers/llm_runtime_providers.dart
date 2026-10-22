@@ -16,10 +16,10 @@ LlmClient createRuntimeLlmClient({
     LlmClient(
       httpClient: httpClient,
       isActive: isActive,
-      onModelSucceeded: (config, model) async {
-        final changed = await settings.promoteSuccessfulLlmModel(
-          config,
-          model,
+      onSelectionSucceeded: (request, successful) async {
+        final changed = await settings.promoteSuccessfulLlmSelection(
+          request,
+          successful,
           isActive: isActive,
         );
         if (changed && isActive()) onSelectionChanged();

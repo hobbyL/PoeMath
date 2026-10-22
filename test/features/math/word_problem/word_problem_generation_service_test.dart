@@ -54,6 +54,133 @@ WordProblemGenerationService service(
     );
 
 void main() {
+  const crossProvider = LlmConfig(
+    baseUrl: 'https://first.example',
+    apiKey: 'first',
+    model: 'A',
+    models: ['A', 'B'],
+    fallbacks: [
+      LlmConfig(
+        baseUrl: 'https://second.example',
+        apiKey: 'second',
+        model: 'A',
+        models: ['A', 'C'],
+      ),
+    ],
+  );
+
+  test('跨供应商共用N+2预算，全部无效时本地补齐不提升', () async {
+    final attempts = <String>[];
+    final promoted = <String>[];
+    final generation = service(
+      MockClient((request) async {
+        attempts.add(
+          '${request.url.host}:${(jsonDecode(request.body) as Map)['model']}',
+        );
+        return response('invalid JSON');
+      }),
+      onModelSucceeded: (_, model) async => promoted.add(model),
+    );
+    addTearDown(generation.client.close);
+    final items = await generation.generate(
+      config: crossProvider,
+      grade: 2,
+      semester: '上',
+      topic: WordProblemTopic.addition,
+      count: 2,
+      isActive: () => true,
+    );
+    expect(attempts, [
+      'first.example:A',
+      'first.example:B',
+      'second.example:A',
+      'second.example:C',
+      'second.example:C',
+      'second.example:C',
+    ]);
+    expect(
+      items.map((item) => item.source),
+      everyElement(WordProblemSource.localTemplate),
+    );
+    expect(promoted, isEmpty);
+  });
+
+  for (final lastFails in [false, true]) {
+    test('跨供应商保留有效位置，仅请求缺失题；末供应商${lastFails ? '失败也保留' : '成功后提升'}', () async {
+      final attempts = <String>[];
+      final indexes = <List<int>>[];
+      final promoted = <String>[];
+      final generation = service(
+        MockClient((request) async {
+          final body = jsonDecode(request.body) as Map;
+          final model = body['model'] as String;
+          attempts.add('${request.url.host}:$model');
+          final prompt = body['messages'].last['content'] as String;
+          indexes.add(
+            (jsonDecode(prompt.substring(prompt.indexOf('['))) as List)
+                .map((item) => item['index'] as int)
+                .toList(),
+          );
+          if (request.url.host == 'first.example' && model == 'B') {
+            return http.Response('', 401);
+          }
+          if (request.url.host == 'second.example' && lastFails) {
+            return http.Response('', 503);
+          }
+          return response([
+            {
+              'index': request.url.host == 'first.example' ? 1 : 2,
+              'sceneId': 'books',
+              'variantId': 'standard',
+            }
+          ]);
+        }),
+        onModelSucceeded: (provider, model) async =>
+            promoted.add('${Uri.parse(provider.baseUrl).host}:$model'),
+      );
+      addTearDown(generation.client.close);
+      final items = await generation.generate(
+        config: crossProvider,
+        grade: 2,
+        semester: '上',
+        topic: WordProblemTopic.addition,
+        count: 2,
+        isActive: () => true,
+      );
+      expect(
+        attempts,
+        lastFails
+            ? [
+                'first.example:A',
+                'first.example:B',
+                'second.example:A',
+                'second.example:C',
+              ]
+            : ['first.example:A', 'first.example:B', 'second.example:A'],
+      );
+      expect(
+        indexes,
+        lastFails
+            ? [
+                [1, 2],
+                [2],
+                [2],
+                [2],
+              ]
+            : [
+                [1, 2],
+                [2],
+                [2],
+              ],
+      );
+      expect(items.map((item) => item.source), [
+        WordProblemSource.aiScene,
+        lastFails ? WordProblemSource.localTemplate : WordProblemSource.aiScene,
+      ]);
+      expect(promoted, lastFails ? isEmpty : ['second.example:A']);
+    });
+  }
+
   const multi = LlmConfig(
     baseUrl: 'https://example.com',
     apiKey: 'secret',

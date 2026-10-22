@@ -15,6 +15,7 @@ class LlmSelectionSnapshot {
     required List<String> models,
     required this.boundProviderId,
     required this.selectedModel,
+    this.providerVersion = 0,
   }) : models = List.unmodifiable(models);
 
   final String providerId;
@@ -23,6 +24,7 @@ class LlmSelectionSnapshot {
   final List<String> models;
   final String? boundProviderId;
   final String? selectedModel;
+  final int providerVersion;
 }
 
 /// LLM 服务配置（OpenAI 兼容）。
@@ -37,6 +39,7 @@ class LlmConfig {
     required this.model,
     this.models = const [],
     this.selection,
+    this.fallbacks = const [],
   });
 
   /// 服务地址（用户原样输入，请求时经 [LlmClient.normalizeBaseUrl] 规范化）。
@@ -52,6 +55,9 @@ class LlmConfig {
   final List<String> models;
   final LlmSelectionSnapshot? selection;
 
+  /// 其余已配置供应商，按设置列表排序；只存在内存，不参与序列化。
+  final List<LlmConfig> fallbacks;
+
   List<String> get candidateModels => <String>{
         model.trim(),
         for (final candidate in models) candidate.trim(),
@@ -64,6 +70,7 @@ class LlmConfig {
         model: value,
         models: models,
         selection: selection,
+        fallbacks: fallbacks,
       );
 
   /// 是否配置了非空 API Key。

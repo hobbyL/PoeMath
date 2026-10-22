@@ -26,6 +26,13 @@ import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
 
 class SettingsRepository {
+  // 跨仓储实例记录本进程内的手动配置写入，覆盖多次凭据复核之间的异步窗口。
+  static final Map<String, int> _llmProviderVersions = {};
+
+  static void _markLlmProviderWrite(String id) {
+    _llmProviderVersions[id] = (_llmProviderVersions[id] ?? 0) + 1;
+  }
+
   int _boundedInt(String key, int fallback) {
     final value = HiveBoxes.settings.get(key);
     return value is int && SettingsConstraints.accepts(key, value)
@@ -416,10 +423,31 @@ class SettingsRepository {
     // 仅当场景确有绑定配置时，场景选中 model 才适用（回落默认配置时忽略）。
     final modelOverride =
         scenarioId != null ? modelForScenario(scenario) : null;
-    return _assembleLlmConfig(
+    final primary = await _assembleLlmConfig(
       targetId,
       scenario: scenario,
       modelOverride: modelOverride,
+    );
+    if (primary == null) return null;
+    final fallbacks = <LlmConfig>[];
+    for (final provider in llmProviders) {
+      if (provider.id == targetId) continue;
+      try {
+        final config =
+            await _assembleLlmConfig(provider.id, scenario: scenario);
+        if (config != null) fallbacks.add(config);
+      } on Object {
+        // 额外凭据不可读不能阻断原供应商；不泄漏平台异常中的凭据信息。
+        AppLogger.e('读取备用 LLM 供应商配置失败', tag: 'LLM');
+      }
+    }
+    return LlmConfig(
+      baseUrl: primary.baseUrl,
+      apiKey: primary.apiKey,
+      model: primary.model,
+      models: primary.models,
+      selection: primary.selection,
+      fallbacks: List.unmodifiable(fallbacks),
     );
   }
 
@@ -515,6 +543,7 @@ class SettingsRepository {
       models: target.models,
       boundProviderId: providerIdForScenario(scenario),
       selectedModel: modelForScenario(scenario),
+      providerVersion: _llmProviderVersions[id] ?? 0,
     );
     final apiKey = await _credentialStore.readLlmApiKeyFor(id);
     return LlmConfig(
@@ -526,38 +555,74 @@ class SettingsRepository {
     );
   }
 
-  /// 运行时只提升已批准的候选，不改变地址、凭据或服务商选择。
+  /// 兼容同供应商的候选模型恢复。
   /// 手动编辑 API 仍需家长解锁；这个受限恢复操作可以在锁定时执行。
   Future<bool> promoteSuccessfulLlmModel(
     LlmConfig request,
     String model, {
     required bool Function() isActive,
+  }) =>
+      promoteSuccessfulLlmSelection(
+        request,
+        request.withModel(model),
+        isActive: isActive,
+      );
+
+  /// 仅在请求捕获的已配置供应商/候选内恢复，不改地址或凭据。
+  Future<bool> promoteSuccessfulLlmSelection(
+    LlmConfig request,
+    LlmConfig successful, {
+    required bool Function() isActive,
   }) async {
-    final snapshot = request.selection;
-    if (snapshot == null ||
-        model == request.model ||
-        !snapshot.models.contains(model) ||
-        !isActive()) {
+    final source = request.selection;
+    final target = successful.selection;
+    if (source == null || target == null || !isActive()) return false;
+    final approved = [request, ...request.fallbacks].where(
+      (candidate) => candidate.selection?.providerId == target.providerId,
+    );
+    if (approved.isEmpty) return false;
+    final candidate = approved.first;
+    final model = successful.model;
+    final switchedProvider = target.providerId != source.providerId;
+    if ((!switchedProvider && model == request.model) ||
+        !candidate.candidateModels.contains(model) ||
+        successful.baseUrl != candidate.baseUrl ||
+        successful.apiKey != candidate.apiKey) {
       return false;
     }
-    final key = await _credentialStore.readLlmApiKeyFor(snapshot.providerId);
-    if (!isActive() || (key ?? '') != request.apiKey) return false;
+    for (final config in {request, candidate}) {
+      final key =
+          await _credentialStore.readLlmApiKeyFor(config.selection!.providerId);
+      if (!isActive() || (key ?? '') != config.apiKey) return false;
+    }
     // 最后一个 await 后重新读全部配置；检查到写入之间没有异步窗口。
     final providers = llmProviders;
-    final index = providers.indexWhere((p) => p.id == snapshot.providerId);
-    if (index < 0) return false;
-    final current = providers[index];
-    if (current.baseUrl.trim() != request.baseUrl ||
-        current.model != snapshot.defaultModel ||
-        current.models.length != snapshot.models.length ||
-        !current.models.indexed
-            .every((entry) => entry.$2 == snapshot.models[entry.$1]) ||
-        providerIdForScenario(snapshot.scenario) != snapshot.boundProviderId ||
-        modelForScenario(snapshot.scenario) != snapshot.selectedModel ||
-        (snapshot.boundProviderId == null &&
-            llmActiveProviderId != snapshot.providerId)) {
+    bool unchanged(LlmConfig config) {
+      final snapshot = config.selection!;
+      if ((_llmProviderVersions[snapshot.providerId] ?? 0) !=
+          snapshot.providerVersion) {
+        return false;
+      }
+      final matches = providers.where((p) => p.id == snapshot.providerId);
+      if (matches.isEmpty) return false;
+      final current = matches.first;
+      return current.baseUrl.trim() == config.baseUrl &&
+          current.model == snapshot.defaultModel &&
+          current.models.length == snapshot.models.length &&
+          current.models.indexed
+              .every((entry) => entry.$2 == snapshot.models[entry.$1]);
+    }
+
+    if (!unchanged(request) ||
+        !unchanged(candidate) ||
+        providerIdForScenario(source.scenario) != source.boundProviderId ||
+        modelForScenario(source.scenario) != source.selectedModel ||
+        (source.boundProviderId == null &&
+            llmActiveProviderId != source.providerId)) {
       return false;
     }
+    final index = providers.indexWhere((p) => p.id == target.providerId);
+    final current = providers[index];
     providers[index] = LlmProviderConfig(
       id: current.id,
       name: current.name,
@@ -567,8 +632,13 @@ class SettingsRepository {
     );
     await HiveBoxes.settings.putAll({
       _keyLlmProviders: LlmProviderConfig.encodeList(providers),
-      if (snapshot.boundProviderId != null && snapshot.selectedModel != null)
-        snapshot.scenario.modelKey: model,
+      if (switchedProvider && source.boundProviderId == null)
+        _keyLlmActiveProviderId: target.providerId,
+      if (switchedProvider && source.boundProviderId != null)
+        source.scenario.settingsKey: target.providerId,
+      if (source.boundProviderId != null &&
+          (switchedProvider || source.selectedModel != null))
+        source.scenario.modelKey: model,
     });
     return true;
   }
@@ -590,6 +660,7 @@ class SettingsRepository {
     ParentAccessService.instance.assertAllowed();
     // 先校验地址合法（非法抛 FormatException，不落盘）。
     final normalized = LlmClient.normalizeBaseUrl(baseUrl);
+    _markLlmProviderWrite(id);
     final key = apiKey.trim();
     if (key.isNotEmpty) {
       await _credentialStore.saveLlmApiKeyFor(id, key);
@@ -635,6 +706,7 @@ class SettingsRepository {
   /// 指向被删配置的场景绑定一并清理（防悬空残留）。
   Future<void> deleteLlmProviderConfig(String id) async {
     ParentAccessService.instance.assertAllowed();
+    _markLlmProviderWrite(id);
     await _credentialStore.deleteLlmApiKeyFor(id);
     // 先按原始存储值清理场景绑定（列表写回后无法再判断悬空归属）。
     for (final scenario in LlmScenario.values) {
@@ -673,6 +745,7 @@ class SettingsRepository {
   /// 不触碰配置本身。无已存 Key 时调用无副作用。
   Future<void> clearLlmApiKey(String id) {
     ParentAccessService.instance.assertAllowed();
+    _markLlmProviderWrite(id);
     return _credentialStore.deleteLlmApiKeyFor(id);
   }
 

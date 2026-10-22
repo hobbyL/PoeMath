@@ -224,6 +224,79 @@ void main() {
     );
   });
 
+  test('工具执行后跨供应商恢复只重试失败单跳，最终成功只更新助手绑定', () async {
+    final repo = SettingsRepository(credentialStore: store);
+    for (final id in ['p1', 'p2']) {
+      await repo.saveLlmProviderConfig(
+        id: id,
+        name: id,
+        baseUrl: 'https://$id.example',
+        model: 'A',
+        models: ['A', 'B'],
+        apiKey: '$id-key',
+      );
+    }
+    await repo.setScenarioSelection(
+      LlmScenario.assistant,
+      providerId: 'p1',
+      model: 'A',
+    );
+    final requests = <String>[];
+    final container = containerWith(
+      MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final model = body['model'] as String;
+        final stream = body['stream'] == true;
+        requests.add('${request.url.host}:$model:$stream');
+        expect(repo.providerIdForScenario(LlmScenario.assistant), 'p1');
+        expect(repo.llmActiveProviderId, 'p1');
+        expect(
+          request.headers['authorization'],
+          'Bearer ${request.url.host == 'p1.example' ? 'p1-key' : 'p2-key'}',
+        );
+        final toolMessages = (body['messages'] as List)
+            .where((message) => message['role'] == 'tool');
+        if (request.url.host == 'p2.example') {
+          expect(toolMessages, hasLength(1));
+          return _sseResponse('跨供应商回答');
+        }
+        if (model == 'A') return http.Response('', 503);
+        if (stream) return http.Response('', 401);
+        if (toolMessages.isNotEmpty) {
+          expect(toolMessages, hasLength(1));
+          return _completionResponse();
+        }
+        return _completionResponse(
+          toolCalls: [_toolCallWire('only-once', 'explain_mistake')],
+        );
+      }),
+    );
+    final settingsInstance = container.read(settingsRepositoryProvider);
+    await container.read(assistantChatControllerProvider.notifier).send('讲讲错题');
+    final state = container.read(assistantChatControllerProvider);
+    expect(state.isReady, isTrue);
+    expect(
+      state.messages.where((message) => message.role == ChatRole.tool),
+      hasLength(1),
+    );
+    expect(state.messages.last.content, '跨供应商回答');
+    expect(requests, [
+      'p1.example:A:false',
+      'p1.example:B:false',
+      'p1.example:B:false',
+      'p1.example:B:true',
+      'p2.example:A:true',
+    ]);
+    expect(repo.providerIdForScenario(LlmScenario.assistant), 'p2');
+    expect(repo.modelForScenario(LlmScenario.assistant), 'A');
+    expect(repo.llmActiveProviderId, 'p1');
+    expect(container.read(llmSelectionVersionProvider), 1);
+    expect(
+      identical(container.read(settingsRepositoryProvider), settingsInstance),
+      isTrue,
+    );
+  });
+
   test('已经有正文后中断保留部分回答，不重试或提升', () async {
     final repo = SettingsRepository(credentialStore: store);
     await repo.saveLlmProviderConfig(

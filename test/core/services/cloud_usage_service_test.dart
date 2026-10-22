@@ -171,40 +171,51 @@ void main() {
     expect(HiveBoxes.meta.get('cloud_usage:${usage.dayKey}:llm'), 1);
   });
 
-  test('模型切换按每次请求计数，额度用完立即停止遍历', () async {
-    var sends = 0;
-    final usage = CloudUsageService();
-    await usage.setLimit(CloudUsageKind.llm, 1);
-    final promoted = <String>[];
-    final client = LlmClient(
-      usage: usage,
-      onModelSucceeded: (_, model) async => promoted.add(model),
-      httpClient: MockClient((_) async {
-        sends++;
-        return http.Response('', 500);
-      }),
-    );
-    addTearDown(client.close);
-    await expectLater(
-      client.explain(
-        config: const LlmConfig(
-          baseUrl: 'https://example.com',
-          apiKey: '',
-          model: 'A',
-          models: ['A', 'B', 'C'],
+  for (final crossProvider in [false, true]) {
+    test('${crossProvider ? '跨供应商' : '模型'}切换按每次请求计数，额度用完立即停止遍历', () async {
+      var sends = 0;
+      final usage = CloudUsageService();
+      await usage.setLimit(CloudUsageKind.llm, 1);
+      final promoted = <String>[];
+      final client = LlmClient(
+        usage: usage,
+        onModelSucceeded: (_, model) async => promoted.add(model),
+        httpClient: MockClient((_) async {
+          sends++;
+          return http.Response('', 500);
+        }),
+      );
+      addTearDown(client.close);
+      await expectLater(
+        client.explain(
+          config: LlmConfig(
+            baseUrl: 'https://example.com',
+            apiKey: '',
+            model: 'A',
+            models: crossProvider ? const ['A'] : const ['A', 'B', 'C'],
+            fallbacks: crossProvider
+                ? const [
+                    LlmConfig(
+                      baseUrl: 'https://other.example',
+                      apiKey: 'other',
+                      model: 'B',
+                    ),
+                  ]
+                : const [],
+          ),
+          systemPrompt: '',
+          userPrompt: '',
         ),
-        systemPrompt: '',
-        userPrompt: '',
-      ),
-      throwsA(
-        isA<LlmNetworkError>()
-            .having((error) => error.retryable, 'retryable', isFalse),
-      ),
-    );
-    expect(sends, 1);
-    expect(usage.used(CloudUsageKind.llm), 1);
-    expect(promoted, isEmpty);
-  });
+        throwsA(
+          isA<LlmNetworkError>()
+              .having((error) => error.retryable, 'retryable', isFalse),
+        ),
+      );
+      expect(sends, 1);
+      expect(usage.used(CloudUsageKind.llm), 1);
+      expect(promoted, isEmpty);
+    });
+  }
 
   group('recentDaily 历史读取', () {
     // 固定"今天"为 2026-10-17，便于断言日期序列。

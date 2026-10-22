@@ -8,6 +8,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
@@ -138,36 +140,107 @@ void main() {
     await tester.runAsync(() async {
       final repo = SettingsRepository(credentialStore: store);
       await repo.saveLlmProviderConfig(
-          id: 'p1',
-          name: 'Provider',
-          baseUrl: 'https://example.com',
-          model: 'A',
-          models: ['A', 'B'],
-          apiKey: '',);
-      await repo.setScenarioSelection(LlmScenario.poemExplain,
-          providerId: 'p1', model: 'A',);
+        id: 'p1',
+        name: 'Provider',
+        baseUrl: 'https://example.com',
+        model: 'A',
+        models: ['A', 'B'],
+        apiKey: '',
+      );
+      await repo.setScenarioSelection(
+        LlmScenario.poemExplain,
+        providerId: 'p1',
+        model: 'A',
+      );
     });
     await _pumpPage(tester, credentialStore: store);
     final container = ProviderScope.containerOf(
-        tester.element(find.byType(LlmScenarioSettingsPage)),);
+      tester.element(find.byType(LlmScenarioSettingsPage)),
+    );
     final repo = container.read(settingsRepositoryProvider);
     final row = find.widgetWithText(AppTile, '诗词讲解');
-    expect(find.descendant(of: row, matching: find.textContaining('A')),
-        findsOneWidget,);
+    expect(
+      find.descendant(of: row, matching: find.textContaining('A')),
+      findsOneWidget,
+    );
     await tester.runAsync(() async {
       final config =
           (await repo.readLlmConfigForScenario(LlmScenario.poemExplain))!;
       expect(
-          await repo.promoteSuccessfulLlmModel(config, 'B',
-              isActive: () => true,),
-          isTrue,);
+        await repo.promoteSuccessfulLlmModel(
+          config,
+          'B',
+          isActive: () => true,
+        ),
+        isTrue,
+      );
       container.read(llmSelectionVersionProvider.notifier).state++;
     });
     await tester.pumpAndSettle();
-    expect(find.descendant(of: row, matching: find.textContaining('B')),
-        findsOneWidget,);
+    expect(
+      find.descendant(of: row, matching: find.textContaining('B')),
+      findsOneWidget,
+    );
     expect(identical(container.read(settingsRepositoryProvider), repo), isTrue);
   });
+
+  for (final explicit in [false, true]) {
+    testWidgets('跨供应商成功刷新${explicit ? '显式场景' : '全局默认'}摘要，不重建仓储',
+        (tester) async {
+      final store = _MemoryCredentialStore();
+      await tester.runAsync(() async {
+        await _seedTwo(store);
+        if (explicit) {
+          await SettingsRepository(credentialStore: store).setScenarioSelection(
+            LlmScenario.poemExplain,
+            providerId: 'p1',
+            model: 'deepseek-chat',
+          );
+        }
+      });
+      await _pumpPage(tester, credentialStore: store);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(LlmScenarioSettingsPage)),
+      );
+      final repo = container.read(settingsRepositoryProvider);
+      final client = createRuntimeLlmClient(
+        httpClient: MockClient(
+          (request) async => request.url.host == 'api.deepseek.com'
+              ? http.Response('', 401)
+              : http.Response(
+                  '{"choices":[{"message":{"content":"answer"}}]}',
+                  200,
+                ),
+        ),
+        settings: repo,
+        isActive: () => true,
+        onSelectionChanged: () =>
+            container.read(llmSelectionVersionProvider.notifier).state++,
+      );
+      addTearDown(client.close);
+      await tester.runAsync(() async {
+        final config =
+            (await repo.readLlmConfigForScenario(LlmScenario.poemExplain))!;
+        await client.explain(config: config, systemPrompt: '', userPrompt: '');
+      });
+      await tester.pumpAndSettle();
+      final row = find.widgetWithText(AppTile, '诗词讲解');
+      expect(
+        find.descendant(of: row, matching: find.textContaining('配置 2')),
+        findsOneWidget,
+      );
+      expect(repo.llmActiveProviderId, explicit ? 'p1' : 'p2');
+      expect(
+        find.text('跟随默认（${explicit ? 'DeepSeek' : '配置 2'}）'),
+        findsNWidgets(explicit ? 3 : 4),
+      );
+      expect(container.read(llmSelectionVersionProvider), 1);
+      expect(
+        identical(container.read(settingsRepositoryProvider), repo),
+        isTrue,
+      );
+    });
+  }
 
   testWidgets('有配置时四行均显示「跟随默认（生效配置名）」', (tester) async {
     final store = _MemoryCredentialStore();
@@ -214,7 +287,8 @@ void main() {
     // 调用setState。等待实际副标题刷新，同时继续推进真实IO和帧。
     for (var i = 0; i < 100 && selectedProviderLabel.evaluate().isEmpty; i++) {
       await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 50)),);
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
       await tester.pump();
     }
 
