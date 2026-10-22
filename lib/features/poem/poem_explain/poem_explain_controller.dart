@@ -7,7 +7,7 @@
 // - Loading 守卫先于第一个 await（防连点重复请求）；
 // - 会话代际令牌：每次 await 之后校验，防晚到结果覆盖新状态
 //   （切诗 / 退页 / 重新生成）；
-// - 失败不自动重试，由用户点「重新生成」。
+// - 首段输出前可在同服务商候选内切换；输出后失败不拼接回答。
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,6 +19,7 @@ import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/features/poem/poem_explain/poem_explain_models.dart';
 import 'package:poemath/features/poem/poem_explain/poem_explain_prompts.dart';
 
@@ -29,10 +30,18 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
   /// 会话代际令牌：reset / 新请求都会使旧请求的回调失效。
   int _sessionToken = 0;
   LlmClient? _activeClient;
+  bool _disposed = false;
 
   @override
   PoemExplainState build() {
-    ref.onDispose(() => _activeClient?.close());
+    _disposed = false;
+    _activeClient?.close();
+    _sessionToken++;
+    ref.onDispose(() {
+      _disposed = true;
+      _sessionToken++;
+      _activeClient?.close();
+    });
     return const PoemExplainState();
   }
 
@@ -49,9 +58,9 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
 
     LlmClient? client;
     try {
-      final config = await ref
-          .read(settingsRepositoryProvider)
-          .readLlmConfigForScenario(LlmScenario.poemExplain);
+      final settings = ref.read(settingsRepositoryProvider);
+      final config =
+          await settings.readLlmConfigForScenario(LlmScenario.poemExplain);
       if (token != _sessionToken) return;
       if (config == null) {
         state = PoemExplainState(
@@ -62,8 +71,13 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
         return;
       }
 
-      client = _activeClient =
-          LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+      client = _activeClient = createRuntimeLlmClient(
+        httpClient: ref.read(llmExplainHttpClientProvider),
+        settings: settings,
+        isActive: () => !_disposed && token == _sessionToken,
+        onSelectionChanged: () =>
+            ref.read(llmSelectionVersionProvider.notifier).state++,
+      );
       final buffer = StringBuffer();
       await for (final chunk in client.explainStream(
         config: config,
@@ -107,6 +121,7 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
       state = PoemExplainState(
         status: PoemExplainStatus.error,
         message: e.message,
+        paragraphs: state.paragraphs,
         poemId: poem.id,
       );
     } on FormatException catch (e) {
@@ -114,6 +129,7 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
       state = PoemExplainState(
         status: PoemExplainStatus.error,
         message: '服务地址无效：${e.message}',
+        paragraphs: state.paragraphs,
         poemId: poem.id,
       );
     } catch (error) {
@@ -123,6 +139,7 @@ class PoemExplainNotifier extends Notifier<PoemExplainState> {
       state = PoemExplainState(
         status: PoemExplainStatus.error,
         message: 'AI 讲解生成失败，请稍后重试。',
+        paragraphs: state.paragraphs,
         poemId: poem.id,
       );
     } finally {

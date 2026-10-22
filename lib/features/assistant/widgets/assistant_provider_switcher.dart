@@ -15,6 +15,7 @@ import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/features/profile/llm_provider_display.dart';
 
 /// 「跟随默认」哨兵值（RadioGroup 不接受 null 选项值）。
@@ -33,6 +34,7 @@ class _AssistantProviderSwitcherState
     extends ConsumerState<AssistantProviderSwitcher> {
   @override
   Widget build(BuildContext context) {
+    ref.watch(llmSelectionVersionProvider);
     final theme = Theme.of(context);
     final repo = ref.read(settingsRepositoryProvider);
     final providers = repo.llmProviders;

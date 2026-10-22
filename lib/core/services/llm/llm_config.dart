@@ -4,6 +4,27 @@
 // 职责：OpenAI 兼容 LLM 服务配置。
 //       apiKey 仅运行时注入，不参与任何序列化；toString 不泄露 apiKey。
 
+import 'package:poemath/core/services/llm/llm_scenario.dart';
+
+/// 请求开始时的非敏感选择快照，仅用于自动切换成功后的条件回写。
+class LlmSelectionSnapshot {
+  LlmSelectionSnapshot({
+    required this.providerId,
+    required this.scenario,
+    required this.defaultModel,
+    required List<String> models,
+    required this.boundProviderId,
+    required this.selectedModel,
+  }) : models = List.unmodifiable(models);
+
+  final String providerId;
+  final LlmScenario scenario;
+  final String defaultModel;
+  final List<String> models;
+  final String? boundProviderId;
+  final String? selectedModel;
+}
+
 /// LLM 服务配置（OpenAI 兼容）。
 ///
 /// 安全边界：[apiKey] 只允许出现在 `Authorization: Bearer` 请求头与
@@ -14,6 +35,8 @@ class LlmConfig {
     required this.baseUrl,
     required this.apiKey,
     required this.model,
+    this.models = const [],
+    this.selection,
   });
 
   /// 服务地址（用户原样输入，请求时经 [LlmClient.normalizeBaseUrl] 规范化）。
@@ -25,11 +48,28 @@ class LlmConfig {
   /// 模型名。
   final String model;
 
+  /// 同一服务商已选候选；旧三字段配置仍只调用 [model]。
+  final List<String> models;
+  final LlmSelectionSnapshot? selection;
+
+  List<String> get candidateModels => <String>{
+        model.trim(),
+        for (final candidate in models) candidate.trim(),
+      }.where((candidate) => candidate.isNotEmpty).toList();
+
+  /// 只替换请求模型，保留原始选择快照供成功回写校验。
+  LlmConfig withModel(String value) => LlmConfig(
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+        model: value,
+        models: models,
+        selection: selection,
+      );
+
   /// 是否配置了非空 API Key。
   bool get hasApiKey => apiKey.trim().isNotEmpty;
 
   @override
-  String toString() =>
-      'LlmConfig(baseUrl: $baseUrl, model: $model, '
+  String toString() => 'LlmConfig(baseUrl: $baseUrl, model: $model, '
       'apiKey: ${hasApiKey ? '<已设置，不回显>' : '<未设置>'})';
 }

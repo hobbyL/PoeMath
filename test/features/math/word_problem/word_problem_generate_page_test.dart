@@ -56,7 +56,7 @@ class _DelayedSettingsRepository extends SettingsRepository {
 
 Future<void> _pumpDelayedGenerator(
   WidgetTester tester,
-  _DelayedSettingsRepository settings, {
+  SettingsRepository settings, {
   WordProblemSkeletonGeneratorFn? skeletons,
   http.Client? client,
   void Function(WordProblemPreviewData)? onPreview,
@@ -103,6 +103,89 @@ void main() {
     // 用例体末尾已用 `drainHiveWritesForTesting` 排空写链，此处用
     // widget 版 tearDown（见 helper 注释：fake 时钟下 close() 需要先解链）。
     await tearDownHiveForWidgetTesting();
+  });
+
+  testWidgets('生成页失败后切换同服务商候选，保存默认且只进入一次预览', (tester) async {
+    final settings = (await tester.runAsync(() async {
+      final repo =
+          SettingsRepository(credentialStore: _MemoryCredentialStore());
+      await repo.saveLlmProviderConfig(
+        id: 'p1',
+        name: '',
+        baseUrl: 'https://example.com',
+        model: 'A',
+        models: ['A', 'B'],
+        apiKey: '',
+      );
+      return repo;
+    }))!;
+    final models = <String>[];
+    WordProblemPreviewData? preview;
+    await _pumpDelayedGenerator(
+      tester,
+      settings,
+      skeletons: ({
+        required int grade,
+        required String semester,
+        required String topic,
+        required int count,
+      }) =>
+          List.filled(
+        count,
+        const ProblemSkeleton(
+          operands: [12, 4],
+          operators: [Operator.add],
+          answer: 16,
+          unitHint: '支',
+          difficulty: 1,
+        ),
+      ),
+      client: MockClient((request) async {
+        final model = (jsonDecode(request.body) as Map)['model'] as String;
+        models.add(model);
+        if (model == 'A') return http.Response('', 503);
+        return http.Response.bytes(
+          utf8.encode(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'content': jsonEncode(
+                      List.generate(
+                        10,
+                        (i) => {
+                          'index': i + 1,
+                          'sceneId': 'pencils',
+                          'variantId': 'standard',
+                        },
+                      ),
+                    ),
+                  },
+                }
+              ],
+            }),
+          ),
+          200,
+        );
+      }),
+      onPreview: (data) => preview = data,
+    );
+    await tester.runAsync(() async {
+      await tester.tap(find.text('生成 10 题'));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    for (var i = 0; i < 100 && preview == null; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    expect(preview!.items, hasLength(10));
+    expect(models, ['A', 'B']);
+    expect(settings.llmProviders.single.model, 'B');
+    expect(tester.takeException(), isNull);
+    await drainHiveWritesForTesting(tester);
   });
 
   testWidgets('配置读取期间同步连点只读取一次，读取失败后允许重试', (tester) async {
@@ -229,10 +312,14 @@ void main() {
     expect(preview, isNotNull);
     expect(preview!.items, hasLength(10));
     expect(
-        preview!.items.map((item) => item.rejectReason), everyElement(isNull),);
+      preview!.items.map((item) => item.rejectReason),
+      everyElement(isNull),
+    );
     expect(preview!.items.map((item) => item.accepted), everyElement(isTrue));
-    expect(preview!.items.map((item) => item.draft!.explanation),
-        everyElement(contains('12 + 4 = 16')),);
+    expect(
+      preview!.items.map((item) => item.draft!.explanation),
+      everyElement(contains('12 + 4 = 16')),
+    );
     expect(tester.takeException(), isNull);
     await drainHiveWritesForTesting(tester);
   });

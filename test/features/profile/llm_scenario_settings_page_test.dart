@@ -14,6 +14,7 @@ import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/profile/llm_scenario_settings_page.dart';
 
@@ -132,6 +133,42 @@ void main() {
     }
   });
 
+  testWidgets('运行时提升模型的专用通知刷新显式场景摘要，不重建设置仓储', (tester) async {
+    final store = _MemoryCredentialStore();
+    await tester.runAsync(() async {
+      final repo = SettingsRepository(credentialStore: store);
+      await repo.saveLlmProviderConfig(
+          id: 'p1',
+          name: 'Provider',
+          baseUrl: 'https://example.com',
+          model: 'A',
+          models: ['A', 'B'],
+          apiKey: '',);
+      await repo.setScenarioSelection(LlmScenario.poemExplain,
+          providerId: 'p1', model: 'A',);
+    });
+    await _pumpPage(tester, credentialStore: store);
+    final container = ProviderScope.containerOf(
+        tester.element(find.byType(LlmScenarioSettingsPage)),);
+    final repo = container.read(settingsRepositoryProvider);
+    final row = find.widgetWithText(AppTile, '诗词讲解');
+    expect(find.descendant(of: row, matching: find.textContaining('A')),
+        findsOneWidget,);
+    await tester.runAsync(() async {
+      final config =
+          (await repo.readLlmConfigForScenario(LlmScenario.poemExplain))!;
+      expect(
+          await repo.promoteSuccessfulLlmModel(config, 'B',
+              isActive: () => true,),
+          isTrue,);
+      container.read(llmSelectionVersionProvider.notifier).state++;
+    });
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: row, matching: find.textContaining('B')),
+        findsOneWidget,);
+    expect(identical(container.read(settingsRepositoryProvider), repo), isTrue);
+  });
+
   testWidgets('有配置时四行均显示「跟随默认（生效配置名）」', (tester) async {
     final store = _MemoryCredentialStore();
     await tester.runAsync(() => _seedTwo(store));
@@ -145,8 +182,7 @@ void main() {
     expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(4));
   });
 
-  testWidgets('点行弹层点选厂商：持久化、副标题更新、重进页面保持',
-      (tester) async {
+  testWidgets('点行弹层点选厂商：持久化、副标题更新、重进页面保持', (tester) async {
     final store = _MemoryCredentialStore();
     await tester.runAsync(() => _seedTwo(store));
     await _pumpPage(tester, credentialStore: store);
@@ -177,7 +213,8 @@ void main() {
     // 绑定包含多个异步Hive写入；全量并发时写入150ms后可能尚未
     // 调用setState。等待实际副标题刷新，同时继续推进真实IO和帧。
     for (var i = 0; i < 100 && selectedProviderLabel.evaluate().isEmpty; i++) {
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),);
       await tester.pump();
     }
 

@@ -12,11 +12,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/features/assistant/tools/assistant_tool.dart';
 import 'package:poemath/features/math/word_problem/word_problem_preview_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
@@ -97,16 +97,21 @@ class GenerateWordProblemsTool extends AssistantTool {
     }
 
     // 出题走「AI 出题」场景配置，非助手配置。
-    final config = await ref
-        .read(settingsRepositoryProvider)
-        .readLlmConfigForScenario(LlmScenario.wordProblem);
+    final settings = ref.read(settingsRepositoryProvider);
+    final config =
+        await settings.readLlmConfigForScenario(LlmScenario.wordProblem);
     if (config == null) {
       return const ToolResult.error('还没有配置 AI 出题服务，无法生成题目。');
     }
     if (!isActive()) return const ToolResult.error('操作已取消');
 
-    final client =
-        LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+    final client = createRuntimeLlmClient(
+      httpClient: ref.read(llmExplainHttpClientProvider),
+      settings: settings,
+      isActive: isActive,
+      onSelectionChanged: () =>
+          ref.read(llmSelectionVersionProvider.notifier).state++,
+    );
     try {
       final generated =
           await ref.read(wordProblemGenerationServiceProvider)(client).generate(

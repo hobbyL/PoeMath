@@ -1110,6 +1110,13 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         ];
       case PoemExplainStatus.error:
         return [
+          for (final paragraph in state.paragraphs) ...[
+            Text(
+              paragraph,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.8),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
           Text(
             state.message ?? 'AI 讲解生成失败，请稍后重试。',
             style: theme.textTheme.bodySmall?.copyWith(

@@ -19,8 +19,10 @@ import 'package:http/testing.dart';
 import 'package:poemath/core/prompts/assistant_prompt_defaults.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
+import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/assistant/assistant_chat_controller.dart';
 
@@ -161,16 +163,150 @@ void main() {
     return container;
   }
 
+  test('仅重试失败单跳，工具不重放，最终回答成功才提升默认并刷新选择', () async {
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.saveLlmProviderConfig(
+      id: 'p1',
+      name: 'Provider',
+      baseUrl: 'https://example.com',
+      model: 'A',
+      models: ['A', 'B', 'C'],
+      apiKey: 'key',
+    );
+    await repo.setScenarioSelection(
+      LlmScenario.assistant,
+      providerId: 'p1',
+      model: 'A',
+    );
+    final requests = <String>[];
+    final container = containerWith(
+      MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final model = body['model'] as String;
+        final stream = body['stream'] == true;
+        requests.add('$model:$stream');
+        // 探测/工具执行/下一跳探测都不写默认，直到最终流完成。
+        expect(repo.llmProviders.single.model, 'A');
+        if (model == 'A' || (model == 'B' && stream)) {
+          return http.Response('', 503);
+        }
+        final hasTool = (body['messages'] as List)
+            .any((message) => message['role'] == 'tool');
+        if (hasTool) {
+          expect(
+            (body['messages'] as List)
+                .where((message) => message['role'] == 'tool'),
+            hasLength(1),
+          );
+          return stream ? _sseResponse('完整回答') : _completionResponse();
+        }
+        return _completionResponse(
+          toolCalls: [_toolCallWire('only-once', 'explain_mistake')],
+        );
+      }),
+    );
+    final settingsInstance = container.read(settingsRepositoryProvider);
+    await container.read(assistantChatControllerProvider.notifier).send('讲讲错题');
+    final state = container.read(assistantChatControllerProvider);
+    expect(state.isReady, isTrue);
+    expect(
+      state.messages.where((message) => message.role == ChatRole.tool),
+      hasLength(1),
+    );
+    expect(state.messages.last.content, '完整回答');
+    expect(requests, ['A:false', 'B:false', 'B:false', 'B:true', 'C:true']);
+    expect(repo.llmProviders.single.model, 'C');
+    expect(repo.modelForScenario(LlmScenario.assistant), 'C');
+    expect(container.read(llmSelectionVersionProvider), 1);
+    expect(
+      identical(container.read(settingsRepositoryProvider), settingsInstance),
+      isTrue,
+    );
+  });
+
+  test('已经有正文后中断保留部分回答，不重试或提升', () async {
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.saveLlmProviderConfig(
+      id: 'p1',
+      name: '',
+      baseUrl: 'https://example.com',
+      model: 'A',
+      models: ['A', 'B'],
+      apiKey: '',
+    );
+    final requests = <String>[];
+    final container = containerWith(
+      MockClient.streaming((request, bodyStream) async {
+        final wire = await bodyStream.bytesToString();
+        final body = jsonDecode(wire) as Map;
+        requests.add(body['model'] as String);
+        if (!_isStream(wire)) return _completionStreamed();
+        return http.StreamedResponse(
+          () async* {
+            yield utf8.encode(_sseData('已经生成'));
+            throw http.ClientException('断开');
+          }(),
+          200,
+        );
+      }),
+    );
+    await container.read(assistantChatControllerProvider.notifier).send('提问');
+    final state = container.read(assistantChatControllerProvider);
+    expect(state.isError, isTrue);
+    expect(state.streamingText, '已经生成');
+    expect(requests, ['A', 'A']);
+    expect(repo.llmProviders.single.model, 'A');
+  });
+
+  for (final cancel in ['停止', '销毁']) {
+    test('$cancel后失败响应晚到，不切换备用模型或回写默认', () async {
+      final repo = SettingsRepository(credentialStore: store);
+      await repo.saveLlmProviderConfig(
+        id: 'p1',
+        name: '',
+        baseUrl: 'https://example.com',
+        model: 'A',
+        models: ['A', 'B'],
+        apiKey: '',
+      );
+      final started = Completer<void>();
+      final response = Completer<http.Response>();
+      var calls = 0;
+      final container = containerWith(
+        MockClient((_) {
+          calls++;
+          started.complete();
+          return response.future;
+        }),
+      );
+      final notifier = container.read(assistantChatControllerProvider.notifier);
+      final pending = notifier.send('提问');
+      await started.future;
+      if (cancel == '停止') {
+        notifier.stop();
+      } else {
+        container.invalidate(assistantChatControllerProvider);
+      }
+      response.complete(http.Response('', 503));
+      await pending;
+      expect(calls, 1);
+      expect(repo.llmProviders.single.model, 'A');
+      expect(container.read(llmSelectionVersionProvider), 0);
+    });
+  }
+
   test('send 成功：追加 user+assistant；契约 system 首条 / stream / 1024 / 发往 p1',
       () async {
     await seedProviders();
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      // chatComplete（非流式）先判定无工具；最终回答走 chatStream。
-      if (!_isStream(request.body)) return _completionResponse();
-      captured = request;
-      return _sseResponse('你好呀，小朋友！');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        // chatComplete（非流式）先判定无工具；最终回答走 chatStream。
+        if (!_isStream(request.body)) return _completionResponse();
+        captured = request;
+        return _sseResponse('你好呀，小朋友！');
+      }),
+    );
 
     await container.read(assistantChatControllerProvider.notifier).send('你好');
 
@@ -201,17 +337,18 @@ void main() {
     expect(captured.body, isNot(contains('key-p1')));
   });
 
-  test('多轮续问：请求体携带历史轮次（system + user + assistant + user）',
-      () async {
+  test('多轮续问：请求体携带历史轮次（system + user + assistant + user）', () async {
     await seedProviders();
     late http.Request captured;
     var streamCall = 0;
-    final container = containerWith(MockClient((request) async {
-      if (!_isStream(request.body)) return _completionResponse();
-      captured = request;
-      streamCall++;
-      return _sseResponse(streamCall == 1 ? '第一答' : '第二答');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (!_isStream(request.body)) return _completionResponse();
+        captured = request;
+        streamCall++;
+        return _sseResponse(streamCall == 1 ? '第一答' : '第二答');
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     await notifier.send('第一问');
@@ -227,17 +364,18 @@ void main() {
     expect(messages[3]['content'], '第二问');
   });
 
-  test('清除上下文：清后下一轮只带 system + 新问（不含旧记录），消息记录仍保留',
-      () async {
+  test('清除上下文：清后下一轮只带 system + 新问（不含旧记录），消息记录仍保留', () async {
     await seedProviders();
     late http.Request captured;
     var streamCall = 0;
-    final container = containerWith(MockClient((request) async {
-      if (!_isStream(request.body)) return _completionResponse();
-      captured = request;
-      streamCall++;
-      return _sseResponse(streamCall == 1 ? '第一答' : '第二答');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (!_isStream(request.body)) return _completionResponse();
+        captured = request;
+        streamCall++;
+        return _sseResponse(streamCall == 1 ? '第一答' : '第二答');
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     await notifier.send('第一问');
@@ -262,10 +400,12 @@ void main() {
 
   test('清除上下文：空会话 / 已在末尾时返回 false，不动状态', () async {
     await seedProviders();
-    final container = containerWith(MockClient((request) async {
-      if (!_isStream(request.body)) return _completionResponse();
-      return _sseResponse('答');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (!_isStream(request.body)) return _completionResponse();
+        return _sseResponse('答');
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     // 空会话：无可清。
@@ -278,10 +418,12 @@ void main() {
 
   test('未配置：unconfigured 态，保留 user 气泡且不发请求', () async {
     var requests = 0;
-    final container = containerWith(MockClient((_) async {
-      requests++;
-      return _sseResponse('不该被调用');
-    }),);
+    final container = containerWith(
+      MockClient((_) async {
+        requests++;
+        return _sseResponse('不该被调用');
+      }),
+    );
 
     await container.read(assistantChatControllerProvider.notifier).send('你好');
 
@@ -313,11 +455,13 @@ void main() {
     await SettingsRepository(credentialStore: store)
         .setAssistantPrompt('我的自定义助手人设');
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      if (!_isStream(request.body)) return _completionResponse();
-      captured = request;
-      return _sseResponse('好的');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (!_isStream(request.body)) return _completionResponse();
+        captured = request;
+        return _sseResponse('好的');
+      }),
+    );
 
     await container.read(assistantChatControllerProvider.notifier).send('你好');
 
@@ -329,11 +473,13 @@ void main() {
   test('regenerate：截掉末尾 assistant，用最后一条 user 重跑', () async {
     await seedProviders();
     var streamCall = 0;
-    final container = containerWith(MockClient((request) async {
-      if (!_isStream(request.body)) return _completionResponse();
-      streamCall++;
-      return _sseResponse(streamCall == 1 ? '第一次回答' : '第二次回答');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (!_isStream(request.body)) return _completionResponse();
+        streamCall++;
+        return _sseResponse(streamCall == 1 ? '第一次回答' : '第二次回答');
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     await notifier.send('出一道题');
@@ -357,8 +503,7 @@ void main() {
     expect(streamCall, 2);
   });
 
-  test('stop：固化已到增量为 assistant 消息，晚到分片不再改写（令牌护栏）',
-      () async {
+  test('stop：固化已到增量为 assistant 消息，晚到分片不再改写（令牌护栏）', () async {
     await seedProviders();
     final sse = StreamController<List<int>>();
     final container = containerWith(
@@ -439,11 +584,13 @@ void main() {
     await seedProviders();
     var requests = 0;
     final completer = Completer<http.Response>();
-    final container = containerWith(MockClient((request) async {
-      requests++;
-      if (_isStream(request.body)) return _sseResponse('回答');
-      return completer.future;
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        requests++;
+        if (_isStream(request.body)) return _sseResponse('回答');
+        return completer.future;
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     final first = notifier.send('第一问');
@@ -467,30 +614,31 @@ void main() {
   test('空白输入被忽略：不改状态、不发请求', () async {
     await seedProviders();
     var requests = 0;
-    final container = containerWith(MockClient((_) async {
-      requests++;
-      return _sseResponse('x');
-    }),);
+    final container = containerWith(
+      MockClient((_) async {
+        requests++;
+        return _sseResponse('x');
+      }),
+    );
 
-    await container
-        .read(assistantChatControllerProvider.notifier)
-        .send('   ');
+    await container.read(assistantChatControllerProvider.notifier).send('   ');
 
     expect(container.read(assistantChatControllerProvider).isIdle, isTrue);
     expect(requests, 0);
   });
 
-  test('resendFrom：截掉该提问之后的全部消息并重跑，上下文只含该提问',
-      () async {
+  test('resendFrom：截掉该提问之后的全部消息并重跑，上下文只含该提问', () async {
     await seedProviders();
     late http.Request captured;
     var streamCall = 0;
-    final container = containerWith(MockClient((request) async {
-      if (!_isStream(request.body)) return _completionResponse();
-      captured = request;
-      streamCall++;
-      return _sseResponse('第$streamCall答');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (!_isStream(request.body)) return _completionResponse();
+        captured = request;
+        streamCall++;
+        return _sseResponse('第$streamCall答');
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     await notifier.send('第一问');
@@ -524,11 +672,13 @@ void main() {
   test('resendFrom：越界 / 非 user 轮次 / 在途时忽略', () async {
     await seedProviders();
     var streamCall = 0;
-    final container = containerWith(MockClient((request) async {
-      if (!_isStream(request.body)) return _completionResponse();
-      streamCall++;
-      return _sseResponse('答$streamCall');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (!_isStream(request.body)) return _completionResponse();
+        streamCall++;
+        return _sseResponse('答$streamCall');
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     await notifier.send('问');
@@ -542,13 +692,14 @@ void main() {
     expect(streamCall, 1); // 未重跑
   });
 
-  test('resendFrom：清除点在重发点之后时被收紧到重发点（contextBaseIndex 不越界）',
-      () async {
+  test('resendFrom：清除点在重发点之后时被收紧到重发点（contextBaseIndex 不越界）', () async {
     await seedProviders();
-    final container = containerWith(MockClient((request) async {
-      if (!_isStream(request.body)) return _completionResponse();
-      return _sseResponse('答');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (!_isStream(request.body)) return _completionResponse();
+        return _sseResponse('答');
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     await notifier.send('第一问');
@@ -567,8 +718,7 @@ void main() {
     expect(state.messages, hasLength(2)); // 第一问 + 新答
   });
 
-  test('页面销毁在 streaming：discardPending 收敛状态（固化增量），不卡 busy',
-      () async {
+  test('页面销毁在 streaming：discardPending 收敛状态（固化增量），不卡 busy', () async {
     await seedProviders();
     final sse = StreamController<List<int>>();
     final container = containerWith(
@@ -612,14 +762,15 @@ void main() {
     );
   });
 
-  test('页面销毁在 loading（判定中无增量）：discardPending 收敛回 ready，不新增消息',
-      () async {
+  test('页面销毁在 loading（判定中无增量）：discardPending 收敛回 ready，不新增消息', () async {
     await seedProviders();
     final completer = Completer<http.Response>();
-    final container = containerWith(MockClient((request) async {
-      if (_isStream(request.body)) return _sseResponse('不该到这');
-      return completer.future; // 挂住 chatComplete 工具判定阶段。
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (_isStream(request.body)) return _sseResponse('不该到这');
+        return completer.future; // 挂住 chatComplete 工具判定阶段。
+      }),
+    );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     final done = notifier.send('在吗');
@@ -642,23 +793,24 @@ void main() {
     expect(finalState.messages, hasLength(1));
   });
 
-  test('工具一轮：chatComplete 回 tool_calls → 执行 → 回灌 role:tool → 流式收尾',
-      () async {
+  test('工具一轮：chatComplete 回 tool_calls → 执行 → 回灌 role:tool → 流式收尾', () async {
     await seedProviders();
     final completeBodies = <String>[];
     var completeCall = 0;
-    final container = containerWith(MockClient((request) async {
-      if (_isStream(request.body)) return _sseResponse('这道题一步步来看～');
-      completeBodies.add(request.body);
-      completeCall++;
-      // 第 1 轮请求讲解错题工具；第 2 轮不再要工具 → 跳出循环走流式。
-      if (completeCall == 1) {
-        return _completionResponse(
-          toolCalls: [_toolCallWire('call_1', 'explain_mistake')],
-        );
-      }
-      return _completionResponse();
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (_isStream(request.body)) return _sseResponse('这道题一步步来看～');
+        completeBodies.add(request.body);
+        completeCall++;
+        // 第 1 轮请求讲解错题工具；第 2 轮不再要工具 → 跳出循环走流式。
+        if (completeCall == 1) {
+          return _completionResponse(
+            toolCalls: [_toolCallWire('call_1', 'explain_mistake')],
+          );
+        }
+        return _completionResponse();
+      }),
+    );
 
     await container
         .read(assistantChatControllerProvider.notifier)
@@ -688,14 +840,16 @@ void main() {
   test('工具循环 4 轮硬上限：始终回 tool_calls → 到顶强制流式收尾', () async {
     await seedProviders();
     var completeCall = 0;
-    final container = containerWith(MockClient((request) async {
-      if (_isStream(request.body)) return _sseResponse('我们先练一练吧！');
-      completeCall++;
-      // 恒回 tool_calls：验证循环到上限后强制走流式收尾，不无限循环。
-      return _completionResponse(
-        toolCalls: [_toolCallWire('call_$completeCall', 'explain_mistake')],
-      );
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        if (_isStream(request.body)) return _sseResponse('我们先练一练吧！');
+        completeCall++;
+        // 恒回 tool_calls：验证循环到上限后强制走流式收尾，不无限循环。
+        return _completionResponse(
+          toolCalls: [_toolCallWire('call_$completeCall', 'explain_mistake')],
+        );
+      }),
+    );
 
     await container
         .read(assistantChatControllerProvider.notifier)
@@ -715,4 +869,3 @@ void main() {
     expect(state.messages.last.content, '我们先练一练吧！');
   });
 }
-

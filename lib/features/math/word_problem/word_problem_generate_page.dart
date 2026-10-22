@@ -9,12 +9,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/features/math/word_problem/word_problem_preview_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -64,8 +64,13 @@ class _WordProblemGeneratePageState
     final count = _count;
     final settings = ref.read(settingsRepositoryProvider);
     final createService = ref.read(wordProblemGenerationServiceProvider);
-    final client =
-        LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+    final client = createRuntimeLlmClient(
+      httpClient: ref.read(llmExplainHttpClientProvider),
+      settings: settings,
+      isActive: () => mounted,
+      onSelectionChanged: () =>
+          ref.read(llmSelectionVersionProvider.notifier).state++,
+    );
     try {
       final config = await settings.readLlmConfig();
       if (!mounted) return;

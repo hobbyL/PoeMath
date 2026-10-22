@@ -18,6 +18,7 @@ import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/poem/poem_explain/poem_explain_controller.dart';
 import 'package:poemath/features/poem/poem_explain/poem_explain_models.dart';
@@ -127,6 +128,100 @@ void main() {
     return container;
   }
 
+  test('当前场景模型失败后切换成功，提升默认并同步当前显式选择', () async {
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.saveLlmProviderConfig(
+      id: 'p1',
+      name: '',
+      baseUrl: 'https://example.com',
+      model: 'A',
+      models: ['A', 'B'],
+      apiKey: '',
+    );
+    await repo.setScenarioSelection(
+      LlmScenario.poemExplain,
+      providerId: 'p1',
+      model: 'A',
+    );
+    final models = <String>[];
+    final container = containerWith(
+      MockClient((request) async {
+        final model = (jsonDecode(request.body) as Map)['model'] as String;
+        models.add(model);
+        return model == 'A' ? http.Response('', 429) : _sseResponse('讲解内容');
+      }),
+    );
+    await container.read(poemExplainProvider.notifier).generate(_poem());
+    expect(container.read(poemExplainProvider).paragraphs, ['讲解内容']);
+    expect(container.read(poemExplainProvider).isReady, isTrue);
+    expect(models, ['A', 'B']);
+    expect(repo.llmProviders.single.model, 'B');
+    expect(repo.modelForScenario(LlmScenario.poemExplain), 'B');
+    expect(container.read(llmSelectionVersionProvider), 1);
+  });
+
+  test('正文后断开保留段落，不切换备用模型', () async {
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.saveLlmProviderConfig(
+      id: 'p1',
+      name: '',
+      baseUrl: 'https://example.com',
+      model: 'A',
+      models: ['A', 'B'],
+      apiKey: '',
+    );
+    var calls = 0;
+    final container = containerWith(
+      MockClient.streaming((_, __) async {
+        calls++;
+        return http.StreamedResponse(
+          () async* {
+            yield utf8.encode(_sseData('已经生成的讲解'));
+            throw http.ClientException('断开');
+          }(),
+          200,
+        );
+      }),
+    );
+    await container.read(poemExplainProvider.notifier).generate(_poem());
+    final state = container.read(poemExplainProvider);
+    expect(state.status, PoemExplainStatus.error);
+    expect(state.paragraphs, ['已经生成的讲解']);
+    expect(calls, 1);
+    expect(repo.llmProviders.single.model, 'A');
+  });
+
+  test('provider销毁后失败晚到，不重试备用模型或访问失效状态', () async {
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.saveLlmProviderConfig(
+      id: 'p1',
+      name: '',
+      baseUrl: 'https://example.com',
+      model: 'A',
+      models: ['A', 'B'],
+      apiKey: '',
+    );
+    final started = Completer<void>();
+    final response = Completer<http.Response>();
+    var calls = 0;
+    final container = containerWith(
+      MockClient((_) {
+        calls++;
+        started.complete();
+        return response.future;
+      }),
+    );
+    final pending =
+        container.read(poemExplainProvider.notifier).generate(_poem());
+    await started.future;
+    container.invalidate(poemExplainProvider);
+    response.complete(http.Response('', 503));
+    await pending;
+    expect(calls, 1);
+    expect(repo.llmProviders.single.model, 'A');
+    expect(container.read(llmSelectionVersionProvider), 0);
+  });
+
   test('成功：按行分段、剥离 markdown 残留、记录 poemId', () async {
     await seedProviders();
     final container = containerWith(
@@ -157,8 +252,7 @@ void main() {
     expect(state.fullText, contains('夜里睡不着'));
   });
 
-  test('流式：中途 streaming 态可见、paragraphs 实时增长，收尾转 ready',
-      () async {
+  test('流式：中途 streaming 态可见、paragraphs 实时增长，收尾转 ready', () async {
     await seedProviders();
     final sse = StreamController<List<int>>();
     final container = containerWith(
@@ -191,10 +285,12 @@ void main() {
 
   test('未配置：unconfigured 引导态且不发请求', () async {
     var requests = 0;
-    final container = containerWith(MockClient((_) async {
-      requests++;
-      return _sseResponse('不该被调用');
-    }),);
+    final container = containerWith(
+      MockClient((_) async {
+        requests++;
+        return _sseResponse('不该被调用');
+      }),
+    );
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
 
@@ -209,7 +305,11 @@ void main() {
     final container = containerWith(
       MockClient(
         (_) async => http.Response.bytes(
-          utf8.encode(jsonEncode({'error': {'message': 'invalid key'}})),
+          utf8.encode(
+            jsonEncode({
+              'error': {'message': 'invalid key'},
+            }),
+          ),
           401,
           headers: const {'content-type': 'application/json; charset=utf-8'},
         ),
@@ -242,10 +342,12 @@ void main() {
     await seedProviders();
     var requests = 0;
     final completer = Completer<http.Response>();
-    final container = containerWith(MockClient((_) async {
-      requests++;
-      return completer.future;
-    }),);
+    final container = containerWith(
+      MockClient((_) async {
+        requests++;
+        return completer.future;
+      }),
+    );
     final notifier = container.read(poemExplainProvider.notifier);
 
     final first = notifier.generate(_poem());
@@ -291,10 +393,12 @@ void main() {
         .setProviderIdForScenario(LlmScenario.poemExplain, 'p2');
 
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('讲解内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('讲解内容。');
+      }),
+    );
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
 
@@ -312,10 +416,12 @@ void main() {
   test('未绑定场景时跟随生效配置', () async {
     await seedProviders();
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('讲解内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('讲解内容。');
+      }),
+    );
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
 
@@ -330,18 +436,22 @@ void main() {
     await repo.setPoemExplainPrompt('我的自定义诗词讲解风格');
 
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('讲解内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('讲解内容。');
+      }),
+    );
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
 
     final body = jsonDecode(captured.body) as Map<String, dynamic>;
     final messages = body['messages'] as List<dynamic>;
     expect((messages[0] as Map<String, dynamic>)['role'], 'system');
-    expect((messages[0] as Map<String, dynamic>)['content'],
-        '我的自定义诗词讲解风格',);
+    expect(
+      (messages[0] as Map<String, dynamic>)['content'],
+      '我的自定义诗词讲解风格',
+    );
     // user prompt 不受覆盖影响（隐私载荷最小化契约保持）。
     final userPrompt = messages[1]['content'] as String;
     expect(userPrompt, contains('静夜思'));
@@ -350,10 +460,12 @@ void main() {
   test('未自定义时请求体 system prompt 为内置出厂默认（AC2 对照）', () async {
     await seedProviders();
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('讲解内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('讲解内容。');
+      }),
+    );
 
     await container.read(poemExplainProvider.notifier).generate(_poem());
 

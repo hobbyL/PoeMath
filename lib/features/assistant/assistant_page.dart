@@ -192,7 +192,9 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   Widget _buildMessageList(ThemeData theme, AssistantChatState chatState) {
     final messages = chatState.messages;
     final base = chatState.contextBaseIndex;
-    final hasPending = chatState.isLoading || chatState.isStreaming;
+    final hasPending = chatState.isLoading ||
+        chatState.isStreaming ||
+        (chatState.isError && chatState.streamingText.trim().isNotEmpty);
     if (messages.isEmpty && !hasPending && !chatState.isError) {
       return _buildEmptyState(theme);
     }
@@ -233,11 +235,12 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   ) {
     final messages = chatState.messages;
     if (index >= messages.length) {
-      if (chatState.isStreaming) {
+      if (chatState.isStreaming ||
+          (chatState.isError && chatState.streamingText.trim().isNotEmpty)) {
         return ChatMessageBubble(
           role: ChatRole.assistant,
           text: chatState.streamingText,
-          isStreaming: true,
+          isStreaming: chatState.isStreaming,
         );
       }
       return const _PendingBubble();

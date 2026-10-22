@@ -4,6 +4,7 @@
 // 存取与空串保留、旧单配置迁移、readLlmConfig 组装、场景级厂商绑定、
 // 删除清理与备份导出不含配置列表/Key 明文。
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
+import 'package:poemath/core/services/llm/llm_config.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -26,6 +29,7 @@ import '../../helpers/hive_test_helper.dart';
 final class _MemoryCredentialStore extends SecureCredentialStore {
   final Map<String, String> llmApiKeysByConfigId = {};
   String? llmApiKey;
+  Future<void> Function()? beforeRead;
 
   @override
   Future<void> saveLlmApiKeyFor(String configId, String apiKey) async {
@@ -33,8 +37,10 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   }
 
   @override
-  Future<String?> readLlmApiKeyFor(String configId) =>
-      Future.value(llmApiKeysByConfigId[configId]);
+  Future<String?> readLlmApiKeyFor(String configId) async {
+    await beforeRead?.call();
+    return llmApiKeysByConfigId[configId];
+  }
 
   @override
   Future<void> deleteLlmApiKeyFor(String configId) async {
@@ -103,6 +109,215 @@ void main() {
     );
   }
 
+  group('运行时成功模型提升', () {
+    test('候选当前模型优先；提升默认和当前显式场景，其他显式选择不变且重开仍生效', () async {
+      await saveMultiModel();
+      for (final scenario in [LlmScenario.assistant, LlmScenario.mathExplain]) {
+        await repository.setScenarioSelection(
+          scenario,
+          providerId: 'p1',
+          model: 'gpt-4o',
+        );
+      }
+      final config =
+          (await repository.readLlmConfigForScenario(LlmScenario.assistant))!;
+      expect(config.candidateModels, ['gpt-4o', 'gpt-4o-mini']);
+      expect(
+        await repository.promoteSuccessfulLlmModel(
+          config,
+          'gpt-4o-mini',
+          isActive: () => true,
+        ),
+        isTrue,
+      );
+      await HiveBoxes.close();
+      await HiveBoxes.init();
+      final reopened = SettingsRepository(credentialStore: credentialStore);
+      expect(reopened.llmProviders.single.model, 'gpt-4o-mini');
+      expect(reopened.llmProviders.single.models, ['gpt-4o-mini', 'gpt-4o']);
+      expect(reopened.llmActiveProviderId, 'p1');
+      expect(reopened.modelForScenario(LlmScenario.assistant), 'gpt-4o-mini');
+      expect(reopened.modelForScenario(LlmScenario.mathExplain), 'gpt-4o');
+      expect((await reopened.readLlmConfig())!.model, 'gpt-4o-mini');
+      expect(await reopened.readLlmApiKeyFor('p1'), 'k');
+    });
+
+    test('跟随默认的场景成功后保持跟随，不创建显式选择', () async {
+      await saveMultiModel();
+      final config = (await repository.readLlmConfig())!;
+      expect(
+        await repository.promoteSuccessfulLlmModel(
+          config,
+          'gpt-4o-mini',
+          isActive: () => true,
+        ),
+        isTrue,
+      );
+      expect(repository.providerIdForScenario(LlmScenario.wordProblem), isNull);
+      expect(repository.modelForScenario(LlmScenario.wordProblem), isNull);
+      expect((await repository.readLlmConfig())!.model, 'gpt-4o-mini');
+    });
+
+    test('原模型、未选模型、无快照和取消均不写入', () async {
+      await saveMultiModel();
+      final config = (await repository.readLlmConfig())!;
+      final before = HiveBoxes.settings.toMap();
+      for (final model in ['gpt-4o', 'unknown']) {
+        expect(
+          await repository.promoteSuccessfulLlmModel(
+            config,
+            model,
+            isActive: () => true,
+          ),
+          isFalse,
+        );
+      }
+      expect(
+        await repository.promoteSuccessfulLlmModel(
+          config,
+          'gpt-4o-mini',
+          isActive: () => false,
+        ),
+        isFalse,
+      );
+      expect(
+        await repository.promoteSuccessfulLlmModel(
+          const LlmConfig(baseUrl: '', apiKey: '', model: ''),
+          'gpt-4o-mini',
+          isActive: () => true,
+        ),
+        isFalse,
+      );
+      expect(HiveBoxes.settings.toMap(), before);
+    });
+
+    for (final change in [
+      '删除',
+      '默认模型',
+      '地址',
+      '候选',
+      '密钥',
+      '场景模型',
+      '场景服务商',
+      '生效服务商',
+    ]) {
+      test('请求后修改$change，旧成功不能覆盖', () async {
+        await saveMultiModel();
+        final config = (await repository.readLlmConfig())!;
+        switch (change) {
+          case '删除':
+            await repository.deleteLlmProviderConfig('p1');
+          case '默认模型':
+          case '地址':
+          case '候选':
+          case '密钥':
+            await repository.saveLlmProviderConfig(
+              id: 'p1',
+              name: 'OpenAI',
+              baseUrl:
+                  change == '地址' ? 'https://other.example/v1' : config.baseUrl,
+              model: change == '默认模型' ? 'gpt-4o-mini' : 'gpt-4o',
+              models: change == '候选' ? ['gpt-4o'] : config.models,
+              apiKey: change == '密钥' ? 'new-key' : '',
+            );
+          case '场景模型':
+            await repository.setModelForScenario(
+              LlmScenario.wordProblem,
+              'gpt-4o-mini',
+            );
+          case '场景服务商':
+            await repository.setScenarioSelection(
+              LlmScenario.wordProblem,
+              providerId: 'p1',
+              model: 'gpt-4o',
+            );
+          case '生效服务商':
+            await repository.saveLlmProviderConfig(
+              id: 'p2',
+              name: 'Other',
+              baseUrl: 'https://other.example',
+              model: 'other',
+              apiKey: '',
+            );
+            await repository.setLlmActiveProvider('p2');
+        }
+        final before = HiveBoxes.settings.toMap();
+        expect(
+          await repository.promoteSuccessfulLlmModel(
+            config,
+            'gpt-4o-mini',
+            isActive: () => true,
+          ),
+          isFalse,
+        );
+        expect(HiveBoxes.settings.toMap(), before);
+      });
+    }
+
+    test('两个并发旧快照只允许第一次提升，合并保留其它配置', () async {
+      await saveMultiModel();
+      final config = (await repository.readLlmConfig())!;
+      await repository.saveLlmProviderConfig(
+        id: 'p2',
+        name: 'Other',
+        baseUrl: 'https://other.example',
+        model: 'other',
+        apiKey: '',
+      );
+      final results = await Future.wait(
+        List.generate(
+          2,
+          (_) => repository.promoteSuccessfulLlmModel(
+            config,
+            'gpt-4o-mini',
+            isActive: () => true,
+          ),
+        ),
+      );
+      expect(results.where((value) => value), hasLength(1));
+      expect(
+        repository.llmProviders.map((provider) => provider.id),
+        ['p1', 'p2'],
+      );
+    });
+
+    test('凭据异步复核期间取消，最后写入前再次校验', () async {
+      await saveMultiModel();
+      final config = (await repository.readLlmConfig())!;
+      final gate = Completer<void>();
+      credentialStore.beforeRead = () => gate.future;
+      var active = true;
+      final pending = repository.promoteSuccessfulLlmModel(
+        config,
+        'gpt-4o-mini',
+        isActive: () => active,
+      );
+      active = false;
+      gate.complete();
+      expect(await pending, isFalse);
+      expect(repository.llmProviders.single.model, 'gpt-4o');
+    });
+
+    test('家长锁定仍可在已批准候选内恢复，手动配置依旧需要解锁', () async {
+      await saveMultiModel();
+      final config = (await repository.readLlmConfig())!;
+      await HiveBoxes.settings.put('parent_protection_enabled', true);
+      ParentAccessService.instance.lock();
+      expect(
+        await repository.promoteSuccessfulLlmModel(
+          config,
+          'gpt-4o-mini',
+          isActive: () => true,
+        ),
+        isTrue,
+      );
+      await expectLater(
+        repository.setModelForScenario(LlmScenario.assistant, 'gpt-4o'),
+        throwsA(isA<ParentAccessDenied>()),
+      );
+    });
+  });
+
   test('场景选中模型生效：readLlmConfigForScenario 用场景选中的 model', () async {
     await saveMultiModel();
     await repository.setScenarioSelection(
@@ -110,7 +325,8 @@ void main() {
       providerId: 'p1',
       model: 'gpt-4o-mini',
     );
-    final cfg = await repository.readLlmConfigForScenario(LlmScenario.assistant);
+    final cfg =
+        await repository.readLlmConfigForScenario(LlmScenario.assistant);
     expect(cfg!.model, 'gpt-4o-mini');
     expect(repository.modelForScenario(LlmScenario.assistant), 'gpt-4o-mini');
   });
@@ -142,7 +358,8 @@ void main() {
     await saveMultiModel();
     await repository.setProviderIdForScenario(LlmScenario.assistant, 'p1');
     await repository.setModelForScenario(LlmScenario.assistant, 'ghost-model');
-    final cfg = await repository.readLlmConfigForScenario(LlmScenario.assistant);
+    final cfg =
+        await repository.readLlmConfigForScenario(LlmScenario.assistant);
     expect(cfg!.model, 'gpt-4o');
   });
 
@@ -768,8 +985,8 @@ void main() {
   });
 
   test(
-    '备份恢复（hint 匹配）：key 写回匹配配置槽位；'
-    '换 active 后恢复不错位（A 的 key 不进 B 槽位）', () async {
+      '备份恢复（hint 匹配）：key 写回匹配配置槽位；'
+      '换 active 后恢复不错位（A 的 key 不进 B 槽位）', () async {
     // 导出机：p1（DeepSeek）为 active 且带 key。
     await saveTwo();
     final exported = await BackupService(secureStore: credentialStore)

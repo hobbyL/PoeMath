@@ -290,6 +290,77 @@ void main() {
   });
 
   group('generate_word_problems', () {
+    test('同服务商失败切换只导航一次，并保存成功模型', () async {
+      final repo = SettingsRepository(credentialStore: store);
+      await repo.saveLlmProviderConfig(
+        id: 'p1',
+        name: '',
+        baseUrl: 'https://example.com',
+        model: 'A',
+        models: ['A', 'B'],
+        apiKey: _apiKey,
+      );
+      final router = _RecordingRouter();
+      final models = <String>[];
+      final container = containerWith(
+        router: router,
+        httpClient: MockClient((request) async {
+          final model = (jsonDecode(request.body) as Map)['model'] as String;
+          models.add(model);
+          return model == 'A' ? http.Response('', 500) : _draftsResponse(3);
+        }),
+      );
+      final tool = container
+          .read(assistantToolsProvider)
+          .whereType<GenerateWordProblemsTool>()
+          .single;
+      final result = await tool.executeCancellable(
+        container.read(_containerRefProvider),
+        {'grade': 2, 'semester': '上', 'topic': 'addition', 'count': 3},
+        isActive: () => true,
+      );
+      expect(result.isError, isFalse);
+      expect(models, ['A', 'B']);
+      expect(router.pushes, hasLength(1));
+      expect(repo.llmProviders.single.model, 'B');
+    });
+
+    test('失败时取消，不尝试备用模型、不回写或导航', () async {
+      final repo = SettingsRepository(credentialStore: store);
+      await repo.saveLlmProviderConfig(
+        id: 'p1',
+        name: '',
+        baseUrl: 'https://example.com',
+        model: 'A',
+        models: ['A', 'B'],
+        apiKey: _apiKey,
+      );
+      final router = _RecordingRouter();
+      var active = true;
+      var calls = 0;
+      final container = containerWith(
+        router: router,
+        httpClient: MockClient((_) async {
+          calls++;
+          active = false;
+          return http.Response('', 500);
+        }),
+      );
+      final tool = container
+          .read(assistantToolsProvider)
+          .whereType<GenerateWordProblemsTool>()
+          .single;
+      final result = await tool.executeCancellable(
+        container.read(_containerRefProvider),
+        {'grade': 2, 'semester': '上', 'topic': 'addition', 'count': 3},
+        isActive: () => active,
+      );
+      expect(result.isError, isTrue);
+      expect(calls, 1);
+      expect(router.pushes, isEmpty);
+      expect(repo.llmProviders.single.model, 'A');
+    });
+
     test(
         '非法参数（grade 越界 / topic 非法 / count 越界 / semester 非法）'
         ' → ToolResult.error 且不发请求、不 push', () async {
@@ -417,7 +488,10 @@ void main() {
       expect(data.topicName, 'addition');
       expect(data.items, hasLength(3));
       expect(data.items.every((item) => item.accepted), isTrue);
-      expect(data.items.every((item) => item.generationMetadataJson.isNotEmpty), isTrue);
+      expect(
+        data.items.every((item) => item.generationMetadataJson.isNotEmpty),
+        isTrue,
+      );
     });
 
     test('出题网络等待期间取消，晚到草稿不能打开预览页', () async {

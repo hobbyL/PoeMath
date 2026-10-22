@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/llm_problem_repository.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
@@ -32,7 +33,9 @@ final wordProblemGenerationServiceProvider =
     Provider<WordProblemGenerationService Function(LlmClient)>((ref) {
   final skeletonFactory = ref.watch(wordProblemSkeletonProvider);
   return (client) => WordProblemGenerationService(
-      client: client, skeletonFactory: skeletonFactory,);
+        client: client,
+        skeletonFactory: skeletonFactory,
+      );
 });
 
 /// 应用题题库 repository。
@@ -45,6 +48,7 @@ final Provider<LlmProblemRepository> llmProblemRepositoryProvider =
 
 /// LLM 配置（null = 未配置，生成页显示引导态）。
 final llmConfigProvider = FutureProvider.autoDispose((ref) async {
+  ref.watch(llmSelectionVersionProvider);
   final settingsRepo = ref.watch(settingsRepositoryProvider);
   return settingsRepo.readLlmConfig();
 });

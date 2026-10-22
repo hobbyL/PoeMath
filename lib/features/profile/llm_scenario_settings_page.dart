@@ -14,6 +14,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/features/profile/llm_provider_display.dart';
 
 /// 场景选择弹层「跟随默认」选项的哨兵值（RadioGroup 不接受 null 选项值）。
@@ -268,6 +269,7 @@ class _LlmScenarioSettingsPageState
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(llmSelectionVersionProvider);
     final theme = Theme.of(context);
     final settingsRepo = ref.watch(settingsRepositoryProvider);
     final providers = settingsRepo.llmProviders;
@@ -301,7 +303,6 @@ class _LlmScenarioSettingsPageState
             ),
           ),
           const SizedBox(height: SpacingTokens.lg),
-
           if (providers.isEmpty)
             ColoredCard(
               color: theme.colorScheme.secondary,

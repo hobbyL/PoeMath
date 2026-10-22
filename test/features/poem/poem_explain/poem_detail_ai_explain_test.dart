@@ -192,8 +192,7 @@ void main() {
     expect(requests, 0);
   });
 
-  testWidgets('成功：讲解清洗 markdown 后分段渲染，附重新生成与朗读提示',
-      (tester) async {
+  testWidgets('成功：讲解清洗 markdown 后分段渲染，附重新生成与朗读提示', (tester) async {
     late http.Request captured;
     await pumpPage(
       tester,
@@ -263,6 +262,29 @@ void main() {
     expect(find.text('他抬头思念故乡。'), findsOneWidget);
     expect(find.text('点击内容可朗读，再次点击停止。'), findsOneWidget);
     expect(find.widgetWithText(AiActionTag, '重新生成'), findsOneWidget);
+  });
+
+  testWidgets('正文输出后中断，页面保留已生成段落和错误提示', (tester) async {
+    await pumpPage(
+      tester,
+      settings: configuredRepo(),
+      client: MockClient.streaming((_, __) async {
+        return http.StreamedResponse(
+          () async* {
+            yield utf8.encode(_sseData('已经生成的讲解'));
+            throw http.ClientException('中断');
+          }(),
+          200,
+        );
+      }),
+    );
+    await tester.tap(find.text('生成讲解'));
+    await tester.pump();
+    await settleSse(tester);
+    expect(find.text('已经生成的讲解'), findsOneWidget);
+    expect(find.textContaining('网络'), findsOneWidget);
+    expect(find.widgetWithText(AiActionTag, '重新生成'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('失败：错误文案不含 Key，点「重新生成」可恢复成功', (tester) async {

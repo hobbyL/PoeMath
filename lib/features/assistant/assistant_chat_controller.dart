@@ -27,6 +27,7 @@ import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/features/assistant/assistant_chat_state.dart';
 import 'package:poemath/features/assistant/tools/assistant_tool.dart';
 import 'package:poemath/features/assistant/tools/assistant_tools_provider.dart';
@@ -237,8 +238,13 @@ class AssistantChatController extends Notifier<AssistantChatState> {
         for (final tool in tools) tool.name: tool,
       };
 
-      client = _activeClient =
-          LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+      client = _activeClient = createRuntimeLlmClient(
+        httpClient: ref.read(llmExplainHttpClientProvider),
+        settings: repo,
+        isActive: () => !_disposed && token == _sessionToken,
+        onSelectionChanged: () =>
+            ref.read(llmSelectionVersionProvider.notifier).state++,
+      );
 
       // 工具循环：非流式 chatComplete 判定是否调工具；有则执行并回灌
       // role:tool，循环（≤4 轮）；无 tool_calls 或到顶即跳出走流式收尾。

@@ -16,6 +16,7 @@ import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/math/math_explain/math_explain_controller.dart';
 import 'package:poemath/features/math/math_explain/math_explain_models.dart';
@@ -112,6 +113,105 @@ void main() {
     return container;
   }
 
+  test('当前场景模型失败后切换成功，提升默认并同步当前显式选择', () async {
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.saveLlmProviderConfig(
+      id: 'p1',
+      name: '',
+      baseUrl: 'https://example.com',
+      model: 'A',
+      models: ['A', 'B'],
+      apiKey: '',
+    );
+    await repo.setScenarioSelection(
+      LlmScenario.mathExplain,
+      providerId: 'p1',
+      model: 'A',
+    );
+    final models = <String>[];
+    final container = containerWith(
+      MockClient((request) async {
+        final model = (jsonDecode(request.body) as Map)['model'] as String;
+        models.add(model);
+        return model == 'A' ? http.Response('', 500) : _sseResponse('先算个位');
+      }),
+    );
+    await container
+        .read(mathExplainProvider.notifier)
+        .generate(problemText: '1 + 1 = ?', correctAnswer: '2');
+    expect(container.read(mathExplainProvider).paragraphs, ['先算个位']);
+    expect(container.read(mathExplainProvider).isReady, isTrue);
+    expect(models, ['A', 'B']);
+    expect(repo.llmProviders.single.model, 'B');
+    expect(repo.modelForScenario(LlmScenario.mathExplain), 'B');
+    expect(container.read(llmSelectionVersionProvider), 1);
+  });
+
+  test('正文后断开保留段落，不切换备用模型', () async {
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.saveLlmProviderConfig(
+      id: 'p1',
+      name: '',
+      baseUrl: 'https://example.com',
+      model: 'A',
+      models: ['A', 'B'],
+      apiKey: '',
+    );
+    var calls = 0;
+    final container = containerWith(
+      MockClient.streaming((_, __) async {
+        calls++;
+        return http.StreamedResponse(
+          () async* {
+            yield utf8.encode(_sseData('已经生成的解析'));
+            throw http.ClientException('断开');
+          }(),
+          200,
+        );
+      }),
+    );
+    await container
+        .read(mathExplainProvider.notifier)
+        .generate(problemText: '1 + 1 = ?', correctAnswer: '2');
+    final state = container.read(mathExplainProvider);
+    expect(state.status, MathExplainStatus.error);
+    expect(state.paragraphs, ['已经生成的解析']);
+    expect(calls, 1);
+    expect(repo.llmProviders.single.model, 'A');
+  });
+
+  test('provider销毁后失败晚到，不重试备用模型或访问失效状态', () async {
+    final repo = SettingsRepository(credentialStore: store);
+    await repo.saveLlmProviderConfig(
+      id: 'p1',
+      name: '',
+      baseUrl: 'https://example.com',
+      model: 'A',
+      models: ['A', 'B'],
+      apiKey: '',
+    );
+    final started = Completer<void>();
+    final response = Completer<http.Response>();
+    var calls = 0;
+    final container = containerWith(
+      MockClient((_) {
+        calls++;
+        started.complete();
+        return response.future;
+      }),
+    );
+    final pending = container
+        .read(mathExplainProvider.notifier)
+        .generate(problemText: '1 + 1 = ?', correctAnswer: '2');
+    await started.future;
+    container.invalidate(mathExplainProvider);
+    response.complete(http.Response('', 503));
+    await pending;
+    expect(calls, 1);
+    expect(repo.llmProviders.single.model, 'A');
+    expect(container.read(llmSelectionVersionProvider), 0);
+  });
+
   test('成功：分段清洗 markdown 残留并记录题面', () async {
     await seedProviders();
     final container = containerWith(
@@ -140,8 +240,7 @@ void main() {
     expect(state.problemText, '27 + 35 = ?');
   });
 
-  test('流式：中途 streaming 态可见、paragraphs 实时增长，收尾转 ready',
-      () async {
+  test('流式：中途 streaming 态可见、paragraphs 实时增长，收尾转 ready', () async {
     await seedProviders();
     final sse = StreamController<List<int>>();
     final container = containerWith(
@@ -178,10 +277,12 @@ void main() {
   test('答错分支：prompt 含孩子答案与错因中文标签', () async {
     await seedProviders();
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('讲解内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('讲解内容。');
+      }),
+    );
 
     await container.read(mathExplainProvider.notifier).generate(
           problemText: '27 + 35 = ?',
@@ -206,10 +307,12 @@ void main() {
   test('答对分支：prompt 不含孩子答案与错因行', () async {
     await seedProviders();
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('讲解内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('讲解内容。');
+      }),
+    );
 
     await container.read(mathExplainProvider.notifier).generate(
           problemText: '27 + 35 = ?',
@@ -226,10 +329,12 @@ void main() {
   test('未知错因 category 不入 prompt（标签映射缺失时静默忽略）', () async {
     await seedProviders();
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('讲解内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('讲解内容。');
+      }),
+    );
 
     await container.read(mathExplainProvider.notifier).generate(
           problemText: '27 + 35 = ?',
@@ -248,10 +353,12 @@ void main() {
 
   test('未配置：unconfigured 引导态且不发请求', () async {
     var requests = 0;
-    final container = containerWith(MockClient((_) async {
-      requests++;
-      return _sseResponse('不该被调用');
-    }),);
+    final container = containerWith(
+      MockClient((_) async {
+        requests++;
+        return _sseResponse('不该被调用');
+      }),
+    );
 
     await container.read(mathExplainProvider.notifier).generate(
           problemText: '1 + 1 = ?',
@@ -285,10 +392,12 @@ void main() {
     await seedProviders();
     var requests = 0;
     final completer = Completer<http.Response>();
-    final container = containerWith(MockClient((_) async {
-      requests++;
-      return completer.future;
-    }),);
+    final container = containerWith(
+      MockClient((_) async {
+        requests++;
+        return completer.future;
+      }),
+    );
     final notifier = container.read(mathExplainProvider.notifier);
 
     final first = notifier.generate(
@@ -337,10 +446,12 @@ void main() {
         .setProviderIdForScenario(LlmScenario.mathExplain, 'p2');
 
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('解析内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('解析内容。');
+      }),
+    );
 
     await container.read(mathExplainProvider.notifier).generate(
           problemText: '1 + 1 = ?',
@@ -363,10 +474,12 @@ void main() {
     await repo.setMathExplainPrompt('我的自定义口算解析风格');
 
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('解析内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('解析内容。');
+      }),
+    );
 
     await container.read(mathExplainProvider.notifier).generate(
           problemText: '1 + 1 = ?',
@@ -376,8 +489,10 @@ void main() {
     final body = jsonDecode(captured.body) as Map<String, dynamic>;
     final messages = body['messages'] as List<dynamic>;
     expect((messages[0] as Map<String, dynamic>)['role'], 'system');
-    expect((messages[0] as Map<String, dynamic>)['content'],
-        '我的自定义口算解析风格',);
+    expect(
+      (messages[0] as Map<String, dynamic>)['content'],
+      '我的自定义口算解析风格',
+    );
     // user prompt 不受覆盖影响（隐私载荷最小化契约保持）。
     final userPrompt = messages[1]['content'] as String;
     expect(userPrompt, contains('题目：1 + 1 = ?'));
@@ -386,10 +501,12 @@ void main() {
   test('未自定义时请求体 system prompt 为内置出厂默认（AC2 对照）', () async {
     await seedProviders();
     late http.Request captured;
-    final container = containerWith(MockClient((request) async {
-      captured = request;
-      return _sseResponse('解析内容。');
-    }),);
+    final container = containerWith(
+      MockClient((request) async {
+        captured = request;
+        return _sseResponse('解析内容。');
+      }),
+    );
 
     await container.read(mathExplainProvider.notifier).generate(
           problemText: '1 + 1 = ?',

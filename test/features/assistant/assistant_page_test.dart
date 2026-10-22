@@ -390,6 +390,24 @@ void main() {
     await _teardownAnim(tester);
   });
 
+  testWidgets('error：部分回答和错误提示同时保留，不再显示生成动画', (tester) async {
+    final harness = _harness(
+      const AssistantChatState(
+        status: AssistantChatStatus.error,
+        messages: [ChatMessage(role: ChatRole.user, content: '提问')],
+        streamingText: '已经生成的回答',
+        message: '网络中断',
+      ),
+    );
+    await _pump(tester, harness.container);
+    await tester.pumpAndSettle();
+    expect(find.text('网络中断'), findsOneWidget);
+    expect(find.textContaining('已经生成的回答'), findsOneWidget);
+    expect(find.byType(ChatMessageBubble), findsNWidgets(2));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await _teardownAnim(tester);
+  });
+
   testWidgets('error：显示错误条与「重试」，消息仍渲染', (tester) async {
     final h = _harness(
       AssistantChatState(

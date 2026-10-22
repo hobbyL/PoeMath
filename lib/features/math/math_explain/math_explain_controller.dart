@@ -4,7 +4,7 @@
 // 职责：算数题 AI 解析控制器 —— 读场景配置、发起单次解析请求、维护四态。
 //
 // 纪律与诗词侧同源：Loading 守卫先于第一个 await；会话代际令牌在每个
-// await 之后校验（防换题/关弹层后晚到结果覆盖新状态）；失败不自动重试。
+// await 之后校验（防换题/关弹层后晚到结果覆盖新状态）；仅首段前允许切换模型。
 //
 // 边界：只读题面与答案做讲解，绝不参与判分、错题记录与统计。
 
@@ -17,6 +17,7 @@ import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/features/math/math_explain/math_explain_models.dart';
 import 'package:poemath/features/math/math_explain/math_explain_prompts.dart';
 import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
@@ -28,10 +29,18 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
   /// 会话代际令牌：reset / 新请求都会使旧请求的回调失效。
   int _sessionToken = 0;
   LlmClient? _activeClient;
+  bool _disposed = false;
 
   @override
   MathExplainState build() {
-    ref.onDispose(() => _activeClient?.close());
+    _disposed = false;
+    _activeClient?.close();
+    _sessionToken++;
+    ref.onDispose(() {
+      _disposed = true;
+      _sessionToken++;
+      _activeClient?.close();
+    });
     return const MathExplainState();
   }
 
@@ -56,9 +65,9 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
 
     LlmClient? client;
     try {
-      final config = await ref
-          .read(settingsRepositoryProvider)
-          .readLlmConfigForScenario(LlmScenario.mathExplain);
+      final settings = ref.read(settingsRepositoryProvider);
+      final config =
+          await settings.readLlmConfigForScenario(LlmScenario.mathExplain);
       if (token != _sessionToken) return;
       if (config == null) {
         state = MathExplainState(
@@ -69,8 +78,13 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
         return;
       }
 
-      client = _activeClient =
-          LlmClient(httpClient: ref.read(llmExplainHttpClientProvider));
+      client = _activeClient = createRuntimeLlmClient(
+        httpClient: ref.read(llmExplainHttpClientProvider),
+        settings: settings,
+        isActive: () => !_disposed && token == _sessionToken,
+        onSelectionChanged: () =>
+            ref.read(llmSelectionVersionProvider.notifier).state++,
+      );
       final buffer = StringBuffer();
       await for (final chunk in client.explainStream(
         config: config,
@@ -123,6 +137,7 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
       state = MathExplainState(
         status: MathExplainStatus.error,
         message: e.message,
+        paragraphs: state.paragraphs,
         problemText: problemText,
       );
     } on FormatException catch (e) {
@@ -130,6 +145,7 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
       state = MathExplainState(
         status: MathExplainStatus.error,
         message: '服务地址无效：${e.message}',
+        paragraphs: state.paragraphs,
         problemText: problemText,
       );
     } catch (error) {
@@ -139,6 +155,7 @@ class MathExplainNotifier extends Notifier<MathExplainState> {
       state = MathExplainState(
         status: MathExplainStatus.error,
         message: 'AI 解析生成失败，请稍后重试。',
+        paragraphs: state.paragraphs,
         problemText: problemText,
       );
     } finally {

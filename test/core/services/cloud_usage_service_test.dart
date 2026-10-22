@@ -25,8 +25,10 @@ void main() {
     final usage = CloudUsageService();
     expect(CloudUsageKind.values.map(usage.limit), [30, 60, 120]);
     await usage.setLimit(CloudUsageKind.llm, 0);
-    await expectLater(usage.reserve(CloudUsageKind.llm),
-        throwsA(isA<CloudQuotaExceededException>()),);
+    await expectLater(
+      usage.reserve(CloudUsageKind.llm),
+      throwsA(isA<CloudQuotaExceededException>()),
+    );
     await usage.setLimit(CloudUsageKind.llm, null);
     expect(usage.limit(CloudUsageKind.llm), isNull);
     await usage.reserve(CloudUsageKind.llm);
@@ -36,14 +38,16 @@ void main() {
     final first = CloudUsageService();
     final second = CloudUsageService();
     await first.setLimit(CloudUsageKind.llm, 3);
-    final accepted = await Future.wait(List.generate(20, (index) async {
-      try {
-        await (index.isEven ? first : second).reserve(CloudUsageKind.llm);
-        return true;
-      } on CloudQuotaExceededException {
-        return false;
-      }
-    }),);
+    final accepted = await Future.wait(
+      List.generate(20, (index) async {
+        try {
+          await (index.isEven ? first : second).reserve(CloudUsageKind.llm);
+          return true;
+        } on CloudQuotaExceededException {
+          return false;
+        }
+      }),
+    );
     expect(accepted.where((value) => value), hasLength(3));
     expect(second.used(CloudUsageKind.llm), 3);
   });
@@ -68,8 +72,10 @@ void main() {
     final reopened = CloudUsageService(clock: () => now);
     expect(reopened.used(CloudUsageKind.asr), 1);
     expect(reopened.limit(CloudUsageKind.asr), 1);
-    await expectLater(reopened.reserve(CloudUsageKind.asr),
-        throwsA(isA<CloudQuotaExceededException>()),);
+    await expectLater(
+      reopened.reserve(CloudUsageKind.asr),
+      throwsA(isA<CloudQuotaExceededException>()),
+    );
     now = DateTime(2026, 10, 17);
     expect(usage.used(CloudUsageKind.asr), 0);
     await usage.reserve(CloudUsageKind.asr);
@@ -88,29 +94,51 @@ void main() {
     }
     final llm = LlmClient(httpClient: httpClient, usage: usage);
     await expectLater(
-        llm.testConnection(const LlmConfig(
-            baseUrl: 'https://api.example.com', apiKey: 'key', model: 'm',),),
-        throwsA(isA<LlmNetworkError>()),);
+      llm.testConnection(
+        const LlmConfig(
+          baseUrl: 'https://api.example.com',
+          apiKey: 'key',
+          model: 'm',
+        ),
+      ),
+      throwsA(isA<LlmNetworkError>()),
+    );
     await expectLater(
-        llm.chatStream(
-            config: const LlmConfig(
-                baseUrl: 'https://api.example.com', apiKey: 'key', model: 'm',),
-            systemPrompt: '学习助手',
-            messages: const [],).toList(),
-        throwsA(isA<LlmNetworkError>()),);
+      llm.chatStream(
+        config: const LlmConfig(
+          baseUrl: 'https://api.example.com',
+          apiKey: 'key',
+          model: 'm',
+        ),
+        systemPrompt: '学习助手',
+        messages: const [],
+      ).toList(),
+      throwsA(isA<LlmNetworkError>()),
+    );
     final asr = TencentAsrClient(httpClient: httpClient, usage: usage);
     await expectLater(
-        asr.recognizePcm16(
-            pcmBytes: Uint8List.fromList([0, 0]),
-            credentials: const TencentAsrCredentials(
-                secretId: 'id', secretKey: 'secret',),),
-        throwsA(isA<TencentAsrException>()
-            .having((e) => e.kind, 'kind', TencentAsrErrorKind.quota),),);
+      asr.recognizePcm16(
+        pcmBytes: Uint8List.fromList([0, 0]),
+        credentials: const TencentAsrCredentials(
+          secretId: 'id',
+          secretKey: 'secret',
+        ),
+      ),
+      throwsA(
+        isA<TencentAsrException>()
+            .having((e) => e.kind, 'kind', TencentAsrErrorKind.quota),
+      ),
+    );
     final tts = WorkerTtsClient(httpClient: httpClient, usage: usage);
     await expectLater(
-        tts.verify(WorkerTtsConfig(
-            base: Uri.parse('https://tts.example.com'), apiKey: 'key',),),
-        throwsA(isA<CloudQuotaExceededException>()),);
+      tts.verify(
+        WorkerTtsConfig(
+          base: Uri.parse('https://tts.example.com'),
+          apiKey: 'key',
+        ),
+      ),
+      throwsA(isA<CloudQuotaExceededException>()),
+    );
     expect(sends, 0);
     expect(CloudUsageKind.values.map(usage.used), everyElement(0));
   });
@@ -120,19 +148,62 @@ void main() {
     final usage = CloudUsageService();
     await usage.setLimit(CloudUsageKind.llm, 1);
     final llm = LlmClient(
-        usage: usage,
-        httpClient: MockClient((request) async {
-          sends++;
-          return http.Response('', 500);
-        }),);
+      usage: usage,
+      httpClient: MockClient((request) async {
+        sends++;
+        return http.Response('', 500);
+      }),
+    );
     const config = LlmConfig(
-        baseUrl: 'https://api.example.com', apiKey: 'key', model: 'm',);
+      baseUrl: 'https://api.example.com',
+      apiKey: 'key',
+      model: 'm',
+    );
     await expectLater(
-        llm.testConnection(config), throwsA(isA<LlmServerError>()),);
+      llm.testConnection(config),
+      throwsA(isA<LlmServerError>()),
+    );
     await expectLater(
-        llm.testConnection(config), throwsA(isA<LlmNetworkError>()),);
+      llm.testConnection(config),
+      throwsA(isA<LlmNetworkError>()),
+    );
     expect(sends, 1);
     expect(HiveBoxes.meta.get('cloud_usage:${usage.dayKey}:llm'), 1);
+  });
+
+  test('模型切换按每次请求计数，额度用完立即停止遍历', () async {
+    var sends = 0;
+    final usage = CloudUsageService();
+    await usage.setLimit(CloudUsageKind.llm, 1);
+    final promoted = <String>[];
+    final client = LlmClient(
+      usage: usage,
+      onModelSucceeded: (_, model) async => promoted.add(model),
+      httpClient: MockClient((_) async {
+        sends++;
+        return http.Response('', 500);
+      }),
+    );
+    addTearDown(client.close);
+    await expectLater(
+      client.explain(
+        config: const LlmConfig(
+          baseUrl: 'https://example.com',
+          apiKey: '',
+          model: 'A',
+          models: ['A', 'B', 'C'],
+        ),
+        systemPrompt: '',
+        userPrompt: '',
+      ),
+      throwsA(
+        isA<LlmNetworkError>()
+            .having((error) => error.retryable, 'retryable', isFalse),
+      ),
+    );
+    expect(sends, 1);
+    expect(usage.used(CloudUsageKind.llm), 1);
+    expect(promoted, isEmpty);
   });
 
   group('recentDaily 历史读取', () {
@@ -164,7 +235,8 @@ void main() {
     test('缺失日期补 0，不跳过', () async {
       final usage = svc();
       // 只在"3 天前"写一条，其余日期无记录。
-      await HiveBoxes.meta.put(key(DateTime(2026, 10, 14), CloudUsageKind.llm), 5);
+      await HiveBoxes.meta
+          .put(key(DateTime(2026, 10, 14), CloudUsageKind.llm), 5);
 
       final daily = usage.recentDaily(7);
       expect(daily, hasLength(7), reason: '不能因为缺数据而少返回天数');

@@ -20,6 +20,7 @@ import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 import 'package:poemath/math_engine/validators/expression_evaluator.dart';
 
@@ -34,7 +35,11 @@ final class LlmClient {
     Duration probeTimeout = const Duration(seconds: 15),
     Duration explainTimeout = const Duration(seconds: 60),
     Duration chatTimeout = const Duration(seconds: 90),
+    bool Function()? isActive,
+    Future<void> Function(LlmConfig config, String model)? onModelSucceeded,
   })  : _usage = usage ?? CloudUsageService.instance,
+        _isActive = isActive,
+        _onModelSucceeded = onModelSucceeded,
         _httpClient = BoundedHttpClient(
           httpClient ?? http.Client(),
           timeout: chatTimeout,
@@ -52,6 +57,108 @@ final class LlmClient {
   final Duration _generateTimeout;
   final Duration _probeTimeout;
   final Duration _explainTimeout;
+  final bool Function()? _isActive;
+  final Future<void> Function(LlmConfig config, String model)?
+      _onModelSucceeded;
+  bool _closed = false;
+  final Map<LlmConfig, String> _preferredModels = {};
+  final Map<LlmConfig, Set<String>> _failedModels = {};
+  final Map<LlmConfig, LlmException> _lastErrors = {};
+
+  void _checkActive() {
+    if (_closed || !(_isActive?.call() ?? true)) {
+      throw const LlmGenerationCancelled();
+    }
+  }
+
+  List<String> _modelsFor(LlmConfig config) {
+    final preferred = _preferredModels[config];
+    final failed = _failedModels[config] ?? const <String>{};
+    final models = <String>{
+      if (preferred != null) preferred,
+      ...config.candidateModels,
+    }.where((model) => !failed.contains(model)).toList();
+    if (models.isEmpty) {
+      throw _lastErrors[config] ?? const LlmResponseFormatError('没有可用的模型');
+    }
+    return models;
+  }
+
+  void _recordFailure(LlmConfig config, String model, LlmException error) {
+    (_failedModels[config] ??= {}).add(model);
+    _lastErrors[config] = error;
+    if (_preferredModels[config] == model) _preferredModels.remove(config);
+  }
+
+  Future<void> _reportSuccess(LlmConfig config, String model) async {
+    _checkActive();
+    _preferredModels[config] = model;
+    if (model == config.model || _onModelSucceeded == null) return;
+    try {
+      await _onModelSucceeded(config, model);
+    } on Object {
+      // 自动保存是附加效果，不得丢弃已经取得的回答或泄漏存储异常内容。
+      AppLogger.e('自动保存可用模型失败', tag: 'LLM');
+    }
+    _checkActive();
+  }
+
+  Future<T> _withModels<T>(
+    LlmConfig config,
+    Future<T> Function(LlmConfig candidate) request, {
+    bool reportSuccess = true,
+  }) async {
+    final models = _modelsFor(config);
+    for (final model in models) {
+      _checkActive();
+      try {
+        final result = await request(config.withModel(model));
+        _checkActive();
+        _preferredModels[config] = model;
+        if (reportSuccess) await _reportSuccess(config, model);
+        return result;
+      } on LlmException catch (error) {
+        _checkActive();
+        if (!error.retryable) rethrow;
+        _recordFailure(config, model, error);
+        if (model == models.last) rethrow;
+      }
+    }
+    throw StateError('模型候选遍历未结束');
+  }
+
+  Stream<String> _streamWithModels(
+    LlmConfig config,
+    Stream<String> Function(LlmConfig candidate) request,
+  ) async* {
+    final models = _modelsFor(config);
+    for (final model in models) {
+      _checkActive();
+      var visible = false;
+      final whitespace = StringBuffer();
+      try {
+        await for (final chunk in request(config.withModel(model))) {
+          _checkActive();
+          if (!visible) {
+            whitespace.write(chunk);
+            if (whitespace.toString().trim().isEmpty) continue;
+            visible = true;
+            yield whitespace.toString();
+          } else {
+            yield chunk;
+          }
+        }
+        if (!visible) throw const LlmResponseFormatError('模型输出内容为空');
+        await _reportSuccess(config, model);
+        return;
+      } on LlmException catch (error) {
+        _checkActive();
+        if (visible || !error.retryable) rethrow;
+        _recordFailure(config, model, error);
+        if (model == models.last) rethrow;
+      }
+    }
+  }
 
   /// 对话档位超时：略长于 [_explainTimeout]，容忍多轮上下文下更长的
   /// 首字节等待与整体生成时间。作用于 SSE 字节流的「两事件间隔」。
@@ -65,7 +172,7 @@ final class LlmClient {
   static Uri _join(Uri base, String path) =>
       base.replace(path: '${base.path}$path');
 
-  /// 格式解析失败时的整批重试上限（不含首次请求，即最多发 3 次）。
+  /// 整批共享的额外格式修复机会；应用题总预算为候选模型数 + 此值。
   static const int _maxFormatRetries = 2;
 
   /// 合法 host 字符（域名 / IPv4 / localhost）。
@@ -173,7 +280,7 @@ final class LlmClient {
     );
   }
 
-  /// 只选择候选情境；部分有效结果保留，格式修复共用最多三次请求。
+  /// 只选择候选情境；N 个模型共享 N + 2 次请求，保留部分有效结果。
   Future<LlmWordProblemSceneResult> chooseWordProblemScenes({
     required LlmConfig config,
     required List<WordProblemPlan> plans,
@@ -187,9 +294,20 @@ final class LlmClient {
     }
     final base = normalizeBaseUrl(config.baseUrl);
     final accepted = <int, LlmWordProblemSceneChoice>{};
+    final models = _modelsFor(config);
+    final pending = [...models];
+    String? repairModel;
+    String? contributingModel;
     var requestCount = 0;
-    for (var attempt = 0; attempt <= _maxFormatRetries; attempt++) {
+    void checkActive() {
+      _checkActive();
       if (!isActive()) throw const LlmGenerationCancelled();
+    }
+
+    while (requestCount < models.length + _maxFormatRetries) {
+      checkActive();
+      final model = pending.isNotEmpty ? pending.removeAt(0) : repairModel;
+      if (model == null) break;
       final remaining = <Map<String, Object?>>[
         for (var i = 0; i < plans.length; i++)
           if (!accepted.containsKey(i + 1))
@@ -209,7 +327,7 @@ final class LlmClient {
             },
       ];
       final body = jsonEncode({
-        'model': config.model,
+        'model': model,
         'temperature': 0.8,
         'max_tokens': remaining.length * 100 + 400,
         'messages': [
@@ -227,14 +345,25 @@ final class LlmClient {
         ],
       });
       requestCount++;
-      final response = await _send(
-        uri: _join(base, _chatPath),
-        body: body,
-        apiKey: config.apiKey,
-        timeout: _generateTimeout,
-        timeoutMessage: '生成应用题请求超时',
-      );
-      if (!isActive()) throw const LlmGenerationCancelled();
+      final http.Response response;
+      try {
+        response = await _send(
+          uri: _join(base, _chatPath),
+          body: body,
+          apiKey: config.apiKey,
+          timeout: _generateTimeout,
+          timeoutMessage: '生成应用题请求超时',
+        );
+      } on LlmException catch (error) {
+        checkActive();
+        if (!error.retryable) rethrow;
+        _recordFailure(config, model, error);
+        if (repairModel == model) repairModel = null;
+        if (pending.isEmpty && repairModel == null) rethrow;
+        continue;
+      }
+      checkActive();
+      repairModel = model;
       try {
         final decoded =
             jsonDecode(_extractJsonArray(_extractAssistantContent(response)));
@@ -277,6 +406,7 @@ final class LlmClient {
           choices.remove(index);
         }
         accepted.addAll(choices);
+        if (choices.isNotEmpty) contributingModel = model;
       } on FormatException {
         // 只消耗本批格式预算，不再套服务层重试。
       } on LlmResponseFormatError {
@@ -284,7 +414,12 @@ final class LlmClient {
       }
       if (accepted.length == plans.length) break;
     }
-    if (!isActive()) throw const LlmGenerationCancelled();
+    checkActive();
+    if (contributingModel != null) {
+      // 正常结束且有 AI 素材才提升；完全本地补齐不算模型成功。
+      await _reportSuccess(config, contributingModel);
+      checkActive();
+    }
     return LlmWordProblemSceneResult(
       choices: [
         for (var i = 1; i <= plans.length; i++)
@@ -385,11 +520,7 @@ final class LlmClient {
     );
   }
 
-  /// 自由文本讲解：单次请求、不重试，返回模型输出的纯文本。
-  ///
-  /// 与 [generateWordProblems] 的差别：输出无结构约束，因此没有格式
-  /// 重试（重试只对「可校验的结构化输出」有意义；讲解失败重试由用户
-  /// 在 UI 上手动触发）。
+  /// 自由文本讲解：失败后依次尝试同服务商候选，每个模型至多一次。
   ///
   /// 模型输出为空（trim 后）抛 [LlmResponseFormatError]；网络/鉴权/
   /// 服务端错误沿用 [LlmException] 家族分类。
@@ -398,6 +529,22 @@ final class LlmClient {
     required String systemPrompt,
     required String userPrompt,
     int maxTokens = 800,
+  }) =>
+      _withModels(
+        config,
+        (candidate) => _explain(
+          config: candidate,
+          systemPrompt: systemPrompt,
+          userPrompt: userPrompt,
+          maxTokens: maxTokens,
+        ),
+      );
+
+  Future<LlmExplainResult> _explain({
+    required LlmConfig config,
+    required String systemPrompt,
+    required String userPrompt,
+    required int maxTokens,
   }) async {
     final base = normalizeBaseUrl(config.baseUrl);
     final body = jsonEncode(<String, Object>{
@@ -435,6 +582,22 @@ final class LlmClient {
     required String systemPrompt,
     required String userPrompt,
     int maxTokens = 800,
+  }) =>
+      _streamWithModels(
+        config,
+        (candidate) => _explainStream(
+          config: candidate,
+          systemPrompt: systemPrompt,
+          userPrompt: userPrompt,
+          maxTokens: maxTokens,
+        ),
+      );
+
+  Stream<String> _explainStream({
+    required LlmConfig config,
+    required String systemPrompt,
+    required String userPrompt,
+    required int maxTokens,
   }) async* {
     final base = normalizeBaseUrl(config.baseUrl);
     final body = jsonEncode(<String, Object>{
@@ -512,6 +675,22 @@ final class LlmClient {
     required String systemPrompt,
     required List<ChatMessage> messages,
     int maxTokens = 1024,
+  }) =>
+      _streamWithModels(
+        config,
+        (candidate) => _chatStream(
+          config: candidate,
+          systemPrompt: systemPrompt,
+          messages: messages,
+          maxTokens: maxTokens,
+        ),
+      );
+
+  Stream<String> _chatStream({
+    required LlmConfig config,
+    required String systemPrompt,
+    required List<ChatMessage> messages,
+    required int maxTokens,
   }) async* {
     final base = normalizeBaseUrl(config.baseUrl);
     final body = jsonEncode(<String, Object>{
@@ -572,6 +751,7 @@ final class LlmClient {
   }
 
   void close() {
+    _closed = true;
     _httpClient.close();
     if (_ownsHttpClient) _httpClient.inner.close();
   }
@@ -597,6 +777,28 @@ final class LlmClient {
     List<Map<String, Object?>> tools = const <Map<String, Object?>>[],
     String toolChoice = 'auto',
     int maxTokens = 1024,
+  }) =>
+      _withModels(
+        config,
+        (candidate) => _chatComplete(
+          config: candidate,
+          systemPrompt: systemPrompt,
+          messages: messages,
+          tools: tools,
+          toolChoice: toolChoice,
+          maxTokens: maxTokens,
+        ),
+        // 工具探测并非最终回答，只有后续流完整成功才持久化。
+        reportSuccess: false,
+      );
+
+  Future<ChatCompletion> _chatComplete({
+    required LlmConfig config,
+    required String systemPrompt,
+    required List<ChatMessage> messages,
+    required List<Map<String, Object?>> tools,
+    required String toolChoice,
+    required int maxTokens,
   }) async {
     final base = normalizeBaseUrl(config.baseUrl);
     final body = jsonEncode(<String, Object?>{
@@ -714,14 +916,16 @@ final class LlmClient {
     required Duration timeout,
     required String timeoutMessage,
   }) async {
+    _checkActive();
     if (body.length > 1024 * 1024 || utf8.encode(body).length > 1024 * 1024) {
-      throw const LlmResponseFormatError('请求内容过长，请缩短后重试');
+      throw const LlmResponseFormatError('请求内容过长，请缩短后重试', retryable: false);
     }
     try {
       await _usage.reserve(CloudUsageKind.llm);
     } on CloudQuotaExceededException catch (error) {
-      throw LlmNetworkError(error.message);
+      throw LlmNetworkError(error.message, retryable: false);
     }
+    _checkActive();
     http.Response response;
     try {
       response = await _httpClient.request(
@@ -740,7 +944,10 @@ final class LlmClient {
     }
 
     if (response.statusCode == 401 || response.statusCode == 403) {
-      throw LlmAuthError('API Key 无效或未授权（HTTP ${response.statusCode}）');
+      throw LlmAuthError(
+        'API Key 无效或未授权（HTTP ${response.statusCode}）',
+        retryable: response.statusCode == 403,
+      );
     }
     if (response.statusCode >= 500) {
       throw LlmServerError('LLM 服务暂时不可用（HTTP ${response.statusCode}）');
@@ -760,14 +967,16 @@ final class LlmClient {
     required Duration timeout,
     required String timeoutMessage,
   }) async {
+    _checkActive();
     if (body.length > 1024 * 1024 || utf8.encode(body).length > 1024 * 1024) {
-      throw const LlmResponseFormatError('请求内容过长，请缩短后重试');
+      throw const LlmResponseFormatError('请求内容过长，请缩短后重试', retryable: false);
     }
     try {
       await _usage.reserve(CloudUsageKind.llm);
     } on CloudQuotaExceededException catch (error) {
-      throw LlmNetworkError(error.message);
+      throw LlmNetworkError(error.message, retryable: false);
     }
+    _checkActive();
     http.StreamedResponse response;
     try {
       final request = http.Request('POST', uri)
@@ -786,7 +995,10 @@ final class LlmClient {
       await response.stream.listen((_) {}).cancel();
     }
     if (response.statusCode == 401 || response.statusCode == 403) {
-      throw LlmAuthError('API Key 无效或未授权（HTTP ${response.statusCode}）');
+      throw LlmAuthError(
+        'API Key 无效或未授权（HTTP ${response.statusCode}）',
+        retryable: response.statusCode == 403,
+      );
     }
     if (response.statusCode >= 500) {
       throw LlmServerError('LLM 服务暂时不可用（HTTP ${response.statusCode}）');
@@ -816,7 +1028,10 @@ final class LlmClient {
       if (bytes + size > maxBytes ||
           messages.length - starts[i] > maxMessages) {
         if (start == messages.length) {
-          throw const LlmResponseFormatError('本轮内容过长，请缩短问题或新建会话');
+          throw const LlmResponseFormatError(
+            '本轮内容过长，请缩短问题或新建会话',
+            retryable: false,
+          );
         }
         break;
       }

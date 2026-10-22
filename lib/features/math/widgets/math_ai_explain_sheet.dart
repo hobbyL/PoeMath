@@ -272,6 +272,13 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
         ];
       case MathExplainStatus.error:
         return [
+          for (final paragraph in state.paragraphs) ...[
+            Text(
+              paragraph,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.7),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
           Text(
             state.message ?? 'AI 解析生成失败，请稍后重试。',
             style: theme.textTheme.bodySmall?.copyWith(

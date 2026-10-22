@@ -71,9 +71,10 @@ class LlmExplainResult {
 
 /// LLM 服务异常基类。所有子类 message 不得包含 apiKey。
 sealed class LlmException implements Exception {
-  const LlmException(this.message);
+  const LlmException(this.message, {this.retryable = false});
 
   final String message;
+  final bool retryable;
 
   @override
   String toString() => '$runtimeType: $message';
@@ -81,22 +82,22 @@ sealed class LlmException implements Exception {
 
 /// 网络不可达 / 超时。
 class LlmNetworkError extends LlmException {
-  const LlmNetworkError(super.message);
+  const LlmNetworkError(super.message, {super.retryable = true});
 }
 
 /// 鉴权失败（401 / 403）。
 class LlmAuthError extends LlmException {
-  const LlmAuthError(super.message);
+  const LlmAuthError(super.message, {super.retryable = false});
 }
 
 /// 服务端错误（5xx）。
 class LlmServerError extends LlmException {
-  const LlmServerError(super.message);
+  const LlmServerError(super.message, {super.retryable = true});
 }
 
 /// 响应格式错误（JSON 解析失败、结构非法）。
 class LlmResponseFormatError extends LlmException {
-  const LlmResponseFormatError(super.message);
+  const LlmResponseFormatError(super.message, {super.retryable = true});
 }
 
 /// `GET /v1/models` 不可用（接口不支持 / 网络错误）。UI 退化手填。

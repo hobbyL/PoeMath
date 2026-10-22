@@ -416,7 +416,11 @@ class SettingsRepository {
     // 仅当场景确有绑定配置时，场景选中 model 才适用（回落默认配置时忽略）。
     final modelOverride =
         scenarioId != null ? modelForScenario(scenario) : null;
-    return _assembleLlmConfig(targetId, modelOverride: modelOverride);
+    return _assembleLlmConfig(
+      targetId,
+      scenario: scenario,
+      modelOverride: modelOverride,
+    );
   }
 
   /// 读取场景绑定的配置 id；未绑定或绑定已悬空（配置被删）返回 null。
@@ -491,6 +495,7 @@ class SettingsRepository {
   /// 配置不存在或 baseUrl/model 为空返回 null；Key 允许为空。
   Future<LlmConfig?> _assembleLlmConfig(
     String id, {
+    required LlmScenario scenario,
     String? modelOverride,
   }) async {
     final providers = llmProviders;
@@ -503,8 +508,69 @@ class SettingsRepository {
             ? modelOverride.trim()
             : target.model.trim();
     if (base.isEmpty || model.isEmpty) return null;
+    final snapshot = LlmSelectionSnapshot(
+      providerId: id,
+      scenario: scenario,
+      defaultModel: target.model,
+      models: target.models,
+      boundProviderId: providerIdForScenario(scenario),
+      selectedModel: modelForScenario(scenario),
+    );
     final apiKey = await _credentialStore.readLlmApiKeyFor(id);
-    return LlmConfig(baseUrl: base, apiKey: apiKey ?? '', model: model);
+    return LlmConfig(
+      baseUrl: base,
+      apiKey: apiKey ?? '',
+      model: model,
+      models: snapshot.models,
+      selection: snapshot,
+    );
+  }
+
+  /// 运行时只提升已批准的候选，不改变地址、凭据或服务商选择。
+  /// 手动编辑 API 仍需家长解锁；这个受限恢复操作可以在锁定时执行。
+  Future<bool> promoteSuccessfulLlmModel(
+    LlmConfig request,
+    String model, {
+    required bool Function() isActive,
+  }) async {
+    final snapshot = request.selection;
+    if (snapshot == null ||
+        model == request.model ||
+        !snapshot.models.contains(model) ||
+        !isActive()) {
+      return false;
+    }
+    final key = await _credentialStore.readLlmApiKeyFor(snapshot.providerId);
+    if (!isActive() || (key ?? '') != request.apiKey) return false;
+    // 最后一个 await 后重新读全部配置；检查到写入之间没有异步窗口。
+    final providers = llmProviders;
+    final index = providers.indexWhere((p) => p.id == snapshot.providerId);
+    if (index < 0) return false;
+    final current = providers[index];
+    if (current.baseUrl.trim() != request.baseUrl ||
+        current.model != snapshot.defaultModel ||
+        current.models.length != snapshot.models.length ||
+        !current.models.indexed
+            .every((entry) => entry.$2 == snapshot.models[entry.$1]) ||
+        providerIdForScenario(snapshot.scenario) != snapshot.boundProviderId ||
+        modelForScenario(snapshot.scenario) != snapshot.selectedModel ||
+        (snapshot.boundProviderId == null &&
+            llmActiveProviderId != snapshot.providerId)) {
+      return false;
+    }
+    providers[index] = LlmProviderConfig(
+      id: current.id,
+      name: current.name,
+      baseUrl: current.baseUrl,
+      model: model,
+      models: LlmProviderConfig.normalizeModels(current.models, model),
+    );
+    await HiveBoxes.settings.putAll({
+      _keyLlmProviders: LlmProviderConfig.encodeList(providers),
+      if (snapshot.boundProviderId != null && snapshot.selectedModel != null)
+        snapshot.scenario.modelKey: model,
+    });
+    return true;
   }
 
   /// 保存（新增或更新）一条 LLM 厂商配置。

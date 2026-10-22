@@ -303,6 +303,26 @@ void main() {
     expect(find.widgetWithText(AiActionTag, '重新生成'), findsOneWidget);
   });
 
+  testWidgets('正文输出后中断，页面保留已生成段落和错误提示', (tester) async {
+    await pumpSheet(
+      tester,
+      settings: configuredRepo(),
+      client: MockClient.streaming((_, __) async {
+        return http.StreamedResponse(
+          () async* {
+            yield utf8.encode(_sseData('已经生成的解析'));
+            throw http.ClientException('中断');
+          }(),
+          200,
+        );
+      }),
+    );
+    expect(find.text('已经生成的解析'), findsOneWidget);
+    expect(find.textContaining('网络'), findsOneWidget);
+    expect(find.widgetWithText(AiActionTag, '重新生成'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('error：错误文案不含 Key，点「重新生成」可恢复成功', (tester) async {
     var calls = 0;
     await pumpSheet(

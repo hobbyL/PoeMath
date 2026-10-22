@@ -17,6 +17,7 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/features/profile/llm_provider_display.dart';
 import 'package:poemath/features/profile/widgets/llm_provider_edit_dialog.dart';
 
@@ -79,9 +80,7 @@ class _LlmProviderSettingsPageState
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          result == LlmProviderEditResult.saved
-              ? 'LLM 服务配置已保存'
-              : 'LLM 服务配置已删除',
+          result == LlmProviderEditResult.saved ? 'LLM 服务配置已保存' : 'LLM 服务配置已删除',
         ),
       ),
     );
@@ -89,6 +88,7 @@ class _LlmProviderSettingsPageState
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(llmSelectionVersionProvider);
     final theme = Theme.of(context);
     final settingsRepo = ref.watch(settingsRepositoryProvider);
     final providers = settingsRepo.llmProviders;
@@ -158,8 +158,7 @@ class _LlmProviderSettingsPageState
               // 让点击反馈落在卡片内部。
               child: Material(
                 color: Colors.transparent,
-                borderRadius:
-                    BorderRadius.circular(SpacingTokens.radiusMedium),
+                borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
                 child: RadioGroup<String>(
                   groupValue: activeId,
                   onChanged: (value) {
@@ -178,8 +177,7 @@ class _LlmProviderSettingsPageState
                         RadioListTile<String>(
                           value: config.id,
                           title: Text(providerDisplayName(index, config)),
-                          subtitle:
-                              Text(providerHostSummary(config.baseUrl)),
+                          subtitle: Text(providerHostSummary(config.baseUrl)),
                           controlAffinity: ListTileControlAffinity.leading,
                           secondary: IconButton(
                             icon: const Icon(Icons.edit_outlined),
