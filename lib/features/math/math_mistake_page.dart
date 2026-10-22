@@ -479,9 +479,124 @@ class _MistakeCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 状态标签行 — 参考 _SessionCard 的标签样式
+          if (mistake.isConsolidationDue || mistake.errorType != null) ...[
+            Wrap(
+              spacing: SpacingTokens.xs,
+              runSpacing: SpacingTokens.xs,
+              children: [
+                // 抽查到期角标
+                if (mistake.isConsolidationDue)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.sm,
+                      vertical: SpacingTokens.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius:
+                          BorderRadius.circular(SpacingTokens.radiusSmall),
+                    ),
+                    child: Text(
+                      '今日可练',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                if (mistake.errorType != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.sm,
+                      vertical: SpacingTokens.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          theme.colorScheme.secondary.withValues(alpha: 0.12),
+                      borderRadius:
+                          BorderRadius.circular(SpacingTokens.radiusSmall),
+                    ),
+                    child: Text(
+                      // 标签单一来源：math_engine kErrorCauseLabels；
+                      // 未收录键回退显示英文原键（守卫内 errorType 非空）。
+                      errorCauseLabel(mistake.errorType)!,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.secondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
+
+          // 题目行
+          Align(
+            alignment: Alignment.centerLeft,
+            child: MathText(
+              mistake.problemText,
+              textAlign: TextAlign.left,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: SpacingTokens.xs),
+
+          // 答案行
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: SpacingTokens.xs,
+                  ),
+                  child: Wrap(
+                    spacing: SpacingTokens.md,
+                    runSpacing: SpacingTokens.xs,
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          text: '你的答案：',
+                          children: [
+                            TextSpan(
+                              text: mistake.userAnswer,
+                              style: TextStyle(
+                                color: theme.colorScheme.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text.rich(
+                        TextSpan(
+                          text: '正确答案：',
+                          children: [
+                            TextSpan(
+                              text: mistake.correctAnswer,
+                              style: TextStyle(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: SpacingTokens.sm,
@@ -500,100 +615,13 @@ class _MistakeCard extends StatelessWidget {
                   ),
                 ),
               ),
-              // 抽查到期角标
-              if (mistake.isConsolidationDue) ...[
-                const SizedBox(width: SpacingTokens.xs),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpacingTokens.sm,
-                    vertical: SpacingTokens.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                    borderRadius:
-                        BorderRadius.circular(SpacingTokens.radiusSmall),
-                  ),
-                  child: Text(
-                    '今日可练',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-              if (mistake.errorType != null) ...[
-                const SizedBox(width: SpacingTokens.xs),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpacingTokens.sm,
-                    vertical: SpacingTokens.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.secondary.withValues(alpha: 0.12),
-                    borderRadius:
-                        BorderRadius.circular(SpacingTokens.radiusSmall),
-                  ),
-                  child: Text(
-                    // 标签单一来源：math_engine kErrorCauseLabels；
-                    // 未收录键回退显示英文原键（守卫内 errorType 非空）。
-                    errorCauseLabel(mistake.errorType)!,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.secondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-              const Spacer(),
-              Icon(
-                Icons.chevron_right,
-                size: 20,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: SpacingTokens.sm),
-
-          // 题目行
-          MathText(
-            mistake.problemText,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: SpacingTokens.xs),
-
-          // 答案行
-          Row(
-            children: [
-              Text(
-                '你的答案：',
-                style: theme.textTheme.bodySmall?.copyWith(
+              const SizedBox(width: SpacingTokens.xs),
+              Padding(
+                padding: const EdgeInsets.only(top: SpacingTokens.xs),
+                child: Icon(
+                  Icons.chevron_right,
+                  size: 20,
                   color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              Text(
-                mistake.userAnswer,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: SpacingTokens.md),
-              Text(
-                '正确答案：',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              Text(
-                mistake.correctAnswer,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
