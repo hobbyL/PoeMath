@@ -77,7 +77,12 @@ class PracticeResumeSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('继续练习', style: theme.textTheme.titleMedium),
+        Text(
+          '继续练习',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: SpacingTokens.sm),
         for (final draft in drafts) ...[
           AppTile(
