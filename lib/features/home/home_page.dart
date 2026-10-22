@@ -95,6 +95,13 @@ class HomePage extends ConsumerWidget {
             ],
 
             // 今日目标
+            Text(
+              '今日目标',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
             _buildDailyGoal(context, dueReviews, ref),
             // 底部留白：为底部导航栏预留空间
             const SizedBox(height: 100),
@@ -589,23 +596,6 @@ class HomePage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.flag_rounded,
-                size: 20,
-                color: theme.colorScheme.secondary,
-              ),
-              const SizedBox(width: SpacingTokens.xs),
-              Text(
-                '今日目标',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: SpacingTokens.sm),
           _buildGoalItem(
             context,
             '背诵 $poemGoal 首诗词',
