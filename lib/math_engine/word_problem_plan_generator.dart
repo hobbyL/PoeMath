@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'models/problem_skeleton.dart';
 import 'models/difficulty_level.dart';
+import 'models/math_problem.dart';
 import 'models/word_problem_plan.dart';
 import 'word_problem_catalog.dart';
 import 'word_problem_plan_rules.dart';
@@ -68,10 +69,27 @@ class WordProblemPlanGenerator {
     final used = <String>{};
     for (var i = 0; i < count; i++) {
       var candidate = initial[i];
+      // 去重重选时保留初始批次分配的乘除类型。
+      final mixedOperator = candidate.operators.lastOrNull;
       WordProblemPlan? plan;
       WordProblemPlan? duplicate;
       for (var attempt = 0; attempt < maxSkeletonCallsPerProblem; attempt++) {
         var relations = WordProblemPlanRules.relationsFor(candidate.operators);
+        if (parsed == WordProblemTopic.mixed) {
+          relations = relations
+              .where(
+                (relation) =>
+                    relation == WordProblemRelation.groupedChange ||
+                    relation == WordProblemRelation.sharedChange,
+              )
+              .where(
+                (_) =>
+                    ![Operator.multiply, Operator.divide]
+                        .contains(mixedOperator) ||
+                    candidate.operators.last == mixedOperator,
+              )
+              .toList();
+        }
         final reverse =
             relations.where((r) => WordProblemPlanRules.isInverse(r)).toList();
         final direct =

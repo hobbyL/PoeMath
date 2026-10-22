@@ -195,11 +195,6 @@ class _WordProblemGeneratePageState
               const SizedBox(height: SpacingTokens.md),
               _buildSemesterSelector(theme),
               const SizedBox(height: SpacingTokens.md),
-              Text(
-                '出题难度：${_difficulty.label}（跟随练习设置）',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: SpacingTokens.md),
               _buildTopicSelector(theme),
               const SizedBox(height: SpacingTokens.md),
               _buildCountSelector(theme),

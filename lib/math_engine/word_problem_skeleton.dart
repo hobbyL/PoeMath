@@ -10,7 +10,6 @@ import 'dart:math';
 
 import 'generators/addition_subtraction_gen.dart';
 import 'generators/base_generator.dart';
-import 'generators/mixed_operation_gen.dart';
 import 'generators/multiplication_table_gen.dart';
 import 'generators/multi_digit_mul_div_gen.dart';
 import 'models/grade_config.dart';
@@ -44,7 +43,7 @@ const List<String> kWordProblemUnitPool = [
 /// - multiplication / division →
 ///   2 年级走 MultiplicationTableGen，3 年级及以上走 MultiDigitMulDivGen，
 ///   按运算过滤
-/// - mixed → 锁两步 chain（无括号）；二年级仅困难档开放
+/// - mixed → 加减搭配乘除的两步 chain（无括号）；二年级仅困难档开放
 class WordProblemSkeletonGenerator {
   const WordProblemSkeletonGenerator._();
 
@@ -69,17 +68,27 @@ class WordProblemSkeletonGenerator {
     final config =
         configuration(grade: grade, semester: semester, difficulty: difficulty);
     final r = random ?? Random();
+    if (!isTopicAvailable(config, parsedTopic, difficulty: difficulty)) {
+      throw ArgumentError('该学期不学习此知识点');
+    }
+    final mixedOperators = [Operator.multiply, Operator.divide]
+        .where(config.allowedOperators.contains)
+        .toList();
+    final mixedOffset = parsedTopic == WordProblemTopic.mixed
+        ? r.nextInt(mixedOperators.length)
+        : 0;
 
     return List.generate(
       count,
-      (_) {
-        if (!isTopicAvailable(config, parsedTopic, difficulty: difficulty)) {
-          throw ArgumentError('该学期不学习此知识点');
-        }
-        var best = _generateOne(config, parsedTopic, r);
+      (index) {
+        final mixedOperator = parsedTopic == WordProblemTopic.mixed
+            ? mixedOperators[(mixedOffset + index) % mixedOperators.length]
+            : null;
+        var best = _generateOne(config, parsedTopic, r, mixedOperator);
         if (difficulty == DifficultyLevel.hard) {
           for (var i = 1; i < 8; i++) {
-            final candidate = _generateOne(config, parsedTopic, r);
+            final candidate =
+                _generateOne(config, parsedTopic, r, mixedOperator);
             if (_selectionScore(candidate, grade) >
                 _selectionScore(best, grade)) {
               best = candidate;
@@ -167,6 +176,7 @@ class WordProblemSkeletonGenerator {
     GradeConfig config,
     WordProblemTopic topic,
     Random random,
+    Operator? mixedOperator,
   ) {
     // 单位池随机（骨架内单位同质：每题独立随机一次）。
     final unitHint = kWordProblemUnitPool[random.nextInt(
@@ -184,7 +194,7 @@ class WordProblemSkeletonGenerator {
       case WordProblemTopic.division:
         problem = _generateMulDiv(config, Operator.divide, random);
       case WordProblemTopic.mixed:
-        problem = _generateMixedChain(config, random);
+        problem = _generateMixedChain(config, mixedOperator!, random);
     }
 
     return _toSkeleton(problem, unitHint);
@@ -254,49 +264,50 @@ class WordProblemSkeletonGenerator {
     throw StateError('无法生成目标运算符的乘除法骨架');
   }
 
-  /// 混合运算锁定 chain 形态（无括号，一期取舍：bracketRange 不入库，
-  /// 带括号题情境表述有歧义风险）。
-  static MathProblem _generateMixedChain(GradeConfig config, Random random) {
-    if (config.grade < 2 || config.allowedOperators.length < 3) {
+  /// 先生成本学期合法的乘除，再按结果范围配上加减数量。
+  /// 每组先分配乘除类型，困难筛选始终在同一类型内进行，避免大数加减挤掉乘除。
+  /// 无括号的 a ± b ×/÷ c 对应现有本地数量关系模板。
+  static MathProblem _generateMixedChain(
+    GradeConfig config,
+    Operator target,
+    Random random,
+  ) {
+    if (config.grade < 2 ||
+        config.allowedOperators.length < 3 ||
+        !config.allowedOperators.contains(target)) {
       throw ArgumentError('该学期不学习混合运算');
     }
-    final generator = MixedOperationGen(config, random: random);
+    final changes = [Operator.add, Operator.subtract]
+        .where(config.allowedOperators.contains)
+        .toList();
     for (var attempt = 0; attempt < 200; attempt++) {
-      final problem = generator.generate();
-      if (problem.mode != ProblemMode.chain) continue;
-      if (problem.bracketRange != null) continue;
-      if (problem.operators.length != 2 ||
-          ![Operator.add, Operator.subtract]
-              .contains(problem.operators.first)) {
-        continue;
-      }
+      final part = _generateMulDiv(config, target, random);
+      final change = changes[random.nextInt(changes.length)];
+      final quantity = part.result.asInteger;
+      final minimum = change == Operator.subtract
+          ? max(max(1, config.minOperand), quantity)
+          : max(1, config.minOperand);
+      final maximum = min(
+        config.maxOperand,
+        change == Operator.add
+            ? config.maxResult - quantity
+            : config.maxResult + quantity,
+      );
+      if (minimum > maximum) continue;
+      final initial = minimum + random.nextInt(maximum - minimum + 1);
+      final problem = MathProblem(
+        operands: [NumberValue.fromInt(initial), ...part.operands],
+        operators: [change, target],
+        result: NumberValue.fromInt(
+          change == Operator.add ? initial + quantity : initial - quantity,
+        ),
+        mode: ProblemMode.chain,
+        grade: config.grade,
+        semester: config.semester,
+      );
       final violation = ConstraintChecker.check(problem, config);
       if (violation != null) continue;
       if (!_isNonNegativeIntegerProblem(problem)) continue;
-      if (config.grade == 2) {
-        final b = problem.operands[1].asInteger;
-        final c = problem.operands[2].asInteger;
-        if (problem.operators.last == Operator.multiply && (b > 9 || c > 9)) {
-          continue;
-        }
-        if (problem.operators.last == Operator.divide &&
-            (b > 81 || c > 9 || b ~/ c > 9)) {
-          continue;
-        }
-        final trace = ExpressionEvaluator.evaluateWithSteps(
-          problem.operands,
-          problem.operators,
-        );
-        if (trace == null ||
-            trace.steps.any(
-              (s) =>
-                  !s.value.isInteger ||
-                  s.value.numerator < 0 ||
-                  s.value.asDouble > config.maxResult,
-            )) {
-          continue;
-        }
-      }
       return problem;
     }
     throw StateError('无法生成 chain 形态的混合运算骨架');
@@ -336,7 +347,9 @@ class WordProblemSkeletonGenerator {
       operators: problem.operators,
       answer: answer,
       unitHint: unitHint,
-      difficulty: problem.difficulty,
+      difficulty: problem.operators.length == 2
+          ? DifficultyScorer.score(problem)
+          : problem.difficulty,
     );
   }
 }

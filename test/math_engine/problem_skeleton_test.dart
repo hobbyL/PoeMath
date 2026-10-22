@@ -166,10 +166,72 @@ void main() {
         expect(skeletons, hasLength(20));
         for (final s in skeletons) {
           _assertSkeletonInvariants(s, config);
-          // chain：2-3 步运算
-          expect(s.operators.length, inInclusiveRange(2, 3));
+          expect(s.operators, hasLength(2));
+          expect(s.operators.first, anyOf(Operator.add, Operator.subtract));
+          expect(s.operators.last, anyOf(Operator.multiply, Operator.divide));
           // 独立参考求值（先乘除后加减、同级从左到右）必须等于答案
           expect(_foldByPriority(s.operands, s.operators), s.answer);
+        }
+        expect(
+          skeletons.where((s) => s.operators.last == Operator.multiply),
+          hasLength(10),
+        );
+        expect(
+          skeletons.where((s) => s.operators.last == Operator.divide),
+          hasLength(10),
+        );
+      });
+    }
+
+    for (final semester in ['上', '下']) {
+      test('二年级$semester困难混合题包含乘除，按组配比且不超表内范围', () {
+        final config = GradePresets.get(2, semester);
+        for (var seed = 0; seed < 12; seed++) {
+          for (final count in [1, 5, 20]) {
+            final skeletons = WordProblemSkeletonGenerator.generate(
+              grade: 2,
+              semester: semester,
+              topic: 'mixed',
+              count: count,
+              difficulty: DifficultyLevel.hard,
+              random: Random(seed),
+            );
+            expect(skeletons, hasLength(count));
+            var multiplicationCount = 0;
+            for (final s in skeletons) {
+              _assertSkeletonInvariants(s, config);
+              expect(s.operators, hasLength(2));
+              expect(s.operators.first, anyOf(Operator.add, Operator.subtract));
+              expect(
+                s.operators.last,
+                anyOf(Operator.multiply, Operator.divide),
+              );
+              final b = s.operands[1], c = s.operands[2];
+              expect(c, inInclusiveRange(1, 9));
+              final int intermediate;
+              if (s.operators.last == Operator.multiply) {
+                multiplicationCount++;
+                expect(b, inInclusiveRange(1, 9));
+                intermediate = b * c;
+              } else {
+                expect(b, inInclusiveRange(1, 81));
+                expect(b % c, 0);
+                intermediate = b ~/ c;
+                expect(intermediate, inInclusiveRange(1, 9));
+              }
+              expect(intermediate, lessThanOrEqualTo(config.maxResult));
+              expect(
+                s.answer,
+                s.operators.first == Operator.add
+                    ? s.operands[0] + intermediate
+                    : s.operands[0] - intermediate,
+              );
+            }
+            expect(
+              multiplicationCount,
+              inInclusiveRange(count ~/ 2, (count + 1) ~/ 2),
+            );
+          }
         }
       });
     }
@@ -254,14 +316,12 @@ void main() {
           semester: config.semester,
         );
         expect(topics, isNotEmpty, reason: '${config.label} 可用知识点不应为空');
-        final ordered =
-            WordProblemTopic.values.where(topics.contains).toList();
+        final ordered = WordProblemTopic.values.where(topics.contains).toList();
         expect(topics, ordered, reason: '${config.label} 顺序应与枚举一致');
       }
     });
 
-    test('isTopicAvailable 与 generate 守卫一致：不可用必抛 ArgumentError、可用必能生成',
-        () {
+    test('isTopicAvailable 与 generate 守卫一致：不可用必抛 ArgumentError、可用必能生成', () {
       for (final config in GradePresets.all) {
         for (final topic in WordProblemTopic.values) {
           final available =
@@ -307,29 +367,37 @@ void _assertSkeletonInvariants(
   // 全操作数非负整数
   for (final operand in skeleton.operands) {
     expect(operand, greaterThanOrEqualTo(0));
-    expect(operand, lessThanOrEqualTo(config.maxOperand),
-        reason: '操作数 $operand 超出学期上限 ${config.maxOperand}',);
+    expect(
+      operand,
+      lessThanOrEqualTo(config.maxOperand),
+      reason: '操作数 $operand 超出学期上限 ${config.maxOperand}',
+    );
   }
   // 答案非负整数且 ≤ maxResult
   expect(skeleton.answer, greaterThanOrEqualTo(0));
-  expect(skeleton.answer, lessThanOrEqualTo(config.maxResult),
-      reason: '答案 ${skeleton.answer} 超出学期上限 ${config.maxResult}',);
+  expect(
+    skeleton.answer,
+    lessThanOrEqualTo(config.maxResult),
+    reason: '答案 ${skeleton.answer} 超出学期上限 ${config.maxResult}',
+  );
   // 难度 1-5
   expect(skeleton.difficulty, inInclusiveRange(1, 5));
   // 运算符序列长度 = 操作数 - 1
   expect(skeleton.operators.length, skeleton.operands.length - 1);
   // 权威求值器复算 == 既定答案
-  final operands = skeleton.operands
-      .map((v) => NumberValue.fromInt(v))
-      .toList();
+  final operands =
+      skeleton.operands.map((v) => NumberValue.fromInt(v)).toList();
   final evaluated = ExpressionEvaluator.evaluate(
     operands,
     skeleton.operators,
   );
   expect(evaluated, isNotNull, reason: '求值失败: ${skeleton.expressionText}');
   expect(evaluated!.isInteger, isTrue, reason: '结果非整数');
-  expect(evaluated.asInteger, skeleton.answer,
-      reason: '求值与答案不一致: ${skeleton.expressionText}',);
+  expect(
+    evaluated.asInteger,
+    skeleton.answer,
+    reason: '求值与答案不一致: ${skeleton.expressionText}',
+  );
 }
 
 /// 测试内独立编写的参考求值（先乘除后加减、同级从左到右）。
@@ -350,9 +418,8 @@ int _foldByPriority(List<int> operands, List<Operator> operators) {
   }
   var result = vals[0];
   for (var k = 0; k < ops.length; k++) {
-    result = ops[k] == Operator.add
-        ? result + vals[k + 1]
-        : result - vals[k + 1];
+    result =
+        ops[k] == Operator.add ? result + vals[k + 1] : result - vals[k + 1];
   }
   return result;
 }

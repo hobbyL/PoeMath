@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/poem_progress.dart';
@@ -24,127 +26,232 @@ void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
 
-  testWidgets('今日任务直达练习，计划数量与顺序可调整；窄屏大字号可用', (tester) async {
-    await tester.runAsync(() async {
-      await HiveBoxes.poems.put(
-        'poem',
-        Poem(
-          id: 'poem',
-          title: '静夜思',
-          author: '李白',
-          dynasty: '唐',
-          content: '床前明月光',
-          pinyin: '',
-          layer: 'core',
-          grade: 4,
-          semester: '下',
-        ),
-      );
-    });
-    const plan = TodayPlan(
-      dateKey: '2026-10-16',
-      profileId: 'default',
-      grade: 4,
-      semester: '下',
-      tasks: [
-        TodayPlanTask(
-          kind: TodayTaskKind.newPoem,
-          targetId: 'poem',
-          title: '静夜思',
-          baseline: 0,
-        ),
-      ],
-    );
-    final container = ProviderContainer(
-      overrides: [todayPlanProvider.overrideWith((ref) async => plan)],
-    );
-    addTearDown(container.dispose);
-    var launched = 0;
-    final router = GoRouter(
-      routes: [
-        GoRoute(
-          path: '/',
-          builder: (_, __) => const Scaffold(
-            body: SingleChildScrollView(child: TodayPlanSection()),
+  for (final scale in [1.0, 1.7]) {
+    testWidgets('今日任务卡片保持高度、独立调整计划；字号 $scale', (tester) async {
+      await tester.runAsync(() async {
+        await HiveBoxes.poems.put(
+          'poem',
+          Poem(
+            id: 'poem',
+            title: '静夜思',
+            author: '李白',
+            dynasty: '唐',
+            content: '床前明月光',
+            pinyin: '',
+            layer: 'core',
+            grade: 4,
+            semester: '下',
           ),
-        ),
-        GoRoute(
-          path: AppRoutes.poemReciteOf('poem'),
-          builder: (context, _) {
-            launched++;
-            return Scaffold(
-              body: TextButton(
-                onPressed: () => context.pop(),
-                child: const Text('返回任务'),
+        );
+      });
+      const plan = TodayPlan(
+        dateKey: '2026-10-16',
+        profileId: 'default',
+        grade: 4,
+        semester: '下',
+        tasks: [
+          TodayPlanTask(
+            kind: TodayTaskKind.newPoem,
+            targetId: 'poem',
+            title: '静夜思',
+            baseline: 0,
+          ),
+        ],
+      );
+      final container = ProviderContainer(
+        overrides: [todayPlanProvider.overrideWith((ref) async => plan)],
+      );
+      addTearDown(container.dispose);
+      var launched = 0;
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, _) => Scaffold(
+              body: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    const TodayPlanSection(),
+                    AppTile(
+                      key: const ValueKey('baseline'),
+                      icon: Icons.menu_book_outlined,
+                      iconColor: Theme.of(context).colorScheme.primary,
+                      title: '标准任务卡片',
+                      subtitle: '开始这一项',
+                    ),
+                  ],
+                ),
               ),
-            );
-          },
-        ),
-      ],
-    );
-    addTearDown(router.dispose);
-    tester.view.physicalSize = const Size(360, 720);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp.router(
-          routerConfig: router,
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: const TextScaler.linear(1.7)),
-            child: child!,
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.poemReciteOf('poem'),
+            builder: (context, _) {
+              launched++;
+              return Scaffold(
+                body: TextButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('返回任务'),
+                ),
+              );
+            },
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      tester.view.physicalSize = const Size(360, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            routerConfig: router,
+            theme: AppTheme.resolve(
+              subject: AppSubject.poem,
+              brightness: Brightness.light,
+            ),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('今日任务 0/1'), findsOneWidget);
-    await tester.runAsync(() async {
-      await tester.tap(find.text('新学 · 静夜思'));
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    });
-    await tester.pumpAndSettle();
-    expect(launched, 1);
-    await tester.tap(find.text('返回任务'));
-    await tester.pumpAndSettle();
-    await tester.runAsync(() async {
-      await tester.tap(find.text('调整计划'));
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    });
-    await tester.pumpAndSettle();
-    expect(find.text('调整每日计划'), findsOneWidget);
-    await tester.tap(find.byTooltip('增加复习'));
-    await tester.pumpAndSettle();
-    final up = find.widgetWithText(TextButton, '上移').last;
-    await tester.ensureVisible(up);
-    await tester.tap(up);
-    await tester.pumpAndSettle();
-    // 已移除「保存计划」按钮：调整即生效，关闭 sheet 时统一落盘。
-    expect(find.text('保存计划'), findsNothing);
-    // 关闭 sheet 触发落盘。用 `Navigator.maybePop` 走 PopScope 的
-    // onPopInvokedWithResult（与系统返回/手势关闭同一条路径），但不像
-    // `handlePopRoute()` 那样依赖全局路由栈 —— 后者在并发测试下会被
-    // 其他用例的路由状态干扰。
-    await tester.runAsync(() async {
-      final navigator = Navigator.of(
-        tester.element(find.text('调整每日计划')),
       );
-      await navigator.maybePop();
-      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+      expect(find.text('今日任务 0/1'), findsOneWidget);
+      expect(find.textContaining('年级'), findsNothing);
+      expect(find.textContaining('每天首次生成后固定'), findsNothing);
+      final taskCard = find.ancestor(
+        of: find.text('新学 · 静夜思'),
+        matching: find.byType(ColoredCard),
+      );
+      final arrow = find.descendant(
+        of: taskCard,
+        matching: find.byIcon(Icons.chevron_right),
+      );
+      final adjust = find.widgetWithText(TextButton, '调整计划');
+      final cardRect = tester.getRect(taskCard);
+      final arrowRect = tester.getRect(arrow);
+      final adjustRect = tester.getRect(adjust);
+      expect(arrowRect.top, tester.getTopLeft(find.text('新学 · 静夜思')).dy);
+      expect(arrowRect.left, greaterThan(cardRect.center.dx));
+      expect(adjustRect.top, closeTo(arrowRect.bottom, 1));
+      expect(cardRect.contains(adjustRect.topLeft), isTrue);
+      expect(cardRect.contains(adjustRect.bottomRight), isTrue);
+      if (scale == 1) {
+        expect(
+          cardRect.height,
+          tester.getSize(find.byKey(const ValueKey('baseline'))).height,
+          reason: '调整计划移入卡内后不能撑高正常字号的任务卡片',
+        );
+      }
+      await tester.runAsync(() async {
+        await tester.tap(find.text('新学 · 静夜思'));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+      expect(launched, 1);
+      await tester.tap(find.text('返回任务'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await tester.tap(find.text('调整计划'));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('调整每日计划'), findsOneWidget);
+      expect(launched, 1, reason: '调整计划不能误触任务导航');
+      await tester.tap(find.byTooltip('增加复习'));
+      await tester.pumpAndSettle();
+      final up = find.widgetWithText(TextButton, '上移').last;
+      await tester.ensureVisible(up);
+      await tester.tap(up);
+      await tester.pumpAndSettle();
+      // 已移除「保存计划」按钮：调整即生效，关闭 sheet 时统一落盘。
+      expect(find.text('保存计划'), findsNothing);
+      // 关闭 sheet 触发落盘。用 `Navigator.maybePop` 走 PopScope 的
+      // onPopInvokedWithResult（与系统返回/手势关闭同一条路径），但不像
+      // `handlePopRoute()` 那样依赖全局路由栈 —— 后者在并发测试下会被
+      // 其他用例的路由状态干扰。
+      await tester.runAsync(() async {
+        final navigator = Navigator.of(
+          tester.element(find.text('调整每日计划')),
+        );
+        await navigator.maybePop();
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      });
+      await tester.pumpAndSettle();
+      final config = TodayPlanRepository().config;
+      expect(config.reviewCount, 3);
+      expect(
+        config.order,
+        [TodayTaskKind.review, TodayTaskKind.newPoem, TodayTaskKind.mistake],
+      );
+      expect(find.text('今日任务 0/1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
-    await tester.pumpAndSettle();
-    final config = TodayPlanRepository().config;
-    expect(config.reviewCount, 3);
-    expect(
-      config.order,
-      [TodayTaskKind.review, TodayTaskKind.newPoem, TodayTaskKind.mistake],
-    );
-    expect(find.text('今日任务 0/1'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+  }
+
+  for (final state in ['已完成', '内容失效', '无任务']) {
+    testWidgets('今日任务$state时仅保留一个可用的调整入口', (tester) async {
+      final plan = TodayPlan(
+        dateKey: '2026-10-16',
+        profileId: 'default',
+        grade: 2,
+        semester: '上',
+        tasks: state == '无任务'
+            ? []
+            : [
+                TodayPlanTask(
+                  kind: TodayTaskKind.newPoem,
+                  targetId: 'missing-first',
+                  title: '第一项',
+                  baseline: 0,
+                  completed: state == '已完成',
+                ),
+                const TodayPlanTask(
+                  kind: TodayTaskKind.newPoem,
+                  targetId: 'missing-second',
+                  title: '第二项',
+                  baseline: 0,
+                ),
+              ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [todayPlanProvider.overrideWith((ref) async => plan)],
+          child: const MaterialApp(
+            home: Scaffold(body: TodayPlanSection()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final adjust = find.widgetWithText(TextButton, '调整计划');
+      expect(adjust, findsOneWidget);
+      expect(find.byIcon(Icons.chevron_right), findsNothing);
+      if (state != '无任务') {
+        expect(
+          find.ancestor(of: adjust, matching: find.byType(ColoredCard)),
+          findsOneWidget,
+        );
+      }
+      await tester.runAsync(() async {
+        await tester.tap(adjust);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('调整每日计划'), findsOneWidget);
+      await tester.runAsync(() async {
+        await Navigator.of(tester.element(find.text('调整每日计划'))).maybePop();
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      });
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await drainHiveWritesForTesting(tester);
+    });
+  }
 
   testWidgets('今日复习直接完成第五轮，同步真实复习事件、掌握日期与统计', (tester) async {
     await tester.runAsync(() async {
@@ -258,7 +365,11 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 50));
     }
-    expect(planReads, greaterThan(readsBefore), reason: '_open 未走到收尾的 invalidate');
+    expect(
+      planReads,
+      greaterThan(readsBefore),
+      reason: '_open 未走到收尾的 invalidate',
+    );
     // 首次掌握会解锁成就，`_open` 随即弹出自动关闭的庆祝弹窗
     // （内部是 1.5s 的 `Future.delayed`）。推过去，否则测试结束时
     // 会留下 pending timer。

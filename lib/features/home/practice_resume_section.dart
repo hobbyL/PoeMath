@@ -46,11 +46,13 @@ class PracticeResumeSection extends ConsumerWidget {
         content: const Text('已答题目的历史记录会保留，未完成部分不再继续。'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('保留草稿'),),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('保留草稿'),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('放弃草稿'),),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('放弃草稿'),
+          ),
         ],
       ),
     );
@@ -81,6 +83,7 @@ class PracticeResumeSection extends ConsumerWidget {
           AppTile(
             icon: Icons.play_circle_outline,
             iconColor: theme.colorScheme.secondary,
+            crossAxisAlignment: CrossAxisAlignment.start,
             title: draft['kind'] == 'math' ? '继续上次口算' : '继续上次应用题',
             subtitle: draft['invalid'] == true
                 ? '草稿无法读取，可放弃后重新练习'
@@ -88,15 +91,20 @@ class PracticeResumeSection extends ConsumerWidget {
             onTap: draft['invalid'] == true
                 ? null
                 : () => context.push(
-                    '${draft['kind'] == 'math' ? AppRoutes.mathPractice : AppRoutes.wordProblemPractice}?resume=1',),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
+                      '${draft['kind'] == 'math' ? AppRoutes.mathPractice : AppRoutes.wordProblemPractice}?resume=1',
+                    ),
+            trailingAction: TextButton(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),
+              ),
               onPressed: () => _discard(context, draft['kind'] as String),
               child: const Text('放弃草稿'),
             ),
           ),
+          const SizedBox(height: SpacingTokens.sm),
         ],
         const SizedBox(height: SpacingTokens.md),
       ],

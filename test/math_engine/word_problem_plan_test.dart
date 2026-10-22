@@ -251,6 +251,146 @@ void main() {
     }
   });
 
+  test('二年级困难混合题经过计划去重后仍同时覆盖乘法和除法', () {
+    for (final semester in ['上', '下']) {
+      for (var seed = 0; seed < 12; seed++) {
+        for (final count in [1, 2, 5, 10, 20]) {
+          final plans = WordProblemPlanGenerator.generate(
+            grade: 2,
+            semester: semester,
+            topic: 'mixed',
+            count: count,
+            difficulty: DifficultyLevel.hard,
+            random: Random(seed),
+          );
+          expect(plans, hasLength(count));
+          expect(
+            plans.where((p) => p.relation == WordProblemRelation.groupedChange),
+            hasLength(inInclusiveRange(count ~/ 2, (count + 1) ~/ 2)),
+          );
+          for (final p in plans) {
+            expect(
+              p.relation,
+              anyOf(
+                WordProblemRelation.groupedChange,
+                WordProblemRelation.sharedChange,
+              ),
+            );
+            expect(p.version, 2);
+            expect(
+              WordProblemPlanRules.validateContext(
+                p,
+                grade: 2,
+                semester: semester,
+                topic: 'mixed',
+              ).canSave,
+              isTrue,
+            );
+            final rendered = WordProblemRenderer.render(p);
+            expect(
+              rendered.explanation,
+              contains(p.skeleton.operators.last.symbol),
+            );
+            final metadata = WordProblemMetadata(
+              plan: p,
+              source: WordProblemSource.localTemplate,
+            );
+            expect(
+              WordProblemMetadata.decode(metadata.encode())!.encode(),
+              metadata.encode(),
+            );
+          }
+        }
+      }
+    }
+  });
+
+  test('混合题去重重选不会把乘法替换成除法而破坏配比', () {
+    const multiplication = ProblemSkeleton(
+      operands: [20, 4, 5],
+      operators: [Operator.add, Operator.multiply],
+      answer: 40,
+      unitHint: '支',
+      difficulty: 3,
+    );
+    const division = ProblemSkeleton(
+      operands: [20, 36, 4],
+      operators: [Operator.add, Operator.divide],
+      answer: 29,
+      unitHint: '支',
+      difficulty: 3,
+    );
+    const replacements = [
+      ProblemSkeleton(
+        operands: [30, 42, 6],
+        operators: [Operator.add, Operator.divide],
+        answer: 37,
+        unitHint: '支',
+        difficulty: 3,
+      ),
+      ProblemSkeleton(
+        operands: [30, 7, 4],
+        operators: [Operator.add, Operator.multiply],
+        answer: 58,
+        unitHint: '支',
+        difficulty: 3,
+      ),
+    ];
+    var calls = 0;
+    final plans = WordProblemPlanGenerator.generate(
+      grade: 2,
+      semester: '上',
+      topic: 'mixed',
+      count: 3,
+      difficulty: DifficultyLevel.hard,
+      random: Random(42),
+      skeletonFactory: ({
+        required grade,
+        required semester,
+        required topic,
+        required count,
+        DifficultyLevel difficulty = DifficultyLevel.medium,
+      }) {
+        calls++;
+        return calls == 1
+            ? [multiplication, division, multiplication]
+            : [replacements[calls - 2]];
+      },
+    );
+    expect(calls, 3);
+    expect(
+      plans.map((p) => p.skeleton.operators.last),
+      [Operator.multiply, Operator.divide, Operator.multiply],
+    );
+    expect(plans.last.skeleton.operands, [30, 7, 4]);
+  });
+
+  test('历史二年级纯加减两步混合题仍可读取和保存', () {
+    final old = plan(
+      [20, 5, 3],
+      [Operator.add, Operator.subtract],
+      WordProblemRelation.sequential,
+      version: 2,
+    );
+    final metadata = WordProblemMetadata(
+      plan: old,
+      source: WordProblemSource.localTemplate,
+    );
+    expect(
+      WordProblemMetadata.decode(metadata.encode())!.encode(),
+      metadata.encode(),
+    );
+    expect(
+      metadata.matchesContext(grade: 2, semester: '上', topic: 'mixed'),
+      isTrue,
+    );
+    expect(old.skeleton.answer, 22);
+    expect(
+      WordProblemRenderer.render(old).text,
+      '文具室原有20支铅笔，添了5支铅笔，又用去3支铅笔，最后有多少支铅笔？',
+    );
+  });
+
   test('课程上下文拒绝知识点错配、未学运算、超范围和未学进位', () {
     final division =
         plan([36, 4], [Operator.divide], WordProblemRelation.equalShare);

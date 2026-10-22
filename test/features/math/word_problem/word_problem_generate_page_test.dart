@@ -359,7 +359,7 @@ void main() {
       }),
       onPreview: (data) => preview = data,
     );
-    expect(find.text('出题难度：困难（跟随练习设置）'), findsOneWidget);
+    expect(find.textContaining('出题难度'), findsNothing);
     expect(find.widgetWithText(ChoiceChip, '混合运算'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '困难'), findsNothing);
     await tester.tap(find.text('生成 10 题'));

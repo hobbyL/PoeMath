@@ -34,7 +34,9 @@ class AppTile extends StatelessWidget {
     required this.subtitle,
     this.onTap,
     this.trailing,
-  });
+    this.trailingAction,
+    this.crossAxisAlignment = CrossAxisAlignment.center,
+  }) : assert(trailing == null || trailingAction == null);
 
   /// 图标；省略时不展示图标，也不保留图标占位。
   final IconData? icon;
@@ -54,6 +56,12 @@ class AppTile extends StatelessWidget {
   /// 尾部组件。为 null 时显示 chevron 箭头。
   final Widget? trailing;
 
+  /// 默认箭头下方的独立操作，与主行并排；不能与 [trailing] 同时使用。
+  final Widget? trailingAction;
+
+  /// 主行内图标、文本及尾部组件的垂直对齐方式。
+  final CrossAxisAlignment crossAxisAlignment;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -69,6 +77,7 @@ class AppTile extends StatelessWidget {
         vertical: SpacingTokens.sm + 2,
       ),
       child: Row(
+        crossAxisAlignment: crossAxisAlignment,
         children: <Widget>[
           if (icon != null) ...[
             Container(
@@ -105,9 +114,16 @@ class AppTile extends StatelessWidget {
           ),
           if (trailing != null) trailing!,
           if (trailing == null)
-            Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurfaceVariant,
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                if (trailingAction != null) trailingAction!,
+              ],
             ),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -55,7 +56,7 @@ WordProblemGenerationService service(
     );
 
 void main() {
-  test('真实困难骨架传入服务，二年级两步题经AI更换情境后保留版本和课程校验', () async {
+  test('二年级混合题经AI更换情境后保留乘除配比、版本和课程校验', () async {
     final client = LlmClient(
       httpClient: MockClient((request) async {
         final body = jsonDecode(request.body) as Map;
@@ -73,30 +74,73 @@ void main() {
       }),
     );
     addTearDown(client.close);
+    final random = Random(2026);
     final generation = WordProblemGenerationService(
       client: client,
-      skeletonFactory: WordProblemSkeletonGenerator.generate,
+      skeletonFactory: ({
+        required grade,
+        required semester,
+        required topic,
+        required count,
+        DifficultyLevel difficulty = DifficultyLevel.medium,
+      }) =>
+          WordProblemSkeletonGenerator.generate(
+        grade: grade,
+        semester: semester,
+        topic: topic,
+        count: count,
+        difficulty: difficulty,
+        random: random,
+      ),
     );
-    final items = await generation.generate(
-      config: config,
-      grade: 2,
-      semester: '上',
-      topic: WordProblemTopic.mixed,
-      count: 5,
-      difficulty: DifficultyLevel.hard,
-      isActive: () => true,
-    );
-    expect(items, hasLength(5));
-    for (final item in items) {
-      expect(item.source, WordProblemSource.aiScene);
-      expect(item.plan.version, 2);
-      expect(item.plan.sceneId, 'water');
-      final metadata = WordProblemMetadata.decode(item.metadataJson)!;
-      expect(
-        metadata.matchesContext(grade: 2, semester: '上', topic: 'mixed'),
-        isTrue,
+    for (final semester in ['上', '下']) {
+      final items = await generation.generate(
+        config: config,
+        grade: 2,
+        semester: semester,
+        topic: WordProblemTopic.mixed,
+        count: 5,
+        difficulty: DifficultyLevel.hard,
+        isActive: () => true,
       );
-      expect(item.plan.skeleton.operators, hasLength(2));
+      expect(items, hasLength(5));
+      expect(
+        items.where(
+          (item) => item.plan.relation == WordProblemRelation.groupedChange,
+        ),
+        hasLength(inInclusiveRange(2, 3)),
+      );
+      for (final item in items) {
+        expect(item.source, WordProblemSource.aiScene);
+        expect(item.plan.version, 2);
+        expect(item.plan.sceneId, 'water');
+        final metadata = WordProblemMetadata.decode(item.metadataJson)!;
+        expect(
+          metadata.matchesContext(grade: 2, semester: semester, topic: 'mixed'),
+          isTrue,
+        );
+        final skeleton = item.plan.skeleton;
+        expect(skeleton.operators, hasLength(2));
+        expect(
+          skeleton.operators.last,
+          anyOf(Operator.multiply, Operator.divide),
+        );
+        final b = skeleton.operands[1], c = skeleton.operands[2];
+        final intermediate =
+            skeleton.operators.last == Operator.multiply ? b * c : b ~/ c;
+        expect(
+          item.explanation,
+          contains(
+            '$b ${skeleton.operators.last.symbol} $c = $intermediate',
+          ),
+        );
+        expect(
+          item.text,
+          contains(
+            skeleton.operators.last == Operator.multiply ? '每盒有' : '平均分成',
+          ),
+        );
+      }
     }
   });
 

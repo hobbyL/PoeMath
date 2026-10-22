@@ -32,6 +32,16 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final adjustPlan = TextButton(
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),
+      ),
+      onPressed: _configuring ? null : _configure,
+      child: const Text('调整计划'),
+    );
     return ref.watch(todayPlanProvider).when(
           loading: () => const Padding(
             padding: EdgeInsets.all(SpacingTokens.md),
@@ -47,25 +57,16 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
           data: (plan) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: SpacingTokens.md,
+              Row(
                 children: [
-                  Text(
-                    '今日任务 ${plan.completedCount}/${plan.tasks.length}',
-                    style: theme.textTheme.titleMedium,
+                  Expanded(
+                    child: Text(
+                      '今日任务 ${plan.completedCount}/${plan.tasks.length}',
+                      style: theme.textTheme.titleMedium,
+                    ),
                   ),
-                  TextButton.icon(
-                    onPressed: _configuring ? null : _configure,
-                    icon: const Icon(Icons.tune),
-                    label: const Text('调整计划'),
-                  ),
+                  if (plan.tasks.isEmpty) adjustPlan,
                 ],
-              ),
-              Text(
-                '${plan.grade}年级${plan.semester}册 · 每天首次生成后固定，完成后不补发',
-                style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: SpacingTokens.sm),
               if (plan.tasks.isEmpty)
@@ -73,8 +74,9 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                   color: theme.colorScheme.primary,
                   child: const Text('今天没有待安排的任务，可按自己的节奏学习。'),
                 ),
-              for (final task in plan.tasks) ...[
+              for (final (index, task) in plan.tasks.indexed) ...[
                 AppTile(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   icon: task.completed
                       ? Icons.check_circle_outline
                       : _icon(task.kind),
@@ -91,8 +93,14 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                       ? null
                       : () => _open(task),
                   trailing: task.completed || !_available(task)
-                      ? const SizedBox.shrink()
+                      ? index == 0
+                          ? adjustPlan
+                          : const SizedBox.shrink()
                       : null,
+                  trailingAction:
+                      index == 0 && !task.completed && _available(task)
+                          ? adjustPlan
+                          : null,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
               ],
