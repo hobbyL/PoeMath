@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 
@@ -74,6 +75,35 @@ class PracticeResumeSection extends ConsumerWidget {
     final drafts = ref.watch(practiceDraftsProvider).valueOrNull ?? [];
     if (drafts.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final cards = [
+      for (final draft in drafts)
+        AppTile(
+          icon: draft['kind'] == 'math'
+              ? Icons.calculate_outlined
+              : Icons.auto_awesome_outlined,
+          iconColor: theme.colorScheme.secondary,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          title: draft['kind'] == 'math' ? '继续上次口算' : '继续上次应用题',
+          subtitle: draft['invalid'] == true
+              ? '草稿无法读取，可放弃后重新练习'
+              : '已答 ${(draft['records'] as List<dynamic>).length} / ${(draft['problems'] as List<dynamic>).length} 题',
+          onTap: draft['invalid'] == true
+              ? null
+              : () => context.push(
+                    '${draft['kind'] == 'math' ? AppRoutes.mathPractice : AppRoutes.wordProblemPractice}?resume=1',
+                  ),
+          trailingAction: TextButton(
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),
+            ),
+            onPressed: () => _discard(context, draft['kind'] as String),
+            child: const Text('放弃草稿'),
+          ),
+        ),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -84,34 +114,33 @@ class PracticeResumeSection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: SpacingTokens.sm),
-        for (final draft in drafts) ...[
-          AppTile(
-            icon: Icons.play_circle_outline,
-            iconColor: theme.colorScheme.secondary,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            title: draft['kind'] == 'math' ? '继续上次口算' : '继续上次应用题',
-            subtitle: draft['invalid'] == true
-                ? '草稿无法读取，可放弃后重新练习'
-                : '已答 ${(draft['records'] as List<dynamic>).length} / ${(draft['problems'] as List<dynamic>).length} 题',
-            onTap: draft['invalid'] == true
-                ? null
-                : () => context.push(
-                      '${draft['kind'] == 'math' ? AppRoutes.mathPractice : AppRoutes.wordProblemPractice}?resume=1',
-                    ),
-            trailingAction: TextButton(
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),
-              ),
-              onPressed: () => _discard(context, draft['kind'] as String),
-              child: const Text('放弃草稿'),
-            ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-        ],
-        const SizedBox(height: SpacingTokens.md),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= ResponsiveLayout.mediumBreakpoint &&
+                cards.length > 1) {
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < cards.length; i++) ...[
+                      if (i > 0) const SizedBox(width: SpacingTokens.sm),
+                      Expanded(child: cards[i]),
+                    ],
+                  ],
+                ),
+              );
+            }
+            return Column(
+              children: [
+                for (var i = 0; i < cards.length; i++) ...[
+                  if (i > 0) const SizedBox(height: SpacingTokens.sm),
+                  cards[i],
+                ],
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: SpacingTokens.lg),
       ],
     );
   }
