@@ -483,17 +483,25 @@ class HomePage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  poem.title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.xs),
-                Text(
-                  '${poem.dynasty} · ${poem.author}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: poem.title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const WidgetSpan(
+                        child: SizedBox(width: SpacingTokens.sm),
+                      ),
+                      TextSpan(
+                        text: '${poem.dynasty} · ${poem.author}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
