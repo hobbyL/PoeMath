@@ -40,6 +40,7 @@ WordProblemGenerationService service(
         required semester,
         required topic,
         required count,
+        DifficultyLevel difficulty = DifficultyLevel.medium,
       }) =>
           List.filled(
         count,
@@ -54,6 +55,51 @@ WordProblemGenerationService service(
     );
 
 void main() {
+  test('真实困难骨架传入服务，二年级两步题经AI更换情境后保留版本和课程校验', () async {
+    final client = LlmClient(
+      httpClient: MockClient((request) async {
+        final body = jsonDecode(request.body) as Map;
+        final prompt = body['messages'].last['content'] as String;
+        final choices =
+            jsonDecode(prompt.substring(prompt.indexOf('['))) as List;
+        return response([
+          for (final item in choices)
+            {
+              'index': item['index'],
+              'sceneId': 'water',
+              'variantId': 'standard',
+            },
+        ]);
+      }),
+    );
+    addTearDown(client.close);
+    final generation = WordProblemGenerationService(
+      client: client,
+      skeletonFactory: WordProblemSkeletonGenerator.generate,
+    );
+    final items = await generation.generate(
+      config: config,
+      grade: 2,
+      semester: '上',
+      topic: WordProblemTopic.mixed,
+      count: 5,
+      difficulty: DifficultyLevel.hard,
+      isActive: () => true,
+    );
+    expect(items, hasLength(5));
+    for (final item in items) {
+      expect(item.source, WordProblemSource.aiScene);
+      expect(item.plan.version, 2);
+      expect(item.plan.sceneId, 'water');
+      final metadata = WordProblemMetadata.decode(item.metadataJson)!;
+      expect(
+        metadata.matchesContext(grade: 2, semester: '上', topic: 'mixed'),
+        isTrue,
+      );
+      expect(item.plan.skeleton.operators, hasLength(2));
+    }
+  });
+
   const crossProvider = LlmConfig(
     baseUrl: 'https://first.example',
     apiKey: 'first',

@@ -39,12 +39,17 @@ class _WordProblemGeneratePageState
   bool _generating = false;
   String? _errorMessage;
 
+  DifficultyLevel get _difficulty => DifficultyLevel.values.byName(
+        ref.read(settingsRepositoryProvider).mathDifficulty,
+      );
+
   /// 年级/学期变更后，若当前知识点在新学期不教授，回退到首个可用项。
   /// 加法/减法在全部预设中恒存在，可用列表不会为空。调用方须自行置于 setState 内。
   void _ensureTopicAvailable() {
     final topics = WordProblemSkeletonGenerator.availableTopics(
       grade: _grade,
       semester: _semester,
+      difficulty: _difficulty,
     );
     if (!topics.contains(_topic)) {
       _topic = topics.first;
@@ -54,6 +59,8 @@ class _WordProblemGeneratePageState
   Future<void> _generate() async {
     if (_generating) return;
 
+    _ensureTopicAvailable();
+
     setState(() {
       _generating = true;
       _errorMessage = null;
@@ -62,6 +69,7 @@ class _WordProblemGeneratePageState
     final semester = _semester;
     final topic = _topic;
     final count = _count;
+    final difficulty = _difficulty;
     final settings = ref.read(settingsRepositoryProvider);
     final createService = ref.read(wordProblemGenerationServiceProvider);
     final client = createRuntimeLlmClient(
@@ -85,6 +93,7 @@ class _WordProblemGeneratePageState
         semester: semester,
         topic: topic,
         count: count,
+        difficulty: difficulty,
         isActive: () => mounted,
       );
       final items = [
@@ -128,6 +137,8 @@ class _WordProblemGeneratePageState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final configAsync = ref.watch(llmConfigProvider);
+    ref.watch(settingsRepositoryProvider);
+    _ensureTopicAvailable();
 
     return Scaffold(
       appBar: AppBar(title: const Text('应用题 AI 出题')),
@@ -183,6 +194,11 @@ class _WordProblemGeneratePageState
               _buildGradeSelector(theme),
               const SizedBox(height: SpacingTokens.md),
               _buildSemesterSelector(theme),
+              const SizedBox(height: SpacingTokens.md),
+              Text(
+                '出题难度：${_difficulty.label}（跟随练习设置）',
+                style: theme.textTheme.bodySmall,
+              ),
               const SizedBox(height: SpacingTokens.md),
               _buildTopicSelector(theme),
               const SizedBox(height: SpacingTokens.md),
@@ -294,6 +310,7 @@ class _WordProblemGeneratePageState
     final topics = WordProblemSkeletonGenerator.availableTopics(
       grade: _grade,
       semester: _semester,
+      difficulty: _difficulty,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

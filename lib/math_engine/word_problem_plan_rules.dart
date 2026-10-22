@@ -1,8 +1,8 @@
 import 'models/math_problem.dart';
+import 'models/difficulty_level.dart';
 import 'models/number_value.dart';
 import 'models/problem_skeleton.dart';
 import 'models/word_problem_plan.dart';
-import 'presets/grade_presets.dart';
 import 'validators/constraint_checker.dart';
 import 'validators/expression_evaluator.dart';
 import 'word_problem_catalog.dart';
@@ -19,11 +19,15 @@ class WordProblemPlanRules {
             WordProblemRelation.merge,
             WordProblemRelation.increase,
             WordProblemRelation.more,
+            WordProblemRelation.restoreInitial,
+            WordProblemRelation.inverseLess,
           ],
         Operator.subtract => [
             WordProblemRelation.decrease,
             WordProblemRelation.less,
             WordProblemRelation.difference,
+            WordProblemRelation.findAdded,
+            WordProblemRelation.inverseMore,
           ],
         Operator.multiply => [WordProblemRelation.equalGroups],
         Operator.divide => [
@@ -44,6 +48,15 @@ class WordProblemPlanRules {
       },
     ];
   }
+
+  static bool isInverse(WordProblemRelation relation) => switch (relation) {
+        WordProblemRelation.restoreInitial ||
+        WordProblemRelation.findAdded ||
+        WordProblemRelation.inverseMore ||
+        WordProblemRelation.inverseLess =>
+          true,
+        _ => false,
+      };
 
   static String answerUnit(
     WordProblemRelation relation,
@@ -70,8 +83,14 @@ class WordProblemPlanRules {
         parsed == null) {
       fail('年级、学期或知识点无效');
     } else {
-      final config = GradePresets.get(grade, semester);
+      final config = WordProblemSkeletonGenerator.configuration(
+        grade: grade,
+        semester: semester,
+      );
       final skeleton = plan.skeleton;
+      if (grade == 2 && skeleton.operators.length == 2 && plan.version < 2) {
+        fail('二年级两步题需要新版题意快照');
+      }
       final expectedOperator = switch (parsed) {
         WordProblemTopic.addition => Operator.add,
         WordProblemTopic.subtraction => Operator.subtract,
@@ -79,7 +98,12 @@ class WordProblemPlanRules {
         WordProblemTopic.division => Operator.divide,
         WordProblemTopic.mixed => null,
       };
-      if (!WordProblemSkeletonGenerator.isTopicAvailable(config, parsed) ||
+      // 存储校验依据实际课程结构，不依赖家长之后可能修改的难度设置。
+      if (!WordProblemSkeletonGenerator.isTopicAvailable(
+            config,
+            parsed,
+            difficulty: DifficultyLevel.hard,
+          ) ||
           skeleton.operators
               .any((op) => !config.allowedOperators.contains(op)) ||
           (expectedOperator == null
@@ -103,6 +127,36 @@ class WordProblemPlanRules {
         config,
       );
       if (violation != null) fail(violation);
+      if (grade == 2) {
+        final quantitiesById = {
+          for (final q in quantities(plan)) q.id: q.value,
+        };
+        for (final step in steps(plan)) {
+          final a = quantitiesById[step.inputs[0]]!;
+          final b = quantitiesById[step.inputs[1]]!;
+          if (step.value > config.maxResult) fail('中间数量超出本学期范围');
+          if (step.operator == Operator.multiply &&
+              (a > config.maxMultiplier ||
+                  b > config.maxMultiplier ||
+                  b > (grade == 2 || semester == '上' ? 9 : 99))) {
+            fail('乘法因数超出本学期范围');
+          }
+          if (step.operator == Operator.divide &&
+              (a > config.maxDividend ||
+                  b > (grade == 2 || semester == '上' ? 9 : 99) ||
+                  grade == 2 && step.value > 9)) {
+            fail('除法数量超出本学期范围');
+          }
+          if (step.operator == Operator.add &&
+                  !config.allowCarry &&
+                  _requiresRegrouping(a, b, subtract: false) ||
+              step.operator == Operator.subtract &&
+                  !config.allowBorrow &&
+                  _requiresRegrouping(a, b, subtract: true)) {
+            fail('本学期尚未学习进退位');
+          }
+        }
+      }
       if (skeleton.operators.length == 1) {
         final a = skeleton.operands[0], b = skeleton.operands[1];
         if (expectedOperator == Operator.multiply &&
@@ -149,6 +203,11 @@ class WordProblemPlanRules {
     void fail(String code, String message, String field) =>
         issues.add(WordProblemIssue(code, message, field: field));
     final skeleton = plan.skeleton;
+    if (plan.version < 1 ||
+        plan.version > 2 ||
+        isInverse(plan.relation) && plan.version < 2) {
+      fail('version', '题目计划版本无效', 'planVersion');
+    }
     final scene = WordProblemCatalog.find(plan.sceneId);
     if (scene == null ||
         !WordProblemCatalog.forRelation(plan.relation).contains(scene)) {
@@ -219,6 +278,10 @@ class WordProblemPlanRules {
           'difference',
         ],
       WordProblemRelation.difference => ['larger', 'smaller'],
+      WordProblemRelation.restoreInitial => ['remaining', 'removed'],
+      WordProblemRelation.findAdded => ['final', 'initial'],
+      WordProblemRelation.inverseMore => ['larger', 'difference'],
+      WordProblemRelation.inverseLess => ['smaller', 'difference'],
       WordProblemRelation.equalGroups => ['perGroup', 'groupCount'],
       WordProblemRelation.equalShare => ['total', 'groupCount'],
       WordProblemRelation.groupCount => ['total', 'perGroup'],

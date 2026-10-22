@@ -36,6 +36,7 @@ class WordProblemGenerationService {
     required String semester,
     required WordProblemTopic topic,
     required int count,
+    DifficultyLevel difficulty = DifficultyLevel.medium,
     required bool Function() isActive,
   }) async {
     if (!isActive()) throw const LlmGenerationCancelled();
@@ -44,6 +45,7 @@ class WordProblemGenerationService {
       semester: semester,
       topic: topic.name,
       count: count,
+      difficulty: difficulty,
       skeletonFactory: skeletonFactory,
     );
     final result = await client.chooseWordProblemScenes(
@@ -72,6 +74,7 @@ class WordProblemGenerationService {
             initial.relation,
             choice.sceneId,
             variantId: choice.variantId,
+            version: initial.version,
           );
     final validation = WordProblemPlanRules.validate(plan);
     final rendered = WordProblemRenderer.render(plan);

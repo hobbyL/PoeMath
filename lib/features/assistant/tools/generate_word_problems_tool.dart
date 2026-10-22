@@ -98,6 +98,7 @@ class GenerateWordProblemsTool extends AssistantTool {
 
     // 出题走「AI 出题」场景配置，非助手配置。
     final settings = ref.read(settingsRepositoryProvider);
+    final difficulty = DifficultyLevel.values.byName(settings.mathDifficulty);
     final config =
         await settings.readLlmConfigForScenario(LlmScenario.wordProblem);
     if (config == null) {
@@ -120,6 +121,7 @@ class GenerateWordProblemsTool extends AssistantTool {
                 semester: semester,
                 topic: topic,
                 count: count,
+                difficulty: difficulty,
                 isActive: isActive,
               );
       final items = [

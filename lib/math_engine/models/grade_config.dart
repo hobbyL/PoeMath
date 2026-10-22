@@ -88,4 +88,32 @@ class GradeConfig {
     this.maxMultiplier = 9,
     this.maxDividend = 81,
   });
+
+  /// 调整可生成的运算/显示形态，数值和课程边界沿用当前配置。
+  GradeConfig withAllowed({
+    Set<Operator>? operators,
+    Set<ProblemMode>? modes,
+  }) =>
+      GradeConfig(
+        grade: grade,
+        semester: semester,
+        label: label,
+        allowedOperators: operators ?? allowedOperators,
+        allowedModes: modes ?? allowedModes,
+        minOperand: minOperand,
+        maxOperand: maxOperand,
+        maxResult: maxResult,
+        allowCarry: allowCarry,
+        allowBorrow: allowBorrow,
+        allowRemainder: allowRemainder,
+        allowBrackets: allowBrackets,
+        maxOperands: maxOperands,
+        allowDecimal: allowDecimal,
+        maxDecimalPlaces: maxDecimalPlaces,
+        allowFraction: allowFraction,
+        maxDenominator: maxDenominator,
+        allowNegative: allowNegative,
+        maxMultiplier: maxMultiplier,
+        maxDividend: maxDividend,
+      );
 }

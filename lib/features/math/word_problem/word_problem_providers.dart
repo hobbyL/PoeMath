@@ -16,12 +16,7 @@ import 'word_problem_generation_service.dart';
 
 /// 骨架生成函数签名（与 [WordProblemSkeletonGenerator.generate] 一致，
 /// 省略可选 random）。
-typedef WordProblemSkeletonGeneratorFn = List<ProblemSkeleton> Function({
-  required int grade,
-  required String semester,
-  required String topic,
-  required int count,
-});
+typedef WordProblemSkeletonGeneratorFn = WordProblemSkeletonFactory;
 
 /// 应用题骨架生成器（生成页经此调用；测试可注入失败场景）。
 final wordProblemSkeletonProvider =

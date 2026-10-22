@@ -28,7 +28,8 @@ class DifficultyAdjuster {
     final maxRes = (base.maxResult * 0.5).ceil().clamp(5, base.maxResult);
 
     // 乘除数范围也缩减
-    final maxMul = (base.maxMultiplier * 0.5).ceil().clamp(2, base.maxMultiplier);
+    final maxMul =
+        (base.maxMultiplier * 0.5).ceil().clamp(2, base.maxMultiplier);
     final maxDiv = (base.maxDividend * 0.5).ceil().clamp(9, base.maxDividend);
 
     // 只保留基础模式
@@ -37,8 +38,8 @@ class DifficultyAdjuster {
     // 运算符只保留加减（低年级），若年级 ≥ 3 则保留乘除
     Set<Operator> ops;
     if (base.grade <= 2) {
-      ops = base.allowedOperators
-          .intersection({Operator.add, Operator.subtract});
+      ops =
+          base.allowedOperators.intersection({Operator.add, Operator.subtract});
       if (ops.isEmpty) ops = {Operator.add};
     } else {
       ops = base.allowedOperators;
@@ -79,9 +80,8 @@ class DifficultyAdjuster {
     }
 
     // 高年级允许多一步运算
-    final maxOps = base.grade >= 3
-        ? (base.maxOperands + 1).clamp(2, 4)
-        : base.maxOperands;
+    final maxOps =
+        base.grade >= 3 ? (base.maxOperands + 1).clamp(2, 4) : base.maxOperands;
 
     return GradeConfig(
       grade: base.grade,
@@ -92,10 +92,10 @@ class DifficultyAdjuster {
       minOperand: base.minOperand,
       maxOperand: base.maxOperand,
       maxResult: base.maxResult,
-      allowCarry: true,
-      allowBorrow: true,
+      allowCarry: base.allowCarry,
+      allowBorrow: base.allowBorrow,
       allowRemainder: base.allowRemainder,
-      allowBrackets: base.allowBrackets || base.grade >= 3,
+      allowBrackets: base.allowBrackets,
       maxOperands: maxOps,
       allowDecimal: base.allowDecimal,
       maxDecimalPlaces: base.maxDecimalPlaces,

@@ -29,6 +29,14 @@ class WordProblemRenderer {
         '$prefix小明有$a$unit$object，小红比小明少$b$unit，小红有多少$unit$object？',
       WordProblemRelation.difference =>
         '$prefix甲组有$a$unit$object，乙组有$b$unit$object，甲组比乙组多多少$unit$object？',
+      WordProblemRelation.restoreInitial =>
+        '$prefix${scene.place}用去$b$unit$object后，还剩$a$unit$object，原来有多少$unit$object？',
+      WordProblemRelation.findAdded =>
+        '$prefix${scene.place}原有$b$unit$object，又添了一些后有$a$unit$object，添了多少$unit$object？',
+      WordProblemRelation.inverseMore =>
+        '$prefix小红有$a$unit$object，比小明多$b$unit，小明有多少$unit$object？',
+      WordProblemRelation.inverseLess =>
+        '$prefix小红有$a$unit$object，比小明少$b$unit，小明有多少$unit$object？',
       WordProblemRelation.equalGroups => scene.purchase
           ? '$prefix每$group${scene.object}$a元，买$b$group${scene.object}，一共花了多少元？'
           : scene.id == 'petals'
@@ -92,6 +100,10 @@ class WordProblemRenderer {
         WordProblemRelation.more => ['小红比小明多，把原有数量加上多出的数量。'],
         WordProblemRelation.less => ['小红比小明少，从原有数量减去少的数量。'],
         WordProblemRelation.difference => ['求相差的数量，用较大的数量减去较小的数量。'],
+        WordProblemRelation.restoreInitial => ['求原来的数量，把剩下的数量加上用去的数量。'],
+        WordProblemRelation.findAdded => ['求添了多少，从现在的数量减去原有的数量。'],
+        WordProblemRelation.inverseMore => ['小红比小明多，求小明的数量要从小红的数量减去多出的数量。'],
+        WordProblemRelation.inverseLess => ['小红比小明少，求小明的数量要在小红的数量上加上少的数量。'],
         WordProblemRelation.equalGroups => ['求总量，用每份数量乘份数。'],
         WordProblemRelation.equalShare => ['求每组数量，用总量除以组数。'],
         WordProblemRelation.groupCount => ['求份数，用总量除以每份数量。'],

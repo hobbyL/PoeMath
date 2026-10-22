@@ -15,6 +15,10 @@ enum WordProblemRelation {
   sequential,
   groupedChange,
   sharedChange,
+  restoreInitial,
+  findAdded,
+  inverseMore,
+  inverseLess,
 }
 
 enum WordProblemSource { aiScene, localTemplate }
@@ -100,7 +104,17 @@ class WordProblemPlan {
     required this.relation,
     required this.sceneId,
     this.variantId = 'standard',
-  }) : skeleton = ProblemSkeleton(
+    int? version,
+  })  : version = version ??
+            switch (relation) {
+              WordProblemRelation.restoreInitial ||
+              WordProblemRelation.findAdded ||
+              WordProblemRelation.inverseMore ||
+              WordProblemRelation.inverseLess =>
+                2,
+              _ => 1,
+            },
+        skeleton = ProblemSkeleton(
           operands: List.unmodifiable(skeleton.operands),
           operators: List.unmodifiable(skeleton.operators),
           answer: skeleton.answer,
@@ -112,6 +126,7 @@ class WordProblemPlan {
   final WordProblemRelation relation;
   final String sceneId;
   final String variantId;
+  final int version;
   String get templateId => '${relation.name}:$variantId';
   String get targetQuantityId => 'target';
 }

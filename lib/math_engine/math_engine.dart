@@ -67,6 +67,8 @@ class MathEngine {
     if (verticalProcessOnly && mode != ProblemMode.vertical) {
       throw ArgumentError('逐列过程练习必须使用竖式模式');
     }
+    final rng = random ?? Random();
+    final candidateCount = difficulty == DifficultyLevel.hard ? 8 : 1;
     var config = GradePresets.get(grade, semester);
     if (difficulty != null) {
       config = DifficultyAdjuster.adjust(config, difficulty);
@@ -74,7 +76,6 @@ class MathEngine {
     if (mode != null && !config.allowedModes.contains(mode)) {
       throw ArgumentError.value(mode, 'mode', '该学期不支持此练习模式');
     }
-    final rng = random ?? Random();
     final requestedSkill = MathSkill.fromId(skillId);
     if (skillId != null && requestedSkill == null) {
       throw ArgumentError.value(skillId, 'skillId', '未知知识点');
@@ -88,11 +89,16 @@ class MathEngine {
         .toList();
     if (generators.isEmpty) throw ArgumentError('当前册次不支持此知识点');
 
+    MathProblem? best;
+    BaseGenerator? selectedGenerator;
+    var candidates = 0;
+
     // 约束检查，不通过则重新生成（最多 100 次）
     for (var i = 0;
         i < (requestedSkill == null && !verticalProcessOnly ? 100 : 1000);
         i++) {
-      final generator = generators[rng.nextInt(generators.length)];
+      final generator =
+          selectedGenerator ?? generators[rng.nextInt(generators.length)];
       final problem = generator.generate();
 
       // 若指定了模式，强制转换
@@ -108,9 +114,23 @@ class MathEngine {
 
       final violation = ConstraintChecker.check(converted, config);
       if (violation == null) {
-        return converted.withContext(skillId: skill.id, semester: semester);
+        final candidate = converted.withContext(
+          skillId: skill.id,
+          semester: semester,
+        );
+        if (candidateCount == 1) return candidate;
+        // 先选生成器，再在同类的合法候选中挑选，避免难题筛选挤掉其他知识点。
+        selectedGenerator = generator;
+        if (best == null ||
+            DifficultyScorer.selectionScore(candidate) >
+                DifficultyScorer.selectionScore(best)) {
+          best = candidate;
+        }
+        if (++candidates == candidateCount) return best;
       }
     }
+
+    if (best != null) return best;
 
     if (requestedSkill != null || verticalProcessOnly) {
       throw StateError('无法生成满足当前册次、模式和知识点的专项题，请调整选择');
@@ -210,19 +230,47 @@ class MathEngine {
     String? skillId,
     bool verticalProcessOnly = false,
   }) {
-    return List.generate(
-      count,
-      (_) => generate(
+    if (count < 0) throw RangeError.value(count, 'count');
+    if (count == 0) return [];
+    final rng = random ?? Random();
+    final pool = <String, MathProblem>{};
+    for (var i = 0; i < count * 3 + 12; i++) {
+      final problem = generate(
         grade: grade,
         semester: semester,
         mode: mode,
         difficulty: difficulty,
-        random: random,
+        random: rng,
         skillId: skillId,
         verticalProcessOnly: verticalProcessOnly,
-      ),
-    );
+      );
+      pool.putIfAbsent(_expressionKey(problem), () => problem);
+    }
+    final result = <MathProblem>[];
+    final skills = <String?, int>{};
+    final modes = <ProblemMode, int>{};
+    var remaining = pool.values.toList();
+    for (var i = 0; i < count; i++) {
+      // 小范围题库耗尽后才允许重复；重试始终有界，不能扩大课程范围补题。
+      if (remaining.isEmpty) remaining = pool.values.toList();
+      var selected = 0;
+      int load(MathProblem p) =>
+          (skills[p.skillId] ?? 0) * 4 + (modes[p.mode] ?? 0);
+      for (var j = 1; j < remaining.length; j++) {
+        if (load(remaining[j]) < load(remaining[selected])) selected = j;
+      }
+      final problem = remaining.removeAt(selected);
+      result.add(problem);
+      skills[problem.skillId] = (skills[problem.skillId] ?? 0) + 1;
+      modes[problem.mode] = (modes[problem.mode] ?? 0) + 1;
+    }
+    return result;
   }
+
+  // 挖空位置/比较目标不同仍属于同一道计算结构，不用换题型掩盖重复。
+  static String _expressionKey(MathProblem p) =>
+      '${p.displayText ?? p.operands.join(',')}|${p.operators.join(',')}|'
+      '${p.bracketRange}|${p.remainder}';
 
   /// 判定用户答案。
   static AnswerJudgement judge(MathProblem problem, String userAnswer) {

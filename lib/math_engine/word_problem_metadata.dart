@@ -16,7 +16,7 @@ class WordProblemMetadata {
 
   Map<String, Object?> toJson() => {
         'schemaVersion': schemaVersion,
-        'planVersion': 1,
+        'planVersion': plan.version,
         'templateVersion': 1,
         'templateId': plan.templateId,
         'relation': plan.relation.name,
@@ -49,7 +49,7 @@ class WordProblemMetadata {
       }
       if ((decoded['schemaVersion'] as int) > schemaVersion ||
           decoded['planVersion'] is int &&
-              (decoded['planVersion'] as int) > 1 ||
+              (decoded['planVersion'] as int) > 2 ||
           decoded['templateVersion'] is int &&
               (decoded['templateVersion'] as int) > 1) {
         return null;
@@ -82,6 +82,7 @@ class WordProblemMetadata {
             .firstWhere((v) => v.name == decoded['relation']),
         sceneId: decoded['sceneId'] as String,
         variantId: decoded['variantId'] as String,
+        version: decoded['planVersion'] as int,
       );
       if (!WordProblemPlanRules.validate(plan).canSave) {
         throw const FormatException('题意快照数量关系无效');
@@ -136,11 +137,15 @@ class WordProblemMetadata {
         difficulty == plan.skeleton.difficulty;
   }
 
-  bool matchesContext(
-          {required int grade,
-          required String semester,
-          required String topic,}) =>
-      WordProblemPlanRules.validateContext(plan,
-              grade: grade, semester: semester, topic: topic,)
-          .canSave;
+  bool matchesContext({
+    required int grade,
+    required String semester,
+    required String topic,
+  }) =>
+      WordProblemPlanRules.validateContext(
+        plan,
+        grade: grade,
+        semester: semester,
+        topic: topic,
+      ).canSave;
 }

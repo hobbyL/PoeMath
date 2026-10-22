@@ -90,6 +90,85 @@ void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
 
+  test('新版逆向题和二年级两步题经入库、作答、关闭重开及备份恢复保留', () async {
+    final plans = [
+      WordProblemPlanGenerator.withScene(
+        const ProblemSkeleton(
+          operands: [17, 18],
+          operators: [Operator.add],
+          answer: 35,
+          unitHint: '支',
+          difficulty: 2,
+        ),
+        WordProblemRelation.restoreInitial,
+        'pencils',
+      ),
+      WordProblemPlanGenerator.withScene(
+        const ProblemSkeleton(
+          operands: [50, 7, 4],
+          operators: [Operator.subtract, Operator.multiply],
+          answer: 22,
+          unitHint: '支',
+          difficulty: 4,
+        ),
+        WordProblemRelation.groupedChange,
+        'pencils',
+        version: 2,
+      ),
+    ];
+    final repository = LlmProblemRepository();
+    for (var i = 0; i < plans.length; i++) {
+      final plan = plans[i];
+      final rendered = WordProblemRenderer.render(plan);
+      final item = LlmProblem(
+        id: 'new$i',
+        profileId: 'default',
+        questionText: rendered.text,
+        explanation: rendered.explanation,
+        unit: plan.skeleton.unitHint,
+        operands: plan.skeleton.operands,
+        operators: plan.skeleton.operators.map((op) => op.symbol).toList(),
+        answer: plan.skeleton.answer,
+        batchId: 'new_batch',
+        createdAt: DateTime(2026, 10, 22),
+        grade: 2,
+        semester: '上',
+        topic: i == 0 ? 'addition' : 'mixed',
+        difficulty: plan.skeleton.difficulty,
+        generationMetadataJson:
+            WordProblemMetadata(plan: plan, source: WordProblemSource.aiScene)
+                .encode(),
+      );
+      await repository.addAll([item]);
+      await repository.recordAttempt(
+        item.id,
+        correct: true,
+        activityId: 'new_attempt$i',
+      );
+    }
+    await HiveBoxes.close();
+    await HiveBoxes.init();
+    final before = [
+      for (var i = 0; i < 2; i++) repository.getById('new$i')!.toSnapshot(),
+    ];
+    final backup = BackupService();
+    final exported = await backup.exportToJson(includeCredentials: false);
+    await backup.restoreFromJson(exported);
+    await HiveBoxes.close();
+    await HiveBoxes.init();
+    for (var i = 0; i < 2; i++) {
+      final restored = repository.getById('new$i')!;
+      expect(restored.toSnapshot(), before[i]);
+      expect(restored.answer, i == 0 ? 35 : 22);
+      expect(
+        WordProblemMetadata.decode(restored.generationMetadataJson)!
+            .plan
+            .version,
+        2,
+      );
+    }
+  });
+
   test('旧18及19字段Hive记录可读取，新增字段回落且原统计保留', () async {
     for (final fieldCount in [18, 19]) {
       await HiveBoxes.close();
@@ -107,8 +186,10 @@ void main() {
       expect(restored.generationMetadataJson, '');
       expect(restored.attempts, 3);
       expect(restored.correctCount, 2);
-      expect(restored.appliedActivityIds,
-          fieldCount == 18 ? <String>[] : ['old_activity'],);
+      expect(
+        restored.appliedActivityIds,
+        fieldCount == 18 ? <String>[] : ['old_activity'],
+      );
       expect(restored.questionText, original.questionText);
       expect(restored.answer, 9);
     }
@@ -120,17 +201,21 @@ void main() {
         as Map<String, dynamic>;
     metadata['schemaVersion'] = 2;
     snapshot['generationMetadataJson'] = jsonEncode(metadata);
-    await BackupService().restoreFromJson(jsonEncode({
-      'version': 1,
-      'llmProblems': [snapshot],
-    }),);
+    await BackupService().restoreFromJson(
+      jsonEncode({
+        'version': 1,
+        'llmProblems': [snapshot],
+      }),
+    );
     await HiveBoxes.close();
     await HiveBoxes.init();
     final restored = LlmProblemRepository().getById('p1')!;
     expect(restored.toSnapshot(), snapshot);
     expect(WordProblemMetadata.decode(restored.generationMetadataJson), isNull);
     await expectLater(
-        LlmProblemRepository().addAll([restored]), throwsFormatException,);
+      LlmProblemRepository().addAll([restored]),
+      throwsFormatException,
+    );
   });
 
   test('错误知识点及未学年级在入库和备份写入前拒绝', () async {
@@ -141,14 +226,19 @@ void main() {
       <String, Object>{'grade': 1},
     ]) {
       final snapshot = problem().toSnapshot()..addAll(change);
-      await expectLater(repository.addAll([LlmProblem.fromSnapshot(snapshot)]),
-          throwsFormatException,);
       await expectLater(
-          BackupService().restoreFromJson(jsonEncode({
+        repository.addAll([LlmProblem.fromSnapshot(snapshot)]),
+        throwsFormatException,
+      );
+      await expectLater(
+        BackupService().restoreFromJson(
+          jsonEncode({
             'version': 1,
             'llmProblems': [snapshot],
-          }),),
-          throwsFormatException,);
+          }),
+        ),
+        throwsFormatException,
+      );
       expect(HiveBoxes.llmProblems.keys, ['default_existing']);
     }
   });
@@ -159,10 +249,15 @@ void main() {
     await repository.addAll([original]);
     await HiveBoxes.close();
     await HiveBoxes.init();
-    expect(repository.getById('p1')!.generationMetadataJson,
-        original.generationMetadataJson,);
-    await repository.recordAttempt('p1',
-        correct: true, activityId: 'test_word_activity',);
+    expect(
+      repository.getById('p1')!.generationMetadataJson,
+      original.generationMetadataJson,
+    );
+    await repository.recordAttempt(
+      'p1',
+      correct: true,
+      activityId: 'test_word_activity',
+    );
     final attempted = repository.getById('p1')!;
     expect(attempted.generationMetadataJson, original.generationMetadataJson);
     expect(attempted.appliedActivityIds, ['test_word_activity']);
@@ -182,10 +277,12 @@ void main() {
   test('旧题缺少元数据可恢复且保持历史题面', () async {
     final old = problem(legacy: true).toSnapshot()
       ..remove('generationMetadataJson');
-    await BackupService().restoreFromJson(jsonEncode({
-      'version': 1,
-      'llmProblems': [old],
-    }),);
+    await BackupService().restoreFromJson(
+      jsonEncode({
+        'version': 1,
+        'llmProblems': [old],
+      }),
+    );
     final stored = LlmProblemRepository().getById('p1')!;
     expect(stored.generationMetadataJson, '');
     expect(stored.questionText, old['questionText']);
@@ -207,10 +304,12 @@ void main() {
               ? '{broken'
               : '被更改的文本';
       await expectLater(
-        BackupService().restoreFromJson(jsonEncode({
-          'version': 1,
-          'llmProblems': [invalid],
-        }),),
+        BackupService().restoreFromJson(
+          jsonEncode({
+            'version': 1,
+            'llmProblems': [invalid],
+          }),
+        ),
         throwsFormatException,
         reason: field,
       );
@@ -222,11 +321,14 @@ void main() {
     metadata['targetQuantityId'] = 'q0';
     invalid['generationMetadataJson'] = jsonEncode(metadata);
     await expectLater(
-        BackupService().restoreFromJson(jsonEncode({
+      BackupService().restoreFromJson(
+        jsonEncode({
           'version': 1,
           'llmProblems': [invalid],
-        }),),
-        throwsFormatException,);
+        }),
+      ),
+      throwsFormatException,
+    );
     expect(HiveBoxes.llmProblems.keys, ['default_existing']);
   });
 
@@ -235,8 +337,9 @@ void main() {
       ..['questionText'] = '一共有36瓶水，问另一个人的数量';
     final repository = LlmProblemRepository();
     await expectLater(
-        repository.addAll([problem(), LlmProblem.fromSnapshot(invalid)]),
-        throwsFormatException,);
+      repository.addAll([problem(), LlmProblem.fromSnapshot(invalid)]),
+      throwsFormatException,
+    );
     expect(repository.getAll(), isEmpty);
   });
 }

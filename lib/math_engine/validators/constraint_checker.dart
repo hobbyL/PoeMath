@@ -4,6 +4,7 @@
 
 import '../models/grade_config.dart';
 import '../models/math_problem.dart';
+import '../models/math_skill.dart';
 import '../models/number_value.dart';
 import 'expression_evaluator.dart';
 
@@ -102,8 +103,10 @@ class ConstraintChecker {
           final operands = List<NumberValue>.of(problem.operands)
             ..[index] = value;
           final alternative = ExpressionEvaluator.evaluate(
-              operands, problem.operators,
-              bracketRange: problem.bracketRange,);
+            operands,
+            problem.operators,
+            bracketRange: problem.bracketRange,
+          );
           if (alternative == evaluated) return '未知项不唯一';
         }
       }
@@ -125,6 +128,55 @@ class ConstraintChecker {
 /// 难度评估器。
 class DifficultyScorer {
   const DifficultyScorer._();
+
+  /// 同一知识点内挑题用的细分分数；不改变历史题目保存的 1–5 评分。
+  /// 数位、进退位和推理模式增加计算量，0/1 捷径降低计算量。
+  static int selectionScore(MathProblem problem) {
+    var score = 0;
+    for (final value in problem.operands) {
+      score += value.asInteger.abs().toString().length * 2;
+      if (!value.isInteger) {
+        score += 3 + value.asFraction.denominator.toString().length;
+      }
+      if (value.asDouble == 0) score -= 12;
+    }
+    if (MathSkill.hasRegrouping(problem)) score += 8;
+    final denominators = problem.operands
+        .where((value) => !value.isInteger)
+        .map((value) => value.asFraction.denominator)
+        .toSet();
+    if (denominators.length > 1) score += 4;
+    score += (problem.operators.length - 1) * 5;
+    if (problem.bracketRange != null) score += 3;
+    if (problem.mode == ProblemMode.findMissing ||
+        problem.mode == ProblemMode.compare) {
+      score += 2;
+    }
+    if (problem.operators.length == 1) {
+      final a = problem.operands[0];
+      final b = problem.operands[1];
+      final op = problem.operators.single;
+      final value = problem.expressionResult ?? problem.result;
+      if ((op == Operator.multiply &&
+              (a.asDouble.abs() == 1 || b.asDouble.abs() == 1)) ||
+          (op == Operator.divide &&
+              (b.asDouble.abs() == 1 || value.asDouble.abs() == 1)) ||
+          (op == Operator.subtract && a == b)) {
+        score -= 16;
+      }
+      if (op == Operator.multiply &&
+          a.asDouble.abs() >= 6 &&
+          b.asDouble.abs() >= 6) {
+        score += 4;
+      }
+      if (op == Operator.divide &&
+          b.asDouble.abs() >= 6 &&
+          value.asDouble.abs() >= 6) {
+        score += 4;
+      }
+    }
+    return score;
+  }
 
   /// 评估题目难度（1-5）。
   static int score(MathProblem problem) {

@@ -129,6 +129,7 @@ void main() {
         required String semester,
         required String topic,
         required int count,
+        DifficultyLevel difficulty = DifficultyLevel.medium,
       }) =>
           List.filled(
         count,
@@ -221,6 +222,7 @@ void main() {
         required String semester,
         required String topic,
         required int count,
+        DifficultyLevel difficulty = DifficultyLevel.medium,
       }) {
         skeletonCalls++;
         return [];
@@ -255,6 +257,7 @@ void main() {
         required String semester,
         required String topic,
         required int count,
+        DifficultyLevel difficulty = DifficultyLevel.medium,
       }) =>
           List.filled(
         count,
@@ -324,11 +327,12 @@ void main() {
     await drainHiveWritesForTesting(tester);
   });
 
-  testWidgets('配置和网络等待时修改选项，骨架请求及预览始终使用发起时快照', (tester) async {
+  testWidgets('配置等待时修改练习难度及选项，生成始终使用发起时设置快照', (tester) async {
     final settings = _DelayedSettingsRepository();
+    await tester.runAsync(() => settings.setMathDifficulty('hard'));
     final response = Completer<http.Response>();
     http.Request? request;
-    (int, String, String, int)? capturedSkeleton;
+    (int, String, String, int, DifficultyLevel)? capturedSkeleton;
     WordProblemPreviewData? preview;
     await _pumpDelayedGenerator(
       tester,
@@ -338,13 +342,15 @@ void main() {
         required String semester,
         required String topic,
         required int count,
+        DifficultyLevel difficulty = DifficultyLevel.medium,
       }) {
-        capturedSkeleton = (grade, semester, topic, count);
+        capturedSkeleton = (grade, semester, topic, count, difficulty);
         return WordProblemSkeletonGenerator.generate(
           grade: grade,
           semester: semester,
           topic: topic,
           count: count,
+          difficulty: difficulty,
         );
       },
       client: MockClient((incoming) {
@@ -353,12 +359,16 @@ void main() {
       }),
       onPreview: (data) => preview = data,
     );
+    expect(find.text('出题难度：困难（跟随练习设置）'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '混合运算'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '困难'), findsNothing);
     await tester.tap(find.text('生成 10 题'));
     await tester.pump();
     await tester.tap(find.widgetWithText(ChoiceChip, '3 年级'));
     await tester.pump();
     await tester.tap(find.text('下学期'));
     await tester.pump();
+    await tester.runAsync(() => settings.setMathDifficulty('easy'));
     settings.pending.complete(_config);
     // 放行配置读取后，`_generate` 才真正开跑，它将经过
     // `CloudUsageService.reserve` —— 其中 `HiveBoxes.meta.put` 的完成
@@ -374,7 +384,7 @@ void main() {
       );
       await tester.pump();
     }
-    expect(capturedSkeleton, (2, '上', 'addition', 10));
+    expect(capturedSkeleton, (2, '上', 'addition', 10, DifficultyLevel.hard));
     expect(request, isNotNull);
     await tester.tap(find.widgetWithText(ChoiceChip, '减法'));
     await tester.pump();
@@ -480,6 +490,7 @@ void main() {
               required String semester,
               required String topic,
               required int count,
+              DifficultyLevel difficulty = DifficultyLevel.medium,
             }) =>
                 throw StateError('无法生成目标运算符的加减法骨架'),
           ),

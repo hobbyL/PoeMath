@@ -33,6 +33,7 @@ import 'package:poemath/features/assistant/tools/explain_mistake_tool.dart';
 import 'package:poemath/features/assistant/tools/generate_word_problems_tool.dart';
 import 'package:poemath/features/assistant/tools/open_practice_tool.dart';
 import 'package:poemath/features/math/word_problem/word_problem_preview_page.dart';
+import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../../helpers/hive_test_helper.dart';
 
@@ -458,6 +459,9 @@ void main() {
         }),
       );
       await _seedWordProblemProvider(store);
+      await container
+          .read(settingsRepositoryProvider)
+          .setMathDifficulty('hard');
       final tool = container
           .read(assistantToolsProvider)
           .whereType<GenerateWordProblemsTool>()
@@ -487,6 +491,13 @@ void main() {
       expect(data.semester, '上');
       expect(data.topicName, 'addition');
       expect(data.items, hasLength(3));
+      for (final item in data.items) {
+        final plan =
+            WordProblemMetadata.decode(item.generationMetadataJson)!.plan;
+        expect(WordProblemPlanRules.isInverse(plan.relation), isTrue);
+        expect(plan.version, 2);
+      }
+
       expect(data.items.every((item) => item.accepted), isTrue);
       expect(
         data.items.every((item) => item.generationMetadataJson.isNotEmpty),
