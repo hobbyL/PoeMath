@@ -128,3 +128,4 @@ docs/
 # FVM Version Cache
 .fvm/
 .ace-tool/
+tools/textbook_importer/.venv/
