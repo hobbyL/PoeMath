@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "kind": "textbookCourse",
+  "status": "draft",
+  "contentRevision": 1,
+  "coverage": "partial",
+  "expectedLessonCount": null,
+  "edition": {
+    "id": "yuwen-g1-second-aaaaaaaaaaaa",
+    "pdfSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "pageCount": 3,
+    "fileSize": 1234,
+    "title": "自有合成教材",
+    "grade": 1,
+    "semester": "下",
+    "publisher": "合成出版社",
+    "editionLabel": "自有测试版",
+    "editionNotes": "自有测试内容，没有真实教材正文",
+    "publicationDate": null,
+    "editionNumber": null,
+    "printingDate": null,
+    "printingNumber": null,
+    "sourceUrl": "https://raw.githubusercontent.com/example/textbook/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/sample.pdf",
+    "sources": [
+      {
+        "pdfPage": 1,
+        "printedPage": null,
+        "extractionStatus": "text_extracted"
+      }
+    ],
+    "review": {
+      "status": "unreviewed",
+      "reviewer": null,
+      "reviewedAt": null,
+      "contentSha256": null,
+      "checks": [],
+      "notes": null
+    }
+  },
+  "permissions": {
+    "content": {
+      "status": "unknown",
+      "evidence": ""
+    },
+    "applicationUse": {
+      "status": "unknown",
+      "evidence": ""
+    }
+  },
+  "review": {
+    "status": "unreviewed",
+    "reviewer": null,
+    "reviewedAt": null,
+    "contentSha256": null,
+    "checks": [],
+    "notes": null
+  },
+  "units": [
+    {
+      "id": "unit-001",
+      "title": "合成单元",
+      "sources": [
+        {
+          "pdfPage": 1,
+          "printedPage": "0",
+          "extractionStatus": "manual"
+        }
+      ],
+      "review": {
+        "status": "unreviewed",
+        "reviewer": null,
+        "reviewedAt": null,
+        "contentSha256": null,
+        "checks": [],
+        "notes": null
+      },
+      "lessonIds": [
+        "lesson-001"
+      ]
+    }
+  ],
+  "lessons": [
+    {
+      "id": "lesson-001",
+      "unitId": "unit-001",
+      "title": "星月测试",
+      "kind": "text",
+      "lessonNumber": 1,
+      "sources": [
+        {
+          "pdfPage": 2,
+          "printedPage": "1",
+          "extractionStatus": "manual"
+        }
+      ],
+      "review": {
+        "status": "unreviewed",
+        "reviewer": null,
+        "reviewedAt": null,
+        "contentSha256": null,
+        "checks": [],
+        "notes": null
+      },
+      "coverage": {
+        "paragraphs": "complete",
+        "recognitionCharacters": "complete",
+        "writingCharacters": "complete",
+        "words": "complete",
+        "recitations": "complete",
+        "exercises": "complete"
+      },
+      "paragraphs": [
+        {
+          "id": "paragraph-001",
+          "text": "星𠀀，月。",
+          "pinyin": [
+            "xīng",
+            "hē",
+            "，",
+            "yuè",
+            "。"
+          ],
+          "sources": [
+            {
+              "pdfPage": 2,
+              "printedPage": "1",
+              "extractionStatus": "manual"
+            }
+          ],
+          "review": {
+            "status": "unreviewed",
+            "reviewer": null,
+            "reviewedAt": null,
+            "contentSha256": null,
+            "checks": [],
+            "notes": null
+          }
+        }
+      ],
+      "recognitionCharacters": [
+        {
+          "id": "recognition-001",
+          "text": "𠀀",
+          "pinyin": [
+            "hē"
+          ],
+          "sources": [
+            {
+              "pdfPage": 2,
+              "printedPage": "1",
+              "extractionStatus": "manual"
+            }
+          ],
+          "review": {
+            "status": "unreviewed",
+            "reviewer": null,
+            "reviewedAt": null,
+            "contentSha256": null,
+            "checks": [],
+            "notes": null
+          },
+          "requirement": "recognition"
+        }
+      ],
+      "writingCharacters": [
+        {
+          "id": "writing-001",
+          "text": "星",
+          "pinyin": [
+            "xīng"
+          ],
+          "sources": [
+            {
+              "pdfPage": 2,
+              "printedPage": "1",
+              "extractionStatus": "manual"
+            }
+          ],
+          "review": {
+            "status": "unreviewed",
+            "reviewer": null,
+            "reviewedAt": null,
+            "contentSha256": null,
+            "checks": [],
+            "notes": null
+          },
+          "requirement": "writing"
+        }
+      ],
+      "words": [
+        {
+          "id": "word-001",
+          "text": "星月",
+          "pinyin": [
+            "xīng",
+            "yuè"
+          ],
+          "sources": [
+            {
+              "pdfPage": 2,
+              "printedPage": "1",
+              "extractionStatus": "manual"
+            }
+          ],
+          "review": {
+            "status": "unreviewed",
+            "reviewer": null,
+            "reviewedAt": null,
+            "contentSha256": null,
+            "checks": [],
+            "notes": null
+          },
+          "requirement": "reading"
+        }
+      ],
+      "recitations": [
+        {
+          "id": "recitation-001",
+          "instruction": "只背测试句的前两个字。",
+          "ranges": [
+            {
+              "paragraphId": "paragraph-001",
+              "start": 0,
+              "end": 2,
+              "textSha256": "bc36e7c32e4e48423439a12cc75d0a1f4c33400bba37866be9778960444a0fe4"
+            }
+          ],
+          "sources": [
+            {
+              "pdfPage": 3,
+              "printedPage": "2",
+              "extractionStatus": "manual"
+            }
+          ],
+          "review": {
+            "status": "unreviewed",
+            "reviewer": null,
+            "reviewedAt": null,
+            "contentSha256": null,
+            "checks": [],
+            "notes": null
+          }
+        }
+      ],
+      "exercises": [
+        {
+          "id": "exercise-001",
+          "prompt": "请说出测试句中的天体。",
+          "origin": "textbook",
+          "answerType": "parentCheck",
+          "answers": [],
+          "answerOrigin": "none",
+          "answerSources": [],
+          "sources": [
+            {
+              "pdfPage": 3,
+              "printedPage": "2",
+              "extractionStatus": "manual"
+            }
+          ],
+          "review": {
+            "status": "unreviewed",
+            "reviewer": null,
+            "reviewedAt": null,
+            "contentSha256": null,
+            "checks": [],
+            "notes": null
+          }
+        }
+      ]
+    }
+  ]
+}

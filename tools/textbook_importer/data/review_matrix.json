@@ -1,0 +1,622 @@
+{
+  "schemaVersion": 1,
+  "kind": "textbookReviewMatrix",
+  "books": [
+    {
+      "grade": 1,
+      "semester": "上",
+      "title": "语文 一年级上册",
+      "pdfSha256": "ad4cb8dcf2d7e55342cb5654ed4517943ad3436fb8fb75316717d91adc2ece0b",
+      "pageCount": 118,
+      "fileSize": 23592263,
+      "editionLabel": "2022课标修订",
+      "editionEvidencePdfPages": [
+        3,
+        116
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/01a-%E4%B8%80%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C/%EF%BC%88%E6%A0%B9%E6%8D%AE2022%E5%B9%B4%E7%89%88%E8%AF%BE%E7%A8%8B%E6%A0%87%E5%87%86%E4%BF%AE%E8%AE%A2%EF%BC%89%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E8%AF%AD%E6%96%87%E4%B8%80%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 1,
+      "semester": "下",
+      "title": "语文 一年级下册",
+      "pdfSha256": "294652c84058ac8d60364e3e04e4cd5ebd37ecf189293b5308ce26c46cfa498f",
+      "pageCount": 127,
+      "fileSize": 13928918,
+      "editionLabel": "2022课标修订",
+      "editionEvidencePdfPages": [
+        3,
+        126
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/01b-%E4%B8%80%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C/%EF%BC%88%E6%A0%B9%E6%8D%AE2022%E5%B9%B4%E7%89%88%E8%AF%BE%E7%A8%8B%E6%A0%87%E5%87%86%E4%BF%AE%E8%AE%A2%EF%BC%89%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E8%AF%AD%E6%96%87%E4%B8%80%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "draft",
+      "pagesNeedingReview": [
+        2
+      ],
+      "directory": "draftOutline",
+      "contentReview": "unreviewed",
+      "coverage": "partial",
+      "lessonCount": 1,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": [
+        {
+          "path": "$.status",
+          "code": "draft",
+          "message": "课程包仍为草稿"
+        },
+        {
+          "path": "$.review",
+          "code": "review",
+          "message": "整包未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.permissions.content",
+          "code": "permission",
+          "message": "许可尚未确认或缺少依据"
+        },
+        {
+          "path": "$.permissions.applicationUse",
+          "code": "permission",
+          "message": "许可尚未确认或缺少依据"
+        },
+        {
+          "path": "$.edition.review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.units[0].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].coverage.paragraphs",
+          "code": "coverage",
+          "message": "该课此类目标尚未核对"
+        },
+        {
+          "path": "$.lessons[0].coverage.recognitionCharacters",
+          "code": "coverage",
+          "message": "该课此类目标尚未核对"
+        },
+        {
+          "path": "$.lessons[0].coverage.writingCharacters",
+          "code": "coverage",
+          "message": "该课此类目标尚未核对"
+        },
+        {
+          "path": "$.lessons[0].coverage.words",
+          "code": "coverage",
+          "message": "该课此类目标尚未核对"
+        },
+        {
+          "path": "$.lessons[0].coverage.recitations",
+          "code": "coverage",
+          "message": "该课此类目标尚未核对"
+        },
+        {
+          "path": "$.lessons[0].coverage.exercises",
+          "code": "coverage",
+          "message": "该课此类目标尚未核对"
+        },
+        {
+          "path": "$.lessons[0].paragraphs[0].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].paragraphs[1].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].paragraphs[2].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].paragraphs[3].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].recognitionCharacters[0].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].recognitionCharacters[1].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].recognitionCharacters[2].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].recognitionCharacters[3].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].recognitionCharacters[4].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].recognitionCharacters[5].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].recognitionCharacters[6].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].recognitionCharacters[7].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].writingCharacters[0].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].writingCharacters[1].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].writingCharacters[2].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].writingCharacters[3].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].writingCharacters[4].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].writingCharacters[5].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].words[0].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].words[1].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].words[2].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].words[3].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].words[4].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].words[5].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].words[6].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].words[7].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].recitations[0].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        },
+        {
+          "path": "$.lessons[0].exercises[0].review",
+          "code": "review",
+          "message": "未审、审核过期或缺少核对项"
+        }
+      ]
+    },
+    {
+      "grade": 2,
+      "semester": "上",
+      "title": "语文 二年级上册",
+      "pdfSha256": "d120c4c1e461353d3af7781ac73a57b30b9633f053af937e8e1017b3152ed33a",
+      "pageCount": 126,
+      "fileSize": 23488142,
+      "editionLabel": "2022课标修订",
+      "editionEvidencePdfPages": [
+        3,
+        124
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/02a-%E4%BA%8C%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C/%EF%BC%88%E6%A0%B9%E6%8D%AE2022%E5%B9%B4%E7%89%88%E8%AF%BE%E7%A8%8B%E6%A0%87%E5%87%86%E4%BF%AE%E8%AE%A2%EF%BC%89%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E8%AF%AD%E6%96%87%E4%BA%8C%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 2,
+      "semester": "下",
+      "title": "语文 二年级下册",
+      "pdfSha256": "2884c15b54396a331612bc8294f883320ba6d1dcfbdaf975ecbd86698a46bfab",
+      "pageCount": 130,
+      "fileSize": 20609873,
+      "editionLabel": "2022课标修订",
+      "editionEvidencePdfPages": [
+        3,
+        128
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/02b-%E4%BA%8C%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C/%EF%BC%88%E6%A0%B9%E6%8D%AE2022%E5%B9%B4%E7%89%88%E8%AF%BE%E7%A8%8B%E6%A0%87%E5%87%86%E4%BF%AE%E8%AE%A2%EF%BC%89%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E8%AF%AD%E6%96%87%E4%BA%8C%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 3,
+      "semester": "上",
+      "title": "语文 三年级上册",
+      "pdfSha256": "0c7838e1c05e5cc41f663d355395195ed2f98e53bd3cc0232e413f601ea8a4e8",
+      "pageCount": 123,
+      "fileSize": 17149566,
+      "editionLabel": "2022课标修订",
+      "editionEvidencePdfPages": [
+        3,
+        122
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/03a-%E4%B8%89%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C/%EF%BC%88%E6%A0%B9%E6%8D%AE2022%E5%B9%B4%E7%89%88%E8%AF%BE%E7%A8%8B%E6%A0%87%E5%87%86%E4%BF%AE%E8%AE%A2%EF%BC%89%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E8%AF%AD%E6%96%87%E4%B8%89%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 3,
+      "semester": "下",
+      "title": "语文 三年级下册",
+      "pdfSha256": "40f001f263db4fd279bb8e289cf949f127d0867afbf39b0288ae3240169b9800",
+      "pageCount": 126,
+      "fileSize": 14593088,
+      "editionLabel": "2022课标修订",
+      "editionEvidencePdfPages": [
+        3,
+        124
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/03b-%E4%B8%89%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C/%EF%BC%88%E6%A0%B9%E6%8D%AE2022%E5%B9%B4%E7%89%88%E8%AF%BE%E7%A8%8B%E6%A0%87%E5%87%86%E4%BF%AE%E8%AE%A2%EF%BC%89%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E8%AF%AD%E6%96%87%E4%B8%89%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 4,
+      "semester": "上",
+      "title": "语文 四年级上册",
+      "pdfSha256": "d10a40e9e890d23fd23066a8630fbc920d79c532ed8bc945bd760b0940397755",
+      "pageCount": 138,
+      "fileSize": 17550429,
+      "editionLabel": "2022课标修订",
+      "editionEvidencePdfPages": [
+        3,
+        136
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/04a-%E5%9B%9B%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C/%EF%BC%88%E6%A0%B9%E6%8D%AE2022%E5%B9%B4%E7%89%88%E8%AF%BE%E7%A8%8B%E6%A0%87%E5%87%86%E4%BF%AE%E8%AE%A2%EF%BC%89%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%E2%80%A2%E8%AF%AD%E6%96%87_%E5%9B%9B%E5%B9%B4%E7%BA%A7_%E4%B8%8A%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 4,
+      "semester": "下",
+      "title": "语文 四年级下册",
+      "pdfSha256": "7c3e89f70f6a6a960081aa3eb43f9a34298dcd9f61099fed38c9d2c818450299",
+      "pageCount": 151,
+      "fileSize": 14980462,
+      "editionLabel": "旧版（2022课标修订前）",
+      "editionEvidencePdfPages": [
+        3,
+        150
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/04x-%E5%9B%9B%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E8%AF%AD%E6%96%87%E5%9B%9B%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 5,
+      "semester": "上",
+      "title": "语文 五年级上册",
+      "pdfSha256": "118122c029aa1ba59ed7e31fb07d7075307c2a049e69a0c0dfb24ee88051e219",
+      "pageCount": 130,
+      "fileSize": 14419343,
+      "editionLabel": "2022课标修订",
+      "editionEvidencePdfPages": [
+        3,
+        128
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/05a-%E4%BA%94%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C/%EF%BC%88%E6%A0%B9%E6%8D%AE2022%E5%B9%B4%E7%89%88%E8%AF%BE%E7%A8%8B%E6%A0%87%E5%87%86%E4%BF%AE%E8%AE%A2%EF%BC%89%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%E2%80%A2%E8%AF%AD%E6%96%87_%E4%BA%94%E5%B9%B4%E7%BA%A7_%E4%B8%8A%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 5,
+      "semester": "下",
+      "title": "语文 五年级下册",
+      "pdfSha256": "3da72ca8f3e26934434a7283b45c5af22bcafaed2d4c91773435ce2266760e0b",
+      "pageCount": 131,
+      "fileSize": 16735209,
+      "editionLabel": "2019年12月第1版（旧版）",
+      "editionEvidencePdfPages": [
+        3,
+        130
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/TapXWorld/ChinaTextbook/5a80345f2043ba6f8db8d7be9cf3db82725ff1f7/%E5%B0%8F%E5%AD%A6/%E8%AF%AD%E6%96%87/%E7%BB%9F%E7%BC%96%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E8%AF%AD%E6%96%87%E4%BA%94%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 6,
+      "semester": "上",
+      "title": "语文 六年级上册",
+      "pdfSha256": "e828449236d0c1b347e5cd6291d58b0febe83a3e21b2b7428697d8006af49ece",
+      "pageCount": 138,
+      "fileSize": 18816548,
+      "editionLabel": "2022课标修订",
+      "editionEvidencePdfPages": [
+        3,
+        136
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/hantang/yuwen/b3fb819c37b7e5c60ce4c62d3e9c45543168530f/06a-%E5%85%AD%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C/%EF%BC%88%E6%A0%B9%E6%8D%AE2022%E5%B9%B4%E7%89%88%E8%AF%BE%E7%A8%8B%E6%A0%87%E5%87%86%E4%BF%AE%E8%AE%A2%EF%BC%89%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%E2%80%A2%E8%AF%AD%E6%96%87_%E5%85%AD%E5%B9%B4%E7%BA%A7_%E4%B8%8A%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    },
+    {
+      "grade": 6,
+      "semester": "下",
+      "title": "语文 六年级下册",
+      "pdfSha256": "5600e1bb3397c18313c77fef9be5cb6504bad45865d62a4520f3c0c6fd71f368",
+      "pageCount": 130,
+      "fileSize": 12860255,
+      "editionLabel": "2019年12月第1版（旧版）",
+      "editionEvidencePdfPages": [
+        3,
+        129
+      ],
+      "sourceUrl": "https://raw.githubusercontent.com/TapXWorld/ChinaTextbook/5a80345f2043ba6f8db8d7be9cf3db82725ff1f7/%E5%B0%8F%E5%AD%A6/%E8%AF%AD%E6%96%87/%E7%BB%9F%E7%BC%96%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E8%AF%AD%E6%96%87%E5%85%AD%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf",
+      "resourceVerification": "catalogEvidenceRecorded",
+      "extraction": "notRecorded",
+      "pagesNeedingReview": null,
+      "directory": "notRecorded",
+      "contentReview": "notStarted",
+      "coverage": "notStarted",
+      "lessonCount": 0,
+      "approvedTargetCount": 0,
+      "permissions": {
+        "content": {
+          "status": "unknown",
+          "evidence": ""
+        },
+        "applicationUse": {
+          "status": "unknown",
+          "evidence": ""
+        }
+      },
+      "publishable": false,
+      "publicationIssues": []
+    }
+  ]
+}
