@@ -204,7 +204,7 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.cloud_sync_outlined,
                 iconColor: theme.colorScheme.tertiary,
                 title: '数据与同步',
-                subtitle: '本地备份与 WebDAV 云端同步',
+                subtitle: '书籍管理、本地备份与 WebDAV 同步',
                 onTap: () => _openSection(context, _SettingsSection.data),
               ),
               const SizedBox(height: SpacingTokens.sm),
@@ -377,6 +377,14 @@ class SettingsPage extends ConsumerWidget {
 
             // ==================== 数据与同步 ====================
             if (_section == _SettingsSection.data) ...[
+              AppTile(
+                icon: Icons.library_books_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '书籍管理',
+                subtitle: '阅读书籍、导入 PDF 与下载教材',
+                onTap: () => context.push(AppRoutes.textbookManagement),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.folder_outlined,
                 iconColor: theme.colorScheme.primary,

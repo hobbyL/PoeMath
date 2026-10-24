@@ -25,6 +25,14 @@ class AppRoutes {
   static const String poemReadAlong = '/poem/read-along/:id';
   static const String poemDictation = '/poem/dictation/:id';
 
+  // ============ 语文教材 ============
+  static const String textbookShelf = '/textbook';
+  static const String textbookDetail = '/textbook/detail/:id';
+  static const String textbookRead = '/textbook/read/:id';
+  static const String textbookReview = '/textbook/review/:id';
+  static const String textbookManagement = '/profile/settings/books';
+  static const String textbookManageDetail = '/profile/settings/books/:id';
+
   // ============ 口算模块 ============
   static const String mathPractice = '/math/practice';
   static const String mathChallenge = '/math/challenge';
@@ -68,4 +76,9 @@ class AppRoutes {
   static String poemReadAlongOf(String id) => '/poem/read-along/$id';
   static String poemDictationOf(String id) => '/poem/dictation/$id';
   static String formulaDetailOf(String id) => '/formula/detail/$id';
+  static String textbookDetailOf(String id) => '/textbook/detail/$id';
+  static String textbookReadOf(String id) => '/textbook/read/$id';
+  static String textbookReviewOf(String id) => '/textbook/review/$id';
+  static String textbookManageDetailOf(String id) =>
+      '/profile/settings/books/$id';
 }

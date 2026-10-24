@@ -57,6 +57,11 @@ import 'package:poemath/features/profile/weekly_report_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 import 'package:poemath/features/shell/onboarding_page.dart';
 import 'package:poemath/features/shell/splash_page.dart';
+import 'package:poemath/features/textbook/textbook_shelf_page.dart';
+import 'package:poemath/features/textbook/textbook_management_page.dart';
+import 'package:poemath/features/textbook/textbook_detail_page.dart';
+import 'package:poemath/features/textbook/textbook_reader_page.dart';
+import 'package:poemath/features/textbook/textbook_course_review_page.dart';
 
 /// `Provider<GoRouter>`：整个应用共享一份 GoRouter 实例。
 final appRouterProvider = Provider<GoRouter>((ref) => createAppRouter());
@@ -101,6 +106,56 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
             builder: (context, state) => const ProfilePage(),
           ),
         ],
+      ),
+      // ============ 语文教材（全屏，保留诗词 Tab） ============
+      GoRoute(
+        path: AppRoutes.textbookManagement,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const TextbookManagementPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookManageDetail,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: TextbookDetailPage(
+            bookId: state.pathParameters['id']!,
+            manage: true,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookShelf,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const TextbookShelfPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookDetail,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: TextbookDetailPage(bookId: state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookRead,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: TextbookReaderPage(
+            bookId: state.pathParameters['id']!,
+            firstPage: state.extra == true,
+            initialPage: state.extra is int ? state.extra as int : null,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookReview,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: TextbookCourseReviewPage(bookId: state.pathParameters['id']!),
+        ),
       ),
       // ============ 公式知识库（全屏，从口算页或首页进入） ============
       GoRoute(
@@ -190,7 +245,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: MathPracticePage(
-              resume: state.uri.queryParameters['resume'] == '1',),
+            resume: state.uri.queryParameters['resume'] == '1',
+          ),
         ),
       ),
       GoRoute(
@@ -355,7 +411,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const ParentAccessBoundary(
-              child: SpeechRecognitionSettingsPage(),),
+            child: SpeechRecognitionSettingsPage(),
+          ),
         ),
       ),
       GoRoute(

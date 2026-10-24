@@ -138,6 +138,7 @@ void main() {
 
     await tester.tap(find.text('数据与同步'));
     await tester.pumpAndSettle();
+    expect(find.text('书籍管理'), findsOneWidget);
     expect(find.text('备份与恢复'), findsOneWidget);
     expect(find.text('云端同步'), findsOneWidget);
 
