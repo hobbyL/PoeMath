@@ -50,13 +50,14 @@ void installGlobalErrorHandlers() {
   };
 }
 
-/// 将随应用打包的音效署名加入「关于 → 开源许可」。
+/// 将随应用打包的资源与原生库署名加入「关于 → 开源许可」。
 /// 注册时不读文件，打开许可页后才加载正文。
 void registerAssetLicenses() {
   LicenseRegistry.addLicense(() async* {
     for (final (name, path) in [
       ('童趣答题语音 — 雨多多', 'assets/sounds/LICENSE-child-voice.txt'),
       ('完成提示音 — Kenney', 'assets/sounds/LICENSE-completion.txt'),
+      ('PDFium 原生阅读引擎', 'assets/legal/LICENSE-pdfium.txt'),
     ]) {
       final text = await rootBundle.loadString(path);
       yield LicenseEntryWithLineBreaks([name], text);

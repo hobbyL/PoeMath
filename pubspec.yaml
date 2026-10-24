@@ -47,6 +47,8 @@ dependencies:
 
   share_plus: ^12.0.2
   file_picker: ^11.0.2
+  # PDF 离线阅读；2.5+ 要求 Flutter 3.47，固定当前 SDK 兼容版。
+  pdfrx: 2.4.8
   fl_chart: ^1.2.0
 
   # 本地通知（每日学习提醒）
@@ -82,3 +84,4 @@ flutter:
     - assets/icons/
     - assets/sounds/
     - assets/legal/
+    - assets/textbooks/covers/

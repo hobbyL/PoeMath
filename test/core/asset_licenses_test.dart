@@ -5,12 +5,15 @@ import 'package:poemath/main.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('应用许可入口收录打包音效的作者、原始来源和修改说明', () async {
+  test('应用许可入口收录音效署名与 PDFium 原生依赖声明', () async {
     registerAssetLicenses();
     final licenses = await LicenseRegistry.licenses
         .where(
           (entry) => entry.packages.any(
-            (name) => name.contains('提示音') || name.contains('童趣答题语音'),
+            (name) =>
+                name.contains('提示音') ||
+                name.contains('童趣答题语音') ||
+                name.contains('PDFium'),
           ),
         )
         .toList();
@@ -31,5 +34,13 @@ void main() {
       completion.paragraphs.map((p) => p.text).join('\n'),
       contains('CC0'),
     );
+    final pdfium = licenses.singleWhere(
+      (entry) => entry.packages.contains('PDFium 原生阅读引擎'),
+    );
+    final pdfiumText = pdfium.paragraphs.map((p) => p.text).join('\n');
+    expect(pdfiumText, contains('Copyright 2014-2025 Benoit Blanchon'));
+    expect(pdfiumText, contains('licenses/pdfium.txt'));
+    expect(pdfiumText, contains('licenses/freetype.txt'));
+    expect(pdfiumText, contains('licenses/libjpeg_turbo.md'));
   });
 }
