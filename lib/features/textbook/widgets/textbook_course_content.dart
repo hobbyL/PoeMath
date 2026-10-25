@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/domain/textbook_pinyin.dart';
+import 'package:poemath/domain/textbook_narration.dart';
 import 'package:poemath/features/textbook/widgets/textbook_exercise_prompt.dart';
 
 const textbookCourseCategoryLabels = {
@@ -93,6 +94,39 @@ List<String> _courseDisplayLines(TextbookCourseParagraph node) {
   return lines;
 }
 
+typedef _DisplayCell = ({String text, int rawIndex, int pinyinIndex});
+List<List<_DisplayCell>> _courseDisplayCells(TextbookCourseParagraph node) {
+  final result = <List<_DisplayCell>>[];
+  var rawIndex = 0;
+  var pinyinIndex = 0;
+  final punctuation = RegExp(r'[，。！？；：、…“”‘’（）《》〈〉【】]');
+  for (final (lineIndex, line) in node.text.split('\n').indexed) {
+    final cells = <_DisplayCell>[];
+    var afterPunctuation = false;
+    var leading = lineIndex == 0 && node is! TextbookCourseVocabulary;
+    for (final rune in line.runes) {
+      final text = String.fromCharCode(rune);
+      final whitespace = text.trim().isEmpty;
+      final cell = (text: text, rawIndex: rawIndex++, pinyinIndex: pinyinIndex);
+      if (!whitespace) pinyinIndex++;
+      if (leading && whitespace) continue;
+      leading = false;
+      if (afterPunctuation && {' ', '\t', '　'}.contains(text)) continue;
+      afterPunctuation = punctuation.hasMatch(text);
+      cells.add(cell);
+    }
+    rawIndex++; // 原始换行也占一个 rune，不占注音 token。
+    if (lineIndex == 0 && node is! TextbookCourseVocabulary) {
+      cells.insertAll(0, [
+        (text: '　', rawIndex: -1, pinyinIndex: -1),
+        (text: '　', rawIndex: -1, pinyinIndex: -1),
+      ]);
+    }
+    result.add(cells);
+  }
+  return result;
+}
+
 class _CourseTextMetrics {
   _CourseTextMetrics(
     BuildContext context,
@@ -181,20 +215,28 @@ class _CourseTextViewport extends StatelessWidget {
 
 /// 逐字排注音使用 Unicode 码点，与课程解码规则一致。
 class TextbookCourseText extends StatelessWidget {
-  const TextbookCourseText({super.key, required this.node})
-      : _metrics = null,
+  const TextbookCourseText({
+    super.key,
+    required this.node,
+    this.activeRanges = const [],
+    this.activeStartKey,
+  })  : _metrics = null,
         _wrap = false;
   const TextbookCourseText._({
     super.key,
     required this.node,
     required _CourseTextMetrics metrics,
     bool wrap = false,
+    this.activeRanges = const [],
+    this.activeStartKey,
   })  : _metrics = metrics,
         _wrap = wrap;
 
   final TextbookCourseParagraph node;
   final _CourseTextMetrics? _metrics;
   final bool _wrap;
+  final List<TextbookNarrationSpan> activeRanges;
+  final GlobalKey? activeStartKey;
 
   @override
   Widget build(BuildContext context) {
@@ -203,17 +245,34 @@ class TextbookCourseText extends StatelessWidget {
         theme.textTheme.bodySmall ?? DefaultTextStyle.of(context).style;
     final metrics = _metrics ?? _CourseTextMetrics(context, [node]);
     final pinyin = metrics.pinyinByNode[node]!;
-    var index = 0;
-    final lines = _courseDisplayLines(node);
-    Widget buildLine(int lineIndex, String line) {
+    final lines = _courseDisplayCells(node);
+    var anchored = false;
+    Widget character(_DisplayCell cell) {
+      final highlighted = activeRanges.any((range) =>
+          range.paragraphId == node.id && range.contains(cell.rawIndex),);
+      final key = highlighted && !anchored ? activeStartKey : null;
+      if (highlighted) anchored = true;
+      return Text(
+        cell.text,
+        key: key ?? ValueKey('narration-character-${node.id}-${cell.rawIndex}'),
+        style: theme.textTheme.titleSmall?.copyWith(
+          backgroundColor:
+              highlighted ? theme.colorScheme.primaryContainer : null,
+          color: highlighted ? theme.colorScheme.onPrimaryContainer : null,
+          fontWeight: highlighted ? FontWeight.w700 : null,
+        ),
+      );
+    }
+
+    Widget buildLine(int lineIndex, List<_DisplayCell> line) {
       final cells = [
-        for (final rune in line.runes)
+        for (final cell in line)
           SizedBox(
             width: metrics.cellWidth,
-            child: String.fromCharCode(rune).trim().isEmpty
+            child: cell.text.trim().isEmpty
                 ? const SizedBox.shrink()
                 : Semantics(
-                    label: '${String.fromCharCode(rune)} ${pinyin[index]}',
+                    label: '${cell.text} ${pinyin[cell.pinyinIndex]}',
                     excludeSemantics: true,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -225,17 +284,14 @@ class TextbookCourseText extends StatelessWidget {
                             maxWidth: double.infinity,
                             alignment: Alignment.center,
                             child: Text(
-                              pinyin[index++],
+                              pinyin[cell.pinyinIndex],
                               maxLines: 1,
                               softWrap: false,
                               style: pinyinStyle,
                             ),
                           ),
                         ),
-                        Text(
-                          String.fromCharCode(rune),
-                          style: theme.textTheme.titleSmall,
-                        ),
+                        character(cell),
                       ],
                     ),
                   ),
@@ -310,9 +366,13 @@ class TextbookCourseParagraphsContent extends StatelessWidget {
   const TextbookCourseParagraphsContent({
     super.key,
     required this.paragraphs,
+    this.activeRanges = const [],
+    this.activeStartKey,
   });
 
   final List<TextbookCourseParagraph> paragraphs;
+  final List<TextbookNarrationSpan> activeRanges;
+  final GlobalKey? activeStartKey;
 
   bool _sharesSourcePage(
     TextbookCourseParagraph prior,
@@ -341,6 +401,13 @@ class TextbookCourseParagraphsContent extends StatelessWidget {
               key: ValueKey('course-text-${paragraph.id}'),
               node: paragraph,
               metrics: metrics,
+              activeRanges: activeRanges
+                  .where((span) => span.paragraphId == paragraph.id)
+                  .toList(),
+              activeStartKey: activeRanges.isNotEmpty &&
+                      activeRanges.first.paragraphId == paragraph.id
+                  ? activeStartKey
+                  : null,
             ),
           ],
         ],

@@ -30,6 +30,7 @@ class AppRoutes {
   static const String textbookDetail = '/textbook/detail/:id';
   static const String textbookRead = '/textbook/read/:id';
   static const String textbookReview = '/textbook/review/:id';
+  static const String textbookContent = '/textbook/content/:id/:section';
   static const String textbookManagement = '/profile/settings/books';
   static const String textbookManageDetail = '/profile/settings/books/:id';
 
@@ -79,6 +80,11 @@ class AppRoutes {
   static String textbookDetailOf(String id) => '/textbook/detail/$id';
   static String textbookReadOf(String id) => '/textbook/read/$id';
   static String textbookReviewOf(String id) => '/textbook/review/$id';
+  static String textbookContentOf(String id, String section, List<int> pages) =>
+      Uri(
+        path: '/textbook/content/$id/$section',
+        queryParameters: {'pages': pages.join(',')},
+      ).toString();
   static String textbookManageDetailOf(String id) =>
       '/profile/settings/books/$id';
 }

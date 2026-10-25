@@ -10,6 +10,8 @@ import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
+import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/domain/textbook_lesson_content.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_layout.dart';
@@ -103,6 +105,12 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
 
   Future<void> _review() => _openRoute(
         AppRoutes.textbookReviewOf(widget.bookId),
+        suspendPreview: false,
+      );
+
+  Future<void> _showContent(TextbookContentSection section, List<int> pages) =>
+      _openRoute(
+        AppRoutes.textbookContentOf(widget.bookId, section.name, pages),
         suspendPreview: false,
       );
 
@@ -323,7 +331,11 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     );
   }
 
-  Widget _pageControls(Textbook book, {required bool available}) => SafeArea(
+  Widget _pageControls(
+    Textbook book, {
+    required bool available,
+  }) =>
+      SafeArea(
         top: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -489,6 +501,65 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
         ),
       );
 
+  Widget _contentActions(
+    List<int> pages,
+    AsyncValue<TextbookCoursePack?> course,
+  ) {
+    final pack = course.valueOrNull;
+    final lessons = pack == null
+        ? const <TextbookCourseLesson>[]
+        : textbookLessonsForPages(pack, pages);
+    final sections = [
+      for (final section in TextbookContentSection.values)
+        if (lessons.any((lesson) => section.targets(lesson).isNotEmpty))
+          section,
+    ];
+    final enabled = !_busy && !_turning && _previewVisible;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (course.hasError)
+          TextButton(
+            onPressed: () =>
+                ref.invalidate(textbookCourseProvider(widget.bookId)),
+            child: const Text('课文内容加载失败，点击重试'),
+          )
+        else if (lessons.isEmpty && (course.isLoading || pack == null))
+          Text(
+            course.isLoading ? '正在加载课文内容…' : '本书尚未整理课文内容',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+        if (sections.isNotEmpty)
+          Wrap(
+            key: const ValueKey('textbook-content-actions'),
+            alignment: WrapAlignment.center,
+            spacing: SpacingTokens.xs,
+            runSpacing: SpacingTokens.xs,
+            children: [
+              for (final section in sections)
+                TextButton(
+                  onPressed:
+                      enabled ? () => _showContent(section, pages) : null,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(
+                      SpacingTokens.minTapTarget,
+                      SpacingTokens.minTapTarget,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.sm,
+                      vertical: SpacingTokens.sm,
+                    ),
+                  ),
+                  child: Text(section.label, textAlign: TextAlign.center),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -509,6 +580,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     }
     final path = ref.watch(textbookPathProvider(book.pdfSha256));
     final available = path.valueOrNull != null;
+    final course = ref.watch(textbookCourseProvider(book.pdfSha256));
     final download = ref.watch(textbookDownloadsProvider)[book.pdfSha256];
     final downloading = download?.active == true;
     return _detailScaffold(
@@ -525,123 +597,160 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
           ? () => _showToc(book)
           : null,
       body: LayoutBuilder(
-        key: const ValueKey('textbook-detail-preview-area'),
         builder: (context, constraints) {
           final layout = TextbookPageLayout.forWidth(constraints.maxWidth);
-          final maxWidth = layout.doublePage
-              ? ResponsiveLayout.wideBreakpoint
-              : ResponsiveLayout.mediumBreakpoint;
-          final innerHeight = math.max(
-            0.0,
-            constraints.maxHeight - SpacingTokens.md * 2,
+          final pages = layout.pages(
+            layout.spreadIndex(_previewPage),
+            book.pageCount,
           );
-          final cardWidth = math.min(
-            constraints.maxWidth - SpacingTokens.md * 2,
-            math.min(maxWidth, innerHeight * layout.aspectRatio),
-          );
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(SpacingTokens.md),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: innerHeight),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Center(
-                    child: SizedBox(
-                      width: cardWidth,
-                      child: AspectRatio(
-                        aspectRatio: layout.aspectRatio,
-                        child: ColoredCard(
-                          key: const ValueKey('textbook-detail-preview-card'),
-                          color: theme.colorScheme.primary,
-                          padding: EdgeInsets.zero,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              SpacingTokens.radiusMedium,
-                            ),
-                            child: available
-                                ? _previewVisible
-                                    ? _preview(path.requireValue!, book, layout)
-                                    : const SizedBox.shrink()
-                                : entry?.coverAsset != null
-                                    ? Image.asset(
-                                        entry!.coverAsset!,
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (_, __, ___) =>
-                                            TextbookCoverPlaceholder(
-                                          title: book.title,
-                                          status: '下载后可翻页查看',
-                                        ),
-                                      )
-                                    : TextbookCoverPlaceholder(
-                                        title: book.title,
-                                        status: path.isLoading
-                                            ? '正在检查本地文件'
-                                            : '本地 PDF 暂不可用',
-                                      ),
-                          ),
-                        ),
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: LayoutBuilder(
+                  key: const ValueKey('textbook-detail-preview-area'),
+                  builder: (context, constraints) {
+                    final maxWidth = layout.doublePage
+                        ? ResponsiveLayout.wideBreakpoint
+                        : ResponsiveLayout.mediumBreakpoint;
+                    final innerHeight = math.max(
+                      0.0,
+                      constraints.maxHeight - SpacingTokens.md * 2,
+                    );
+                    final cardWidth = math.min(
+                      constraints.maxWidth - SpacingTokens.md * 2,
+                      math.min(
+                        maxWidth,
+                        // 缺文件时卡片随正文滚动，保留占位图和提示的可用高度。
+                        (available
+                                ? innerHeight
+                                : math.max(
+                                    innerHeight,
+                                    SpacingTokens.minTapTarget * 3,
+                                  )) *
+                            layout.aspectRatio,
                       ),
-                    ),
-                  ),
-                  if (!available) const SizedBox(height: SpacingTokens.md),
-                  if (!available && download != null) ...[
-                    Text(download.label),
-                    if (downloading) ...[
-                      const SizedBox(height: SpacingTokens.sm),
-                      LinearProgressIndicator(value: download.progress),
-                      TextButton(
-                        onPressed: () => ref
-                            .read(textbookDownloadsProvider.notifier)
-                            .cancel(book.pdfSha256),
-                        child: const Text('取消下载'),
-                      ),
-                    ],
-                    const SizedBox(height: SpacingTokens.md),
-                  ],
-                  if (!available && entry != null && !path.isLoading)
-                    FilledButton.icon(
-                      onPressed: downloading
-                          ? null
-                          : () => ref
-                              .read(textbookDownloadsProvider.notifier)
-                              .download(entry),
-                      icon: const Icon(Icons.download_outlined),
-                      label: Text(download != null ? '重新下载教材' : '下载教材'),
-                    ),
-                  if (!available)
-                    path.when(
-                      data: (_) => entry != null
-                          ? const Text('下载完成后可离线阅读，同版重新下载会恢复阅读位置。')
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  '本地 PDF 已移除或丢失。请到书籍管理重新导入同一文件，恢复阅读。',
-                                ),
-                                TextButton(
-                                  onPressed: () => context
-                                      .push(AppRoutes.textbookManagement),
-                                  child: const Text('打开书籍管理'),
-                                ),
-                              ],
-                            ),
-                      loading: () => const LinearProgressIndicator(),
-                      error: (_, __) => Column(
+                    );
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.all(SpacingTokens.md),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('无法检查本地文件'),
-                          TextButton(
-                            onPressed: () => ref.invalidate(
-                              textbookPathProvider(book.pdfSha256),
+                          Center(
+                            child: SizedBox(
+                              width: cardWidth,
+                              child: AspectRatio(
+                                aspectRatio: layout.aspectRatio,
+                                child: ColoredCard(
+                                  key: const ValueKey(
+                                    'textbook-detail-preview-card',
+                                  ),
+                                  color: theme.colorScheme.primary,
+                                  padding: EdgeInsets.zero,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(
+                                      SpacingTokens.radiusMedium,
+                                    ),
+                                    child: available
+                                        ? _previewVisible
+                                            ? _preview(
+                                                path.requireValue!,
+                                                book,
+                                                layout,
+                                              )
+                                            : const SizedBox.shrink()
+                                        : entry?.coverAsset != null
+                                            ? Image.asset(
+                                                entry!.coverAsset!,
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (_, __, ___) =>
+                                                    TextbookCoverPlaceholder(
+                                                  title: book.title,
+                                                  status: '下载后可翻页查看',
+                                                ),
+                                              )
+                                            : TextbookCoverPlaceholder(
+                                                title: book.title,
+                                                status: path.isLoading
+                                                    ? '正在检查本地文件'
+                                                    : '本地 PDF 暂不可用',
+                                              ),
+                                  ),
+                                ),
+                              ),
                             ),
-                            child: const Text('重新检查'),
                           ),
+                          if (!available)
+                            const SizedBox(height: SpacingTokens.md),
+                          if (!available && download != null) ...[
+                            Text(download.label),
+                            if (downloading) ...[
+                              const SizedBox(height: SpacingTokens.sm),
+                              LinearProgressIndicator(value: download.progress),
+                              TextButton(
+                                onPressed: () => ref
+                                    .read(textbookDownloadsProvider.notifier)
+                                    .cancel(book.pdfSha256),
+                                child: const Text('取消下载'),
+                              ),
+                            ],
+                            const SizedBox(height: SpacingTokens.md),
+                          ],
+                          if (!available && entry != null && !path.isLoading)
+                            FilledButton.icon(
+                              onPressed: downloading
+                                  ? null
+                                  : () => ref
+                                      .read(textbookDownloadsProvider.notifier)
+                                      .download(entry),
+                              icon: const Icon(Icons.download_outlined),
+                              label: Text(download != null ? '重新下载教材' : '下载教材'),
+                            ),
+                          if (!available)
+                            path.when(
+                              data: (_) => entry != null
+                                  ? const Text('下载完成后可离线阅读，同版重新下载会恢复阅读位置。')
+                                  : Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          '本地 PDF 已移除或丢失。请到书籍管理重新导入同一文件，恢复阅读。',
+                                        ),
+                                        TextButton(
+                                          onPressed: () => context.push(
+                                            AppRoutes.textbookManagement,
+                                          ),
+                                          child: const Text('打开书籍管理'),
+                                        ),
+                                      ],
+                                    ),
+                              loading: () => const LinearProgressIndicator(),
+                              error: (_, __) => Column(
+                                children: [
+                                  const Text('无法检查本地文件'),
+                                  TextButton(
+                                    onPressed: () => ref.invalidate(
+                                      textbookPathProvider(book.pdfSha256),
+                                    ),
+                                    child: const Text('重新检查'),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
-                    ),
-                ],
+                    );
+                  },
+                ),
               ),
-            ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.md,
+                ),
+                child: _contentActions(pages, course),
+              ),
+            ],
           );
         },
       ),

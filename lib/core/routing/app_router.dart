@@ -8,6 +8,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/widgets.dart';
 
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
@@ -62,6 +63,8 @@ import 'package:poemath/features/textbook/textbook_management_page.dart';
 import 'package:poemath/features/textbook/textbook_detail_page.dart';
 import 'package:poemath/features/textbook/textbook_reader_page.dart';
 import 'package:poemath/features/textbook/textbook_course_review_page.dart';
+import 'package:poemath/features/textbook/textbook_lesson_content_page.dart';
+import 'package:poemath/domain/textbook_lesson_content.dart';
 
 /// `Provider<GoRouter>`：整个应用共享一份 GoRouter 实例。
 final appRouterProvider = Provider<GoRouter>((ref) => createAppRouter());
@@ -71,7 +74,9 @@ final appRouterProvider = Provider<GoRouter>((ref) => createAppRouter());
 /// [initialLocation] 仅为测试预留：测试需要直达某条深层路由验证兜底行为，
 /// 而默认启动页会触发真实数据导入。生产代码一律用默认值。
 GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
+  final textbookObserver = RouteObserver<ModalRoute<dynamic>>();
   return GoRouter(
+    observers: [textbookObserver],
     initialLocation: initialLocation,
     // 未匹配到任何路由时（旧版本链接、外部跳错）渲染兜底页；
     // 缺省行为是 go_router 自带的英文错误页，对小学生用户不可读。
@@ -147,6 +152,26 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
             bookId: state.pathParameters['id']!,
             firstPage: state.extra == true,
             initialPage: state.extra is int ? state.extra as int : null,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookContent,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: TextbookLessonContentPage(
+            routeObserver: textbookObserver,
+            bookId: state.pathParameters['id']!,
+            section: TextbookContentSection.values
+                .where(
+                  (section) => section.name == state.pathParameters['section'],
+                )
+                .firstOrNull,
+            pages: [
+              for (final page
+                  in (state.uri.queryParameters['pages'] ?? '').split(','))
+                if (int.tryParse(page) case final int value) value,
+            ],
           ),
         ),
       ),

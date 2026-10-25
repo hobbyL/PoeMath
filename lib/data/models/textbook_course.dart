@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
-/// 课程包与 PDF 书目、自动目录独立；未审草稿不能成为学习内容。
+/// 课程包与 PDF 书目、自动目录独立；未审草稿可标识预览，不能用于练习结算或发布。
 enum TextbookReviewStatus { unreviewed, approved, rejected }
 
 enum TextbookCoverage { pending, notApplicable, complete }
