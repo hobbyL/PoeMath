@@ -156,6 +156,180 @@ void main() {
     return data;
   }
 
+  testWidgets('习题审核隐藏来源标题，词组逐列对齐并居中，加点在正常和大字下保留', (tester) async {
+    final raw = courseFixture();
+    final exercise =
+        ((raw['lessons'] as List).single['exercises'] as List).single as Map;
+    exercise['prompt'] = '读一读，注意加点的词。\n𠀀月明亮\t看星星\n春风\t山河\n我发现这些加点的词是表示动作的。';
+    exercise['answerType'] = 'none';
+    exercise['promptLayout'] = [
+      [
+        {'text': '读一读，注意加点的词。', 'emphasis': <int>[]},
+      ],
+      [
+        {
+          'text': '𠀀月明亮',
+          'emphasis': [0],
+        },
+        {
+          'text': '看星星',
+          'emphasis': [0],
+        }
+      ],
+      [
+        {'text': '春风', 'emphasis': <int>[]},
+        {'text': '山河', 'emphasis': <int>[]},
+      ],
+      [
+        {'text': '我发现这些加点的词是表示动作的。', 'emphasis': <int>[]},
+      ],
+    ];
+    courses.current = TextbookCoursePack.fromJson(raw);
+    for (final large in [false, true]) {
+      await pump(
+        tester,
+        TextbookCourseNodePage(
+          book: book,
+          pack: courses.current!,
+          nodeId: 'exercise-001',
+        ),
+        large: large,
+        size: const Size(320, 900),
+      );
+      expect(find.text('原书习题'), findsNothing);
+      expect(find.textContaining('答案类型：'), findsNothing);
+      expect(find.textContaining('原书未提供答案'), findsNothing);
+      final heading = find.text('读一读，注意加点的词');
+      expect(heading, findsOneWidget);
+      expect(find.text('读一读，注意加点的词。'), findsNothing);
+      expect(find.textContaining('我发现这些加点的词是表示动作的。'), findsNothing);
+      final sourceButton = find.byKey(const ValueKey('course-source-button'));
+      expect(
+        tester.getRect(heading).center.dy,
+        closeTo(tester.getRect(sourceButton).center.dy, .1),
+      );
+      final theme = Theme.of(tester.element(heading));
+      expect(
+        tester.widget<Text>(heading).style,
+        theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+      );
+      expect(tester.widget<Text>(heading).maxLines, isNull);
+      expect(find.byIcon(Icons.circle), findsNWidgets(2));
+      expect(find.text('𠀀'), findsOneWidget);
+      expect(find.text('看'), findsOneWidget);
+      final cells = find.descendant(
+        of: find.byKey(const ValueKey('course-content-body')),
+        matching: find.byType(SelectableText),
+      );
+      final first = tester.getRect(cells.at(0));
+      final second = tester.getRect(cells.at(1));
+      if (!large) {
+        final editable = tester.state<EditableTextState>(
+          find.descendant(
+            of: cells.at(0),
+            matching: find.byType(EditableText),
+          ),
+        );
+        final boxes = editable.renderEditable.getBoxesForSelection(
+          const TextSelection(baseOffset: 1, extentOffset: 4),
+        );
+        expect(boxes.map((b) => b.top).toSet(), hasLength(1));
+      }
+      expect(first.left, closeTo(tester.getRect(cells.at(2)).left, .1));
+      expect(second.left, closeTo(tester.getRect(cells.at(3)).left, .1));
+      final content =
+          tester.getRect(find.byKey(const ValueKey('course-content-body')));
+      expect((first.left + second.right) / 2, closeTo(content.center.dx, .1));
+      expect(tester.takeException(), isNull);
+      expect(courses.saves, 0);
+      expect(courses.current!.toJson(), raw);
+    }
+  });
+
+  testWidgets('读一读记一记在原书同行展示完整标题，兼容纯文本且保留已有答案', (tester) async {
+    for (final withLayout in [true, false]) {
+      final raw = courseFixture();
+      final exercise =
+          ((raw['lessons'] as List).single['exercises'] as List).single as Map;
+      exercise['prompt'] = withLayout
+          ? '读一读，记一记。\n星光\t月光\n春风\t山河'
+          : '读一读，注意加点的词。\n星光\t月光\n春风\t山河\n我发现这些加点的词是表示动作的。';
+      exercise['answerType'] = withLayout ? 'none' : 'reference';
+      exercise['answerOrigin'] = withLayout ? 'none' : 'reviewerReference';
+      exercise['answers'] = withLayout ? <String>[] : ['合成参考要点'];
+      if (withLayout) {
+        exercise['promptLayout'] = [
+          [
+            {'text': '读一读，记一记。', 'emphasis': <int>[]},
+          ],
+          [
+            {'text': '星光', 'emphasis': <int>[]},
+            {'text': '月光', 'emphasis': <int>[]},
+          ],
+          [
+            {'text': '春风', 'emphasis': <int>[]},
+            {'text': '山河', 'emphasis': <int>[]},
+          ],
+        ];
+      }
+      courses.current = TextbookCoursePack.fromJson(raw);
+      await pump(
+        tester,
+        TextbookCourseNodePage(
+          key: ValueKey(withLayout),
+          book: book,
+          pack: courses.current!,
+          nodeId: 'exercise-001',
+        ),
+        large: true,
+        size: const Size(320, 1100),
+      );
+      final heading = find.text(withLayout ? '读一读，记一记' : '读一读，注意加点的词');
+      expect(heading, findsOneWidget);
+      expect(find.text('读一读，记一记。'), findsNothing);
+      expect(find.text('读一读，注意加点的词。'), findsNothing);
+      expect(find.textContaining('我发现这些加点的词是表示动作的。'), findsNothing);
+      final title = tester.widget<Text>(heading);
+      expect(title.maxLines, isNull);
+      expect(title.overflow, isNull);
+      expect(
+        title.style,
+        Theme.of(tester.element(heading))
+            .textTheme
+            .titleLarge
+            ?.copyWith(fontWeight: FontWeight.w600),
+      );
+      expect(
+        tester.getRect(heading).center.dy,
+        closeTo(
+          tester
+              .getRect(find.byKey(const ValueKey('course-source-button')))
+              .center
+              .dy,
+          .1,
+        ),
+      );
+      final body = find.byKey(const ValueKey('course-content-body'));
+      expect(
+        find.descendant(of: body, matching: find.textContaining('读一读')),
+        findsNothing,
+      );
+      expect(find.textContaining('原书未提供答案'), findsNothing);
+      expect(
+        find.textContaining('答案类型：'),
+        withLayout ? findsNothing : findsOneWidget,
+      );
+      if (!withLayout) {
+        expect(find.text('星光\t月光\n春风\t山河'), findsOneWidget);
+        expect(find.text('合成参考要点'), findsOneWidget);
+        expect(find.text('答案来源：审核者整理的参考要点'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+      expect(courses.saves, 0);
+      expect(courses.current!.toJson(), raw);
+    }
+  });
+
   testWidgets('三类字词各用一个两行省略的空格摘要，详情自动换行展示全部', (tester) async {
     final data = courseFixture();
     final lesson = (data['lessons'] as List).single as Map<String, dynamic>;

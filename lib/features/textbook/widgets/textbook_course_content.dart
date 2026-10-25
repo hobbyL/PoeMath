@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/domain/textbook_pinyin.dart';
+import 'package:poemath/features/textbook/widgets/textbook_exercise_prompt.dart';
 
 const textbookCourseCategoryLabels = {
   'paragraphs': '课文与注音',
@@ -353,9 +354,11 @@ class TextbookCourseContent extends StatelessWidget {
     super.key,
     required this.pack,
     required this.node,
+    this.showExerciseHeading = true,
   });
   final TextbookCoursePack pack;
   final TextbookCourseNode node;
+  final bool showExerciseHeading;
 
   @override
   Widget build(BuildContext context) {
@@ -417,16 +420,20 @@ class TextbookCourseContent extends StatelessWidget {
         );
       }
     } else if (current is TextbookCourseExercise) {
-      text(current.toJson()['origin'] == 'textbook' ? '原书习题' : '另行编写的习题');
-      text(current.prompt);
-      text('答案类型：${textbookCourseAnswerLabels[current.answerType]}');
-      text(
-        switch (current.answerOrigin) {
-          'textbook' => '答案来源：原书',
-          'reviewerReference' => '答案来源：审核者整理的参考要点',
-          _ => '原书未提供答案，不自动生成标准答案',
-        },
+      children.add(
+        TextbookExercisePrompt(
+          exercise: current,
+          showHeading: showExerciseHeading,
+        ),
       );
+      if (current.answerType != TextbookAnswerType.none) {
+        text('答案类型：${textbookCourseAnswerLabels[current.answerType]}');
+      }
+      if (current.answerOrigin != 'none') {
+        text(
+          current.answerOrigin == 'textbook' ? '答案来源：原书' : '答案来源：审核者整理的参考要点',
+        );
+      }
       for (final answer in current.answers) {
         text(answer);
       }

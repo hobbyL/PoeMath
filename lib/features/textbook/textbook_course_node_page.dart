@@ -339,6 +339,11 @@ class _TextbookCourseNodePageState
                 ? '待整包核对'
                 : textbookCourseReviewLabel(node);
     final paragraphLesson = _paragraphLesson;
+    final contentHeading = _isParagraphGroup
+        ? paragraphLesson?.title
+        : node is TextbookCourseExercise
+            ? node.promptHeading?.replaceFirst(RegExp(r'。\s*$'), '')
+            : null;
     return PopScope(
       canPop: !_saving,
       child: Scaffold(
@@ -377,7 +382,7 @@ class _TextbookCourseNodePageState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (_isParagraphGroup && paragraphLesson != null) ...[
+                      if (contentHeading != null) ...[
                         Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: SpacingTokens.xs,
@@ -395,9 +400,11 @@ class _TextbookCourseNodePageState
                                         SpacingTokens.lg,
                                   ),
                                   child: Text(
-                                    paragraphLesson.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    contentHeading,
+                                    maxLines: _isParagraphGroup ? 1 : null,
+                                    overflow: _isParagraphGroup
+                                        ? TextOverflow.ellipsis
+                                        : null,
                                     textAlign: TextAlign.center,
                                     style: theme.textTheme.titleLarge?.copyWith(
                                       fontWeight: FontWeight.w600,
@@ -421,9 +428,15 @@ class _TextbookCourseNodePageState
                           ),
                           child: KeyedSubtree(
                             key: const ValueKey('course-content-body'),
-                            child: TextbookCourseParagraphsContent(
-                              paragraphs: _paragraphs,
-                            ),
+                            child: _isParagraphGroup
+                                ? TextbookCourseParagraphsContent(
+                                    paragraphs: _paragraphs,
+                                  )
+                                : TextbookCourseContent(
+                                    pack: _pack,
+                                    node: node,
+                                    showExerciseHeading: false,
+                                  ),
                           ),
                         ),
                       ] else ...[
