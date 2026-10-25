@@ -16,9 +16,15 @@ import java.security.MessageDigest
 class MainActivity : FlutterActivity() {
 
     private val channelName = "com.poemath.app/app_update"
+    private val textbookTtsChannelName = "com.poemath.app/textbook_tts"
+    private var textbookTts: TextbookTtsFileSynthesizer? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        textbookTts = TextbookTtsFileSynthesizer(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            textbookTtsChannelName).setMethodCallHandler(textbookTts)
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -26,6 +32,14 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             handleMethodCall(call, result)
         }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            textbookTtsChannelName).setMethodCallHandler(null)
+        textbookTts?.dispose()
+        textbookTts = null
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {

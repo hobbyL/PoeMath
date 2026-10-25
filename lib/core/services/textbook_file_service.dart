@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:poemath/core/services/textbook_content_cache.dart';
+import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_catalog.dart';
 
@@ -57,11 +58,16 @@ class TextbookFileService {
   TextbookFileService({
     Future<Directory> Function()? directoryProvider,
     Future<Directory?> Function()? pickerCacheDirectoryProvider,
+    NarrationAudioCache? narrationAudioCache,
     TextbookPdfValidator? validator,
     http.Client Function()? clientFactory,
     Duration requestTimeout = const Duration(seconds: 30),
     this.maxFileSize = 250 * 1024 * 1024,
-  })  : _directoryProvider =
+  })  : narrationCache = narrationAudioCache ??
+            NarrationAudioCache(
+              directoryProvider: directoryProvider ?? getTemporaryDirectory,
+            ),
+        _directoryProvider =
             directoryProvider ?? getApplicationSupportDirectory,
         _pickerCacheDirectoryProvider =
             pickerCacheDirectoryProvider ?? _pickerCacheDirectory,
@@ -76,6 +82,7 @@ class TextbookFileService {
   final int maxFileSize;
   Future<void> _operations = Future<void>.value();
   final _contentCaches = <String, TextbookContentCache>{};
+  final NarrationAudioCache narrationCache;
 
   TextbookContentCache contentCache(Textbook book) =>
       _contentCaches.putIfAbsent(
@@ -343,6 +350,7 @@ class TextbookFileService {
   Future<void> removePdf(String id) {
     final result = _operations.then((_) async {
       final file = await _file(id);
+      await narrationCache.clearBook(id);
       final cache = _contentCaches[id];
       if (cache != null) {
         await cache.clear();

@@ -12,6 +12,10 @@ import 'package:flutter_tts/flutter_tts.dart';
 
 import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/core/services/tts/worker_tts_client.dart';
+import 'package:poemath/core/services/tts/narration_audio_cache.dart';
+import 'package:poemath/core/services/tts/narration_player.dart';
+import 'package:poemath/core/services/tts/narration_session.dart';
+import 'package:poemath/core/services/tts/system_tts_file_synthesizer.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
@@ -50,6 +54,10 @@ class TtsService {
   final WorkerTtsClient? _cloudClient;
 
   CloudAudioPlayer? _cloudPlayer;
+  SystemTtsFileSynthesizer? _fileSynthesizer;
+  final NarrationPlayer Function()? _narrationPlayerFactory;
+  NarrationSession? _narration;
+  Future<void>? _narrationRetirement;
   final Map<String, Uint8List> _cloudCache = <String, Uint8List>{};
 
   WorkerTtsConfig? _cloudConfig;
@@ -82,9 +90,13 @@ class TtsService {
     FlutterTts? flutterTts,
     WorkerTtsClient? cloudClient,
     CloudAudioPlayer? cloudPlayer,
+    SystemTtsFileSynthesizer? fileSynthesizer,
+    NarrationPlayer Function()? narrationPlayerFactory,
   })  : _tts = flutterTts ?? FlutterTts(),
         _cloudClient = cloudClient,
-        _cloudPlayer = cloudPlayer;
+        _cloudPlayer = cloudPlayer,
+        _fileSynthesizer = fileSynthesizer,
+        _narrationPlayerFactory = narrationPlayerFactory;
 
   /// 当前是否正在朗读。
   bool get isSpeaking => _isSpeaking;
@@ -136,12 +148,14 @@ class TtsService {
       // 置位同样会在新会话循环检查处生效），本改动统一语义、消除双机制
       // 漂移，不追求解决回调归属的平台层问题。
       _tts.setCancelHandler(() {
+        if (_narration != null) return; // 文件朗读不属于旧系统引擎。
         _sessionGeneration++;
         _isSpeaking = false;
         _stopRequested = true;
       });
 
       _tts.setErrorHandler((message) {
+        if (_narration != null) return;
         _sessionGeneration++;
         _engineErrorMessage = message.toString();
         _isSpeaking = false;
@@ -458,6 +472,7 @@ class TtsService {
     String text, {
     void Function(int sessionId)? onReady,
   }) async {
+    final retiring = _retireNarration();
     // 会话令牌在入口同步段捕获（任何 await 之前，含引擎初始化与云端
     // 状态刷新窗口）：入口调用本身即宣告新会话诞生，此后窗口内任何
     // stop/dispose 递增代际都会使本会话在首个段检查即死——消灭
@@ -470,6 +485,10 @@ class TtsService {
     _isSpeaking = true;
 
     try {
+      if (retiring != null) {
+        await retiring;
+        if (generation != _sessionGeneration) return;
+      }
       await _ensureInitialized();
       await _refreshCloudState();
       final result = await _speakSegmentBestEffort(
@@ -507,6 +526,7 @@ class TtsService {
     void Function(int sessionId)? onReady,
     void Function(int sessionId)? onComplete,
   }) async {
+    final retiring = _retireNarration();
     // 会话令牌在入口同步段捕获（任何 await 之前，含引擎初始化与云端
     // 状态刷新窗口）：窗口内 stop/dispose 递增代际后，本会话首个循环
     // 检查即死，不再「页面已销毁整首照播」（缺陷 1）。
@@ -533,6 +553,7 @@ class TtsService {
     await _runSegments(
       sentences,
       generation: generation,
+      retiring: retiring,
       onSegmentStart: onSentenceStart,
       onReady: onReady,
       onComplete: onComplete,
@@ -556,6 +577,7 @@ class TtsService {
     void Function(int sessionId)? onReady,
     void Function(int sessionId)? onComplete,
   }) async {
+    final retiring = _retireNarration();
     // 会话令牌在入口同步段捕获（任何 await 之前）——语义同
     // [speakSentences]（缺陷 1）。
     final generation = ++_sessionGeneration;
@@ -565,6 +587,7 @@ class TtsService {
     await _runSegments(
       lines,
       generation: generation,
+      retiring: retiring,
       onSegmentStart: onLineStart,
       onReady: onReady,
       onComplete: onComplete,
@@ -579,6 +602,7 @@ class TtsService {
   Future<void> _runSegments(
     List<String> segments, {
     required int generation,
+    Future<void>? retiring,
     void Function(int index, int sessionId)? onSegmentStart,
     void Function(int sessionId)? onReady,
     void Function(int sessionId)? onComplete,
@@ -587,6 +611,10 @@ class TtsService {
     final results = <_SegmentPlayResult>[];
     _isSpeaking = true;
     try {
+      if (retiring != null) {
+        await retiring;
+        if (generation != _sessionGeneration) return;
+      }
       await _ensureInitialized();
       await _refreshCloudState();
       for (var i = 0; i < segments.length; i++) {
@@ -617,6 +645,7 @@ class TtsService {
   /// 停止朗读（云端与系统引擎均停止）。
   Future<void> stop() async {
     _stopRequested = true;
+    final cancelling = _retireNarration();
     _cloudClient?.cancelPending();
     // 会话令牌递增：所有在途会话（含引擎 stop 失败后仍挂起的旧循环）
     // 在下一次迭代 / 段发起前按代际退出——即使后续新入口复位
@@ -629,6 +658,7 @@ class TtsService {
     // 取消新会话当前句、令其静默中断（缺陷 3 根治点）。
     final generation = _sessionGeneration;
     _isSpeaking = false;
+    if (cancelling != null) await cancelling;
     final player = _cloudPlayer;
     if (player != null) {
       if (_sessionGeneration != generation) return;
@@ -648,6 +678,11 @@ class TtsService {
   /// 释放资源。
   void dispose() {
     _stopRequested = true;
+    _retireNarration();
+    final synthesizer = _fileSynthesizer;
+    if (synthesizer != null) {
+      unawaited(synthesizer.dispose().catchError((Object _) {}));
+    }
     _cloudClient?.cancelPending();
     _cloudCache.clear();
     _cloudCacheBytes = 0;
@@ -668,6 +703,198 @@ class TtsService {
             onError: (Object error, StackTrace stackTrace) {},
           ),
     );
+  }
+
+  Future<void>? _retireNarration() {
+    final narration = _narration;
+    _narration = null;
+    if (narration != null) {
+      final cancelling = narration.cancel().catchError((Object _) {});
+      _narrationRetirement = cancelling;
+      unawaited(cancelling.then((_) {
+        if (identical(_narrationRetirement, cancelling)) _narrationRetirement = null;
+      }),);
+    }
+    return _narrationRetirement;
+  }
+
+  /// 教材长文：首段优先，随后有限预生成，所有音色通过同一文件播放器。
+  /// 入口同步分配身份，取消/旧请求均不得启动后续音频。
+  NarrationSession startNarration(
+    List<String> texts, {
+    required String bookId,
+    required NarrationAudioCache cache,
+    void Function(NarrationState state, int sessionId)? onState,
+    void Function(int index, int sessionId)? onSegmentStart,
+  }) {
+    final retiring = _retireNarration();
+    _cloudClient?.cancelPending();
+    final generation = ++_sessionGeneration;
+    _stopRequested = false;
+    _isSpeaking = true;
+    final bookRevision = cache.revision(bookId);
+    bool current() =>
+        generation == _sessionGeneration &&
+        !_stopRequested &&
+        cache.revision(bookId) == bookRevision;
+    Future<void>? quieting;
+    Future<void> quietLegacy() async {
+      if (retiring != null) await retiring;
+      if (_cloudPlayer != null && current()) await _cloudPlayer!.stop();
+      if (_initialized && current()) await _tts.stop();
+    }
+
+    final double speed;
+    final Map<String, String>? voice;
+    final String cloudVoice;
+    final String style;
+    final bool cloudEnabled;
+    try {
+      speed = _settings.ttsSpeed;
+      voice = _settings.ttsVoice == null
+          ? null
+          : Map<String, String>.unmodifiable(_settings.ttsVoice!);
+      cloudVoice = _settings.ttsCloudVoice;
+      style = _settings.ttsCloudStyle;
+      cloudEnabled = _settings.ttsCloudEnabled;
+    } on Object catch (error) {
+      _isSpeaking = false;
+      throw TtsException('读取朗读设置失败', cause: error);
+    }
+    final rate = workerRateFor(speed);
+    Future<WorkerTtsConfig?>? configuration;
+    Future<String>? systemIdentity;
+    var allowCloudRequest = true;
+    Future<WorkerTtsConfig?> config() => configuration ??= (() async {
+          if (_cloudClient == null || !cloudEnabled) return null;
+          try {
+            if (!await _settings.isWorkerTtsVerified()) return null;
+            return await _settings.readWorkerTtsConfig();
+          } on Object {
+            return null;
+          }
+        })();
+    Future<NarrationAudio> prepare(int index) async {
+      if (!current()) throw const NarrationException('已停止朗读');
+      await (quieting ??= quietLegacy());
+      if (!current()) throw const NarrationException('已停止朗读');
+      final cloud = await config();
+      if (!current()) throw const NarrationException('已停止朗读');
+      final text = texts[index];
+      if (cloud != null) {
+        final key = NarrationAudioCache.key([
+          1,
+          'cloud',
+          cloud.base.toString(),
+          cloudVoice,
+          style,
+          rate,
+          'mp3',
+          text,
+        ]);
+        final cached = await cache.read(bookId, key, 'mp3');
+        if (cached != null) return cached;
+        if (allowCloudRequest && current()) {
+          try {
+            return await cache.obtain(
+              bookId,
+              key,
+              'mp3',
+              revision: bookRevision,
+              isCurrent: current,
+              generate: () {
+                if (!current() || !allowCloudRequest) {
+                  throw const NarrationException('云端请求已停止');
+                }
+                return _cloudClient!.synthesize(
+                  config: cloud,
+                  text: text,
+                  voice: cloudVoice,
+                  style: style,
+                  rate: rate,
+                );
+              },
+            );
+          } on CloudQuotaExceededException {
+            allowCloudRequest = false;
+          } on WorkerTtsException catch (error) {
+            if (error.kind == WorkerTtsErrorKind.authentication) {
+              allowCloudRequest = false;
+            }
+          } on NarrationException {/* 缺失段使用系统音色 */}
+        }
+      }
+      if (!current()) throw const NarrationException('已停止朗读');
+      final synth = _fileSynthesizer ??= AndroidSystemTtsFileSynthesizer();
+      final String identity;
+      try {
+        identity = await (systemIdentity ??= synth.describeVoice(voice, speed));
+      } on Exception {
+        systemIdentity = null;
+        rethrow;
+      }
+      if (!current()) throw const NarrationException('已停止朗读');
+      final key =
+          NarrationAudioCache.key([1, 'system', identity, speed, 'wav', text]);
+      return cache.obtain(
+        bookId,
+        key,
+        'wav',
+        revision: bookRevision,
+        isCurrent: current,
+        generate: () {
+          if (!current()) throw const NarrationException('已停止朗读');
+          return synth.synthesize(
+            sessionId: generation,
+            text: text,
+            voice: voice,
+            speed: speed,
+          );
+        },
+      );
+    }
+
+    final NarrationPlayer player;
+    try {
+      player = _narrationPlayerFactory?.call() ?? AudioplayersNarrationPlayer();
+    } on Object catch (error) {
+      _isSpeaking = false;
+      throw TtsException('音频播放器初始化失败', cause: error);
+    }
+    final session = NarrationSession(
+      sessionId: generation,
+      count: texts.length,
+      player: player,
+      isCurrent: current,
+      prepare: prepare,
+      onState: onState,
+      onSegmentStart: onSegmentStart,
+      cancelPreparation: () {
+        // 此回调的同步段发生在新请求入口之前；原生按身份单独取消。
+        if (generation == _sessionGeneration) _cloudClient?.cancelPending();
+        return _fileSynthesizer?.cancelSession(generation) ??
+            Future<void>.value();
+      },
+    );
+    _narration = session;
+    session.start();
+    unawaited(
+      session.completed.then<void>(
+        (_) {
+          if (generation == _sessionGeneration) {
+            _isSpeaking = false;
+            _narration = null;
+          }
+        },
+        onError: (Object _, StackTrace __) {
+          if (generation == _sessionGeneration) {
+            _isSpeaking = false;
+            _narration = null;
+          }
+        },
+      ),
+    );
+    return session;
   }
 }
 
