@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_course_draft.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
@@ -11,6 +12,98 @@ void main() {
   final seed = parser.seed(draftFixtureEntry(), draftFixtureToc);
   final lesson = seed.pack.lessons.first;
   final plan = seed.generation!.plans.first;
+
+  test('阅读习题按视觉行分题，词语不跨题，加点由字符下方几何位置识别', () {
+    final text = StringBuffer();
+    final glyphs = <TextbookPageGlyph>[];
+    void line(String value, double top, double left, {bool dot = false}) {
+      var x = left;
+      for (final rune in value.runes) {
+        final index = text.toString().runes.length;
+        text.writeCharCode(rune);
+        glyphs.add(
+          TextbookPageGlyph(
+            text: String.fromCharCode(rune),
+            index: index,
+            left: x,
+            top: top,
+            right: x + .025,
+            bottom: top + .03,
+          ),
+        );
+        x += .03;
+      }
+      text.write('\n');
+      if (dot) {
+        // 模拟 PDF 的小号字形编码：只有位于汉字正下方的 3 才是加点。
+        glyphs.add(
+          TextbookPageGlyph(
+            text: '3',
+            index: text.toString().runes.length,
+            left: left + .01,
+            top: top + .034,
+            right: left + .014,
+            bottom: top + .038,
+          ),
+        );
+        text.write('3\n');
+      }
+    }
+
+    line('星月测试', .05, .1);
+    line('星月明，山河亮。', .12, .1);
+    line('读一读，注意加点的词。', .22, .1);
+    line('看星星', .30, .1, dot: true);
+    line('望月亮', .30, .45, dot: true);
+    line('听风声', .38, .1, dot: true);
+    line('赏春光', .38, .45, dot: true);
+    line('读一读，记一记。', .48, .1);
+    for (final (r, words) in [
+      ['星光', '月光', '光点', '光线'],
+      ['山风', '春风', '风雨', '风声'],
+    ].indexed) {
+      for (final (c, word) in words.indexed) {
+        line(word, .56 + r * .08, .1 + c * .2);
+      }
+    }
+    final parsed = parser.parse(lesson, plan, [
+      TextbookPageText(
+        page: 2,
+        text: text.toString(),
+        width: 600,
+        height: 800,
+        glyphs: glyphs,
+      ),
+    ]);
+    final raw = seed.pack.toJson();
+    (raw['lessons'] as List)[0] = parsed.lesson;
+    final exercises = TextbookCoursePack.fromJson(raw).lessons.first.exercises;
+    expect(exercises.map((e) => e.prompt), [
+      '读一读，注意加点的词。\n看星星\t望月亮\n听风声\t赏春光',
+      '读一读，记一记。\n星光\t月光\t光点\t光线\n山风\t春风\t风雨\t风声',
+    ]);
+    expect(
+        exercises.first.promptLayout
+            .skip(1)
+            .expand((r) => r)
+            .map((c) => c.emphasis),
+        [
+          [0],
+          [0],
+          [0],
+          [0],
+        ]);
+    expect(
+      exercises.last.promptLayout.skip(1).expand((r) => r).map((c) => c.text),
+      ['星光', '月光', '光点', '光线', '山风', '春风', '风雨', '风声'],
+    );
+    expect(
+      exercises.last.promptLayout
+          .expand((r) => r)
+          .every((c) => c.emphasis.isEmpty),
+      isTrue,
+    );
+  });
 
   test('目录新增课目和单元时保留已有ID，不用列表位置占用原ID', () {
     final next = parser.seed(
@@ -30,8 +123,10 @@ void main() {
       previousPlans: seed.generation!.plans,
     );
     expect(next.pack.lessons.length, 3);
-    expect(next.pack.lessons.skip(1).map((l) => l.id),
-        seed.pack.lessons.map((l) => l.id),);
+    expect(
+      next.pack.lessons.skip(1).map((l) => l.id),
+      seed.pack.lessons.map((l) => l.id),
+    );
     expect(next.pack.units.last.id, seed.pack.units.single.id);
     expect(next.pack.units.first.id, isNot(seed.pack.units.single.id));
   });
@@ -245,7 +340,9 @@ void main() {
       '星月明亮星月山河天地明亮',
     );
     expect(
-        tables[seed.pack.lessons.last.id]!.map((v) => v.text).join(), '山河风雨星光',);
+      tables[seed.pack.lessons.last.id]!.map((v) => v.text).join(),
+      '山河风雨星光',
+    );
   });
 
   test('组合声调保留原始线索，不能丢声调后误写完整注音', () {

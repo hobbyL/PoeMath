@@ -15,7 +15,7 @@ class TextbookParsedLesson {
 
 /// 可独立测试的确定性规则。原书证据不足时保留候选，不猜读音或答案。
 class TextbookCourseDraftParser {
-  static const version = 3;
+  static const version = 4;
   String _plain(String value) => value.replaceAll(RegExp(r'[\s·•…*＊]'), '');
   String _title(String value) =>
       _plain(value).replaceFirst(RegExp(r'^\d+[.、]?'), '');
@@ -484,7 +484,10 @@ class TextbookCourseDraftParser {
       chunks.last.add(row);
     }
     for (final chunk in chunks) {
-      final prompt = chunk.map((r) => r.text).join('\n');
+      final layout = _exerciseLayout(chunk, pages);
+      final prompt = layout == null
+          ? chunk.map((r) => r.text).join('\n')
+          : layout.map((r) => r.map((c) => c['text']).join('\t')).join('\n');
       final sources = [
         for (final p in chunk.map((r) => r.page).toSet()) _source(p),
       ];
@@ -536,6 +539,7 @@ class TextbookCourseDraftParser {
       (raw['exercises'] as List).add({
         'id': '$anchor-ex',
         'prompt': prompt,
+        if (layout != null) 'promptLayout': layout,
         'origin': 'textbook',
         'answerType': 'none',
         'answers': <String>[],
@@ -558,6 +562,85 @@ class TextbookCourseDraftParser {
         ),
     ];
     return TextbookParsedLesson(raw, candidates);
+  }
+
+  List<List<Map<String, dynamic>>>? _exerciseLayout(
+    List<_Line> chunk,
+    List<TextbookPageText> pages,
+  ) {
+    if (!RegExp(r'^(读一读|读读)').hasMatch(chunk.first.text)) return null;
+    final rows = <List<_Line>>[];
+    for (final row in chunk) {
+      final widths = row.glyphs
+          .where((g) => _han(g.text))
+          .map((g) => g.width)
+          .toList()
+        ..sort();
+      final width =
+          widths.isEmpty ? double.infinity : widths[widths.length ~/ 2];
+      final cells = <_Line>[];
+      for (final glyph in row.glyphs) {
+        if (cells.isEmpty ||
+            glyph.left - cells.last.glyphs.last.right > width * 1.5) {
+          cells.add(_Line(row.page, [], row.original));
+        }
+        cells.last.glyphs.add(glyph);
+      }
+      rows.add(cells);
+    }
+    if (!rows.any((r) => r.length > 1)) return null;
+    final gridRight = rows
+        .where((r) => r.length > 1)
+        .expand((r) => r)
+        .expand((c) => c.glyphs)
+        .map((g) => g.right)
+        .reduce(math.max);
+    final notes = <_Line>[];
+    final content = <List<_Line>>[];
+    for (final row in rows) {
+      // 旁注位于词组区域右侧；放在词组之后，避免插断同一题的两行内容。
+      if (row.length == 1 && row.single.left > gridRight) {
+        notes.add(row.single);
+      } else {
+        content.add(row);
+      }
+    }
+    final marked = chunk.first.text.contains('加点');
+    Map<String, dynamic> cell(_Line line) {
+      final text = line.text;
+      final runes = text.runes.toList();
+      final emphasis = <int>[];
+      var at = 0;
+      for (final glyph in line.glyphs) {
+        while (at < runes.length && runes[at] != glyph.text.runes.single) {
+          at++;
+        }
+        final dots = pages.firstWhere((p) => p.page == line.page).glyphs;
+        if (marked &&
+            _han(glyph.text) &&
+            dots.any(
+              (dot) =>
+                  const ['3', '·', '•', '‧', '.'].contains(dot.text) &&
+                  dot.width < glyph.width * .5 &&
+                  dot.height < glyph.height * .5 &&
+                  (dot.centerX - glyph.centerX).abs() < glyph.width * .35 &&
+                  dot.top >= glyph.bottom &&
+                  dot.top - glyph.bottom < glyph.height * .6,
+            )) {
+          emphasis.add(at);
+        }
+        at++;
+      }
+      return {'text': text, 'emphasis': emphasis};
+    }
+
+    return [
+      for (final row in content) [for (final line in row) cell(line)],
+      if (notes.isNotEmpty)
+        [
+          {'text': notes.map((l) => l.text).join(), 'emphasis': <int>[]},
+        ],
+    ];
   }
 
   Map<String, dynamic> _range(Map<String, dynamic> p) => {
@@ -867,6 +950,8 @@ class TextbookCourseDraftParser {
       row.glyphs.sort((a, b) => a.left.compareTo(b.left));
     }
     rows.sort((a, b) => a.top.compareTo(b.top));
+    // 课文和习题保持从上到下的阅读顺序；双栏重排只适用于册末字词表。
+    if (!table) return rows;
     // A repeated gutter, rather than a fixed half-page split, supplies column
     // evidence. This also keeps each numbered appendix row in its own column.
     final gutters = <({double left, double right, _Line row})>[];

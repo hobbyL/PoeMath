@@ -202,6 +202,13 @@ must match, so editing a referenced paragraph cannot silently move the target.
 Whole-text recitation explicitly lists each covered paragraph/range.
 
 Exercise fields: `id,prompt,origin,answerType,answers,answerOrigin,answerSources,sources,review`.
+Optional `promptLayout` preserves reading-exercise rows and columns as
+`[[{"text":"word","emphasis":[0]}]]`. `emphasis` contains unique zero-based
+Unicode-scalar positions of characters with dots underneath. Cells contain no
+newlines or tabs; joining cells with tabs and rows with newlines must exactly
+equal `prompt`. Old packs can omit this field. Editing prompt text clears a
+previous layout unless a matching replacement is explicitly supplied; editing
+answers preserves it. Layout and emphasis participate in content review hashes.
 `origin` is `textbook` or `curated`. Answer types are `none`, `exact`, `reference`,
 or `parentCheck`. `exact`/`reference` require nonempty answers; `none` has no
 answers. `answerOrigin` is `none`, `textbook`, or `reviewerReference`; textbook

@@ -223,6 +223,14 @@ class TextbookCourseRecitation extends TextbookCourseNode {
   List<String> get requiredChecks => const ['sourcePages', 'content', 'range'];
 }
 
+class TextbookExerciseCell {
+  const TextbookExerciseCell(this.text, this.emphasis);
+  final String text;
+
+  /// 加点字符在 text 中的 Unicode 码点位置。
+  final List<int> emphasis;
+}
+
 class TextbookCourseExercise extends TextbookCourseNode {
   TextbookCourseExercise._(
     super.id,
@@ -235,6 +243,7 @@ class TextbookCourseExercise extends TextbookCourseNode {
     this.answers,
     this.answerOrigin,
     this.answerSources,
+    this.promptLayout,
   ) : super._();
   final String prompt;
   final TextbookAnswerType answerType;
@@ -243,6 +252,21 @@ class TextbookCourseExercise extends TextbookCourseNode {
   /// textbook / reviewerReference / none，参考要点不当作唯一标准答案。
   final String answerOrigin;
   final List<TextbookSourcePage> answerSources;
+  final List<List<TextbookExerciseCell>> promptLayout;
+
+  /// 有排版时使用题首独占行；旧数据和编辑后的阅读题兼容首行指令。
+  String? get promptHeading {
+    if (promptLayout.isNotEmpty) {
+      return promptLayout.first.length == 1
+          ? promptLayout.first.single.text
+          : null;
+    }
+    final lineEnd = prompt.indexOf('\n');
+    if (lineEnd <= 0) return null;
+    final firstLine = prompt.substring(0, lineEnd).trim();
+    return firstLine.startsWith('读一读') ? firstLine : null;
+  }
+
   @override
   List<String> get requiredChecks => [
         ...super.requiredChecks,
@@ -895,6 +919,7 @@ class _CourseDecoder {
       fields(exercise, p, [
         'id',
         'prompt',
+        if (exercise.containsKey('promptLayout')) 'promptLayout',
         'origin',
         'answerType',
         'answers',
@@ -919,6 +944,39 @@ class _CourseDecoder {
       );
       final answerPages =
           sources(exercise['answerSources'], '$p.answerSources');
+      final prompt = string(exercise['prompt'], '$p.prompt');
+      final layout = <List<TextbookExerciseCell>>[];
+      if (exercise.containsKey('promptLayout')) {
+        for (final (r, row)
+            in list(exercise['promptLayout'], '$p.promptLayout').indexed) {
+          final cells = <TextbookExerciseCell>[];
+          for (final (c, value) in list(row, '$p.promptLayout[$r]').indexed) {
+            final at = '$p.promptLayout[$r][$c]';
+            final cell = object(value, at);
+            fields(cell, at, ['text', 'emphasis']);
+            final text = string(cell['text'], '$at.text');
+            if (text.contains(RegExp(r'[\r\n\t]'))) fail(at, '习题单元格不能包含换行或制表符');
+            final emphasis = <int>[];
+            for (final index in list(cell['emphasis'], '$at.emphasis')) {
+              if (index is! int ||
+                  index < 0 ||
+                  index >= text.runes.length ||
+                  emphasis.contains(index)) {
+                fail(at, '习题加点位置无效或重复');
+              }
+              emphasis.add(index);
+            }
+            cells.add(TextbookExerciseCell(text, List.unmodifiable(emphasis)));
+          }
+          if (cells.isEmpty) fail('$p.promptLayout[$r]', '习题排版行不能为空');
+          layout.add(List.unmodifiable(cells));
+        }
+        if (layout.isEmpty ||
+            layout.map((r) => r.map((c) => c.text).join('\t')).join('\n') !=
+                prompt) {
+          fail('$p.promptLayout', '习题排版与题目文字不一致');
+        }
+      }
       if ((type == TextbookAnswerType.exact ||
               type == TextbookAnswerType.reference) &&
           answers.isEmpty) {
@@ -940,11 +998,12 @@ class _CourseDecoder {
           sources(exercise['sources'], '$p.sources'),
           review(exercise['review'], '$p.review'),
           exercise,
-          string(exercise['prompt'], '$p.prompt'),
+          prompt,
           type,
           answers,
           origin,
           answerPages,
+          List.unmodifiable(layout),
         ),
       );
     }

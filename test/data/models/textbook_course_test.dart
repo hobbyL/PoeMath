@@ -10,6 +10,44 @@ Map<String, dynamic> lesson(Map<String, dynamic> pack) =>
     (pack['lessons'] as List).single as Map<String, dynamic>;
 
 void main() {
+  test('习题排版严格往返，加点按Unicode码点校验且文字须与题目一致', () {
+    final raw = courseFixture();
+    final exercise =
+        (lesson(raw)['exercises'] as List).single as Map<String, dynamic>;
+    exercise['prompt'] = '读一读。\n𠀀月\t星光';
+    exercise['promptLayout'] = [
+      [
+        {'text': '读一读。', 'emphasis': <int>[]},
+      ],
+      [
+        {
+          'text': '𠀀月',
+          'emphasis': [0],
+        },
+        {'text': '星光', 'emphasis': <int>[]},
+      ],
+    ];
+    final pack = TextbookCoursePack.fromJson(raw);
+    expect(pack.toJson(), raw);
+    expect(
+      pack.lessons.single.exercises.single.promptLayout[1][0].emphasis,
+      [0],
+    );
+    for (final invalid in [
+      [2],
+      [-1],
+      [0, 0],
+      [0.0],
+    ]) {
+      final bad = pack.toJson();
+      final ex = (lesson(bad)['exercises'] as List).single as Map;
+      ((ex['promptLayout'] as List)[1][0] as Map)['emphasis'] = invalid;
+      expect(() => TextbookCoursePack.fromJson(bad), throwsFormatException);
+    }
+    exercise['prompt'] = '另一道题';
+    expect(() => TextbookCoursePack.fromJson(raw), throwsFormatException);
+  });
+
   test('实际建稿和审核产物完整往返，Unicode注音与范围不按UTF16误计', () {
     final produced = courseFixture(reviewed: true, permitted: true);
     final pack = TextbookCoursePack.forPublication(produced);

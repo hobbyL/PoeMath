@@ -5,6 +5,45 @@ import 'package:poemath/data/models/textbook_course_review.dart';
 import '../../helpers/textbook_course_fixture.dart';
 
 void main() {
+  test('编辑习题答案保留排版；改写题目清除旧排版及加点位置', () {
+    final raw = courseFixture();
+    final exercise =
+        ((raw['lessons'] as List).single['exercises'] as List).single as Map;
+    exercise['prompt'] = '读一读。\n星光\t月光';
+    exercise['promptLayout'] = [
+      [
+        {'text': '读一读。', 'emphasis': <int>[]},
+      ],
+      [
+        {
+          'text': '星光',
+          'emphasis': [0],
+        },
+        {'text': '月光', 'emphasis': <int>[]},
+      ],
+    ];
+    final pack = TextbookCoursePack.fromJson(raw);
+    final changedAnswer = editTextbookCourseNode(pack, 'exercise-001', {
+      'answers': ['星光'],
+      'answerOrigin': 'reviewerReference',
+    });
+    expect(
+      changedAnswer.lessons.single.exercises.single.toJson()['promptLayout'],
+      exercise['promptLayout'],
+    );
+    final changedPrompt =
+        editTextbookCourseNode(pack, 'exercise-001', {'prompt': '新的题目。'});
+    expect(changedPrompt.lessons.single.exercises.single.prompt, '新的题目。');
+    expect(changedPrompt.lessons.single.exercises.single.promptLayout, isEmpty);
+    expect(
+      changedPrompt.lessons.single.exercises.single
+          .toJson()
+          .containsKey('promptLayout'),
+      isFalse,
+    );
+    expect(changedPrompt.contentRevision, pack.contentRevision + 1);
+  });
+
   test('编辑正文使段落、课目、整包及关联背诵待审，重新绑定同一字符范围', () {
     final pack = TextbookCoursePack.fromJson(
       courseFixture(reviewed: true, permitted: true),

@@ -28,6 +28,7 @@ TextbookCoursePack editTextbookCourseNode(
     if (node is TextbookCourseRecitation) ...['instruction', 'ranges'],
     if (node is TextbookCourseExercise) ...[
       'prompt',
+      'promptLayout',
       'origin',
       'answerType',
       'answers',
@@ -42,6 +43,13 @@ TextbookCoursePack editTextbookCourseNode(
   final selected = _findNode(output, nodeId)!;
   final before = textbookContentDigest(selected);
   selected.addAll(changes);
+  if (node is TextbookCourseExercise &&
+      changes.containsKey('prompt') &&
+      changes['prompt'] != node.prompt &&
+      !changes.containsKey('promptLayout')) {
+    // 编辑纯文字后，旧排版及其加点位置不再是新题目的可靠依据。
+    selected.remove('promptLayout');
+  }
   if (before == textbookContentDigest(selected)) return pack;
   selected['review'] = newTextbookReview();
   if (node is TextbookCourseParagraph && node is! TextbookCourseVocabulary) {
