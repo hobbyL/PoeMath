@@ -759,6 +759,9 @@ class _TextbookCourseLessonPageState
                   top: false,
                   bottom: false,
                   child: ListView(
+                    key: PageStorageKey(
+                      'course-lesson-${widget.book.pdfSha256}-${lesson.id}',
+                    ),
                     padding: const EdgeInsets.all(SpacingTokens.md),
                     children: [
                       AppTile(

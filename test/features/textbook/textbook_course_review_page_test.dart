@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,11 +25,17 @@ import '../../helpers/textbook_course_fixture.dart';
 
 class _Courses extends TextbookCourseRepository {
   TextbookCoursePack? current;
+  Completer<TextbookCoursePack?>? nextLoad;
   bool failNextSave = false;
   int saves = 0;
   int imports = 0;
   @override
-  Future<TextbookCoursePack?> load(Textbook book) async => current;
+  Future<TextbookCoursePack?> load(Textbook book) async {
+    final pending = nextLoad;
+    nextLoad = null;
+    return pending == null ? current : pending.future;
+  }
+
   @override
   Future<TextbookCoursePack> readDraft(Textbook book, String path) async =>
       TextbookCoursePack.fromJson(courseFixture());
@@ -789,6 +797,46 @@ void main() {
     expectFullWidth(find.widgetWithText(TextField, '正文'));
     expect(tester.takeException(), isNull);
     expect(courses.current!.toJson(), data);
+  });
+
+  testWidgets('习题审核返回后异步刷新课程仍保留列表滚动位置', (tester) async {
+    await pump(
+      tester,
+      TextbookCourseReviewPage(bookId: book.pdfSha256),
+      size: const Size(360, 620),
+    );
+    await tap(tester, find.byKey(const ValueKey('course-lesson-lesson-001')));
+    final exerciseRow =
+        find.byKey(const ValueKey('course-target-exercise-001'));
+    await tester.scrollUntilVisible(exerciseRow, 300);
+    await tester.ensureVisible(exerciseRow);
+    await tester.pumpAndSettle();
+    final listScrollable = find.descendant(
+      of: find.byType(ListView),
+      matching: find.byType(Scrollable),
+    );
+    final offset =
+        tester.state<ScrollableState>(listScrollable).position.pixels;
+    final rowTop = tester.getTopLeft(exerciseRow).dy;
+    expect(offset, greaterThan(0));
+    await tap(tester, exerciseRow);
+    expect(find.byType(TextbookCourseNodePage), findsOneWidget);
+
+    final reload = Completer<TextbookCoursePack?>();
+    courses.nextLoad = reload;
+    await tester.pageBack();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    reload.complete(courses.current);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.state<ScrollableState>(listScrollable).position.pixels,
+      closeTo(offset, 0.1),
+    );
+    expect(tester.getTopLeft(exerciseRow).dy, closeTo(rowTop, 0.1));
+    expect(courses.saves, 0);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('窄屏大字长状态会省略，摘要保留可用宽度且整行可点击', (tester) async {
