@@ -149,7 +149,11 @@ void main() {
             tester.widget<PageView>(find.byType(PageView)).controller!.page ==
                 1,
       );
-      expect(repo.reading('default', book.pdfSha256).page, 1);
+      await _until(
+        tester,
+        () => repo.reading('default', book.pdfSha256).page == 2,
+      );
+      expect(repo.reading('default', book.pdfSha256).page, 2);
       await tester.drag(find.byType(PageView), const Offset(-500, 0));
       await _until(
         tester,
@@ -199,19 +203,34 @@ void main() {
               find.byType(PageView).evaluate().isNotEmpty &&
               tester.widget<PageView>(find.byType(PageView)).controller!.page ==
                   target - 1 &&
-              tester
-                      .widget<FilledButton>(
-                        find.byKey(const ValueKey('textbook-detail-read')),
-                      )
-                      .onPressed !=
-                  null,
+              _detailReadEnabled(tester),
         );
-        expect(repo.reading('default', book.pdfSha256).page, 1);
+        await _until(
+          tester,
+          () => repo.reading('default', book.pdfSha256).page == target,
+        );
+        expect(repo.reading('default', book.pdfSha256).page, target);
         expect(
           tester.widget<PdfPageView>(find.byType(PdfPageView).first).document,
           same(previewDocument),
         );
       }
+      router.go(AppRoutes.textbookManagement);
+      await _until(
+        tester,
+        () => find.byType(TextbookPdfPreview).evaluate().isEmpty,
+      );
+      router.go(AppRoutes.textbookManageDetailOf(book.pdfSha256));
+      await _until(
+        tester,
+        () =>
+            find.byType(PageView).evaluate().isNotEmpty &&
+            tester.widget<PageView>(find.byType(PageView)).controller!.page ==
+                1 &&
+            _detailReadEnabled(tester),
+      );
+      expect(find.text('2 / 3'), findsOneWidget);
+      expect(repo.reading('default', book.pdfSha256).page, 2);
       await tester.tap(find.byKey(const ValueKey('textbook-detail-read')));
       await _until(
         tester,
@@ -420,6 +439,14 @@ void main() {
     },
     skip: !const bool.fromEnvironment('TEXTBOOK_NETWORK_ACCEPTANCE'),
   );
+}
+
+bool _detailReadEnabled(WidgetTester tester) {
+  final finder = find.byKey(const ValueKey('textbook-detail-read'));
+  if (finder.evaluate().isEmpty) return false;
+  final button = tester.widget(finder);
+  if (button is IconButton) return button.onPressed != null;
+  return button is ButtonStyleButton && button.onPressed != null;
 }
 
 Future<void> _until(WidgetTester tester, bool Function() ready) async {

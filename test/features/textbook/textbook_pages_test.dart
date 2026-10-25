@@ -677,9 +677,8 @@ void main() {
     expect(find.text('本地 PDF 已移除或丢失。请到书籍管理重新导入同一文件，恢复阅读。'), findsOneWidget);
   });
 
-  testWidgets('详情卡片纵向居中，底部固定带箭头按钮；翻页不改续读位置', (tester) async {
+  testWidgets('详情卡片纵向居中，底部固定带箭头按钮；翻页保存续读位置', (tester) async {
     repo.books[book.pdfSha256] = book;
-    await repo.savePage('default', book, 2);
     final jumps = <int>[];
     var previewTaps = 0;
     TextbookViewerOptions? options;
@@ -856,6 +855,99 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     old.onPageChanged(1);
     expect(repo.reading('default', book.pdfSha256).page, 2);
+  });
+
+  testWidgets('详情退出重进恢复阅读位置，书籍和入页档案隔离，旧书回调失效', (tester) async {
+    final bookA = Textbook.fromJson({...book.toJson(), 'pageCount': 30});
+    final bookB = Textbook.fromJson({
+      ...bookA.toJson(),
+      'pdfSha256': List.filled(64, 'b').join(),
+      'title': '另一本合成教材',
+    });
+    repo.books[bookA.pdfSha256] = bookA;
+    repo.books[bookB.pdfSha256] = bookB;
+    await repo.setMatch('default', bookA.pdfSha256, TextbookMatch.matches);
+    TextbookViewerOptions? options;
+    TextbookDetailPage detail(Textbook selected) => TextbookDetailPage(
+          bookId: selected.pdfSha256,
+          previewBuilder: (_, value) {
+            options = value;
+            return const SizedBox.expand();
+          },
+        );
+    await pump(tester, detail(bookA));
+    expect(options!.initialPage, 1);
+    options!.onPageChanged(10);
+    await tester.pumpAndSettle();
+    expect(
+      repo.reading('default', bookA.pdfSha256).toJson(),
+      {'page': 10, 'match': 'matches'},
+    );
+    final oldA = options!;
+    await pump(tester, detail(bookB));
+    expect(options!.initialPage, 1);
+    oldA.onPageChanged(20);
+    options!.onPageChanged(7);
+    await tester.pumpAndSettle();
+    expect(repo.reading('default', bookA.pdfSha256).page, 10);
+    expect(repo.reading('default', bookB.pdfSha256).page, 7);
+    await tester.pumpWidget(const SizedBox());
+    await pump(tester, detail(bookA));
+    expect(options!.initialPage, 10);
+    expect(find.text('10 / 30'), findsOneWidget);
+    ProfileScope.switchTo('other');
+    options!.onPageChanged(11);
+    await tester.pumpAndSettle();
+    expect(repo.reading('default', bookA.pdfSha256).page, 11);
+    expect(repo.reading('other', bookA.pdfSha256).page, 1);
+    await tester.pumpWidget(const SizedBox());
+    await pump(tester, detail(bookA));
+    expect(options!.initialPage, 1);
+    options!.onPageChanged(4);
+    await tester.pumpAndSettle();
+    expect(repo.reading('other', bookA.pdfSha256).page, 4);
+    await tester.pumpWidget(const SizedBox());
+    ProfileScope.reset();
+    await pump(tester, detail(bookB));
+    expect(options!.initialPage, 7);
+    await tester.pumpWidget(const SizedBox());
+    await pump(tester, detail(bookA));
+    expect(options!.initialPage, 11);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('详情保存失败可重试，不同档案及离页旧回调不改写阅读记录', (tester) async {
+    final longBook = Textbook.fromJson({...book.toJson(), 'pageCount': 30});
+    repo.books[longBook.pdfSha256] = longBook;
+    TextbookViewerOptions? options;
+    await pump(
+      tester,
+      TextbookDetailPage(
+        bookId: longBook.pdfSha256,
+        previewBuilder: (_, value) {
+          options = value;
+          return const SizedBox.expand();
+        },
+      ),
+    );
+    repo.failSave = true;
+    options!.onPageChanged(10);
+    await tester.pumpAndSettle();
+    expect(find.text('阅读位置保存失败'), findsOneWidget);
+    expect(repo.reading('default', longBook.pdfSha256).page, 1);
+    ProfileScope.switchTo('other');
+    repo.failSave = false;
+    await tester.tap(find.text('重试保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('阅读位置保存失败'), findsNothing);
+    expect(repo.reading('default', longBook.pdfSha256).page, 10);
+    expect(repo.reading('other', longBook.pdfSha256).page, 1);
+    final old = options!;
+    await tester.pumpWidget(const SizedBox());
+    old.onPageChanged(20);
+    await tester.pumpAndSettle();
+    expect(repo.saved, [(profile: 'default', page: 10)]);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('原书阅读支持从预览页进入并保存于当前档案', (tester) async {
@@ -1093,10 +1185,10 @@ void main() {
     await tester.tap(find.text('下一页'));
     await tester.pumpAndSettle();
     expect(options!.initialPage, 3);
-    expect(repo.reading('default', book.pdfSha256).page, 1);
+    expect(repo.reading('default', book.pdfSha256).page, 3);
   });
 
-  testWidgets('详情页码支持输入与键盘跳转、校验、取消，预览不写续读', (tester) async {
+  testWidgets('详情页码支持输入与键盘跳转、校验、取消，成功跳转保存续读', (tester) async {
     final longBook = Textbook.fromJson({...book.toJson(), 'pageCount': 127});
     repo.books[longBook.pdfSha256] = longBook;
     await repo.savePage('default', longBook, 2);
@@ -1124,8 +1216,8 @@ void main() {
     await tester.pumpAndSettle();
     final pageNumber =
         find.byKey(const ValueKey('textbook-detail-page-number'));
-    expect(find.text('1 / 127'), findsOneWidget);
-    for (final label in ['上一页', '1 / 127', '下一页']) {
+    expect(find.text('2 / 127'), findsOneWidget);
+    for (final label in ['上一页', '2 / 127', '下一页']) {
       final button = find.ancestor(
         of: find.text(label),
         matching:
@@ -1142,7 +1234,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.widget<TextFormField>(find.byType(TextFormField)).controller!.text,
-      '1',
+      '2',
     );
     for (final invalid in ['', '0', '128', '-1', 'abc', '1.5']) {
       await tester.enterText(find.byType(TextFormField), invalid);
@@ -1154,7 +1246,7 @@ void main() {
     await tester.enterText(find.byType(TextFormField), '127');
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
-    expect(find.text('1 / 127'), findsOneWidget);
+    expect(find.text('2 / 127'), findsOneWidget);
     expect(jumps, isEmpty);
     await tester.tap(pageNumber);
     await tester.pumpAndSettle();
@@ -1185,8 +1277,8 @@ void main() {
     );
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
-    expect(repo.saved, isEmpty);
-    expect(repo.reading('default', longBook.pdfSha256).page, 2);
+    expect(repo.saved, [(profile: 'default', page: 127)]);
+    expect(repo.reading('default', longBook.pdfSha256).page, 127);
     expect(tester.takeException(), isNull);
   });
 
@@ -1233,11 +1325,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('3 / 3'), findsOneWidget);
     expect(options!.initialPage, 3);
-    expect(repo.saved, isEmpty);
+    expect(repo.saved, [
+      (profile: 'default', page: 3),
+      (profile: 'default', page: 2),
+      (profile: 'default', page: 3),
+    ]);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('页码右侧搜索本书，选择双页右页结果不写续读且重试屏蔽旧搜索', (tester) async {
+  testWidgets('页码右侧搜索本书，选择双页右页结果保存续读且重试屏蔽旧搜索', (tester) async {
     repo.books[book.pdfSha256] = book;
     await repo.savePage('default', book, 2);
     repo.saved.clear();
@@ -1311,8 +1407,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('2–3 / 3'), findsOneWidget);
     expect(options!.initialPage, 3);
-    expect(repo.saved, isEmpty);
-    expect(repo.reading('default', book.pdfSha256).page, 2);
+    expect(repo.saved, [(profile: 'default', page: 3)]);
+    expect(repo.reading('default', book.pdfSha256).page, 3);
     await tester.tap(searchButton);
     await tester.pumpAndSettle();
     expect(
@@ -1329,11 +1425,11 @@ void main() {
     old.onReady((_) async {});
     await tester.pumpAndSettle();
     expect(tester.widget<IconButton>(searchButton).onPressed, isNull);
-    expect(repo.saved, isEmpty);
+    expect(repo.saved, [(profile: 'default', page: 3)]);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('详情目录紧邻返回右侧，旋转保留位置，跳转不写续读且重试屏蔽旧回调', (tester) async {
+  testWidgets('详情目录紧邻返回右侧，旋转保留位置，跳转保存续读且重试屏蔽旧回调', (tester) async {
     repo.books[book.pdfSha256] = book;
     TextbookViewerOptions? options;
     final jumps = <int>[];
@@ -1401,7 +1497,7 @@ void main() {
           tester.getRect(find.byType(BackButton)).center.dx,
       SpacingTokens.minTapTarget,
     );
-    expect(repo.saved, isEmpty);
+    expect(repo.saved, [(profile: 'default', page: 3)]);
     final old = options!;
     old.onRetry();
     await tester.pumpAndSettle();

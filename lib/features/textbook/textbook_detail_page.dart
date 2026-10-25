@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -6,11 +7,13 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/domain/textbook_lesson_content.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_dialog.dart';
@@ -37,6 +40,10 @@ class TextbookDetailPage extends ConsumerStatefulWidget {
 }
 
 class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
+  late final TextbookRepository _repo;
+  late final String _profileId;
+  int _saveRevision = 0;
+  bool _saveFailed = false;
   bool _busy = false;
   bool _previewVisible = true;
   bool _turning = false;
@@ -45,6 +52,50 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   TextbookGoToPage? _goToPage;
   TextbookSearch? _search;
   TextbookTocLoader? _toc;
+
+  @override
+  void initState() {
+    super.initState();
+    _repo = ref.read(textbookRepositoryProvider);
+    _profileId = ProfileScope.currentId;
+    _previewPage = _repo.reading(_profileId, widget.bookId).page;
+  }
+
+  @override
+  void didUpdateWidget(covariant TextbookDetailPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.bookId == widget.bookId) return;
+    _previewPage = _repo.reading(_profileId, widget.bookId).page;
+    _previewRevision++;
+    _saveRevision++;
+    _saveFailed = false;
+    _previewVisible = true;
+    _turning = false;
+    _goToPage = null;
+    _search = null;
+    _toc = null;
+  }
+
+  Future<void> _savePreviewPage(Textbook book, int page) async {
+    final revision = ++_saveRevision;
+    try {
+      // 入队即捕获书籍、页码与档案；离页后继续完成持久化。
+      await _repo.savePage(_profileId, book, page);
+      if (mounted && revision == _saveRevision && _saveFailed) {
+        setState(() => _saveFailed = false);
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '阅读位置保存失败',
+        tag: 'Textbook',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted && revision == _saveRevision) {
+        setState(() => _saveFailed = true);
+      }
+    }
+  }
 
   Future<void> _remove(Textbook book) async {
     if (_busy) return;
@@ -303,7 +354,10 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       initialPage: _previewPage.clamp(1, book.pageCount),
       onPageChanged: (page) {
         if (mounted && _previewVisible && revision == _previewRevision) {
-          setState(() => _previewPage = page.clamp(1, book.pageCount));
+          final nextPage = page.clamp(1, book.pageCount);
+          if (nextPage == _previewPage) return;
+          setState(() => _previewPage = nextPage);
+          unawaited(_savePreviewPage(book, nextPage));
         }
       },
       onReady: (goToPage) {
@@ -484,6 +538,17 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (_saveFailed)
+                        Row(
+                          children: [
+                            const Expanded(child: Text('阅读位置保存失败')),
+                            TextButton(
+                              onPressed: () =>
+                                  _savePreviewPage(book, _previewPage),
+                              child: const Text('重试保存'),
+                            ),
+                          ],
+                        ),
                       controls,
                       if (wrapRead) ...[
                         const SizedBox(height: SpacingTokens.xs),
@@ -578,6 +643,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
             : const Center(child: Text('找不到这本教材，请返回书架重新选择。')),
       );
     }
+    _previewPage = _previewPage.clamp(1, book.pageCount);
     final path = ref.watch(textbookPathProvider(book.pdfSha256));
     final available = path.valueOrNull != null;
     final course = ref.watch(textbookCourseProvider(book.pdfSha256));

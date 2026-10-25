@@ -344,7 +344,7 @@ void main() {
       find.byType(TextbookLessonContentPage),
     );
     expect(content.pages, [2, 3]);
-    expect(books.saved, isEmpty);
+    expect(books.saved, [2]);
     expect(tester.takeException(), isNull);
   });
 }
