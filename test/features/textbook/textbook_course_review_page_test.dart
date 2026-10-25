@@ -8,12 +8,14 @@ import 'package:poemath/core/widgets/app_tile.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_course_draft.dart';
 import 'package:poemath/data/models/textbook_course_review.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_course_editor_page.dart';
 import 'package:poemath/features/textbook/textbook_course_node_page.dart';
 import 'package:poemath/features/textbook/textbook_course_review_page.dart';
+import 'package:poemath/features/textbook/textbook_draft_details_page.dart';
 import 'package:poemath/features/textbook/textbook_source_page.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
 
@@ -590,6 +592,68 @@ void main() {
     expect(courses.current!.toJson(), courseFixture());
   });
 
+  testWidgets('范围弹窗从标题原书入口对照起始页，返回后保留未保存输入', (tester) async {
+    final document = TextbookCourseDocument(
+      courses.current!,
+      const TextbookDraftManifest(
+        runId: 'range-preview',
+        parserVersion: 1,
+        phase: 'ready',
+        plans: [
+          TextbookDraftPlan(
+            id: 'lesson-001',
+            startPage: 2,
+            endPage: 3,
+            title: '星月测试',
+          ),
+        ],
+        completed: ['lesson-001'],
+        candidates: {
+          'lesson-001': [
+            TextbookDraftCandidate(
+              id: 'candidate-1',
+              text: '待整理的文字',
+              reason: '需要人工核对',
+              pages: [2],
+            ),
+          ],
+        },
+      ),
+    );
+    await pump(
+      tester,
+      ProviderScope(
+        overrides: [
+          textbookCourseDocumentProvider(book.pdfSha256)
+              .overrideWith((ref) async => document),
+          textbookPathProvider(book.pdfSha256)
+              .overrideWith((ref) async => null),
+        ],
+        child: TextbookDraftDetailsPage(book: book, lessonId: 'lesson-001'),
+      ),
+    );
+    await tap(tester, find.widgetWithText(AppTile, 'PDF 第2–3页'));
+    final anchor = find.widgetWithText(TextField, '正文标题锚点');
+    await tester.enterText(anchor, '尚未保存的标题');
+    await tap(tester, find.text('原书页'));
+    final source = tester.widget<TextbookCourseSourcePage>(
+      find.byType(TextbookCourseSourcePage),
+    );
+    expect(source.sources.single.pdfPage, 2);
+    expect(courses.saves, 0);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      tester.widget<TextField>(anchor).controller!.text,
+      '尚未保存的标题',
+    );
+    await tap(tester, find.text('取消'));
+    expect(courses.saves, 0);
+    expect(courses.current!.toJson(), courseFixture());
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('横屏正文卡片使用安全区内的完整宽度', (tester) async {
     const size = Size(1100, 620);
     const insets = EdgeInsets.only(left: 24, right: 12);
@@ -629,6 +693,11 @@ void main() {
     paragraph
       ..['text'] = '${paragraph['text']}\n${List.filled(40, '春风吹过星月。').join()}'
       ..['pinyin'] = null;
+    final exercise =
+        (lesson['exercises'] as List<dynamic>).single as Map<String, dynamic>;
+    final prompt = List.generate(12, (index) => '问题${index + 1}：请读课文并说一说星月的特点。')
+        .join('\n');
+    exercise['prompt'] = prompt;
     courses.current = TextbookCoursePack.fromJson(data);
     tester.view.padding = const FakeViewPadding(left: 24, right: 12);
     addTearDown(tester.view.resetPadding);
@@ -689,6 +758,28 @@ void main() {
       tester.getSize(summary).width,
       greaterThan(tester.getSize(paragraphRow).width * 0.75),
     );
+    final exerciseRow =
+        find.byKey(const ValueKey('course-target-exercise-001'));
+    await tester.scrollUntilVisible(exerciseRow, 300);
+    await tester.pumpAndSettle();
+    final exerciseTile = tester.widget<AppTile>(exerciseRow);
+    expect(exerciseTile.subtitle, startsWith('问题1：'));
+    expect(exerciseTile.subtitle, isNot(contains('\n')));
+    final exerciseSummary = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.descendant(
+          of: exerciseRow,
+          matching: find.text(exerciseTile.subtitle),
+        ),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect(exerciseSummary.didExceedMaxLines, isTrue);
+    await tap(tester, exerciseRow);
+    expect(find.text(prompt), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(paragraphRow, -300);
     await tap(tester, coverageButton);
     expectFullWidth(find.byKey(const ValueKey('coverage-paragraphs')));
     await tester.pageBack();
@@ -956,7 +1047,8 @@ void main() {
       );
       expect(tile.trailingText, '待审核');
       if (id == 'recitation-001' || id == 'exercise-001') {
-        expect(tile.subtitle, isEmpty);
+        expect(tile.title, isEmpty);
+        expect(tile.subtitle, isNotEmpty);
       }
       final row = find.byKey(ValueKey('course-target-$id'));
       await tester.ensureVisible(row);

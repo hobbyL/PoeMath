@@ -364,6 +364,10 @@ class TextbookCourseContent extends StatelessWidget {
     void text(String value) => children.add(
           SelectableText(
             value,
+            style: current is TextbookCourseRecitation ||
+                    current is TextbookCourseExercise
+                ? Theme.of(context).textTheme.titleSmall
+                : null,
             textAlign: current is TextbookCourseParagraph
                 ? TextAlign.center
                 : TextAlign.start,

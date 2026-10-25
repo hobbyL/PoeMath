@@ -225,10 +225,53 @@ class _TextbookDraftDetailsState
     final last = TextEditingController(text: '${plan.endPage}');
     final title = TextEditingController(text: plan.title);
     try {
-      final yes = await showDialog<bool>(
+      final navigator = Navigator.of(context, rootNavigator: true);
+      final dialog = DialogRoute<bool>(
         context: context,
+        themes: InheritedTheme.capture(from: context, to: navigator.context),
         builder: (context) => AlertDialog(
-          title: const Text('调整原书范围'),
+          titlePadding: EdgeInsets.zero,
+          actionsPadding: const EdgeInsets.fromLTRB(
+            SpacingTokens.lg,
+            0,
+            SpacingTokens.lg,
+            SpacingTokens.lg,
+          ),
+          title: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              SpacingTokens.lg,
+              SpacingTokens.lg,
+              SpacingTokens.lg,
+              0,
+            ),
+            child: Row(
+              children: [
+                const Expanded(child: Text('调整原书范围')),
+                const SizedBox(width: SpacingTokens.sm),
+                TextButton(
+                  onPressed: () => _page(plan.startPage),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    alignment: AlignmentDirectional.centerEnd,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('原书页'),
+                      // 补偿 chevron 字形的右侧留白，对齐保存按钮的可见边缘。
+                      Transform.translate(
+                        offset: const Offset(SpacingTokens.sm, 0),
+                        child: const Icon(
+                          Icons.chevron_right,
+                          size: SpacingTokens.lg,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -265,6 +308,9 @@ class _TextbookDraftDetailsState
           ],
         ),
       );
+      final yes = await navigator.push(dialog);
+      // 输入框会随退出动画继续构建，等路由移除后再释放控制器。
+      await dialog.completed;
       if (yes != true || !mounted) return;
       final start = int.tryParse(first.text);
       final end = int.tryParse(last.text);
@@ -360,8 +406,22 @@ class _TextbookDraftDetailsState
     final data =
         ref.watch(textbookCourseDocumentProvider(widget.book.pdfSha256));
     final theme = Theme.of(context);
+    final contentStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     return Scaffold(
-      appBar: AppBar(title: const Text('原书与待整理内容')),
+      appBar: AppBar(
+        title: const Text('原书与待整理内容'),
+        actions: [
+          IconButton(
+            tooltip: _saving ? '正在整理本课…' : '重新整理本课',
+            onPressed: _saving || data.asData?.value?.generation == null
+                ? null
+                : _retry,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: data.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => Center(
@@ -394,18 +454,8 @@ class _TextbookDraftDetailsState
                       '标题锚点：${plan.title} · ${generation.completed.contains(plan.id) ? '已整理，待审核' : '尚待整理'}',
                   onTap: () => _range(doc, plan),
                 ),
-              if (plan != null)
-                TextButton(
-                  onPressed: () => _page(plan.startPage),
-                  child: const Text('查看原书起始页'),
-                ),
               if (generation.errors[widget.lessonId] != null)
                 Text('此课整理失败：${generation.errors[widget.lessonId]}'),
-              TextButton.icon(
-                onPressed: _saving ? null : _retry,
-                icon: const Icon(Icons.refresh),
-                label: Text(_saving ? '正在整理本课…' : '重新整理本课（保留人工修改）'),
-              ),
               if (difference != null) ...[
                 const Divider(height: SpacingTokens.xl),
                 Text('生成差异', style: theme.textTheme.titleLarge),
@@ -457,42 +507,70 @@ class _TextbookDraftDetailsState
               const Divider(height: SpacingTokens.xl),
               Text(
                 '待整理内容 · ${candidateList.length}',
-                style: theme.textTheme.titleLarge,
+                style: theme.textTheme.titleMedium,
               ),
               if (candidateList.isEmpty)
-                const Text('没有未分类候选。各类内容是否完整，仍需对照原书核对。'),
+                Text(
+                  '没有未分类候选。各类内容是否完整，仍需对照原书核对。',
+                  style: contentStyle,
+                ),
               for (final candidate in candidateList)
                 Padding(
                   padding: const EdgeInsets.only(top: SpacingTokens.md),
                   child: ColoredCard(
                     color: theme.colorScheme.secondary,
+                    padding: const EdgeInsets.fromLTRB(
+                      SpacingTokens.md,
+                      SpacingTokens.md,
+                      SpacingTokens.md,
+                      SpacingTokens.xs,
+                    ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(candidate.reason),
+                        Text(candidate.reason, style: contentStyle),
                         const SizedBox(height: SpacingTokens.sm),
-                        SelectableText(candidate.text),
+                        SelectableText(
+                          candidate.text,
+                          style: contentStyle,
+                        ),
                         if (candidate.pinyin.isNotEmpty)
                           SelectableText(
                             candidate.pinyin.join(' · '),
+                            style: contentStyle,
                           ),
-                        Wrap(
-                          spacing: SpacingTokens.sm,
-                          children: [
-                            for (final page in candidate.pages)
-                              TextButton(
-                                onPressed: () => _page(page),
-                                child: Text('原书第$page页'),
+                        TextButtonTheme(
+                          data: TextButtonThemeData(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: SpacingTokens.sm,
                               ),
-                            TextButton(
-                              onPressed: () => _candidate(doc, candidate),
-                              child: const Text('选择归属并编辑'),
+                              minimumSize: const Size(
+                                0,
+                                SpacingTokens.minTapTarget,
+                              ),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            TextButton(
-                              onPressed: () => _dismiss(doc, candidate),
-                              child: const Text('忽略此候选'),
-                            ),
-                          ],
+                          ),
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: SpacingTokens.sm,
+                            children: [
+                              for (final page in candidate.pages)
+                                TextButton(
+                                  onPressed: () => _page(page),
+                                  child: Text('原书第$page页'),
+                                ),
+                              TextButton(
+                                onPressed: () => _candidate(doc, candidate),
+                                child: const Text('选择归属并编辑'),
+                              ),
+                              TextButton(
+                                onPressed: () => _dismiss(doc, candidate),
+                                child: const Text('忽略此候选'),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

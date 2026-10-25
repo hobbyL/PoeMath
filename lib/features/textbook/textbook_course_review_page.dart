@@ -784,6 +784,19 @@ class _TextbookCourseLessonPageState
                             ),
                             TextButton.icon(
                               onPressed: () => _add(entry.key),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsetsDirectional.only(
+                                  top: SpacingTokens.sm,
+                                  end: SpacingTokens.sm,
+                                  bottom: SpacingTokens.sm,
+                                ),
+                                minimumSize: const Size(
+                                  SpacingTokens.minTapTarget,
+                                  SpacingTokens.minTapTarget,
+                                ),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                alignment: AlignmentDirectional.centerEnd,
+                              ),
                               icon: const Icon(Icons.add),
                               label: const Text('添加'),
                             ),
@@ -801,12 +814,16 @@ class _TextbookCourseLessonPageState
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               vertical: SpacingTokens.md,
+                              horizontal: SpacingTokens.sm,
                             ),
                             child: Text(
                               lesson.coverage[entry.key] ==
                                       TextbookCoverage.notApplicable
                                   ? '已核对：原书无此要求'
                                   : '尚未整理此类内容，可对照原书添加。',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         if (entry.value.isNotEmpty &&
@@ -842,10 +859,12 @@ class _TextbookCourseLessonPageState
                               flat: true,
                               flatTrailingEdgeAligned: true,
                               iconColor: theme.colorScheme.primary,
-                              title: node is TextbookCourseParagraph
-                                  ? node.text
-                                  : textbookCourseNodeTitle(node),
-                              subtitle: '',
+                              title: '',
+                              subtitle: (node is TextbookCourseExercise
+                                      ? node.prompt
+                                      : textbookCourseNodeTitle(node))
+                                  .replaceAll(RegExp(r'\s+'), ' ')
+                                  .trim(),
                               subtitleMaxLines: 2,
                               trailingText: textbookCourseReviewLabel(node),
                               onTap: () => _openNode(node.id),
