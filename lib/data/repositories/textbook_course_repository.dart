@@ -82,6 +82,13 @@ class TextbookCourseRepository {
   Future<TextbookCourseDocument?> loadDocument(Textbook book) =>
       _serial(() => _loadDocument(book));
 
+  /// 与审核写入共用排序；callback 不得再次调用本仓库的 load/save。
+  Future<T> withCurrentPack<T>(
+    Textbook book,
+    Future<T> Function(TextbookCoursePack? pack) action,
+  ) =>
+      _serial(() async => action((await _loadDocument(book))?.pack));
+
   /// 只有用户明确确认导入时才替换；失败保留此前可用草稿。
   Future<void> importDraft(Textbook book, TextbookCoursePack pack) =>
       _serial(() => _writeDocument(book, TextbookCourseDocument(pack)));
@@ -91,8 +98,10 @@ class TextbookCourseRepository {
     Textbook book,
     TextbookCoursePack pack, {
     required TextbookCoursePack previous,
+    void Function()? authorize,
   }) =>
       _serial(() async {
+        authorize?.call();
         final document = await _loadDocument(book);
         final current = document?.pack;
         if (current == null ||
@@ -116,6 +125,7 @@ class TextbookCourseRepository {
                 if (!remaining.contains((node as Map)['id']))
                   'vocabulary:${lesson.id}:$category:${textbookTextDigest(node['text'] as String)}',
         };
+        authorize?.call();
         await _writeDocument(
           book,
           TextbookCourseDocument(

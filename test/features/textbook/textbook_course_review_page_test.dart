@@ -50,7 +50,9 @@ class _Courses extends TextbookCourseRepository {
     Textbook book,
     TextbookCoursePack pack, {
     required TextbookCoursePack previous,
+    void Function()? authorize,
   }) async {
+    authorize?.call();
     if (failNextSave) {
       failNextSave = false;
       throw StateError('disk unavailable');
