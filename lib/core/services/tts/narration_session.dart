@@ -35,6 +35,7 @@ class NarrationSession {
     required this.cancelPreparation,
     this.onState,
     this.onSegmentStart,
+    this.onAudioReady,
   });
   final int sessionId;
   final int count;
@@ -44,6 +45,11 @@ class NarrationSession {
   final Future<void> Function() cancelPreparation;
   final void Function(NarrationState state, int sessionId)? onState;
   final void Function(int index, int sessionId)? onSegmentStart;
+  final void Function(
+    int index,
+    NarrationAudioIdentity identity,
+    int sessionId,
+  )? onAudioReady;
   final _pending = <int, Future<_Prepared>>{};
   final _cancelled = Completer<void>();
   Completer<void>? _resumeGate;
@@ -122,6 +128,10 @@ class NarrationSession {
           if (ready.error != null) throw ready.error!;
           audio = ready.audio!;
           await _unpaused();
+          if (audio.identity case final identity?) {
+            onAudioReady?.call(_index, identity, sessionId);
+          }
+          _check();
           _playing = true; // 包含播放器加载窗口，暂停同样必须传到平台。
           _started = false;
           await _owned(
@@ -182,9 +192,11 @@ class NarrationSession {
       _paused = false;
       _resumeGate?.complete();
       _resumeGate = null;
-      _emit(_playing && _started
-          ? NarrationStatus.playing
-          : NarrationStatus.buffering,);
+      _emit(
+        _playing && _started
+            ? NarrationStatus.playing
+            : NarrationStatus.buffering,
+      );
       rethrow;
     }
   }
@@ -202,9 +214,11 @@ class NarrationSession {
     if (!active) return;
     _resumeGate?.complete();
     _resumeGate = null;
-    _emit(_playing && _started
-        ? NarrationStatus.playing
-        : NarrationStatus.buffering,);
+    _emit(
+      _playing && _started
+          ? NarrationStatus.playing
+          : NarrationStatus.buffering,
+    );
     if (_playing && _started) _prefetch();
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/tts/narration_session.dart';
+import 'package:poemath/core/services/tts/narration_audio_identity.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import '../../../helpers/narration_fakes.dart';
 import '../../../helpers/textbook_course_fixture.dart';
@@ -78,13 +79,15 @@ void main() {
     await service.startNarration(['缓存段。'],
         bookId: courseFixtureHash, cache: cache,).completed;
     cloud.usage.exhausted = true;
+    final identities = <NarrationBackend>[];
     final session = service.startNarration(['缺失段。', '缓存段。', '另一个缺失段。'],
-        bookId: courseFixtureHash, cache: cache,);
+        bookId: courseFixtureHash, cache: cache, onAudioReady: (index, identity, sessionId) => identities.add(identity.backend),);
     await session.completed;
     expect(cloud.texts, ['缓存段。']);
     expect(cloud.usage.reservations, 2);
     expect(synth.texts, ['缺失段。', '另一个缺失段。']);
     expect(players.last.audio.map((a) => a.format), ['wav', 'mp3', 'wav']);
+    expect(identities, [NarrationBackend.system, NarrationBackend.cloud, NarrationBackend.system]);
     service.dispose();
   });
 

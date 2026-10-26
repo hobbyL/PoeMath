@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:http/http.dart' as http;
@@ -71,7 +72,9 @@ class NarrationSynth implements SystemTtsFileSynthesizer {
   Future<Uint8List> Function(String text)? generate;
   @override
   Future<String> describeVoice(
-          Map<String, String>? voice, double speed,) async =>
+    Map<String, String>? voice,
+    double speed,
+  ) async =>
       identity;
   @override
   Future<Uint8List> synthesize({
@@ -104,8 +107,10 @@ class RecordingNarrationPlayer implements NarrationPlayer {
   int resumes = 0;
   bool disposed = false;
   @override
-  Future<void> play(NarrationAudio clip,
-      {required void Function() onStarted,}) async {
+  Future<void> play(
+    NarrationAudio clip, {
+    required void Function() onStarted,
+  }) async {
     audio.add(clip);
     starts.add(onStarted);
     final end = Completer<void>();
@@ -139,9 +144,20 @@ class RecordingNarrationPlayer implements NarrationPlayer {
 class MemoryNarrationCache extends NarrationAudioCache {
   final entries = <String, Uint8List>{};
   @override
-  Future<NarrationAudio?> read(String book, String key, String format) async {
+  Future<NarrationAudio?> read(String book, String key, String format,
+      {NarrationBackend? backend,}) async {
     final bytes = entries['$book|$key|$format'];
-    return bytes == null ? null : NarrationAudio(bytes: bytes, format: format);
+    return bytes == null
+        ? null
+        : NarrationAudio(
+            bytes: bytes,
+            format: format,
+            identity: backend == null
+                ? null
+                : NarrationAudioIdentity(
+                    cacheKey: key,
+                    backend: backend,
+                    audioSha256: sha256.convert(bytes).toString(),),);
   }
 
   @override
@@ -152,11 +168,20 @@ class MemoryNarrationCache extends NarrationAudioCache {
     Uint8List bytes, {
     required int revision,
     required bool Function() isCurrent,
+    NarrationBackend? backend,
   }) async {
     if (isCurrent() && revision == this.revision(book)) {
       entries['$book|$key|$format'] = bytes;
     }
-    return NarrationAudio(bytes: bytes, format: format);
+    return NarrationAudio(
+        bytes: bytes,
+        format: format,
+        identity: backend == null
+            ? null
+            : NarrationAudioIdentity(
+                cacheKey: key,
+                backend: backend,
+                audioSha256: sha256.convert(bytes).toString(),),);
   }
 }
 
@@ -182,8 +207,11 @@ class NarrationCloud {
       texts.add(text);
       if (unauthorized) return http.Response('', 401);
       final bytes = generate == null ? Uint8List(16) : await generate!(text);
-      return http.Response.bytes(bytes, 200,
-          headers: {'content-type': 'audio/mpeg'},);
+      return http.Response.bytes(
+        bytes,
+        200,
+        headers: {'content-type': 'audio/mpeg'},
+      );
     }),
   );
 }

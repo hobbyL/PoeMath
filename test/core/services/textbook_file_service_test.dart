@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
+import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:hive/hive.dart';
@@ -228,6 +230,41 @@ void main() {
     );
     final other = textbookFixture(id: List.filled(64, 'b').join());
     expect(repo.reading('child', other.pdfSha256).page, 1);
+  });
+
+  test('移除 PDF 同时清理按教材关联的朗读缓存', () async {
+    final narrationCache = NarrationAudioCache(
+      directoryProvider: () async => directory,
+    );
+    final service = TextbookFileService(
+      directoryProvider: () async => directory,
+      validator: (_) async => 3,
+      narrationAudioCache: narrationCache,
+    );
+    final imported = await service.importPdf(
+      sourcePath: source.path,
+      token: TextbookImportToken(),
+    );
+    final key = NarrationAudioCache.key(['test', 'character']);
+    final audio = await narrationCache.store(
+      imported.sha256,
+      key,
+      'wav',
+      Uint8List.fromList([1, 2, 3]),
+      revision: 0,
+      isCurrent: () => true,
+    );
+    expect(audio.path, isNotNull);
+    expect(await File(audio.path!).exists(), isTrue);
+
+    await service.removePdf(imported.sha256);
+
+    expect(await File(audio.path!).exists(), isFalse);
+    expect(
+      await narrationCache.read(imported.sha256, key, 'wav'),
+      isNull,
+    );
+    audio.release();
   });
 
   test('路径只允许 SHA，无法删除任意来源文件', () async {

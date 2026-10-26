@@ -5,6 +5,9 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:poemath/core/services/tts/narration_audio_identity.dart';
+
+export 'package:poemath/core/services/tts/narration_audio_identity.dart';
 
 /// 一次播放持有的音频租约，防止容量清理删除正在使用的文件。
 class NarrationAudio {
@@ -12,11 +15,13 @@ class NarrationAudio {
     this.path,
     this.bytes,
     required this.format,
+    this.identity,
     void Function()? release,
   }) : _release = release;
   final String? path;
   final Uint8List? bytes;
   final String format;
+  final NarrationAudioIdentity? identity;
   void Function()? _release;
   void release() {
     _release?.call();
@@ -50,11 +55,24 @@ class NarrationAudioCache {
     return File('${(await _root()).path}/$book/$key.$format');
   }
 
-  NarrationAudio _lease(File file, String format) {
+  NarrationAudio _lease(
+    File file,
+    String format, {
+    required String key,
+    required String digest,
+    NarrationBackend? backend,
+  }) {
     _pins.update(file.path, (count) => count + 1, ifAbsent: () => 1);
     return NarrationAudio(
       path: file.path,
       format: format,
+      identity: backend == null
+          ? null
+          : NarrationAudioIdentity(
+              cacheKey: key,
+              backend: backend,
+              audioSha256: digest,
+            ),
       release: () {
         final count = (_pins[file.path] ?? 1) - 1;
         if (count <= 0) {
@@ -80,8 +98,9 @@ class NarrationAudioCache {
     required int revision,
     required bool Function() isCurrent,
     required Future<Uint8List> Function() generate,
+    NarrationBackend? backend,
   }) async {
-    final cached = await read(book, key, format);
+    final cached = await read(book, key, format, backend: backend);
     if (cached != null) return cached;
     final pendingKey = '$book|$revision|$key';
     final future =
@@ -95,13 +114,19 @@ class NarrationAudioCache {
         bytes,
         revision: revision,
         isCurrent: isCurrent,
+        backend: backend,
       );
     } finally {
       if (identical(_pending[pendingKey], future)) _pending.remove(pendingKey);
     }
   }
 
-  Future<NarrationAudio?> read(String book, String key, String format) async {
+  Future<NarrationAudio?> read(
+    String book,
+    String key,
+    String format, {
+    NarrationBackend? backend,
+  }) async {
     final revision = this.revision(book);
     try {
       final file = await _file(book, key, format);
@@ -123,7 +148,13 @@ class NarrationAudioCache {
         await file.setLastModified(DateTime.now());
       } on IOException {/* 仍可播放 */}
       if (revision != this.revision(book)) return null;
-      return _lease(file, format);
+      return _lease(
+        file,
+        format,
+        key: key,
+        digest: value['sha256'] as String,
+        backend: backend,
+      );
     } on Exception {
       return null;
     }
@@ -136,7 +167,9 @@ class NarrationAudioCache {
     Uint8List bytes, {
     required int revision,
     required bool Function() isCurrent,
+    NarrationBackend? backend,
   }) async {
+    final digest = sha256.convert(bytes).toString();
     NarrationAudio? result;
     await _enqueue(() async {
       if (!isCurrent() ||
@@ -156,11 +189,17 @@ class NarrationAudioCache {
         await File('${file.path}.json').writeAsString(
           jsonEncode({
             'size': bytes.length,
-            'sha256': sha256.convert(bytes).toString(),
+            'sha256': digest,
           }),
           flush: true,
         );
-        result = _lease(file, format);
+        result = _lease(
+          file,
+          format,
+          key: key,
+          digest: digest,
+          backend: backend,
+        );
         await _prune();
       } on Exception {/* 写入失败只损失缓存，音频仍可临时播放。 */} finally {
         if (pending != null) {
@@ -170,7 +209,18 @@ class NarrationAudioCache {
         }
       }
     });
-    return result ?? NarrationAudio(bytes: bytes, format: format);
+    return result ??
+        NarrationAudio(
+          bytes: bytes,
+          format: format,
+          identity: backend == null
+              ? null
+              : NarrationAudioIdentity(
+                  cacheKey: key,
+                  backend: backend,
+                  audioSha256: digest,
+                ),
+        );
   }
 
   Future<void> _prune() async {

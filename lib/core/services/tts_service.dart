@@ -711,9 +711,13 @@ class TtsService {
     if (narration != null) {
       final cancelling = narration.cancel().catchError((Object _) {});
       _narrationRetirement = cancelling;
-      unawaited(cancelling.then((_) {
-        if (identical(_narrationRetirement, cancelling)) _narrationRetirement = null;
-      }),);
+      unawaited(
+        cancelling.then((_) {
+          if (identical(_narrationRetirement, cancelling)) {
+            _narrationRetirement = null;
+          }
+        }),
+      );
     }
     return _narrationRetirement;
   }
@@ -726,6 +730,11 @@ class TtsService {
     required NarrationAudioCache cache,
     void Function(NarrationState state, int sessionId)? onState,
     void Function(int index, int sessionId)? onSegmentStart,
+    void Function(
+      int index,
+      NarrationAudioIdentity identity,
+      int sessionId,
+    )? onAudioReady,
   }) {
     final retiring = _retireNarration();
     _cloudClient?.cancelPending();
@@ -792,7 +801,12 @@ class TtsService {
           'mp3',
           text,
         ]);
-        final cached = await cache.read(bookId, key, 'mp3');
+        final cached = await cache.read(
+          bookId,
+          key,
+          'mp3',
+          backend: NarrationBackend.cloud,
+        );
         if (cached != null) return cached;
         if (allowCloudRequest && current()) {
           try {
@@ -800,6 +814,7 @@ class TtsService {
               bookId,
               key,
               'mp3',
+              backend: NarrationBackend.cloud,
               revision: bookRevision,
               isCurrent: current,
               generate: () {
@@ -840,6 +855,7 @@ class TtsService {
         bookId,
         key,
         'wav',
+        backend: NarrationBackend.system,
         revision: bookRevision,
         isCurrent: current,
         generate: () {
@@ -869,6 +885,7 @@ class TtsService {
       prepare: prepare,
       onState: onState,
       onSegmentStart: onSegmentStart,
+      onAudioReady: onAudioReady,
       cancelPreparation: () {
         // 此回调的同步段发生在新请求入口之前；原生按身份单独取消。
         if (generation == _sessionGeneration) _cloudClient?.cancelPending();

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 
@@ -17,6 +18,20 @@ void main() {
   });
   tearDown(() async {
     await directory.delete(recursive: true);
+  });
+  test('写入、重开命中和字节降级均保留实际来源/音频摘要', () async {
+    final bytes = Uint8List.fromList([7, 8, 9]);
+    final generated = await cache.obtain(book, key, 'wav', backend: NarrationBackend.system,
+      revision: 0, isCurrent: () => true, generate: () async => bytes,);
+    expect(generated.identity!.audioSha256, sha256.convert(bytes).toString());
+    final expected = generated.identity!.signature; generated.release();
+    final hit = await NarrationAudioCache(directoryProvider: () async => directory).read(book, key, 'wav', backend: NarrationBackend.system);
+    expect(hit!.identity!.signature, expected); hit.release();
+    final blocker = File('${directory.path}/blocked'); await blocker.writeAsString('blocked');
+    final fallback = await NarrationAudioCache(directoryProvider: () async => Directory(blocker.path)).store(book, key, 'mp3', bytes,
+      backend: NarrationBackend.cloud, revision: 0, isCurrent: () => true,);
+    expect(fallback.path, isNull); expect(fallback.identity!.backend, NarrationBackend.cloud);
+    expect(fallback.identity!.audioSha256, sha256.convert(bytes).toString());
   });
   test('完整文件跨实例命中，损坏缓存重新生成；不同身份不串用', () async {
     final bytes = Uint8List.fromList([1, 2, 3, 4]);

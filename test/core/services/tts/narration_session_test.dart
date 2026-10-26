@@ -51,6 +51,23 @@ Future<void> flush() async {
 }
 
 void main() {
+  test('实际音频身份回调同步取消，片段不会播放且租约只释放一次', () async {
+    final player = Player();
+    final identity = NarrationAudioIdentity(cacheKey: 'a' * 64, backend: NarrationBackend.system, audioSha256: 'b' * 64);
+    var released = 0, cancelled = 0;
+    final calls = <int>[];
+    final statuses = <NarrationStatus>[];
+    late NarrationSession session;
+    session = NarrationSession(sessionId: 9, count: 1, player: player,
+      isCurrent: () => true, cancelPreparation: () async {cancelled++;},
+      prepare: (_) async => NarrationAudio(bytes: Uint8List.fromList([1]), format: 'wav', identity: identity, release: () => released++),
+      onAudioReady: (index, actual, id) {expect(actual.signature, identity.signature); expect(id, 9); calls.add(index); unawaited(session.cancel());},
+      onState: (state, _) => statuses.add(state.status),);
+    session.start(); await session.completed; await flush();
+    expect(calls, [0]); expect(player.played, isEmpty); expect(player.starts, isEmpty);
+    expect(released, 1); expect(cancelled, 1);
+    expect(statuses, contains(NarrationStatus.stopped)); expect(statuses, isNot(contains(NarrationStatus.completed)));
+  });
   test('恢复与再次暂停同帧发生时必须等待新的暂停闸门', () async {
     final player = Player();
     final gate = Completer<NarrationAudio>();
