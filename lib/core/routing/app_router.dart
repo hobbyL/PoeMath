@@ -64,6 +64,9 @@ import 'package:poemath/features/textbook/textbook_detail_page.dart';
 import 'package:poemath/features/textbook/textbook_reader_page.dart';
 import 'package:poemath/features/textbook/textbook_course_review_page.dart';
 import 'package:poemath/features/textbook/textbook_lesson_content_page.dart';
+import 'package:poemath/features/textbook/recognition/textbook_recognition_practice_page.dart';
+import 'package:poemath/features/textbook/recognition/textbook_recognition_prepare_page.dart';
+import 'package:poemath/features/textbook/recognition/textbook_recognition_check_page.dart';
 import 'package:poemath/domain/textbook_lesson_content.dart';
 
 /// `Provider<GoRouter>`：整个应用共享一份 GoRouter 实例。
@@ -182,6 +185,15 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           child: TextbookCourseReviewPage(bookId: state.pathParameters['id']!),
         ),
       ),
+      GoRoute(path: AppRoutes.textbookRecognitionPractice, pageBuilder: (context, state) => fadeSlideTransitionPage(
+        state: state, child: TextbookRecognitionPracticePage(bookId: state.pathParameters['id']!,
+          lessonId: state.pathParameters['lesson']!, routeObserver: textbookObserver,),),),
+      GoRoute(path: AppRoutes.textbookRecognitionPrepare, pageBuilder: (context, state) => fadeSlideTransitionPage(
+        state: state, child: TextbookRecognitionPreparePage(bookId: state.pathParameters['id']!,
+          lessonId: state.pathParameters['lesson']!, routeObserver: textbookObserver,),),),
+      GoRoute(path: AppRoutes.textbookRecognitionCheck, pageBuilder: (context, state) => fadeSlideTransitionPage(
+        state: state, child: TextbookRecognitionCheckPage(bookId: state.pathParameters['id']!,
+          lessonId: state.pathParameters['lesson']!, routeObserver: textbookObserver,),),),
       // ============ 公式知识库（全屏，从口算页或首页进入） ============
       GoRoute(
         path: AppRoutes.studyHub,

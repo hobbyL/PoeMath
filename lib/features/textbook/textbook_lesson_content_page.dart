@@ -12,6 +12,7 @@ import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
+import 'package:poemath/features/textbook/recognition/textbook_recognition_overview.dart';
 
 /// 当前原书页对应的只读内容；待审核内容可查看，不改审核或学习记录。
 class TextbookLessonContentPage extends ConsumerStatefulWidget {
@@ -288,53 +289,57 @@ class _TextbookLessonContentPageState
   }) {
     final theme = Theme.of(context);
     final targets = section.targets(lesson);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showTitle) ...[
+          Text(
+            lesson.title,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: SpacingTokens.md),
+        ],
+        if (targets.isEmpty)
+          Text(
+            _emptyLabel(lesson, section),
+            style: theme.textTheme.titleSmall,
+          )
+        else
+          switch (section) {
+            TextbookContentSection.reading => TextbookCourseParagraphsContent(
+                paragraphs: lesson.paragraphs,
+                activeRanges: _segment?.lessonId == lesson.id
+                    ? _segment!.spans
+                    : const [],
+                activeStartKey:
+                    _segment?.lessonId == lesson.id ? _wordKey : null,
+              ),
+            TextbookContentSection.recognition => TextbookRecognitionOverview(
+                bookId: bookId,
+                lesson: lesson,
+                routeObserver: widget.routeObserver,
+              ),
+            TextbookContentSection.recitation => _recitations(context, lesson),
+            TextbookContentSection.writing => TextbookCourseVocabularyContent(
+                vocabulary: lesson.writingCharacters,
+              ),
+          },
+      ],
+    );
     return KeyedSubtree(
       key: _lessonKeys.putIfAbsent(lesson.id, GlobalKey.new),
-      child: ColoredCard(
-        key: ValueKey('textbook-content-${lesson.id}'),
-        color: theme.colorScheme.primary,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showTitle) ...[
-              Text(
-                lesson.title,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
-            if (targets.isEmpty)
-              Text(
-                _emptyLabel(lesson, section),
-                style: theme.textTheme.titleSmall,
-              )
-            else
-              switch (section) {
-                TextbookContentSection.reading =>
-                  TextbookCourseParagraphsContent(
-                    paragraphs: lesson.paragraphs,
-                    activeRanges: _segment?.lessonId == lesson.id
-                        ? _segment!.spans
-                        : const [],
-                    activeStartKey:
-                        _segment?.lessonId == lesson.id ? _wordKey : null,
-                  ),
-                TextbookContentSection.recognition =>
-                  TextbookCourseVocabularyContent(
-                    vocabulary: lesson.recognitionCharacters,
-                  ),
-                TextbookContentSection.recitation =>
-                  _recitations(context, lesson),
-                TextbookContentSection.writing =>
-                  TextbookCourseVocabularyContent(
-                    vocabulary: lesson.writingCharacters,
-                  ),
-              },
-          ],
-        ),
-      ),
+      child: section == TextbookContentSection.recognition
+          ? KeyedSubtree(
+              key: ValueKey('textbook-content-${lesson.id}'),
+              child: content,
+            )
+          : ColoredCard(
+              key: ValueKey('textbook-content-${lesson.id}'),
+              color: theme.colorScheme.primary,
+              child: content,
+            ),
     );
   }
 

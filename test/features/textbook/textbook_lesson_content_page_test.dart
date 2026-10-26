@@ -5,6 +5,7 @@ import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
@@ -147,15 +148,25 @@ void main() {
           );
         case TextbookContentSection.recognition:
           expect(
-            tester
-                .widget<TextbookCourseVocabularyContent>(
-                  find.byType(TextbookCourseVocabularyContent),
-                )
-                .vocabulary
-                .single
-                .id,
-            'recognition-001',
+            find.byKey(const ValueKey('recognition-card-recognition-001')),
+            findsOneWidget,
           );
+          expect(find.text('hē'), findsOneWidget);
+          expect(find.text('星𠀀，月。'), findsOneWidget);
+          expect(find.text('课文词句：星𠀀，月'), findsNothing);
+          expect(
+            tester
+                .widget<ColoredCard>(
+                  find.byKey(
+                    const ValueKey('recognition-card-recognition-001'),
+                  ),
+                )
+                .onTap,
+            isNull,
+          );
+          expect(find.byType(ColoredCard), findsOneWidget);
+          expect(find.text('开始学习'), findsNothing);
+          expect(find.text('继续学习'), findsNothing);
         case TextbookContentSection.writing:
           expect(
             tester
