@@ -108,8 +108,7 @@ final llmProblemRepoDataProvider = Provider<LlmProblemRepository>((ref) {
   return LlmProblemRepository();
 });
 
-final conversationRepositoryProvider =
-    Provider<ConversationRepository>((ref) {
+final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
   return ConversationRepository();
 });
 
@@ -162,6 +161,18 @@ final tencentAsrClientProvider = Provider<TencentAsrClient>((ref) {
   final client = TencentAsrClient();
   ref.onDispose(client.close);
   return client;
+});
+
+/// Pages own and dispose their recording service, so leaving one cannot cancel another.
+final speechRecognitionServiceFactoryProvider =
+    Provider<SpeechRecognitionService Function()>((ref) {
+  final client = ref.watch(tencentAsrClientProvider);
+  final settings = ref.watch(settingsRepositoryProvider);
+  return () => TencentSpeechRecognitionService(
+        recorder: RecordSpeechAudioRecorder(),
+        tencentClient: client,
+        settingsRepository: settings,
+      );
 });
 
 final workerTtsClientProvider = Provider<WorkerTtsClient>((ref) {

@@ -79,6 +79,7 @@ abstract class RecognitionPageState<W extends RecognitionPage>
     cache = ref.read(textbookFileServiceProvider).narrationCache;
     WidgetsBinding.instance.addObserver(this);
     _restore = HiveBoxes.meta.watch(key: 'practice_draft_epoch').listen((_) {
+      _scopeInvalid = true;
       unawaited(stopAudio());
       if (mounted) {
         setState(() {
@@ -268,6 +269,9 @@ abstract class RecognitionPageState<W extends RecognitionPage>
     String text, {
     NarrationAudioIdentity? requiredIdentity,
     String label = '听示范',
+    bool iconOnly = false,
+    bool enabled = true,
+    IconData icon = Icons.volume_up_outlined,
   }) {
     final paused = _audioText == text && audioStatus == NarrationStatus.paused;
     final active = _audioText == text &&
@@ -276,64 +280,105 @@ abstract class RecognitionPageState<W extends RecognitionPage>
           NarrationStatus.preparing,
           NarrationStatus.buffering,
         ].contains(audioStatus);
+    final VoidCallback? onPressed = busy || !enabled
+        ? null
+        : () => playAudio(text, requiredIdentity: requiredIdentity);
+    final buttonIcon = Icon(
+      paused
+          ? Icons.play_arrow
+          : active
+              ? Icons.pause
+              : icon,
+    );
+    final buttonLabel = paused
+        ? '继续播放'
+        : active
+            ? '暂停'
+            : label;
+    if (iconOnly) {
+      return IconButton(
+        onPressed: onPressed,
+        tooltip: buttonLabel,
+        constraints: const BoxConstraints(
+          minWidth: SpacingTokens.minTapTarget,
+          minHeight: SpacingTokens.minTapTarget,
+        ),
+        icon: buttonIcon,
+      );
+    }
     return OutlinedButton.icon(
-      onPressed: busy
-          ? null
-          : () => playAudio(text, requiredIdentity: requiredIdentity),
-      icon: Icon(
-        paused
-            ? Icons.play_arrow
-            : active
-                ? Icons.pause
-                : Icons.volume_up_outlined,
-      ),
-      label: Text(
-        paused
-            ? '继续播放'
-            : active
-                ? '暂停'
-                : label,
-      ),
+      onPressed: onPressed,
+      icon: buttonIcon,
+      label: Text(buttonLabel),
     );
   }
 
-  Widget frame(String title, List<Widget> children) => Scaffold(
-        appBar: AppBar(title: Text(title)),
+  bool get showNavigationBar => true;
+
+  Widget frame(String title, List<Widget> children, {bool compact = false}) =>
+      Scaffold(
+        appBar: showNavigationBar ? AppBar(title: Text(title)) : null,
         body: SafeArea(
-          child: loading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView(
-                  padding: const EdgeInsets.all(SpacingTokens.md),
-                  children: [
-                    if (error != null)
-                      ColoredCard(
-                        color: Theme.of(context).colorScheme.error,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(error!),
-                            if (_retry != null)
-                              TextButton(
-                                onPressed: busy ? null : _retry,
-                                child: const Text('重试'),
-                              ),
-                          ],
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView(
+                        padding: EdgeInsets.fromLTRB(
+                          SpacingTokens.md,
+                          showNavigationBar
+                              ? SpacingTokens.md
+                              : compact && error == null && audioError == null
+                                  ? SpacingTokens.xl
+                                  : kToolbarHeight + SpacingTokens.md,
+                          SpacingTokens.md,
+                          SpacingTokens.md,
                         ),
+                        children: [
+                          if (error != null)
+                            ColoredCard(
+                              color: Theme.of(context).colorScheme.error,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(error!),
+                                  if (_retry != null)
+                                    TextButton(
+                                      onPressed: busy ? null : _retry,
+                                      child: const Text('重试'),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          if (audioError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: SpacingTokens.md,
+                              ),
+                              child: Text(audioError!),
+                            ),
+                          if (lesson != null) ...children,
+                          if (busy)
+                            const Padding(
+                              padding: EdgeInsets.all(SpacingTokens.md),
+                              child: LinearProgressIndicator(),
+                            ),
+                        ],
                       ),
-                    if (audioError != null)
-                      Padding(
-                        padding:
-                            const EdgeInsets.only(bottom: SpacingTokens.md),
-                        child: Text(audioError!),
-                      ),
-                    if (lesson != null) ...children,
-                    if (busy)
-                      const Padding(
-                        padding: EdgeInsets.all(SpacingTokens.md),
-                        child: LinearProgressIndicator(),
-                      ),
-                  ],
+              ),
+              if (!showNavigationBar)
+                const PositionedDirectional(
+                  top: 0,
+                  start: 0,
+                  child: SizedBox(
+                    width: kToolbarHeight,
+                    height: kToolbarHeight,
+                    child: BackButton(),
+                  ),
                 ),
+            ],
+          ),
         ),
       );
   @override

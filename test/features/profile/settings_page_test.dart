@@ -112,6 +112,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('音频设置'), findsOneWidget);
     expect(find.text('语音识别设置'), findsOneWidget);
+    expect(find.text('认一认口语评测'), findsNothing);
     expect(find.text('音效'), findsNothing);
     expect(find.text('触觉反馈'), findsNothing);
     await tester.pageBack();

@@ -117,7 +117,11 @@ class _SpeechRecognitionSettingsPageState
         return;
       }
       await _loadSettings();
-      if (mounted) _showMessage('密钥已保存，需重新完成真实录音测试');
+      if (mounted) {
+        _showMessage(
+          _settings.isVerified ? '密钥已保存，认字与跟读均可用' : '密钥已保存，认字已可用；跟读需完成录音测试',
+        );
+      }
     } on Object {
       if (mounted) _showMessage('密钥保存失败，请稍后重试', isError: true);
     } finally {
@@ -365,7 +369,7 @@ class _SpeechRecognitionSettingsPageState
                           settings.isVerified
                               ? '已配置 · 跟读评分可用'
                               : settings.hasCredentials
-                                  ? '密钥已保存，完成真实录音测试后可用'
+                                  ? '密钥已保存 · 认字可用，跟读需完成录音测试'
                                   : '未配置 · 跟读功能需先填写密钥并通过测试',
                           style: theme.textTheme.bodyMedium,
                         ),
@@ -426,7 +430,7 @@ class _SpeechRecognitionSettingsPageState
             ],
             const SizedBox(height: SpacingTokens.md),
             Text(
-              '录音仅在测试或跟读时处理。腾讯云额度与费用以腾讯云账户状态为准。',
+              '录音仅在测试、跟读或认字时处理。腾讯云额度与费用以腾讯云账户状态为准。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

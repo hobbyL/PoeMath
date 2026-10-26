@@ -11,7 +11,9 @@ enum RecognitionEvidence {
   correct,
   incorrect,
   parentCorrect,
-  parentAgain
+  parentAgain,
+  oralCorrect,
+  oralAgain,
 }
 
 int _integer(Map<String, dynamic> j, String key, [int? max]) {
@@ -47,6 +49,8 @@ class RecognitionRecord {
     this.selfCorrect = 0,
     this.selfAgain = 0,
     this.hints = 0,
+    this.oralCorrect = 0,
+    this.oralAgain = 0,
     this.stage = 0,
     this.lastDay,
     this.nextDay,
@@ -57,6 +61,7 @@ class RecognitionRecord {
   });
   final String fingerprint;
   final int studies, correct, incorrect, selfCorrect, selfAgain, hints, stage;
+  final int oralCorrect, oralAgain;
   final String? lastDay, nextDay, advancedDay, parentDay, checkedDay;
   final bool? parentPassed;
   Map<String, dynamic> toJson() => {
@@ -67,6 +72,8 @@ class RecognitionRecord {
         'selfCorrect': selfCorrect,
         'selfAgain': selfAgain,
         'hints': hints,
+        'oralCorrect': oralCorrect,
+        'oralAgain': oralAgain,
         'stage': stage,
         'lastDay': lastDay,
         'nextDay': nextDay,
@@ -84,6 +91,9 @@ class RecognitionRecord {
         selfCorrect: _integer(j, 'selfCorrect'),
         selfAgain: _integer(j, 'selfAgain'),
         hints: _integer(j, 'hints'),
+        oralCorrect:
+            j.containsKey('oralCorrect') ? _integer(j, 'oralCorrect') : 0,
+        oralAgain: j.containsKey('oralAgain') ? _integer(j, 'oralAgain') : 0,
         stage: _integer(j, 'stage', 4),
         lastDay: _day(j['lastDay']),
         nextDay: _day(j['nextDay']),
@@ -161,11 +171,13 @@ class RecognitionSession {
     this.hinted = false,
     this.feedback,
     this.repeated = const [],
+    this.recognitionFirst = false,
   });
   final String id, lessonId, fingerprint, startedAt;
   final int epoch, index;
   final List<RecognitionQuestion> questions;
   final bool hinted;
+  final bool recognitionFirst;
   final RecognitionEvidence? feedback;
   final List<String> repeated;
   bool get finished => index >= questions.length;
@@ -189,6 +201,7 @@ class RecognitionSession {
         hinted: hinted ?? this.hinted,
         feedback: clearFeedback ? null : feedback ?? this.feedback,
         repeated: repeated ?? this.repeated,
+        recognitionFirst: recognitionFirst,
       );
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -201,6 +214,7 @@ class RecognitionSession {
         'hinted': hinted,
         'feedback': feedback?.name,
         'repeated': repeated,
+        'recognitionFirst': recognitionFirst,
       };
   factory RecognitionSession.fromJson(Map<String, dynamic> j) {
     final questions =
@@ -225,6 +239,7 @@ class RecognitionSession {
           ? null
           : RecognitionEvidence.values.byName(j['feedback'] as String),
       repeated: _list(j['repeated'], (v) => v as String),
+      recognitionFirst: j['recognitionFirst'] as bool? ?? false,
     );
   }
 }

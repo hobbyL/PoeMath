@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
+import 'package:poemath/core/services/tts/narration_audio_identity.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
@@ -27,6 +28,18 @@ class _CheckState extends RecognitionPageState<TextbookRecognitionCheckPage> {
   int index = 0;
   bool revealed = false;
   List<RecognitionTarget> sample = const [];
+  @override
+  void playAudio(String text,
+      {NarrationAudioIdentity? requiredIdentity, VoidCallback? rejected,}) {
+    if (busy || !current) return;
+    setState(() => revealed = true);
+    super.playAudio(
+      text,
+      requiredIdentity: requiredIdentity,
+      rejected: rejected,
+    );
+  }
+
   @override
   Future<void> onLoaded() async {
     final candidates = targets.where((t) => t.ready).toList()

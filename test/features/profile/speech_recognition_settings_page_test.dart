@@ -246,6 +246,36 @@ void main() {
     expect(secretIdField.enabled, isTrue);
   });
 
+  testWidgets('保存密钥显示认字可用，不自动开始录音或伪造验证', (tester) async {
+    final service = _FakeSpeechRecognitionService();
+    await pumpPage(tester, service);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'SecretId (AK)'),
+      'AKID-test',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'SecretKey (SK)'),
+      'SK-test',
+    );
+    tester.testTextInput.hide();
+    FocusManager.instance.primaryFocus?.unfocus();
+    final saveButton = find.widgetWithText(FilledButton, '保存密钥');
+    await tester.ensureVisible(saveButton);
+    await tester.pumpAndSettle();
+    await tester.tap(saveButton);
+    await tester.pumpAndSettle();
+    final state = await settings.loadSpeechRecognitionSettings();
+    expect(state.hasCredentials, isTrue);
+    expect(state.isVerified, isFalse);
+    expect(find.text('密钥已保存 · 认字可用，跟读需完成录音测试'), findsOneWidget);
+    expect(find.text('密钥已保存，认字已可用；跟读需完成录音测试'), findsOneWidget);
+    expect(service.initializeCalls, 0);
+    expect(service.startCalls, 0);
+    expect(service.stopCalls, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
+  });
+
   testWidgets('真实录音测试通过后即标记已配置', (tester) async {
     final service = _FakeSpeechRecognitionService();
     await pumpPage(tester, service);
@@ -304,7 +334,7 @@ void main() {
     expect(state.hasCredentials, isTrue);
     expect(find.text('腾讯云密钥无效或没有识别权限'), findsOneWidget);
     expect(
-      find.text('密钥已保存，完成真实录音测试后可用'),
+      find.text('密钥已保存 · 认字可用，跟读需完成录音测试'),
       findsOneWidget,
     );
 

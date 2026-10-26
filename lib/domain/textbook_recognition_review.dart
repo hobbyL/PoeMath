@@ -21,8 +21,10 @@ RecognitionRecord recognitionRecordResult(
   required bool hinted,
 }) {
   final objective = evidence == RecognitionEvidence.correct ||
+      evidence == RecognitionEvidence.oralCorrect ||
       evidence == RecognitionEvidence.parentCorrect;
   final failed = evidence == RecognitionEvidence.incorrect ||
+      evidence == RecognitionEvidence.oralAgain ||
       evidence == RecognitionEvidence.parentAgain ||
       evidence == RecognitionEvidence.selfAgain;
   final delayed = r.lastDay != null &&
@@ -47,6 +49,10 @@ RecognitionRecord recognitionRecordResult(
     selfAgain:
         r.selfAgain + (evidence == RecognitionEvidence.selfAgain ? 1 : 0),
     hints: r.hints + (hinted ? 1 : 0),
+    oralCorrect: r.oralCorrect +
+        (evidence == RecognitionEvidence.oralCorrect && !hinted ? 1 : 0),
+    oralAgain:
+        r.oralAgain + (evidence == RecognitionEvidence.oralAgain ? 1 : 0),
     stage: stage,
     advancedDay: advancedDay,
     // 同日通过不拉长日期；失败/提示始终缩短，曝光/自评不延长客观日程。
@@ -73,9 +79,15 @@ RecognitionRecord recognitionRecordResult(
 
 String recognitionRecordLabel(RecognitionRecord? r) {
   if (r == null) return '还没练过';
-  if (r.parentPassed == false || r.incorrect > 0 && r.stage == 0) return '再练一练';
-  if (r.stage >= 3) return '已巩固';
+  if (r.parentPassed == false ||
+      (r.incorrect > 0 || r.oralAgain > 0) && r.stage == 0) {
+    return '再练一练';
+  }
+  if (r.stage >= 3 && (r.oralCorrect > 0 || r.parentPassed == true)) {
+    return '多次复习通过';
+  }
   if (r.parentPassed == true) return '家长确认过';
+  if (r.oralCorrect > 0) return '独立认读通过，待复习';
   if (r.correct > 0) return '辨认通过，待复习';
   return '练习过，待认读确认';
 }

@@ -28,8 +28,30 @@ RecognitionSession? buildRecognitionSession({
   required String id,
   required DateTime now,
   required int epoch,
+  bool recognitionFirst = false,
+  String? targetId,
 }) {
   final ready = targets.where((t) => t.ready).toList();
+  if (targetId != null) {
+    if (!ready.any((target) => target.id == targetId)) {
+      throw StateError('找不到这个生字，请返回认一认重试');
+    }
+    return RecognitionSession(
+      id: id,
+      lessonId: lessonId,
+      fingerprint: recognitionLessonFingerprint(targets),
+      epoch: epoch,
+      startedAt: now.toIso8601String(),
+      recognitionFirst: true,
+      questions: [
+        RecognitionQuestion(
+          id: '$id/0',
+          targetId: targetId,
+          kind: RecognitionQuestionKind.read,
+        ),
+      ],
+    );
+  }
   final day = recognitionDay(now);
   final reviewedToday =
       progress.records.values.where((r) => r.checkedDay == day).length;
@@ -43,8 +65,8 @@ RecognitionSession? buildRecognitionSession({
     ..sort((a, b) {
       final ra = recognitionCurrentRecord(progress, lessonId, a)!;
       final rb = recognitionCurrentRecord(progress, lessonId, b)!;
-      final error =
-          (rb.incorrect + rb.selfAgain).compareTo(ra.incorrect + ra.selfAgain);
+      final error = (rb.incorrect + rb.selfAgain + rb.oralAgain)
+          .compareTo(ra.incorrect + ra.selfAgain + ra.oralAgain);
       return error != 0 ? error : ra.nextDay!.compareTo(rb.nextDay!);
     });
   final selected = [
@@ -77,7 +99,8 @@ RecognitionSession? buildRecognitionSession({
   }
 
   for (final t in selected) {
-    if (recognitionCurrentRecord(progress, lessonId, t) == null) {
+    if (!recognitionFirst &&
+        recognitionCurrentRecord(progress, lessonId, t) == null) {
       add(t, RecognitionQuestionKind.study);
     }
   }
@@ -97,7 +120,12 @@ RecognitionSession? buildRecognitionSession({
               !cue.text.contains(other.text),
         )
         .toList();
-    int priority(RecognitionTarget target) => recognitionCurrentRecord(progress, lessonId, target) != null ? 0 : selected.contains(target) ? 1 : 2;
+    int priority(RecognitionTarget target) =>
+        recognitionCurrentRecord(progress, lessonId, target) != null
+            ? 0
+            : selected.contains(target)
+                ? 1
+                : 2;
     candidates.sort((a, b) => priority(a).compareTo(priority(b)));
     final distractors = candidates.map((t) => t.id).toSet().take(3).toList();
     if (distractors.isNotEmpty) {
@@ -135,13 +163,21 @@ RecognitionSession? buildRecognitionSession({
       .where((q) => q.kind != RecognitionQuestionKind.study)
       .toList()
     ..shuffle(Random(now.microsecondsSinceEpoch));
+  // In recognition mode, no same-round audio or answer precedes the first read.
+  final ordered = recognitionFirst
+      ? [
+          ...practice.where((q) => q.kind == RecognitionQuestionKind.read),
+          ...practice.where((q) => q.kind != RecognitionQuestionKind.read),
+        ]
+      : [...study, ...practice];
   return RecognitionSession(
     id: id,
     lessonId: lessonId,
     fingerprint: recognitionLessonFingerprint(targets),
     epoch: epoch,
     startedAt: now.toIso8601String(),
-    questions: [...study, ...practice],
+    questions: ordered,
+    recognitionFirst: recognitionFirst,
   );
 }
 
@@ -159,6 +195,8 @@ RecognitionProgress answerRecognition(
     RecognitionQuestionKind.read => [
         RecognitionEvidence.selfCorrect,
         RecognitionEvidence.selfAgain,
+        RecognitionEvidence.oralCorrect,
+        RecognitionEvidence.oralAgain,
       ],
     _ => [RecognitionEvidence.correct, RecognitionEvidence.incorrect],
   };
@@ -170,6 +208,7 @@ RecognitionProgress answerRecognition(
   final questions = [...session.questions];
   final repeated = [...session.repeated];
   if ((evidence == RecognitionEvidence.incorrect ||
+          evidence == RecognitionEvidence.oralAgain ||
           evidence == RecognitionEvidence.selfAgain) &&
       !repeated.contains(target.id)) {
     // 必须至少隔两道其他字的题；找不到位置则留到下一轮。
@@ -201,7 +240,10 @@ RecognitionProgress answerRecognition(
         r,
         evidence,
         day: recognitionDay(at),
-        hinted: session.hinted,
+        hinted: session.hinted ||
+            q.repeat ||
+            !session.recognitionFirst &&
+                evidence == RecognitionEvidence.oralCorrect,
       ),
     },
     session: session.copy(

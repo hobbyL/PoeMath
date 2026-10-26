@@ -99,7 +99,9 @@ class TextbookRecognitionRepository {
   }
 
   RecognitionProgress _currentContent(
-      RecognitionProgress p, TextbookCoursePack pack,) {
+    RecognitionProgress p,
+    TextbookCoursePack pack,
+  ) {
     final records = <String, RecognitionRecord>{};
     final audio = <String, RecognitionAudioApproval>{};
     for (final lesson in pack.lessons) {
@@ -185,7 +187,7 @@ class TextbookRecognitionRepository {
           if (lesson == null) throw StateError('课目已更新，请重新进入');
           final targets = recognitionTargets(pack, lesson);
           if (recognitionLessonFingerprint(targets) != fingerprint) {
-            throw StateError('生字或审核已更新，请重新准备');
+            throw StateError('生字内容已更新，请重新进入认字');
           }
           var p = _currentContent(_read(), pack);
           if (p.operations.contains(operationId)) return p;

@@ -213,8 +213,7 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
                     ),
                   ),
                 ),
-                borderRadius:
-                    BorderRadius.circular(SpacingTokens.radiusSmall),
+                borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: SpacingTokens.xs,

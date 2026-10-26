@@ -56,7 +56,7 @@ String? _recognitionPinyinIn(
 
 /// 卡片展示优先使用教材注音；缺失时从本课词句的逐字注音草稿取同字读音。
 ///
-/// 该回退只用于展示，不能作为训练准备、听音题或掌握证据。
+/// 认字入口复用同一份注音；展示或听过注音本身不算认读通过。
 String recognitionCardPinyin(
   TextbookCourseLesson lesson,
   TextbookCourseVocabulary target,
@@ -134,17 +134,19 @@ class RecognitionTarget {
     required this.fingerprint,
     required this.cues,
     required this.ready,
+    this.cardPinyin,
   });
   final TextbookCourseVocabulary node;
   final String fingerprint;
   final List<RecognitionCue> cues;
   final bool ready;
+  final String? cardPinyin;
   String get id => node.id;
   String get text => node.text;
-  String get pinyin => node.pinyin?.first ?? '';
+  String get pinyin => cardPinyin ?? node.pinyin?.first ?? '';
 }
 
-/// 准备页可查看候选；训练入口只使用 ready，绝不以自动注音当答案。
+/// 直接使用认一认字卡里的生字，不要求家长审核；缺少明确注音仍可自练。
 List<RecognitionTarget> recognitionTargets(
   TextbookCoursePack pack,
   TextbookCourseLesson lesson, {
@@ -153,10 +155,12 @@ List<RecognitionTarget> recognitionTargets(
   return [
     for (final target in lesson.recognitionCharacters)
       () {
-        final pronunciation =
-            recognitionPronunciation(target.pinyin?.first ?? '');
+        final isCharacter = target.text.runes.length == 1 &&
+            recognitionIsHan(target.text.runes.single);
+        final pinyin = recognitionCardPinyin(lesson, target);
+        final pronunciation = recognitionPronunciation(pinyin);
         final cues = <RecognitionCue>[];
-        if (pronunciation != null) {
+        if (isCharacter && pronunciation != null) {
           cues.add(
             RecognitionCue(
               nodeId: target.id,
@@ -216,6 +220,7 @@ List<RecognitionTarget> recognitionTargets(
                 if (relevant.contains(n.id)) n.toJson(),
             ],
             'cues': cues.map((c) => c.toJson()).toList(),
+            if (pinyin != (target.pinyin?.first ?? '')) 'cardPinyin': pinyin,
           }),
         );
         final approved = {
@@ -233,13 +238,8 @@ List<RecognitionTarget> recognitionTargets(
                     approved.contains(c.nodeId),
               )
               .toList(),
-          ready: lesson.isApproved &&
-              target.isApproved &&
-              target.sources.isNotEmpty &&
-              target.requirement == 'recognition' &&
-              target.text.runes.length == 1 &&
-              recognitionIsHan(target.text.runes.single) &&
-              pronunciation != null,
+          ready: isCharacter,
+          cardPinyin: pinyin,
         );
       }(),
   ];

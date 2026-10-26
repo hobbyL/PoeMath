@@ -39,6 +39,9 @@ Map<String, dynamic> _maliciousSettings() => <String, dynamic>{
       'tts_cloud_enabled': true,
       'tencent_asr_verified_at': DateTime(2030, 1, 1).toIso8601String(),
       'worker_tts_verified_fingerprint': 'evil-fingerprint',
+      'tencent_oral_app_id': '123456789',
+      'tencent_oral_enabled': true,
+      'tencent_oral_verified_fingerprint': 'evil-fingerprint',
     };
 
 /// 备份中的 LLM 端点 key（现纳入白名单）。
@@ -177,6 +180,9 @@ void main() {
       HiveBoxes.settings.get('tts_cloud_enabled'),
       isNull,
     );
+    expect(HiveBoxes.settings.get('tencent_oral_app_id'), isNull);
+    expect(HiveBoxes.settings.get('tencent_oral_enabled'), isNull);
+    expect(HiveBoxes.settings.get('tencent_oral_verified_fingerprint'), isNull);
     // 白名单内 key 正常恢复。
     expect(HiveBoxes.settings.get('theme_mode'), 'dark');
   });
@@ -294,6 +300,9 @@ void main() {
     await HiveBoxes.settings.put('tencent_asr_verified_at', '2026-01-01');
     await HiveBoxes.settings
         .put('worker_tts_verified_fingerprint', 'fp-worker');
+    await HiveBoxes.settings.put('tencent_oral_app_id', '123456789');
+    await HiveBoxes.settings.put('tencent_oral_enabled', true);
+    await HiveBoxes.settings.put('tencent_oral_verified_fingerprint', 'fp-soe');
     await HiveBoxes.settings.put('theme_mode', 'light');
     await HiveBoxes.settings.put(
       'llm_providers',
@@ -314,6 +323,9 @@ void main() {
     final json = await backupService.exportToJson();
     final settings = (jsonDecode(json) as Map<String, dynamic>)['settings']
         as Map<String, dynamic>;
+    expect(settings, isNot(contains('tencent_oral_app_id')));
+    expect(settings, isNot(contains('tencent_oral_enabled')));
+    expect(settings, isNot(contains('tencent_oral_verified_fingerprint')));
 
     expect(settings.keys, contains('theme_mode'));
     const excluded = <String>{

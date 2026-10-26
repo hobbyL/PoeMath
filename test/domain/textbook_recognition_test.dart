@@ -9,6 +9,127 @@ import 'package:poemath/domain/textbook_recognition_session.dart';
 import '../helpers/recognition_fixture.dart';
 
 void main() {
+  test('指定生字只创建该字认读题，已练过未到复习日也可主动进入', () {
+    final pack = recognitionFixture();
+    final lesson = pack.lessons.single;
+    final targets = recognitionTargets(pack, lesson);
+    final target = targets.firstWhere((t) => t.id == 'star');
+    final progress = RecognitionProgress(
+      profileId: 'default',
+      bookId: 'book',
+      editionId: 'edition',
+      records: {
+        RecognitionProgress.targetKey(lesson.id, target.id): RecognitionRecord(
+          fingerprint: target.fingerprint,
+          oralCorrect: 2,
+          checkedDay: '2026-10-26',
+          nextDay: '2026-11-01',
+        ),
+      },
+    );
+    final session = buildRecognitionSession(
+      progress: progress,
+      lessonId: lesson.id,
+      targets: targets,
+      id: 'selected',
+      now: DateTime(2026, 10, 26),
+      epoch: 0,
+      targetId: target.id,
+    )!;
+    expect(session.questions.map((q) => q.targetId).toList(), ['star']);
+    expect(session.question.kind, RecognitionQuestionKind.read);
+    expect(session.recognitionFirst, true);
+    expect(session.hinted, false);
+    expect(session.fingerprint, recognitionLessonFingerprint(targets));
+    expect(progress.records.values.single.oralCorrect, 2);
+    expect(
+      () => buildRecognitionSession(
+        progress: progress,
+        lessonId: lesson.id,
+        targets: targets,
+        id: 'missing',
+        now: DateTime(2026, 10, 26),
+        epoch: 0,
+        targetId: 'unknown',
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('我来认先无提示认读，所有认读在选择题之前，不先曝光新字', () {
+    final pack = recognitionFixture(),
+        lesson = recognitionFixture().lessons.single;
+    final session = buildRecognitionSession(
+      progress: const RecognitionProgress(
+        profileId: 'default',
+        bookId: 'book',
+        editionId: 'edition',
+      ),
+      lessonId: lesson.id,
+      targets: recognitionTargets(pack, lesson),
+      id: 's',
+      now: DateTime(2026, 10, 26),
+      epoch: 0,
+      recognitionFirst: true,
+    )!;
+    expect(session.recognitionFirst, isTrue);
+    expect(
+      session.questions.any((q) => q.kind == RecognitionQuestionKind.study),
+      isFalse,
+    );
+    expect(
+      session.questions
+          .take(5)
+          .every((q) => q.kind == RecognitionQuestionKind.read),
+      isTrue,
+    );
+    expect(
+      RecognitionSession.fromJson(session.toJson()).recognitionFirst,
+      isTrue,
+    );
+  });
+
+  test('口语证据独立计数，提示和补题不计独立；跨天才推进间隔，旧 v1 兼容', () {
+    const record = RecognitionRecord(fingerprint: 'fp');
+    final first = recognitionRecordResult(
+      record,
+      RecognitionEvidence.oralCorrect,
+      day: '2026-10-26',
+      hinted: false,
+    );
+    expect(first.oralCorrect, 1);
+    expect(first.correct, 0);
+    expect(first.stage, 0);
+    expect(recognitionRecordLabel(first), '独立认读通过，待复习');
+    final hinted = recognitionRecordResult(
+      first,
+      RecognitionEvidence.oralCorrect,
+      day: '2026-10-27',
+      hinted: true,
+    );
+    expect(hinted.oralCorrect, 1);
+    expect(hinted.stage, 0);
+    final delayed = recognitionRecordResult(
+      first,
+      RecognitionEvidence.oralCorrect,
+      day: '2026-10-27',
+      hinted: false,
+    );
+    expect(delayed.stage, 1);
+    expect(delayed.nextDay, '2026-10-30');
+    final old = record.toJson()
+      ..remove('oralCorrect')
+      ..remove('oralAgain');
+    expect(RecognitionRecord.fromJson(old).oralCorrect, 0);
+    final failed = recognitionRecordResult(
+      delayed,
+      RecognitionEvidence.oralAgain,
+      day: '2026-10-30',
+      hinted: false,
+    );
+    expect(failed.oralAgain, 1);
+    expect(failed.stage, 0);
+  });
   test('卡片注音缺失时从课内上下文生成，底部展示完整词语或课文句子', () {
     final raw = recognitionFixture().toJson();
     final lessonRaw = (raw['lessons'] as List).single as Map<String, dynamic>;
@@ -101,7 +222,7 @@ void main() {
     );
   });
 
-  test('跨课移动的已审子节点不能越过新课目归属审批；空拼音不能训练', () {
+  test('认字使用当前课目字卡，不要求课目审核；缺少原始拼音复用卡片读音', () {
     final pack = recognitionFixture();
     final raw = pack.toJson();
     final lesson = (raw['lessons'] as List).single as Map<String, dynamic>;
@@ -128,10 +249,15 @@ void main() {
     final changed = TextbookCoursePack.fromJson(raw);
     final newLesson = changed.lessons.last;
     expect(newLesson.recognitionCharacters.single.isApproved, true);
-    expect(recognitionTargets(changed, newLesson).single.ready, false);
+    expect(recognitionTargets(changed, newLesson).single.ready, true);
     final empty =
         editTextbookCourseNode(pack, 'recognition-001', {'pinyin': null});
-    expect(recognitionTargets(empty, empty.lessons.single).first.ready, false);
+    final target = recognitionTargets(empty, empty.lessons.single).first;
+    expect(target.ready, true);
+    expect(
+      target.pinyin,
+      recognitionCardPinyin(empty.lessons.single, target.node),
+    );
   });
   test('每日每册10字上限按不同目标计数，完成不自动追加', () {
     final pack = recognitionFixture();
@@ -180,10 +306,10 @@ void main() {
       isNot(recognitionPronunciation('xìng')),
     );
   });
-  test('草稿预览可见但不能训练；批准课目归属与部分生字即可使用', () {
+  test('未审核的本课字卡全部可认字，进入练习不自动批准课程', () {
     final pack = recognitionFixture(approved: false);
     expect(
-      recognitionTargets(pack, pack.lessons.single).every((t) => !t.ready),
+      recognitionTargets(pack, pack.lessons.single).every((t) => t.ready),
       true,
     );
     var raw = pack.toJson();
@@ -206,7 +332,7 @@ void main() {
       recognitionTargets(partial, partial.lessons.single)
           .where((t) => t.ready)
           .map((t) => t.text),
-      ['𠀀'],
+      ['𠀀', '星', '月', '行', '形'],
     );
     expect(partial.isPublishable, false);
   });
@@ -228,7 +354,7 @@ void main() {
     );
     final rejected = TextbookCoursePack.fromJson(raw);
     final updated = recognitionTargets(rejected, rejected.lessons.single).first;
-    expect(updated.ready, false);
+    expect(updated.ready, true);
     expect(updated.fingerprint, isNot(t.fingerprint));
     expect(rejected.contentRevision, pack.contentRevision);
   });
