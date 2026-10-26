@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook_course.dart';
@@ -14,7 +16,7 @@ import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_overview.dart';
 
-/// 当前原书页对应的只读内容；待审核内容可查看，不改审核或学习记录。
+/// 当前原书页对应的课文内容；认一认可进入本课生字练习。
 class TextbookLessonContentPage extends ConsumerStatefulWidget {
   const TextbookLessonContentPage({
     super.key,
@@ -52,6 +54,8 @@ class _TextbookLessonContentPageState
   ModalRoute<dynamic>? _route;
   bool _leaving = false;
   bool _changingControl = false;
+  bool _openingRecognition = false;
+  int _recognitionNavigationGeneration = 0;
 
   @override
   void initState() {
@@ -77,6 +81,7 @@ class _TextbookLessonContentPageState
     if (oldWidget.bookId != bookId ||
         oldWidget.section != section ||
         !listEquals(oldWidget.pages, pages)) {
+      _recognitionNavigationGeneration++;
       unawaited(_stop());
       _lessonKeys.clear();
     }
@@ -84,11 +89,13 @@ class _TextbookLessonContentPageState
 
   @override
   void didPushNext() {
+    _recognitionNavigationGeneration++;
     unawaited(_stop());
   }
 
   @override
   void didPop() {
+    _recognitionNavigationGeneration++;
     unawaited(_stop());
   }
 
@@ -320,6 +327,8 @@ class _TextbookLessonContentPageState
                 bookId: bookId,
                 lesson: lesson,
                 routeObserver: widget.routeObserver,
+                onRecognize: (targetId) =>
+                    unawaited(_openRecognition(lesson.id, targetId)),
               ),
             TextbookContentSection.recitation => _recitations(context, lesson),
             TextbookContentSection.writing => TextbookCourseVocabularyContent(
@@ -341,6 +350,48 @@ class _TextbookLessonContentPageState
               child: content,
             ),
     );
+  }
+
+  Future<void> _openRecognition(String lessonId, String targetId) async {
+    if (_openingRecognition) return;
+    _openingRecognition = true;
+    final generation = _recognitionNavigationGeneration;
+    bool canNavigate() =>
+        mounted &&
+        !_leaving &&
+        _route?.isCurrent != false &&
+        generation == _recognitionNavigationGeneration;
+    try {
+      await _stop();
+      if (!canNavigate()) return;
+      bool configured;
+      try {
+        final settings = await ref
+            .read(settingsRepositoryProvider)
+            .loadSpeechRecognitionSettings();
+        configured = settings.hasCredentials;
+      } on Object {
+        if (mounted && canNavigate()) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('无法读取语音识别配置，请重试')),
+          );
+        }
+        return;
+      }
+      if (!mounted || !canNavigate()) return;
+      await context.push(
+        configured
+            ? AppRoutes.textbookRecognitionOf(
+                bookId,
+                lessonId,
+                'practice',
+                targetId: targetId,
+              )
+            : AppRoutes.speechRecognitionSettings,
+      );
+    } finally {
+      _openingRecognition = false;
+    }
   }
 
   @override

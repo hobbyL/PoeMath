@@ -31,9 +31,12 @@ class AppRoutes {
   static const String textbookRead = '/textbook/read/:id';
   static const String textbookReview = '/textbook/review/:id';
   static const String textbookContent = '/textbook/content/:id/:section';
-  static const String textbookRecognitionPractice = '/textbook/recognition/:id/:lesson/practice';
-  static const String textbookRecognitionPrepare = '/textbook/recognition/:id/:lesson/prepare';
-  static const String textbookRecognitionCheck = '/textbook/recognition/:id/:lesson/check';
+  static const String textbookRecognitionPractice =
+      '/textbook/recognition/:id/:lesson/practice';
+  static const String textbookRecognitionPrepare =
+      '/textbook/recognition/:id/:lesson/prepare';
+  static const String textbookRecognitionCheck =
+      '/textbook/recognition/:id/:lesson/check';
   static const String textbookManagement = '/profile/settings/books';
   static const String textbookManageDetail = '/profile/settings/books/:id';
 
@@ -83,10 +86,22 @@ class AppRoutes {
   static String textbookDetailOf(String id) => '/textbook/detail/$id';
   static String textbookReadOf(String id) => '/textbook/read/$id';
   static String textbookReviewOf(String id) => '/textbook/review/$id';
-  static String textbookRecognitionOf(String id, String lesson, String mode) {
-    if (!['practice', 'prepare', 'check'].contains(mode)) throw ArgumentError.value(mode, 'mode');
-    return '/textbook/recognition/${Uri.encodeComponent(id)}/${Uri.encodeComponent(lesson)}/$mode';
+  static String textbookRecognitionOf(
+    String id,
+    String lesson,
+    String mode, {
+    String? targetId,
+  }) {
+    if (!['practice', 'prepare', 'check'].contains(mode)) {
+      throw ArgumentError.value(mode, 'mode');
+    }
+    final path =
+        '/textbook/recognition/${Uri.encodeComponent(id)}/${Uri.encodeComponent(lesson)}/$mode';
+    return targetId == null
+        ? path
+        : '$path?${Uri(queryParameters: {'target': targetId}).query}';
   }
+
   static String textbookContentOf(String id, String section, List<int> pages) =>
       Uri(
         path: '/textbook/content/$id/$section',

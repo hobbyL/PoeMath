@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 import 'package:poemath/core/services/tts/narration_session.dart';
 import 'package:poemath/core/services/tts_service.dart';
+import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook_course.dart';
@@ -19,11 +20,13 @@ class TextbookRecognitionOverview extends ConsumerStatefulWidget {
     required this.bookId,
     required this.lesson,
     this.routeObserver,
+    this.onRecognize,
   });
 
   final String bookId;
   final TextbookCourseLesson lesson;
   final RouteObserver<ModalRoute<dynamic>>? routeObserver;
+  final ValueChanged<String>? onRecognize;
 
   @override
   ConsumerState<TextbookRecognitionOverview> createState() => _OverviewState();
@@ -198,6 +201,18 @@ class _OverviewState extends ConsumerState<TextbookRecognitionOverview>
     final characterAudioKey = _audioKey(target.id, target.text);
     final noteAudioKey =
         note == null ? null : _audioKey('${target.id}:note', note.text);
+    final entryStyle = theme.textTheme.bodySmall!;
+    final entryLabel = TextPainter(
+      text: TextSpan(text: '去认字', style: entryStyle),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final entryWidth = (entryLabel.width +
+            SpacingTokens.md +
+            SpacingTokens.xs +
+            SpacingTokens.sm * 2)
+        .clamp(0.0, width - SpacingTokens.sm);
+    entryLabel.dispose();
     return SizedBox(
       width: width,
       child: ColoredCard(
@@ -209,100 +224,173 @@ class _OverviewState extends ConsumerState<TextbookRecognitionOverview>
           type: MaterialType.transparency,
           borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
           clipBehavior: Clip.antiAlias,
-          child: Semantics(
-            container: true,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Semantics(
-                  button: true,
-                  label: '${target.text}，拼音${pinyin.isEmpty ? '未知' : pinyin}',
-                  hint: _audioHint(
-                    audioKey: characterAudioKey,
-                    text: target.text,
-                  ),
-                  child: InkWell(
-                    key: ValueKey('recognition-character-${target.id}'),
-                    onTap: () => _controlAudio(
-                      target: target,
-                      audioKey: characterAudioKey,
-                      text: target.text,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        SpacingTokens.md + SpacingTokens.xs,
-                        SpacingTokens.lg,
-                        SpacingTokens.md + SpacingTokens.xs,
-                        SpacingTokens.md,
+          child: Stack(
+            children: [
+              Semantics(
+                container: true,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Semantics(
+                      button: true,
+                      label:
+                          '${target.text}，拼音${pinyin.isEmpty ? '未知' : pinyin}',
+                      hint: _audioHint(
+                        audioKey: characterAudioKey,
+                        text: target.text,
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            pinyin.isEmpty ? '—' : pinyin,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                      child: InkWell(
+                        key: ValueKey('recognition-character-${target.id}'),
+                        onTap: () => _controlAudio(
+                          target: target,
+                          audioKey: characterAudioKey,
+                          text: target.text,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            SpacingTokens.md + SpacingTokens.xs,
+                            SpacingTokens.lg,
+                            SpacingTokens.md + SpacingTokens.xs,
+                            note == null && widget.onRecognize != null
+                                ? SpacingTokens.minTapTarget + SpacingTokens.sm
+                                : SpacingTokens.md,
                           ),
-                          const SizedBox(height: SpacingTokens.sm),
-                          AutoFitLine(
-                            child: Text(
-                              target.text,
-                              maxLines: 1,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                pinyin.isEmpty ? '—' : pinyin,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: SpacingTokens.sm),
+                              AutoFitLine(
+                                child: Text(
+                                  target.text,
+                                  maxLines: 1,
+                                  textAlign: TextAlign.center,
+                                  style:
+                                      theme.textTheme.displayMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (note != null) ...[
+                      const Divider(
+                        height: 0,
+                        indent: SpacingTokens.md,
+                        endIndent: SpacingTokens.md,
+                      ),
+                      Semantics(
+                        button: true,
+                        label: note.text,
+                        hint: _audioHint(
+                          audioKey: noteAudioKey!,
+                          text: note.text,
+                        ),
+                        child: InkWell(
+                          key: ValueKey('recognition-note-${target.id}'),
+                          onTap: () => _controlAudio(
+                            target: target,
+                            audioKey: noteAudioKey,
+                            text: note.text,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              SpacingTokens.md + SpacingTokens.xs,
+                              SpacingTokens.md,
+                              SpacingTokens.md + SpacingTokens.xs,
+                              SpacingTokens.lg,
+                            ),
+                            child: Text.rich(
+                              TextSpan(
+                                text: note.text,
+                                children: [
+                                  if (widget.onRecognize != null)
+                                    WidgetSpan(
+                                      child: SizedBox(
+                                        height: SpacingTokens.lg,
+                                        width: entryWidth.clamp(
+                                          0.0,
+                                          width -
+                                              (SpacingTokens.md +
+                                                      SpacingTokens.xs) *
+                                                  2,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                               textAlign: TextAlign.center,
-                              style: theme.textTheme.displayMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
-                        ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (widget.onRecognize != null)
+                PositionedDirectional(
+                  end: 0,
+                  bottom: 0,
+                  child: SizedBox(
+                    width: entryWidth,
+                    child: TextButton(
+                      key: ValueKey('recognition-practice-${target.id}'),
+                      onPressed: () => widget.onRecognize!(target.id),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(
+                          SpacingTokens.minTapTarget,
+                          SpacingTokens.minTapTarget,
+                        ),
+                        alignment: Alignment.bottomCenter,
+                        padding: const EdgeInsets.fromLTRB(
+                          SpacingTokens.sm,
+                          0,
+                          SpacingTokens.sm,
+                          SpacingTokens.xs,
+                        ),
+                        foregroundColor: theme.brightness == Brightness.dark
+                            ? Color.lerp(
+                                ColorTokens.poemSeal,
+                                theme.colorScheme.onSurface,
+                                0.7,
+                              )
+                            : ColorTokens.poemSeal,
+                        textStyle: entryStyle,
+                      ),
+                      child: Semantics(
+                        label: '去认字，${target.text}',
+                        excludeSemantics: true,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(child: Text('去认字', maxLines: 1)),
+                            SizedBox(width: SpacingTokens.xs),
+                            Icon(
+                              Icons.chevron_right,
+                              size: SpacingTokens.md,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-                if (note != null) ...[
-                  const Divider(
-                    height: 0,
-                    indent: SpacingTokens.md,
-                    endIndent: SpacingTokens.md,
-                  ),
-                  Semantics(
-                    button: true,
-                    label: note.text,
-                    hint: _audioHint(
-                      audioKey: noteAudioKey!,
-                      text: note.text,
-                    ),
-                    child: InkWell(
-                      key: ValueKey('recognition-note-${target.id}'),
-                      onTap: () => _controlAudio(
-                        target: target,
-                        audioKey: noteAudioKey,
-                        text: note.text,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          SpacingTokens.md + SpacingTokens.xs,
-                          SpacingTokens.md,
-                          SpacingTokens.md + SpacingTokens.xs,
-                          SpacingTokens.lg,
-                        ),
-                        child: Text(
-                          note.text,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+            ],
           ),
         ),
       ),

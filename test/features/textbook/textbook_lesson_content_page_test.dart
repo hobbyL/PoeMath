@@ -152,7 +152,17 @@ void main() {
             findsOneWidget,
           );
           expect(find.text('hē'), findsOneWidget);
-          expect(find.text('星𠀀，月。'), findsOneWidget);
+          final note = tester.widget<Text>(
+            find.descendant(
+              of: find
+                  .byKey(const ValueKey('recognition-note-recognition-001')),
+              matching: find.byType(Text),
+            ),
+          );
+          expect(
+            note.textSpan!.toPlainText(includePlaceholders: false),
+            '星𠀀，月。',
+          );
           expect(find.text('课文词句：星𠀀，月'), findsNothing);
           expect(
             tester
@@ -167,6 +177,19 @@ void main() {
           expect(find.byType(ColoredCard), findsOneWidget);
           expect(find.text('开始学习'), findsNothing);
           expect(find.text('继续学习'), findsNothing);
+          expect(
+            find.ancestor(
+              of: find.byKey(
+                const ValueKey('recognition-practice-recognition-001'),
+              ),
+              matching: find
+                  .byKey(const ValueKey('recognition-card-recognition-001')),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text('家长核对生字'), findsNothing);
+          expect(find.text('家长抽查'), findsNothing);
+          expect(find.text('我来认'), findsNothing);
         case TextbookContentSection.writing:
           expect(
             tester

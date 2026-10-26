@@ -185,15 +185,41 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           child: TextbookCourseReviewPage(bookId: state.pathParameters['id']!),
         ),
       ),
-      GoRoute(path: AppRoutes.textbookRecognitionPractice, pageBuilder: (context, state) => fadeSlideTransitionPage(
-        state: state, child: TextbookRecognitionPracticePage(bookId: state.pathParameters['id']!,
-          lessonId: state.pathParameters['lesson']!, routeObserver: textbookObserver,),),),
-      GoRoute(path: AppRoutes.textbookRecognitionPrepare, pageBuilder: (context, state) => fadeSlideTransitionPage(
-        state: state, child: TextbookRecognitionPreparePage(bookId: state.pathParameters['id']!,
-          lessonId: state.pathParameters['lesson']!, routeObserver: textbookObserver,),),),
-      GoRoute(path: AppRoutes.textbookRecognitionCheck, pageBuilder: (context, state) => fadeSlideTransitionPage(
-        state: state, child: TextbookRecognitionCheckPage(bookId: state.pathParameters['id']!,
-          lessonId: state.pathParameters['lesson']!, routeObserver: textbookObserver,),),),
+      GoRoute(
+        path: AppRoutes.textbookRecognitionPractice,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: TextbookRecognitionPracticePage(
+            recognitionFirst: true,
+            targetId: state.uri.queryParameters['target'],
+            bookId: state.pathParameters['id']!,
+            lessonId: state.pathParameters['lesson']!,
+            routeObserver: textbookObserver,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookRecognitionPrepare,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: TextbookRecognitionPreparePage(
+            bookId: state.pathParameters['id']!,
+            lessonId: state.pathParameters['lesson']!,
+            routeObserver: textbookObserver,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookRecognitionCheck,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: TextbookRecognitionCheckPage(
+            bookId: state.pathParameters['id']!,
+            lessonId: state.pathParameters['lesson']!,
+            routeObserver: textbookObserver,
+          ),
+        ),
+      ),
       // ============ 公式知识库（全屏，从口算页或首页进入） ============
       GoRoute(
         path: AppRoutes.studyHub,
