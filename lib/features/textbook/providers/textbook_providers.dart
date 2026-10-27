@@ -79,6 +79,10 @@ final textbookDownloadsProvider = StateNotifierProvider<
 });
 final textbookPathProvider =
     FutureProvider.autoDispose.family<String?, String>((ref, id) async {
+  // 管理页反复进出时保留检查结果：否则每次先闪「正在检查本地文件」占位，
+  // 再闪「正在生成封面」，即使封面早已缓存。导入、下载、删除 PDF 的
+  // 入口都会显式 invalidate 本 provider。
+  ref.keepAlive();
   final book = ref
       .watch(textbookLocalListProvider)
       .where((book) => book.pdfSha256 == id)

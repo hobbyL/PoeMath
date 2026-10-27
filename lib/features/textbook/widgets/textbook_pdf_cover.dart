@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:poemath/core/services/textbook_cover_cache.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 
@@ -30,11 +31,26 @@ final textbookCoverRendererProvider = Provider<TextbookCoverRenderer>(
   (ref) => _renderFirstPage,
 );
 
-/// 只加载首页，限定原生位图大小；返回的 ui.Image 由封面组件负责释放。
+const _coverCache = TextbookCoverCache();
+
+/// 先读磁盘缓存（PNG），未命中才打开 PDF 渲染首页并回写。
+///
+/// 早先每次挂载都重新打开原书渲染：大 PDF 要几百毫秒甚至更久，
+/// 用户看到的是「每次进入书籍管理页封面都没图」。现在同一本书只渲染一次。
 Future<ui.Image?> _renderFirstPage(
   String path,
   TextbookCoverToken token,
 ) async {
+  final cached = await _coverCache.read(path);
+  if (cached != null) {
+    // 命中缓存：只做一次 PNG 解码，不再打开原书。
+    if (token.isCancelled) {
+      cached.dispose();
+      return null;
+    }
+    _coverCache.remember(path, cached);
+    return cached;
+  }
   await pdfrxFlutterInitialize();
   if (token.isCancelled) return null;
   final document = await PdfDocument.openFile(
@@ -55,7 +71,11 @@ Future<ui.Image?> _renderFirstPage(
       cancellationToken: renderToken,
     );
     if (token.isCancelled || rendered == null) return null;
-    return await rendered.createImage();
+    final image = await rendered.createImage();
+    // 落盘后再返回：即使组件随即销毁，下一次进入也能直接命中。
+    await _coverCache.write(path, image);
+    _coverCache.remember(path, image);
+    return image;
   } finally {
     token._renderToken = null;
     rendered?.dispose();
@@ -149,6 +169,13 @@ class _TextbookPdfCoverState extends ConsumerState<TextbookPdfCover> {
     _image?.dispose();
     _image = null;
     _failed = false;
+    // 同一会话内再次进入：直接复用上次解码的位图，首帧就有封面，
+    // 不再先闪一下「正在生成封面」。
+    final memory = const TextbookCoverCache().take(widget.path);
+    if (memory != null) {
+      _image = memory;
+      return;
+    }
     final token = TextbookCoverToken();
     _token = token;
     final renderer = ref.read(textbookCoverRendererProvider);

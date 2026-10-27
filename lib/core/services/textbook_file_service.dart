@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:poemath/core/services/textbook_content_cache.dart';
+import 'package:poemath/core/services/textbook_cover_cache.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_catalog.dart';
@@ -140,6 +141,7 @@ class TextbookFileService {
     if (await file.exists() && await file.length() == book.fileSize) {
       return file.path;
     }
+    const TextbookCoverCache().forget(file.path);
     await contentCache(book).clear();
     return null;
   }
@@ -350,6 +352,7 @@ class TextbookFileService {
   Future<void> removePdf(String id) {
     final result = _operations.then((_) async {
       final file = await _file(id);
+      const TextbookCoverCache().forget(file.path);
       await narrationCache.clearBook(id);
       final cache = _contentCaches[id];
       if (cache != null) {
