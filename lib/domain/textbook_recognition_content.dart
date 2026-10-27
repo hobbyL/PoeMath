@@ -89,12 +89,14 @@ RecognitionCardNote? recognitionCardNote(
   if (words.isNotEmpty) {
     return (label: '课内词语', text: words.join('、'));
   }
-  // 每个完整句独立成段，复用正文朗读的 PDF 换行／跨段及句末引号规则。
+  // 每个完整句独立成段，复用正文朗读的跨段整句规则；这里不能按逗号拆，
+  // 否则「课文词句」会退化成半句。
   final sentences = buildTextbookNarration(
     [lesson],
     firstTarget: 1,
     target: 1,
     softLimit: 1,
+    sentenceOnly: true,
   );
   for (final sentence in sentences) {
     if (sentence.text.contains(target.text)) {

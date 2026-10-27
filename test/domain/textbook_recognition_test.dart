@@ -210,7 +210,7 @@ void main() {
 
     expect(
       recognitionCardNote(lesson, target),
-      (label: '课文词句', text: '$firstPart\n游去。”'),
+      (label: '课文词句', text: '“池塘里有一群小蝌蚪，𠀀大大的脑袋，黑灰色的身子，游来游去。”'),
     );
     expect(
       recognitionCardNote(lesson, star),

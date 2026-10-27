@@ -1293,8 +1293,9 @@ void main() {
     final lessonRaw = (raw['lessons'] as List).single as Map<String, dynamic>;
     final paragraph =
         (lessonRaw['paragraphs'] as List).single as Map<String, dynamic>;
-    const sentence = '这里有一群小蝌蚪，𠀀的大大的脑袋，黑\n灰色的身子，拖着长长的尾巴。';
-    paragraph['text'] = sentence;
+    const source = '这里有一群小蝌蚪，𠀀的大大的脑袋，黑\n灰色的身子，拖着长长的尾巴。';
+    const sentence = '这里有一群小蝌蚪，𠀀的大大的脑袋，黑灰色的身子，拖着长长的尾巴。';
+    paragraph['text'] = source;
     paragraph['pinyin'] = null;
     final range = ((((lessonRaw['recitations'] as List).single
             as Map<String, dynamic>)['ranges'] as List)
