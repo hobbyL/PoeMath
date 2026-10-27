@@ -54,6 +54,44 @@ class ImportedTextbookFile {
   final int size;
 }
 
+/// 一本书在本机的存储分布。
+///
+/// [pdfBytes] 与 [courseBytes] 是用户数据：原书需要重新导入/下载，
+/// 课程内容（读一读/认一认/写一写）需要重新审核，二者都不属于缓存。
+/// 其余字段均由原书派生，可随时重建。
+class TextbookStorageUsage {
+  const TextbookStorageUsage({
+    required this.pdfBytes,
+    required this.coverBytes,
+    required this.contentBytes,
+    required this.contentFiles,
+    required this.audioBytes,
+    required this.audioFiles,
+    required this.courseBytes,
+  });
+
+  final int pdfBytes;
+
+  /// 封面 PNG（与目录提取同目录）。
+  final int coverBytes;
+
+  /// 目录、逐页文字与版面 JSON。
+  final int contentBytes;
+  final int contentFiles;
+
+  /// 朗读音频缓存。
+  final int audioBytes;
+  final int audioFiles;
+
+  /// 课程数据 `<textbooks>/courses/<sha>.json`。
+  final int courseBytes;
+
+  int get derivedBytes => coverBytes + contentBytes + audioBytes;
+
+  bool get hasDerived =>
+      coverBytes > 0 || contentBytes > 0 || audioBytes > 0;
+}
+
 /// 大文件始终流式读取；文件名只从 SHA 派生，不信任来源文件名。
 class TextbookFileService {
   TextbookFileService({
@@ -346,6 +384,75 @@ class TextbookFileService {
       await output?.close();
       if (pending != null && await pending.exists()) await pending.delete();
     }
+  }
+
+  /// 统计一本书的存储占用；只读，不触发任何提取或渲染。
+  Future<TextbookStorageUsage> storageUsage(Textbook book) async {
+    final id = book.pdfSha256;
+    if (!Textbook.isValidId(id)) {
+      throw const TextbookFileException('教材身份无效');
+    }
+    final textbooks = '${(await _directoryProvider()).path}/textbooks';
+
+    var pdfBytes = 0;
+    final pdf = File('$textbooks/$id.pdf');
+    if (await pdf.exists()) pdfBytes = await pdf.length();
+
+    var coverBytes = 0;
+    var contentBytes = 0;
+    var contentFiles = 0;
+    final cacheDirectory = Directory('$textbooks/cache/$id');
+    if (await cacheDirectory.exists()) {
+      await for (final entity in cacheDirectory.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final name = entity.path.split(Platform.pathSeparator).last;
+        final size = await entity.length();
+        if (name.startsWith('cover-v') && name.endsWith('.png')) {
+          coverBytes += size;
+        } else if (name.endsWith('.json')) {
+          contentBytes += size;
+          contentFiles++;
+        }
+      }
+    }
+
+    final audio = await narrationCache.bookUsage(id);
+    var courseBytes = 0;
+    final course = File('$textbooks/courses/$id.json');
+    if (await course.exists()) courseBytes = await course.length();
+
+    return TextbookStorageUsage(
+      pdfBytes: pdfBytes,
+      coverBytes: coverBytes,
+      contentBytes: contentBytes,
+      contentFiles: contentFiles,
+      audioBytes: audio.bytes,
+      audioFiles: audio.files,
+      courseBytes: courseBytes,
+    );
+  }
+
+  /// 只删封面 PNG；目录缓存与朗读音频保留。
+  Future<void> clearCover(Textbook book) async {
+    final file = await _file(book.pdfSha256);
+    const TextbookCoverCache().forget(file.path);
+    final cover = const TextbookCoverCache().fileFor(file.path);
+    if (cover != null && await cover.exists()) await cover.delete();
+  }
+
+  /// 清目录与逐页提取结果，保留封面（重新渲染封面比重新提取更贵）。
+  Future<void> clearExtractedContent(Textbook book) =>
+      contentCache(book).clearExtracted();
+
+  Future<void> clearNarration(Textbook book) =>
+      narrationCache.clearBook(book.pdfSha256);
+
+  /// 清理全部可重建派生数据；原书与课程数据保留。
+  Future<void> clearDerived(Textbook book) async {
+    final file = await _file(book.pdfSha256);
+    const TextbookCoverCache().forget(file.path);
+    await contentCache(book).clear();
+    await narrationCache.clearBook(book.pdfSha256);
   }
 
   /// 删除原书及派生缓存，书目/阅读记录由仓储保留。

@@ -600,6 +600,13 @@ void main() {
     expect(find.text('本机教材'), findsNothing);
     expect(find.textContaining('已下载教材占用'), findsNothing);
     expect(find.textContaining('教材文件与阅读位置保存在本机'), findsNothing);
+    for (final item in books) {
+      expect(
+        find.byKey(ValueKey('textbook-cache-${item.pdfSha256}')),
+        findsOneWidget,
+        reason: '每本书都有独立的缓存管理入口',
+      );
+    }
     await tester.tap(card(books[1]));
     await tester.pumpAndSettle();
     final detail = tester.widget<TextbookDetailPage>(

@@ -9,6 +9,7 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
+import 'package:poemath/features/textbook/widgets/textbook_cache_manager_sheet.dart';
 import 'package:poemath/features/textbook/widgets/textbook_cover_grid.dart';
 import 'package:poemath/features/textbook/widgets/textbook_import_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_cover.dart';
@@ -230,43 +231,73 @@ class _TextbookManagementPageState
                 itemBuilder: (context, index) {
                   final book = books[index];
                   final title = '${book.title}\n${book.volumeLabel}';
-                  return Semantics(
-                    label: '${book.title}，${book.volumeLabel}',
-                    button: true,
-                    excludeSemantics: true,
-                    onTap: () => _open(book),
-                    child: ColoredCard(
-                      key: ValueKey('textbook-card-${book.pdfSha256}'),
-                      color: theme.colorScheme.primary,
-                      padding: EdgeInsets.zero,
-                      onTap: () => _open(book),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                          SpacingTokens.radiusMedium,
-                        ),
-                        child: paths[book.pdfSha256]!.when(
-                          data: (path) => path == null
-                              ? TextbookCoverPlaceholder(
-                                  title: title,
-                                  status: cloudIds.contains(book.pdfSha256)
-                                      ? '可重新下载'
-                                      : '需重新导入',
-                                )
-                              : TextbookPdfCover(
-                                  path: path,
-                                  title: title,
-                                ),
-                          loading: () => TextbookCoverPlaceholder(
-                            title: title,
-                            status: '正在检查本地文件',
-                          ),
-                          error: (_, __) => TextbookCoverPlaceholder(
-                            title: title,
-                            status: '文件检查失败',
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Semantics(
+                        label: '${book.title}，${book.volumeLabel}',
+                        button: true,
+                        excludeSemantics: true,
+                        onTap: () => _open(book),
+                        child: ColoredCard(
+                          key: ValueKey('textbook-card-${book.pdfSha256}'),
+                          color: theme.colorScheme.primary,
+                          padding: EdgeInsets.zero,
+                          onTap: () => _open(book),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              SpacingTokens.radiusMedium,
+                            ),
+                            child: paths[book.pdfSha256]!.when(
+                              data: (path) => path == null
+                                  ? TextbookCoverPlaceholder(
+                                      title: title,
+                                      status:
+                                          cloudIds.contains(book.pdfSha256)
+                                              ? '可重新下载'
+                                              : '需重新导入',
+                                    )
+                                  : TextbookPdfCover(
+                                      path: path,
+                                      title: title,
+                                    ),
+                              loading: () => TextbookCoverPlaceholder(
+                                title: title,
+                                status: '正在检查本地文件',
+                              ),
+                              error: (_, __) => TextbookCoverPlaceholder(
+                                title: title,
+                                status: '文件检查失败',
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                      // 每本书独立的缓存入口：封面整卡仍是「打开书籍」，
+                      // 这里只负责查看占用与清理可重建数据。
+                      Positioned(
+                        top: SpacingTokens.xs,
+                        right: SpacingTokens.xs,
+                        child: IconButton(
+                          key: ValueKey('textbook-cache-${book.pdfSha256}'),
+                          tooltip: '缓存管理',
+                          onPressed: () => showTextbookCacheSheet(context, book),
+                          style: IconButton.styleFrom(
+                            backgroundColor: theme.colorScheme.surface
+                                .withValues(alpha: 0.9),
+                            foregroundColor: theme.colorScheme.onSurface,
+                            fixedSize:
+                                const Size.square(SpacingTokens.minTapTarget),
+                            padding: EdgeInsets.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          icon: const Icon(
+                            Icons.storage_outlined,
+                            size: SpacingTokens.md,
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),

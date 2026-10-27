@@ -251,6 +251,28 @@ class NarrationAudioCache {
     } on IOException {/* 清理失败不影响播放 */}
   }
 
+  /// 本书派生音频占用的字节数与文件数（不含 `.json` 元数据）。
+  Future<({int bytes, int files})> bookUsage(String book) async {
+    if (!_valid(book)) return (bytes: 0, files: 0);
+    try {
+      final folder = Directory('${(await _root()).path}/$book');
+      if (!await folder.exists()) return (bytes: 0, files: 0);
+      var bytes = 0;
+      var files = 0;
+      await for (final entity in folder.list(followLinks: false)) {
+        if (entity is! File ||
+            !(entity.path.endsWith('.mp3') || entity.path.endsWith('.wav'))) {
+          continue;
+        }
+        bytes += await entity.length();
+        files++;
+      }
+      return (bytes: bytes, files: files);
+    } on IOException {
+      return (bytes: 0, files: 0);
+    }
+  }
+
   /// 先失效在途写入，再删除本书派生音频。
   Future<void> clearBook(String book) {
     if (!_valid(book)) throw ArgumentError('无效的教材身份');

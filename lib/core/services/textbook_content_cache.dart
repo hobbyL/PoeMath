@@ -242,7 +242,13 @@ class TextbookContentCache {
   }
 
   /// 删除前失效所有在途任务，再等已开始的原子写入结束，防止缓存复活。
-  Future<void> clear() {
+  Future<void> clear() => _clear(keepCover: false);
+
+  /// 只清理目录与提取结果，保留封面 PNG：封面重新生成要打开原书渲染，
+  /// 代价高于重新提取目录，缓存管理里应能单独保留。
+  Future<void> clearExtracted() => _clear(keepCover: true);
+
+  Future<void> _clear({required bool keepCover}) {
     _generation++;
     _toc = null;
     _texts.clear();
@@ -252,7 +258,16 @@ class TextbookContentCache {
     _characters = 0;
     final result = _writes.then((_) async {
       final directory = await _directory();
-      if (await directory.exists()) await directory.delete(recursive: true);
+      if (!await directory.exists()) return;
+      if (!keepCover) {
+        await directory.delete(recursive: true);
+        return;
+      }
+      await for (final entity in directory.list(followLinks: false)) {
+        final name = entity.path.split(Platform.pathSeparator).last;
+        if (name.startsWith('cover-v') && name.endsWith('.png')) continue;
+        await entity.delete(recursive: true);
+      }
     });
     _writes = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return result;

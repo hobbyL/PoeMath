@@ -59,6 +59,25 @@ void main() {
     );
   });
 
+  test('删除课程数据后读取为空，原书与目录不受影响且可重复删除', () async {
+    await repository.importDraft(
+      book,
+      TextbookCoursePack.fromJson(courseFixture()),
+    );
+    final pdf = File('${directory.path}/textbooks/${book.pdfSha256}.pdf');
+    await pdf.writeAsString('test only');
+
+    await repository.clear(book);
+
+    expect(await repository.load(book), isNull);
+    expect(await repository.loadDocument(book), isNull);
+    expect(await pdf.exists(), isTrue);
+    expect(Directory('${directory.path}/textbooks').existsSync(), isTrue);
+
+    await repository.clear(book);
+    expect(await repository.load(book), isNull);
+  });
+
   test('册次/原书身份不匹配拒绝导入，之前草稿保持完整', () async {
     final pack = TextbookCoursePack.fromJson(courseFixture());
     await repository.importDraft(book, pack);

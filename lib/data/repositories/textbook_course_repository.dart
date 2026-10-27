@@ -82,6 +82,15 @@ class TextbookCourseRepository {
   Future<TextbookCourseDocument?> loadDocument(Textbook book) =>
       _serial(() => _loadDocument(book));
 
+  /// 删除本书课程数据（读一读/认一认/写一写的内容来源）。
+  ///
+  /// 与缓存不同，课程数据不能自动重建：删除后需要重新生成或重新导入
+  /// 课程 JSON 才能继续使用；书目与学习进度不受影响。
+  Future<void> clear(Textbook book) => _serial(() async {
+        final file = await _file(book);
+        if (await file.exists()) await file.delete();
+      });
+
   /// 与审核写入共用排序；callback 不得再次调用本仓库的 load/save。
   Future<T> withCurrentPack<T>(
     Textbook book,
