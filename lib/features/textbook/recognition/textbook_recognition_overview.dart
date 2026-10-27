@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 import 'package:poemath/core/services/tts/narration_session.dart';
@@ -418,7 +417,7 @@ class _OverviewState extends ConsumerState<TextbookRecognitionOverview>
               ),
               const SizedBox(height: SpacingTokens.sm),
             ],
-            _MasonryLayout(
+            MasonryLayout(
               key: const ValueKey('recognition-masonry'),
               columnCount: columns,
               gap: gap,
@@ -455,111 +454,4 @@ class _OverviewState extends ConsumerState<TextbookRecognitionOverview>
     unawaited(_stopAudio());
     super.dispose();
   }
-}
-
-class _MasonryLayout extends MultiChildRenderObjectWidget {
-  const _MasonryLayout({
-    super.key,
-    required this.columnCount,
-    required this.gap,
-    required super.children,
-  });
-
-  final int columnCount;
-  final double gap;
-
-  @override
-  _RenderMasonry createRenderObject(BuildContext context) =>
-      _RenderMasonry(columnCount: columnCount, gap: gap);
-
-  @override
-  void updateRenderObject(BuildContext context, _RenderMasonry renderObject) {
-    renderObject
-      ..columnCount = columnCount
-      ..gap = gap;
-  }
-}
-
-class _MasonryParentData extends ContainerBoxParentData<RenderBox> {}
-
-class _RenderMasonry extends RenderBox
-    with
-        ContainerRenderObjectMixin<RenderBox, _MasonryParentData>,
-        RenderBoxContainerDefaultsMixin<RenderBox, _MasonryParentData> {
-  _RenderMasonry({required int columnCount, required double gap})
-      : _columnCount = columnCount,
-        _gap = gap;
-
-  int _columnCount;
-  double _gap;
-
-  int get columnCount => _columnCount;
-  set columnCount(int value) {
-    if (_columnCount == value) return;
-    _columnCount = value;
-    markNeedsLayout();
-  }
-
-  double get gap => _gap;
-  set gap(double value) {
-    if (_gap == value) return;
-    _gap = value;
-    markNeedsLayout();
-  }
-
-  @override
-  void setupParentData(RenderBox child) {
-    if (child.parentData is! _MasonryParentData) {
-      child.parentData = _MasonryParentData();
-    }
-  }
-
-  @override
-  void performLayout() {
-    final width = constraints.hasBoundedWidth
-        ? constraints.maxWidth
-        : constraints.minWidth;
-    final columns = _columnCount.clamp(1, 8);
-    final columnWidth =
-        ((width - _gap * (columns - 1)) / columns).clamp(0.0, double.infinity);
-    final columnHeights = List<double>.filled(columns, 0);
-    var maxHeight = 0.0;
-
-    var child = firstChild;
-    while (child != null) {
-      var shortestColumn = 0;
-      for (var column = 1; column < columns; column++) {
-        if (columnHeights[column] < columnHeights[shortestColumn]) {
-          shortestColumn = column;
-        }
-      }
-      child.layout(
-        BoxConstraints.tightFor(width: columnWidth),
-        parentUsesSize: true,
-      );
-      final y = columnHeights[shortestColumn];
-      final parentData = child.parentData! as _MasonryParentData;
-      parentData.offset = Offset(
-        shortestColumn * (columnWidth + _gap),
-        y,
-      );
-      columnHeights[shortestColumn] = y + child.size.height + _gap;
-      maxHeight = maxHeight < columnHeights[shortestColumn]
-          ? columnHeights[shortestColumn]
-          : maxHeight;
-      child = childAfter(child);
-    }
-
-    size = constraints.constrain(
-      Size(width, maxHeight == 0 ? 0 : maxHeight - _gap),
-    );
-  }
-
-  @override
-  void paint(PaintingContext context, Offset offset) =>
-      defaultPaint(context, offset);
-
-  @override
-  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
-      defaultHitTestChildren(result, position: position);
 }
