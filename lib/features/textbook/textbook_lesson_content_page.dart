@@ -15,6 +15,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_overview.dart';
+import 'package:poemath/features/textbook/writing/textbook_writing_overview.dart';
 
 /// 当前原书页对应的课文内容；认一认可进入本课生字练习。
 class TextbookLessonContentPage extends ConsumerStatefulWidget {
@@ -55,6 +56,7 @@ class _TextbookLessonContentPageState
   bool _leaving = false;
   bool _changingControl = false;
   bool _openingRecognition = false;
+  bool _openingWriting = false;
   int _recognitionNavigationGeneration = 0;
 
   @override
@@ -331,15 +333,22 @@ class _TextbookLessonContentPageState
                     unawaited(_openRecognition(lesson.id, targetId)),
               ),
             TextbookContentSection.recitation => _recitations(context, lesson),
-            TextbookContentSection.writing => TextbookCourseVocabularyContent(
-                vocabulary: lesson.writingCharacters,
+            TextbookContentSection.writing => TextbookWritingOverview(
+                bookId: bookId,
+                lesson: lesson,
+                routeObserver: widget.routeObserver,
+                onPractice: (targetId) =>
+                    unawaited(_openWriting(lesson.id, targetId)),
               ),
           },
       ],
     );
     return KeyedSubtree(
       key: _lessonKeys.putIfAbsent(lesson.id, GlobalKey.new),
-      child: section == TextbookContentSection.recognition
+      // 认一认与写一写的字卡自带背景，再套一层 ColoredCard 只会多一层
+      // 同色内边距（用户反馈「字卡外面不用再套一层」）。
+      child: section == TextbookContentSection.recognition ||
+              section == TextbookContentSection.writing
           ? KeyedSubtree(
               key: ValueKey('textbook-content-${lesson.id}'),
               child: content,
@@ -391,6 +400,28 @@ class _TextbookLessonContentPageState
       );
     } finally {
       _openingRecognition = false;
+    }
+  }
+
+  /// 进入单字书写练习。与 [_openRecognition] 同款防抖 + 路由守卫 +
+/// 先停朗读再导航；写一写无需读取语音识别配置，因此无配置分支。
+  Future<void> _openWriting(String lessonId, String targetId) async {
+    if (_openingWriting) return;
+    _openingWriting = true;
+    final generation = _recognitionNavigationGeneration;
+    bool canNavigate() =>
+        mounted &&
+        !_leaving &&
+        _route?.isCurrent != false &&
+        generation == _recognitionNavigationGeneration;
+    try {
+      await _stop();
+      if (!mounted || !canNavigate()) return;
+      await context.push(
+        AppRoutes.textbookWritingOf(bookId, lessonId, targetId),
+      );
+    } finally {
+      _openingWriting = false;
     }
   }
 

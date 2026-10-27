@@ -14,6 +14,9 @@ import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_detail_page.dart';
 import 'package:poemath/features/textbook/textbook_lesson_content_page.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
+import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
+import 'package:poemath/features/textbook/writing/textbook_writing_overview.dart';
+import 'package:poemath/features/textbook/writing/writing_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_preview.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
 
@@ -104,6 +107,13 @@ void main() {
           textbookCourseProvider(book.pdfSha256).overrideWith(
             (_) async => TextbookCoursePack.fromJson(raw ?? courseFixture()),
           ),
+          // 写一写字卡会读取笔顺资产与进度；测试固定为空资产/空进度，
+          // 避免触达真实 Hive 与 2.4MB 资产。
+          writingStrokeDataProvider.overrideWith(
+            (_) async => const WritingStrokeAsset({}),
+          ),
+          textbookWritingProgressProvider(book.pdfSha256)
+              .overrideWith((_) async => null),
         ],
         child: MaterialApp(
           builder: (context, child) => MediaQuery(
@@ -193,14 +203,26 @@ void main() {
         case TextbookContentSection.writing:
           expect(
             tester
-                .widget<TextbookCourseVocabularyContent>(
-                  find.byType(TextbookCourseVocabularyContent),
+                .widget<TextbookWritingOverview>(
+                  find.byType(TextbookWritingOverview),
                 )
-                .vocabulary
+                .lesson
+                .writingCharacters
                 .single
                 .id,
             'writing-001',
           );
+          expect(
+            find.byKey(const ValueKey('writing-card-writing-001')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('writing-practice-writing-001')),
+            findsOneWidget,
+          );
+          // 卡面只显示字本身，拼音不进可见文案。
+          expect(find.text('星'), findsOneWidget);
+          expect(find.text('xīng'), findsNothing);
         case TextbookContentSection.recitation:
           expect(find.text('只背测试句的前两个字。'), findsOneWidget);
           expect(find.text('　　星𠀀'), findsOneWidget);
