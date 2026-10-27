@@ -37,6 +37,7 @@ class AppRoutes {
       '/textbook/recognition/:id/:lesson/prepare';
   static const String textbookRecognitionCheck =
       '/textbook/recognition/:id/:lesson/check';
+  static const String textbookWriting = '/textbook/writing/:id/:lesson';
   static const String textbookManagement = '/profile/settings/books';
   static const String textbookManageDetail = '/profile/settings/books/:id';
 
@@ -101,6 +102,17 @@ class AppRoutes {
         ? path
         : '$path?${Uri(queryParameters: {'target': targetId}).query}';
   }
+
+  static String textbookWritingOf(
+    String id,
+    String lesson,
+    String targetId,
+  ) =>
+      Uri(
+        path: '/textbook/writing/${Uri.encodeComponent(id)}'
+            '/${Uri.encodeComponent(lesson)}',
+        queryParameters: {'target': targetId},
+      ).toString();
 
   static String textbookContentOf(String id, String section, List<int> pages) =>
       Uri(

@@ -67,6 +67,7 @@ import 'package:poemath/features/textbook/textbook_lesson_content_page.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_practice_page.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_prepare_page.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_check_page.dart';
+import 'package:poemath/features/textbook/writing/writing_practice_page.dart';
 import 'package:poemath/domain/textbook_lesson_content.dart';
 
 /// `Provider<GoRouter>`：整个应用共享一份 GoRouter 实例。
@@ -216,6 +217,18 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           child: TextbookRecognitionCheckPage(
             bookId: state.pathParameters['id']!,
             lessonId: state.pathParameters['lesson']!,
+            routeObserver: textbookObserver,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookWriting,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: WritingPracticePage(
+            bookId: state.pathParameters['id']!,
+            lessonId: state.pathParameters['lesson']!,
+            targetId: state.uri.queryParameters['target']!,
             routeObserver: textbookObserver,
           ),
         ),
