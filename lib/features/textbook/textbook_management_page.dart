@@ -292,7 +292,7 @@ class _TextbookManagementPageState
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           icon: const Icon(
-                            Icons.storage_outlined,
+                            Icons.cleaning_services_outlined,
                             size: SpacingTokens.md,
                           ),
                         ),
