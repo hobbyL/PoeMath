@@ -58,6 +58,8 @@ void registerAssetLicenses() {
       ('童趣答题语音 — 雨多多', 'assets/sounds/LICENSE-child-voice.txt'),
       ('完成提示音 — Kenney', 'assets/sounds/LICENSE-completion.txt'),
       ('PDFium 原生阅读引擎', 'assets/legal/LICENSE-pdfium.txt'),
+      ('汉字笔顺数据 — Make Me a Hanzi / Arphic Public License',
+          'assets/legal/ARPHICPL.TXT'),
     ]) {
       final text = await rootBundle.loadString(path);
       yield LicenseEntryWithLineBreaks([name], text);
