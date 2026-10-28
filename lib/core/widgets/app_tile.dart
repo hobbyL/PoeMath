@@ -22,7 +22,7 @@ import 'package:poemath/core/widgets/colored_card.dart';
 /// 通用列表行组件。
 ///
 /// 视觉规则继承 [ColoredCard]（半透明彩色背景 + 圆角），额外提供：
-/// - 可选的 40×40 圆角图标容器（12% 透明度）
+/// - 裸图标（无背景容器，颜色跟随 iconColor）
 /// - 标题 + 副标题文本列
 /// - 尾部组件（默认为 chevron 箭头；可替换为 Switch 等）
 class AppTile extends StatelessWidget {
@@ -194,15 +194,7 @@ class AppTile extends StatelessWidget {
         crossAxisAlignment: crossAxisAlignment,
         children: <Widget>[
           if (icon != null) ...[
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-              ),
-              child: Icon(icon, color: iconColor, size: 22),
-            ),
+            Icon(icon, color: iconColor, size: 22),
             const SizedBox(width: SpacingTokens.md),
           ],
           Expanded(

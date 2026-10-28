@@ -78,7 +78,6 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                 ),
               for (final (index, task) in plan.tasks.indexed) ...[
                 AppTile(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   icon: task.completed
                       ? Icons.check_circle_outline
                       : _icon(task.kind),
