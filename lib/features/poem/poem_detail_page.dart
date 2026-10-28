@@ -775,8 +775,21 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         ) ??
         TypographyTokens.poemContentStyle();
 
-    return Column(
-      children: List.generate(lines.length, (i) {
+    // 全诗统一字号：以最长行为基准缩放，各行字号一致。
+    return AutoFitTextLines(
+      lines: lines,
+      minFontSize:
+          theme.textTheme.bodyMedium?.fontSize ?? TypographyTokens.fsBody,
+      styleFor: (i) {
+        final isActive = _isSpeaking && i == _currentLineIndex;
+        return isActive
+            ? baseStyle.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              )
+            : baseStyle;
+      },
+      lineWrapper: (i, line) {
         final isActive = _isSpeaking && i == _currentLineIndex;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -790,20 +803,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
           ),
-          // 诗句行单行自适应：只缩不放，缩到正文字号下限仍放不下则换行。
-          child: AutoFitText(
-            text: lines[i],
-            style: isActive
-                ? baseStyle.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  )
-                : baseStyle,
-            minFontSize:
-                theme.textTheme.bodyMedium?.fontSize ?? TypographyTokens.fsBody,
-          ),
+          child: line,
         );
-      }),
+      },
     );
   }
 
