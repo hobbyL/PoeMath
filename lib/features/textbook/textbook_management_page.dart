@@ -201,27 +201,18 @@ class _TextbookManagementPageState
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(SpacingTokens.md),
-                    child: ColoredCard(
-                      color: theme.colorScheme.primary,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.menu_book_outlined,
-                            size: SpacingTokens.xxl,
-                          ),
-                          const SizedBox(height: SpacingTokens.md),
-                          Text('暂无书籍', style: theme.textTheme.titleLarge),
-                          const SizedBox(height: SpacingTokens.sm),
-                          const Text(
-                            '点击右上角导入或下载',
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.menu_book_outlined,
+                        size: SpacingTokens.xxl,
                       ),
-                    ),
+                      const SizedBox(height: SpacingTokens.md),
+                      Text('暂无书籍', style: theme.textTheme.titleLarge),
+                      const SizedBox(height: SpacingTokens.sm),
+                      const Text('点击右上角导入或下载'),
+                    ],
                   ),
                 ),
               )
