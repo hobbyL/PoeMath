@@ -780,6 +780,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       lines: lines,
       minFontSize:
           theme.textTheme.bodyMedium?.fontSize ?? TypographyTokens.fsBody,
+      linePadding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.sm,
+        vertical: 2,
+      ),
       styleFor: (i) {
         final isActive = _isSpeaking && i == _currentLineIndex;
         return isActive
@@ -793,10 +797,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         final isActive = _isSpeaking && i == _currentLineIndex;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(
-            horizontal: SpacingTokens.sm,
-            vertical: 2,
-          ),
           decoration: BoxDecoration(
             color: isActive
                 ? theme.colorScheme.primary.withValues(alpha: 0.15)

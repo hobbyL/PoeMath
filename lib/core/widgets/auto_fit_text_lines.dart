@@ -27,6 +27,7 @@ class AutoFitTextLines extends StatelessWidget {
     required this.minFontSize,
     this.textAlign = TextAlign.center,
     this.lineWrapper,
+    this.linePadding = EdgeInsets.zero,
   });
 
   /// 逐行文本（调用方已按行拆分）。
@@ -43,7 +44,13 @@ class AutoFitTextLines extends StatelessWidget {
   final TextAlign textAlign;
 
   /// 可选的逐行包装（如朗读高亮背景）；返回值直接替代该行渲染。
+  ///
+  /// 注意：包装不得自带水平 padding，否则文字测宽（按组件总宽）与
+  /// 渲染（扣除 padding）不一致，行尾会被裁切；行内边距请用 [linePadding]。
   final Widget Function(int index, Widget line)? lineWrapper;
+
+  /// 每行文字的内边距；测宽时从可用宽度中扣除，保证渲染不溢出。
+  final EdgeInsets linePadding;
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +68,8 @@ class AutoFitTextLines extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
+        final maxWidth =
+            constraints.maxWidth - linePadding.horizontal;
         // 无界宽度或无字号：无法计算缩放比例，按原样式渲染（允许换行）。
         if (!maxWidth.isFinite || baseFontSize == null) {
           return _buildLines(resolveStyle, (_) => baseStyle, false);
@@ -129,12 +137,15 @@ class AutoFitTextLines extends StatelessWidget {
         for (var i = 0; i < lines.length; i++)
           _wrap(
             i,
-            Text(
-              lines[i],
-              style: transform(resolveStyle(styleFor(i))),
-              textAlign: textAlign,
-              maxLines: singleLine ? 1 : null,
-              softWrap: !singleLine,
+            Padding(
+              padding: linePadding,
+              child: Text(
+                lines[i],
+                style: transform(resolveStyle(styleFor(i))),
+                textAlign: textAlign,
+                maxLines: singleLine ? 1 : null,
+                softWrap: !singleLine,
+              ),
             ),
           ),
       ],
