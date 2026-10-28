@@ -1,28 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:poemath/core/services/textbook_file_service.dart';
-import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
-import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 import 'package:poemath/features/textbook/writing/textbook_writing_overview.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
 
 import '../../helpers/hive_test_helper.dart';
-import '../../helpers/narration_fakes.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/writing_fixture.dart';
 
 void main() {
-  late TtsService tts;
-  late NarrationSynth synth;
-  late MemoryNarrationCache audioCache;
   late TextbookCoursePack pack;
   late WritingStrokeAsset asset;
 
@@ -30,20 +23,11 @@ void main() {
     ProfileScope.reset();
     await setUpHiveForTesting();
     pack = writingFixture();
-    synth = NarrationSynth();
-    audioCache = MemoryNarrationCache();
-    tts = TtsService(
-      NarrationSettings(),
-      flutterTts: NarrationEngine(),
-      fileSynthesizer: synth,
-      narrationPlayerFactory: RecordingNarrationPlayer.new,
-    );
     // 空资产：两个字都无笔顺数据，但仍能正常出卡（AC6 前置条件）。
     asset = const WritingStrokeAsset({});
   });
 
   tearDown(() async {
-    tts.dispose();
     ProfileScope.reset();
     await tearDownHiveForWidgetTesting();
   });
@@ -65,15 +49,11 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          ttsServiceProvider.overrideWithValue(tts),
           textbookListProvider.overrideWithValue([courseFixtureBook()]),
           textbookCourseProvider(bookId).overrideWith((_) async => package),
           writingStrokeDataProvider.overrideWith((_) async => asset),
           textbookWritingProgressProvider(bookId)
               .overrideWith((_) async => progress),
-          textbookFileServiceProvider.overrideWithValue(
-            TextbookFileService(narrationAudioCache: audioCache),
-          ),
         ],
         child: MaterialApp(
           builder: (context, child) => MediaQuery(
@@ -95,11 +75,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-  }
-
-  Future<void> flush(WidgetTester tester) async {
-    await flushNarration();
-    await tester.pump();
   }
 
   WritingRecord record({
@@ -144,10 +119,7 @@ void main() {
     final gridSide = tester
         .getSize(find.byKey(const ValueKey('writing-grid-writing-001')))
         .shortestSide;
-    final fontSize = tester
-        .widget<Text>(find.text('星'))
-        .style!
-        .fontSize!;
+    final fontSize = tester.widget<Text>(find.text('星')).style!.fontSize!;
     expect(fontSize / gridSide, closeTo(0.72, 0.01));
     expect(fontSize, greaterThan(80), reason: '160pt 卡片的格子应撑满字身');
     // 拼音只保留在无障碍标签里，卡面不再显示。
@@ -166,7 +138,8 @@ void main() {
     );
     expect((badgeY.dy - entryY.dy).abs(), lessThan(SpacingTokens.md));
 
-    await tester.tap(find.byKey(const ValueKey('writing-practice-writing-002')));
+    await tester
+        .tap(find.byKey(const ValueKey('writing-practice-writing-002')));
     await tester.pumpAndSettle();
     expect(practiced, ['writing-002']);
     expect(tester.takeException(), isNull);
@@ -232,28 +205,24 @@ void main() {
     );
   });
 
-  testWidgets('点击卡片任意位置进入练字，喇叭按钮只朗读', (tester) async {
+  testWidgets('字卡不提供朗读按钮，点击任意位置直接进入练字', (tester) async {
     final practiced = <String>[];
     await pump(tester, onPractice: practiced.add);
 
-    // 点田字格字身：整卡可点，直接进入练字、不朗读。
+    // 写一写是书写活动：卡面不再出现喇叭，也不应创建朗读入口。
+    expect(
+      find.byKey(const ValueKey('writing-audio-writing-001')),
+      findsNothing,
+    );
+    expect(find.byIcon(Icons.volume_up_outlined), findsNothing);
+
+    // 点田字格字身：整卡可点，直接进入练字。
     await tester.tap(
       find.byKey(const ValueKey('writing-grid-writing-001')),
     );
     await tester.pumpAndSettle();
     expect(practiced, ['writing-001']);
-    expect(synth.texts, isEmpty, reason: '整卡点击不朗读');
-
-    // 点底部小喇叭：只朗读，不导航。
-    await tester.tap(
-      find.byKey(const ValueKey('writing-audio-writing-002')),
-    );
-    await flush(tester);
-    expect(synth.texts, ['月']);
-    expect(practiced, ['writing-001'], reason: '朗读按钮不导航');
-
-    await tester.pumpWidget(const SizedBox());
-    await flush(tester);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('无会写字时显示空态且不渲染卡片', (tester) async {

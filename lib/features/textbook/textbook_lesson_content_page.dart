@@ -336,7 +336,6 @@ class _TextbookLessonContentPageState
             TextbookContentSection.writing => TextbookWritingOverview(
                 bookId: bookId,
                 lesson: lesson,
-                routeObserver: widget.routeObserver,
                 onPractice: (targetId) =>
                     unawaited(_openWriting(lesson.id, targetId)),
               ),
@@ -404,7 +403,7 @@ class _TextbookLessonContentPageState
   }
 
   /// 进入单字书写练习。与 [_openRecognition] 同款防抖 + 路由守卫 +
-/// 先停朗读再导航；写一写无需读取语音识别配置，因此无配置分支。
+  /// 先停朗读再导航；写一写无需读取语音识别配置，因此无配置分支。
   Future<void> _openWriting(String lessonId, String targetId) async {
     if (_openingWriting) return;
     _openingWriting = true;
