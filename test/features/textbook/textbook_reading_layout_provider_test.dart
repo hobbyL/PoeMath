@@ -29,6 +29,65 @@ class _CachedFiles extends TextbookFileService {
 }
 
 void main() {
+  test('单行段落利用同课正文边距恢复几何缩进，课程数据保持原样', () async {
+    final directory = await Directory.systemTemp.createTemp('reading_indent_');
+    addTearDown(() => directory.delete(recursive: true));
+    final book = courseFixtureBook();
+    final base = layoutFixturePage(2, ['前段星月明，', '山河也明亮。', '短段𠀀。']);
+    final start = '前段星月明，\n山河也明亮。\n'.runes.length;
+    final page = TextbookPageText(
+      page: 2,
+      text: base.text,
+      width: base.width,
+      height: base.height,
+      glyphs: [
+        for (final glyph in base.glyphs)
+          TextbookPageGlyph(
+            text: glyph.text,
+            index: glyph.index,
+            left: glyph.left + (glyph.index >= start ? .06 : 0),
+            right: glyph.right + (glyph.index >= start ? .06 : 0),
+            top: glyph.top,
+            bottom: glyph.bottom,
+          ),
+      ],
+    );
+    final cache = TextbookContentCache(
+      book: book,
+      directoryProvider: () async => directory,
+    );
+    await cache.pageLayout(2, () async => page);
+    final raw = courseFixture();
+    final lesson = (raw['lessons'] as List).single as Map;
+    lesson['paragraphs'] = [
+      courseFixtureText('prior', '　　前段星月明，\n山河也明亮。', null),
+      courseFixtureText('last', '短段𠀀。', null),
+    ];
+    lesson['recitations'] = <Object>[];
+    (lesson['coverage'] as Map)['recitations'] = 'notApplicable';
+    final pack = TextbookCoursePack.fromJson(raw);
+    final before = pack.toJson();
+    final files = _CachedFiles(cache);
+    final container = ProviderContainer(
+      overrides: [
+        textbookListProvider.overrideWithValue([book]),
+        textbookFileServiceProvider.overrideWithValue(files),
+        textbookCourseProvider(book.pdfSha256).overrideWith((_) async => pack),
+      ],
+    );
+    addTearDown(container.dispose);
+    final provider = textbookReadingLayoutProvider(
+      (bookId: book.pdfSha256, lessonId: 'lesson-001'),
+    );
+    final subscription = container.listen(provider, (_, __) {});
+    addTearDown(subscription.close);
+    final layouts = await container.read(provider.future);
+    expect(layouts['last']!.leadingIndentCells, 2);
+    expect(layouts['prior']!.leadingIndentCells, 0);
+    expect(pack.toJson(), before);
+    expect(files.pathReads, 0);
+  });
+
   test('读一读按需读取冷布局缓存，恢复text课目的诗行分节且不改写课程', () async {
     final directory = await Directory.systemTemp.createTemp('reading_layout_');
     addTearDown(() => directory.delete(recursive: true));

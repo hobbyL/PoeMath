@@ -103,6 +103,7 @@ final textbookReadingLayoutProvider = FutureProvider.autoDispose.family<
               if (pages[source.pdfPage] != null) pages[source.pdfPage]!,
           ],
           preserveLines: lesson.kind == 'poetry',
+          paragraphs: lesson.paragraphs,
         ),
     };
   } on Object {

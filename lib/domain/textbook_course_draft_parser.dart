@@ -103,6 +103,7 @@ class TextbookCourseDraftParser {
     TextbookCourseParagraph paragraph,
     List<TextbookPageText> pages, {
     bool preserveLines = false,
+    List<TextbookCourseParagraph> paragraphs = const [],
   }) {
     final fallback = textbookReadingLayoutForText(
       paragraph.text,
@@ -144,10 +145,43 @@ class TextbookCourseDraftParser {
       matched.add(source[cursor++]);
     }
     final verse = _verseLines(matched);
-    if (!preserveLines && !verse) return fallback;
+    var leadingIndentCells = 0;
+    if (!verse && matched.isNotEmpty) {
+      final firstLine = paragraph.text
+          .split('\n')
+          .firstWhere((line) => line.trim().isNotEmpty);
+      if (firstLine == firstLine.trimLeft()) {
+        final first = matched.first;
+        final savedBodyLines = {
+          for (final paragraph in paragraphs)
+            for (final line in paragraph.text.split('\n')) normalized(line),
+        };
+        final body = source
+            .where(
+              (row) =>
+                  row.page == first.page &&
+                  row.height >= first.height * .72 &&
+                  row.height <= first.height * 1.4 &&
+                  savedBodyLines.contains(normalized(row.text)),
+            )
+            .toList();
+        final margin = _pageMargins(body)[first.page];
+        if (first.hasParagraphIndent ||
+            margin != null && first.left - margin > first.width * 1.5) {
+          leadingIndentCells = 2;
+        }
+      }
+    }
+    if (!preserveLines && !verse) {
+      return TextbookReadingLayout(
+        breaks: fallback.breaks,
+        leadingIndentCells: leadingIndentCells,
+      );
+    }
     final stanzas = _stanzaStarts(matched, verse: true);
     return TextbookReadingLayout(
       retainLeadingIndent: !verse,
+      leadingIndentCells: leadingIndentCells,
       breaks: Map.unmodifiable({
         ...fallback.breaks,
         for (var i = 1; i < savedLines.length; i++)

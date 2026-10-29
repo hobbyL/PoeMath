@@ -73,6 +73,64 @@ void main() {
   final lesson = seed.pack.lessons.first;
   final plan = seed.generation!.plans.first;
 
+  for (final explicit in [false, true]) {
+    test('单行自然段从原书恢复缩进，已有缩进不重复补（文字层含缩进=$explicit）', () {
+      final prefix = explicit ? '\u2003\u2003 ' : '';
+      final base =
+          layoutFixturePage(2, ['星月测试', '前段星月明，', '山河也明亮。', '$prefix短段𠀀。']);
+      final lastStart = base.text.indexOf('$prefix短段');
+      final page = TextbookPageText(
+        page: 2,
+        text: base.text,
+        width: base.width,
+        height: base.height,
+        glyphs: [
+          for (final glyph in base.glyphs)
+            TextbookPageGlyph(
+              text: glyph.text,
+              index: glyph.index,
+              left: glyph.left +
+                  (!explicit && glyph.index >= lastStart ? .06 : 0),
+              right: glyph.right +
+                  (!explicit && glyph.index >= lastStart ? .06 : 0),
+              top: glyph.top,
+              bottom: glyph.bottom,
+            ),
+        ],
+      );
+      final raw = courseFixture();
+      final lesson = (raw['lessons'] as List).single as Map;
+      lesson['paragraphs'] = [
+        courseFixtureText('prior', '　　前段星月明，\n山河也明亮。', null),
+        courseFixtureText('last', '短段𠀀。', null),
+        courseFixtureText('saved', '　　短段𠀀。', null),
+      ];
+      lesson['recitations'] = <Object>[];
+      (lesson['coverage'] as Map)['recitations'] = 'notApplicable';
+      final paragraphs =
+          TextbookCoursePack.fromJson(raw).lessons.single.paragraphs;
+      final source = paragraphs[1].toJson();
+      final layout =
+          parser.readingLayout(paragraphs[1], [page], paragraphs: paragraphs);
+      expect(layout.leadingIndentCells, 2);
+      expect(layout.breaks, isEmpty);
+      expect(layout.retainLeadingIndent, isTrue);
+      expect(paragraphs[1].toJson(), source);
+      expect(
+        parser
+            .readingLayout(paragraphs[2], [page], paragraphs: paragraphs)
+            .leadingIndentCells,
+        0,
+      );
+      expect(
+        parser
+            .readingLayout(paragraphs[1], const [], paragraphs: paragraphs)
+            .leadingIndentCells,
+        0,
+      );
+    });
+  }
+
   test('旧课程按真实页坐标恢复6节24行，跨页边距不同不制造缩进或丢失分节', () {
     final pages = [_versePage(2, 0, .36), _versePage(3, 12, .12)];
     final paragraph = _legacyVerse(pages);

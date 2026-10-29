@@ -544,8 +544,10 @@ class TextbookCourseText extends StatelessWidget {
               final rows = <List<_DisplayCell>>[];
               final rowWidths = <double>[];
               final stanzaRows = <bool>[];
+              final leadingIndentWidth =
+                  _readingLayout.leadingIndentCells * metrics.charWidths['国']!;
               var row = <_DisplayCell>[];
-              var rowWidth = 0.0;
+              var rowWidth = leadingIndentWidth;
               var startsStanza = false;
               _DisplayCell? pendingSpace;
               void finishRow() {
@@ -589,10 +591,13 @@ class TextbookCourseText extends StatelessWidget {
               }
               if (row.isNotEmpty) finishRow();
 
-              Widget rowBox(List<_DisplayCell> cells) => Row(
+              Widget rowBox(List<_DisplayCell> cells, {required bool first}) =>
+                  Row(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      if (first && leadingIndentWidth > 0)
+                        SizedBox(width: leadingIndentWidth),
                       for (final cell in cells) cellBox(cell, widthOf(cell)),
                     ],
                   );
@@ -615,10 +620,10 @@ class TextbookCourseText extends StatelessWidget {
                       if (rowWidths[index] > constraints.maxWidth)
                         _CourseTextViewport(
                           width: rowWidths[index],
-                          child: rowBox(row),
+                          child: rowBox(row, first: index == 0),
                         )
                       else
-                        rowBox(row),
+                        rowBox(row, first: index == 0),
                     ],
                   ],
                 ),

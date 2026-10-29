@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/domain/textbook_narration.dart';
 import 'package:poemath/domain/textbook_pinyin.dart';
@@ -87,6 +88,79 @@ Finder _character(TextbookCourseParagraph paragraph, int rawIndex) =>
 void main() {
   for (final showPinyin in [false, true]) {
     for (final scale in [1.0, 2.0]) {
+      testWidgets('恢复单行段首两格缩进，续行左对齐且原文注音高亮不移位（拼音=$showPinyin，字号=$scale）',
+          (tester) async {
+        _setViewport(tester);
+        final paragraph = _paragraph(
+          'short-paragraph',
+          '甲𠀀乙丙丁。',
+          ['jiǎ', 'hē', 'yǐ', 'bǐng', 'dīng', '。'],
+        );
+        Future<void> pump(
+          double width, {
+          bool highlighted = false,
+          bool recover = true,
+        }) =>
+            _pumpParagraph(
+              tester,
+              paragraph,
+              showPinyin: showPinyin,
+              scale: scale,
+              width: width,
+              readingLayouts: recover
+                  ? const {
+                      'short-paragraph':
+                          TextbookReadingLayout(leadingIndentCells: 2),
+                    }
+                  : const {},
+              activeRanges: highlighted
+                  ? const [TextbookNarrationSpan('short-paragraph', 0, 2)]
+                  : const [],
+            );
+        await pump(1500, recover: false);
+        final baseline = tester.getTopLeft(_character(paragraph, 0));
+        final style = tester.widget<Text>(_character(paragraph, 0)).style!;
+        final painter = TextPainter(
+          text: TextSpan(text: '国', style: style),
+          textDirection: TextDirection.ltr,
+          textScaler: TextScaler.linear(scale),
+        )..layout();
+        final indent = 2 * (painter.width + SpacingTokens.sm);
+        painter.dispose();
+        await pump(1500);
+        expect(
+          tester.getTopLeft(_character(paragraph, 0)).dx - baseline.dx,
+          closeTo(indent, .1),
+        );
+        final before = {
+          for (var index = 0; index < paragraph.text.runes.length; index++)
+            index: tester.getRect(_character(paragraph, index)),
+        };
+        await pump(1500, highlighted: true);
+        for (final entry in before.entries) {
+          expect(tester.getRect(_character(paragraph, entry.key)), entry.value);
+        }
+        if (showPinyin) {
+          expect(find.text('jiǎ'), findsOneWidget);
+          expect(find.text('hē'), findsOneWidget);
+        }
+        final cellWidth = tester.getTopLeft(_character(paragraph, 1)).dx -
+            tester.getTopLeft(_character(paragraph, 0)).dx;
+        await pump(indent + cellWidth * 2 + .01);
+        final flow =
+            tester.getRect(find.byKey(const ValueKey('short-paragraph-flow')));
+        expect(
+          tester.getTopLeft(_character(paragraph, 2)).dy,
+          greaterThan(tester.getTopLeft(_character(paragraph, 0)).dy),
+        );
+        expect(
+          tester.getTopLeft(_character(paragraph, 2)).dx,
+          closeTo(flow.left, .1),
+        );
+        expect(paragraph.text, '甲𠀀乙丙丁。');
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('诗行与空行分节保留，窄屏续行后下一诗行仍另起一行（拼音=$showPinyin，字号=$scale）',
           (tester) async {
         _setViewport(tester);

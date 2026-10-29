@@ -5,10 +5,14 @@ class TextbookReadingLayout {
   const TextbookReadingLayout({
     this.breaks = const {},
     this.retainLeadingIndent = true,
+    this.leadingIndentCells = 0,
   });
 
   final Map<int, TextbookReadingBreak> breaks;
   final bool retainLeadingIndent;
+
+  /// 原文未保存、但原书明确存在的首行缩进；仅占位，不插入原文字符。
+  final int leadingIndentCells;
 }
 
 TextbookReadingLayout textbookReadingLayoutForText(
