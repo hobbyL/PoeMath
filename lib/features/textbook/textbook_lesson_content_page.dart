@@ -57,6 +57,7 @@ class _TextbookLessonContentPageState
   bool _changingControl = false;
   bool _openingRecognition = false;
   bool _openingWriting = false;
+  bool _showPinyin = false;
   int _recognitionNavigationGeneration = 0;
 
   @override
@@ -86,6 +87,7 @@ class _TextbookLessonContentPageState
       _recognitionNavigationGeneration++;
       unawaited(_stop());
       _lessonKeys.clear();
+      _showPinyin = false;
     }
   }
 
@@ -319,6 +321,7 @@ class _TextbookLessonContentPageState
           switch (section) {
             TextbookContentSection.reading => TextbookCourseParagraphsContent(
                 paragraphs: lesson.paragraphs,
+                showPinyin: _showPinyin,
                 activeRanges: _segment?.lessonId == lesson.id
                     ? _segment!.spans
                     : const [],
@@ -477,6 +480,12 @@ class _TextbookLessonContentPageState
         actions: [
           if (selected == TextbookContentSection.reading &&
               lessons.any((lesson) => lesson.paragraphs.isNotEmpty)) ...[
+            IconButton(
+              tooltip: _showPinyin ? '隐藏拼音' : '显示拼音',
+              isSelected: _showPinyin,
+              onPressed: () => setState(() => _showPinyin = !_showPinyin),
+              icon: const Icon(Icons.abc_rounded),
+            ),
             IconButton(
               tooltip: _session == null
                   ? '朗读课文'

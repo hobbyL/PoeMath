@@ -107,7 +107,7 @@ void main() {
     expect(find.byTooltip('朗读课文'), findsOneWidget); await tester.pumpWidget(const SizedBox()); router.dispose();
   });
 
-  testWidgets('实际播放才高亮，拼音保留且不参与合成，暂停恢复复用同段', (tester) async {
+  testWidgets('实际播放才高亮，切换拼音不影响高亮与会话，暂停恢复复用同段', (tester) async {
     await pump(tester);
     await tester.tap(find.byTooltip('朗读课文'));
     await flush(tester);
@@ -115,13 +115,30 @@ void main() {
     expect(tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
         isEmpty,);
     expect(synth.texts, ['星𠀀，月。']);
-    expect(find.text('xīng'), findsOneWidget);
+    expect(find.text('xīng'), findsNothing);
     players.single.starts.single();
     await flush(tester);
     expect(tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
         isNotEmpty,);
     expect(
         tester.widget<Text>(find.text('星')).style!.backgroundColor, isNotNull,);
+    await tester.tap(find.byTooltip('显示拼音'));
+    await tester.pump();
+    expect(find.text('xīng'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('星')).style!.backgroundColor,
+      isNotNull,
+    );
+    await tester.tap(find.byTooltip('隐藏拼音'));
+    await tester.pump();
+    expect(find.text('xīng'), findsNothing);
+    expect(
+      tester.widget<Text>(find.text('星')).style!.backgroundColor,
+      isNotNull,
+    );
+    expect(players.single.disposed, false);
+    expect(players.single.audio.length, 1);
+    expect(synth.texts, ['星𠀀，月。']);
     await tester.tap(find.byTooltip('暂停朗读'));
     await flush(tester);
     expect(find.text('已暂停'), findsOneWidget);
@@ -179,7 +196,7 @@ void main() {
     final first = lessons.single as Map;
     first['paragraphs'] = [
       courseFixtureText(
-          'long-paragraph', '${List.filled(80, '星星星星星').join('\n')}。', null,),
+          'long-paragraph', '${List.filled(240, '星星星星星').join('\n')}。', null,),
     ];
     first['recitations'] = <Object>[];
     (first['coverage'] as Map)['recitations'] = 'notApplicable';

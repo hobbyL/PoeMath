@@ -91,8 +91,7 @@ List<String> _courseDisplayLines(TextbookCourseParagraph node) {
 }
 
 typedef _DisplayCell = ({String text, int rawIndex, int pinyinIndex});
-final _coursePunctuationChars =
-    RegExp(r'^[，。！？；：、…“”‘’（）《》〈〉【】]$');
+final _coursePunctuationChars = RegExp(r'^[，。！？；：、…“”‘’（）《》〈〉【】]$');
 bool _isPunctuation(String text) =>
     text.length == 1 && _coursePunctuationChars.hasMatch(text);
 List<List<_DisplayCell>> _courseDisplayCells(TextbookCourseParagraph node) {
@@ -121,8 +120,9 @@ List<List<_DisplayCell>> _courseDisplayCells(TextbookCourseParagraph node) {
 class _CourseTextMetrics {
   _CourseTextMetrics(
     BuildContext context,
-    List<TextbookCourseParagraph> nodes,
-  ) {
+    List<TextbookCourseParagraph> nodes, {
+    bool showPinyin = true,
+  }) {
     final theme = Theme.of(context);
     final fallback = DefaultTextStyle.of(context).style;
     final painter = TextPainter(
@@ -140,10 +140,11 @@ class _CourseTextMetrics {
     final pinyinStyle = theme.textTheme.bodySmall ?? fallback;
     final characterStyle = theme.textTheme.titleSmall ?? fallback;
     try {
-      final pinyinTokens = <String>{'Āg'};
+      final pinyinTokens = <String>{if (showPinyin) 'Āg'};
       final characters = <String>{'国'};
       for (final node in nodes) {
-        final pinyin = textbookCoursePinyinForReview(node);
+        final pinyin =
+            showPinyin ? textbookCoursePinyinForReview(node) : const <String>[];
         pinyinByNode[node] = pinyin;
         columnsByNode[node] = 1;
         pinyinTokens.addAll(pinyin);
@@ -224,6 +225,7 @@ class TextbookCourseText extends StatelessWidget {
   const TextbookCourseText({
     super.key,
     required this.node,
+    this.showPinyin = true,
     this.activeRanges = const [],
     this.activeStartKey,
   })  : _metrics = null,
@@ -233,12 +235,14 @@ class TextbookCourseText extends StatelessWidget {
     required this.node,
     required _CourseTextMetrics metrics,
     bool wrap = false,
+    this.showPinyin = true,
     this.activeRanges = const [],
     this.activeStartKey,
   })  : _metrics = metrics,
         _wrap = wrap;
 
   final TextbookCourseParagraph node;
+  final bool showPinyin;
   final _CourseTextMetrics? _metrics;
   final bool _wrap;
   final List<TextbookNarrationSpan> activeRanges;
@@ -249,13 +253,16 @@ class TextbookCourseText extends StatelessWidget {
     final theme = Theme.of(context);
     final pinyinStyle =
         theme.textTheme.bodySmall ?? DefaultTextStyle.of(context).style;
-    final metrics = _metrics ?? _CourseTextMetrics(context, [node]);
+    final metrics =
+        _metrics ?? _CourseTextMetrics(context, [node], showPinyin: showPinyin);
     final pinyin = metrics.pinyinByNode[node]!;
     final lines = _courseDisplayCells(node);
     var anchored = false;
     Widget character(_DisplayCell cell) {
-      final highlighted = activeRanges.any((range) =>
-          range.paragraphId == node.id && range.contains(cell.rawIndex),);
+      final highlighted = activeRanges.any(
+        (range) =>
+            range.paragraphId == node.id && range.contains(cell.rawIndex),
+      );
       final key = highlighted && !anchored ? activeStartKey : null;
       if (highlighted) anchored = true;
       return Text(
@@ -276,28 +283,31 @@ class TextbookCourseText extends StatelessWidget {
           child: cell.text.trim().isEmpty
               ? const SizedBox.shrink()
               : Semantics(
-                  label: '${cell.text} ${pinyin[cell.pinyinIndex]}',
+                  label: showPinyin
+                      ? '${cell.text} ${pinyin[cell.pinyinIndex]}'
+                      : cell.text,
                   excludeSemantics: true,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        height: metrics.pinyinLineHeight,
-                        child: _isPunctuation(cell.text)
-                            ? null
-                            : OverflowBox(
-                                minWidth: 0,
-                                maxWidth: double.infinity,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  pinyin[cell.pinyinIndex],
-                                  maxLines: 1,
-                                  softWrap: false,
-                                  style: pinyinStyle,
+                      if (showPinyin)
+                        SizedBox(
+                          height: metrics.pinyinLineHeight,
+                          child: _isPunctuation(cell.text)
+                              ? null
+                              : OverflowBox(
+                                  minWidth: 0,
+                                  maxWidth: double.infinity,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    pinyin[cell.pinyinIndex],
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    style: pinyinStyle,
+                                  ),
                                 ),
-                              ),
-                      ),
+                        ),
                       character(cell),
                     ],
                   ),
@@ -322,7 +332,10 @@ class TextbookCourseText extends StatelessWidget {
             final cellWidth = [
               for (final cell in cells)
                 if (cell.text.trim().isNotEmpty)
-                  metrics.tokenWidth(cell.text, pinyin[cell.pinyinIndex]),
+                  metrics.tokenWidth(
+                    cell.text,
+                    showPinyin ? pinyin[cell.pinyinIndex] : '',
+                  ),
             ].reduce((a, b) => a > b ? a : b);
             return Wrap(
               key: ValueKey('${node.id}-flow'),
@@ -399,11 +412,13 @@ class TextbookCourseParagraphsContent extends StatelessWidget {
   const TextbookCourseParagraphsContent({
     super.key,
     required this.paragraphs,
+    this.showPinyin = true,
     this.activeRanges = const [],
     this.activeStartKey,
   });
 
   final List<TextbookCourseParagraph> paragraphs;
+  final bool showPinyin;
   final List<TextbookNarrationSpan> activeRanges;
   final GlobalKey? activeStartKey;
 
@@ -417,7 +432,8 @@ class TextbookCourseParagraphsContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metrics = _CourseTextMetrics(context, paragraphs);
+    final metrics =
+        _CourseTextMetrics(context, paragraphs, showPinyin: showPinyin);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -433,6 +449,7 @@ class TextbookCourseParagraphsContent extends StatelessWidget {
             node: paragraph,
             metrics: metrics,
             wrap: true,
+            showPinyin: showPinyin,
             activeRanges: activeRanges
                 .where((span) => span.paragraphId == paragraph.id)
                 .toList(),

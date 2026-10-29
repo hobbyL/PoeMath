@@ -158,6 +158,39 @@ void main() {
                 .id,
             'paragraph-001',
           );
+          expect(find.text('xīng'), findsNothing);
+          expect(find.text('hē'), findsNothing);
+          expect(find.text('yuè'), findsNothing);
+          final plainRect = tester.getRect(
+            find.byKey(const ValueKey('course-text-paragraph-001')),
+          );
+          await tester.tap(find.byTooltip('显示拼音'));
+          await tester.pumpAndSettle();
+          expect(find.text('xīng'), findsOneWidget);
+          expect(find.text('hē'), findsOneWidget);
+          expect(find.text('yuè'), findsOneWidget);
+          expect(
+            tester
+                .getRect(
+                  find.byKey(const ValueKey('course-text-paragraph-001')),
+                )
+                .height,
+            greaterThan(plainRect.height),
+          );
+          await tester.tap(find.byTooltip('隐藏拼音'));
+          await tester.pumpAndSettle();
+          expect(find.text('xīng'), findsNothing);
+          expect(find.text('hē'), findsNothing);
+          expect(find.text('yuè'), findsNothing);
+          for (final character in ['星', '𠀀', '，', '月', '。']) {
+            expect(find.text(character), findsOneWidget);
+          }
+          expect(
+            tester.getRect(
+              find.byKey(const ValueKey('course-text-paragraph-001')),
+            ),
+            plainRect,
+          );
         case TextbookContentSection.recognition:
           expect(
             find.byKey(const ValueKey('recognition-card-recognition-001')),
@@ -230,6 +263,10 @@ void main() {
           expect(find.text('　　星𠀀'), findsOneWidget);
           expect(find.text('　　星𠀀，月。'), findsNothing);
       }
+      if (section != TextbookContentSection.reading) {
+        expect(find.byTooltip('显示拼音'), findsNothing);
+        expect(find.byTooltip('隐藏拼音'), findsNothing);
+      }
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     }
@@ -275,6 +312,12 @@ void main() {
         expect(card.left, 16);
         expect(card.right, size.width - 16);
         expect(tester.takeException(), isNull);
+        if (section == TextbookContentSection.reading) {
+          await tester.tap(find.byTooltip('显示拼音'));
+          await tester.pumpAndSettle();
+          expect(find.text('xīng'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
         await tester.pumpWidget(const SizedBox());
       }
     }
@@ -386,6 +429,12 @@ void main() {
       );
       expect(creates, 1);
       expect(disposes, 0);
+      if (section == TextbookContentSection.reading) {
+        expect(find.text('xīng'), findsNothing);
+        await tester.tap(find.byTooltip('显示拼音'));
+        await tester.pumpAndSettle();
+        expect(find.text('xīng'), findsOneWidget);
+      }
       router.pop();
       await tester.pumpAndSettle();
       expect(find.byType(TextbookDetailPage), findsOneWidget);
@@ -393,6 +442,12 @@ void main() {
       expect(creates, 1);
       expect(disposes, 0);
     }
+    await tester.tap(find.widgetWithText(TextButton, '读一读'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('显示拼音'), findsOneWidget);
+    expect(find.text('xīng'), findsNothing);
+    router.pop();
+    await tester.pumpAndSettle();
     tester.view.physicalSize = const Size(800, 280);
     await tester.pumpAndSettle();
     expectCompactActionsBelowPdf();
