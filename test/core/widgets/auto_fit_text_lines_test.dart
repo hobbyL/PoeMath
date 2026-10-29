@@ -60,8 +60,11 @@ void main() {
     );
     final sizes = _fontSizes(tester);
     expect(sizes.first, isNot(20), reason: '最长行超宽时应统一缩小');
-    expect(sizes.every((s) => s == sizes.first), isTrue,
-        reason: '全部行字号必须一致');
+    expect(
+      sizes.every((s) => s == sizes.first),
+      isTrue,
+      reason: '全部行字号必须一致',
+    );
   });
 
   testWidgets('缩到字号下限后统一用下限字号，放不下的行允许换行', (tester) async {

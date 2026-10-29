@@ -228,8 +228,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
           appBar: layout.doublePage
               ? null
               : AppBar(
-                  leadingWidth:
-                      showToc ? SpacingTokens.minTapTarget * 2 : null,
+                  leadingWidth: showToc ? SpacingTokens.minTapTarget * 2 : null,
                   leading: showToc
                       ? Row(
                           children: [
@@ -341,13 +340,8 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
             final pageLabel = pages.length == 2
                 ? '${pages.first}–${pages.last} / ${book.pageCount}'
                 : '$_previewPage / ${book.pageCount}';
-            final canNavigate = available &&
-                !_turning &&
-                _previewVisible &&
-                _goToPage != null;
-            final maxWidth = layout.doublePage
-                ? ResponsiveLayout.wideBreakpoint
-                : ResponsiveLayout.mediumBreakpoint;
+            final canNavigate =
+                available && !_turning && _previewVisible && _goToPage != null;
             final padding = const EdgeInsets.symmetric(
               horizontal: SpacingTokens.xs,
               vertical: SpacingTokens.sm,
@@ -393,9 +387,8 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
               icon: const Icon(Icons.chevron_right),
               label: const Text('下一页', textAlign: TextAlign.center),
             );
-            final onRead = available && !_turning && _previewVisible
-                ? _read
-                : null;
+            final onRead =
+                available && !_turning && _previewVisible ? _read : null;
             final readButton = layout.doublePage
                 ? FilledButton.icon(
                     key: const ValueKey('textbook-detail-read'),
@@ -431,10 +424,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                 SpacingTokens.sm +
                 SpacingTokens.xs * 2;
             glyph.dispose();
-            final controlsWidth = math.min(
-              constraints.maxWidth - SpacingTokens.md * 2,
-              maxWidth,
-            );
+            final controlsWidth = constraints.maxWidth - SpacingTokens.md * 2;
             final wrapRead = controlsWidth <
                 minCell * (layout.doublePage ? 4 : 3) +
                     SpacingTokens.minTapTarget * (layout.doublePage ? 1 : 2) +
@@ -466,37 +456,30 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                 top: SpacingTokens.md,
                 right: SpacingTokens.md,
               ),
-              child: Center(
-                heightFactor: 1,
-                child: ConstrainedBox(
-                  key: const ValueKey('textbook-detail-controls'),
-                  constraints: BoxConstraints(maxWidth: maxWidth),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_saveFailed)
-                        Row(
-                          children: [
-                            const Expanded(child: Text('阅读位置保存失败')),
-                            TextButton(
-                              onPressed: () =>
-                                  _savePreviewPage(book, _previewPage),
-                              child: const Text('重试保存'),
-                            ),
-                          ],
-                        ),
-                      controls,
-                      if (wrapRead) ...[
-                        const SizedBox(height: SpacingTokens.xs),
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: readButton,
+              child: Column(
+                key: const ValueKey('textbook-detail-controls'),
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_saveFailed)
+                    Row(
+                      children: [
+                        const Expanded(child: Text('阅读位置保存失败')),
+                        TextButton(
+                          onPressed: () => _savePreviewPage(book, _previewPage),
+                          child: const Text('重试保存'),
                         ),
                       ],
-                    ],
-                  ),
-                ),
+                    ),
+                  controls,
+                  if (wrapRead) ...[
+                    const SizedBox(height: SpacingTokens.xs),
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: readButton,
+                    ),
+                  ],
+                ],
               ),
             );
           },

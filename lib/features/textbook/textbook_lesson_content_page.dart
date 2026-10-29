@@ -408,6 +408,63 @@ class _TextbookLessonContentPageState
   /// 进入单字书写练习。与 [_openRecognition] 同款防抖 + 路由守卫 +
   /// 先停朗读再导航；写一写无需读取语音识别配置，因此无配置分支。
   Future<void> _openWriting(String lessonId, String targetId) async {
+    await _openWritingRoute(
+      AppRoutes.textbookWritingOf(bookId, lessonId, targetId),
+    );
+  }
+
+  Future<void> _openDictation(List<TextbookCourseLesson> lessons) async {
+    if (_openingWriting || lessons.isEmpty) return;
+    final selection = lessons.length == 1
+        ? Future<String?>.value(lessons.single.id)
+        : showModalBottomSheet<String>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            builder: (sheetContext) => SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(SpacingTokens.md),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '选择听写课文',
+                      style: Theme.of(sheetContext).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    for (final lesson in lessons)
+                      AppTile(
+                        icon: Icons.hearing_outlined,
+                        iconColor: Theme.of(sheetContext).colorScheme.primary,
+                        title: lesson.title,
+                        subtitle: '${lesson.writingCharacters.length} 个会写字',
+                        flat: true,
+                        onTap: () => Navigator.pop(sheetContext, lesson.id),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+    // 弹出课文选择本身也会触发 didPushNext；从弹层已打开的代次开始守卫。
+    final generation = _recognitionNavigationGeneration;
+    final lessonId = await selection;
+    if (!mounted ||
+        _leaving ||
+        _route?.isCurrent == false ||
+        generation != _recognitionNavigationGeneration ||
+        lessonId == null ||
+        !_lessons.any(
+          (lesson) =>
+              lesson.id == lessonId && lesson.writingCharacters.isNotEmpty,
+        )) {
+      return;
+    }
+    await _openWritingRoute(AppRoutes.textbookDictationOf(bookId, lessonId));
+  }
+
+  Future<void> _openWritingRoute(String path) async {
     if (_openingWriting) return;
     _openingWriting = true;
     final generation = _recognitionNavigationGeneration;
@@ -419,9 +476,7 @@ class _TextbookLessonContentPageState
     try {
       await _stop();
       if (!mounted || !canNavigate()) return;
-      await context.push(
-        AppRoutes.textbookWritingOf(bookId, lessonId, targetId),
-      );
+      await context.push(path);
     } finally {
       _openingWriting = false;
     }
@@ -436,6 +491,11 @@ class _TextbookLessonContentPageState
         ? const <TextbookCourseLesson>[]
         : textbookLessonsForPages(pack, pages);
     _lessons = lessons;
+    final dictationLessons = [
+      for (final lesson in lessons)
+        if (lesson.writingCharacters.isNotEmpty) lesson,
+    ];
+    final isWide = MediaQuery.sizeOf(context).width >= 420;
     final title = selected == null
         ? '课文内容'
         : lessons.length == 1
@@ -478,6 +538,25 @@ class _TextbookLessonContentPageState
       appBar: AppBar(
         title: Text(title),
         actions: [
+          if (selected == TextbookContentSection.writing &&
+              dictationLessons.isNotEmpty)
+            if (isWide)
+              TextButton.icon(
+                key: const ValueKey('writing-dictation-entry'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
+                ),
+                onPressed: () => unawaited(_openDictation(dictationLessons)),
+                icon: const Icon(Icons.hearing_outlined),
+                label: const Text('听写'),
+              )
+            else
+              IconButton(
+                key: const ValueKey('writing-dictation-entry'),
+                tooltip: '听写',
+                onPressed: () => unawaited(_openDictation(dictationLessons)),
+                icon: const Icon(Icons.hearing_outlined),
+              ),
           if (selected == TextbookContentSection.reading &&
               lessons.any((lesson) => lesson.paragraphs.isNotEmpty)) ...[
             IconButton(

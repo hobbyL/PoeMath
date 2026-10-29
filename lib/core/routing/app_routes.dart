@@ -38,6 +38,7 @@ class AppRoutes {
   static const String textbookRecognitionCheck =
       '/textbook/recognition/:id/:lesson/check';
   static const String textbookWriting = '/textbook/writing/:id/:lesson';
+  static const String textbookDictation = '/textbook/dictation/:id/:lesson';
   static const String textbookManagement = '/profile/settings/books';
   static const String textbookManageDetail = '/profile/settings/books/:id';
 
@@ -113,6 +114,10 @@ class AppRoutes {
             '/${Uri.encodeComponent(lesson)}',
         queryParameters: {'target': targetId},
       ).toString();
+
+  static String textbookDictationOf(String id, String lesson) =>
+      '/textbook/dictation/${Uri.encodeComponent(id)}'
+      '/${Uri.encodeComponent(lesson)}';
 
   static String textbookContentOf(String id, String section, List<int> pages) =>
       Uri(

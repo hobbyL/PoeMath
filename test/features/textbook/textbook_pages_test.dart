@@ -449,7 +449,8 @@ void main() {
       find.byTooltip('移除本地 PDF'),
       findsNothing,
       reason: '移除入口已移至缓存管理 sheet 的「删除本书」',
-    );    expect(repo.reading('default', book.pdfSha256).page, 2);
+    );
+    expect(repo.reading('default', book.pdfSha256).page, 2);
     expect(repo.reading('other', book.pdfSha256).page, 1);
   });
 
@@ -1041,14 +1042,18 @@ void main() {
       large: true,
     );
     tester.view.physicalSize = const Size(800, 280);
-    tester.view.padding = const FakeViewPadding(top: 24, bottom: 20);
+    tester.view.padding =
+        const FakeViewPadding(top: 24, bottom: 20, left: 24, right: 36);
     addTearDown(tester.view.resetPadding);
     await tester.pumpAndSettle();
     final back = find.byType(BackButton);
     final review = find.widgetWithIcon(IconButton, Icons.fact_check_outlined);
     final backRect = tester.getRect(back);
     final reviewRect = tester.getRect(review);
-    expect(backRect.center, const Offset(SpacingTokens.minTapTarget / 2, 52));
+    expect(
+      backRect.center,
+      const Offset(24 + SpacingTokens.minTapTarget / 2, 52),
+    );
     expect(reviewRect.center.dy, backRect.center.dy);
     final card = find.byKey(const ValueKey('textbook-detail-preview-card'));
     final area = tester.getRect(
@@ -1058,6 +1063,8 @@ void main() {
     final controls = find.byKey(const ValueKey('textbook-detail-controls'));
     final controlsRect = tester.getRect(controls);
     expect(controlsRect.bottom, 280 - 20);
+    expect(controlsRect.left, 24 + SpacingTokens.md);
+    expect(controlsRect.right, 800 - 36 - SpacingTokens.md);
     expect(tester.getRect(card).bottom, lessThan(controlsRect.top));
     await tester.drag(
       find.byType(SingleChildScrollView),
@@ -1117,7 +1124,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('宽屏按展开页翻页，切回窄屏保留当前预览页', (tester) async {
+  testWidgets('宽屏底栏铺满并按展开页翻页，切回窄屏保留当前预览页', (tester) async {
     repo.books[book.pdfSha256] = book;
     TextbookViewerOptions? options;
     var previewTaps = 0;
@@ -1137,6 +1144,9 @@ void main() {
     );
     tester.view.physicalSize = const Size(1000, 700);
     await tester.pumpAndSettle();
+    final controls = find.byKey(const ValueKey('textbook-detail-controls'));
+    expect(tester.getRect(controls).left, SpacingTokens.md);
+    expect(tester.getRect(controls).right, 1000 - SpacingTokens.md);
     expect(options!.doublePage, isTrue);
     expect(find.byType(AppBar), findsNothing);
     final card = tester.getRect(
@@ -1168,6 +1178,8 @@ void main() {
     );
     tester.view.physicalSize = const Size(360, 800);
     await tester.pumpAndSettle();
+    expect(tester.getRect(controls).left, SpacingTokens.md);
+    expect(tester.getRect(controls).right, 360 - SpacingTokens.md);
     expect(options!.doublePage, isFalse);
     expect(options!.initialPage, 2);
     expect(find.byType(AppBar), findsOneWidget);

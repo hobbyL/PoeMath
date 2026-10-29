@@ -91,9 +91,77 @@ List<String> _courseDisplayLines(TextbookCourseParagraph node) {
 }
 
 typedef _DisplayCell = ({String text, int rawIndex, int pinyinIndex});
-final _coursePunctuationChars = RegExp(r'^[，。！？；：、…“”‘’（）《》〈〉【】]$');
+const _courseOpeningPunctuationChars = {
+  '“',
+  '‘',
+  '（',
+  '《',
+  '〈',
+  '【',
+  '「',
+  '『',
+  '〔',
+  '〖',
+  '［',
+  '｛',
+  '(',
+  '[',
+  '{',
+};
+const _courseClosingPunctuationChars = {
+  '，',
+  '。',
+  '！',
+  '？',
+  '；',
+  '：',
+  '、',
+  '…',
+  '”',
+  '’',
+  '）',
+  '》',
+  '〉',
+  '】',
+  '」',
+  '』',
+  '〕',
+  '〗',
+  '］',
+  '｝',
+  '％',
+  ',',
+  '.',
+  '!',
+  '?',
+  ';',
+  ':',
+  ')',
+  ']',
+  '}',
+  '%',
+};
+const _courseNeutralPunctuationChars = {
+  '—',
+  '–',
+  '-',
+  '〜',
+  '～',
+  '·',
+  '・',
+  '/',
+  '@',
+  '"',
+  "'",
+};
 bool _isPunctuation(String text) =>
-    text.length == 1 && _coursePunctuationChars.hasMatch(text);
+    _isOpeningPunctuation(text) ||
+    _isClosingPunctuation(text) ||
+    _courseNeutralPunctuationChars.contains(text);
+bool _isOpeningPunctuation(String text) =>
+    _courseOpeningPunctuationChars.contains(text);
+bool _isClosingPunctuation(String text) =>
+    _courseClosingPunctuationChars.contains(text);
 List<List<_DisplayCell>> _courseDisplayCells(TextbookCourseParagraph node) {
   final result = <List<_DisplayCell>>[];
   var rawIndex = 0;
@@ -115,6 +183,102 @@ List<List<_DisplayCell>> _courseDisplayCells(TextbookCourseParagraph node) {
     result.add(cells);
   }
   return result;
+}
+
+final _courseWordCharacter = RegExp(r'^[a-zA-Z0-9_\u00c0-\u024f]$');
+const _courseAsciiWordSeparators = {
+  ',',
+  '.',
+  '!',
+  '?',
+  ';',
+  ':',
+  ')',
+  ']',
+  '}',
+};
+
+List<_DisplayCell> _courseReadingCells(TextbookCourseParagraph node) {
+  final result = <_DisplayCell>[];
+  final whitespace = <_DisplayCell>[];
+  var pinyinIndex = 0;
+  // 先按原始 Unicode 码点计数，再处理展示空白，朗读与注音索引不能重排。
+  for (final (rawIndex, rune) in node.text.runes.indexed) {
+    final text = String.fromCharCode(rune);
+    final cell = (text: text, rawIndex: rawIndex, pinyinIndex: pinyinIndex);
+    if (text.trim().isEmpty) {
+      if (result.isEmpty && (text == '\n' || text == '\r')) {
+        whitespace.clear();
+      } else {
+        whitespace.add(cell);
+      }
+      continue;
+    }
+    pinyinIndex++;
+    if (result.isEmpty) {
+      // 只保留实际段首缩进，PDF 续行缩进不应占据段内字格。
+      result.addAll(whitespace);
+    } else if (whitespace.isNotEmpty &&
+        (_courseWordCharacter.hasMatch(result.last.text) ||
+            _courseWordCharacter.hasMatch(text) ||
+            _courseAsciiWordSeparators.contains(result.last.text)) &&
+        !_isOpeningPunctuation(result.last.text) &&
+        !_isClosingPunctuation(text)) {
+      // 英文词间及中英混排的语义空白折为一个，换行也能分隔英文单词。
+      result.add(
+        (
+          text: ' ',
+          rawIndex: whitespace.first.rawIndex,
+          pinyinIndex: whitespace.first.pinyinIndex,
+        ),
+      );
+    }
+    whitespace.clear();
+    result.add(cell);
+  }
+  return result;
+}
+
+List<List<_DisplayCell>> _courseReadingGroups(List<_DisplayCell> cells) {
+  final groups = <List<_DisplayCell>>[];
+  var bindNext = false;
+  var hasText = false;
+  final openQuotes = <String>{};
+  for (final (index, cell) in cells.indexed) {
+    final text = cell.text;
+    if (text.trim().isEmpty && bindNext && hasText) continue;
+    var opening = _isOpeningPunctuation(text);
+    var closing = _isClosingPunctuation(text);
+    final apostrophe = text == "'" &&
+        index > 0 &&
+        index + 1 < cells.length &&
+        _courseWordCharacter.hasMatch(cells[index - 1].text) &&
+        _courseWordCharacter.hasMatch(cells[index + 1].text);
+    if (!apostrophe && (text == '"' || text == "'")) {
+      closing = openQuotes.remove(text) ||
+          (index > 0 && _courseWordCharacter.hasMatch(cells[index - 1].text));
+      opening = !closing;
+      if (opening) openQuotes.add(text);
+    }
+    final repeatedDash =
+        text == '—' && index > 0 && cells[index - 1].text == text;
+    if (closing && groups.isNotEmpty) {
+      while (groups.last.isNotEmpty && groups.last.last.text.trim().isEmpty) {
+        groups.last.removeLast();
+      }
+      if (groups.last.isEmpty) groups.removeLast();
+    }
+    if (groups.isNotEmpty &&
+        (bindNext || closing || apostrophe || repeatedDash)) {
+      groups.last.add(cell);
+    } else {
+      groups.add([cell]);
+    }
+    if (text.trim().isEmpty && bindNext) continue;
+    hasText = hasText || text.trim().isNotEmpty;
+    bindNext = opening || apostrophe || !hasText;
+  }
+  return groups;
 }
 
 class _CourseTextMetrics {
@@ -141,7 +305,7 @@ class _CourseTextMetrics {
     final characterStyle = theme.textTheme.titleSmall ?? fallback;
     try {
       final pinyinTokens = <String>{if (showPinyin) 'Āg'};
-      final characters = <String>{'国'};
+      final characters = <String>{'国', ' '};
       for (final node in nodes) {
         final pinyin =
             showPinyin ? textbookCoursePinyinForReview(node) : const <String>[];
@@ -165,8 +329,14 @@ class _CourseTextMetrics {
         if (width > cellWidth) cellWidth = width;
       }
       for (final character in characters) {
-        final width =
-            measure(character, characterStyle).width + SpacingTokens.sm;
+        final glyphWidth = measure(character, characterStyle).width;
+        final highlightedWidth = measure(
+          character,
+          characterStyle.copyWith(fontWeight: FontWeight.w700),
+        ).width;
+        glyphWidths[character] =
+            glyphWidth > highlightedWidth ? glyphWidth : highlightedWidth;
+        final width = glyphWidth + SpacingTokens.sm;
         charWidths[character] = width;
         if (width > cellWidth) cellWidth = width;
       }
@@ -179,6 +349,7 @@ class _CourseTextMetrics {
   final columnsByNode = <TextbookCourseParagraph, int>{};
   final pinyinWidths = <String, double>{};
   final charWidths = <String, double>{};
+  final glyphWidths = <String, double>{};
   double cellWidth = 0;
   double pinyinLineHeight = 0;
   int columns = 1;
@@ -314,45 +485,111 @@ class TextbookCourseText extends StatelessWidget {
                 ),
         );
 
-    // 自动换行视图（读一读）：段内合并 PDF 物理折行，连续排布由屏宽
-    // 自动换行；标点与前字合成一组避免标点起行。非换行视图（审核页
-    // 对照原书）保持逐行 Row + 横向滚动。
+    // 阅读视图统一按实际宽度装行。标点只占字形宽度；普通字保留注音
+    // 字格。相邻禁断组是最小单位，不把整段引语或 PDF 原行绑定在一起。
+    // 审核视图仍保留原书逐行 Row + 横向滚动。
     final content = _wrap
-        ? () {
-            final cells = [for (final line in lines) ...line];
-
-            final groups = <List<_DisplayCell>>[];
-            for (final cell in cells) {
-              if (_isPunctuation(cell.text) && groups.isNotEmpty) {
-                groups.last.add(cell);
-              } else {
-                groups.add([cell]);
+        ? LayoutBuilder(
+            builder: (context, constraints) {
+              final cells = _courseReadingCells(node);
+              if (cells.isEmpty) return const SizedBox.shrink();
+              final groups = _courseReadingGroups(cells);
+              final cellWidth = [
+                metrics.charWidths['国']!,
+                for (final cell in cells)
+                  if (cell.text.trim().isNotEmpty &&
+                      !_isPunctuation(cell.text)) ...[
+                    metrics.tokenWidth(
+                      cell.text,
+                      showPinyin ? pinyin[cell.pinyinIndex] : '',
+                    ),
+                    metrics.glyphWidths[cell.text]! + SpacingTokens.sm,
+                  ],
+              ].reduce((a, b) => a > b ? a : b);
+              final firstTextIndex = cells
+                  .firstWhere((cell) => cell.text.trim().isNotEmpty)
+                  .rawIndex;
+              double widthOf(_DisplayCell cell) {
+                if (_isPunctuation(cell.text)) {
+                  return metrics.glyphWidths[cell.text]!;
+                }
+                if (cell.text.trim().isEmpty) {
+                  return cell.rawIndex < firstTextIndex
+                      ? metrics.charWidths[cell.text]!
+                      : metrics.glyphWidths[' ']!;
+                }
+                return cellWidth;
               }
-            }
-            final cellWidth = [
-              for (final cell in cells)
-                if (cell.text.trim().isNotEmpty)
-                  metrics.tokenWidth(
-                    cell.text,
-                    showPinyin ? pinyin[cell.pinyinIndex] : '',
-                  ),
-            ].reduce((a, b) => a > b ? a : b);
-            return Wrap(
-              key: ValueKey('${node.id}-flow'),
-              alignment: WrapAlignment.start,
-              runSpacing: SpacingTokens.sm,
-              children: [
-                for (final group in groups)
-                  Row(
+
+              final rows = <List<_DisplayCell>>[];
+              final rowWidths = <double>[];
+              var row = <_DisplayCell>[];
+              var rowWidth = 0.0;
+              _DisplayCell? pendingSpace;
+              void finishRow() {
+                rows.add(row);
+                rowWidths.add(rowWidth);
+                row = [];
+                rowWidth = 0;
+              }
+
+              for (final group in groups) {
+                if (group.length == 1 && group.single.text.trim().isEmpty) {
+                  pendingSpace = group.single;
+                  continue;
+                }
+                final groupWidth = group.fold<double>(
+                  0,
+                  (width, cell) => width + widthOf(cell),
+                );
+                final spaceWidth =
+                    pendingSpace == null ? 0.0 : widthOf(pendingSpace);
+                if (row.isNotEmpty &&
+                    rowWidth + spaceWidth + groupWidth > constraints.maxWidth) {
+                  finishRow();
+                }
+                // 行尾/行首不保留分词空格，避免空白本身触发提前换行。
+                if (row.isNotEmpty && pendingSpace != null) {
+                  row.add(pendingSpace);
+                  rowWidth += spaceWidth;
+                }
+                pendingSpace = null;
+                row.addAll(group);
+                rowWidth += groupWidth;
+              }
+              if (row.isNotEmpty) finishRow();
+
+              Widget rowBox(List<_DisplayCell> cells) => Row(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      for (final cell in group) cellBox(cell, cellWidth),
+                      for (final cell in cells) cellBox(cell, widthOf(cell)),
                     ],
-                  ),
-              ],
-            );
-          }()
+                  );
+
+              return SizedBox(
+                key: ValueKey('${node.id}-flow'),
+                width:
+                    constraints.hasBoundedWidth ? constraints.maxWidth : null,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final (index, row) in rows.indexed) ...[
+                      if (index > 0) const SizedBox(height: SpacingTokens.sm),
+                      if (rowWidths[index] > constraints.maxWidth)
+                        _CourseTextViewport(
+                          width: rowWidths[index],
+                          child: rowBox(row),
+                        )
+                      else
+                        rowBox(row),
+                    ],
+                  ],
+                ),
+              );
+            },
+          )
         : Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

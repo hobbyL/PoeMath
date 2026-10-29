@@ -867,7 +867,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('宽屏课目子页铺满安全区，范围核对从导航栏进入', (tester) async {
+  testWidgets('宽屏课程总览和课目子页铺满安全区，范围核对从导航栏进入', (tester) async {
     const size = Size(1100, 620);
     const insets = EdgeInsets.only(left: 24, right: 12);
     final data = courseFixture();
@@ -891,6 +891,17 @@ void main() {
       TextbookCourseReviewPage(bookId: book.pdfSha256),
       size: size,
     );
+    void expectFullWidth(Finder finder) {
+      final rect = tester.getRect(finder);
+      expect(rect.left, closeTo(insets.left + SpacingTokens.md, 0.1));
+      expect(
+        rect.right,
+        closeTo(size.width - insets.right - SpacingTokens.md, 0.1),
+      );
+    }
+
+    expectFullWidth(find.byKey(const ValueKey('course-unit-unit-001')));
+    expectFullWidth(find.byKey(const ValueKey('course-lesson-lesson-001')));
     await tap(tester, find.byKey(const ValueKey('course-lesson-lesson-001')));
     expect(find.text('课目信息与审核'), findsNothing);
     expect(find.text('核对内容范围'), findsNothing);
@@ -903,15 +914,6 @@ void main() {
     expect(buttonRect.center.dx, greaterThan(size.width / 2));
     expect(buttonRect.width, greaterThanOrEqualTo(SpacingTokens.minTapTarget));
     expect(buttonRect.height, greaterThanOrEqualTo(SpacingTokens.minTapTarget));
-
-    void expectFullWidth(Finder finder) {
-      final rect = tester.getRect(finder);
-      expect(rect.left, closeTo(insets.left + SpacingTokens.md, 0.1));
-      expect(
-        rect.right,
-        closeTo(size.width - insets.right - SpacingTokens.md, 0.1),
-      );
-    }
 
     expectFullWidth(find.widgetWithText(AppTile, '原书范围与待整理内容'));
     final paragraphRow = find.byKey(const ValueKey('course-target-paragraphs'));

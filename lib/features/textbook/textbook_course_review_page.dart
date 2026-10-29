@@ -461,80 +461,76 @@ class _TextbookCourseReviewPageState
   Widget _content(Textbook book, TextbookCoursePack pack) {
     final theme = Theme.of(context);
     final nodes = pack.nodes.toList();
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900),
-        child: ListView(
-          padding: const EdgeInsets.all(SpacingTokens.md),
-          children: [
-            Text(pack.edition.title, style: theme.textTheme.headlineSmall),
-            const SizedBox(height: SpacingTokens.sm),
-            Text(
-              '${pack.edition.editionLabel} · ${nodes.where((node) => node.isApproved).length}/${nodes.length} 项已通过',
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            _generationStatus(book),
-            for (final unit in pack.units) ...[
-              const Divider(height: SpacingTokens.xl),
-              Wrap(
-                key: ValueKey('course-unit-${unit.id}'),
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: SpacingTokens.md,
-                children: [
-                  Text(unit.title, style: theme.textTheme.titleMedium),
-                  TextButton.icon(
-                    onPressed: () => _open(book, pack, nodeId: unit.id),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(0, SpacingTokens.minTapTarget),
-                      padding: const EdgeInsetsDirectional.only(
-                        start: SpacingTokens.sm,
-                      ),
-                      iconSize: SpacingTokens.lg,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    iconAlignment: IconAlignment.end,
-                    icon: const Icon(Icons.chevron_right),
-                    label: Text(
-                      '单元审核 · ${textbookCourseReviewLabel(unit)}',
-                    ),
-                  ),
-                ],
-              ),
-              for (final id in unit.lessonIds)
-                Builder(
-                  builder: (context) {
-                    final lesson =
-                        pack.lessons.firstWhere((lesson) => lesson.id == id);
-                    return AppTile(
-                      key: ValueKey('course-lesson-$id'),
-                      flat: true,
-                      flatTrailingEdgeAligned: true,
-                      iconColor: theme.colorScheme.primary,
-                      title:
-                          '${lesson.lessonNumber == null ? '' : '${lesson.lessonNumber} · '}${lesson.title}',
-                      subtitle:
-                          '${lesson.targets.where((node) => node.isApproved).length}/${lesson.targets.length} 项内容已通过',
-                      trailingText: textbookCourseReviewLabel(lesson),
-                      onTap: () => _open(book, pack, lessonId: id),
-                    );
-                  },
-                ),
-            ],
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        children: [
+          Text(pack.edition.title, style: theme.textTheme.headlineSmall),
+          const SizedBox(height: SpacingTokens.sm),
+          Text(
+            '${pack.edition.editionLabel} · ${nodes.where((node) => node.isApproved).length}/${nodes.length} 项已通过',
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          _generationStatus(book),
+          for (final unit in pack.units) ...[
             const Divider(height: SpacingTokens.xl),
-            AppTile(
-              flat: true,
-              flatTrailingEdgeAligned: true,
-              iconColor: theme.colorScheme.primary,
-              title: '整包核对',
-              subtitle: pack.isPublishable
-                  ? '已满足发布条件'
-                  : '还有 ${pack.publicationIssues.length} 项发布条件待处理',
-              onTap: () => _open(book, pack, nodeId: '@pack'),
+            Wrap(
+              key: ValueKey('course-unit-${unit.id}'),
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: SpacingTokens.md,
+              children: [
+                Text(unit.title, style: theme.textTheme.titleMedium),
+                TextButton.icon(
+                  onPressed: () => _open(book, pack, nodeId: unit.id),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, SpacingTokens.minTapTarget),
+                    padding: const EdgeInsetsDirectional.only(
+                      start: SpacingTokens.sm,
+                    ),
+                    iconSize: SpacingTokens.lg,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  iconAlignment: IconAlignment.end,
+                  icon: const Icon(Icons.chevron_right),
+                  label: Text(
+                    '单元审核 · ${textbookCourseReviewLabel(unit)}',
+                  ),
+                ),
+              ],
             ),
+            for (final id in unit.lessonIds)
+              Builder(
+                builder: (context) {
+                  final lesson =
+                      pack.lessons.firstWhere((lesson) => lesson.id == id);
+                  return AppTile(
+                    key: ValueKey('course-lesson-$id'),
+                    flat: true,
+                    flatTrailingEdgeAligned: true,
+                    iconColor: theme.colorScheme.primary,
+                    title:
+                        '${lesson.lessonNumber == null ? '' : '${lesson.lessonNumber} · '}${lesson.title}',
+                    subtitle:
+                        '${lesson.targets.where((node) => node.isApproved).length}/${lesson.targets.length} 项内容已通过',
+                    trailingText: textbookCourseReviewLabel(lesson),
+                    onTap: () => _open(book, pack, lessonId: id),
+                  );
+                },
+              ),
           ],
-        ),
+          const Divider(height: SpacingTokens.xl),
+          AppTile(
+            flat: true,
+            flatTrailingEdgeAligned: true,
+            iconColor: theme.colorScheme.primary,
+            title: '整包核对',
+            subtitle: pack.isPublishable
+                ? '已满足发布条件'
+                : '还有 ${pack.publicationIssues.length} 项发布条件待处理',
+            onTap: () => _open(book, pack, nodeId: '@pack'),
+          ),
+        ],
       ),
     );
   }
