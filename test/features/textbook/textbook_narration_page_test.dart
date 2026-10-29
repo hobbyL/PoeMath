@@ -216,6 +216,14 @@ void main() {
     }
     await tester.pump(const Duration(milliseconds: 250));
     expect(find.text('第二课'), findsOneWidget);
+    // ensureVisible 滚动动画需要时间完成；长段落合并后滚动距离更长。
+    for (var i = 0;
+        i < 30 && !tester
+            .getRect(find.text('月'))
+            .overlaps(tester.getRect(find.byType(Scaffold)));
+        i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     final current = tester
         .widgetList<TextbookCourseParagraphsContent>(
             find.byType(TextbookCourseParagraphsContent),)

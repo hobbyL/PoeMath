@@ -185,6 +185,43 @@ void main() {
     expect(body.lesson['exercises'], isEmpty);
   });
 
+  test('拼音字体大写编码在生成时还原为带调注音', () {
+    final base = layoutFixturePage(2, ['星月测试', '星月']);
+    final glyphs = <TextbookPageGlyph>[...base.glyphs];
+    final text = StringBuffer(base.text);
+    var index = base.text.runes.length;
+    for (final han in base.glyphs.where((g) => g.top > .2)) {
+      final hint = han.text == '星' ? 'xUng' : 'yuF';
+      for (final (i, rune) in hint.runes.indexed) {
+        text.writeCharCode(rune);
+        glyphs.add(
+          TextbookPageGlyph(
+            text: String.fromCharCode(rune),
+            index: index++,
+            left: han.left + i * .006,
+            top: han.top - .02,
+            right: han.left + (i + 1) * .006,
+            bottom: han.top - .006,
+          ),
+        );
+      }
+    }
+    final parsed = parser.parse(lesson, plan, [
+      TextbookPageText(
+        page: 2,
+        text: text.toString(),
+        width: 600,
+        height: 800,
+        glyphs: glyphs,
+      ),
+    ]);
+    expect(
+      (parsed.lesson['paragraphs'] as List).single['pinyin'],
+      ['xīng', 'yuè'],
+    );
+    expect(parsed.candidates, isEmpty);
+  });
+
   test('隐藏页外文字、已定位生字条和成对写字格不混入正文或习题', () {
     final base = layoutFixturePage(
       2,
@@ -408,5 +445,58 @@ void main() {
       2,
     );
     expect((parsed.lesson['recitations'] as List).length, 1);
+  });
+
+  test('段落首行保留原书缩进，续行折行不保留行首空白', () {
+    // 原书缩进只存在于几何坐标：段首行 left 比正文左边界外扩约两字宽。
+    final base = layoutFixturePage(2, [
+      '星月测试',
+      '星月明，山河亮。',
+      '星月山河都明亮。',
+      '另一段开始了。',
+    ]);
+    final indentedGlyphs = <TextbookPageGlyph>[];
+    var index = 0;
+    for (final (lineIndex, line) in [
+      '星月测试',
+      '星月明，山河亮。',
+      '星月山河都明亮。',
+      '另一段开始了。',
+    ].indexed) {
+      // 第 1、3 行（正文段落首行）外扩 0.06（约两字宽）。
+      final x = lineIndex == 1 || lineIndex == 3 ? .16 : .1;
+      var cursor = x;
+      for (final rune in line.runes) {
+        indentedGlyphs.add(
+          TextbookPageGlyph(
+            text: String.fromCharCode(rune),
+            index: index++,
+            left: cursor,
+            top: .1 + lineIndex * .15,
+            right: cursor + .025,
+            bottom: .13 + lineIndex * .15,
+          ),
+        );
+        cursor += .03;
+      }
+      index++;
+    }
+    final parsed = parser.parse(
+      lesson,
+      plan,
+      [
+        TextbookPageText(
+          page: 2,
+          text: base.text,
+          width: 600,
+          height: 800,
+          glyphs: indentedGlyphs,
+        ),
+      ],
+    );
+    final paragraphs = parsed.lesson['paragraphs'] as List;
+    expect(paragraphs.length, 2, reason: '几何缩进开启新段落');
+    expect(paragraphs[0]['text'], '　　星月明，山河亮。\n星月山河都明亮。');
+    expect(paragraphs[1]['text'], '　　另一段开始了。');
   });
 }

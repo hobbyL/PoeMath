@@ -745,9 +745,10 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(TextbookCourseText),
-        matching: find.byType(Wrap),
+        matching: find.byType(SingleChildScrollView),
       ),
       findsNothing,
+      reason: '段落视图按屏宽自动换行，不再横向滚动',
     );
     expect(
       find.byType(PopupMenuButton<String>),
@@ -1095,8 +1096,9 @@ void main() {
       closeTo(3 * cellWidth, 0.1),
     );
     expect(
-      tester.getRect(character('乙')).center.dx,
-      closeTo(tester.getRect(find.text('yǐ')).center.dx, 0.1),
+      tester.getRect(find.text('yǐ')).left,
+      closeTo(tester.getRect(character('乙')).left, 0.1),
+      reason: '格内拼音与汉字左对齐',
     );
     expect(find.byKey(const ValueKey('course-text-line-3')), findsOneWidget);
     expect(find.byKey(const ValueKey('course-text-line-4')), findsNothing);
@@ -1184,7 +1186,8 @@ void main() {
     expect(
       tester.getRect(paragraphContents.at(1)).top -
           tester.getRect(paragraphContents.at(0)).bottom,
-      closeTo(SpacingTokens.md, 0.1),
+      closeTo(SpacingTokens.lg, 0.1),
+      reason: '段与段之间用更大间距区分分段',
     );
     expect(
       tester.getRect(find.text('星')).left,
@@ -1363,7 +1366,55 @@ void main() {
   });
 
   for (final large in [false, true]) {
-    testWidgets('正文首行缩进两格，拼音不重叠，长行可横向查看（大字=$large）', (tester) async {
+    testWidgets('阅读视图段内合并折行自动换行，段首缩进保留（大字=$large）', (tester) async {
+      final data = courseFixture();
+      final lesson =
+          (data['lessons'] as List<dynamic>).single as Map<String, dynamic>;
+      final paragraph = (lesson['paragraphs'] as List<dynamic>).single
+          as Map<String, dynamic>;
+      // 模拟解析层输出：段首两个全角空格 + PDF 折行。
+      paragraph
+        ..['text'] = '　　霜风吹夏雨落，秋霜降冬雪飘。\n春水清。'
+        ..['pinyin'] = null;
+      lesson['recitations'] = <Object?>[];
+      (lesson['coverage'] as Map<String, dynamic>)['recitations'] =
+          TextbookCoverage.notApplicable.name;
+      final node =
+          TextbookCoursePack.fromJson(data).lessons.single.paragraphs.single;
+
+      await pump(
+        tester,
+        Scaffold(
+          body: SizedBox(
+            width: 640,
+            child: TextbookCourseParagraphsContent(paragraphs: [node]),
+          ),
+        ),
+        size: const Size(680, 900),
+        large: large,
+      );
+
+      // 段内合并：没有逐行 key，只有整段 Wrap。
+      expect(find.byKey(const ValueKey('course-text-line-0')), findsNothing);
+      final flow = find.byKey(const ValueKey('paragraph-001-flow'));
+      expect(flow, findsOneWidget);
+      // 段首缩进：首字「霜」前有两个空白格占位。
+      expect(
+        tester.getRect(find.text('霜').first).left,
+        greaterThan(tester.getRect(flow).left),
+        reason: '段首两个全角空格渲染为缩进',
+      );
+      // 首行第二个字「风」紧跟首字，同一文本流连续排布。
+      expect(
+        tester.getRect(find.text('霜').first).center.dy,
+        closeTo(tester.getRect(find.text('风')).center.dy, 0.1),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final large in [false, true]) {
+    testWidgets('正文行按原书内容左对齐排版，拼音不重叠，长行可横向查看（大字=$large）', (tester) async {
       final data = courseFixture();
       final lesson =
           (data['lessons'] as List<dynamic>).single as Map<String, dynamic>;
@@ -1413,13 +1464,8 @@ void main() {
       );
       expect(
         tester.getRect(find.text('霜').first).left,
-        closeTo(
-          tester.getRect(find.text('春')).left +
-              2 *
-                  (tester.getRect(find.text('水')).left -
-                      tester.getRect(find.text('春')).left),
-          0.1,
-        ),
+        greaterThan(tester.getRect(find.text('春')).left),
+        reason: '原文自带三格全角空白保留为缩进，不再注入额外两格',
       );
       expect(
         tester.getRect(find.text('保')).left,
@@ -1427,7 +1473,8 @@ void main() {
       );
       expect(
         tester.getRect(find.text('shuāng').first).left,
-        lessThan(tester.getRect(find.text('霜').first).left),
+        closeTo(tester.getRect(find.text('霜').first).left, 0.1),
+        reason: '格内拼音与汉字左对齐',
       );
       final pinyinInFirstLine = find.descendant(
         of: find.byKey(const ValueKey('course-text-line-0')),
@@ -1468,7 +1515,7 @@ void main() {
         tester.getRect(find.text('飘')).right,
         greaterThan(tester.getRect(viewport).right),
       );
-      await tester.drag(viewport, const Offset(-2000, 0));
+      await tester.drag(viewport, const Offset(-5000, 0));
       await tester.pumpAndSettle();
       expect(
         tester.getRect(find.text('飘')).right,

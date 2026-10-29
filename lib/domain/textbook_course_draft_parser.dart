@@ -6,6 +6,7 @@ import 'package:poemath/data/models/textbook_course_draft.dart';
 import 'package:poemath/data/models/textbook_course_review.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
+import 'package:poemath/domain/textbook_pinyin_font.dart';
 
 class TextbookParsedLesson {
   const TextbookParsedLesson(this.lesson, this.candidates);
@@ -376,8 +377,12 @@ class TextbookCourseDraftParser {
         final width = row.glyphs.map((g) => g.width).reduce((a, b) => a + b) /
             row.glyphs.length;
         final gap = prior == null ? 0 : row.top - prior.bottom;
+        // 原书段首缩进只存在于几何坐标（空白字形不进行数据），这里按
+        // 相对正文左边界的外扩量识别首行缩进段落。
+        final geometricIndent = row.left - margin > width * 1.5;
         final newParagraph = prior == null ||
             row.hasParagraphIndent ||
+            geometricIndent ||
             (row.left - margin > width * 2.5 &&
                 row.left - prior.left > width * 1.5 &&
                 RegExp(r'[。！？…][”」』）]?$').hasMatch(prior.text.trim())) ||
@@ -386,7 +391,14 @@ class TextbookCourseDraftParser {
         groups.last.add(row);
       }
       for (final group in groups) {
-        final text = group.map((r) => r.text.trim()).join('\n');
+        // 段首缩进还原为两个全角空格，供阅读视图保留原书版式；
+        // 续行折行的行首空白不保留。
+        final first = group.first;
+        final firstIndent = first.left - margin > first.width * 1.5;
+        final text = [
+          firstIndent ? '　　${first.text.trim()}' : first.text.trim(),
+          for (final row in group.skip(1)) row.text.trim(),
+        ].join('\n');
         final id =
             '${plan.id}-p-${group.first.page}-${group.first.glyphs.first.index}';
         final tokens = <String>[];
@@ -399,10 +411,18 @@ class TextbookCourseDraftParser {
               tokens.add(glyph.text);
               continue;
             }
-            final hint = _pinyin(glyph, row, pages);
-            if (hint == null || !_validPinyin(hint)) complete = false;
-            tokens.add(hint ?? '');
-            if (hint != null) hints.add('${glyph.text}: $hint');
+            final rawHint = _pinyin(glyph, row, pages);
+            final hint =
+                rawHint == null ? null : decodeTextbookPinyinFont(rawHint);
+            final valid = hint != null && isTextbookPinyin(hint);
+            if (!valid) complete = false;
+            tokens.add(valid ? hint : '');
+            if (!valid) {
+              // 只把真正待补齐的字放进候选；有效注音不再重复铺满卡片。
+              hints.add(
+                '${glyph.text}: ${rawHint == null ? '未找到注音' : hint ?? '字体编码待核对'}',
+              );
+            }
           }
         }
         final node = {
@@ -691,8 +711,6 @@ class TextbookCourseDraftParser {
                 actual.length <= expected.length + 2);
   }
 
-  bool _validPinyin(String text) =>
-      RegExp(r'^[a-züāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜêńňǹḿ]+[1-5]?$').hasMatch(text);
   String? _pinyin(
     TextbookPageGlyph han,
     _Line line,
@@ -1016,6 +1034,8 @@ class _Line {
   double get center => (top + bottom) / 2;
   double get height => bottom - top;
   double get left => glyphs.first.left;
+  double get width => glyphs.map((g) => g.width).reduce((a, b) => a + b) /
+      glyphs.length;
   String get text {
     final out = StringBuffer();
     TextbookPageGlyph? prior;

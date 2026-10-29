@@ -78,7 +78,8 @@ final _coursePunctuationSpaces = RegExp(
 
 List<String> _courseDisplayLines(TextbookCourseParagraph node) {
   // 抽取产生的标点后空白不占字格；换行和英文词间空格保留。
-  final lines = node.text
+  // 缩进保留 PDF 原文，不额外注入首行缩进（用户要求左对齐）。
+  return node.text
       .split('\n')
       .map(
         (line) => line.replaceAllMapped(
@@ -87,41 +88,31 @@ List<String> _courseDisplayLines(TextbookCourseParagraph node) {
         ),
       )
       .toList();
-  if (node is! TextbookCourseVocabulary) {
-    // 仅规范显示缩进，不改写原文、拼音位置或背诵范围。
-    lines[0] = '　　${lines[0].trimLeft()}';
-  }
-  return lines;
 }
 
 typedef _DisplayCell = ({String text, int rawIndex, int pinyinIndex});
+final _coursePunctuationChars =
+    RegExp(r'^[，。！？；：、…“”‘’（）《》〈〉【】]$');
+bool _isPunctuation(String text) =>
+    text.length == 1 && _coursePunctuationChars.hasMatch(text);
 List<List<_DisplayCell>> _courseDisplayCells(TextbookCourseParagraph node) {
   final result = <List<_DisplayCell>>[];
   var rawIndex = 0;
   var pinyinIndex = 0;
   final punctuation = RegExp(r'[，。！？；：、…“”‘’（）《》〈〉【】]');
-  for (final (lineIndex, line) in node.text.split('\n').indexed) {
+  for (final line in node.text.split('\n')) {
     final cells = <_DisplayCell>[];
     var afterPunctuation = false;
-    var leading = lineIndex == 0 && node is! TextbookCourseVocabulary;
     for (final rune in line.runes) {
       final text = String.fromCharCode(rune);
       final whitespace = text.trim().isEmpty;
       final cell = (text: text, rawIndex: rawIndex++, pinyinIndex: pinyinIndex);
       if (!whitespace) pinyinIndex++;
-      if (leading && whitespace) continue;
-      leading = false;
       if (afterPunctuation && {' ', '\t', '　'}.contains(text)) continue;
       afterPunctuation = punctuation.hasMatch(text);
       cells.add(cell);
     }
     rawIndex++; // 原始换行也占一个 rune，不占注音 token。
-    if (lineIndex == 0 && node is! TextbookCourseVocabulary) {
-      cells.insertAll(0, [
-        (text: '　', rawIndex: -1, pinyinIndex: -1),
-        (text: '　', rawIndex: -1, pinyinIndex: -1),
-      ]);
-    }
     result.add(cells);
   }
   return result;
@@ -169,11 +160,13 @@ class _CourseTextMetrics {
         final size = measure(token, pinyinStyle);
         if (size.height > pinyinLineHeight) pinyinLineHeight = size.height;
         final width = size.width + SpacingTokens.xs;
+        pinyinWidths[token] = width;
         if (width > cellWidth) cellWidth = width;
       }
       for (final character in characters) {
         final width =
             measure(character, characterStyle).width + SpacingTokens.sm;
+        charWidths[character] = width;
         if (width > cellWidth) cellWidth = width;
       }
     } finally {
@@ -183,10 +176,23 @@ class _CourseTextMetrics {
 
   final pinyinByNode = <TextbookCourseParagraph, List<String>>{};
   final columnsByNode = <TextbookCourseParagraph, int>{};
+  final pinyinWidths = <String, double>{};
+  final charWidths = <String, double>{};
   double cellWidth = 0;
   double pinyinLineHeight = 0;
   int columns = 1;
   double get width => cellWidth * columns;
+
+  /// 单个字格宽度：取该字与其注音中较宽的一方。
+  /// 自动换行视图按行取最大格宽，短拼音行不再被全段最宽拼音撑开。
+  double tokenWidth(String character, String pinyin) {
+    final pw = pinyinWidths[pinyin];
+    final cw = charWidths[character];
+    if (pw == null && cw == null) return cellWidth;
+    if (pw == null) return cw!;
+    if (cw == null) return pw;
+    return pw > cw ? pw : cw;
+  }
 }
 
 class _CourseTextViewport extends StatelessWidget {
@@ -255,6 +261,7 @@ class TextbookCourseText extends StatelessWidget {
       return Text(
         cell.text,
         key: key ?? ValueKey('narration-character-${node.id}-${cell.rawIndex}'),
+        textAlign: TextAlign.left,
         style: theme.textTheme.titleSmall?.copyWith(
           backgroundColor:
               highlighted ? theme.colorScheme.primaryContainer : null,
@@ -264,66 +271,92 @@ class TextbookCourseText extends StatelessWidget {
       );
     }
 
-    Widget buildLine(int lineIndex, List<_DisplayCell> line) {
-      final cells = [
-        for (final cell in line)
-          SizedBox(
-            width: metrics.cellWidth,
-            child: cell.text.trim().isEmpty
-                ? const SizedBox.shrink()
-                : Semantics(
-                    label: '${cell.text} ${pinyin[cell.pinyinIndex]}',
-                    excludeSemantics: true,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          height: metrics.pinyinLineHeight,
-                          child: OverflowBox(
-                            minWidth: 0,
-                            maxWidth: double.infinity,
-                            alignment: Alignment.center,
-                            child: Text(
-                              pinyin[cell.pinyinIndex],
-                              maxLines: 1,
-                              softWrap: false,
-                              style: pinyinStyle,
-                            ),
-                          ),
-                        ),
-                        character(cell),
-                      ],
-                    ),
+    Widget cellBox(_DisplayCell cell, double width) => SizedBox(
+          width: width,
+          child: cell.text.trim().isEmpty
+              ? const SizedBox.shrink()
+              : Semantics(
+                  label: '${cell.text} ${pinyin[cell.pinyinIndex]}',
+                  excludeSemantics: true,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: metrics.pinyinLineHeight,
+                        child: _isPunctuation(cell.text)
+                            ? null
+                            : OverflowBox(
+                                minWidth: 0,
+                                maxWidth: double.infinity,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  pinyin[cell.pinyinIndex],
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  style: pinyinStyle,
+                                ),
+                              ),
+                      ),
+                      character(cell),
+                    ],
                   ),
-          ),
-      ];
-      final key = ValueKey('course-text-line-$lineIndex');
-      return _wrap
-          ? Wrap(
-              key: key,
-              alignment: WrapAlignment.center,
-              runSpacing: SpacingTokens.md,
-              children: cells,
-            )
-          : Row(
-              key: key,
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: cells,
-            );
-    }
+                ),
+        );
 
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment:
-          _wrap ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-      children: [
-        for (final (lineIndex, line) in lines.indexed) ...[
-          if (lineIndex > 0) const SizedBox(height: SpacingTokens.md),
-          buildLine(lineIndex, line),
-        ],
-      ],
-    );
+    // 自动换行视图（读一读）：段内合并 PDF 物理折行，连续排布由屏宽
+    // 自动换行；标点与前字合成一组避免标点起行。非换行视图（审核页
+    // 对照原书）保持逐行 Row + 横向滚动。
+    final content = _wrap
+        ? () {
+            final cells = [for (final line in lines) ...line];
+
+            final groups = <List<_DisplayCell>>[];
+            for (final cell in cells) {
+              if (_isPunctuation(cell.text) && groups.isNotEmpty) {
+                groups.last.add(cell);
+              } else {
+                groups.add([cell]);
+              }
+            }
+            final cellWidth = [
+              for (final cell in cells)
+                if (cell.text.trim().isNotEmpty)
+                  metrics.tokenWidth(cell.text, pinyin[cell.pinyinIndex]),
+            ].reduce((a, b) => a > b ? a : b);
+            return Wrap(
+              key: ValueKey('${node.id}-flow'),
+              alignment: WrapAlignment.start,
+              runSpacing: SpacingTokens.sm,
+              children: [
+                for (final group in groups)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (final cell in group) cellBox(cell, cellWidth),
+                    ],
+                  ),
+              ],
+            );
+          }()
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final (lineIndex, line) in lines.indexed) ...[
+                if (lineIndex > 0) const SizedBox(height: SpacingTokens.md),
+                Row(
+                  key: ValueKey('course-text-line-$lineIndex'),
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (final cell in line) cellBox(cell, metrics.cellWidth),
+                  ],
+                ),
+              ],
+            ],
+          );
     return _metrics != null
         ? content
         : _CourseTextViewport(width: metrics.width, child: content);
@@ -385,33 +418,31 @@ class TextbookCourseParagraphsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final metrics = _CourseTextMetrics(context, paragraphs);
-    return _CourseTextViewport(
-      width: metrics.width,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final (index, paragraph) in paragraphs.indexed) ...[
-            if (index > 0)
-              SizedBox(
-                height: _sharesSourcePage(paragraphs[index - 1], paragraph)
-                    ? SpacingTokens.md
-                    : SpacingTokens.lg,
-              ),
-            TextbookCourseText._(
-              key: ValueKey('course-text-${paragraph.id}'),
-              node: paragraph,
-              metrics: metrics,
-              activeRanges: activeRanges
-                  .where((span) => span.paragraphId == paragraph.id)
-                  .toList(),
-              activeStartKey: activeRanges.isNotEmpty &&
-                      activeRanges.first.paragraphId == paragraph.id
-                  ? activeStartKey
-                  : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (index, paragraph) in paragraphs.indexed) ...[
+          if (index > 0)
+            SizedBox(
+              height: _sharesSourcePage(paragraphs[index - 1], paragraph)
+                  ? SpacingTokens.lg
+                  : SpacingTokens.xl,
             ),
-          ],
+          TextbookCourseText._(
+            key: ValueKey('course-text-${paragraph.id}'),
+            node: paragraph,
+            metrics: metrics,
+            wrap: true,
+            activeRanges: activeRanges
+                .where((span) => span.paragraphId == paragraph.id)
+                .toList(),
+            activeStartKey: activeRanges.isNotEmpty &&
+                    activeRanges.first.paragraphId == paragraph.id
+                ? activeStartKey
+                : null,
+          ),
         ],
-      ),
+      ],
     );
   }
 }

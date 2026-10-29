@@ -48,6 +48,8 @@ class _Books implements TextbookRepository {
     String id,
     TextbookMatch match,
   ) async {}
+  @override
+  Future<void> delete(String id) async {}
 }
 
 class _Preview extends StatefulWidget {
