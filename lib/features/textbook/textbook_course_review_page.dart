@@ -11,6 +11,7 @@ import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_course_review.dart';
 import 'package:poemath/domain/textbook_course_mutations.dart';
+import 'package:poemath/domain/textbook_text_display.dart';
 import 'package:poemath/features/textbook/textbook_course_editor_page.dart';
 import 'package:poemath/features/textbook/textbook_draft_details_page.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
@@ -840,9 +841,11 @@ class _TextbookCourseLessonPageState
                             title: '',
                             subtitle: entry.value
                                 .cast<TextbookCourseParagraph>()
-                                .map((paragraph) => paragraph.text)
+                                .map(
+                                  (paragraph) =>
+                                      textbookContinuousText(paragraph.text),
+                                )
                                 .join(' ')
-                                .replaceAll(RegExp(r'\s+'), ' ')
                                 .trim(),
                             subtitleMaxLines: 2,
                             trailingText: textbookCourseReviewLabelFor(

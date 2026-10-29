@@ -17,6 +17,9 @@ class TypographyTokens {
   static const double fsDisplay = 34.0;
   static const double fsHeadline = 26.0;
   static const double fsTitle = 20.0;
+
+  /// 卡片内的小节标题（大于正文、小于卡片标题）。
+  static const double fsSection = 18.0;
   static const double fsBody = 16.0;
   static const double fsCaption = 13.0;
   static const double fsLabel = 12.0;

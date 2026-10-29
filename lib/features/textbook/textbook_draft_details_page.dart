@@ -1,15 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/typography_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_course_draft.dart';
+import 'package:poemath/domain/textbook_course_diff.dart';
 import 'package:poemath/domain/textbook_course_mutations.dart';
+import 'package:poemath/domain/textbook_pinyin_font.dart';
+import 'package:poemath/domain/textbook_text_display.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_course_editor_page.dart';
 import 'package:poemath/features/textbook/textbook_source_page.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
+
+typedef _PinyinHint = ({String character, String? decoded, bool valid});
+
+/// 条目短、可以直接列出增删的类别；段落和习题改用差异位置展示。
+const _listDifferenceCategories = {
+  'recognitionCharacters',
+  'writingCharacters',
+  'words',
+};
+
+List<_PinyinHint> _pinyinHints(TextbookDraftCandidate candidate) {
+  final hints = <_PinyinHint>[];
+  for (final hint in candidate.pinyin) {
+    final separator = hint.indexOf(': ');
+    if (separator <= 0) continue;
+    final character = hint.substring(0, separator);
+    final raw = hint.substring(separator + 2);
+    final decoded = decodeTextbookPinyinFont(raw);
+    final valid = decoded != null && isTextbookPinyin(decoded);
+    hints.add((character: character, decoded: decoded, valid: valid));
+  }
+  return hints;
+}
+
+/// 旧草稿里可能仍存着拼音字体的 ASCII 编码；编辑页展示前统一解码。
+List<String> _decodedPinyinHints(TextbookDraftCandidate candidate) => [
+      for (final hint in _pinyinHints(candidate))
+        '${hint.character}: ${hint.decoded ?? '字体编码待核对'}',
+    ];
+
+List<String> _pendingPinyinHints(TextbookDraftCandidate candidate) => [
+      for (final hint in _pinyinHints(candidate))
+        if (!hint.valid) '${hint.character}: ${hint.decoded ?? '字体编码待核对'}',
+    ];
 
 class TextbookDraftDetailsPage extends ConsumerStatefulWidget {
   const TextbookDraftDetailsPage({
@@ -96,7 +134,7 @@ class _TextbookDraftDetailsState
             book: widget.book,
             pack: doc.pack,
             node: original,
-            pinyinHints: candidate.pinyin,
+            pinyinHints: _decodedPinyinHints(candidate),
           ),
         ),
       );
@@ -183,7 +221,7 @@ class _TextbookDraftDetailsState
             node: pack.nodes.firstWhere((n) => n.id == id),
             creating: true,
             initialText: candidate.text,
-            pinyinHints: candidate.pinyin,
+            pinyinHints: _decodedPinyinHints(candidate),
           ),
         ),
       );
@@ -440,6 +478,9 @@ class _TextbookDraftDetailsState
               .firstOrNull;
           final candidateList = generation.candidates[widget.lessonId] ?? [];
           final difference = generation.pending[widget.lessonId];
+          final currentView = doc.pack.lessons
+              .firstWhere((l) => l.id == widget.lessonId)
+              .toJson();
           return ListView(
             padding: const EdgeInsets.all(SpacingTokens.md),
             children: [
@@ -460,11 +501,17 @@ class _TextbookDraftDetailsState
                 const Divider(height: SpacingTokens.xl),
                 Text('生成差异', style: theme.textTheme.titleLarge),
                 const Text('已保留当前人工版本。核对两个版本后，可采纳完整生成版本或保留当前版本。'),
-                for (final view in [
-                  doc.pack.lessons
-                      .firstWhere((l) => l.id == widget.lessonId)
-                      .toJson(),
-                  difference,
+                const SizedBox(height: SpacingTokens.md),
+                _DifferenceSummary(
+                  difference: textbookCourseDiff(
+                    current: currentView,
+                    generated: difference,
+                    categories: TextbookCoursePack.categories,
+                  ),
+                ),
+                for (final (label, view) in [
+                  ('当前版本', currentView),
+                  ('生成版本', difference),
                 ])
                   ColoredCard(
                     color: theme.colorScheme.primary,
@@ -472,19 +519,28 @@ class _TextbookDraftDetailsState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          identical(view, difference) ? '生成版本' : '当前版本',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        for (final c in TextbookCoursePack.categories) ...[
-                          Text(
-                            '${textbookCourseCategoryLabels[c]} · ${(view[c] as List).length}',
+                          label,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
-                          for (final target in view[c] as List)
+                        ),
+                        for (final category
+                            in TextbookCoursePack.categories) ...[
+                          const SizedBox(height: SpacingTokens.md),
+                          Text(
+                            '${textbookCourseCategoryLabels[category]} · '
+                            '${((view[category] as List?) ?? const []).length}',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontSize: TypographyTokens.fsSection,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if ((view[category] as List?)?.isNotEmpty ?? false)
                             SelectableText(
-                              (target as Map)['text'] as String? ??
-                                  target['prompt'] as String? ??
-                                  target['instruction'] as String? ??
-                                  '',
+                              textbookCategoryContent(
+                                category,
+                                view[category] as List,
+                              ),
                             ),
                         ],
                       ],
@@ -531,14 +587,20 @@ class _TextbookDraftDetailsState
                         Text(candidate.reason, style: contentStyle),
                         const SizedBox(height: SpacingTokens.sm),
                         SelectableText(
-                          candidate.text,
+                          textbookContinuousText(candidate.text),
                           style: contentStyle,
                         ),
-                        if (candidate.pinyin.isNotEmpty)
-                          SelectableText(
-                            candidate.pinyin.join(' · '),
+                        if (candidate.pinyin.isNotEmpty) ...[
+                          const SizedBox(height: SpacingTokens.xs),
+                          Text(
+                            _pendingPinyinHints(candidate).isEmpty
+                                ? '原书注音线索已识别；如无缺失，可点右上角重新整理本课。'
+                                : '待补齐：${_pendingPinyinHints(candidate).join(' · ')}',
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
                             style: contentStyle,
                           ),
+                        ],
                         TextButtonTheme(
                           data: TextButtonThemeData(
                             style: TextButton.styleFrom(
@@ -579,6 +641,75 @@ class _TextbookDraftDetailsState
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _DifferenceSummary extends StatelessWidget {
+  const _DifferenceSummary({required this.difference});
+
+  final TextbookCourseDifference difference;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final style = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final changed = difference.categories.where((c) => !c.isSame).toList();
+    return ColoredCard(
+      color: theme.colorScheme.tertiary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '差异摘要',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.xs),
+          if (changed.isEmpty && !difference.hasPinyinDifference)
+            Text('两个版本的可见内容一致。', style: style)
+          else ...[
+            for (final category in changed) ...[
+              Text(
+                '${textbookCourseCategoryLabels[category.category]}：'
+                '当前 ${category.currentCount} 项 · 生成 ${category.generatedCount} 项',
+                style: style?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              if (category.window case final window?)
+                Text(
+                  '差异位置：当前「${window.current}」· '
+                  '生成「${window.generated}」',
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
+              if (category.removed.isNotEmpty &&
+                  _listDifferenceCategories.contains(category.category))
+                Text(
+                  '仅当前版本：${category.removed.join('、')}',
+                  style: style,
+                ),
+              if (category.added.isNotEmpty &&
+                  _listDifferenceCategories.contains(category.category))
+                Text(
+                  '仅生成版本：${category.added.join('、')}',
+                  style: style,
+                ),
+            ],
+            if (difference.hasPinyinDifference)
+              Text(
+                '正文注音完整度：当前 ${difference.currentAnnotatedParagraphs}/'
+                '${difference.currentParagraphs} 段 · '
+                '生成 ${difference.generatedAnnotatedParagraphs}/'
+                '${difference.generatedParagraphs} 段',
+                style: style,
+              ),
+          ],
+        ],
       ),
     );
   }
