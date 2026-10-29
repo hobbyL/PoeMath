@@ -87,6 +87,19 @@ class TextbookRepository {
         );
       });
 
+  /// 删除本书：移除书目登记与全部档案的阅读位置。
+  ///
+  /// 重复删除幂等；键不存在时无操作。书名/课程/学习进度的清理由调用方
+  /// 编排（见缓存管理 sheet 的「删除本书」）。
+  Future<void> delete(String id) => _enqueue(() async {
+        await _box.delete('$bookKeyPrefix$id');
+        for (final key in _box.keys.whereType<String>().toList()) {
+          if (key.startsWith(readingKeyPrefix) && key.endsWith(':$id')) {
+            await _box.delete(key);
+          }
+        }
+      });
+
   Future<void> _enqueue(Future<void> Function() operation) {
     final result = _writes.then((_) => operation());
     _writes = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});

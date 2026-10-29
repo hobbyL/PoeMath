@@ -44,7 +44,6 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   late final String _profileId;
   int _saveRevision = 0;
   bool _saveFailed = false;
-  bool _busy = false;
   bool _previewVisible = true;
   bool _turning = false;
   int _previewPage = 1;
@@ -93,58 +92,6 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       );
       if (mounted && revision == _saveRevision) {
         setState(() => _saveFailed = true);
-      }
-    }
-  }
-
-  Future<void> _remove(Textbook book) async {
-    if (_busy) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('移除本地 PDF？'),
-        content: const Text('书目、核对状态和阅读位置会保留。重新下载或导入同一文件后，可以继续阅读。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('移除 PDF'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      setState(() {
-        _previewVisible = false;
-        _goToPage = null;
-        _search = null;
-        _toc = null;
-      });
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted) return;
-      await ref.read(textbookFileServiceProvider).removePdf(book.pdfSha256);
-      if (!mounted) return;
-      ref.invalidate(textbookPathProvider(book.pdfSha256));
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('已移除本地 PDF，阅读位置已保留')));
-    } on Object catch (error) {
-      AppLogger.e('教材移除失败', tag: 'Textbook', error: error);
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('本地 PDF 移除失败，请重试')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _previewVisible = true;
-          _previewRevision++;
-        });
       }
     }
   }
@@ -250,8 +197,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   Widget _detailScaffold({
     required Widget body,
     Widget? bottomNavigationBar,
-    bool showRemove = false,
-    VoidCallback? onRemove,
+    bool showToc = false,
     VoidCallback? onToc,
     VoidCallback? onReview,
   }) {
@@ -265,12 +211,6 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
         final layout = TextbookPageLayout.forWidth(
           constraints.maxWidth - MediaQuery.paddingOf(context).horizontal,
         );
-        Widget removeButton({ButtonStyle? style}) => IconButton(
-              tooltip: '移除本地 PDF',
-              style: style,
-              onPressed: onRemove,
-              icon: const Icon(Icons.delete_outline),
-            );
         Widget tocButton({ButtonStyle? style}) => IconButton(
               tooltip: '目录',
               style: style,
@@ -289,8 +229,8 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
               ? null
               : AppBar(
                   leadingWidth:
-                      showRemove ? SpacingTokens.minTapTarget * 2 : null,
-                  leading: showRemove
+                      showToc ? SpacingTokens.minTapTarget * 2 : null,
+                  leading: showToc
                       ? Row(
                           children: [
                             const SizedBox(
@@ -307,7 +247,6 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                   title: const Text('教材详情'),
                   actions: [
                     if (onReview != null) reviewButton(),
-                    if (showRemove) removeButton(),
                   ],
                 ),
           body: SafeArea(
@@ -327,14 +266,13 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                           width: SpacingTokens.minTapTarget,
                           child: Center(child: BackButton(style: buttonStyle)),
                         ),
-                        if (showRemove)
+                        if (showToc)
                           SizedBox(
                             width: SpacingTokens.minTapTarget,
                             child: Center(child: tocButton(style: buttonStyle)),
                           ),
                         const Spacer(),
                         if (onReview != null) reviewButton(style: buttonStyle),
-                        if (showRemove) removeButton(style: buttonStyle),
                       ],
                     ),
                   ),
@@ -404,7 +342,6 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                 ? '${pages.first}–${pages.last} / ${book.pageCount}'
                 : '$_previewPage / ${book.pageCount}';
             final canNavigate = available &&
-                !_busy &&
                 !_turning &&
                 _previewVisible &&
                 _goToPage != null;
@@ -456,7 +393,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
               icon: const Icon(Icons.chevron_right),
               label: const Text('下一页', textAlign: TextAlign.center),
             );
-            final onRead = available && !_busy && !_turning && _previewVisible
+            final onRead = available && !_turning && _previewVisible
                 ? _read
                 : null;
             final readButton = layout.doublePage
@@ -579,7 +516,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
         if (lessons.any((lesson) => section.targets(lesson).isNotEmpty))
           section,
     ];
-    final enabled = !_busy && !_turning && _previewVisible;
+    final enabled = !_turning && _previewVisible;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -651,11 +588,9 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     final downloading = download?.active == true;
     return _detailScaffold(
       bottomNavigationBar: _pageControls(book, available: available),
-      showRemove: available,
-      onReview: !_busy && !_turning && _previewVisible ? _review : null,
-      onRemove: _busy || downloading ? null : () => _remove(book),
+      showToc: available,
+      onReview: !_turning && _previewVisible ? _review : null,
       onToc: available &&
-              !_busy &&
               !_turning &&
               _previewVisible &&
               _goToPage != null &&

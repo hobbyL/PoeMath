@@ -1,17 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
+import 'package:poemath/core/services/textbook_course_generation_service.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
+import 'package:poemath/data/repositories/textbook_progress_cleanup.dart';
+import 'package:poemath/data/repositories/textbook_repository.dart';
+import 'package:poemath/features/textbook/providers/textbook_download_controller.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_cache_manager_sheet.dart';
+import 'package:poemath/features/textbook/providers/textbook_generation_controller.dart';
 
 import '../../helpers/textbook_fixture.dart';
 
 class _FakeFiles extends TextbookFileService {
-  _FakeFiles(this.usage);
+  _FakeFiles(this.usage, {void Function(String)? onAction})
+      : _onAction = onAction;
 
+  final void Function(String)? _onAction;
   TextbookStorageUsage usage;
   final cleared = <String>[];
   bool courseGone = false;
@@ -71,47 +79,121 @@ class _FakeFiles extends TextbookFileService {
     cleared.add('all');
     _set(cover: 0, content: 0, contentFiles: 0, audio: 0, audioFiles: 0);
   }
+
+  @override
+  Future<void> removePdf(String id) async {
+    _onAction?.call('files');
+    courseGone = true;
+  }
 }
 
 class _FakeCourses extends TextbookCourseRepository {
-  _FakeCourses(this.onClear);
+  _FakeCourses(this.onClear, {void Function(String)? onAction})
+      : _onAction = onAction;
 
   final void Function() onClear;
+  final void Function(String)? _onAction;
   int cleared = 0;
 
   @override
   Future<void> clear(Textbook book) async {
     cleared++;
+    _onAction?.call('course');
     onClear();
+  }
+}
+
+/// 构造期惰性 box：仅用于绕开超类对 HiveBoxes.settings 的访问，
+/// 测试中从不调用其成员。
+class _UnusedBox implements Box<dynamic> {
+  const _UnusedBox();
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError('测试不应访问 box: ${invocation.memberName}');
+}
+
+class _FakeRepo extends TextbookRepository {
+  _FakeRepo({void Function(String)? onAction})
+      : _onAction = onAction,
+        super(box: const _UnusedBox());
+  final void Function(String)? _onAction;
+  final deleted = <String>[];
+
+  @override
+  Future<void> delete(String id) async {
+    deleted.add(id);
+    _onAction?.call('repo');
+  }
+}
+
+class _FakeCleanup extends TextbookProgressCleanup {
+  _FakeCleanup({void Function(String)? onAction})
+      : _onAction = onAction,
+        super(box: const _UnusedBox());
+  final void Function(String)? _onAction;
+  final deleted = <String>[];
+
+  @override
+  Future<int> deleteBookProgress(String bookId) async {
+    deleted.add(bookId);
+    _onAction?.call('progress');
+    return 1;
+  }
+}
+
+/// 构造即置入下载中状态，用于验证删除按钮被禁用。
+class _SeededDownloads extends TextbookDownloadController {
+  _SeededDownloads(
+    TextbookFileService files,
+    TextbookRepository repo,
+    String id,
+  ) : super(files, repo, (_) {}) {
+    state = {
+      id: const TextbookDownloadState(
+        TextbookDownloadStatus.downloading,
+        progress: 0.5,
+      ),
+    };
   }
 }
 
 void main() {
   final book = textbookFixture();
+  const usage = TextbookStorageUsage(
+    pdfBytes: 12 * 1024 * 1024,
+    coverBytes: 800,
+    contentBytes: 3000,
+    contentFiles: 7,
+    audioBytes: 2048,
+    audioFiles: 2,
+    courseBytes: 1024,
+  );
   late _FakeFiles files;
   late _FakeCourses courses;
 
-  setUp(() {
-    files = _FakeFiles(
-      const TextbookStorageUsage(
-        pdfBytes: 12 * 1024 * 1024,
-        coverBytes: 800,
-        contentBytes: 3000,
-        contentFiles: 7,
-        audioBytes: 2048,
-        audioFiles: 2,
-        courseBytes: 1024,
-      ),
-    );
-    courses = _FakeCourses(() => files.courseGone = true);
-  });
-
-  Future<void> pump(WidgetTester tester) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    List<Override> overrides = const [],
+    void Function(String)? onAction,
+  }) async {
+    files = _FakeFiles(usage, onAction: onAction);
+    courses = _FakeCourses(() => files.courseGone = true, onAction: onAction);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           textbookFileServiceProvider.overrideWithValue(files),
           textbookCourseRepositoryProvider.overrideWithValue(courses),
+          // 默认空状态，避免测试环境初始化 Hive。
+          textbookGenerationProvider.overrideWith((ref) {
+            return TextbookGenerationController(
+              ref.watch(textbookGenerationServiceProvider),
+              (_) {},
+            );
+          }),
+          textbookDownloadsProvider.overrideWith((ref) {
+            return TextbookDownloadController(files, _FakeRepo(), (_) {});
+          }),
+          ...overrides,
         ],
         child: MaterialApp(
           home: Scaffold(body: TextbookCacheSheet(book: book)),
@@ -243,6 +325,170 @@ void main() {
       find.byKey(const ValueKey('cache-clear-all')),
     );
     expect(clearAll.onPressed, isNull, reason: '没有缓存时不能再清理');
+
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('删除本书按钮位于底部、错误色，确认前列出范围且不删除', (tester) async {
+    await pump(tester);
+
+    final deleteButton = tester.widget<OutlinedButton>(
+      find.byKey(const ValueKey('cache-delete-book')),
+    );
+    expect(find.text('删除本书'), findsOneWidget);
+    expect(deleteButton.onPressed, isNotNull);
+    // 与「清理全部缓存」同行展示。
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('cache-delete-book'))).dy,
+      tester.getTopLeft(find.byKey(const ValueKey('cache-clear-all'))).dy,
+    );
+    expect(
+      tester
+          .getRect(find.byKey(const ValueKey('cache-delete-book')))
+          .left,
+      greaterThan(
+        tester
+            .getRect(find.byKey(const ValueKey('cache-clear-all')))
+            .center
+            .dx,
+      ),
+    );
+    // 确认对话框列出删除范围。
+    await tester.ensureVisible(find.byKey(const ValueKey('cache-delete-book')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('cache-delete-book')));
+    await tester.pumpAndSettle();
+    expect(find.text('删除本书？'), findsOneWidget);
+    expect(find.textContaining('学习进度删除后不可恢复'), findsOneWidget);
+    expect(find.textContaining('书目登记'), findsOneWidget);
+    // 默认取消：取消后无任何数据被删。
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(files.cleared, isEmpty);
+    expect(courses.cleared, 0);
+
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('确认删除本书后按序清理各仓储并关闭 sheet', (tester) async {
+    final calls = <String>[];
+    final repo = _FakeRepo(onAction: calls.add);
+    final progress = _FakeCleanup(onAction: calls.add);
+    await pump(
+      tester,
+      overrides: [
+        textbookRepositoryProvider.overrideWithValue(repo),
+        textbookProgressCleanupProvider.overrideWithValue(progress),
+      ],
+      onAction: calls.add,
+    );
+
+    await tester.ensureVisible(find.byKey(const ValueKey('cache-delete-book')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('cache-delete-book')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('删除本书'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      calls,
+      ['progress', 'course', 'files', 'repo'],
+      reason: '书目登记最后删除，中途失败不产生幽灵书',
+    );
+    expect(progress.deleted, [book.pdfSha256]);
+    expect(courses.cleared, 1);
+    expect(repo.deleted, [book.pdfSha256]);
+    expect(
+      find.byKey(const ValueKey('textbook-cache-sheet')),
+      findsNothing,
+      reason: '删除成功后 sheet 关闭',
+    );
+
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('课程整理运行中禁止删除本书', (tester) async {
+    final repo = _FakeRepo();
+    final progress = _FakeCleanup();
+    final generation = textbookGenerationProvider.overrideWith((ref) {
+      final controller = TextbookGenerationController(
+        ref.watch(textbookGenerationServiceProvider),
+        (_) {},
+      );
+      controller.state = {
+        book.pdfSha256:
+            const TextbookGenerationProgress('running', 1, 3, '整理中'),
+      };
+      return controller;
+    });
+    await pump(
+      tester,
+      overrides: [
+        textbookRepositoryProvider.overrideWithValue(repo),
+        textbookProgressCleanupProvider.overrideWithValue(progress),
+        generation,
+      ],
+    );
+
+    final deleteButton = tester.widget<OutlinedButton>(
+      find.byKey(const ValueKey('cache-delete-book')),
+    );
+    expect(deleteButton.onPressed, isNull, reason: '生成中按钮置灰');
+    expect(
+      tester
+          .widget<Tooltip>(
+            find.ancestor(
+              of: find.byKey(const ValueKey('cache-delete-book')),
+              matching: find.byType(Tooltip),
+            ),
+          )
+          .message,
+      '课程整理进行中，请稍后再试',
+    );
+    // 未确认时无任何数据被删。
+    expect(progress.deleted, isEmpty);
+    expect(repo.deleted, isEmpty);
+
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('下载进行中禁止删除本书', (tester) async {
+    final repo = _FakeRepo();
+    final progress = _FakeCleanup();
+    await pump(
+      tester,
+      overrides: [
+        textbookRepositoryProvider.overrideWithValue(repo),
+        textbookProgressCleanupProvider.overrideWithValue(progress),
+        textbookDownloadsProvider.overrideWith((ref) {
+          final controller = _SeededDownloads(files, repo, book.pdfSha256);
+          return controller;
+        }),
+      ],
+    );
+
+    final deleteButton = tester.widget<OutlinedButton>(
+      find.byKey(const ValueKey('cache-delete-book')),
+    );
+    expect(deleteButton.onPressed, isNull, reason: '下载中按钮置灰');
+    expect(
+      tester
+          .widget<Tooltip>(
+            find.ancestor(
+              of: find.byKey(const ValueKey('cache-delete-book')),
+              matching: find.byType(Tooltip),
+            ),
+          )
+          .message,
+      '下载进行中，请稍后再试',
+    );
+    expect(progress.deleted, isEmpty);
+    expect(repo.deleted, isEmpty);
 
     await tester.pump(const Duration(seconds: 5));
   });

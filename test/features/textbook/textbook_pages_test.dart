@@ -65,6 +65,12 @@ class _MemoryRepository implements TextbookRepository {
     readings['$profileId:$id'] =
         TextbookReading(page: reading(profileId, id).page, match: match);
   }
+
+  @override
+  Future<void> delete(String id) async {
+    books.remove(id);
+    readings.removeWhere((key, _) => key.endsWith(':$id'));
+  }
 }
 
 class _Files extends TextbookFileService {
@@ -439,8 +445,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(repo.find(book.pdfSha256)?.title, book.title);
     expect(find.byTooltip('原书阅读'), findsOneWidget);
-    expect(find.byTooltip('移除本地 PDF'), findsOneWidget);
-    expect(repo.reading('default', book.pdfSha256).page, 2);
+    expect(
+      find.byTooltip('移除本地 PDF'),
+      findsNothing,
+      reason: '移除入口已移至缓存管理 sheet 的「删除本书」',
+    );    expect(repo.reading('default', book.pdfSha256).page, 2);
     expect(repo.reading('other', book.pdfSha256).page, 1);
   });
 
@@ -658,7 +667,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('详情取消移除不删文件，确认只移除 PDF并保留原核对和阅读记录', (tester) async {
+  testWidgets('详情页不再提供移除本地 PDF 入口', (tester) async {
     repo.books[book.pdfSha256] = book;
     await repo.savePage('default', book, 2);
     await repo.setMatch('default', book.pdfSha256, TextbookMatch.matches);
@@ -666,22 +675,14 @@ void main() {
       tester,
       TextbookDetailPage(bookId: book.pdfSha256, manage: true),
     );
-    await tester.tap(find.byTooltip('移除本地 PDF'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('取消'));
-    await tester.pumpAndSettle();
+    expect(find.byTooltip('移除本地 PDF'), findsNothing);
     expect(files.removes, 0);
-    await tester.tap(find.byTooltip('移除本地 PDF'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('移除 PDF'));
-    await tester.pumpAndSettle();
-    expect(files.removes, 1);
+    // 书目、核对状态与阅读位置不受影响。
     expect(repo.find(book.pdfSha256), book);
     expect(
       repo.reading('default', book.pdfSha256).toJson(),
       {'page': 2, 'match': 'matches'},
     );
-    expect(find.text('本地 PDF 已移除或丢失。请到书籍管理重新导入同一文件，恢复阅读。'), findsOneWidget);
   });
 
   testWidgets('详情卡片纵向居中，底部固定带箭头按钮；翻页保存续读位置', (tester) async {
@@ -730,24 +731,20 @@ void main() {
     expect(
       find.descendant(
         of: navigation,
-        matching: find.widgetWithIcon(IconButton, Icons.delete_outline),
+        matching: find.widgetWithIcon(IconButton, Icons.fact_check_outlined),
       ),
       findsOneWidget,
+      reason: '右上角仅保留内容审核按钮',
     );
     expect(
       tester.getRect(find.byType(BackButton)).center,
       const Offset(SpacingTokens.minTapTarget / 2, kToolbarHeight / 2),
     );
-    final removeRect = tester.getRect(
-      find.widgetWithIcon(IconButton, Icons.delete_outline),
-    );
-    expect(removeRect.right, 360);
-    expect(removeRect.center.dy, kToolbarHeight / 2);
-    expect(removeRect.width, greaterThanOrEqualTo(SpacingTokens.minTapTarget));
-    expect(removeRect.height, greaterThanOrEqualTo(SpacingTokens.minTapTarget));
+    final reviewRect = tester.getRect(find.byType(BackButton));
+    expect(reviewRect.right, lessThan(360));
+    expect(reviewRect.center.dy, kToolbarHeight / 2);
     for (final buttonRect in [
-      tester.getRect(find.byType(BackButton)),
-      removeRect,
+      reviewRect,
     ]) {
       expect(buttonRect.overlaps(cardRect), isFalse);
       expect(
@@ -810,7 +807,7 @@ void main() {
     expect(find.textContaining('MB'), findsNothing);
     expect(find.textContaining('${book.pageCount} 页'), findsNothing);
     expect(find.text(book.volumeLabel), findsNothing);
-    expect(find.byTooltip('移除本地 PDF'), findsOneWidget);
+    expect(find.byTooltip('移除本地 PDF'), findsNothing);
     expect(options!.initialPage, 1);
     expect(
       tester
@@ -1048,11 +1045,11 @@ void main() {
     addTearDown(tester.view.resetPadding);
     await tester.pumpAndSettle();
     final back = find.byType(BackButton);
-    final remove = find.widgetWithIcon(IconButton, Icons.delete_outline);
+    final review = find.widgetWithIcon(IconButton, Icons.fact_check_outlined);
     final backRect = tester.getRect(back);
-    final removeRect = tester.getRect(remove);
+    final reviewRect = tester.getRect(review);
     expect(backRect.center, const Offset(SpacingTokens.minTapTarget / 2, 52));
-    expect(removeRect.center.dy, backRect.center.dy);
+    expect(reviewRect.center.dy, backRect.center.dy);
     final card = find.byKey(const ValueKey('textbook-detail-preview-card'));
     final area = tester.getRect(
       find.byKey(const ValueKey('textbook-detail-preview-area')),
@@ -1069,9 +1066,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getRect(controls), controlsRect);
     expect(tester.getRect(back), backRect);
-    expect(tester.getRect(remove), removeRect);
+    expect(tester.getRect(review), reviewRect);
     expect(back.hitTestable(), findsOneWidget);
-    expect(remove.hitTestable(), findsOneWidget);
+    expect(review.hitTestable(), findsOneWidget);
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('textbook-detail-read')),
@@ -1477,7 +1474,7 @@ void main() {
     );
     expect(
       tester.getRect(toc).right,
-      lessThanOrEqualTo(tester.getRect(find.byTooltip('移除本地 PDF')).left),
+      lessThanOrEqualTo(tester.getTopRight(find.byType(AppBar)).dx),
     );
     final back = tester.getRect(find.byType(BackButton));
     expect(tester.getRect(toc).left, greaterThanOrEqualTo(back.right));

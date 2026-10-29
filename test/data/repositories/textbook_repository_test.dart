@@ -90,4 +90,38 @@ void main() {
     expect(failing.find(book.pdfSha256)!.title, book.title);
     expect(attempts, 2);
   });
+
+  test('delete 移除书目与全部档案阅读位置，重复删除幂等', () async {
+    final book = textbookFixture();
+    final other = textbookFixture(id: List.filled(64, 'b').join());
+    await repo.addIfAbsent(book);
+    await repo.addIfAbsent(other);
+    await repo.savePage('child', book, 2);
+    await repo.savePage('parent', book, 5);
+    await repo.savePage('child', other, 3);
+    await repo.setMatch('child', book.pdfSha256, TextbookMatch.matches);
+
+    await repo.delete(book.pdfSha256);
+
+    expect(repo.find(book.pdfSha256), isNull);
+    expect(repo.reading('child', book.pdfSha256).page, 1);
+    expect(repo.reading('parent', book.pdfSha256).page, 1);
+    expect(repo.reading('child', book.pdfSha256).match, TextbookMatch.unchecked);
+    // 其他书不受影响。
+    expect(repo.find(other.pdfSha256), isNotNull);
+    expect(repo.reading('child', other.pdfSha256).page, 3);
+
+    // 重复删除幂等。
+    await repo.delete(book.pdfSha256);
+    await repo.delete(book.pdfSha256);
+    expect(repo.find(book.pdfSha256), isNull);
+    expect(repo.find(other.pdfSha256), isNotNull);
+    // 真实键已从 box 移除，而不只是 getter 返回默认值。
+    expect(
+      box.keys.whereType<String>().where(
+            (key) => key.endsWith(':${book.pdfSha256}'),
+          ),
+      isEmpty,
+    );
+  });
 }

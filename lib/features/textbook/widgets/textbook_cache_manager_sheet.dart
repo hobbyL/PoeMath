@@ -135,6 +135,74 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
     }
   }
 
+  /// 删除本书：连同书目、阅读位置与学习进度一并清除，不可恢复。
+  ///
+  /// 顺序：进度 → 课程 → 原书文件与缓存 → 书目登记。书目登记最后删，
+  /// 中途失败时本书仍在列表中可重试，不会产生「幽灵书」。
+  Future<void> _deleteBook() async {
+    if (_busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('删除本书？'),
+        content: const Text(
+          '将一并删除：\n'
+          '· 原书 PDF 及其封面、目录缓存\n'
+          '· 朗读音频\n'
+          '· 课程内容（含待确认差异与审核记录）\n'
+          '· 书目登记\n'
+          '· 全部档案的阅读位置\n'
+          '· 全部档案的认一认、写一写学习进度\n\n'
+          '学习进度删除后不可恢复；重新导入同一 PDF 将从零开始。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('删除本书'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final id = widget.book.pdfSha256;
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(textbookProgressCleanupProvider)
+          .deleteBookProgress(id); // 1. 学习进度（可先删，重导入后从零开始）
+      await ref
+          .read(textbookCourseRepositoryProvider)
+          .clear(widget.book); // 2. 课程数据
+      await ref
+          .read(textbookFileServiceProvider)
+          .removePdf(id); // 3. 原书与派生缓存
+      await ref
+          .read(textbookRepositoryProvider)
+          .delete(id); // 4. 书目与阅读位置
+      if (!mounted) return;
+      // 先关闭 sheet 再失效 provider，否则 sheet 会因 provider 失效重建。
+      Navigator.of(context).pop();
+      ref.invalidate(textbookLocalListProvider);
+      ref.invalidate(textbookPathProvider(id));
+      ref.invalidate(textbookCourseProvider(id));
+      ref.invalidate(textbookCourseDocumentProvider(id));
+    } on Object {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('删除失败，已删除的部分不会恢复，请稍后重试')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Widget _row({
     required Key key,
     Key? deleteKey,
@@ -158,12 +226,25 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
               size: SpacingTokens.md,
               color: theme.colorScheme.onSurfaceVariant,
             )
-          : IconButton(
+          : Tooltip(
               key: deleteKey,
-              tooltip: deleteTooltip ?? '清理$title',
-              onPressed: _busy ? null : onDelete,
-              icon: const Icon(Icons.delete_outline),
-              color: theme.colorScheme.error,
+              message: deleteTooltip ?? '清理$title',
+              child: GestureDetector(
+                onTap: _busy ? null : onDelete,
+                behavior: HitTestBehavior.opaque,
+                child: SizedBox(
+                  width: SpacingTokens.minTapTarget,
+                  height: SpacingTokens.minTapTarget,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Icon(
+                      Icons.delete_outline,
+                      size: SpacingTokens.md,
+                      color: _busy ? theme.disabledColor : theme.colorScheme.error,
+                    ),
+                  ),
+                ),
+              ),
             ),
     );
   }
@@ -256,7 +337,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   icon: Icons.picture_as_pdf_outlined,
                   title: '原书 PDF',
                   subtitle: usage.pdfBytes > 0
-                      ? '${_formatBytes(usage.pdfBytes)} · 阅读必需，需在详情页「移除本地 PDF」'
+                      ? '${_formatBytes(usage.pdfBytes)} · 阅读必需'
                       : '未保存',
                 ),
                 const SizedBox(height: SpacingTokens.sm),
@@ -340,18 +421,56 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   ),
                 ),
                 const SizedBox(height: SpacingTokens.md),
-                OutlinedButton.icon(
-                  key: const ValueKey('cache-clear-all'),
-                  onPressed: _busy || !usage.hasDerived
-                      ? null
-                      : () => _clear(
-                            '全部缓存',
-                            () => ref
-                                .read(textbookFileServiceProvider)
-                                .clearDerived(widget.book),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('cache-clear-all'),
+                        onPressed: _busy || !usage.hasDerived
+                            ? null
+                            : () => _clear(
+                                  '全部缓存',
+                                  () => ref
+                                      .read(textbookFileServiceProvider)
+                                      .clearDerived(widget.book),
+                                ),
+                        icon: const Icon(Icons.delete_sweep_outlined),
+                        label: const Text('清理全部缓存'),
+                      ),
+                    ),
+                    const SizedBox(width: SpacingTokens.sm),
+                    Builder(
+                      builder: (context) {
+                        final id = widget.book.pdfSha256;
+                        final generationBusy = ref
+                                .watch(textbookGenerationProvider)[id]
+                                ?.running ??
+                            false;
+                        final downloading = ref
+                                .watch(textbookDownloadsProvider)[id]
+                                ?.active ??
+                            false;
+                        final blocked = generationBusy || downloading;
+                        final button = OutlinedButton.icon(
+                          key: const ValueKey('cache-delete-book'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: theme.colorScheme.error,
+                            side: BorderSide(color: theme.colorScheme.error),
                           ),
-                  icon: const Icon(Icons.delete_sweep_outlined),
-                  label: const Text('清理全部缓存'),
+                          onPressed: _busy || blocked ? null : _deleteBook,
+                          icon: const Icon(Icons.delete_forever_outlined),
+                          label: const Text('删除本书'),
+                        );
+                        if (!blocked) return button;
+                        return Tooltip(
+                          message: generationBusy
+                              ? '课程整理进行中，请稍后再试'
+                              : '下载进行中，请稍后再试',
+                          child: button,
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ],
             ],

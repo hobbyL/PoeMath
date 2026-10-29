@@ -5,6 +5,7 @@ import 'package:poemath/data/models/textbook_catalog.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
+import 'package:poemath/data/repositories/textbook_progress_cleanup.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/features/textbook/providers/textbook_download_controller.dart';
 import 'package:poemath/core/services/textbook_course_generation_service.dart';
@@ -13,6 +14,9 @@ import 'package:poemath/features/textbook/providers/textbook_generation_controll
 
 final textbookRepositoryProvider =
     Provider<TextbookRepository>((ref) => TextbookRepository());
+final textbookProgressCleanupProvider = Provider<TextbookProgressCleanup>(
+  (ref) => TextbookProgressCleanup(),
+);
 final textbookFileServiceProvider =
     Provider<TextbookFileService>((ref) => TextbookFileService());
 final textbookCourseRepositoryProvider = Provider<TextbookCourseRepository>(
