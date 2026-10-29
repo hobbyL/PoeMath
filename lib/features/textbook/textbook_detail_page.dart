@@ -572,7 +572,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     return _detailScaffold(
       bottomNavigationBar: _pageControls(book, available: available),
       showToc: available,
-      onReview: !_turning && _previewVisible ? _review : null,
+      onReview: widget.manage && !_turning && _previewVisible ? _review : null,
       onToc: available &&
               !_turning &&
               _previewVisible &&

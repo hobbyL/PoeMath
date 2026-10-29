@@ -166,6 +166,12 @@ void main() {
     await tester.tap(_bookCard(current));
     await tester.pumpAndSettle();
     expect(find.byType(TextbookDetailPage), findsOneWidget);
+    expect(
+      tester.widget<TextbookDetailPage>(find.byType(TextbookDetailPage)).manage,
+      isFalse,
+    );
+    expect(find.byTooltip('内容审核'), findsNothing);
+    expect(find.byIcon(Icons.fact_check_outlined), findsNothing);
     expect(find.byType(NavigationBar), findsNothing);
     app.router.pop();
     await tester.pumpAndSettle();

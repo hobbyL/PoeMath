@@ -624,6 +624,7 @@ void main() {
     );
     expect(detail.bookId, books[1].pdfSha256);
     expect(detail.manage, isTrue);
+    expect(find.byTooltip('内容审核'), findsOneWidget);
     router.pop();
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('下载'));
@@ -734,8 +735,8 @@ void main() {
         of: navigation,
         matching: find.widgetWithIcon(IconButton, Icons.fact_check_outlined),
       ),
-      findsOneWidget,
-      reason: '右上角仅保留内容审核按钮',
+      findsNothing,
+      reason: '孩子学习详情不显示家长的内容审核入口',
     );
     expect(
       tester.getRect(find.byType(BackButton)).center,
@@ -983,12 +984,13 @@ void main() {
     var creates = 0;
     var disposes = 0;
     final router = GoRouter(
-      initialLocation: AppRoutes.textbookDetailOf(book.pdfSha256),
+      initialLocation: AppRoutes.textbookManageDetailOf(book.pdfSha256),
       routes: [
         GoRoute(
-          path: AppRoutes.textbookDetail,
+          path: AppRoutes.textbookManageDetail,
           builder: (_, state) => TextbookDetailPage(
             bookId: state.pathParameters['id']!,
+            manage: true,
             previewBuilder: (_, options) => _LifecycleViewer(
               options: options,
               onCreate: () => creates++,
@@ -1038,7 +1040,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await pump(
       tester,
-      TextbookDetailPage(bookId: book.pdfSha256),
+      TextbookDetailPage(bookId: book.pdfSha256, manage: true),
       large: true,
     );
     tester.view.physicalSize = const Size(800, 280);
