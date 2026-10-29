@@ -1,6 +1,7 @@
 // test/data/repositories/settings_repository_test.dart
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
@@ -13,15 +14,44 @@ void main() {
   late SettingsRepository repo;
 
   setUp(() async {
+    ProfileScope.reset();
     await setUpHiveForTesting();
     repo = SettingsRepository();
   });
 
   tearDown(() async {
+    ProfileScope.reset();
     await tearDownHiveForTesting();
   });
 
   group('SettingsRepository', () {
+    group('chineseSection', () {
+      test('首次课本，每个档案独立，关闭重开后记住栏目', () async {
+        expect(repo.chineseSection, 'textbook');
+        await repo.setChineseSection('poem');
+        ProfileScope.switchTo('second');
+        expect(repo.chineseSection, 'textbook');
+        await repo.setChineseSection('textbook');
+        ProfileScope.reset();
+        expect(repo.chineseSection, 'poem');
+        await HiveBoxes.close();
+        await HiveBoxes.init();
+        expect(SettingsRepository().chineseSection, 'poem');
+      });
+
+      test('损坏值回落课本，读取不改盘，非法选择拒绝写入', () async {
+        final key = ProfileScope.key('chinese_section');
+        await HiveBoxes.meta.put(key, 'unknown');
+        expect(repo.chineseSection, 'textbook');
+        expect(HiveBoxes.meta.get(key), 'unknown');
+        await expectLater(
+          repo.setChineseSection('unknown'),
+          throwsArgumentError,
+        );
+        expect(HiveBoxes.meta.get(key), 'unknown');
+      });
+    });
+
     group('themeMode', () {
       test('默认值为 system', () {
         expect(repo.themeMode, 'system');

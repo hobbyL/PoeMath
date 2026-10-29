@@ -14,6 +14,7 @@ import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/core/services/tts/worker_tts_client.dart';
@@ -122,6 +123,21 @@ class SettingsRepository {
   }
 
   // ============ 主题 ============
+
+  /// 语文页上次浏览的栏目，仅作本机 UI 偏好，不随学习数据备份迁移。
+  String get chineseSection {
+    final value = HiveBoxes.meta.get(ProfileScope.key('chinese_section'));
+    return value == 'poem' ? 'poem' : 'textbook';
+  }
+
+  Future<void> setChineseSection(String section) async {
+    if (section != 'textbook' && section != 'poem') {
+      throw ArgumentError.value(section, 'section', '语文栏目无效');
+    }
+    // 在异步写入前捕获当前档案，避免写入过程中切换档案后串数据。
+    final key = ProfileScope.key('chinese_section');
+    await HiveBoxes.meta.put(key, section);
+  }
 
   /// 当前活跃学科主题（'poem' 或 'math'），默认 'poem'。
   String get activeSubject => _boundedString(_keyActiveSubject, 'poem');
