@@ -456,8 +456,8 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
             modes[1],
           ],
         ),
-      const SizedBox(height: SpacingTokens.md),
       if (_mode == _DictationMode.paper) ...[
+        const SizedBox(height: SpacingTokens.md),
         Text('播报节奏', style: theme.textTheme.titleSmall),
         const SizedBox(height: SpacingTokens.sm),
         Wrap(
@@ -475,8 +475,7 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
               ),
           ],
         ),
-      ] else
-        const Text('写完后点“写好了”，不会写也可以先跳过。'),
+      ],
       const SizedBox(height: SpacingTokens.lg),
       FilledButton.icon(
         key: const ValueKey('dictation-start'),

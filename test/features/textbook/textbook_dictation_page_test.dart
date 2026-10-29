@@ -528,7 +528,7 @@ void main() {
       expect(startButton.left, SpacingTokens.md);
       expect(startButton.right, width - SpacingTokens.md);
       await tapKey(tester, 'dictation-mode-handwriting');
-      expect(find.text('写完后点“写好了”，不会写也可以先跳过。'), findsOneWidget);
+      expect(find.text('写完后点“写好了”，不会写也可以先跳过。'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
