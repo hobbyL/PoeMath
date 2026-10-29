@@ -863,6 +863,92 @@ void main() {
     expect(repo.reading('default', book.pdfSha256).page, 2);
   });
 
+  for (final wide in [false, true]) {
+    testWidgets('详情书角使用相同翻页与续读流程，就绪、忙碌及首末页受保护（双页=$wide）', (tester) async {
+      final longBook = Textbook.fromJson({...book.toJson(), 'pageCount': 5});
+      repo.books[book.pdfSha256] = longBook;
+      TextbookViewerOptions? options;
+      final jumps = <int>[];
+      final turning = Completer<void>();
+      await pump(
+        tester,
+        TextbookDetailPage(
+          bookId: book.pdfSha256,
+          previewBuilder: (_, value) {
+            options = value;
+            return const SizedBox.expand();
+          },
+        ),
+        size: wide ? const Size(1000, 700) : const Size(360, 800),
+      );
+      expect(options!.onPreviousPage, isNull);
+      expect(options!.onNextPage, isNull);
+      options!.onReady((page) async {
+        jumps.add(page);
+        if (jumps.length == 1) await turning.future;
+        options!.onPageChanged(page);
+      });
+      await tester.pumpAndSettle();
+      expect(options!.onPreviousPage, isNull);
+      final next = options!.onNextPage!;
+      next();
+      next();
+      await tester.pumpAndSettle();
+      expect(jumps, [2]);
+      expect(options!.onPreviousPage, isNull);
+      expect(options!.onNextPage, isNull);
+      turning.complete();
+      await tester.pumpAndSettle();
+      expect(repo.reading('default', book.pdfSha256).page, 2);
+      options!.onNextPage!();
+      await tester.pumpAndSettle();
+      expect(jumps, wide ? [2, 4] : [2, 3]);
+      if (!wide) {
+        options!.onNextPage!();
+        await tester.pumpAndSettle();
+        options!.onNextPage!();
+        await tester.pumpAndSettle();
+      }
+      expect(options!.onNextPage, isNull);
+      options!.onPreviousPage!();
+      await tester.pumpAndSettle();
+      expect(repo.reading('default', book.pdfSha256).page, wide ? 2 : 4);
+      expect(jumps, wide ? [2, 4, 2] : [2, 3, 4, 5, 4]);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('原书书角按单页或展开页导航并保存入页档案（双页=$wide）', (tester) async {
+      repo.books[book.pdfSha256] = book;
+      ProfileScope.switchTo('corner-profile');
+      TextbookViewerOptions? options;
+      await pump(
+        tester,
+        TextbookReaderPage(
+          bookId: book.pdfSha256,
+          viewerBuilder: (_, value) {
+            options = value;
+            return _Viewer(value);
+          },
+        ),
+        size: wide ? const Size(1000, 700) : const Size(360, 800),
+      );
+      expect(options!.onPreviousPage, isNull);
+      options!.onNextPage!();
+      await tester.pumpAndSettle();
+      if (!wide) {
+        options!.onNextPage!();
+        await tester.pumpAndSettle();
+      }
+      expect(options!.onNextPage, isNull);
+      options!.onPreviousPage!();
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(repo.reading('corner-profile', book.pdfSha256).page, wide ? 1 : 2);
+      expect(repo.reading('default', book.pdfSha256).page, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('详情退出重进恢复阅读位置，书籍和入页档案隔离，旧书回调失效', (tester) async {
     final bookA = Textbook.fromJson({...book.toJson(), 'pageCount': 30});
     final bookB = Textbook.fromJson({

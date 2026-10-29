@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:poemath/core/services/textbook_toc_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_corner.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_layout.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_turn.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
@@ -138,6 +139,24 @@ class _TextbookPdfPreviewState extends State<TextbookPdfPreview> {
     super.dispose();
   }
 
+  void _tapPage(Offset point, Size size, int number, int pageCount) {
+    if (_navigationTarget != null ||
+        !_controller.hasClients ||
+        _controller.position.isScrollingNotifier.value ||
+        _layout.spreadIndex(number) != _layout.spreadIndex(_page)) {
+      return;
+    }
+    final pages = _layout.pages(_layout.spreadIndex(_page), pageCount);
+    switch (textbookPageCornerAt(point, Offset.zero & size)) {
+      case TextbookPageCorner.previous:
+        if (number == pages.first) widget.options.onPreviousPage?.call();
+      case TextbookPageCorner.next:
+        if (number == pages.last) widget.options.onNextPage?.call();
+      case null:
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) => PdfDocumentViewBuilder(
         documentRef: _documentRef,
@@ -217,11 +236,21 @@ class _TextbookPdfPreviewState extends State<TextbookPdfPreview> {
           pageNumber: number,
           decorationBuilder: (context, _, __, pageImage) => Center(
             child: pageImage != null
-                ? TextbookCurlPageImage(
-                    image: pageImage,
-                    start: start,
-                    end: end,
-                    gutter: end - start < 1 ? SpacingTokens.xs : 0,
+                ? GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    excludeFromSemantics: true,
+                    onTapUp: (details) => _tapPage(
+                      details.localPosition,
+                      Size(pageImage.width!, pageImage.height!),
+                      number,
+                      document.pages.length,
+                    ),
+                    child: TextbookCurlPageImage(
+                      image: pageImage,
+                      start: start,
+                      end: end,
+                      gutter: end - start < 1 ? SpacingTokens.xs : 0,
+                    ),
                   )
                 : const CircularProgressIndicator(),
           ),

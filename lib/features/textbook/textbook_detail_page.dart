@@ -285,6 +285,9 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
 
   Widget _preview(String path, Textbook book, TextbookPageLayout layout) {
     final revision = _previewRevision;
+    final previous = layout.previous(_previewPage, book.pageCount);
+    final next = layout.next(_previewPage, book.pageCount);
+    final canTurn = !_turning && _previewVisible && _goToPage != null;
     final options = TextbookViewerOptions(
       path: path,
       contentCache: ref.read(textbookFileServiceProvider).contentCache(book),
@@ -314,6 +317,12 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       },
       onRetry: _retryPreview,
       doublePage: layout.doublePage,
+      onPreviousPage: canTurn && previous != null
+          ? () => _turnPage(previous, book.pageCount)
+          : null,
+      onNextPage: canTurn && next != null
+          ? () => _turnPage(next, book.pageCount)
+          : null,
     );
     return KeyedSubtree(
       key: ValueKey('$path:$revision'),

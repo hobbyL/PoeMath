@@ -92,11 +92,21 @@ class TextbookPageCurl {
     return path;
   }();
 
-  late final revealed = Path.combine(
-    PathOperation.difference,
-    Path()..addRect(Offset.zero & size),
-    coverage,
-  );
+  late final revealed = () {
+    final page = Path()..addRect(Offset.zero & size);
+    if (!active || progress >= 0.999) return page;
+    if (progress < 0.001) {
+      double edge(double y) => (fold - (y - size.height / 2) * math.tan(tilt))
+          .clamp(0.0, size.width);
+      return Path()
+        ..moveTo(edge(0), 0)
+        ..lineTo(size.width, 0)
+        ..lineTo(size.width, size.height)
+        ..lineTo(edge(size.height), size.height)
+        ..close();
+    }
+    return Path.combine(PathOperation.difference, page, coverage);
+  }();
 
   /// 弯曲区密集采样，平面区域只需端点；随倾斜逐行对齐圆柱。
   TextbookCurlMesh meshFor(Rect source, {bool reverse = false}) {

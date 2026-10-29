@@ -239,6 +239,12 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
             },
             onRetry: _retry,
             doublePage: layout.doublePage,
+            onPreviousPage: _goToPage != null && previous != null
+                ? () => _navigate(previous)
+                : null,
+            onNextPage: _goToPage != null && next != null
+                ? () => _navigate(next)
+                : null,
           );
           return KeyedSubtree(
             key: ValueKey(_viewerRevision),

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_layout.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_preview.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
 import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
@@ -13,12 +15,36 @@ import '../test/helpers/textbook_fixture.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('真实预览：邻页预渲染及翻页等待测量', (tester) async {
+  testWidgets('真实预览：邻页预渲染、书角点击与翻页等待测量', (tester) async {
     final directory = await Directory.systemTemp.createTemp('preview_render_');
     final file =
         await File('${directory.path}/sample.pdf').writeAsBytes(syntheticPdf());
     TextbookGoToPage? goTo;
     var page = 1;
+    void turn(bool forward, {bool doublePage = false}) {
+      final layout = TextbookPageLayout(doublePage: doublePage);
+      final target = forward ? layout.next(page, 3) : layout.previous(page, 3);
+      if (target != null) unawaited(goTo!(target));
+    }
+
+    Rect imageBounds(int number) => tester.getRect(
+          find.descendant(
+            of: find.byWidgetPredicate(
+              (widget) => widget is PdfPageView && widget.pageNumber == number,
+            ),
+            matching: find.byType(RawImage),
+          ),
+        );
+
+    Future<void> tapCorner(Rect bounds, {required bool next}) async {
+      await tester.tapAt(
+        next
+            ? bounds.bottomRight - const Offset(16, 16)
+            : bounds.bottomLeft + const Offset(16, -16),
+      );
+      await tester.pumpAndSettle();
+    }
+
     Widget preview({bool doublePage = false, bool reduceMotion = false}) =>
         MaterialApp(
           builder: (context, child) => MediaQuery(
@@ -39,6 +65,8 @@ void main() {
                     onReady: (value) => goTo = value,
                     onPageChanged: (value) => page = value,
                     onRetry: () {},
+                    onPreviousPage: () => turn(false, doublePage: doublePage),
+                    onNextPage: () => turn(true, doublePage: doublePage),
                   ),
                 ),
               ),
@@ -61,6 +89,27 @@ void main() {
             _rendered(tester, 3),
       );
       await tester.pumpAndSettle();
+      await tester.tapAt(imageBounds(1).center);
+      await tester.pumpAndSettle();
+      expect(page, 1);
+      await tapCorner(imageBounds(1), next: false);
+      expect(page, 1);
+      for (var turn = 0; turn < 5; turn++) {
+        await tapCorner(imageBounds(1), next: true);
+        await _until(tester, () => page == 2);
+        await tapCorner(imageBounds(2), next: false);
+        await _until(tester, () => page == 1);
+      }
+      // 从书角开始滑动仍然只走一次原有 PageView 翻页。
+      await tester.dragFrom(
+        imageBounds(1).bottomRight - const Offset(16, 16),
+        const Offset(-280, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(page, 2);
+      final restoreCover = goTo!(1);
+      await tester.pumpAndSettle();
+      await restoreCover;
       final prefetched = _rendered(tester, 2);
       final pageView = tester.widget<PageView>(find.byType(PageView));
       final firstPage = find.byWidgetPredicate(
@@ -150,6 +199,16 @@ void main() {
       expect(left.top, right.top);
       expect(right.left, greaterThan(left.right));
       expect(page, 2);
+      // 对开只响应书本外侧两角，书脊两旁不能反向翻页。
+      await tapCorner(imageBounds(2), next: true);
+      await tapCorner(imageBounds(3), next: false);
+      expect(page, 2);
+      await tapCorner(imageBounds(3), next: true);
+      expect(page, 2);
+      await tapCorner(imageBounds(2), next: false);
+      await _until(tester, () => page == 1);
+      await tapCorner(imageBounds(1), next: true);
+      await _until(tester, () => page == 2);
       // 同一展开页输入右页仍保留精确页码。
       final sameSpreadRight = goTo!(3);
       await tester.pumpAndSettle();
@@ -190,6 +249,8 @@ void main() {
                 onReady: (value) => goTo = value,
                 onPageChanged: (value) => page = value,
                 onRetry: () {},
+                onPreviousPage: () => turn(false, doublePage: true),
+                onNextPage: () => turn(true, doublePage: true),
               ),
             ),
           ),
@@ -205,6 +266,28 @@ void main() {
       expect(controller.visibleRect.contains(rects[1].center), isTrue);
       expect(controller.visibleRect.contains(rects[2].center), isTrue);
       expect(page, 3);
+      Rect readerBounds(int number) {
+        final rect = controller.layout.pageLayouts[number - 1];
+        return Rect.fromPoints(
+          controller.documentToLocal(rect.topLeft),
+          controller.documentToLocal(rect.bottomRight),
+        ).shift(tester.getTopLeft(find.byType(PdfViewer)));
+      }
+
+      await tapCorner(readerBounds(2), next: false);
+      await _until(tester, () => page == 1);
+      await tapCorner(readerBounds(1), next: true);
+      await _until(tester, () => page == 2);
+      // 双击仍由原 PDF 手势识别，不触发单击书角导航。
+      final doubleTapPoint = readerBounds(2).bottomLeft + const Offset(16, -16);
+      await tester.tapAt(doubleTapPoint);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tapAt(doubleTapPoint);
+      await tester.pumpAndSettle();
+      expect(page, 2);
+      final restoreRight = goTo!(3);
+      await tester.pumpAndSettle();
+      await restoreRight;
       final readerCover = goTo!(1);
       await _until(tester, () => page == 1);
       await tester.pumpAndSettle();
@@ -223,6 +306,8 @@ void main() {
                 onReady: (value) => goTo = value,
                 onPageChanged: (value) => page = value,
                 onRetry: () {},
+                onPreviousPage: () => turn(false),
+                onNextPage: () => turn(true),
               ),
             ),
           ),
@@ -230,6 +315,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(page, 3);
+      await tapCorner(readerBounds(3), next: true);
+      expect(page, 3);
+      await tapCorner(readerBounds(3), next: false);
+      await _until(tester, () => page == 2);
+      await tapCorner(readerBounds(2), next: true);
+      await _until(tester, () => page == 3);
       expect(tester.takeException(), isNull);
     } finally {
       await tester.pumpWidget(const SizedBox());

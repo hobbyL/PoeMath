@@ -5,6 +5,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:poemath/core/services/textbook_content_cache.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_corner.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_layout.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
@@ -26,6 +27,8 @@ class TextbookViewerOptions {
     this.onSearchReady,
     this.onTocReady,
     this.contentCache,
+    this.onPreviousPage,
+    this.onNextPage,
   });
   final String path;
   final int initialPage;
@@ -36,6 +39,8 @@ class TextbookViewerOptions {
   final ValueChanged<TextbookSearch>? onSearchReady;
   final ValueChanged<TextbookTocLoader>? onTocReady;
   final TextbookContentCache? contentCache;
+  final VoidCallback? onPreviousPage;
+  final VoidCallback? onNextPage;
 }
 
 /// PDF 库只在此适配层出现，页面/测试可注入其他渲染器。
@@ -119,6 +124,30 @@ class _TextbookPdfViewState extends State<TextbookPdfView> {
           horizontalCacheExtent: 1,
           verticalCacheExtent: 2,
           maxImageBytesCachedOnMemory: 64 * 1024 * 1024,
+          onGeneralTap: (_, controller, details) {
+            if (details.type != PdfViewerGeneralTapType.tap ||
+                !_viewerReady ||
+                _changingLayout ||
+                _navigating) {
+              return false;
+            }
+            final spread = _spreadRect(_page);
+            final corner = textbookPageCornerAt(
+              details.localPosition,
+              Rect.fromPoints(
+                controller.documentToLocal(spread.topLeft),
+                controller.documentToLocal(spread.bottomRight),
+              ),
+            );
+            final action = switch (corner) {
+              TextbookPageCorner.previous => widget.options.onPreviousPage,
+              TextbookPageCorner.next => widget.options.onNextPage,
+              null => null,
+            };
+            if (action == null) return false;
+            action();
+            return true;
+          },
           sizeDelegateProvider: PdfViewerSizeDelegateProviderLegacy(
             calculateInitialZoom: (_, controller, fitScale, coverScale) {
               if (!widget.options.doublePage) return coverScale;
