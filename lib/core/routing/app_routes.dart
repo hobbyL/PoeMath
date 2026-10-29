@@ -9,10 +9,16 @@ class AppRoutes {
 
   // ============ Shell 顶层 tab 路由 ============
   static const String home = '/';
+  static const String chineseTab = '/chinese';
   static const String poemTab = '/poem';
   static const String mathTab = '/math';
   static const String studyHub = '/study';
   static const String profile = '/profile';
+
+  static String chineseSectionOf(String section) => Uri(
+        path: chineseTab,
+        queryParameters: {'section': section},
+      ).toString();
 
   // ============ 诗词模块 ============
   static const String poemDetail = '/poem/detail/:id';

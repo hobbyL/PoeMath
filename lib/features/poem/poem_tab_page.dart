@@ -16,7 +16,14 @@ import 'package:poemath/features/poem/widgets/poem_card.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 
 class PoemTabPage extends ConsumerStatefulWidget {
-  const PoemTabPage({super.key});
+  const PoemTabPage({
+    super.key,
+    this.navigationTitle,
+    this.navigationToolbarHeight,
+  });
+
+  final Widget? navigationTitle;
+  final double? navigationToolbarHeight;
 
   @override
   ConsumerState<PoemTabPage> createState() => _PoemTabPageState();
@@ -129,18 +136,26 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
         builder: (context, constraints) {
           final columns = ResponsiveLayout.columns(constraints.maxWidth);
           return CustomScrollView(
+            key: const PageStorageKey('poem-list'),
             slivers: [
               // ============ AppBar（精简版） ============
               SliverAppBar(
+                pinned: widget.navigationTitle != null,
                 floating: true,
                 snap: true,
+                centerTitle: widget.navigationTitle != null ? true : null,
+                titleSpacing:
+                    widget.navigationTitle != null ? SpacingTokens.sm : null,
+                leadingWidth:
+                    widget.navigationTitle != null ? SpacingTokens.xxl : null,
+                toolbarHeight: widget.navigationToolbarHeight ?? kToolbarHeight,
                 automaticallyImplyLeading: false,
                 leading: IconButton(
                   onPressed: () => context.push(AppRoutes.poemLearningPath),
                   icon: const Icon(Icons.route_rounded),
                   tooltip: '学习路径',
                 ),
-                title: Text('诗词(${poems.length})'),
+                title: widget.navigationTitle ?? Text('诗词(${poems.length})'),
                 actions: [
                   IconButton(
                     onPressed: () => context.push(AppRoutes.poemFavorites),

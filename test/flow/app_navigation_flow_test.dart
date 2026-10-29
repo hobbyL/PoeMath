@@ -53,7 +53,7 @@ void main() {
     expect(_selectedTab(tester), 0, reason: '启动应停在首页 tab');
 
     const expectedIndex = <String, int>{
-      '诗词': 1,
+      '语文': 1,
       '口算': 2,
       '我的': 3,
       '首页': 0,

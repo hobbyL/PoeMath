@@ -1,6 +1,6 @@
 // test/shell/main_shell_test.dart
 //
-// MainShell 5-Tab 点击测试：点击 tab 后应正确切换页面；
+// MainShell 4-Tab 点击测试：点击 tab 后应正确切换页面；
 // 主题由用户在设置页手动切换，tab 切换不改变主题。
 
 import 'package:flutter/material.dart';
@@ -75,12 +75,12 @@ void main() {
     expect(_selectedTab(tester), 2, reason: '应切到口算 tab');
     expect(container.read(activeSubjectProvider), initialSubject);
 
-    // 点击"诗词" — 切换到诗词页，主题仍不变
-    await tester.tap(find.text('诗词'));
+    // 点击“语文”切换到课本与诗词入口，主题仍不变。
+    await tester.tap(find.text('语文'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
-    expect(_selectedTab(tester), 1, reason: '应切到诗词 tab');
+    expect(_selectedTab(tester), 1, reason: '应切到语文 tab');
     expect(container.read(activeSubjectProvider), initialSubject);
 
     // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。

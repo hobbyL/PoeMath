@@ -19,6 +19,7 @@ import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/features/assistant/assistant_page.dart';
+import 'package:poemath/features/chinese/chinese_tab_page.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
@@ -45,7 +46,6 @@ import 'package:poemath/features/poem/poem_recite_mode_page.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/poem_review_page.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
-import 'package:poemath/features/poem/poem_tab_page.dart';
 import 'package:poemath/features/profile/about_page.dart';
 import 'package:poemath/features/profile/achievement_page.dart';
 import 'package:poemath/features/profile/learning_stats_page.dart';
@@ -105,7 +105,14 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           ),
           GoRoute(
             path: AppRoutes.poemTab,
-            builder: (context, state) => const PoemTabPage(),
+            redirect: (context, state) => AppRoutes.chineseSectionOf('poem'),
+          ),
+          GoRoute(
+            path: AppRoutes.chineseTab,
+            builder: (context, state) => ChineseTabPage(
+              section:
+                  ChineseSection.fromId(state.uri.queryParameters['section']),
+            ),
           ),
           GoRoute(
             path: AppRoutes.mathTab,
@@ -117,7 +124,7 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           ),
         ],
       ),
-      // ============ 语文教材（全屏，保留诗词 Tab） ============
+      // ============ 语文教材（学习详情全屏，返回语文 Tab） ============
       GoRoute(
         path: AppRoutes.textbookManagement,
         pageBuilder: (context, state) => fadeSlideTransitionPage(

@@ -1,7 +1,7 @@
 // lib/features/shell/main_shell.dart
 //
 // 层级：features/shell
-// 职责：应用主体的 4-Tab Shell（首页 / 诗词 / 口算 / 我的）+
+// 职责：应用主体的 4-Tab Shell（首页 / 语文 / 口算 / 我的）+
 //       启动/前台恢复自动检测更新的挂载点（WidgetsBindingObserver）。
 // 依赖：go_router / Riverpod / AppRoutes / UpdateCheckController。
 
@@ -28,11 +28,15 @@ import 'package:poemath/features/shell/update_dialog.dart';
 /// controller 构造工厂：MainShell 传入自己的 onAvailable 包装后构造，
 /// 保证注入路径与生产路径同构（抑制分支等 MainShell 链路可被测试覆盖）。
 typedef UpdateCheckControllerFactory = UpdateCheckController Function(
-    UpdateAvailableCallback onAvailable,);
+  UpdateAvailableCallback onAvailable,
+);
 
 class MainShell extends ConsumerStatefulWidget {
-  const MainShell(
-      {super.key, required this.child, this.updateControllerFactory,});
+  const MainShell({
+    super.key,
+    required this.child,
+    this.updateControllerFactory,
+  });
 
   final Widget child;
 
@@ -48,7 +52,7 @@ class _MainShellState extends ConsumerState<MainShell>
   /// 4 个 tab 对应的目标路由。
   static const List<String> _routes = [
     AppRoutes.home,
-    AppRoutes.poemTab,
+    AppRoutes.chineseTab,
     AppRoutes.mathTab,
     AppRoutes.profile,
   ];
@@ -95,8 +99,12 @@ class _MainShellState extends ConsumerState<MainShell>
     try {
       await ref.read(backupHistoryProvider).maybeCreateDaily();
     } on Object catch (error, stackTrace) {
-      AppLogger.e('每日快照暂未完成，下次回到应用将重试',
-          tag: 'Backup', error: error, stackTrace: stackTrace,);
+      AppLogger.e(
+        '每日快照暂未完成，下次回到应用将重试',
+        tag: 'Backup',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -113,7 +121,8 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   UpdateCheckController _realControllerFactory(
-      UpdateAvailableCallback onAvailable,) {
+    UpdateAvailableCallback onAvailable,
+  ) {
     return UpdateCheckController(
       updateCheckConfigured: AppConfig.hasUpdateCheckUrl,
       client: UpdateClient(updateUrl: AppConfig.updateCheckUrl),
@@ -196,7 +205,9 @@ class _MainShellState extends ConsumerState<MainShell>
   /// 根据当前路由推导 tab index。
   int _indexFromRoute(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-    if (location == AppRoutes.poemTab) return 1;
+    if (location == AppRoutes.chineseTab || location == AppRoutes.poemTab) {
+      return 1;
+    }
     if (location == AppRoutes.mathTab) return 2;
     if (location == AppRoutes.profile) return 3;
     return 0;
@@ -230,7 +241,7 @@ class _MainShellState extends ConsumerState<MainShell>
           NavigationDestination(
             icon: Icon(Icons.menu_book_outlined),
             selectedIcon: Icon(Icons.menu_book_rounded),
-            label: '诗词',
+            label: '语文',
           ),
           NavigationDestination(
             icon: Icon(Icons.calculate_outlined),
