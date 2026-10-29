@@ -30,8 +30,12 @@ import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
+import 'package:poemath/domain/writing_stroke_data.dart';
 import 'package:poemath/features/poem/poem_answer_difference.dart';
+import 'package:poemath/features/poem/widgets/poem_handwriting_pad.dart';
+import 'package:poemath/features/poem/widgets/poem_sentence_writing_sheet.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 
 /// 中文标点集合（不作为听写目标），口径与背诵页一致。
 const _punctuation = {
@@ -138,7 +142,12 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
 
   // ── 输入模式 ──
   bool _useTyping = false;
-  final _typeController = TextEditingController();
+
+  // ── 手写默写 ──
+  /// 当前待手写字 → 笔顺数据（null = 无数据降级自由书写）。
+  CharacterStrokeData? _handwriteStrokeData;
+  bool _handwriteLoading = false;
+  int _handwriteLoadId = 0;
 
   // ── 点选模式 ──
   List<_CandidateTile> _candidates = [];
@@ -164,7 +173,6 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
   void dispose() {
     // 退出停播纪律：与 assistant / detail 页一致。
     unawaited(_tts.stop().onError((_, __) {}));
-    _typeController.dispose();
     super.dispose();
   }
 
@@ -213,12 +221,57 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
       _currentLineIndex = index;
       _filled = [];
       _judging = false;
-      _typeController.clear();
+      _handwritten.clear();
+      _handwriteStrokeData = null;
       _candidates = _generateCandidates(target);
     });
+    if (_useTyping) {
+      // 手写默写：预载首字笔顺（逐字换新时再取下一个）。
+      unawaited(_loadHandwriteStrokeData(target.first));
+    }
     // 进入新句自动朗读（听一句，写一句）。
     unawaited(_speakLine(index));
   }
+
+  /// 加载手写目标字的笔顺数据；无数据（未收录）时保持 null 走降级路径。
+  Future<void> _loadHandwriteStrokeData(String character) async {
+    final loadId = ++_handwriteLoadId;
+    setState(() => _handwriteLoading = true);
+    try {
+      final asset = await ref.read(writingStrokeDataProvider.future);
+      if (!mounted || loadId != _handwriteLoadId) return;
+      setState(() {
+        _handwriteStrokeData = asset[character];
+        _handwriteLoading = false;
+      });
+    } on Object {
+      if (!mounted || loadId != _handwriteLoadId) return;
+      setState(() {
+        // 资产加载失败：本句降级自由书写（与无数据同路径）。
+        _handwriteStrokeData = null;
+        _handwriteLoading = false;
+      });
+    }
+  }
+
+  /// 手写板确认一个字：填入作答序列；满句即走既有判定。
+  void _onHandwriteCharConfirmed(PoemHandwrittenChar result) {
+    if (_judging) return;
+    HapticFeedback.lightImpact();
+    _handwritten.add(result);
+    final target = _targetCharsOf(_lines[_currentLineIndex]);
+    if (_handwritten.length >= target.length) {
+      // 整句写满：按笔迹序拼出作答走既有判定（对/错由判定给出）。
+      _judgeCurrentLine([for (final c in _handwritten) c.character]);
+      return;
+    }
+    // 预载下一个待手写字的笔顺。
+    unawaited(_loadHandwriteStrokeData(target[_handwritten.length]));
+    setState(() {});
+  }
+
+  /// 当前句已确认的笔迹（句级格位行展示）。
+  final List<PoemHandwrittenChar> _handwritten = [];
 
   /// 候选字池：本句全部字（含重复）+ 干扰字，凑满 12 个（句长更长则全用）。
   List<_CandidateTile> _generateCandidates(List<String> target) {
@@ -341,15 +394,6 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
     });
   }
 
-  void _submitTyped() {
-    if (_judging) return;
-    final typed = _typeController.text;
-    final typedChars =
-        typed.characters.where((ch) => !_isPunctuation(ch)).toList();
-    if (typedChars.isEmpty) return;
-    _judgeCurrentLine(typedChars);
-  }
-
   /// 逐句判定：去标点后逐字全对才计通过。
   void _judgeCurrentLine(List<String> answer) {
     final target = _targetCharsOf(_lines[_currentLineIndex]);
@@ -361,7 +405,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
         lineIndex: _sourceIndices[_currentLineIndex],
         lineText: _lines[_currentLineIndex],
         expected: target.join(),
-        answer: _useTyping ? _typeController.text : answer.join(),
+        answer: answer.join(),
         passed: isCorrect,
       ),
     );
@@ -524,16 +568,16 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
       child: Scaffold(
         appBar: AppBar(
           title: Text('听写 · ${poem.title}'),
-          actions: [
-            // 再听一遍当前句
-            IconButton(
-              onPressed: () => unawaited(_speakLine(_currentLineIndex)),
-              tooltip: '再听一遍',
-              icon: const Icon(Icons.volume_up_outlined),
-            ),
-            // 点选 ⇄ 打字 模式切换
-            Padding(
-              padding: const EdgeInsets.only(right: SpacingTokens.sm),
+          // 点选 ⇄ 默写 模式切换：导航栏正下方（AppBar.bottom）。
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(56),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.md,
+                0,
+                SpacingTokens.md,
+                SpacingTokens.sm,
+              ),
               child: SegmentedButton<bool>(
                 segments: const [
                   ButtonSegment(
@@ -543,20 +587,35 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
                   ),
                   ButtonSegment(
                     value: true,
-                    icon: Icon(Icons.keyboard_outlined, size: 18),
-                    label: Text('打字'),
+                    icon: Icon(Icons.draw_outlined, size: 18),
+                    label: Text('默写'),
                   ),
                 ],
                 selected: {_useTyping},
                 onSelectionChanged: _judging
                     ? null
                     : (selection) {
-                        setState(() => _useTyping = selection.first);
+                        final next = selection.first;
+                        setState(() {
+                          _useTyping = next;
+                          _filled = [];
+                          _handwriteStrokeData = null;
+                        });
+                        if (next) {
+                          final target =
+                              _targetCharsOf(_lines[_currentLineIndex]);
+                          if (target.isNotEmpty) {
+                            unawaited(_loadHandwriteStrokeData(target.first));
+                          }
+                        }
                       },
                 showSelectedIcon: false,
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             ),
-          ],
+          ),
         ),
         body: SafeArea(
           child: Stack(
@@ -589,36 +648,43 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
       child: Column(
         children: [
           _buildProgressBar(context),
-          const SizedBox(height: SpacingTokens.lg),
+          const SizedBox(height: SpacingTokens.md),
 
-          // 朗读状态提示
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                _isSpeaking ? Icons.graphic_eq : Icons.hearing_outlined,
-                size: 20,
-                color: theme.colorScheme.primary,
+          // 朗读状态提示（点击重听当前句；准备期禁用避免重入）
+          InkWell(
+            onTap: _isPreparing ? null : () => unawaited(_speakLine(_currentLineIndex)),
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: SpacingTokens.sm,
+                vertical: SpacingTokens.xs,
               ),
-              const SizedBox(width: SpacingTokens.xs),
-              Text(
-                _isSpeaking ? '正在朗读…' : '听写第 ${_currentLineIndex + 1} 句',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isSpeaking ? Icons.graphic_eq : Icons.hearing_outlined,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: SpacingTokens.xs),
+                  Text(
+                    _isSpeaking ? '正在朗读…' : '听写第 ${_currentLineIndex + 1} 句',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
 
-          const Spacer(),
-
-          // 已填字格（两种模式共用展示；打字模式显示输入框）
-          _useTyping ? _buildTypingInput(context) : _buildFilledSlots(context),
-
-          const Spacer(),
-
-          // 点选模式：候选字格
+          // 点选模式：已填字格 + 候选字格（上下留白居中）。
           if (!_useTyping) ...[
+            const Spacer(),
+            _buildFilledSlots(context),
+            const Spacer(),
             _buildCandidateGrid(context),
             const SizedBox(height: SpacingTokens.sm),
             TextButton.icon(
@@ -628,11 +694,25 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
             ),
           ],
 
+          // 手写默写模式：整句格位行 + 书写板紧跟状态行（听一句写一句）。
           if (_useTyping)
-            FilledButton.icon(
-              onPressed: _submitTyped,
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('确认本句'),
+            Expanded(
+              child: _handwriteLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.only(
+                        top: SpacingTokens.sm,
+                      ),
+                      child: PoemSentenceWritingSheet(
+                        targetChars: _targetCharsOf(
+                          _lines[_currentLineIndex],
+                        ),
+                        confirmedChars: _handwritten,
+                        currentStrokeData: _handwriteStrokeData,
+                        onCharConfirmed: _onHandwriteCharConfirmed,
+                        maxBoardSide: 240,
+                      ),
+                    ),
             ),
 
           const SizedBox(height: SpacingTokens.md),
@@ -774,27 +854,6 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
             )
             .fadeIn(delay: (60 * i).ms, duration: 200.ms);
       }).toList(),
-    );
-  }
-
-  Widget _buildTypingInput(BuildContext context) {
-    final theme = Theme.of(context);
-    return TextField(
-      controller: _typeController,
-      enabled: !_judging,
-      maxLines: 1,
-      textAlign: TextAlign.center,
-      style: theme.textTheme.headlineSmall?.copyWith(
-        letterSpacing: 4,
-        fontFamilyFallback: TypographyTokens.serifFallback,
-      ),
-      decoration: InputDecoration(
-        hintText: '听到什么，写什么…',
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        ),
-      ),
-      onSubmitted: (_) => _submitTyped(),
     );
   }
 

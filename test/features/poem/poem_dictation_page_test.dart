@@ -24,6 +24,9 @@ import '../../helpers/hive_test_helper.dart';
 import '../../helpers/recording_sound_service.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/poem_dictation_page.dart';
+import 'package:poemath/features/poem/widgets/poem_sentence_writing_sheet.dart';
+import 'package:poemath/features/textbook/writing/writing_canvas.dart';
+import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
@@ -157,6 +160,10 @@ void main() {
         userStatsRepoProvider.overrideWithValue(_Stats()),
         checkInRepoProvider.overrideWithValue(checkIn),
         poemByIdProvider(_poemId).overrideWith((ref) => poem ?? _makePoem()),
+        // 手写默写用空笔顺资产：全部走自由书写降级（「下一个」直通）。
+        writingStrokeDataProvider.overrideWith(
+          (ref) => const WritingStrokeAsset({}),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -387,20 +394,39 @@ void main() {
     expect(container.read(lastPracticeScoreProvider), 0.5);
   });
 
-  testWidgets('打字模式：输入整句判定通过', (tester) async {
+  testWidgets('默写（手写）模式：整句逐字写完判定通过并推进下一句', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
     await pumpPage(tester);
 
-    await tester.tap(find.text('打字'));
+    // 切到手写默写。
+    await tester.tap(find.text('默写'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
-    await tester.enterText(
-      find.byType(TextField),
-      '床前明月光，',
-    );
-    await tester.tap(find.text('确认本句'));
+    // 整句「床前明月光」为一排田字格；活跃格书写板是最后一个 WritingCanvas
+    // （格位行的已写格不可交互、活跃格只是容器）。笔顺资产为空 →
+    // 自由书写「下一个」直通。
+    final target = '床前明月光';
+    for (var i = 0; i < target.length; i++) {
+      final pads = find.descendant(
+        of: find.byType(PoemSentenceWritingSheet),
+        matching: find.byType(WritingCanvas),
+      );
+      // 末位是书写板（已写格数 = i，活跃格无笔迹不可交互）。
+      final board = pads.at(pads.evaluate().length - 1);
+      await tester.ensureVisible(board);
+      await tester.drag(board, const Offset(20, 20));
+      await tester.pump();
+      final next = find.text('下一个');
+      await tester.ensureVisible(next);
+      await tester.tap(next);
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    // 整句判定反馈期 900ms 后进入第 2 句（进度 1/2）。
     await tester.pump(const Duration(milliseconds: 950));
-
-    // 第 1 句已判定进入第 2 句（进度 1/2）
     expect(find.text('1/2'), findsOneWidget);
   });
 

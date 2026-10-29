@@ -33,6 +33,7 @@ import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
+import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
@@ -304,6 +305,10 @@ void main() {
         achievementRepoProvider.overrideWith(
           (ref) => achievementRepo ?? _UnlockedAchievementRepository(),
         ),
+        // 默写模式手写准备会读笔顺资产：测试环境给空资产（全部降级自由书写）。
+        writingStrokeDataProvider.overrideWith(
+          (ref) => const WritingStrokeAsset({}),
+        ),
       ],
     );
   }
@@ -324,7 +329,7 @@ void main() {
     );
   }
 
-  /// 页面就绪并切到默写模式、输入全文；结束于提交按钮已启用。
+  /// 页面就绪并切到默写模式（键盘输入）、输入全文；结束于提交按钮已启用。
   /// [home] 非空时先点击其中的「打开背诵」推入页面（R3 记录 pop 结果用）。
   Future<void> prepareDictation(
     WidgetTester tester,
@@ -340,6 +345,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     await tester.tap(find.text('默写'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // 默写默认手写；本组回归结算竞态，走键盘输入路径。
+    await tester.tap(find.byTooltip('切换键盘输入'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 

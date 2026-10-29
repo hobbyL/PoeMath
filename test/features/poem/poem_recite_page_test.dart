@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
+import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
@@ -44,12 +45,15 @@ void main() {
       await tearDownHiveForTesting();
     });
 
-    /// 进入默写模式；结束时提交按钮处于禁用态。
+    /// 进入默写模式（手写为默认输入，先切到键盘）；结束时提交按钮处于禁用态。
     Future<void> enterDictation(WidgetTester tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             poemByIdProvider(_poemId).overrideWith((ref) => _poem),
+            writingStrokeDataProvider.overrideWith(
+              (ref) => const WritingStrokeAsset({}),
+            ),
           ],
           child: const MaterialApp(home: PoemRecitePage(poemId: _poemId)),
         ),
@@ -58,6 +62,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       await tester.tap(find.text('默写'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // 默写默认手写，本组回归的是键盘输入路径：切到键盘。
+      await tester.tap(find.byTooltip('切换键盘输入'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
     }

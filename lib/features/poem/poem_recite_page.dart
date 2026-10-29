@@ -21,11 +21,15 @@ import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
+import 'package:poemath/domain/writing_stroke_data.dart';
 import 'package:poemath/features/poem/poem_practice_history_page.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
+import 'package:poemath/features/poem/widgets/poem_handwriting_pad.dart';
+import 'package:poemath/features/poem/widgets/poem_sentence_writing_sheet.dart';
+import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 
 /// 背诵难度级别。
 enum ReciteLevel {
@@ -117,6 +121,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   final _celebrationCtrl = CelebrationController();
   final _dictController = TextEditingController();
 
+  /// 手写默写目标字 → 笔顺数据（postFrame 异步准备，未就绪时降级自由书写）。
+  final Map<String, CharacterStrokeData?> _strokeCache = {};
+  bool _strokeLoadingFailed = false;
+
   // ── 诗句数据 ──
   List<String> _lines = [];
   List<String> _pinyinLines = [];
@@ -160,6 +168,25 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   bool _showDictDiff = false;
   bool _allowResultPop = false;
 
+  /// 默写输入方式：手写（默认）⇄ 键盘。
+  bool _dictHandwrite = true;
+
+  /// 手写默写：当前句字符队列（含标点，标点自动落位）。
+  List<String> _dictTargetChars = [];
+
+  /// 手写默写：当前句已确认的笔迹（格位行展示 + 结算组装全文）。
+  final List<PoemHandwrittenChar> _dictConfirmed = [];
+
+  /// 手写默写：全诗各句笔迹（句下标 → 该句确认笔迹），结算时按序拼接。
+  final Map<int, List<PoemHandwrittenChar>> _dictLineResults = {};
+
+  /// 当前句手写板目标字。
+  String get _dictCurrentChar =>
+      _dictCharIdx < _dictTargetChars.length
+          ? _dictTargetChars[_dictCharIdx]
+          : '';
+  int get _dictCharIdx => _dictConfirmed.length;
+
   /// 默写输入是否非空 —— 驱动「提交默写」按钮的启用状态。
   /// 由 `_dictController` 的监听器维护，覆盖键入与 `clear()` 两条路径。
   bool _canSubmitDictation = false;
@@ -186,6 +213,63 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       setState(() => _canSubmitDictation = canSubmit);
     }
   }
+
+  // ─────────────────────────────────────────────────────────────
+  // 默写模式：手写逐句
+  // ─────────────────────────────────────────────────────────────
+
+  /// 进入手写默写时预取笔顺资产到本地缓存（整诗目标字，缓存命中复用）。
+  Future<void> _prepareHandwriteDictation() async {
+    final chars = _lines.join().characters.toList();
+    WritingStrokeAsset? asset;
+    try {
+      asset = await ref.read(writingStrokeDataProvider.future);
+    } on Object {
+      // 资产加载失败：全部降级为自由书写（不崩溃，AC6 口径）。
+      _strokeLoadingFailed = true;
+    }
+    if (!mounted) return;
+    for (final ch in chars) {
+      if (_isPunctuation(ch) || _strokeCache.containsKey(ch)) continue;
+      _strokeCache[ch] = asset?[ch];
+    }
+    setState(() {
+      _dictConfirmed.clear();
+      _dictLineResults.clear();
+    });
+    _setupHandwriteLine(0);
+  }
+
+  /// 手写默写换句：装载当前句字符队列（标点由格位行自动落位）。
+  void _setupHandwriteLine(int index) {
+    if (index >= _lines.length) {
+      // 整诗写完：组装全文走既有逐字比对结算。
+      unawaited(_submitHandwriteDictation());
+      return;
+    }
+    setState(() {
+      _dictTargetChars = _lines[index].characters.toList();
+      _dictConfirmed.clear();
+    });
+  }
+
+  /// 手写板确认一个字：入当前句笔迹；写满整句保存后换下一句。
+  void _onHandwriteCharConfirmed(PoemHandwrittenChar result) {
+    if (_completedAt != null || _settlementStarted) return;
+    final lineIdx = _currentHandwriteLine;
+    setState(() => _dictConfirmed.add(result));
+    if (_dictConfirmed.length >= _dictTargetChars.length) {
+      _dictLineResults[lineIdx] = List.of(_dictConfirmed);
+      // 下一帧换句（让「写满」的最后一格先渲染）。
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _completedAt != null || _settlementStarted) return;
+        _setupHandwriteLine(lineIdx + 1);
+      });
+    }
+  }
+
+  /// 手写默写当前进行的句下标（已保存句数 + 当前句）。
+  int get _currentHandwriteLine => _dictLineResults.length;
 
   // ─────────────────────────────────────────────────────────────
   // 初始化
@@ -552,8 +636,12 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _detailsJson = null;
       _settlementError = null;
       _settlementStarted = false; // 新一轮换新 activityId，允许再次结算
+      _resetHandwriteDictation();
       _setupLine(0);
     });
+    if (_level == ReciteLevel.dictation && _dictHandwrite) {
+      unawaited(_prepareHandwriteDictation());
+    }
   }
 
   void _changeLevel(ReciteLevel level) {
@@ -574,8 +662,20 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       _detailsJson = null;
       _settlementError = null;
       _settlementStarted = false; // 新一轮换新 activityId，允许再次结算
+      _resetHandwriteDictation();
       _setupLine(0);
     });
+    // 进默写模式：准备手写逐字队列（异步，不阻塞首帧）。
+    if (level == ReciteLevel.dictation && _dictHandwrite) {
+      unawaited(_prepareHandwriteDictation());
+    }
+  }
+
+  /// 重置手写默写进度（换级/重开共用）。
+  void _resetHandwriteDictation() {
+    _dictTargetChars = [];
+    _dictConfirmed.clear();
+    _dictLineResults.clear();
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -660,6 +760,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   @override
   Widget build(BuildContext context) {
     final poem = ref.watch(poemByIdProvider(widget.poemId));
+    final theme = Theme.of(context);
 
     if (poem == null || _lines.isEmpty) {
       return Scaffold(
@@ -675,7 +776,40 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(poem.title),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: Text(
+                  poem.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: SpacingTokens.sm),
+              Text(
+                '〔${poem.dynasty}〕${poem.author}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          // 分段按钮放导航栏正下方（AppBar.bottom），练习中始终可见可切。
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(56),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.md,
+                0,
+                SpacingTokens.md,
+                SpacingTokens.sm,
+              ),
+              child: _buildLevelSelector(context),
+            ),
+          ),
         ),
         body: Stack(
           children: [
@@ -724,14 +858,6 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       padding: const EdgeInsets.all(SpacingTokens.md),
       child: Column(
         children: [
-          // ── 诗人信息 ──
-          _buildAuthorInfo(context),
-          const SizedBox(height: SpacingTokens.sm),
-
-          // ── 难度 Slider ──
-          _buildLevelSlider(context),
-          const SizedBox(height: SpacingTokens.sm),
-
           // ── 进度条 ──
           _buildProgressBar(context),
           const SizedBox(height: SpacingTokens.lg),
@@ -794,17 +920,6 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     );
   }
 
-  Widget _buildAuthorInfo(BuildContext context) {
-    final poem = ref.read(poemByIdProvider(widget.poemId))!;
-    final theme = Theme.of(context);
-    return Text(
-      '〔${poem.dynasty}〕${poem.author}',
-      style: theme.textTheme.bodyMedium?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-
   Widget _buildProgressBar(BuildContext context) {
     final theme = Theme.of(context);
     final progress = _lines.isEmpty ? 0.0 : _linesCompleted / _lines.length;
@@ -855,53 +970,28 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     );
   }
 
-  Widget _buildLevelSlider(BuildContext context) {
+  /// 难度模式切换：分段按钮（替代原 Slider 滑杆）。
+  Widget _buildLevelSelector(BuildContext context) {
     final theme = Theme.of(context);
-    final levelIndex = ReciteLevel.values.indexOf(_level).toDouble();
 
-    return Column(
-      children: [
-        Row(
-          children: ReciteLevel.values.map((l) {
-            final isActive = l == _level;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => _changeLevel(l),
-                child: Text(
-                  l.label,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: isActive
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 4,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+    return SegmentedButton<ReciteLevel>(
+      segments: [
+        for (final level in ReciteLevel.values)
+          ButtonSegment(
+            value: level,
+            label: Text(level.label),
           ),
-          child: Slider(
-            value: levelIndex,
-            min: 0,
-            max: (ReciteLevel.values.length - 1).toDouble(),
-            divisions: ReciteLevel.values.length - 1,
-            activeColor: theme.colorScheme.primary,
-            inactiveColor: theme.colorScheme.primary.withValues(alpha: 0.2),
-            onChanged: (v) {
-              final newLevel = ReciteLevel.values[v.round()];
-              if (newLevel != _level) {
-                _changeLevel(newLevel);
-              }
-            },
-          ),
-        ),
       ],
+      selected: {_level},
+      onSelectionChanged:
+          (_isComplete || _settlementStarted || _completedAt != null)
+              ? null
+              : (selection) => _changeLevel(selection.first),
+      showSelectedIcon: false,
+      style: ButtonStyle(
+        visualDensity: VisualDensity.compact,
+        textStyle: WidgetStatePropertyAll(theme.textTheme.labelMedium),
+      ),
     );
   }
 
@@ -1075,44 +1165,75 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.all(SpacingTokens.lg),
+      // 顶部间距收紧：标题紧贴 AppBar 分段按钮底缘。
+      padding: const EdgeInsets.fromLTRB(
+        SpacingTokens.lg,
+        SpacingTokens.xs,
+        SpacingTokens.lg,
+        SpacingTokens.lg,
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildAuthorInfo(context),
-          const SizedBox(height: SpacingTokens.sm),
-          _buildLevelSlider(context),
-          const SizedBox(height: SpacingTokens.md),
-          Text(
-            '请默写全文',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.primary,
-            ),
+          // 标题 + 手写 ⇄ 键盘切换：整体 X 轴居中。
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '请默写全文',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              IconButton(
+                tooltip: _dictHandwrite ? '切换键盘输入' : '切换手写',
+                icon: Icon(
+                  _dictHandwrite
+                      ? Icons.keyboard_outlined
+                      : Icons.draw_outlined,
+                  size: 20,
+                ),
+                color: theme.colorScheme.onSurfaceVariant,
+                onPressed: _showDictDiff
+                    ? null
+                    : () => setState(() {
+                          _dictHandwrite = !_dictHandwrite;
+                          _resetHandwriteDictation();
+                          if (_dictHandwrite) {
+                            unawaited(_prepareHandwriteDictation());
+                          }
+                        }),
+              ),
+            ],
           ),
-          const SizedBox(height: SpacingTokens.md),
+          const SizedBox(height: SpacingTokens.xs),
           Expanded(
             child: _showDictDiff
                 ? _buildDiffResult(context)
-                : TextField(
-                    controller: _dictController,
-                    maxLines: null,
-                    expands: true,
-                    textAlignVertical: TextAlignVertical.top,
-                    decoration: InputDecoration(
-                      hintText: '在此默写…',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          SpacingTokens.radiusMedium,
+                : _dictHandwrite
+                    ? _buildHandwriteDictation(context)
+                    : TextField(
+                        controller: _dictController,
+                        maxLines: null,
+                        expands: true,
+                        textAlignVertical: TextAlignVertical.top,
+                        decoration: InputDecoration(
+                          hintText: '在此默写…',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              SpacingTokens.radiusMedium,
+                            ),
+                          ),
+                        ),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          height: 2,
+                          letterSpacing: 1,
                         ),
                       ),
-                    ),
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      height: 2,
-                      letterSpacing: 1,
-                    ),
-                  ),
           ),
           const SizedBox(height: SpacingTokens.md),
-          if (!_showDictDiff)
+          if (!_showDictDiff && !_dictHandwrite)
             FilledButton.icon(
               onPressed: _canSubmitDictation ? _submitDictation : null,
               icon: const Icon(Icons.check_circle_outline),
@@ -1121,6 +1242,61 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
         ],
       ),
     );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 默写模式：手写逐字
+  // ─────────────────────────────────────────────────────────────
+
+  /// 手写逐句默写主体：整句格位行 + 当前字书写板。
+  Widget _buildHandwriteDictation(BuildContext context) {
+    final currentChar = _dictCurrentChar;
+    if (_dictTargetChars.isEmpty || currentChar.isEmpty) {
+      // 队列未装载（进入/换句间隙）。
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Column(
+      children: [
+        // 句进度 + 已完成句的笔迹回看（折叠为小字，节省纵向空间）。
+        Text(
+          '第 ${_currentHandwriteLine + 1}/${_lines.length} 句',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: SpacingTokens.xs),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SpacingTokens.sm,
+            ),
+            child: PoemSentenceWritingSheet(
+              targetChars: _dictTargetChars,
+              confirmedChars: _dictConfirmed,
+              currentStrokeData: _strokeLoadingFailed
+                  ? null
+                  : _strokeCache[currentChar],
+              onCharConfirmed: _onHandwriteCharConfirmed,
+              maxBoardSide: min(
+                MediaQuery.sizeOf(context).width - SpacingTokens.lg * 2,
+                260.0,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 手写整诗完成：按句序组装全文（标点已在位），走既有逐字比对结算。
+  Future<void> _submitHandwriteDictation() async {
+    setState(() => _showDictDiff = true);
+    _dictController.text = [
+      for (var i = 0; i < _lines.length; i++)
+        ...?_dictLineResults[i]?.map((c) => c.character),
+    ].join();
+    await _submitDictation();
   }
 
   Widget _buildDiffResult(BuildContext context) {
