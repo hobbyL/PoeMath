@@ -7,6 +7,7 @@ import 'package:poemath/data/models/textbook_course_review.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/domain/textbook_pinyin_font.dart';
+import 'package:poemath/domain/textbook_text_display.dart';
 
 class TextbookParsedLesson {
   const TextbookParsedLesson(this.lesson, this.candidates);
@@ -16,10 +17,148 @@ class TextbookParsedLesson {
 
 /// 可独立测试的确定性规则。原书证据不足时保留候选，不猜读音或答案。
 class TextbookCourseDraftParser {
-  static const version = 4;
+  static const version = 5;
   String _plain(String value) => value.replaceAll(RegExp(r'[\s·•…*＊]'), '');
   String _title(String value) =>
       _plain(value).replaceFirst(RegExp(r'^\d+[.、]?'), '');
+
+  Map<int, double> _pageMargins(List<_Line> rows) => {
+        for (final page in rows.map((row) => row.page).toSet())
+          page: () {
+            final lefts = rows
+                .where((row) => row.page == page)
+                .map((row) => row.left)
+                .toList()
+              ..sort();
+            return lefts[(lefts.length * .2).floor()];
+          }(),
+      };
+
+  bool _verseLines(List<_Line> rows) {
+    if (rows.length < 2) return false;
+    final clauseEnd = RegExp(r'[，。！？；：、…][”’」』）】》]*$');
+    if (rows.any(
+      (row) => !clauseEnd.hasMatch(row.text.trim()) || row.hasParagraphIndent,
+    )) {
+      return false;
+    }
+    final margins = _pageMargins(rows);
+    return rows
+        .every((row) => (row.left - margins[row.page]!).abs() < row.width);
+  }
+
+  Set<int> _stanzaStarts(List<_Line> rows, {required bool verse}) {
+    final spacings = <int, double>{};
+    for (final page in rows.map((row) => row.page).toSet()) {
+      final intervals = <double>[
+        for (var i = 1; i < rows.length; i++)
+          if (rows[i].page == page &&
+              rows[i - 1].page == page &&
+              rows[i].top > rows[i - 1].top)
+            rows[i].top - rows[i - 1].top,
+      ]..sort();
+      if (intervals.isNotEmpty) {
+        spacings[page] = intervals[intervals.length ~/ 2];
+      }
+    }
+    final starts = <int>{
+      for (var i = 1; i < rows.length; i++)
+        if (rows[i].page == rows[i - 1].page &&
+            rows[i].top - rows[i - 1].top >
+                (spacings[rows[i].page] ?? double.infinity) * 1.35)
+          i,
+    };
+    if (!verse) return starts;
+    // 跨页不天然等于分节。仅在两侧可见节长一致、且原页有重复节长证据时延续分节。
+    final lengths = <int>[];
+    for (final page in rows.map((row) => row.page).toSet()) {
+      final pageStart = rows.indexWhere((row) => row.page == page);
+      var prior = pageStart;
+      for (final index
+          in starts.where((index) => rows[index].page == page).toList()
+            ..sort()) {
+        lengths.add(index - prior);
+        prior = index;
+      }
+    }
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i].page == rows[i - 1].page) continue;
+      final before = starts.where((index) => index < i).toList()..sort();
+      final after = starts
+          .where((index) => index > i && rows[index].page == rows[i].page)
+          .toList()
+        ..sort();
+      if (before.isEmpty || after.isEmpty) continue;
+      final length = i - before.last;
+      if (after.first - i == length &&
+          lengths.where((value) => value == length).length >= 2) {
+        starts.add(i);
+      }
+    }
+    return starts;
+  }
+
+  /// 从原页恢复旧课程丢失的诗行和节间距；匹配失败时不把原书其他文字套到编辑稿上。
+  TextbookReadingLayout readingLayout(
+    TextbookCourseParagraph paragraph,
+    List<TextbookPageText> pages, {
+    bool preserveLines = false,
+  }) {
+    final fallback = textbookReadingLayoutForText(
+      paragraph.text,
+      preserveLines: preserveLines,
+    );
+    final orderedPages = pages.toList()
+      ..sort((a, b) => a.page.compareTo(b.page));
+    final source = [for (final page in orderedPages) ..._lines(page)];
+    String normalized(String text) => text.replaceAll(RegExp(r'\s|\u3000'), '');
+    final savedLines = <({String text, int rawIndex})>[];
+    var rawIndex = 0;
+    for (final line in paragraph.text.split('\n')) {
+      final runes = line.runes.toList();
+      final first = runes
+          .indexWhere((rune) => String.fromCharCode(rune).trim().isNotEmpty);
+      if (first >= 0) {
+        savedLines.add((text: normalized(line), rawIndex: rawIndex + first));
+      }
+      rawIndex += runes.length + 1;
+    }
+    final matched = <_Line>[];
+    var cursor = 0;
+    var previous = -1;
+    for (final line in savedLines) {
+      while (cursor < source.length &&
+          normalized(source[cursor].text) != line.text) {
+        cursor++;
+      }
+      if (cursor == source.length) return fallback;
+      if (previous >= 0 &&
+          source[previous].page == source[cursor].page &&
+          source.sublist(previous + 1, cursor).any(
+                (row) =>
+                    _han(row.text) && row.height >= source[cursor].height * .72,
+              )) {
+        return fallback;
+      }
+      previous = cursor;
+      matched.add(source[cursor++]);
+    }
+    final verse = _verseLines(matched);
+    if (!preserveLines && !verse) return fallback;
+    final stanzas = _stanzaStarts(matched, verse: true);
+    return TextbookReadingLayout(
+      retainLeadingIndent: !verse,
+      breaks: Map.unmodifiable({
+        ...fallback.breaks,
+        for (var i = 1; i < savedLines.length; i++)
+          savedLines[i].rawIndex: stanzas.contains(i) ||
+                  fallback.breaks[savedLines[i].rawIndex] ==
+                      TextbookReadingBreak.stanza
+              ? TextbookReadingBreak.stanza
+              : TextbookReadingBreak.line,
+      }),
+    );
+  }
 
   TextbookCourseDocument seed(
     TextbookCatalogEntry entry,
@@ -362,21 +501,16 @@ class TextbookCourseDraftParser {
     final paragraphs = raw['paragraphs'] as List;
     final groups = <List<_Line>>[];
     if (body.isNotEmpty) {
-      final lefts = body.map((l) => l.left).toList()..sort();
-      final margin = lefts[(lefts.length * .2).floor()];
-      final intervals = <double>[
-        for (var i = 1; i < body.length; i++)
-          if (body[i].page == body[i - 1].page && body[i].top > body[i - 1].top)
-            body[i].top - body[i - 1].top,
-      ]..sort();
-      final lineSpacing = intervals.isEmpty
-          ? double.infinity
-          : intervals[intervals.length ~/ 2];
-      for (final row in body) {
+      final margins = _pageMargins(body);
+      final stanzas = _stanzaStarts(
+        body,
+        verse: skeleton.kind == 'poetry' || _verseLines(body),
+      );
+      for (final (index, row) in body.indexed) {
         final prior = groups.isEmpty ? null : groups.last.last;
+        final margin = margins[row.page]!;
         final width = row.glyphs.map((g) => g.width).reduce((a, b) => a + b) /
             row.glyphs.length;
-        final gap = prior == null ? 0 : row.top - prior.bottom;
         // 原书段首缩进只存在于几何坐标（空白字形不进行数据），这里按
         // 相对正文左边界的外扩量识别首行缩进段落。
         final geometricIndent = row.left - margin > width * 1.5;
@@ -386,7 +520,7 @@ class TextbookCourseDraftParser {
             (row.left - margin > width * 2.5 &&
                 row.left - prior.left > width * 1.5 &&
                 RegExp(r'[。！？…][”」』）]?$').hasMatch(prior.text.trim())) ||
-            (row.page == prior.page && gap + prior.height > lineSpacing * 1.6);
+            stanzas.contains(index);
         if (newParagraph) groups.add([]);
         groups.last.add(row);
       }
@@ -394,7 +528,8 @@ class TextbookCourseDraftParser {
         // 段首缩进还原为两个全角空格，供阅读视图保留原书版式；
         // 续行折行的行首空白不保留。
         final first = group.first;
-        final firstIndent = first.left - margin > first.width * 1.5;
+        final firstIndent =
+            first.left - margins[first.page]! > first.width * 1.5;
         final text = [
           firstIndent ? '　　${first.text.trim()}' : first.text.trim(),
           for (final row in group.skip(1)) row.text.trim(),
@@ -1034,8 +1169,8 @@ class _Line {
   double get center => (top + bottom) / 2;
   double get height => bottom - top;
   double get left => glyphs.first.left;
-  double get width => glyphs.map((g) => g.width).reduce((a, b) => a + b) /
-      glyphs.length;
+  double get width =>
+      glyphs.map((g) => g.width).reduce((a, b) => a + b) / glyphs.length;
   String get text {
     final out = StringBuffer();
     TextbookPageGlyph? prior;

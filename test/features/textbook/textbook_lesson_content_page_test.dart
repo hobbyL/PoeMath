@@ -10,6 +10,7 @@ import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/domain/textbook_lesson_content.dart';
+import 'package:poemath/domain/textbook_text_display.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_detail_page.dart';
 import 'package:poemath/features/textbook/textbook_lesson_content_page.dart';
@@ -98,6 +99,7 @@ void main() {
     List<int> pages = const [2],
     Size size = const Size(360, 800),
     double scale = 1,
+    Map<String, TextbookReadingLayout> readingLayouts = const {},
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -106,6 +108,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          textbookReadingLayoutProvider
+              .overrideWith((_, __) async => readingLayouts),
           textbookCourseProvider(book.pdfSha256).overrideWith(
             (_) async => TextbookCoursePack.fromJson(raw ?? courseFixture()),
           ),
@@ -133,6 +137,79 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final poetry in [false, true]) {
+      testWidgets('读一读接通诗行和空行分节，切换拼音保留结构（诗歌=$poetry，字号=$scale）',
+          (tester) async {
+        final raw = courseFixture();
+        final lesson = (raw['lessons'] as List).single as Map;
+        lesson['kind'] = poetry ? 'poetry' : 'text';
+        lesson['paragraphs'] = [
+          courseFixtureText('verse', '甲乙\n丙丁\n\n戊己\n庚辛', null),
+        ];
+        lesson['recitations'] = <Object>[];
+        (lesson['coverage'] as Map)['recitations'] = 'notApplicable';
+        await pump(
+          tester,
+          TextbookContentSection.reading,
+          raw: raw,
+          size: const Size(1000, 1200),
+          scale: scale,
+        );
+        for (final showPinyin in [false, true, false]) {
+          final firstY = tester.getCenter(find.text('甲')).dy;
+          final secondY = tester.getCenter(find.text('丙')).dy;
+          final thirdY = tester.getCenter(find.text('戊')).dy;
+          if (poetry) {
+            expect(secondY, greaterThan(firstY));
+            expect(thirdY - secondY, greaterThan(secondY - firstY));
+          } else {
+            expect(secondY, firstY);
+            expect(thirdY, greaterThan(secondY));
+          }
+          expect(
+            tester
+                .widget<TextbookCourseParagraphsContent>(
+                  find.byType(TextbookCourseParagraphsContent),
+                )
+                .showPinyin,
+            showPinyin,
+          );
+          await tester.tap(find.byTooltip(showPinyin ? '隐藏拼音' : '显示拼音'));
+          await tester.pumpAndSettle();
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('普通text课目也使用原页恢复布局，不依赖课名或poetry标记', (tester) async {
+    final raw = courseFixture();
+    final lesson = (raw['lessons'] as List).single as Map;
+    lesson['paragraphs'] = [courseFixtureText('legacy', '甲乙\n丙丁\n戊己', null)];
+    lesson['recitations'] = <Object>[];
+    (lesson['coverage'] as Map)['recitations'] = 'notApplicable';
+    await pump(
+      tester,
+      TextbookContentSection.reading,
+      raw: raw,
+      readingLayouts: const {
+        'legacy': TextbookReadingLayout(
+          breaks: {
+            3: TextbookReadingBreak.line,
+            6: TextbookReadingBreak.stanza,
+          },
+        ),
+      },
+    );
+    final first = tester.getCenter(find.text('甲')).dy;
+    final second = tester.getCenter(find.text('丙')).dy;
+    final third = tester.getCenter(find.text('戊')).dy;
+    expect(second, greaterThan(first));
+    expect(third - second, greaterThan(second - first));
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('四类内容标题放在导航栏，卡片只展示内容且没有审核状态', (tester) async {
     for (final section in TextbookContentSection.values) {

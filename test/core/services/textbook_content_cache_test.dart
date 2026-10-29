@@ -242,10 +242,13 @@ void main() {
   test('布局缓存按版本冷启动复用，清理后迟到布局和页文都不能复活', () async {
     final cache = reopen();
     final page = layoutFixturePage(2, ['自有布局']);
+    expect(await cache.cachedPageLayout(2), isNull);
     await cache.pageLayout(2, () async => page);
+    expect((await reopen().cachedPageLayout(2))!.toJson(), page.toJson());
     expect(
-        (await reopen().pageLayout(2, () => throw StateError('应命中'))).toJson(),
-        page.toJson(),);
+      (await reopen().pageLayout(2, () => throw StateError('应命中'))).toJson(),
+      page.toJson(),
+    );
     final entered = Completer<void>();
     final loaded = Completer<TextbookPageText>();
     final pending = cache.pageLayout(3, () {
@@ -255,17 +258,21 @@ void main() {
     final rejected = expectLater(pending, throwsStateError);
     await entered.future;
     await cache.clear();
+    expect(await cache.cachedPageLayout(2), isNull);
     loaded.complete(layoutFixturePage(3, ['迟到文字']));
     await rejected;
     for (final name in ['layout-2', 'layout-3', 'page-2', 'page-3']) {
       expect(await stored(name).exists(), isFalse);
     }
     expect(
-        (await cache.pageLayout(2, () async => page)).toJson(), page.toJson(),);
+      (await cache.pageLayout(2, () async => page)).toJson(),
+      page.toJson(),
+    );
     final raw = jsonDecode(await stored('layout-2').readAsString())
         as Map<String, dynamic>;
     (raw['data'] as Map)['layoutVersion'] = 0;
     await stored('layout-2').writeAsString(jsonEncode(raw));
+    expect(await reopen().cachedPageLayout(2), isNull);
     var calls = 0;
     await reopen().pageLayout(2, () async {
       calls++;

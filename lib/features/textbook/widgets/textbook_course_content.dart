@@ -3,6 +3,7 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/domain/textbook_pinyin.dart';
 import 'package:poemath/domain/textbook_narration.dart';
+import 'package:poemath/domain/textbook_text_display.dart';
 import 'package:poemath/features/textbook/widgets/textbook_exercise_prompt.dart';
 
 const textbookCourseCategoryLabels = {
@@ -198,7 +199,10 @@ const _courseAsciiWordSeparators = {
   '}',
 };
 
-List<_DisplayCell> _courseReadingCells(TextbookCourseParagraph node) {
+List<_DisplayCell> _courseReadingCells(
+  TextbookCourseParagraph node, {
+  bool retainLeadingIndent = true,
+}) {
   final result = <_DisplayCell>[];
   final whitespace = <_DisplayCell>[];
   var pinyinIndex = 0;
@@ -217,7 +221,7 @@ List<_DisplayCell> _courseReadingCells(TextbookCourseParagraph node) {
     pinyinIndex++;
     if (result.isEmpty) {
       // 只保留实际段首缩进，PDF 续行缩进不应占据段内字格。
-      result.addAll(whitespace);
+      if (retainLeadingIndent) result.addAll(whitespace);
     } else if (whitespace.isNotEmpty &&
         (_courseWordCharacter.hasMatch(result.last.text) ||
             _courseWordCharacter.hasMatch(text) ||
@@ -239,13 +243,18 @@ List<_DisplayCell> _courseReadingCells(TextbookCourseParagraph node) {
   return result;
 }
 
-List<List<_DisplayCell>> _courseReadingGroups(List<_DisplayCell> cells) {
+List<List<_DisplayCell>> _courseReadingGroups(
+  List<_DisplayCell> cells, {
+  Set<int> lineStarts = const {},
+}) {
   final groups = <List<_DisplayCell>>[];
   var bindNext = false;
   var hasText = false;
   final openQuotes = <String>{};
   for (final (index, cell) in cells.indexed) {
     final text = cell.text;
+    final startsLine = lineStarts.contains(cell.rawIndex);
+    if (startsLine) bindNext = false;
     if (text.trim().isEmpty && bindNext && hasText) continue;
     var opening = _isOpeningPunctuation(text);
     var closing = _isClosingPunctuation(text);
@@ -262,13 +271,14 @@ List<List<_DisplayCell>> _courseReadingGroups(List<_DisplayCell> cells) {
     }
     final repeatedDash =
         text == '—' && index > 0 && cells[index - 1].text == text;
-    if (closing && groups.isNotEmpty) {
+    if (closing && groups.isNotEmpty && !startsLine) {
       while (groups.last.isNotEmpty && groups.last.last.text.trim().isEmpty) {
         groups.last.removeLast();
       }
       if (groups.last.isEmpty) groups.removeLast();
     }
-    if (groups.isNotEmpty &&
+    if (!startsLine &&
+        groups.isNotEmpty &&
         (bindNext || closing || apostrophe || repeatedDash)) {
       groups.last.add(cell);
     } else {
@@ -400,22 +410,26 @@ class TextbookCourseText extends StatelessWidget {
     this.activeRanges = const [],
     this.activeStartKey,
   })  : _metrics = null,
+        _readingLayout = const TextbookReadingLayout(),
         _wrap = false;
   const TextbookCourseText._({
     super.key,
     required this.node,
     required _CourseTextMetrics metrics,
     bool wrap = false,
+    TextbookReadingLayout readingLayout = const TextbookReadingLayout(),
     this.showPinyin = true,
     this.activeRanges = const [],
     this.activeStartKey,
   })  : _metrics = metrics,
+        _readingLayout = readingLayout,
         _wrap = wrap;
 
   final TextbookCourseParagraph node;
   final bool showPinyin;
   final _CourseTextMetrics? _metrics;
   final bool _wrap;
+  final TextbookReadingLayout _readingLayout;
   final List<TextbookNarrationSpan> activeRanges;
   final GlobalKey? activeStartKey;
 
@@ -491,9 +505,15 @@ class TextbookCourseText extends StatelessWidget {
     final content = _wrap
         ? LayoutBuilder(
             builder: (context, constraints) {
-              final cells = _courseReadingCells(node);
+              final cells = _courseReadingCells(
+                node,
+                retainLeadingIndent: _readingLayout.retainLeadingIndent,
+              );
               if (cells.isEmpty) return const SizedBox.shrink();
-              final groups = _courseReadingGroups(cells);
+              final groups = _courseReadingGroups(
+                cells,
+                lineStarts: _readingLayout.breaks.keys.toSet(),
+              );
               final cellWidth = [
                 metrics.charWidths['国']!,
                 for (final cell in cells)
@@ -523,17 +543,27 @@ class TextbookCourseText extends StatelessWidget {
 
               final rows = <List<_DisplayCell>>[];
               final rowWidths = <double>[];
+              final stanzaRows = <bool>[];
               var row = <_DisplayCell>[];
               var rowWidth = 0.0;
+              var startsStanza = false;
               _DisplayCell? pendingSpace;
               void finishRow() {
                 rows.add(row);
                 rowWidths.add(rowWidth);
+                stanzaRows.add(startsStanza);
                 row = [];
                 rowWidth = 0;
+                startsStanza = false;
               }
 
               for (final group in groups) {
+                final breakBefore = _readingLayout.breaks[group.first.rawIndex];
+                if (breakBefore != null) {
+                  if (row.isNotEmpty) finishRow();
+                  pendingSpace = null;
+                  startsStanza = breakBefore == TextbookReadingBreak.stanza;
+                }
                 if (group.length == 1 && group.single.text.trim().isEmpty) {
                   pendingSpace = group.single;
                   continue;
@@ -576,7 +606,12 @@ class TextbookCourseText extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     for (final (index, row) in rows.indexed) ...[
-                      if (index > 0) const SizedBox(height: SpacingTokens.sm),
+                      if (index > 0)
+                        SizedBox(
+                          height: stanzaRows[index]
+                              ? SpacingTokens.lg
+                              : SpacingTokens.sm,
+                        ),
                       if (rowWidths[index] > constraints.maxWidth)
                         _CourseTextViewport(
                           width: rowWidths[index],
@@ -650,12 +685,16 @@ class TextbookCourseParagraphsContent extends StatelessWidget {
     super.key,
     required this.paragraphs,
     this.showPinyin = true,
+    this.preserveLineBreaks = false,
+    this.readingLayouts = const {},
     this.activeRanges = const [],
     this.activeStartKey,
   });
 
   final List<TextbookCourseParagraph> paragraphs;
   final bool showPinyin;
+  final bool preserveLineBreaks;
+  final Map<String, TextbookReadingLayout> readingLayouts;
   final List<TextbookNarrationSpan> activeRanges;
   final GlobalKey? activeStartKey;
 
@@ -686,6 +725,11 @@ class TextbookCourseParagraphsContent extends StatelessWidget {
             node: paragraph,
             metrics: metrics,
             wrap: true,
+            readingLayout: readingLayouts[paragraph.id] ??
+                textbookReadingLayoutForText(
+                  paragraph.text,
+                  preserveLines: preserveLineBreaks,
+                ),
             showPinyin: showPinyin,
             activeRanges: activeRanges
                 .where((span) => span.paragraphId == paragraph.id)

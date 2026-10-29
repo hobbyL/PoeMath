@@ -1,8 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
+import 'package:poemath/core/services/textbook_pdf_source.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_catalog.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_page_text.dart';
+import 'package:poemath/domain/textbook_course_draft_parser.dart';
+import 'package:poemath/domain/textbook_text_display.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
 import 'package:poemath/data/repositories/textbook_progress_cleanup.dart';
@@ -39,6 +43,74 @@ final textbookCourseDocumentProvider = FutureProvider.autoDispose
       .firstOrNull;
   if (book == null) return null;
   return ref.watch(textbookCourseRepositoryProvider).loadDocument(book);
+});
+final textbookReadingLayoutProvider = FutureProvider.autoDispose.family<
+    Map<String, TextbookReadingLayout>,
+    ({String bookId, String lessonId})>((ref, key) async {
+  final book = ref
+      .watch(textbookListProvider)
+      .where((book) => book.pdfSha256 == key.bookId)
+      .firstOrNull;
+  if (book == null) return const {};
+  final files = ref.watch(textbookFileServiceProvider);
+  final course = ref.watch(textbookCourseProvider(key.bookId).future);
+  final token = TextbookDraftToken();
+  ref.onDispose(token.cancel);
+  TextbookPdfSource? source;
+  try {
+    final pack = await course;
+    token.check();
+    final lesson =
+        pack?.lessons.where((lesson) => lesson.id == key.lessonId).firstOrNull;
+    if (lesson == null) return const {};
+    final cache = files.contentCache(book);
+    final revision = cache.revision;
+    final pages = <int, TextbookPageText>{};
+    final numbers = lesson.paragraphs
+        .expand((paragraph) => paragraph.sources)
+        .map((source) => source.pdfPage)
+        .toSet()
+        .toList()
+      ..sort();
+    for (final number in numbers) {
+      token.check();
+      if (cache.revision != revision) return const {};
+      var page = await cache.cachedPageLayout(number);
+      token.check();
+      if (page == null) {
+        final localPath = await files.installedPath(book);
+        token.check();
+        if (localPath == null) continue;
+        source ??= await NativeTextbookPdfSource.open(
+          path: localPath,
+          book: book,
+          cache: cache,
+          token: token,
+        );
+        page = await source.page(number);
+      }
+      pages[number] = page;
+    }
+    token.check();
+    if (cache.revision != revision) return const {};
+    final parser = TextbookCourseDraftParser();
+    return {
+      for (final paragraph in lesson.paragraphs)
+        paragraph.id: parser.readingLayout(
+          paragraph,
+          [
+            for (final source in paragraph.sources)
+              if (pages[source.pdfPage] != null) pages[source.pdfPage]!,
+          ],
+          preserveLines: lesson.kind == 'poetry',
+        ),
+    };
+  } on Object {
+    // 原书缺失或布局不可匹配时使用课程已有分节；不能阻断阅读或改写课程。
+    return const {};
+  } finally {
+    await source?.close();
+  }
 });
 final textbookGenerationServiceProvider =
     Provider<TextbookCourseGenerationService>(

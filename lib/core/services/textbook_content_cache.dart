@@ -163,6 +163,26 @@ class TextbookContentCache {
     await _write('page-$page', text, revision);
   }
 
+  /// 只读已有原页布局，命中时无需打开原生 PDF 文档。
+  Future<TextbookPageText?> cachedPageLayout(int page) async {
+    RangeError.checkValueInInterval(page, 1, book.pageCount, 'page');
+    final cached = _layouts[page];
+    if (cached != null) return cached;
+    final generation = _generation;
+    final raw = await _read('layout-$page');
+    if (generation != _generation) return null;
+    if (raw is! Map<String, dynamic> || raw['layoutVersion'] != layoutVersion) {
+      return null;
+    }
+    try {
+      final value =
+          TextbookPageText.fromJson(raw['page'] as Map<String, dynamic>);
+      return value.page == page ? value : null;
+    } on Object {
+      return null;
+    }
+  }
+
   /// 与纯文字共用写入队列和失效代次，清理后旧布局不能复活。
   Future<TextbookPageText> pageLayout(
     int page,
@@ -180,18 +200,7 @@ class TextbookContentCache {
     late final Future<TextbookPageText> result;
     result = (() async {
       try {
-        TextbookPageText? value;
-        final raw = await _read('layout-$page');
-        if (raw is Map<String, dynamic> &&
-            raw['layoutVersion'] == layoutVersion) {
-          try {
-            value =
-                TextbookPageText.fromJson(raw['page'] as Map<String, dynamic>);
-            if (value.page != page) value = null;
-          } on Object {
-            value = null;
-          }
-        }
+        var value = await cachedPageLayout(page);
         if (generation != _generation) throw StateError('原书缓存已失效');
         if (value == null) {
           value = await load();

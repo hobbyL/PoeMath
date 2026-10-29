@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/domain/textbook_narration.dart';
 import 'package:poemath/domain/textbook_pinyin.dart';
+import 'package:poemath/domain/textbook_text_display.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
 
 import '../../helpers/textbook_course_fixture.dart';
@@ -34,6 +35,8 @@ Future<void> _pumpParagraph(
   required double scale,
   required double width,
   List<TextbookNarrationSpan> activeRanges = const [],
+  bool preserveLineBreaks = false,
+  Map<String, TextbookReadingLayout> readingLayouts = const {},
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -48,6 +51,8 @@ Future<void> _pumpParagraph(
                 paragraphs: [paragraph],
                 showPinyin: showPinyin,
                 activeRanges: activeRanges,
+                preserveLineBreaks: preserveLineBreaks,
+                readingLayouts: readingLayouts,
               ),
             ),
           ),
@@ -82,6 +87,96 @@ Finder _character(TextbookCourseParagraph paragraph, int rawIndex) =>
 void main() {
   for (final showPinyin in [false, true]) {
     for (final scale in [1.0, 2.0]) {
+      testWidgets('诗行与空行分节保留，窄屏续行后下一诗行仍另起一行（拼音=$showPinyin，字号=$scale）',
+          (tester) async {
+        _setViewport(tester);
+        final paragraph = _paragraph('verse', '甲乙，\n𠀀丙。\n\n丁戊！');
+        Future<void> pump(double width, {bool highlighted = false}) =>
+            _pumpParagraph(
+              tester,
+              paragraph,
+              showPinyin: showPinyin,
+              scale: scale,
+              width: width,
+              preserveLineBreaks: true,
+              activeRanges: highlighted
+                  ? const [TextbookNarrationSpan('verse', 4, 7)]
+                  : const [],
+            );
+        await pump(1500);
+        final first = tester.getTopLeft(_character(paragraph, 0));
+        final second = tester.getTopLeft(_character(paragraph, 4));
+        final third = tester.getTopLeft(_character(paragraph, 9));
+        expect(second.dx, first.dx);
+        expect(third.dx, first.dx);
+        expect(second.dy, greaterThan(first.dy));
+        expect(third.dy - second.dy, greaterThan(second.dy - first.dy));
+        final positions = {
+          for (final (index, rune) in paragraph.text.runes.indexed)
+            if (String.fromCharCode(rune).trim().isNotEmpty)
+              index: tester.getRect(_character(paragraph, index)),
+        };
+        await pump(1500, highlighted: true);
+        for (final entry in positions.entries) {
+          expect(tester.getRect(_character(paragraph, entry.key)), entry.value);
+          expect(
+            tester
+                .widget<Text>(_character(paragraph, entry.key))
+                .style!
+                .backgroundColor,
+            entry.key >= 4 && entry.key < 7 ? isNotNull : isNull,
+          );
+        }
+        await pump(40);
+        expect(
+          tester.getCenter(_character(paragraph, 4)).dy,
+          greaterThan(tester.getCenter(_character(paragraph, 2)).dy),
+        );
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('源布局恢复缺失的分节，散文物理折行仍连续排版（拼音=$showPinyin，字号=$scale）',
+          (tester) async {
+        _setViewport(tester);
+        final paragraph = _paragraph('legacy', '　　甲乙，\n𠀀丙。\n丁戊！');
+        await _pumpParagraph(
+          tester,
+          paragraph,
+          showPinyin: showPinyin,
+          scale: scale,
+          width: 1500,
+          readingLayouts: const {
+            'legacy': TextbookReadingLayout(
+              retainLeadingIndent: false,
+              breaks: {
+                6: TextbookReadingBreak.line,
+                10: TextbookReadingBreak.stanza,
+              },
+            ),
+          },
+        );
+        final flow = tester.getRect(find.byKey(const ValueKey('legacy-flow')));
+        final first = tester.getTopLeft(_character(paragraph, 2));
+        final second = tester.getTopLeft(_character(paragraph, 6));
+        final third = tester.getTopLeft(_character(paragraph, 10));
+        expect(first.dx, flow.left);
+        expect(second.dx, flow.left);
+        expect(third.dy - second.dy, greaterThan(second.dy - first.dy));
+        await _pumpParagraph(
+          tester,
+          paragraph,
+          showPinyin: showPinyin,
+          scale: scale,
+          width: 1500,
+        );
+        expect(
+          tester.getCenter(_character(paragraph, 2)).dy,
+          tester.getCenter(_character(paragraph, 10)).dy,
+        );
+        expect(paragraph.text, '　　甲乙，\n𠀀丙。\n丁戊！');
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('引语前的文字利用行尾空间，左引号随下字换行（拼音=$showPinyin，字号=$scale）',
           (tester) async {
         _setViewport(tester);

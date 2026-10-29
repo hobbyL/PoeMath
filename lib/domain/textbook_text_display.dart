@@ -1,3 +1,44 @@
+enum TextbookReadingBreak { line, stanza }
+
+/// 仅用于排版的原文 rune 边界，不改写课文、注音或背诵索引。
+class TextbookReadingLayout {
+  const TextbookReadingLayout({
+    this.breaks = const {},
+    this.retainLeadingIndent = true,
+  });
+
+  final Map<int, TextbookReadingBreak> breaks;
+  final bool retainLeadingIndent;
+}
+
+TextbookReadingLayout textbookReadingLayoutForText(
+  String text, {
+  bool preserveLines = false,
+}) {
+  final breaks = <int, TextbookReadingBreak>{};
+  final runes = text.runes.toList();
+  var lineBreaks = 0;
+  var hasText = false;
+  for (final (index, rune) in runes.indexed) {
+    if (rune == 0x0a ||
+        rune == 0x0d &&
+            (index + 1 == runes.length || runes[index + 1] != 0x0a)) {
+      lineBreaks++;
+    }
+    if (String.fromCharCode(rune).trim().isEmpty) continue;
+    if (hasText && lineBreaks > 0) {
+      if (lineBreaks > 1) {
+        breaks[index] = TextbookReadingBreak.stanza;
+      } else if (preserveLines) {
+        breaks[index] = TextbookReadingBreak.line;
+      }
+    }
+    hasText = true;
+    lineBreaks = 0;
+  }
+  return TextbookReadingLayout(breaks: Map.unmodifiable(breaks));
+}
+
 /// 把 PDF 文本层里的视觉换行和排版空格折叠成连续文本。
 ///
 /// 教材 PDF 会把每个视觉行写成换行，直接展示时会出现“黑\n灰色”

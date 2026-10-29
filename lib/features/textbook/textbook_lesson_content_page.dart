@@ -322,6 +322,15 @@ class _TextbookLessonContentPageState
             TextbookContentSection.reading => TextbookCourseParagraphsContent(
                 paragraphs: lesson.paragraphs,
                 showPinyin: _showPinyin,
+                preserveLineBreaks: lesson.kind == 'poetry',
+                readingLayouts: ref
+                        .watch(
+                          textbookReadingLayoutProvider(
+                            (bookId: bookId, lessonId: lesson.id),
+                          ),
+                        )
+                        .valueOrNull ??
+                    const {},
                 activeRanges: _segment?.lessonId == lesson.id
                     ? _segment!.spans
                     : const [],

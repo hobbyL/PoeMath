@@ -4,14 +4,139 @@ import 'package:poemath/data/models/textbook_course_draft.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/domain/textbook_course_draft_parser.dart';
+import 'package:poemath/domain/textbook_text_display.dart';
 
 import '../helpers/textbook_draft_fixture.dart';
+import '../helpers/textbook_course_fixture.dart';
+
+TextbookPageText _versePage(int page, int start, double left) {
+  final text = StringBuffer('星月测试\n');
+  final glyphs = <TextbookPageGlyph>[
+    for (final (index, rune) in '星月测试'.runes.indexed)
+      TextbookPageGlyph(
+        text: String.fromCharCode(rune),
+        index: index,
+        left: .1 + index * .03,
+        right: .125 + index * .03,
+        top: .05,
+        bottom: .08,
+      ),
+  ];
+  var rawIndex = '星月测试\n'.runes.length;
+  for (var row = 0; row < 12; row++) {
+    final line = '甲${start + row}星光闪，';
+    final top = .15 + row * .05 + (row ~/ 4) * .025;
+    for (final (column, rune) in line.runes.indexed) {
+      glyphs.add(
+        TextbookPageGlyph(
+          text: String.fromCharCode(rune),
+          index: rawIndex++,
+          left: left + column * .03,
+          right: left + column * .03 + .025,
+          top: top,
+          bottom: top + .03,
+        ),
+      );
+    }
+    text.writeln(line);
+    rawIndex++;
+  }
+  return TextbookPageText(
+    page: page,
+    text: text.toString(),
+    width: 600,
+    height: 800,
+    glyphs: glyphs,
+  );
+}
+
+TextbookCourseParagraph _legacyVerse(List<TextbookPageText> pages) {
+  final raw = courseFixture();
+  final lesson = (raw['lessons'] as List).single as Map;
+  final text = '　　${[
+    for (final page in pages) ...page.text.trim().split('\n').skip(1),
+  ].join('\n')}';
+  lesson['paragraphs'] = [
+    courseFixtureText('legacy-verse', text, null)
+      ..['sources'] = [
+        for (final page in pages) courseFixtureSource(page.page),
+      ],
+  ];
+  lesson['recitations'] = <Object>[];
+  (lesson['coverage'] as Map)['recitations'] = 'notApplicable';
+  return TextbookCoursePack.fromJson(raw).lessons.single.paragraphs.single;
+}
 
 void main() {
   final parser = TextbookCourseDraftParser();
   final seed = parser.seed(draftFixtureEntry(), draftFixtureToc);
   final lesson = seed.pack.lessons.first;
   final plan = seed.generation!.plans.first;
+
+  test('旧课程按真实页坐标恢复6节24行，跨页边距不同不制造缩进或丢失分节', () {
+    final pages = [_versePage(2, 0, .36), _versePage(3, 12, .12)];
+    final paragraph = _legacyVerse(pages);
+    final source = paragraph.text;
+    final layout = parser.readingLayout(paragraph, pages);
+    expect(layout.retainLeadingIndent, isFalse);
+    expect(layout.breaks.length, 23);
+    final sourceLines = source.split('\n');
+    var rawIndex = 0;
+    for (final (index, line) in sourceLines.indexed) {
+      if (index > 0) {
+        expect(
+          layout.breaks[rawIndex],
+          index % 4 == 0
+              ? TextbookReadingBreak.stanza
+              : TextbookReadingBreak.line,
+        );
+      }
+      rawIndex += line.runes.length + 1;
+    }
+    expect(paragraph.text, source);
+    final changed = courseFixture();
+    final lesson = (changed['lessons'] as List).single as Map;
+    lesson['paragraphs'] = [courseFixtureText('edited', '甲乙\n改写正文。', null)];
+    lesson['recitations'] = <Object>[];
+    (lesson['coverage'] as Map)['recitations'] = 'notApplicable';
+    final edited =
+        TextbookCoursePack.fromJson(changed).lessons.single.paragraphs.single;
+    expect(parser.readingLayout(edited, pages).breaks, isEmpty);
+    final shortened = paragraph.text.split('\n')..removeAt(1);
+    lesson['paragraphs'] = [
+      courseFixtureText('shortened', shortened.join('\n'), null),
+    ];
+    final removedLine =
+        TextbookCoursePack.fromJson(changed).lessons.single.paragraphs.single;
+    expect(parser.readingLayout(removedLine, pages).breaks, isEmpty);
+  });
+
+  test('重新提取识别1.5倍节间距，6节逐节保存且左右页不注入错误缩进', () {
+    final parsed = parser.parse(
+      lesson,
+      TextbookDraftPlan(
+        id: plan.id,
+        title: plan.title,
+        startPage: 2,
+        endPage: 3,
+      ),
+      [_versePage(2, 0, .36), _versePage(3, 12, .12)],
+    );
+    final paragraphs = parsed.lesson['paragraphs'] as List;
+    expect(paragraphs, hasLength(6));
+    expect(
+      paragraphs.every(
+        (paragraph) => !(paragraph['text'] as String).startsWith('　'),
+      ),
+      isTrue,
+    );
+    expect(
+      paragraphs.map(
+        (paragraph) => (paragraph['text'] as String).split('\n').length,
+      ),
+      everyElement(4),
+    );
+  });
 
   test('阅读习题按视觉行分题，词语不跨题，加点由字符下方几何位置识别', () {
     final text = StringBuffer();
