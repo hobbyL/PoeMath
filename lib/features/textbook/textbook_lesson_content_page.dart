@@ -15,6 +15,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_overview.dart';
+import 'package:poemath/features/textbook/exercise/textbook_exercise_overview.dart';
 import 'package:poemath/features/textbook/writing/textbook_writing_overview.dart';
 
 /// 当前原书页对应的课文内容；认一认可进入本课生字练习。
@@ -267,8 +268,10 @@ class _TextbookLessonContentPageState
         TextbookContentSection.recognition => '原书未要求本课会认字。',
         TextbookContentSection.recitation => '原书未要求本课背诵。',
         TextbookContentSection.writing => '原书未要求本课会写字。',
+        TextbookContentSection.exercise => '原书未要求本课练习。',
       };
     }
+    if (section == TextbookContentSection.exercise) return '本课尚未整理练习。';
     return '本课尚未整理${textbookCourseCategoryLabels[section.category]}。';
   }
 
@@ -299,7 +302,10 @@ class _TextbookLessonContentPageState
     required bool showTitle,
   }) {
     final theme = Theme.of(context);
-    final targets = section.targets(lesson);
+    final coursePack = ref.read(textbookCourseProvider(bookId)).valueOrNull;
+    final targets = coursePack == null
+        ? const <TextbookCourseNode>[]
+        : textbookVisibleTargets(coursePack, lesson, section);
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -350,6 +356,11 @@ class _TextbookLessonContentPageState
                 lesson: lesson,
                 onPractice: (targetId) =>
                     unawaited(_openWriting(lesson.id, targetId)),
+              ),
+            TextbookContentSection.exercise => TextbookExerciseOverview(
+                bookId: bookId,
+                lesson: lesson,
+                exercises: targets.cast<TextbookCourseExercise>(),
               ),
           },
       ],

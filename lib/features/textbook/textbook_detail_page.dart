@@ -505,7 +505,11 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
         : textbookLessonsForPages(pack, pages);
     final sections = [
       for (final section in TextbookContentSection.values)
-        if (lessons.any((lesson) => section.targets(lesson).isNotEmpty))
+        if (pack != null &&
+            lessons.any(
+              (lesson) =>
+                  textbookVisibleTargets(pack, lesson, section).isNotEmpty,
+            ))
           section,
     ];
     final enabled = !_turning && _previewVisible;

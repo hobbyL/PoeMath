@@ -66,6 +66,31 @@ class _RangeDraft {
   }
 }
 
+class _ChoiceDraft {
+  _ChoiceDraft({required String id, required String text, this.correct = false})
+      : id = TextEditingController(text: id),
+        text = TextEditingController(text: text);
+  final TextEditingController id;
+  final TextEditingController text;
+  bool correct;
+  void dispose() {
+    id.dispose();
+    text.dispose();
+  }
+}
+
+class _BlankDraft {
+  _BlankDraft({required String id, required String answers})
+      : id = TextEditingController(text: id),
+        answers = TextEditingController(text: answers);
+  final TextEditingController id;
+  final TextEditingController answers;
+  void dispose() {
+    id.dispose();
+    answers.dispose();
+  }
+}
+
 class _TextbookCourseEditorPageState
     extends ConsumerState<TextbookCourseEditorPage> {
   final _fields = <String, TextEditingController>{};
@@ -76,10 +101,14 @@ class _TextbookCourseEditorPageState
   final _ranges = <_RangeDraft>[];
   final _allAnswers = <TextEditingController>[];
   final _answers = <TextEditingController>[];
+  final _choices = <_ChoiceDraft>[];
+  final _blanks = <_BlankDraft>[];
   late String _requirement;
   late String _origin;
   late String _answerOrigin;
   late TextbookAnswerType _answerType;
+  late TextbookExerciseQuestionType _questionType;
+  late TextbookExerciseChoiceMode _choiceMode;
   bool _saving = false;
 
   TextEditingController _field(String key) =>
@@ -155,6 +184,13 @@ class _TextbookCourseEditorPageState
     _answerType = widget.node is TextbookCourseExercise
         ? (widget.node as TextbookCourseExercise).answerType
         : TextbookAnswerType.none;
+    _questionType = widget.node is TextbookCourseExercise
+        ? (widget.node as TextbookCourseExercise).questionType
+        : TextbookExerciseQuestionType.oral;
+    _choiceMode = widget.node is TextbookCourseExercise
+        ? (widget.node as TextbookCourseExercise).choiceMode ??
+            TextbookExerciseChoiceMode.single
+        : TextbookExerciseChoiceMode.single;
     for (final source in widget.node.sources) {
       _addSource(_sources, source);
     }
@@ -170,6 +206,20 @@ class _TextbookCourseEditorPageState
       }
       for (final answer in node.answers) {
         _addAnswer(answer);
+      }
+      for (final option in node.choiceOptions) {
+        _choices.add(
+          _ChoiceDraft(
+            id: option.id,
+            text: option.text,
+            correct: node.correctChoiceIds.contains(option.id),
+          ),
+        );
+      }
+      for (final blank in node.fillBlanks) {
+        _blanks.add(
+          _BlankDraft(id: blank.id, answers: blank.answers.join('\n')),
+        );
       }
     }
   }
@@ -187,6 +237,12 @@ class _TextbookCourseEditorPageState
     }
     for (final answer in _allAnswers) {
       answer.dispose();
+    }
+    for (final choice in _choices) {
+      choice.dispose();
+    }
+    for (final blank in _blanks) {
+      blank.dispose();
     }
     super.dispose();
   }
@@ -258,6 +314,29 @@ class _TextbookCourseEditorPageState
         'answerSources': _answerOrigin == 'textbook'
             ? _answerSources.map((source) => source.toJson()).toList()
             : <Map<String, dynamic>>[],
+        'questionType': _questionType.name,
+        if (_questionType == TextbookExerciseQuestionType.choice) ...{
+          'choiceMode': _choiceMode.name,
+          'choiceOptions': [
+            for (final choice in _choices)
+              {'id': choice.id.text.trim(), 'text': choice.text.text.trim()},
+          ],
+          'correctChoiceIds': [
+            for (final choice in _choices)
+              if (choice.correct) choice.id.text.trim(),
+          ],
+        },
+        if (_questionType == TextbookExerciseQuestionType.fillBlank)
+          'fillBlanks': [
+            for (final blank in _blanks)
+              {
+                'id': blank.id.text.trim(),
+                'answers': [
+                  for (final answer in blank.answers.text.split('\n'))
+                    if (answer.trim().isNotEmpty) answer.trim(),
+                ],
+              },
+          ],
       });
     }
     return result;
@@ -496,10 +575,193 @@ class _TextbookCourseEditorPageState
     }
   }
 
+  void _selectQuestionType(TextbookExerciseQuestionType value) {
+    setState(() {
+      _questionType = value;
+      if (value == TextbookExerciseQuestionType.choice && _choices.isEmpty) {
+        _choices
+          ..add(_ChoiceDraft(id: 'A', text: '', correct: true))
+          ..add(_ChoiceDraft(id: 'B', text: ''));
+      }
+      if (value == TextbookExerciseQuestionType.fillBlank && _blanks.isEmpty) {
+        _blanks.add(_BlankDraft(id: 'blank-1', answers: ''));
+      }
+    });
+  }
+
+  void _addChoice() {
+    final id = String.fromCharCode('A'.codeUnitAt(0) + _choices.length);
+    setState(() => _choices.add(_ChoiceDraft(id: id, text: '')));
+  }
+
+  void _addBlank() {
+    setState(
+      () => _blanks.add(
+        _BlankDraft(id: 'blank-${_blanks.length + 1}', answers: ''),
+      ),
+    );
+  }
+
+  Widget _questionTypeFields() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DropdownButtonFormField<TextbookExerciseQuestionType>(
+            initialValue: _questionType,
+            decoration: const InputDecoration(labelText: '作答题型'),
+            items: const [
+              DropdownMenuItem(
+                value: TextbookExerciseQuestionType.choice,
+                child: Text('选择题'),
+              ),
+              DropdownMenuItem(
+                value: TextbookExerciseQuestionType.fillBlank,
+                child: Text('填空题'),
+              ),
+              DropdownMenuItem(
+                value: TextbookExerciseQuestionType.oral,
+                child: Text('口答题'),
+              ),
+            ],
+            onChanged: _saving
+                ? null
+                : (value) {
+                    if (value != null) _selectQuestionType(value);
+                  },
+          ),
+          if (_questionType == TextbookExerciseQuestionType.choice)
+            _choiceFields(),
+          if (_questionType == TextbookExerciseQuestionType.fillBlank)
+            _blankFields(),
+        ],
+      );
+
+  Widget _choiceFields() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: SpacingTokens.md),
+          DropdownButtonFormField<TextbookExerciseChoiceMode>(
+            initialValue: _choiceMode,
+            decoration: const InputDecoration(labelText: '选择方式'),
+            items: const [
+              DropdownMenuItem(
+                value: TextbookExerciseChoiceMode.single,
+                child: Text('单选'),
+              ),
+              DropdownMenuItem(
+                value: TextbookExerciseChoiceMode.multiple,
+                child: Text('多选'),
+              ),
+            ],
+            onChanged: _saving
+                ? null
+                : (value) => setState(() => _choiceMode = value!),
+          ),
+          for (final (index, choice) in _choices.indexed)
+            Padding(
+              padding: const EdgeInsets.only(top: SpacingTokens.sm),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Checkbox(
+                    value: choice.correct,
+                    onChanged: _saving
+                        ? null
+                        : (value) => setState(() => choice.correct = value!),
+                  ),
+                  SizedBox(
+                    width: 72,
+                    child: TextField(
+                      controller: choice.id,
+                      enabled: !_saving,
+                      decoration: InputDecoration(labelText: '选项 ${index + 1}'),
+                    ),
+                  ),
+                  const SizedBox(width: SpacingTokens.sm),
+                  Expanded(
+                    child: TextField(
+                      controller: choice.text,
+                      enabled: !_saving,
+                      decoration: const InputDecoration(labelText: '选项内容'),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '移除选项',
+                    onPressed: _saving || _choices.length <= 2
+                        ? null
+                        : () => setState(() {
+                              choice.dispose();
+                              _choices.removeAt(index);
+                            }),
+                    icon: const Icon(Icons.remove_circle_outline),
+                  ),
+                ],
+              ),
+            ),
+          TextButton.icon(
+            onPressed: _saving || _choices.length >= 8 ? null : _addChoice,
+            icon: const Icon(Icons.add),
+            label: const Text('添加选项'),
+          ),
+        ],
+      );
+
+  Widget _blankFields() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: SpacingTokens.md),
+          for (final (index, blank) in _blanks.indexed)
+            Padding(
+              padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 96,
+                    child: TextField(
+                      controller: blank.id,
+                      enabled: !_saving,
+                      decoration: InputDecoration(labelText: '第 ${index + 1} 空'),
+                    ),
+                  ),
+                  const SizedBox(width: SpacingTokens.sm),
+                  Expanded(
+                    child: TextField(
+                      controller: blank.answers,
+                      enabled: !_saving,
+                      minLines: 1,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: '可接受答案',
+                        helperText: '每行一个答案',
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '移除填空',
+                    onPressed: _saving || _blanks.length <= 1
+                        ? null
+                        : () => setState(() {
+                              blank.dispose();
+                              _blanks.removeAt(index);
+                            }),
+                    icon: const Icon(Icons.remove_circle_outline),
+                  ),
+                ],
+              ),
+            ),
+          TextButton.icon(
+            onPressed: _saving || _blanks.length >= 12 ? null : _addBlank,
+            icon: const Icon(Icons.add),
+            label: const Text('添加填空'),
+          ),
+        ],
+      );
+
   Widget _exerciseFields() => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _input('prompt', '题目', multiline: true),
+          _questionTypeFields(),
           DropdownButtonFormField<String>(
             initialValue: _origin,
             decoration: const InputDecoration(labelText: '题目来源'),

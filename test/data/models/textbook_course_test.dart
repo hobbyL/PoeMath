@@ -10,6 +10,70 @@ Map<String, dynamic> lesson(Map<String, dynamic> pack) =>
     (pack['lessons'] as List).single as Map<String, dynamic>;
 
 void main() {
+  test('旧习题缺省题型按口答兼容，新题型保留结构化选项和空位', () {
+    final legacy = TextbookCoursePack.fromJson(courseFixture())
+        .lessons
+        .single
+        .exercises
+        .single;
+    expect(legacy.questionType, TextbookExerciseQuestionType.oral);
+    expect(legacy.hasExplicitQuestionType, isFalse);
+
+    final raw = courseFixture();
+    final exercise = (lesson(raw)['exercises'] as List).single as Map;
+    exercise.addAll(<String, dynamic>{
+      'questionType': 'choice',
+      'choiceMode': 'multiple',
+      'choiceOptions': [
+        {'id': 'A', 'text': '星'},
+        {'id': 'B', 'text': '月'},
+      ],
+      'correctChoiceIds': ['A', 'B'],
+      'answerType': 'exact',
+      'answers': ['星、月'],
+      'answerOrigin': 'textbook',
+      'answerSources': [courseFixtureSource(3)],
+    });
+    final choice =
+        TextbookCoursePack.fromJson(raw).lessons.single.exercises.single;
+    expect(choice.questionType, TextbookExerciseQuestionType.choice);
+    expect(choice.choiceMode, TextbookExerciseChoiceMode.multiple);
+    expect(choice.choiceOptions.map((option) => option.id), ['A', 'B']);
+    expect(choice.correctChoiceIds, ['A', 'B']);
+
+    exercise
+      ..remove('choiceMode')
+      ..remove('choiceOptions')
+      ..remove('correctChoiceIds')
+      ..addAll(<String, dynamic>{
+        'questionType': 'fillBlank',
+        'fillBlanks': [
+          {
+            'id': 'blank-1',
+            'answers': ['星'],
+          },
+          {
+            'id': 'blank-2',
+            'answers': ['月', '月亮'],
+          },
+        ],
+        'answerType': 'exact',
+        'answers': ['星、月'],
+        'answerOrigin': 'textbook',
+        'answerSources': [courseFixtureSource(3)],
+      });
+    final fill =
+        TextbookCoursePack.fromJson(raw).lessons.single.exercises.single;
+    expect(fill.questionType, TextbookExerciseQuestionType.fillBlank);
+    expect(fill.fillBlanks[1].answers, ['月', '月亮']);
+  });
+
+  test('显式空题型不按旧题兼容', () {
+    final raw = courseFixture();
+    ((lesson(raw)['exercises'] as List).single as Map)['questionType'] = null;
+    expect(() => TextbookCoursePack.fromJson(raw), throwsFormatException);
+  });
+
   test('习题排版严格往返，加点按Unicode码点校验且文字须与题目一致', () {
     final raw = courseFixture();
     final exercise =
@@ -190,6 +254,35 @@ void main() {
       exercise['answerType'] = 'exact';
       exercise['answers'] = ['星'];
       exercise['answerOrigin'] = 'reviewerReference';
+    },
+    '单选多个正确项': (p) {
+      final exercise = (lesson(p)['exercises'] as List).single as Map;
+      exercise.addAll(<String, dynamic>{
+        'questionType': 'choice',
+        'choiceMode': 'single',
+        'choiceOptions': [
+          {'id': 'A', 'text': '星'},
+          {'id': 'B', 'text': '月'},
+        ],
+        'correctChoiceIds': ['A', 'B'],
+        'answerType': 'exact',
+        'answers': ['星、月'],
+        'answerOrigin': 'textbook',
+        'answerSources': [courseFixtureSource(3)],
+      });
+    },
+    '填空答案缺失': (p) {
+      final exercise = (lesson(p)['exercises'] as List).single as Map;
+      exercise.addAll(<String, dynamic>{
+        'questionType': 'fillBlank',
+        'fillBlanks': [
+          {'id': 'blank-1', 'answers': <String>[]},
+        ],
+        'answerType': 'exact',
+        'answers': ['星'],
+        'answerOrigin': 'textbook',
+        'answerSources': [courseFixtureSource(3)],
+      });
     },
   };
   for (final entry in invalidCases.entries) {

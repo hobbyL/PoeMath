@@ -34,6 +34,11 @@ TextbookCoursePack editTextbookCourseNode(
       'answers',
       'answerOrigin',
       'answerSources',
+      'questionType',
+      'choiceMode',
+      'choiceOptions',
+      'correctChoiceIds',
+      'fillBlanks',
     ],
   };
   if (changes.keys.any((key) => !fields.contains(key))) {

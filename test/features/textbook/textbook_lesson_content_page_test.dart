@@ -339,6 +339,8 @@ void main() {
           expect(find.text('只背测试句的前两个字。'), findsOneWidget);
           expect(find.text('　　星𠀀'), findsOneWidget);
           expect(find.text('　　星𠀀，月。'), findsNothing);
+        case TextbookContentSection.exercise:
+          break;
       }
       if (section != TextbookContentSection.reading) {
         expect(find.byTooltip('显示拼音'), findsNothing);
@@ -466,6 +468,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('当前页暂无对应课目'), findsNothing);
     for (final section in TextbookContentSection.values) {
+      if (section == TextbookContentSection.exercise) continue;
       expect(find.widgetWithText(TextButton, section.label), findsNothing);
     }
     current!.onPageChanged(2);
@@ -479,7 +482,8 @@ void main() {
       );
       final buttons = [
         for (final section in TextbookContentSection.values)
-          tester.getRect(find.widgetWithText(TextButton, section.label)),
+          if (section != TextbookContentSection.exercise)
+            tester.getRect(find.widgetWithText(TextButton, section.label)),
       ];
       expect(buttons.first.top, closeTo(pdf.bottom + SpacingTokens.md, 0.01));
       expect(buttons.last.bottom, lessThan(controls.top));
@@ -497,6 +501,7 @@ void main() {
 
     expectCompactActionsBelowPdf();
     for (final section in TextbookContentSection.values) {
+      if (section == TextbookContentSection.exercise) continue;
       await tester.tap(find.widgetWithText(TextButton, section.label));
       await tester.pumpAndSettle();
       expect(find.byType(TextbookLessonContentPage), findsOneWidget);

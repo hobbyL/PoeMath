@@ -202,6 +202,13 @@ must match, so editing a referenced paragraph cannot silently move the target.
 Whole-text recitation explicitly lists each covered paragraph/range.
 
 Exercise fields: `id,prompt,origin,answerType,answers,answerOrigin,answerSources,sources,review`.
+The optional `questionType` is `choice`, `fillBlank`, or `oral`; old packs may
+omit it and are consumed as `oral` until edited. A `choice` exercise adds
+`choiceMode` (`single`/`multiple`), `choiceOptions` (2--8 unique `{id,text}`
+objects), and `correctChoiceIds`. A `fillBlank` exercise adds `fillBlanks`, an
+ordered list of 1--12 unique `{id,answers}` objects. `oral` exercises carry no
+choice or blank fields. Explicit choices/blanks are the only source for their
+controls; the app never infers them from the prompt.
 Optional `promptLayout` preserves reading-exercise rows and columns as
 `[[{"text":"word","emphasis":[0]}]]`. `emphasis` contains unique zero-based
 Unicode-scalar positions of characters with dots underneath. Cells contain no

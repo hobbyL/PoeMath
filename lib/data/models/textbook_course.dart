@@ -9,6 +9,10 @@ enum TextbookCoverage { pending, notApplicable, complete }
 
 enum TextbookAnswerType { none, exact, reference, parentCheck }
 
+enum TextbookExerciseQuestionType { choice, fillBlank, oral }
+
+enum TextbookExerciseChoiceMode { single, multiple }
+
 class TextbookCourseIssue {
   const TextbookCourseIssue(this.path, this.code, this.message);
   final String path;
@@ -231,6 +235,18 @@ class TextbookExerciseCell {
   final List<int> emphasis;
 }
 
+class TextbookExerciseChoice {
+  const TextbookExerciseChoice(this.id, this.text);
+  final String id;
+  final String text;
+}
+
+class TextbookExerciseBlank {
+  const TextbookExerciseBlank(this.id, this.answers);
+  final String id;
+  final List<String> answers;
+}
+
 class TextbookCourseExercise extends TextbookCourseNode {
   TextbookCourseExercise._(
     super.id,
@@ -244,6 +260,11 @@ class TextbookCourseExercise extends TextbookCourseNode {
     this.answerOrigin,
     this.answerSources,
     this.promptLayout,
+    this.questionType,
+    this.choiceMode,
+    this.choiceOptions,
+    this.correctChoiceIds,
+    this.fillBlanks,
   ) : super._();
   final String prompt;
   final TextbookAnswerType answerType;
@@ -253,6 +274,15 @@ class TextbookCourseExercise extends TextbookCourseNode {
   final String answerOrigin;
   final List<TextbookSourcePage> answerSources;
   final List<List<TextbookExerciseCell>> promptLayout;
+
+  /// 旧课程包缺省题型时按口答兼容，不修改原始 JSON。
+  final TextbookExerciseQuestionType questionType;
+  final TextbookExerciseChoiceMode? choiceMode;
+  final List<TextbookExerciseChoice> choiceOptions;
+  final List<String> correctChoiceIds;
+  final List<TextbookExerciseBlank> fillBlanks;
+
+  bool get hasExplicitQuestionType => _json.containsKey('questionType');
 
   /// 有排版时使用题首独占行；旧数据和编辑后的阅读题兼容首行指令。
   String? get promptHeading {
@@ -927,6 +957,11 @@ class _CourseDecoder {
         'answerSources',
         'sources',
         'review',
+        if (exercise.containsKey('questionType')) 'questionType',
+        if (exercise.containsKey('choiceMode')) 'choiceMode',
+        if (exercise.containsKey('choiceOptions')) 'choiceOptions',
+        if (exercise.containsKey('correctChoiceIds')) 'correctChoiceIds',
+        if (exercise.containsKey('fillBlanks')) 'fillBlanks',
       ]);
       choice(exercise['origin'], '$p.origin', ['textbook', 'curated']);
       final type = TextbookAnswerType.values.byName(
@@ -945,6 +980,112 @@ class _CourseDecoder {
       final answerPages =
           sources(exercise['answerSources'], '$p.answerSources');
       final prompt = string(exercise['prompt'], '$p.prompt');
+      final questionType = TextbookExerciseQuestionType.values.byName(
+        exercise.containsKey('questionType')
+            ? choice(
+                exercise['questionType'],
+                '$p.questionType',
+                TextbookExerciseQuestionType.values.map((e) => e.name).toList(),
+              )
+            : TextbookExerciseQuestionType.oral.name,
+      );
+      TextbookExerciseChoiceMode? choiceMode;
+      final choiceOptions = <TextbookExerciseChoice>[];
+      final correctChoiceIds = <String>[];
+      final fillBlanks = <TextbookExerciseBlank>[];
+      String localId(Object? value, String path, Set<String> used) {
+        final result = string(value, path);
+        if (!RegExp(r'^[A-Za-z][A-Za-z0-9._-]{0,31}$').hasMatch(result) ||
+            !used.add(result)) {
+          fail(path, '题型内部 ID 无效或重复');
+        }
+        return result;
+      }
+
+      void rejectUnexpected(String field) {
+        if (exercise.containsKey(field)) fail(p, '$field 只适用于指定题型');
+      }
+
+      if (questionType == TextbookExerciseQuestionType.choice) {
+        if (!exercise.containsKey('choiceMode') ||
+            !exercise.containsKey('choiceOptions') ||
+            !exercise.containsKey('correctChoiceIds')) {
+          fail(p, '选择题须提供 choiceMode、choiceOptions 和 correctChoiceIds');
+        }
+        choiceMode = TextbookExerciseChoiceMode.values.byName(
+          choice(
+            exercise['choiceMode'],
+            '$p.choiceMode',
+            TextbookExerciseChoiceMode.values.map((e) => e.name).toList(),
+          ),
+        );
+        final optionIds = <String>{};
+        final rawOptions = list(exercise['choiceOptions'], '$p.choiceOptions');
+        if (rawOptions.length < 2 || rawOptions.length > 8) {
+          fail('$p.choiceOptions', '选择题选项数须为 2 至 8');
+        }
+        for (final (index, value) in rawOptions.indexed) {
+          final at = '$p.choiceOptions[$index]';
+          final option = object(value, at);
+          fields(option, at, ['id', 'text']);
+          choiceOptions.add(
+            TextbookExerciseChoice(
+              localId(option['id'], '$at.id', optionIds),
+              string(option['text'], '$at.text'),
+            ),
+          );
+        }
+        final optionSet = choiceOptions.map((item) => item.id).toSet();
+        for (final (index, value)
+            in list(exercise['correctChoiceIds'], '$p.correctChoiceIds')
+                .indexed) {
+          final id = string(value, '$p.correctChoiceIds[$index]');
+          if (!optionSet.contains(id) || correctChoiceIds.contains(id)) {
+            fail('$p.correctChoiceIds[$index]', '正确选项 ID 无效或重复');
+          }
+          correctChoiceIds.add(id);
+        }
+        if (correctChoiceIds.isEmpty ||
+            (choiceMode == TextbookExerciseChoiceMode.single &&
+                correctChoiceIds.length != 1)) {
+          fail('$p.correctChoiceIds', '单选题须恰好一个正确选项，多选题至少一个');
+        }
+        rejectUnexpected('fillBlanks');
+      } else if (questionType == TextbookExerciseQuestionType.fillBlank) {
+        if (!exercise.containsKey('fillBlanks')) {
+          fail(p, '填空题须提供 fillBlanks');
+        }
+        rejectUnexpected('choiceMode');
+        rejectUnexpected('choiceOptions');
+        rejectUnexpected('correctChoiceIds');
+        final blankIds = <String>{};
+        final rawBlanks = list(exercise['fillBlanks'], '$p.fillBlanks');
+        if (rawBlanks.isEmpty || rawBlanks.length > 12) {
+          fail('$p.fillBlanks', '填空数量须为 1 至 12');
+        }
+        for (final (index, value) in rawBlanks.indexed) {
+          final at = '$p.fillBlanks[$index]';
+          final blank = object(value, at);
+          fields(blank, at, ['id', 'answers']);
+          final blankAnswers = strings(blank['answers'], '$at.answers');
+          if ((type == TextbookAnswerType.exact ||
+                  type == TextbookAnswerType.reference) &&
+              blankAnswers.isEmpty) {
+            fail('$at.answers', '有答案的填空题每个空须提供答案或参考要点');
+          }
+          fillBlanks.add(
+            TextbookExerciseBlank(
+              localId(blank['id'], '$at.id', blankIds),
+              blankAnswers,
+            ),
+          );
+        }
+      } else {
+        rejectUnexpected('choiceMode');
+        rejectUnexpected('choiceOptions');
+        rejectUnexpected('correctChoiceIds');
+        rejectUnexpected('fillBlanks');
+      }
       final layout = <List<TextbookExerciseCell>>[];
       if (exercise.containsKey('promptLayout')) {
         for (final (r, row)
@@ -1004,6 +1145,11 @@ class _CourseDecoder {
           origin,
           answerPages,
           List.unmodifiable(layout),
+          questionType,
+          choiceMode,
+          List.unmodifiable(choiceOptions),
+          List.unmodifiable(correctChoiceIds),
+          List.unmodifiable(fillBlanks),
         ),
       );
     }

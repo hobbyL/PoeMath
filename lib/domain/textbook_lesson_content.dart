@@ -4,7 +4,8 @@ enum TextbookContentSection {
   reading('读一读', 'paragraphs'),
   recognition('认一认', 'recognitionCharacters'),
   recitation('背一背', 'recitations'),
-  writing('写一写', 'writingCharacters');
+  writing('写一写', 'writingCharacters'),
+  exercise('习题', 'exercises');
 
   const TextbookContentSection(this.label, this.category);
   final String label;
@@ -16,7 +17,27 @@ enum TextbookContentSection {
         recognition => lesson.recognitionCharacters,
         recitation => lesson.recitations,
         writing => lesson.writingCharacters,
+        exercise => lesson.exercises,
       };
+}
+
+List<TextbookCourseNode> textbookVisibleTargets(
+  TextbookCoursePack pack,
+  TextbookCourseLesson lesson,
+  TextbookContentSection section,
+) {
+  if (section != TextbookContentSection.exercise) {
+    return section.targets(lesson);
+  }
+  if (pack.status != 'reviewed' ||
+      lesson.coverage['exercises'] != TextbookCoverage.complete ||
+      !lesson.isApproved) {
+    return const [];
+  }
+  return [
+    for (final exercise in lesson.exercises)
+      if (exercise.isApproved) exercise,
+  ];
 }
 
 /// 先按原书来源找到课目，再展示整课内容。生字的来源可能在册末字表。

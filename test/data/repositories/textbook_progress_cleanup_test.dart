@@ -24,7 +24,7 @@ void main() {
   String digestKey(String prefix, List<String> parts) =>
       '$prefix:${base64Encode(utf8.encode(jsonEncode(parts)))}';
 
-  test('按 bookId 删除认一认与写一写两个前缀的进度键', () async {
+  test('按 bookId 删除认一认、写一写与习题三个前缀的进度键', () async {
     final sha = 'a' * 64;
     final other = List.filled(64, 'b').join();
     final recognitionKey = digestKey('textbook_recognition_v1', [
@@ -33,48 +33,75 @@ void main() {
       'edition-1',
     ]);
     final writingKey = digestKey('textbook_writing_v1', ['child', sha, 'e1']);
+    final exerciseKey = digestKey('textbook_exercise_v1', [
+      'child',
+      sha,
+      'e1',
+    ]);
     final otherKey = digestKey('textbook_recognition_v1', [
       'child',
       other,
       'edition-1',
     ]);
-    box.put(recognitionKey, jsonEncode({
-      'v': 1,
-      'profileId': 'child',
-      'bookId': sha,
-      'editionId': 'edition-1',
-      'revision': 0,
-      'records': <String, dynamic>{},
-      'audio': <String, dynamic>{},
-      'operations': <String>[],
-    }),);
-    box.put(writingKey, jsonEncode({
-      'v': 1,
-      'profileId': 'child',
-      'bookId': sha,
-      'editionId': 'e1',
-      'revision': 0,
-      'records': <String, dynamic>{},
-      'operations': <String>[],
-    }),);
-    box.put(otherKey, jsonEncode({
-      'v': 1,
-      'profileId': 'child',
-      'bookId': other,
-      'editionId': 'edition-1',
-      'revision': 0,
-      'records': <String, dynamic>{},
-      'audio': <String, dynamic>{},
-      'operations': <String>[],
-    }),);
+    box.put(
+      recognitionKey,
+      jsonEncode({
+        'v': 1,
+        'profileId': 'child',
+        'bookId': sha,
+        'editionId': 'edition-1',
+        'revision': 0,
+        'records': <String, dynamic>{},
+        'audio': <String, dynamic>{},
+        'operations': <String>[],
+      }),
+    );
+    box.put(
+      writingKey,
+      jsonEncode({
+        'v': 1,
+        'profileId': 'child',
+        'bookId': sha,
+        'editionId': 'e1',
+        'revision': 0,
+        'records': <String, dynamic>{},
+        'operations': <String>[],
+      }),
+    );
+    box.put(
+      exerciseKey,
+      jsonEncode({
+        'v': 1,
+        'profileId': 'child',
+        'bookId': sha,
+        'editionId': 'e1',
+        'revision': 0,
+        'records': <String, dynamic>{},
+        'operations': <String>[],
+      }),
+    );
+    box.put(
+      otherKey,
+      jsonEncode({
+        'v': 1,
+        'profileId': 'child',
+        'bookId': other,
+        'editionId': 'edition-1',
+        'revision': 0,
+        'records': <String, dynamic>{},
+        'audio': <String, dynamic>{},
+        'operations': <String>[],
+      }),
+    );
     // 无关键不动。
     box.put('poem_progress:1', 'whatever');
 
     final removed = await cleanup.deleteBookProgress(sha);
 
-    expect(removed, 2);
+    expect(removed, 3);
     expect(box.get(recognitionKey), isNull);
     expect(box.get(writingKey), isNull);
+    expect(box.get(exerciseKey), isNull);
     expect(box.get(otherKey), isNotNull, reason: '其他书的进度不受影响');
     expect(box.get('poem_progress:1'), 'whatever');
   });
@@ -84,14 +111,17 @@ void main() {
     final badKey = 'textbook_recognition_v1:digest-bad';
     final missingKey = 'textbook_writing_v1:digest-missing';
     box.put(badKey, '{not json');
-    box.put(missingKey, jsonEncode({
-      'v': 1,
-      'profileId': 'child',
-      'editionId': 'e1',
-      'revision': 0,
-      'records': <String, dynamic>{},
-      'operations': <String>[],
-    }),);
+    box.put(
+      missingKey,
+      jsonEncode({
+        'v': 1,
+        'profileId': 'child',
+        'editionId': 'e1',
+        'revision': 0,
+        'records': <String, dynamic>{},
+        'operations': <String>[],
+      }),
+    );
 
     final removed = await cleanup.deleteBookProgress(sha);
 
