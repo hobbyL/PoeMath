@@ -21,6 +21,7 @@ class TypographyTokens {
   /// 卡片内的小节标题（大于正文、小于卡片标题）。
   static const double fsSection = 18.0;
   static const double fsBody = 16.0;
+  static const double fsBodySmall = 14.0;
   static const double fsCaption = 13.0;
   static const double fsLabel = 12.0;
 

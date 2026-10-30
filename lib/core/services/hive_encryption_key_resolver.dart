@@ -55,6 +55,7 @@ class HiveEncryptionKeyResolver {
     HiveKeys.llmProblemBox,
     HiveKeys.conversationBox,
     HiveKeys.messageBox,
+    HiveKeys.pictureStoryPracticeBox,
     HiveKeys.settingsBox,
     HiveKeys.metaBox,
   ];

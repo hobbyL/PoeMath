@@ -127,11 +127,15 @@ class SettingsRepository {
   /// 语文页上次浏览的栏目，仅作本机 UI 偏好，不随学习数据备份迁移。
   String get chineseSection {
     final value = HiveBoxes.meta.get(ProfileScope.key('chinese_section'));
-    return value == 'poem' ? 'poem' : 'textbook';
+    return switch (value) {
+      'poem' => 'poem',
+      'expression' => 'expression',
+      _ => 'textbook',
+    };
   }
 
   Future<void> setChineseSection(String section) async {
-    if (section != 'textbook' && section != 'poem') {
+    if (!{'textbook', 'poem', 'expression'}.contains(section)) {
       throw ArgumentError.value(section, 'section', '语文栏目无效');
     }
     // 在异步写入前捕获当前档案，避免写入过程中切换档案后串数据。

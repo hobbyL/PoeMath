@@ -23,12 +23,15 @@ import 'package:poemath/core/widgets/colored_card.dart';
 ///
 /// 视觉规则继承 [ColoredCard]（半透明彩色背景 + 圆角），额外提供：
 /// - 裸图标（无背景容器，颜色跟随 iconColor）
+/// - 自定义前导内容（如题目缩略图）
 /// - 标题 + 副标题文本列
 /// - 尾部组件（默认为 chevron 箭头；可替换为 Switch 等）
 class AppTile extends StatelessWidget {
   const AppTile({
     super.key,
     this.icon,
+    this.leading,
+    this.leadingEdgeWidth,
     required this.iconColor,
     required this.title,
     this.titleSuffix,
@@ -49,10 +52,19 @@ class AppTile extends StatelessWidget {
         assert(
           onTrailingTap == null || (trailing == null && trailingAction == null),
         ),
-        assert(subtitleMaxLines == null || subtitleMaxLines > 0);
+        assert(subtitleMaxLines == null || subtitleMaxLines > 0),
+        assert(leadingEdgeWidth == null || leadingEdgeWidth > 0),
+        assert(leadingEdgeWidth == null || (leading != null && !flat));
 
-  /// 图标；省略时不展示图标，也不保留图标占位。
+  /// 图标；未提供 [leading] 时展示，省略时不保留图标占位。
   final IconData? icon;
+
+  /// 自定义前导内容，优先于 [icon]；未设置 [leadingEdgeWidth] 时应限制其宽度。
+  final Widget? leading;
+
+  /// 贴边前导内容的宽度；设置后铺满卡片起始侧的完整高度并沿卡片圆角裁切。
+  /// 仅适用于提供 [leading] 的卡片列表行，文字和尾部操作保留默认内边距。
+  final double? leadingEdgeWidth;
 
   /// 图标主色调，同时决定卡片背景色。
   final Color iconColor;
@@ -97,7 +109,7 @@ class AppTile extends StatelessWidget {
   /// 普通列表行中将尾部图形贴到内容区右边界；整行仍保留 44dp 点击高度。
   final bool flatTrailingEdgeAligned;
 
-  /// 主行内图标、文本及尾部组件的垂直对齐方式。
+  /// 主行内前导内容、文本及尾部组件的垂直对齐方式。
   final CrossAxisAlignment crossAxisAlignment;
 
   @override
@@ -193,8 +205,9 @@ class AppTile extends StatelessWidget {
       return Row(
         crossAxisAlignment: crossAxisAlignment,
         children: <Widget>[
-          if (icon != null) ...[
-            Icon(icon, color: iconColor, size: 22),
+          if (leadingEdgeWidth == null &&
+              (leading != null || icon != null)) ...[
+            leading ?? Icon(icon, color: iconColor, size: 22),
             const SizedBox(width: SpacingTokens.md),
           ],
           Expanded(
@@ -259,17 +272,42 @@ class AppTile extends StatelessWidget {
         ),
       );
     }
+    const contentPadding = EdgeInsets.symmetric(
+      horizontal: SpacingTokens.md,
+      vertical: SpacingTokens.sm + 2,
+    );
+    final edgeWidth = leadingEdgeWidth;
+    final cardContent = edgeWidth == null
+        ? content
+        : ClipRRect(
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                Padding(
+                  padding: contentPadding.add(
+                    EdgeInsetsDirectional.only(start: edgeWidth),
+                  ),
+                  child: content,
+                ),
+                PositionedDirectional(
+                  start: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: edgeWidth,
+                  child: leading!,
+                ),
+              ],
+            ),
+          );
     return ColoredCard(
       color: iconColor,
       onTap: trailing == null ? onTap : null,
       constraints: const BoxConstraints(
         minHeight: SpacingTokens.minTapTarget + SpacingTokens.md,
       ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: SpacingTokens.md,
-        vertical: SpacingTokens.sm + 2,
-      ),
-      child: content,
+      padding: edgeWidth == null ? contentPadding : EdgeInsets.zero,
+      child: cardContent,
     );
   }
 }

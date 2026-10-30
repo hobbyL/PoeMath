@@ -59,6 +59,9 @@ class HiveKeys {
   /// AI 助手消息 Box
   static const String messageBox = 'assistant_messages';
 
+  /// 看图说话练习记录 Box
+  static const String pictureStoryPracticeBox = 'picture_story_practice';
+
   /// 设置 Box（KV 存储）
   static const String settingsBox = 'settings';
 

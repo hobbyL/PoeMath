@@ -146,7 +146,7 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.menu_book_outlined,
                 iconColor: theme.colorScheme.primary,
                 title: '学习与内容',
-                subtitle: '学习背景与练习参数',
+                subtitle: '学习背景、练习参数与看图说话题库',
                 onTap: () => _openSection(context, _SettingsSection.learning),
               ),
               const SizedBox(height: SpacingTokens.sm),
@@ -241,6 +241,14 @@ class SettingsPage extends ConsumerWidget {
                     ref.invalidate(settingsRepositoryProvider);
                   }
                 },
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              AppTile(
+                icon: Icons.image_outlined,
+                iconColor: theme.colorScheme.secondary,
+                title: '看图说话题库',
+                subtitle: '管理内置题目与启用状态',
+                onTap: () => context.push(AppRoutes.pictureStoryManagement),
               ),
               const SizedBox(height: SpacingTokens.sm),
               _buildPracticeSettings(context, ref),

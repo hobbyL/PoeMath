@@ -48,6 +48,12 @@ class AppRoutes {
   static const String textbookManagement = '/profile/settings/books';
   static const String textbookManageDetail = '/profile/settings/books/:id';
 
+  // ============ 看图说话 ==========
+  static const String pictureStoryPractice = '/chinese/expression/practice/:id';
+  static const String pictureStoryHistory = '/chinese/expression/history';
+  static const String pictureStoryManagement =
+      '/profile/settings/picture-story';
+
   // ============ 口算模块 ============
   static const String mathPractice = '/math/practice';
   static const String mathChallenge = '/math/challenge';
@@ -132,4 +138,6 @@ class AppRoutes {
       ).toString();
   static String textbookManageDetailOf(String id) =>
       '/profile/settings/books/$id';
+  static String pictureStoryPracticeOf(String id) =>
+      '/chinese/expression/practice/${Uri.encodeComponent(id)}';
 }

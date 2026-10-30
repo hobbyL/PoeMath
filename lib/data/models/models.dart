@@ -17,3 +17,4 @@ export 'achievement.dart';
 export 'check_in.dart';
 export 'user_stats.dart';
 export 'learning_activity.dart';
+export 'picture_story_practice_record.dart';

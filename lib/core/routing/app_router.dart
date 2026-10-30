@@ -20,6 +20,8 @@ import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/features/assistant/assistant_page.dart';
 import 'package:poemath/features/chinese/chinese_tab_page.dart';
+import 'package:poemath/features/chinese/expression/picture_story_history_page.dart';
+import 'package:poemath/features/chinese/expression/picture_story_practice_page.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
 import 'package:poemath/features/home/home_page.dart';
@@ -51,6 +53,7 @@ import 'package:poemath/features/profile/achievement_page.dart';
 import 'package:poemath/features/profile/learning_stats_page.dart';
 import 'package:poemath/features/profile/llm_provider_settings_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
+import 'package:poemath/features/profile/picture_story_management_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 import 'package:poemath/features/profile/update_page.dart';
@@ -250,6 +253,23 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
             lessonId: state.pathParameters['lesson']!,
             routeObserver: textbookObserver,
           ),
+        ),
+      ),
+      // ============ 看图说话（子路由） ==========
+      GoRoute(
+        path: AppRoutes.pictureStoryPractice,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: PictureStoryPracticePage(
+            promptId: state.pathParameters['id']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.pictureStoryHistory,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const PictureStoryHistoryPage(),
         ),
       ),
       // ============ 公式知识库（全屏，从口算页或首页进入） ============
@@ -515,6 +535,15 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const ParentAccessBoundary(child: LlmProviderSettingsPage()),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.pictureStoryManagement,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const ParentAccessBoundary(
+            child: PictureStoryManagementPage(),
+          ),
         ),
       ),
       // ============ 学习报告（非 Shell 子路由，全屏） ============

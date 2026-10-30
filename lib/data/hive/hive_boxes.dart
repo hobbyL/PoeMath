@@ -25,6 +25,7 @@ import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/models/assistant_conversation.dart';
 import 'package:poemath/data/models/assistant_message.dart';
+import 'package:poemath/data/models/picture_story_practice_record.dart';
 
 class HiveBoxes {
   const HiveBoxes._();
@@ -49,6 +50,7 @@ class HiveBoxes {
   static late Box<LlmProblem> llmProblems;
   static late Box<Conversation> conversations;
   static late Box<Message> messages;
+  static late Box<PictureStoryPracticeRecord> pictureStoryPractice;
 
   // ============ KV Box ============
   static late Box<dynamic> settings;
@@ -61,7 +63,7 @@ class HiveBoxes {
   /// **生产路径必须传 cipher** —— 见 `database-guidelines.md` 的
   /// 「Hive 加密」一节；漏传会让全部用户数据以明文 JSON 落盘。
   ///
-  /// 19 处 `openBox` 逐处显式写 `crashRecovery: false, encryptionCipher: cipher`，**故意不抽
+  /// 每处 `openBox` 逐处显式写 `crashRecovery: false, encryptionCipher: cipher`，**故意不抽
   /// 辅助函数**：机械重复反而让「哪一个 box 漏加了 cipher」在 review 时
   /// 一眼可见；抽成 `open<T>(name)` 会把这种遗漏藏进一行里。
   static Future<void> init({HiveCipher? cipher}) async {
@@ -150,6 +152,11 @@ class HiveBoxes {
     );
     messages = await Hive.openBox<Message>(
       HiveKeys.messageBox,
+      crashRecovery: false,
+      encryptionCipher: cipher,
+    );
+    pictureStoryPractice = await Hive.openBox<PictureStoryPracticeRecord>(
+      HiveKeys.pictureStoryPracticeBox,
       crashRecovery: false,
       encryptionCipher: cipher,
     );

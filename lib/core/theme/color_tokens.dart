@@ -83,6 +83,9 @@ class ColorTokens {
   static const Color error = Color(0xFFFF4D4F);
   static const Color info = Color(0xFF1890FF);
 
+  /// 提示灯亮起时的琥珀色，在浅色图片上保留清晰轮廓。
+  static const Color hintAmber = Color(0xFF9A6700);
+
   // ============ 深色模式（占位映射） ============
   /// 深色背景
   static const Color darkBackground = Color(0xFF1A1A1F);

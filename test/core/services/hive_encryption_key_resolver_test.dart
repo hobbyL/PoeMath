@@ -310,12 +310,12 @@ void main() {
   });
 
   group('allBoxNames', () {
-    test('覆盖 HiveBoxes 打开的全部 19 个 box', () {
+    test('覆盖 HiveBoxes 打开的全部 20 个 box', () {
       // 漏一个就是一处明文泄漏，因此数量与名单都要钉住。
-      expect(HiveEncryptionKeyResolver.allBoxNames, hasLength(19));
+      expect(HiveEncryptionKeyResolver.allBoxNames, hasLength(20));
       expect(
         HiveEncryptionKeyResolver.allBoxNames.toSet(),
-        hasLength(19),
+        hasLength(20),
         reason: '名单中不应有重复项',
       );
       for (final required in ['poems', 'settings', 'meta']) {

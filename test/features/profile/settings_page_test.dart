@@ -90,10 +90,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 学习与内容：学习背景 + 练习参数（拼音显示开关已移除）。
+    // 学习与内容：学习背景 + 看图说话题库 + 练习参数。
     await tester.tap(find.text('学习与内容'));
     await tester.pumpAndSettle();
     expect(find.text('学习背景'), findsOneWidget);
+    expect(find.text('看图说话题库'), findsOneWidget);
+    expect(find.text('管理内置题目与启用状态'), findsOneWidget);
     expect(find.text('练习设置'), findsOneWidget);
     expect(find.text('拼音显示'), findsNothing);
     // 通知与 AI 已不在此组。

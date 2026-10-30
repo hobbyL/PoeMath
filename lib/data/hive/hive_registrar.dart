@@ -26,6 +26,7 @@ import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/models/assistant_conversation.dart';
 import 'package:poemath/data/models/assistant_message.dart';
+import 'package:poemath/data/models/picture_story_practice_record.dart';
 
 bool _adaptersRegistered = false;
 
@@ -55,6 +56,7 @@ void registerHiveAdapters() {
   _register(LlmProblemAdapter()); // typeId: 16
   _register(ConversationAdapter()); // typeId: 17
   _register(MessageAdapter()); // typeId: 18
+  _register(PictureStoryPracticeRecordAdapter()); // typeId: 21
 
   // 枚举 Adapter
   _register(LearningStatusAdapter()); // typeId: 20

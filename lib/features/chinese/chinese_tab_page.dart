@@ -13,14 +13,18 @@ import 'package:poemath/features/poem/poem_tab_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_learning_providers.dart';
 import 'package:poemath/features/textbook/textbook_learning_page.dart';
+import 'package:poemath/features/chinese/expression/picture_story_page.dart';
+import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 
 enum ChineseSection {
   textbook,
-  poem;
+  poem,
+  expression;
 
   static ChineseSection? fromId(String? id) => switch (id) {
         'textbook' => textbook,
         'poem' => poem,
+        'expression' => expression,
         _ => null,
       };
 }
@@ -108,6 +112,7 @@ class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
   Widget build(BuildContext context) {
     final textbookCount = ref.watch(currentTextbooksProvider).length;
     final poemCount = ref.watch(filteredPoemsProvider).length;
+    final expressionCount = ref.watch(pictureStoryPromptCountProvider);
     final labelStyle = Theme.of(context).textTheme.labelLarge!;
     final labelHeight =
         MediaQuery.textScalerOf(context).scale(labelStyle.fontSize!) *
@@ -128,6 +133,13 @@ class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
           label: FittedBox(
             fit: BoxFit.scaleDown,
             child: Text('课本($textbookCount)', maxLines: 1),
+          ),
+        ),
+        ButtonSegment(
+          value: ChineseSection.expression,
+          label: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text('表达($expressionCount)', maxLines: 1),
           ),
         ),
         ButtonSegment(
@@ -157,6 +169,13 @@ class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
           TickerMode(
             enabled: _section == ChineseSection.poem,
             child: PoemTabPage(
+              navigationTitle: switcher,
+              navigationToolbarHeight: toolbarHeight,
+            ),
+          ),
+          TickerMode(
+            enabled: _section == ChineseSection.expression,
+            child: PictureStoryPage(
               navigationTitle: switcher,
               navigationToolbarHeight: toolbarHeight,
             ),
