@@ -8,6 +8,7 @@ import 'package:poemath/domain/textbook_text_display.dart';
 
 import '../helpers/textbook_draft_fixture.dart';
 import '../helpers/textbook_course_fixture.dart';
+import '../helpers/textbook_reading_fixture.dart';
 
 TextbookPageText _versePage(int page, int start, double left) {
   final text = StringBuffer('星月测试\n');
@@ -72,6 +73,68 @@ void main() {
   final seed = parser.seed(draftFixtureEntry(), draftFixtureToc);
   final lesson = seed.pack.lessons.first;
   final plan = seed.generation!.plans.first;
+
+  test('为插图整体右移的文字块保持三节，不逐行拆段或注入缩进，旧稿同样恢复诗行', () {
+    final page = illustratedReadingPage();
+    final parsed = parser.parse(lesson, plan, [page]);
+    expect(
+      (parsed.lesson['paragraphs'] as List).map((p) => p['text']),
+      [
+        for (var row = 0; row < illustratedReadingLines.length; row += 3)
+          illustratedReadingLines.sublist(row, row + 3).join('\n'),
+      ],
+    );
+    final legacy = _legacyVerse([page]);
+    final before = legacy.toJson();
+    final layout = parser.readingLayout(legacy, [page]);
+    expect(layout.retainLeadingIndent, isFalse);
+    expect(layout.leadingIndentCells, 0);
+    var rawIndex = 2;
+    expect(layout.breaks, {
+      for (var index = 1; index < illustratedReadingLines.length; index++)
+        (rawIndex += illustratedReadingLines[index - 1].runes.length + 1):
+            index % 3 == 0
+                ? TextbookReadingBreak.stanza
+                : TextbookReadingBreak.line,
+    });
+    expect(legacy.toJson(), before);
+  });
+
+  test('插图旁散文仍保留相对本块续行的真实两格首行缩进', () {
+    final base = illustratedReadingPage();
+    final page = TextbookPageText(
+      page: base.page,
+      text: base.text,
+      width: base.width,
+      height: base.height,
+      glyphs: [
+        for (final glyph in base.glyphs)
+          () {
+            final row = base.text.runes
+                .take(glyph.index)
+                .where((rune) => rune == 0x0a)
+                .length;
+            final indent = row > 0 && (row - 1) % 3 == 0 ? .06 : 0.0;
+            return TextbookPageGlyph(
+              text: glyph.text,
+              index: glyph.index,
+              left: glyph.left + indent,
+              right: glyph.right + indent,
+              top: glyph.top,
+              bottom: glyph.bottom,
+            );
+          }(),
+      ],
+    );
+    final parsed = parser.parse(lesson, plan, [page]);
+    expect(
+      (parsed.lesson['paragraphs'] as List).map((p) => p['text']),
+      [
+        for (var row = 0; row < illustratedReadingLines.length; row += 3)
+          '　　${illustratedReadingLines.sublist(row, row + 3).join('\n')}',
+      ],
+    );
+  });
 
   for (final explicit in [false, true]) {
     test('单行自然段从原书恢复缩进，已有缩进不重复补（文字层含缩进=$explicit）', () {
@@ -195,6 +258,183 @@ void main() {
       everyElement(4),
     );
   });
+
+  test('插图小字不因邻列拼音或错位图注合行混入正文，薄标点归回同列正文', () {
+    final text = StringBuffer();
+    final glyphs = <TextbookPageGlyph>[];
+    var index = 0;
+    void line(
+      String value,
+      double top,
+      double left, {
+      double width = .03,
+      double height = .024,
+      double step = .045,
+      bool thinPunctuation = false,
+    }) {
+      for (final (column, rune) in value.runes.indexed) {
+        final character = String.fromCharCode(rune);
+        final thin = thinPunctuation && '，。'.contains(character);
+        text.write(character);
+        glyphs.add(
+          TextbookPageGlyph(
+            text: character,
+            index: index++,
+            left: left + column * step,
+            right: left + column * step + (thin ? .008 : width),
+            top: thin ? top + .018 : top,
+            bottom: top + height,
+          ),
+        );
+      }
+      text.writeln();
+      index++;
+    }
+
+    const body = [
+      '星光照亮小山河，',
+      '月色轻轻洒窗前。',
+      '清风吹过青青草，',
+      '细雨轻敲小屋檐。',
+      '白云悠悠飘山外，',
+      '小鸟声声唱林间。',
+      '我们一起看星月，',
+      '快乐歌声满校园。',
+    ];
+    line('星月测试', .05, .45, height: .034);
+    for (final (row, value) in body.indexed) {
+      line(
+        value,
+        .2 + row * .055,
+        .45,
+        // 正文字形较窄但同样高，不能仅凭宽度判成小字。
+        width: row == 4 ? .019 : .03,
+        thinPunctuation: true,
+      );
+    }
+    // 同一视觉行内的邻列拼音会撑大图注外框。
+    line('xUng guQng', .184, .45, width: .007, height: .0146, step: .008);
+    line('云朵', .187, .12, width: .0215, height: .0156, step: .024);
+    // 图注比正文行更接近逗号的纵向位置，但横向位于另一列。
+    line('石桥', .328, .12, width: .0215, height: .0156, step: .024);
+    for (final (column, label) in ['风筝', '花朵', '小船'].indexed) {
+      line(
+        label,
+        .75 + column * .004,
+        .45 + column * .15,
+        width: .0215,
+        height: .0156,
+        step: .024,
+      );
+    }
+    final page = TextbookPageText.fromJson(
+      TextbookPageText(
+        page: 2,
+        text: text.toString(),
+        width: 600,
+        height: 800,
+        glyphs: glyphs,
+      ).toJson(),
+    );
+    final parsed = parser.parse(lesson, plan, [page]);
+    final raw = seed.pack.toJson();
+    (raw['lessons'] as List)[0] = parsed.lesson;
+    final paragraph =
+        TextbookCoursePack.fromJson(raw).lessons.first.paragraphs.single;
+    expect(paragraph.text, body.join('\n'));
+    expect(paragraph.sources.map((source) => source.pdfPage), [2]);
+    for (final label in ['云朵', '石桥', '风筝 花朵 小船']) {
+      expect(
+        parsed.candidates.any(
+          (candidate) =>
+              candidate.text.contains(label) && candidate.pages.contains(2),
+        ),
+        isTrue,
+      );
+    }
+    final layout = parser.readingLayout(paragraph, [page]);
+    expect(layout.retainLeadingIndent, isFalse);
+    expect(layout.breaks.values, List.filled(7, TextbookReadingBreak.line));
+  });
+
+  for (final (crossPage, writing) in [
+    (false, false),
+    (true, false),
+    (false, true),
+  ]) {
+    test('生字条匹配完整识字表（跨页=$crossPage，续表为写字表=$writing）', () {
+      final continuation = [
+        if (writing) ...['写字表', '阅读', '1 林风'] else '林风',
+      ];
+      final tables = parser.vocabularyTables(seed.pack, [
+        layoutFixturePage(
+          2,
+          [
+            '识字表',
+            '阅读',
+            '1 星月山河',
+            if (!crossPage) ...continuation,
+          ],
+          step: .1,
+        ),
+        if (crossPage) layoutFixturePage(3, continuation),
+      ]);
+      expect(
+        tables[lesson.id]!.map((candidate) => candidate.text),
+        ['星月山河', '林风'],
+      );
+      final pages = [
+        _versePage(2, 0, .36),
+        layoutFixturePage(3, ['星月山河林风', '朗读课文。']),
+      ];
+      final parsed = parser.parse(
+        lesson,
+        TextbookDraftPlan(
+          id: plan.id,
+          title: plan.title,
+          startPage: 2,
+          endPage: 3,
+        ),
+        pages,
+        vocabulary: tables[lesson.id]!,
+      );
+      final paragraphs = parsed.lesson['paragraphs'] as List;
+      expect(paragraphs, hasLength(3));
+      final last = paragraphs.last as Map;
+      final lines = (last['text'] as String).split('\n');
+      expect(lines, [
+        for (var row = 8; row < 12; row++) '甲$row星光闪，',
+        if (writing) '星月山河林风',
+      ]);
+      expect(
+        (last['sources'] as List).map((source) => (source as Map)['pdfPage']),
+        writing ? [2, 3] : [2],
+      );
+      expect(
+        (parsed.lesson['recognitionCharacters'] as List)
+            .map((node) => (node as Map)['text']),
+        writing ? ['星', '月', '山', '河'] : ['星', '月', '山', '河', '林', '风'],
+      );
+      expect(
+        (parsed.lesson['exercises'] as List)
+            .map((node) => (node as Map)['prompt']),
+        ['朗读课文。'],
+      );
+      if (!writing) {
+        final raw = seed.pack.toJson();
+        (raw['lessons'] as List)[0] = parsed.lesson;
+        final paragraphs =
+            TextbookCoursePack.fromJson(raw).lessons.first.paragraphs;
+        final layout = parser.readingLayout(paragraphs.last, pages);
+        expect(layout.retainLeadingIndent, isFalse);
+        expect(layout.breaks.values, [
+          TextbookReadingBreak.line,
+          TextbookReadingBreak.line,
+          TextbookReadingBreak.line,
+        ]);
+      }
+    });
+  }
 
   test('阅读习题按视觉行分题，词语不跨题，加点由字符下方几何位置识别', () {
     final text = StringBuffer();
@@ -366,6 +606,93 @@ void main() {
     ]);
     expect((body.lesson['paragraphs'] as List).single['text'], '我会变，星月明。');
     expect(body.lesson['exercises'], isEmpty);
+  });
+
+  test('文字层逐字注音用完整音节归属，长拼音不会跨到邻字或被截断', () {
+    final base = layoutFixturePage(2, ['星月测试']);
+    final text = StringBuffer('${base.text}\n');
+    final glyphs = <TextbookPageGlyph>[...base.glyphs];
+    for (final (column, item) in [
+      ('绿', 'lC', .11),
+      ('洲', 'zhTu', .1325),
+    ].indexed) {
+      final (han, hint, hintLeft) = item;
+      final left = .1 + column * .05;
+      glyphs.add(
+        TextbookPageGlyph(
+          text: han,
+          index: text.toString().runes.length,
+          left: left,
+          right: left + .03,
+          top: .25,
+          bottom: .28,
+        ),
+      );
+      text.writeln(han);
+      for (final (index, rune) in hint.runes.indexed) {
+        glyphs.add(
+          TextbookPageGlyph(
+            text: String.fromCharCode(rune),
+            index: text.toString().runes.length,
+            left: hintLeft + index * .012,
+            right: hintLeft + index * .012 + .007,
+            top: .23,
+            bottom: .244,
+          ),
+        );
+        text.writeCharCode(rune);
+      }
+      text.writeln();
+    }
+    final parsed = parser.parse(lesson, plan, [
+      TextbookPageText.fromJson(
+        TextbookPageText(
+          page: 2,
+          text: text.toString(),
+          width: 600,
+          height: 800,
+          glyphs: glyphs,
+        ).toJson(),
+      ),
+    ]);
+    expect((parsed.lesson['paragraphs'] as List).single['text'], '绿洲');
+    expect(
+      (parsed.lesson['paragraphs'] as List).single['pinyin'],
+      ['lǜ', 'zhōu'],
+    );
+    expect(parsed.candidates, isEmpty);
+
+    final misplaced = parser.parse(lesson, plan, [
+      TextbookPageText(
+        page: 2,
+        text: text.toString(),
+        width: 600,
+        height: 800,
+        glyphs: [
+          for (final glyph in glyphs)
+            if (glyph.top == .23 && glyph.left >= .13)
+              TextbookPageGlyph(
+                text: glyph.text,
+                index: glyph.index,
+                left: glyph.left + .5,
+                right: glyph.right + .5,
+                top: glyph.top,
+                bottom: glyph.bottom,
+              )
+            else
+              glyph,
+        ],
+      ),
+    ]);
+    expect((misplaced.lesson['paragraphs'] as List).single['pinyin'], isNull);
+    expect(
+      misplaced.candidates.any(
+        (candidate) =>
+            candidate.pinyin.contains('洲: 未找到注音') &&
+            candidate.pages.contains(2),
+      ),
+      isTrue,
+    );
   });
 
   test('拼音字体大写编码在生成时还原为带调注音', () {

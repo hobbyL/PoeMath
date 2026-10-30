@@ -5,7 +5,7 @@ import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_catalog.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
-import 'package:poemath/domain/textbook_course_draft_parser.dart';
+import 'package:poemath/domain/textbook_reading_content.dart';
 import 'package:poemath/domain/textbook_text_display.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
@@ -44,25 +44,36 @@ final textbookCourseDocumentProvider = FutureProvider.autoDispose
   if (book == null) return null;
   return ref.watch(textbookCourseRepositoryProvider).loadDocument(book);
 });
-final textbookReadingLayoutProvider = FutureProvider.autoDispose.family<
-    Map<String, TextbookReadingLayout>,
-    ({String bookId, String lessonId})>((ref, key) async {
+final textbookReadingContentProvider = FutureProvider.autoDispose
+    .family<TextbookReadingContent?, ({String bookId, String lessonId})>(
+        (ref, key) async {
   final book = ref
       .watch(textbookListProvider)
       .where((book) => book.pdfSha256 == key.bookId)
       .firstOrNull;
-  if (book == null) return const {};
+  if (book == null) return null;
   final files = ref.watch(textbookFileServiceProvider);
   final course = ref.watch(textbookCourseProvider(key.bookId).future);
   final token = TextbookDraftToken();
   ref.onDispose(token.cancel);
   TextbookPdfSource? source;
+  TextbookCourseLesson? lesson;
   try {
     final pack = await course;
     token.check();
-    final lesson =
+    lesson =
         pack?.lessons.where((lesson) => lesson.id == key.lessonId).firstOrNull;
-    if (lesson == null) return const {};
+    if (lesson == null || pack == null) return null;
+    TextbookCourseDocument? document;
+    try {
+      document =
+          await ref.watch(textbookCourseDocumentProvider(key.bookId).future);
+    } on Object {
+      // 导入课程或检查点不可用时，仍可按保存正文恢复布局。
+    }
+    token.check();
+    final resolver = TextbookReadingResolver();
+    final plan = resolver.automaticPlan(document, lesson);
     final cache = files.contentCache(book);
     final revision = cache.revision;
     final pages = <int, TextbookPageText>{};
@@ -72,9 +83,13 @@ final textbookReadingLayoutProvider = FutureProvider.autoDispose.family<
         .toSet()
         .toList()
       ..sort();
+    if (plan != null) {
+      numbers.clear();
+      numbers.addAll([for (var p = plan.startPage; p <= plan.endPage; p++) p]);
+    }
     for (final number in numbers) {
       token.check();
-      if (cache.revision != revision) return const {};
+      if (cache.revision != revision) return TextbookReadingContent(lesson);
       var page = await cache.cachedPageLayout(number);
       token.check();
       if (page == null) {
@@ -92,26 +107,26 @@ final textbookReadingLayoutProvider = FutureProvider.autoDispose.family<
       pages[number] = page;
     }
     token.check();
-    if (cache.revision != revision) return const {};
-    final parser = TextbookCourseDraftParser();
-    return {
-      for (final paragraph in lesson.paragraphs)
-        paragraph.id: parser.readingLayout(
-          paragraph,
-          [
-            for (final source in paragraph.sources)
-              if (pages[source.pdfPage] != null) pages[source.pdfPage]!,
-          ],
-          preserveLines: lesson.kind == 'poetry',
-          paragraphs: lesson.paragraphs,
-        ),
-    };
+    if (cache.revision != revision) return TextbookReadingContent(lesson);
+    return resolver.resolve(
+      pack,
+      lesson,
+      pages.values.toList(),
+      document: document,
+    );
   } on Object {
     // 原书缺失或布局不可匹配时使用课程已有分节；不能阻断阅读或改写课程。
-    return const {};
+    return lesson == null ? null : TextbookReadingContent(lesson);
   } finally {
     await source?.close();
   }
+});
+final textbookReadingLayoutProvider = FutureProvider.autoDispose.family<
+    Map<String, TextbookReadingLayout>,
+    ({String bookId, String lessonId})>((ref, key) async {
+  return (await ref.watch(textbookReadingContentProvider(key).future))
+          ?.layouts ??
+      const {};
 });
 final textbookGenerationServiceProvider =
     Provider<TextbookCourseGenerationService>(

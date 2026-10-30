@@ -300,6 +300,7 @@ class _TextbookLessonContentPageState
     TextbookCourseLesson lesson,
     TextbookContentSection section, {
     required bool showTitle,
+    bool readingLoading = false,
   }) {
     final theme = Theme.of(context);
     final coursePack = ref.read(textbookCourseProvider(bookId)).valueOrNull;
@@ -318,7 +319,9 @@ class _TextbookLessonContentPageState
           ),
           const SizedBox(height: SpacingTokens.md),
         ],
-        if (targets.isEmpty)
+        if (readingLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (targets.isEmpty)
           Text(
             _emptyLabel(lesson, section),
             style: theme.textTheme.titleSmall,
@@ -507,9 +510,32 @@ class _TextbookLessonContentPageState
     final selected = section;
     final course = ref.watch(textbookCourseProvider(bookId));
     final pack = course.valueOrNull;
-    final lessons = pack == null
+    final matchingLessons = pack == null
         ? const <TextbookCourseLesson>[]
         : textbookLessonsForPages(pack, pages);
+    final readingLessons = selected == TextbookContentSection.reading
+        ? matchingLessons
+            .where((lesson) => lesson.paragraphs.isNotEmpty)
+            .toList()
+        : const <TextbookCourseLesson>[];
+    // 有课文可读时聚焦正文；全部无正文时仍保留真实的未整理/无要求提示。
+    final selectedLessons =
+        readingLessons.isNotEmpty ? readingLessons : matchingLessons;
+    final reading = {
+      if (selected == TextbookContentSection.reading)
+        for (final lesson in selectedLessons)
+          if (lesson.paragraphs.isNotEmpty)
+            lesson.id: ref.watch(
+              textbookReadingContentProvider(
+                (bookId: bookId, lessonId: lesson.id),
+              ),
+            ),
+    };
+    final readingReady = reading.values.every((value) => !value.isLoading);
+    final lessons = [
+      for (final lesson in selectedLessons)
+        reading[lesson.id]?.valueOrNull?.lesson ?? lesson,
+    ];
     _lessons = lessons;
     final dictationLessons = [
       for (final lesson in lessons)
@@ -593,7 +619,7 @@ class _TextbookLessonContentPageState
                       : _state?.status == NarrationStatus.failed
                           ? '重试朗读'
                           : '暂停朗读',
-              onPressed: _control,
+              onPressed: readingReady ? _control : null,
               icon: Icon(
                 _session == null
                     ? Icons.volume_up_outlined
@@ -645,6 +671,8 @@ class _TextbookLessonContentPageState
                       lessons[index],
                       selected,
                       showTitle: lessons.length > 1,
+                      readingLoading:
+                          reading[lessons[index].id]?.isLoading ?? false,
                     ),
                   );
                 },

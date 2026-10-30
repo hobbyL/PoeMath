@@ -12,11 +12,13 @@ import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/textbook_lesson_content.dart';
 import 'package:poemath/domain/textbook_narration.dart';
+import 'package:poemath/domain/textbook_reading_content.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_lesson_content_page.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
 import '../../helpers/narration_fakes.dart';
 import '../../helpers/textbook_course_fixture.dart';
+import '../../helpers/textbook_reading_fixture.dart';
 
 void main() {
   late NarrationSynth synth;
@@ -38,17 +40,21 @@ void main() {
   });
   tearDown(() => tts.dispose());
 
-  Future<void> pump(WidgetTester tester,
-      {Map<String, dynamic>? raw,
-      RouteObserver<ModalRoute<dynamic>>? observer,}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    Map<String, dynamic>? raw,
+    RouteObserver<ModalRoute<dynamic>>? observer,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           ttsServiceProvider.overrideWithValue(tts),
           textbookFileServiceProvider.overrideWithValue(
-              TextbookFileService(narrationAudioCache: MemoryNarrationCache()),),
+            TextbookFileService(narrationAudioCache: MemoryNarrationCache()),
+          ),
           textbookCourseProvider(courseFixtureHash).overrideWith(
-              (_) async => TextbookCoursePack.fromJson(raw ?? courseFixture()),),
+            (_) async => TextbookCoursePack.fromJson(raw ?? courseFixture()),
+          ),
         ],
         child: MaterialApp(
           navigatorObservers: [if (observer != null) observer],
@@ -70,41 +76,170 @@ void main() {
     await tester.pump(const Duration(milliseconds: 250));
   }
 
+  testWidgets('阅读结果就绪前禁播，显示、朗读与高亮统一使用清理后的正文', (tester) async {
+    final fixture = readingFixture(legacyIndent: true);
+    final doc = fixture.document;
+    final old = doc.pack.lessons.first;
+    final before = doc.toJson();
+    final resolved = TextbookReadingResolver().resolve(
+      doc.pack,
+      old,
+      fixture.pages,
+      document: doc,
+    );
+    final gate = Completer<TextbookReadingContent?>();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ttsServiceProvider.overrideWithValue(tts),
+          textbookCourseProvider(courseFixtureHash)
+              .overrideWith((_) async => doc.pack),
+          textbookReadingContentProvider.overrideWith((_, __) => gate.future),
+          textbookFileServiceProvider.overrideWithValue(
+            TextbookFileService(narrationAudioCache: MemoryNarrationCache()),
+          ),
+        ],
+        child: MaterialApp(
+          home: TextbookLessonContentPage(
+            bookId: courseFixtureHash,
+            section: TextbookContentSection.reading,
+            pages: const [2],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byWidgetPredicate(
+              (widget) => widget is IconButton && widget.tooltip == '朗读课文',
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(find.byType(TextbookCourseParagraphsContent), findsNothing);
+    expect(synth.texts, isEmpty);
+    gate.complete(resolved);
+    await tester.pumpAndSettle();
+    final content = find.byType(TextbookCourseParagraphsContent);
+    expect(
+      tester.widget<TextbookCourseParagraphsContent>(content).paragraphs,
+      resolved.lesson.paragraphs,
+    );
+    expect(resolved.lesson.paragraphs, hasLength(4));
+    await tester.tap(find.byTooltip('朗读课文'));
+    await flush(tester);
+    expect(synth.texts, [readingFixtureLines.join()]);
+    players.last.starts.single();
+    await flush(tester);
+    final spans =
+        tester.widget<TextbookCourseParagraphsContent>(content).activeRanges;
+    expect(
+      spans.map((span) => span.paragraphId).toSet(),
+      resolved.lesson.paragraphs.map((p) => p.id).toSet(),
+    );
+    expect(doc.toJson(), before);
+    await tester.pumpWidget(const SizedBox());
+    await flush(tester);
+  });
+
   testWidgets('缩进及标点空白清理不改变原文高亮和拼音坐标', (tester) async {
-    final raw = courseFixture(); final lesson = (raw['lessons'] as List).single as Map;
+    final raw = courseFixture();
+    final lesson = (raw['lessons'] as List).single as Map;
     const original = '　　甲， \t乙。\n𠀀 A, B！';
-    lesson['paragraphs'] = [courseFixtureText('mapped', original, ['jiǎ', '，', 'yǐ', '。', 'hē', 'ei', ',', 'bi', '！'])];
-    lesson['recitations'] = <Object>[]; (lesson['coverage'] as Map)['recitations'] = 'notApplicable';
-    final paragraph = TextbookCoursePack.fromJson(raw).lessons.single.paragraphs.single;
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: TextbookCourseText(node: paragraph,
-      activeRanges: const [TextbookNarrationSpan('mapped', 6, 10)],),),),);
+    lesson['paragraphs'] = [
+      courseFixtureText(
+        'mapped',
+        original,
+        ['jiǎ', '，', 'yǐ', '。', 'hē', 'ei', ',', 'bi', '！'],
+      ),
+    ];
+    lesson['recitations'] = <Object>[];
+    (lesson['coverage'] as Map)['recitations'] = 'notApplicable';
+    final paragraph =
+        TextbookCoursePack.fromJson(raw).lessons.single.paragraphs.single;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TextbookCourseText(
+            node: paragraph,
+            activeRanges: const [TextbookNarrationSpan('mapped', 6, 10)],
+          ),
+        ),
+      ),
+    );
     for (final index in [6, 7, 9]) {
-      expect(tester.widget<Text>(find.byKey(ValueKey('narration-character-mapped-$index'))).style!.backgroundColor, isNotNull);
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(ValueKey('narration-character-mapped-$index')),
+            )
+            .style!
+            .backgroundColor,
+        isNotNull,
+      );
     }
     for (final index in [2, 11, 14]) {
-      expect(tester.widget<Text>(find.byKey(ValueKey('narration-character-mapped-$index'))).style!.backgroundColor, isNull);
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(ValueKey('narration-character-mapped-$index')),
+            )
+            .style!
+            .backgroundColor,
+        isNull,
+      );
     }
-    expect(find.text('yǐ'), findsOneWidget); expect(find.text('hē'), findsOneWidget);
-    expect(paragraph.text, original); await tester.pumpWidget(const SizedBox());
+    expect(find.text('yǐ'), findsOneWidget);
+    expect(find.text('hē'), findsOneWidget);
+    expect(paragraph.text, original);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('同一路由切换页参数和应用后台均停止，不恢复旧朗读', (tester) async {
-    final router = createAppRouter(initialLocation: AppRoutes.textbookContentOf(courseFixtureHash, 'reading', [2]));
-    await tester.pumpWidget(ProviderScope(overrides: [
-      ttsServiceProvider.overrideWithValue(tts),
-      textbookFileServiceProvider.overrideWithValue(TextbookFileService(narrationAudioCache: MemoryNarrationCache())),
-      textbookCourseProvider(courseFixtureHash).overrideWith((_) async => TextbookCoursePack.fromJson(courseFixture())),
-    ], child: MaterialApp.router(routerConfig: router),),);
-    await tester.pumpAndSettle(); await tester.tap(find.byTooltip('朗读课文')); await flush(tester);
-    players.last.starts.single(); await flush(tester);
+    final router = createAppRouter(
+      initialLocation:
+          AppRoutes.textbookContentOf(courseFixtureHash, 'reading', [2]),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ttsServiceProvider.overrideWithValue(tts),
+          textbookFileServiceProvider.overrideWithValue(
+            TextbookFileService(narrationAudioCache: MemoryNarrationCache()),
+          ),
+          textbookCourseProvider(courseFixtureHash).overrideWith(
+            (_) async => TextbookCoursePack.fromJson(courseFixture()),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('朗读课文'));
+    await flush(tester);
+    players.last.starts.single();
+    await flush(tester);
     router.go(AppRoutes.textbookContentOf(courseFixtureHash, 'reading', [3]));
-    await tester.pumpAndSettle(); expect(players.last.disposed, true);
+    await tester.pumpAndSettle();
+    expect(players.last.disposed, true);
     expect(find.byTooltip('朗读课文'), findsOneWidget);
-    await tester.tap(find.byTooltip('朗读课文')); await flush(tester); players.last.starts.single(); await flush(tester);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused); await flush(tester);
-    expect(players.last.disposed, true); expect(find.byTooltip('朗读课文'), findsOneWidget);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed); await flush(tester);
-    expect(find.byTooltip('朗读课文'), findsOneWidget); await tester.pumpWidget(const SizedBox()); router.dispose();
+    await tester.tap(find.byTooltip('朗读课文'));
+    await flush(tester);
+    players.last.starts.single();
+    await flush(tester);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await flush(tester);
+    expect(players.last.disposed, true);
+    expect(find.byTooltip('朗读课文'), findsOneWidget);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await flush(tester);
+    expect(find.byTooltip('朗读课文'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    router.dispose();
   });
 
   testWidgets('实际播放才高亮，切换拼音不影响高亮与会话，暂停恢复复用同段', (tester) async {
@@ -112,16 +247,22 @@ void main() {
     await tester.tap(find.byTooltip('朗读课文'));
     await flush(tester);
     final content = find.byType(TextbookCourseParagraphsContent);
-    expect(tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
-        isEmpty,);
+    expect(
+      tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
+      isEmpty,
+    );
     expect(synth.texts, ['星𠀀，月。']);
     expect(find.text('xīng'), findsNothing);
     players.single.starts.single();
     await flush(tester);
-    expect(tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
-        isNotEmpty,);
     expect(
-        tester.widget<Text>(find.text('星')).style!.backgroundColor, isNotNull,);
+      tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
+      isNotEmpty,
+    );
+    expect(
+      tester.widget<Text>(find.text('星')).style!.backgroundColor,
+      isNotNull,
+    );
     await tester.tap(find.byTooltip('显示拼音'));
     await tester.pump();
     expect(find.text('xīng'), findsOneWidget);
@@ -143,8 +284,10 @@ void main() {
     await flush(tester);
     expect(find.text('已暂停'), findsOneWidget);
     expect(players.single.pauses, 1);
-    expect(tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
-        isNotEmpty,);
+    expect(
+      tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
+      isNotEmpty,
+    );
     await tester.tap(find.byTooltip('继续朗读'));
     await flush(tester);
     expect(players.single.resumes, 1);
@@ -153,8 +296,10 @@ void main() {
     players.single.ends.single.complete();
     await flush(tester);
     expect(find.byTooltip('朗读课文'), findsOneWidget);
-    expect(tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
-        isEmpty,);
+    expect(
+      tester.widget<TextbookCourseParagraphsContent>(content).activeRanges,
+      isEmpty,
+    );
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -179,8 +324,11 @@ void main() {
     players.single.starts.single();
     await flush(tester);
     final context = tester.element(find.byType(TextbookLessonContentPage));
-    unawaited(Navigator.of(context).push<void>(
-        MaterialPageRoute(builder: (_) => const Scaffold(body: Text('覆盖页'))),),);
+    unawaited(
+      Navigator.of(context).push<void>(
+        MaterialPageRoute(builder: (_) => const Scaffold(body: Text('覆盖页'))),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(players.single.disposed, true);
     Navigator.of(tester.element(find.text('覆盖页'))).pop();
@@ -196,7 +344,10 @@ void main() {
     final first = lessons.single as Map;
     first['paragraphs'] = [
       courseFixtureText(
-          'long-paragraph', '${List.filled(240, '星星星星星').join('\n')}。', null,),
+        'long-paragraph',
+        '${List.filled(240, '星星星星星').join('\n')}。',
+        null,
+      ),
     ];
     first['recitations'] = <Object>[];
     (first['coverage'] as Map)['recitations'] = 'notApplicable';
@@ -206,7 +357,10 @@ void main() {
     second['lessonNumber'] = 2;
     second['paragraphs'] = [
       courseFixtureText(
-          'second-paragraph', '月𠀀明亮。', ['yuè', 'hē', 'míng', 'liàng', '。'],),
+        'second-paragraph',
+        '月𠀀明亮。',
+        ['yuè', 'hē', 'míng', 'liàng', '。'],
+      ),
     ];
     for (final category
         in TextbookCoursePack.categories.where((c) => c != 'paragraphs')) {
@@ -235,23 +389,26 @@ void main() {
     expect(find.text('第二课'), findsOneWidget);
     // ensureVisible 滚动动画需要时间完成；长段落合并后滚动距离更长。
     for (var i = 0;
-        i < 30 && !tester
-            .getRect(find.text('月'))
-            .overlaps(tester.getRect(find.byType(Scaffold)));
+        i < 30 &&
+            !tester
+                .getRect(find.text('月'))
+                .overlaps(tester.getRect(find.byType(Scaffold)));
         i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
     final current = tester
         .widgetList<TextbookCourseParagraphsContent>(
-            find.byType(TextbookCourseParagraphsContent),)
+          find.byType(TextbookCourseParagraphsContent),
+        )
         .where((c) => c.activeRanges.isNotEmpty)
         .single;
     expect(current.paragraphs.single.id, 'second-paragraph');
     expect(
-        tester
-            .getRect(find.text('月'))
-            .overlaps(tester.getRect(find.byType(Scaffold))),
-        true,);
+      tester
+          .getRect(find.text('月'))
+          .overlaps(tester.getRect(find.byType(Scaffold))),
+      true,
+    );
     await tester.pumpWidget(const SizedBox());
   });
 }

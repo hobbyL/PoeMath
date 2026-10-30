@@ -138,6 +138,83 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Map<String, dynamic> withEmptyLesson() {
+    final raw = courseFixture();
+    final lesson = (raw['lessons'] as List).single as Map<String, dynamic>;
+    (raw['lessons'] as List).insert(0, {
+      ...lesson,
+      'id': 'lesson-empty',
+      'title': '故事共读',
+      'lessonNumber': null,
+      'sources': [courseFixtureSource(2), courseFixtureSource(3)],
+      'coverage': {
+        for (final category in TextbookCoursePack.categories)
+          category: 'pending',
+      },
+      for (final category in TextbookCoursePack.categories)
+        category: <Object?>[],
+    });
+    (((raw['units'] as List).single as Map)['lessonIds'] as List)
+        .insert(0, 'lesson-empty');
+    return raw;
+  }
+
+  for (final pages in [
+    [2],
+    [2, 3],
+  ]) {
+    testWidgets('读一读有正文时不展示来源重叠的空课目（页=$pages）', (tester) async {
+      await pump(
+        tester,
+        TextbookContentSection.reading,
+        raw: withEmptyLesson(),
+        pages: pages,
+      );
+      expect(find.widgetWithText(AppBar, '读一读·星月测试'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('textbook-content-lesson-001')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('textbook-content-lesson-empty')),
+        findsNothing,
+      );
+      expect(find.text('故事共读'), findsNothing);
+      expect(find.text('本课尚未整理课文与注音。'), findsNothing);
+      expect(find.byTooltip('朗读课文'), findsOneWidget);
+    });
+  }
+
+  testWidgets('读一读保留来源重叠且都有正文的多个课目', (tester) async {
+    final raw = withEmptyLesson();
+    final other = (raw['lessons'] as List).first as Map;
+    other['paragraphs'] = [courseFixtureText('other-paragraph', '云山。', null)];
+    await pump(tester, TextbookContentSection.reading, raw: raw);
+    expect(find.widgetWithText(AppBar, '读一读'), findsOneWidget);
+    expect(find.text('故事共读'), findsOneWidget);
+    expect(find.text('星月测试'), findsOneWidget);
+    expect(find.byType(TextbookCourseParagraphsContent), findsNWidgets(2));
+    expect(find.text('本课尚未整理课文与注音。'), findsNothing);
+  });
+
+  for (final state in ['pending', 'notApplicable']) {
+    testWidgets('读一读所有课目均无正文时保留真实空状态（$state）', (tester) async {
+      final raw = courseFixture();
+      final lesson = (raw['lessons'] as List).single as Map;
+      lesson['paragraphs'] = <Object>[];
+      lesson['recitations'] = <Object>[];
+      (lesson['coverage'] as Map)['paragraphs'] = state;
+      (lesson['coverage'] as Map)['recitations'] = 'notApplicable';
+      await pump(tester, TextbookContentSection.reading, raw: raw);
+      expect(find.widgetWithText(AppBar, '读一读·星月测试'), findsOneWidget);
+      expect(
+        find.text(state == 'pending' ? '本课尚未整理课文与注音。' : '原书未要求本课阅读课文。'),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('朗读课文'), findsNothing);
+    });
+  }
+
   for (final scale in [1.0, 2.0]) {
     for (final poetry in [false, true]) {
       testWidgets('读一读接通诗行和空行分节，切换拼音保留结构（诗歌=$poetry，字号=$scale）',
@@ -450,6 +527,7 @@ void main() {
           textbookRepositoryProvider.overrideWithValue(books),
           textbookCatalogProvider.overrideWith((_) async => []),
           textbookFileServiceProvider.overrideWithValue(_Files()),
+          textbookReadingContentProvider.overrideWith((_, __) async => null),
           textbookCourseProvider(book.pdfSha256).overrideWith(
             (_) async => TextbookCoursePack.fromJson(courseFixture()),
           ),

@@ -377,6 +377,105 @@ class _CourseTextMetrics {
   }
 }
 
+/// 装行与正文块测宽共用同一结果，避免居中后再次排版改变诗行或高亮位置。
+class _CourseReadingFlow {
+  _CourseReadingFlow(
+    TextbookCourseParagraph node,
+    _CourseTextMetrics metrics, {
+    required TextbookReadingLayout layout,
+    required double maxWidth,
+  }) : leadingIndentWidth =
+            layout.leadingIndentCells * metrics.charWidths['国']! {
+    final cells = _courseReadingCells(
+      node,
+      retainLeadingIndent: layout.retainLeadingIndent,
+    );
+    if (cells.isEmpty) return;
+    hasLeadingIndent =
+        leadingIndentWidth > 0 || cells.first.text.trim().isEmpty;
+    final pinyin = metrics.pinyinByNode[node]!;
+    final groups = _courseReadingGroups(
+      cells,
+      lineStarts: layout.breaks.keys.toSet(),
+    );
+    final cellWidth = [
+      metrics.charWidths['国']!,
+      for (final cell in cells)
+        if (cell.text.trim().isNotEmpty && !_isPunctuation(cell.text)) ...[
+          metrics.tokenWidth(
+            cell.text,
+            pinyin.isEmpty ? '' : pinyin[cell.pinyinIndex],
+          ),
+          metrics.glyphWidths[cell.text]! + SpacingTokens.sm,
+        ],
+    ].reduce((a, b) => a > b ? a : b);
+    final firstTextIndex =
+        cells.firstWhere((cell) => cell.text.trim().isNotEmpty).rawIndex;
+    for (final cell in cells) {
+      _cellWidths[cell.rawIndex] = _isPunctuation(cell.text)
+          ? metrics.glyphWidths[cell.text]!
+          : cell.text.trim().isEmpty
+              ? cell.rawIndex < firstTextIndex
+                  ? metrics.charWidths[cell.text]!
+                  : metrics.glyphWidths[' ']!
+              : cellWidth;
+    }
+
+    var row = <_DisplayCell>[];
+    var rowWidth = leadingIndentWidth;
+    var startsStanza = false;
+    _DisplayCell? pendingSpace;
+    void finishRow() {
+      rows.add(row);
+      rowWidths.add(rowWidth);
+      stanzaRows.add(startsStanza);
+      row = [];
+      rowWidth = 0;
+      startsStanza = false;
+    }
+
+    for (final group in groups) {
+      final breakBefore = layout.breaks[group.first.rawIndex];
+      if (breakBefore != null) {
+        if (row.isNotEmpty) finishRow();
+        pendingSpace = null;
+        startsStanza = breakBefore == TextbookReadingBreak.stanza;
+      }
+      if (group.length == 1 && group.single.text.trim().isEmpty) {
+        pendingSpace = group.single;
+        continue;
+      }
+      final groupWidth = group.fold<double>(
+        0,
+        (width, cell) => width + widthOf(cell),
+      );
+      final spaceWidth = pendingSpace == null ? 0.0 : widthOf(pendingSpace);
+      if (row.isNotEmpty && rowWidth + spaceWidth + groupWidth > maxWidth) {
+        finishRow();
+      }
+      // 行尾/行首不保留分词空格，避免空白本身触发提前换行。
+      if (row.isNotEmpty && pendingSpace != null) {
+        row.add(pendingSpace);
+        rowWidth += spaceWidth;
+      }
+      pendingSpace = null;
+      row.addAll(group);
+      rowWidth += groupWidth;
+    }
+    if (row.isNotEmpty) finishRow();
+  }
+
+  final double leadingIndentWidth;
+  bool hasLeadingIndent = false;
+  final _cellWidths = <int, double>{};
+  final rows = <List<_DisplayCell>>[];
+  final rowWidths = <double>[];
+  final stanzaRows = <bool>[];
+
+  double widthOf(_DisplayCell cell) => _cellWidths[cell.rawIndex]!;
+  double get maxRowWidth => rowWidths.fold(0, (a, b) => a > b ? a : b);
+}
+
 class _CourseTextViewport extends StatelessWidget {
   const _CourseTextViewport({required this.width, required this.child});
 
@@ -410,6 +509,7 @@ class TextbookCourseText extends StatelessWidget {
     this.activeRanges = const [],
     this.activeStartKey,
   })  : _metrics = null,
+        _flow = null,
         _readingLayout = const TextbookReadingLayout(),
         _wrap = false;
   const TextbookCourseText._({
@@ -418,16 +518,19 @@ class TextbookCourseText extends StatelessWidget {
     required _CourseTextMetrics metrics,
     bool wrap = false,
     TextbookReadingLayout readingLayout = const TextbookReadingLayout(),
+    _CourseReadingFlow? flow,
     this.showPinyin = true,
     this.activeRanges = const [],
     this.activeStartKey,
   })  : _metrics = metrics,
+        _flow = flow,
         _readingLayout = readingLayout,
         _wrap = wrap;
 
   final TextbookCourseParagraph node;
   final bool showPinyin;
   final _CourseTextMetrics? _metrics;
+  final _CourseReadingFlow? _flow;
   final bool _wrap;
   final TextbookReadingLayout _readingLayout;
   final List<TextbookNarrationSpan> activeRanges;
@@ -505,100 +608,24 @@ class TextbookCourseText extends StatelessWidget {
     final content = _wrap
         ? LayoutBuilder(
             builder: (context, constraints) {
-              final cells = _courseReadingCells(
-                node,
-                retainLeadingIndent: _readingLayout.retainLeadingIndent,
-              );
-              if (cells.isEmpty) return const SizedBox.shrink();
-              final groups = _courseReadingGroups(
-                cells,
-                lineStarts: _readingLayout.breaks.keys.toSet(),
-              );
-              final cellWidth = [
-                metrics.charWidths['国']!,
-                for (final cell in cells)
-                  if (cell.text.trim().isNotEmpty &&
-                      !_isPunctuation(cell.text)) ...[
-                    metrics.tokenWidth(
-                      cell.text,
-                      showPinyin ? pinyin[cell.pinyinIndex] : '',
-                    ),
-                    metrics.glyphWidths[cell.text]! + SpacingTokens.sm,
-                  ],
-              ].reduce((a, b) => a > b ? a : b);
-              final firstTextIndex = cells
-                  .firstWhere((cell) => cell.text.trim().isNotEmpty)
-                  .rawIndex;
-              double widthOf(_DisplayCell cell) {
-                if (_isPunctuation(cell.text)) {
-                  return metrics.glyphWidths[cell.text]!;
-                }
-                if (cell.text.trim().isEmpty) {
-                  return cell.rawIndex < firstTextIndex
-                      ? metrics.charWidths[cell.text]!
-                      : metrics.glyphWidths[' ']!;
-                }
-                return cellWidth;
-              }
-
-              final rows = <List<_DisplayCell>>[];
-              final rowWidths = <double>[];
-              final stanzaRows = <bool>[];
-              final leadingIndentWidth =
-                  _readingLayout.leadingIndentCells * metrics.charWidths['国']!;
-              var row = <_DisplayCell>[];
-              var rowWidth = leadingIndentWidth;
-              var startsStanza = false;
-              _DisplayCell? pendingSpace;
-              void finishRow() {
-                rows.add(row);
-                rowWidths.add(rowWidth);
-                stanzaRows.add(startsStanza);
-                row = [];
-                rowWidth = 0;
-                startsStanza = false;
-              }
-
-              for (final group in groups) {
-                final breakBefore = _readingLayout.breaks[group.first.rawIndex];
-                if (breakBefore != null) {
-                  if (row.isNotEmpty) finishRow();
-                  pendingSpace = null;
-                  startsStanza = breakBefore == TextbookReadingBreak.stanza;
-                }
-                if (group.length == 1 && group.single.text.trim().isEmpty) {
-                  pendingSpace = group.single;
-                  continue;
-                }
-                final groupWidth = group.fold<double>(
-                  0,
-                  (width, cell) => width + widthOf(cell),
-                );
-                final spaceWidth =
-                    pendingSpace == null ? 0.0 : widthOf(pendingSpace);
-                if (row.isNotEmpty &&
-                    rowWidth + spaceWidth + groupWidth > constraints.maxWidth) {
-                  finishRow();
-                }
-                // 行尾/行首不保留分词空格，避免空白本身触发提前换行。
-                if (row.isNotEmpty && pendingSpace != null) {
-                  row.add(pendingSpace);
-                  rowWidth += spaceWidth;
-                }
-                pendingSpace = null;
-                row.addAll(group);
-                rowWidth += groupWidth;
-              }
-              if (row.isNotEmpty) finishRow();
+              final flow = _flow ??
+                  _CourseReadingFlow(
+                    node,
+                    metrics,
+                    layout: _readingLayout,
+                    maxWidth: constraints.maxWidth,
+                  );
+              if (flow.rows.isEmpty) return const SizedBox.shrink();
 
               Widget rowBox(List<_DisplayCell> cells, {required bool first}) =>
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      if (first && leadingIndentWidth > 0)
-                        SizedBox(width: leadingIndentWidth),
-                      for (final cell in cells) cellBox(cell, widthOf(cell)),
+                      if (first && flow.leadingIndentWidth > 0)
+                        SizedBox(width: flow.leadingIndentWidth),
+                      for (final cell in cells)
+                        cellBox(cell, flow.widthOf(cell)),
                     ],
                   );
 
@@ -610,16 +637,16 @@ class TextbookCourseText extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final (index, row) in rows.indexed) ...[
+                    for (final (index, row) in flow.rows.indexed) ...[
                       if (index > 0)
                         SizedBox(
-                          height: stanzaRows[index]
+                          height: flow.stanzaRows[index]
                               ? SpacingTokens.lg
                               : SpacingTokens.sm,
                         ),
-                      if (rowWidths[index] > constraints.maxWidth)
+                      if (flow.rowWidths[index] > constraints.maxWidth)
                         _CourseTextViewport(
-                          width: rowWidths[index],
+                          width: flow.rowWidths[index],
                           child: rowBox(row, first: index == 0),
                         )
                       else
@@ -715,37 +742,79 @@ class TextbookCourseParagraphsContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final metrics =
         _CourseTextMetrics(context, paragraphs, showPinyin: showPinyin);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final (index, paragraph) in paragraphs.indexed) ...[
-          if (index > 0)
-            SizedBox(
-              height: _sharesSourcePage(paragraphs[index - 1], paragraph)
-                  ? SpacingTokens.lg
-                  : SpacingTokens.xl,
+    final layouts = [
+      for (final paragraph in paragraphs)
+        readingLayouts[paragraph.id] ??
+            textbookReadingLayoutForText(
+              paragraph.text,
+              preserveLines: preserveLineBreaks,
             ),
-          TextbookCourseText._(
-            key: ValueKey('course-text-${paragraph.id}'),
-            node: paragraph,
-            metrics: metrics,
-            wrap: true,
-            readingLayout: readingLayouts[paragraph.id] ??
-                textbookReadingLayoutForText(
-                  paragraph.text,
-                  preserveLines: preserveLineBreaks,
-                ),
-            showPinyin: showPinyin,
-            activeRanges: activeRanges
-                .where((span) => span.paragraphId == paragraph.id)
-                .toList(),
-            activeStartKey: activeRanges.isNotEmpty &&
-                    activeRanges.first.paragraphId == paragraph.id
-                ? activeStartKey
-                : null,
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final flows = [
+          for (final (index, paragraph) in paragraphs.indexed)
+            _CourseReadingFlow(
+              paragraph,
+              metrics,
+              layout: layouts[index],
+              maxWidth: constraints.maxWidth,
+            ),
+        ];
+        // 原书判定的无缩进诗歌整篇居中；散文或混合内容仍使用全宽。
+        // 各段共享最长显示行的宽度，不能分别居中导致每段左边界不同。
+        final centerBlock = paragraphs.isNotEmpty &&
+            flows.indexed.every(
+              (entry) =>
+                  !entry.$2.hasLeadingIndent &&
+                  (!layouts[entry.$1].retainLeadingIndent ||
+                      preserveLineBreaks),
+            );
+        final maxRowWidth = flows.fold<double>(
+          0,
+          (width, flow) => flow.maxRowWidth > width ? flow.maxRowWidth : width,
+        );
+        final width = centerBlock || !constraints.hasBoundedWidth
+            ? maxRowWidth.clamp(0.0, constraints.maxWidth).toDouble()
+            : constraints.maxWidth;
+        return Align(
+          alignment: Alignment.topCenter,
+          heightFactor: 1,
+          child: SizedBox(
+            width: width,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final (index, paragraph) in paragraphs.indexed) ...[
+                  if (index > 0)
+                    SizedBox(
+                      height:
+                          _sharesSourcePage(paragraphs[index - 1], paragraph)
+                              ? SpacingTokens.lg
+                              : SpacingTokens.xl,
+                    ),
+                  TextbookCourseText._(
+                    key: ValueKey('course-text-${paragraph.id}'),
+                    node: paragraph,
+                    metrics: metrics,
+                    flow: flows[index],
+                    wrap: true,
+                    showPinyin: showPinyin,
+                    activeRanges: activeRanges
+                        .where((span) => span.paragraphId == paragraph.id)
+                        .toList(),
+                    activeStartKey: activeRanges.isNotEmpty &&
+                            activeRanges.first.paragraphId == paragraph.id
+                        ? activeStartKey
+                        : null,
+                  ),
+                ],
+              ],
+            ),
           ),
-        ],
-      ],
+        );
+      },
     );
   }
 }

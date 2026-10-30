@@ -12,6 +12,7 @@ import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/textbook_draft_fixture.dart';
+import '../../helpers/textbook_reading_fixture.dart';
 
 class _CachedFiles extends TextbookFileService {
   _CachedFiles(this.cache);
@@ -29,6 +30,52 @@ class _CachedFiles extends TextbookFileService {
 }
 
 void main() {
+  test('旧草稿经冷布局缓存直接得到共用正文结果，不需逐课重整或写课程', () async {
+    final directory = await Directory.systemTemp.createTemp('reading_content_');
+    addTearDown(() => directory.delete(recursive: true));
+    final fixture = readingFixture(legacyIndent: true);
+    final doc = fixture.document;
+    final before = doc.toJson();
+    final book = courseFixtureBook();
+    TextbookContentCache cache() => TextbookContentCache(
+          book: book,
+          directoryProvider: () async => directory,
+        );
+    for (final page in fixture.pages) {
+      await cache().pageLayout(page.page, () async => page);
+    }
+    final files = _CachedFiles(cache());
+    final container = ProviderContainer(
+      overrides: [
+        textbookListProvider.overrideWithValue([book]),
+        textbookFileServiceProvider.overrideWithValue(files),
+        textbookCourseProvider(book.pdfSha256)
+            .overrideWith((_) async => doc.pack),
+        textbookCourseDocumentProvider(book.pdfSha256)
+            .overrideWith((_) async => doc),
+      ],
+    );
+    addTearDown(container.dispose);
+    final key = (bookId: book.pdfSha256, lessonId: doc.pack.lessons.first.id);
+    final provider = textbookReadingContentProvider(key);
+    final subscription = container.listen(provider, (_, __) {});
+    addTearDown(subscription.close);
+    final reading = (await container.read(provider.future))!;
+    expect(reading.lesson.paragraphs.map((paragraph) => paragraph.text), [
+      for (var row = 0; row < readingFixtureLines.length; row += 2)
+        readingFixtureLines.sublist(row, row + 2).join('\n'),
+    ]);
+    final layouts =
+        await container.read(textbookReadingLayoutProvider(key).future);
+    expect(layouts, reading.layouts);
+    expect(
+      layouts.values.map((layout) => layout.breaks.values),
+      everyElement([TextbookReadingBreak.line]),
+    );
+    expect(files.pathReads, 0);
+    expect(doc.toJson(), before);
+  });
+
   test('单行段落利用同课正文边距恢复几何缩进，课程数据保持原样', () async {
     final directory = await Directory.systemTemp.createTemp('reading_indent_');
     addTearDown(() => directory.delete(recursive: true));

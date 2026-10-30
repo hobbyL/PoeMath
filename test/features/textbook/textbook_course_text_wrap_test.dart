@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/domain/textbook_course_draft_parser.dart';
 import 'package:poemath/domain/textbook_narration.dart';
 import 'package:poemath/domain/textbook_pinyin.dart';
 import 'package:poemath/domain/textbook_text_display.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
 
 import '../../helpers/textbook_course_fixture.dart';
+import '../../helpers/textbook_draft_fixture.dart';
+import '../../helpers/textbook_reading_fixture.dart';
 
 TextbookCourseParagraph _paragraph(
   String id,
@@ -38,6 +41,27 @@ Future<void> _pumpParagraph(
   List<TextbookNarrationSpan> activeRanges = const [],
   bool preserveLineBreaks = false,
   Map<String, TextbookReadingLayout> readingLayouts = const {},
+}) =>
+    _pumpParagraphs(
+      tester,
+      [paragraph],
+      showPinyin: showPinyin,
+      scale: scale,
+      width: width,
+      activeRanges: activeRanges,
+      preserveLineBreaks: preserveLineBreaks,
+      readingLayouts: readingLayouts,
+    );
+
+Future<void> _pumpParagraphs(
+  WidgetTester tester,
+  List<TextbookCourseParagraph> paragraphs, {
+  required bool showPinyin,
+  required double scale,
+  required double width,
+  List<TextbookNarrationSpan> activeRanges = const [],
+  bool preserveLineBreaks = false,
+  Map<String, TextbookReadingLayout> readingLayouts = const {},
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -48,12 +72,14 @@ Future<void> _pumpParagraph(
             alignment: Alignment.topLeft,
             child: SizedBox(
               width: width,
-              child: TextbookCourseParagraphsContent(
-                paragraphs: [paragraph],
-                showPinyin: showPinyin,
-                activeRanges: activeRanges,
-                preserveLineBreaks: preserveLineBreaks,
-                readingLayouts: readingLayouts,
+              child: SingleChildScrollView(
+                child: TextbookCourseParagraphsContent(
+                  paragraphs: paragraphs,
+                  showPinyin: showPinyin,
+                  activeRanges: activeRanges,
+                  preserveLineBreaks: preserveLineBreaks,
+                  readingLayouts: readingLayouts,
+                ),
               ),
             ),
           ),
@@ -88,6 +114,254 @@ Finder _character(TextbookCourseParagraph paragraph, int rawIndex) =>
 void main() {
   for (final showPinyin in [false, true]) {
     for (final scale in [1.0, 2.0]) {
+      testWidgets('无缩进诗歌整篇居中、不同长度的各段共用左边界，换行和高亮不漂移（拼音=$showPinyin，字号=$scale）',
+          (tester) async {
+        _setViewport(tester);
+        final paragraphs = [
+          _paragraph('short-verse', '甲乙，\n丙。'),
+          _paragraph('long-verse', '丁戊己庚辛壬，\n癸子。'),
+          _paragraph('legacy-verse', '　　𠀀丑，\n寅卯辰巳！'),
+        ];
+        final before = paragraphs.map((p) => p.toJson()).toList();
+        final layouts = {
+          for (final paragraph in paragraphs)
+            paragraph.id: TextbookReadingLayout(
+              retainLeadingIndent: false,
+              breaks: textbookReadingLayoutForText(
+                paragraph.text,
+                preserveLines: true,
+              ).breaks,
+            ),
+        };
+        Future<void> pump(double width, {bool highlighted = false}) =>
+            _pumpParagraphs(
+              tester,
+              paragraphs,
+              showPinyin: showPinyin,
+              scale: scale,
+              width: width,
+              readingLayouts: layouts,
+              activeRanges: highlighted
+                  ? const [TextbookNarrationSpan('legacy-verse', 2, 3)]
+                  : const [],
+            );
+        Rect flow(TextbookCourseParagraph paragraph) => tester.getRect(
+              find.byKey(ValueKey('${paragraph.id}-flow')),
+            );
+        Rect row(TextbookCourseParagraph paragraph, int index) =>
+            tester.getRect(
+              find
+                  .ancestor(
+                    of: _character(paragraph, index),
+                    matching: find.byType(Row),
+                  )
+                  .first,
+            );
+        Map<Finder, Rect> verify(double width) {
+          final positions = <Finder, Rect>{};
+          final block = flow(paragraphs.first);
+          expect(block.left, greaterThan(0));
+          expect(block.center.dx, closeTo(width / 2, .1));
+          var longestRow = 0.0;
+          for (final paragraph in paragraphs) {
+            expect(flow(paragraph).left, closeTo(block.left, .1));
+            expect(flow(paragraph).width, closeTo(block.width, .1));
+            var start = 0;
+            for (final line in paragraph.text.split('\n')) {
+              final first = start +
+                  line.runes
+                      .takeWhile(
+                        (rune) => String.fromCharCode(rune).trim().isEmpty,
+                      )
+                      .length;
+              expect(
+                tester.getTopLeft(_character(paragraph, first)).dx,
+                closeTo(block.left, .1),
+              );
+              start += line.runes.length + 1;
+            }
+            for (final (index, rune) in paragraph.text.runes.indexed) {
+              if (String.fromCharCode(rune).trim().isEmpty) continue;
+              final finder = _character(paragraph, index);
+              final bounds = row(paragraph, index);
+              expect(bounds.left, closeTo(block.left, .1));
+              expect(bounds.right, lessThanOrEqualTo(width + .1));
+              if (bounds.width > longestRow) longestRow = bounds.width;
+              positions[finder] = tester.getRect(finder);
+            }
+          }
+          expect(block.width, closeTo(longestRow, .1));
+          return positions;
+        }
+
+        await pump(1400);
+        final widePositions = verify(1400);
+        final narrowWidth = flow(paragraphs.first).width * .6;
+        expect(row(paragraphs[1], 0).top, row(paragraphs[1], 6).top);
+        await pump(narrowWidth);
+        final narrowPositions = verify(narrowWidth);
+        expect(
+          row(paragraphs[1], 6).top,
+          greaterThan(row(paragraphs[1], 0).top),
+        );
+        await pump(narrowWidth, highlighted: true);
+        for (final entry in narrowPositions.entries) {
+          expect(tester.getRect(entry.key), entry.value);
+        }
+        final rare = _character(paragraphs.last, 2);
+        expect(tester.widget<Text>(rare).data, '𠀀');
+        expect(tester.widget<Text>(rare).style!.backgroundColor, isNotNull);
+        await pump(1400, highlighted: true);
+        for (final entry in widePositions.entries) {
+          expect(tester.getRect(entry.key), entry.value);
+        }
+        expect(paragraphs.map((p) => p.toJson()).toList(), before);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('散文全宽换行，保存与源布局恢复的段首缩进一致（拼音=$showPinyin，字号=$scale）',
+          (tester) async {
+        _setViewport(tester);
+        final paragraphs = [
+          _paragraph('indented', '　　甲乙丙丁戊己庚辛壬癸，子丑寅卯辰巳午未申酉戌亥。'),
+          _paragraph('recovered', '甲乙丙丁戊己庚辛壬癸，子丑寅卯辰巳午未申酉戌亥。'),
+        ];
+        for (final width in [1400.0, 320.0]) {
+          await _pumpParagraphs(
+            tester,
+            paragraphs,
+            showPinyin: showPinyin,
+            scale: scale,
+            width: width,
+            readingLayouts: const {
+              'recovered': TextbookReadingLayout(leadingIndentCells: 2),
+            },
+          );
+          final starts = <Offset>[];
+          for (final (index, paragraph) in paragraphs.indexed) {
+            final flow = tester.getRect(
+              find.byKey(ValueKey('${paragraph.id}-flow')),
+            );
+            expect(flow.left, 0);
+            expect(flow.width, width);
+            final first =
+                tester.getTopLeft(_character(paragraph, index == 0 ? 2 : 0));
+            expect(first.dx, greaterThan(flow.left));
+            starts.add(first);
+            if (width == 320) {
+              final wrapped = [
+                for (final (rawIndex, rune) in paragraph.text.runes.indexed)
+                  if (String.fromCharCode(rune).trim().isNotEmpty &&
+                      tester.getTopLeft(_character(paragraph, rawIndex)).dy >
+                          first.dy)
+                    tester.getTopLeft(_character(paragraph, rawIndex)),
+              ];
+              expect(wrapped, isNotEmpty);
+              expect(wrapped.first.dx, flow.left);
+            }
+          }
+          expect(starts[0].dx, closeTo(starts[1].dx, .1));
+          expect(starts[1].dy, greaterThan(starts[0].dy));
+          expect(tester.takeException(), isNull);
+        }
+      });
+
+      testWidgets('插图让位的三个文字块纯文字显示时都左对齐，分节和原始高亮坐标不变（拼音=$showPinyin，字号=$scale）',
+          (tester) async {
+        _setViewport(tester);
+        final parser = TextbookCourseDraftParser();
+        final seed = parser.seed(draftFixtureEntry(), draftFixtureToc);
+        final page = illustratedReadingPage();
+        final parsed = parser.parse(
+          seed.pack.lessons.first,
+          seed.generation!.plans.first,
+          [page],
+        );
+        final raw = seed.pack.toJson();
+        (raw['lessons'] as List)[0] = parsed.lesson;
+        final lesson = TextbookCoursePack.fromJson(raw).lessons.first;
+        final before = lesson.toJson();
+        expect(lesson.paragraphs, hasLength(3));
+        final layouts = {
+          for (final paragraph in lesson.paragraphs)
+            paragraph.id: parser.readingLayout(
+              paragraph,
+              [page],
+              paragraphs: lesson.paragraphs,
+            ),
+        };
+        Future<void> pump({bool highlighted = false}) async {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: MediaQuery(
+                data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+                child: Scaffold(
+                  body: SingleChildScrollView(
+                    child: SizedBox(
+                      width: 320,
+                      child: TextbookCourseParagraphsContent(
+                        paragraphs: lesson.paragraphs,
+                        showPinyin: showPinyin,
+                        readingLayouts: layouts,
+                        activeRanges: highlighted
+                            ? [
+                                TextbookNarrationSpan(
+                                  lesson.paragraphs.first.id,
+                                  1,
+                                  2,
+                                ),
+                              ]
+                            : const [],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+
+        await pump();
+        final positions = <Finder, Rect>{};
+        final readingBounds = tester.getRect(
+          find.byType(TextbookCourseParagraphsContent),
+        );
+        final firstFlow = tester.getRect(
+          find.byKey(ValueKey('${lesson.paragraphs.first.id}-flow')),
+        );
+        double? priorBottom;
+        for (final paragraph in lesson.paragraphs) {
+          final flow = tester.getRect(
+            find.byKey(ValueKey('${paragraph.id}-flow')),
+          );
+          expect(flow.left, closeTo(firstFlow.left, .1));
+          expect(flow.center.dx, closeTo(readingBounds.center.dx, .1));
+          if (priorBottom != null) expect(flow.top, greaterThan(priorBottom));
+          priorBottom = flow.bottom;
+          var rawIndex = 0;
+          for (final line in paragraph.text.split('\n')) {
+            final finder = _character(paragraph, rawIndex);
+            final bounds = tester.getRect(finder);
+            expect(bounds.left, closeTo(flow.left, .1));
+            positions[finder] = bounds;
+            rawIndex += line.runes.length + 1;
+          }
+        }
+        await pump(highlighted: true);
+        for (final entry in positions.entries) {
+          expect(tester.getRect(entry.key), entry.value);
+        }
+        final supplementary = _character(lesson.paragraphs.first, 1);
+        expect(tester.widget<Text>(supplementary).data, '𠀀');
+        expect(
+          tester.widget<Text>(supplementary).style!.backgroundColor,
+          isNotNull,
+        );
+        expect(lesson.toJson(), before);
+        expect(tester.takeException(), isNull);
+      });
+
       testWidgets('恢复单行段首两格缩进，续行左对齐且原文注音高亮不移位（拼音=$showPinyin，字号=$scale）',
           (tester) async {
         _setViewport(tester);
@@ -178,6 +452,11 @@ void main() {
                   : const [],
             );
         await pump(1500);
+        final centered = tester.getRect(
+          find.byKey(const ValueKey('verse-flow')),
+        );
+        expect(centered.left, greaterThan(0));
+        expect(centered.center.dx, closeTo(750, .1));
         final first = tester.getTopLeft(_character(paragraph, 0));
         final second = tester.getTopLeft(_character(paragraph, 4));
         final third = tester.getTopLeft(_character(paragraph, 9));
@@ -488,6 +767,7 @@ void main() {
           showPinyin: showPinyin,
           scale: scale,
           width: 40,
+          preserveLineBreaks: true,
         );
         final horizontalScroll = find.byWidgetPredicate(
           (widget) =>
@@ -623,4 +903,29 @@ void main() {
       });
     }
   }
+
+  testWidgets('缺少诗歌依据、散文混排或显式段首缩进时保留全宽', (tester) async {
+    _setViewport(tester);
+    final verse = _paragraph('quote', '甲乙，\n丙。');
+    final prose = _paragraph('prose', '　　丁戊己庚，辛壬癸子。');
+    for (final mode in ['unknown', 'mixed', 'indented-poetry']) {
+      await _pumpParagraphs(
+        tester,
+        mode == 'unknown' ? [verse] : [verse, prose],
+        showPinyin: false,
+        scale: 1,
+        width: 400,
+        preserveLineBreaks: mode == 'indented-poetry',
+        readingLayouts: mode == 'mixed'
+            ? const {
+                'quote': TextbookReadingLayout(retainLeadingIndent: false),
+              }
+            : const {},
+      );
+      final flow = tester.getRect(find.byKey(const ValueKey('quote-flow')));
+      expect(flow.left, 0);
+      expect(flow.width, 400);
+      expect(tester.takeException(), isNull);
+    }
+  });
 }
