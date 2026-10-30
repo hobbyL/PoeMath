@@ -27,6 +27,8 @@ class _SpeechRecognitionSettingsPageState
 
   late final TextEditingController _secretIdController;
   late final TextEditingController _secretKeyController;
+  late final TextEditingController _appIdController;
+  String _storedAppId = '';
   SpeechRecognitionSettingsState _settings =
       const SpeechRecognitionSettingsState(
     hasCredentials: false,
@@ -34,6 +36,7 @@ class _SpeechRecognitionSettingsPageState
   );
   bool _loadingSettings = true;
   bool _obscureSecretKey = true;
+  bool _showRealtimeSettings = false;
   bool _busy = false;
   bool _recording = false;
   String? _message;
@@ -46,6 +49,7 @@ class _SpeechRecognitionSettingsPageState
     super.initState();
     _secretIdController = TextEditingController();
     _secretKeyController = TextEditingController();
+    _appIdController = TextEditingController();
     _speechService = ref.read(speechRecognitionServiceProvider);
     unawaited(_loadSettings());
   }
@@ -57,8 +61,11 @@ class _SpeechRecognitionSettingsPageState
       if (!mounted) return;
       _secretIdController.text = snapshot.credentials?.secretId ?? '';
       _secretKeyController.text = snapshot.credentials?.secretKey ?? '';
+      _appIdController.text = snapshot.credentials?.appId ?? '';
+      _storedAppId = snapshot.credentials?.appId ?? '';
       setState(() {
         _settings = snapshot.settings;
+        _showRealtimeSettings = _storedAppId.isNotEmpty;
         _loadingSettings = false;
       });
     } on Object catch (error) {
@@ -86,6 +93,7 @@ class _SpeechRecognitionSettingsPageState
     final credentials = TencentAsrCredentials(
       secretId: _secretIdController.text.trim(),
       secretKey: _secretKeyController.text.trim(),
+      appId: _appIdController.text.trim(),
     );
     if (!credentials.isComplete) return null;
     return credentials;
@@ -101,6 +109,12 @@ class _SpeechRecognitionSettingsPageState
           secretId: credentials.secretId,
           secretKey: credentials.secretKey,
         );
+    if (credentials.appId.isNotEmpty || _storedAppId.isNotEmpty) {
+      await ref
+          .read(settingsRepositoryProvider)
+          .saveTencentAsrAppId(credentials.appId);
+      _storedAppId = credentials.appId;
+    }
     return credentials;
   }
 
@@ -269,6 +283,7 @@ class _SpeechRecognitionSettingsPageState
     if (_speechService.isRecording) unawaited(_speechService.cancel());
     _secretIdController.dispose();
     _secretKeyController.dispose();
+    _appIdController.dispose();
     super.dispose();
   }
 
@@ -334,6 +349,31 @@ class _SpeechRecognitionSettingsPageState
               ),
               textInputAction: TextInputAction.done,
             ),
+            const SizedBox(height: SpacingTokens.sm),
+            TextButton.icon(
+              onPressed: _loadingSettings || _busy || _recording
+                  ? null
+                  : () => setState(
+                        () => _showRealtimeSettings = !_showRealtimeSettings,
+                      ),
+              icon: Icon(
+                _showRealtimeSettings ? Icons.expand_less : Icons.expand_more,
+              ),
+              label: const Text('实时识别设置（可选）'),
+            ),
+            if (_showRealtimeSettings) ...[
+              TextField(
+                controller: _appIdController,
+                enabled: !_loadingSettings && !_busy && !_recording,
+                decoration: const InputDecoration(
+                  labelText: 'APPID',
+                  prefixIcon: Icon(Icons.swap_horiz_outlined),
+                  helperText: '填写后优先使用实时识别；留空则使用一句话识别',
+                ),
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+              ),
+            ],
             const SizedBox(height: SpacingTokens.sm),
             Align(
               alignment: Alignment.centerRight,

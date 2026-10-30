@@ -10,12 +10,16 @@ final class TencentAsrCredentials {
   const TencentAsrCredentials({
     required this.secretId,
     required this.secretKey,
+    this.appId = '',
   });
 
   final String secretId;
   final String secretKey;
+  final String appId;
 
   bool get isComplete => secretId.isNotEmpty && secretKey.isNotEmpty;
+
+  bool get hasRealtimeCredentials => isComplete && appId.trim().isNotEmpty;
 
   @override
   String toString() => 'TencentAsrCredentials(<redacted>)';
@@ -50,9 +54,15 @@ final class SpeechRecognitionSettingsSnapshot {
 
 /// Final result for one recorded utterance.
 final class SpeechRecognitionResult {
-  const SpeechRecognitionResult({required this.text});
+  const SpeechRecognitionResult({
+    required this.text,
+    this.mode = 'sentence',
+    this.usedFallback = false,
+  });
 
   final String text;
+  final String mode;
+  final bool usedFallback;
 }
 
 class SpeechRecognitionException implements Exception {

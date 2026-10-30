@@ -70,15 +70,22 @@ class SecureCredentialStore {
       key: _tencentSecretKeyKey,
       value: credentials.secretKey,
     );
+    if (credentials.appId.trim().isEmpty) {
+      await _storage.delete(key: _tencentAppIdKey);
+    } else {
+      await _storage.write(key: _tencentAppIdKey, value: credentials.appId);
+    }
   }
 
   Future<TencentAsrCredentials?> readTencentAsrCredentials() async {
     final secretId = await _storage.read(key: _tencentSecretIdKey);
     final secretKey = await _storage.read(key: _tencentSecretKeyKey);
+    final appId = await _storage.read(key: _tencentAppIdKey) ?? '';
     if (secretId == null || secretKey == null) return null;
     final credentials = TencentAsrCredentials(
       secretId: secretId,
       secretKey: secretKey,
+      appId: appId,
     );
     return credentials.isComplete ? credentials : null;
   }
@@ -86,6 +93,7 @@ class SecureCredentialStore {
   Future<void> deleteTencentAsrCredentials() async {
     await _storage.delete(key: _tencentSecretIdKey);
     await _storage.delete(key: _tencentSecretKeyKey);
+    await _storage.delete(key: _tencentAppIdKey);
   }
 
   // ============ 自建 Worker TTS API Key ============
@@ -201,6 +209,7 @@ class SecureCredentialStore {
 
   static const String _tencentSecretIdKey = 'tencent_asr_secret_id';
   static const String _tencentSecretKeyKey = 'tencent_asr_secret_key';
+  static const String _tencentAppIdKey = 'tencent_asr_app_id';
   static const String _workerTtsApiKeyKey = 'worker_tts_api_key';
   static const String _llmApiKeyKey = 'llm_api_key';
   static const String _backupPassphraseKey = 'backup_passphrase';

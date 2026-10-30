@@ -1055,6 +1055,23 @@ class SettingsRepository {
     await _credentialStore.saveTencentAsrCredentials(credentials);
   }
 
+  Future<void> saveTencentAsrAppId(String appId) async {
+    ParentAccessService.instance.assertAllowed();
+    final current = await readTencentAsrCredentials();
+    if (current == null) {
+      throw StateError('请先保存 SecretId 和 SecretKey');
+    }
+    final updated = TencentAsrCredentials(
+      secretId: current.secretId,
+      secretKey: current.secretKey,
+      appId: appId.trim(),
+    );
+    if (_credentialFingerprint(current) != _credentialFingerprint(updated)) {
+      await invalidateTencentAsrVerification();
+    }
+    await _credentialStore.saveTencentAsrCredentials(updated);
+  }
+
   Future<void> markTencentAsrCredentialsVerified({
     required TencentAsrCredentials testedCredentials,
     DateTime? verifiedAt,
@@ -1090,9 +1107,11 @@ class SettingsRepository {
   }
 
   static String _credentialFingerprint(TencentAsrCredentials credentials) {
+    // 保留旧版本未配置 APPID 时的指纹格式，避免升级后让既有用户重新测试。
     final canonical = jsonEncode(<String>[
       credentials.secretId,
       credentials.secretKey,
+      if (credentials.appId.trim().isNotEmpty) credentials.appId,
     ]);
     return sha256.convert(utf8.encode(canonical)).toString();
   }

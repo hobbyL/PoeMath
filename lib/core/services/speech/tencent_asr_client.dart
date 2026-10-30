@@ -67,6 +67,7 @@ final class TencentAsrClient {
   Future<String> recognizePcm16({
     required Uint8List pcmBytes,
     required TencentAsrCredentials credentials,
+    bool reserveUsage = true,
   }) async {
     if (!credentials.isComplete) {
       throw const TencentAsrException(
@@ -121,6 +122,7 @@ final class TencentAsrClient {
       signature: signature,
       timestamp: timestamp,
       host: host,
+      reserveUsage: reserveUsage,
     );
     return _parseResponse(response);
   }
@@ -130,11 +132,17 @@ final class TencentAsrClient {
     required TencentTc3Signature signature,
     required int timestamp,
     required String host,
+    required bool reserveUsage,
   }) async {
-    try {
-      await _usage.reserve(CloudUsageKind.asr);
-    } on CloudQuotaExceededException catch (error) {
-      throw TencentAsrException(error.message, kind: TencentAsrErrorKind.quota);
+    if (reserveUsage) {
+      try {
+        await _usage.reserve(CloudUsageKind.asr);
+      } on CloudQuotaExceededException catch (error) {
+        throw TencentAsrException(
+          error.message,
+          kind: TencentAsrErrorKind.quota,
+        );
+      }
     }
     try {
       return await _httpClient

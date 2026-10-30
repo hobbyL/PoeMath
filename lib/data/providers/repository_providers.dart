@@ -29,6 +29,8 @@ import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_audio_recorder.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
+import 'package:poemath/core/services/speech/tencent_realtime_asr_client.dart';
+import 'package:poemath/core/services/speech/preferred_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/services/haptic_service.dart';
@@ -163,14 +165,21 @@ final tencentAsrClientProvider = Provider<TencentAsrClient>((ref) {
   return client;
 });
 
+final tencentRealtimeAsrClientProvider =
+    Provider<TencentRealtimeAsrClient>((ref) {
+  return TencentRealtimeAsrClient();
+});
+
 /// Pages own and dispose their recording service, so leaving one cannot cancel another.
 final speechRecognitionServiceFactoryProvider =
     Provider<SpeechRecognitionService Function()>((ref) {
   final client = ref.watch(tencentAsrClientProvider);
+  final realtime = ref.watch(tencentRealtimeAsrClientProvider);
   final settings = ref.watch(settingsRepositoryProvider);
-  return () => TencentSpeechRecognitionService(
+  return () => PreferredSpeechRecognitionService(
         recorder: RecordSpeechAudioRecorder(),
-        tencentClient: client,
+        sentenceClient: client,
+        realtimeClient: realtime,
         settingsRepository: settings,
       );
 });
@@ -184,9 +193,10 @@ final workerTtsClientProvider = Provider<WorkerTtsClient>((ref) {
 final speechRecognitionServiceProvider = Provider<SpeechRecognitionService>((
   ref,
 ) {
-  final service = TencentSpeechRecognitionService(
+  final service = PreferredSpeechRecognitionService(
     recorder: RecordSpeechAudioRecorder(),
-    tencentClient: ref.watch(tencentAsrClientProvider),
+    sentenceClient: ref.watch(tencentAsrClientProvider),
+    realtimeClient: ref.watch(tencentRealtimeAsrClientProvider),
     settingsRepository: ref.watch(settingsRepositoryProvider),
   );
   ref.onDispose(() => unawaited(service.dispose()));
