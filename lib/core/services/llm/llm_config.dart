@@ -76,6 +76,33 @@ class LlmConfig {
   /// 是否配置了非空 API Key。
   bool get hasApiKey => apiKey.trim().isNotEmpty;
 
+  /// Whether the configured model name identifies a commonly supported
+  /// vision/multimodal model. Providers expose this capability through model
+  /// naming; text-only models are never sent image content by default.
+  bool get supportsVision => candidateModels.any(_looksLikeVisionModel);
+
+  static bool _looksLikeVisionModel(String value) {
+    final model = value.toLowerCase();
+    const markers = <String>[
+      'vision',
+      'vl',
+      'gpt-4o',
+      'gpt-4.1',
+      'gpt-4.5',
+      'gemini',
+      'claude-3',
+      'claude-4',
+      'qwen2-vl',
+      'qwen2.5-vl',
+      'qwen3-vl',
+      'glm-4v',
+      'minicpm-v',
+      'internvl',
+      'llava',
+    ];
+    return markers.any(model.contains);
+  }
+
   @override
   String toString() => 'LlmConfig(baseUrl: $baseUrl, model: $model, '
       'apiKey: ${hasApiKey ? '<已设置，不回显>' : '<未设置>'})';

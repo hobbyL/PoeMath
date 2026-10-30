@@ -33,6 +33,7 @@ class ChatMessage {
   const ChatMessage({
     required this.role,
     required this.content,
+    this.contentParts,
     this.toolCallId,
     this.name,
     this.toolCalls,
@@ -40,6 +41,11 @@ class ChatMessage {
 
   final ChatRole role;
   final String content;
+
+  /// OpenAI-compatible multimodal content parts. When present, this replaces
+  /// the plain string in the wire message while keeping [content] available
+  /// for existing text-only callers and persistence adapters.
+  final List<Map<String, Object?>>? contentParts;
 
   /// role=tool 时关联的 tool_call id。
   final String? toolCallId;
@@ -56,7 +62,7 @@ class ChatMessage {
   /// 普通会话轮次附加无意义的 null 字段。
   Map<String, Object?> toJson() => <String, Object?>{
         'role': role.wire,
-        'content': content,
+        'content': contentParts ?? content,
         if (toolCallId != null) 'tool_call_id': toolCallId,
         if (name != null) 'name': name,
         if (toolCalls != null && toolCalls!.isNotEmpty)
