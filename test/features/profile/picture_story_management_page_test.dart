@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_tile.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
@@ -66,6 +67,11 @@ Finder _switchOf(String title) => find.descendant(
       matching: find.byType(Switch),
     );
 
+List<Rect> _promptRects(WidgetTester tester) => [
+      for (final prompt in PictureStoryCatalog.prompts)
+        tester.getRect(find.widgetWithText(AppTile, prompt.title)),
+    ];
+
 void _verifyPromptLayout(WidgetTester tester) {
   for (final prompt in PictureStoryCatalog.prompts) {
     final row = find.widgetWithText(AppTile, prompt.title);
@@ -106,6 +112,15 @@ void main() {
     await _pumpPage(tester);
 
     _verifyPromptLayout(tester);
+    final rects = _promptRects(tester);
+    for (var index = 1; index < rects.length; index++) {
+      expect(rects[index].left, rects.first.left);
+      expect(rects[index].width, rects.first.width);
+      expect(
+        rects[index].top,
+        closeTo(rects[index - 1].bottom + SpacingTokens.sm, 0.001),
+      );
+    }
   });
 
   testWidgets('窄屏和两倍字号下插图仍应贴边，开关居中且内容不溢出', (tester) async {
@@ -114,9 +129,52 @@ void main() {
     _verifyPromptLayout(tester);
   });
 
+  testWidgets('平板宽度下题库应展示两列，末行卡片保持同宽', (tester) async {
+    await _pumpPage(tester, size: const Size(800, 800));
+
+    _verifyPromptLayout(tester);
+    final rects = _promptRects(tester);
+    final first = rects[0];
+    final second = rects[1];
+    final last = rects[2];
+    expect(second.top, first.top);
+    expect(second.height, first.height);
+    expect(second.width, closeTo(first.width, 0.001));
+    expect(second.left, closeTo(first.right + SpacingTokens.sm, 0.001));
+    expect(last.left, first.left);
+    expect(last.width, closeTo(first.width, 0.001));
+    expect(last.top, closeTo(first.bottom + SpacingTokens.sm, 0.001));
+  });
+
+  for (final textScale in [1.0, 2.0]) {
+    testWidgets('宽屏题库应展示三列，同排等高且字号 $textScale 下不溢出', (tester) async {
+      await _pumpPage(
+        tester,
+        size: const Size(900, 700),
+        textScale: textScale,
+      );
+
+      _verifyPromptLayout(tester);
+      final rects = _promptRects(tester);
+      for (var index = 1; index < rects.length; index++) {
+        expect(rects[index].top, rects.first.top);
+        expect(rects[index].height, rects.first.height);
+        expect(rects[index].width, closeTo(rects.first.width, 0.001));
+        expect(
+          rects[index].left,
+          closeTo(rects[index - 1].right + SpacingTokens.sm, 0.001),
+        );
+      }
+    });
+  }
+
   testWidgets('切换启用状态应保存并刷新开关与表达题目数量', (tester) async {
     final repository = _TrackingPictureStoryRepository();
-    final container = await _pumpPage(tester, repository: repository);
+    final container = await _pumpPage(
+      tester,
+      size: const Size(900, 700),
+      repository: repository,
+    );
     const title = '公园里的风筝';
     const promptId = 'kite-in-the-park';
     final control = _switchOf(title);
