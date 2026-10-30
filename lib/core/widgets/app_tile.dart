@@ -47,12 +47,14 @@ class AppTile extends StatelessWidget {
     this.subtitleMaxLines,
     this.flat = false,
     this.flatTrailingEdgeAligned = false,
+    this.selected = false,
     this.crossAxisAlignment = CrossAxisAlignment.center,
   })  : assert(trailing == null || trailingAction == null),
         assert(
           onTrailingTap == null || (trailing == null && trailingAction == null),
         ),
         assert(subtitleMaxLines == null || subtitleMaxLines > 0),
+        assert(!selected || flat),
         assert(leadingEdgeWidth == null || leadingEdgeWidth > 0),
         assert(leadingEdgeWidth == null || (leading != null && !flat));
 
@@ -72,7 +74,7 @@ class AppTile extends StatelessWidget {
   /// 标题文本；为空时省略标题行，仅显示副标题内容。
   final String title;
 
-  /// 紧跟标题的单行辅助信息；标题过长时省略，保留辅助信息。
+  /// 紧跟标题的辅助信息；标题过长时省略，大字号空间不足时辅助信息另起一行。
   final String? titleSuffix;
 
   /// 副标题文本。
@@ -109,6 +111,9 @@ class AppTile extends StatelessWidget {
   /// 普通列表行中将尾部图形贴到内容区右边界；整行仍保留 44dp 点击高度。
   final bool flatTrailingEdgeAligned;
 
+  /// 普通列表行（[flat]）的选中状态，提供主题高亮和辅助技术选中语义。
+  final bool selected;
+
   /// 主行内前导内容、文本及尾部组件的垂直对齐方式。
   final CrossAxisAlignment crossAxisAlignment;
 
@@ -122,28 +127,48 @@ class AppTile extends StatelessWidget {
           ? null
           : TextOverflow.ellipsis,
       style: theme.textTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w600,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+        color: selected ? theme.colorScheme.onPrimaryContainer : null,
       ),
     );
     final titleWidget = titleSuffix == null
         ? titleText
-        : Row(
-            children: [
-              Flexible(child: titleText),
-              const SizedBox(width: SpacingTokens.xs),
-              Text(
-                titleSuffix!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+        : LayoutBuilder(
+            builder: (context, constraints) {
+              final suffixStyle = theme.textTheme.bodySmall?.copyWith(
+                color: selected
+                    ? theme.colorScheme.onPrimaryContainer
+                    : theme.colorScheme.onSurfaceVariant,
+              );
+              final suffix = Text(titleSuffix!, style: suffixStyle);
+              final painter = TextPainter(
+                text: TextSpan(text: titleSuffix, style: suffixStyle),
+                textDirection: Directionality.of(context),
+                textScaler: MediaQuery.textScalerOf(context),
+              )..layout();
+              final suffixWidth = painter.width;
+              painter.dispose();
+              if (suffixWidth + SpacingTokens.xs > constraints.maxWidth) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [titleText, suffix],
+                );
+              }
+              return Row(
+                children: [
+                  Flexible(child: titleText),
+                  const SizedBox(width: SpacingTokens.xs),
+                  suffix,
+                ],
+              );
+            },
           );
     final trailingContent = trailing ??
         (onTrailingTap != null
             ? IconButton(
                 tooltip: trailingTooltip,
                 onPressed: onTrailingTap,
+                color: selected ? theme.colorScheme.onPrimaryContainer : null,
                 icon: Icon(trailingIcon),
               )
             : Column(
@@ -152,7 +177,9 @@ class AppTile extends StatelessWidget {
                 children: [
                   Icon(
                     trailingIcon,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: selected
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.onSurfaceVariant,
                   ),
                   if (trailingAction != null) trailingAction!,
                 ],
@@ -191,7 +218,9 @@ class AppTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.end,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: selected
+                            ? theme.colorScheme.onPrimaryContainer
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -207,7 +236,14 @@ class AppTile extends StatelessWidget {
         children: <Widget>[
           if (leadingEdgeWidth == null &&
               (leading != null || icon != null)) ...[
-            leading ?? Icon(icon, color: iconColor, size: 22),
+            leading ??
+                Icon(
+                  icon,
+                  color: selected
+                      ? theme.colorScheme.onPrimaryContainer
+                      : iconColor,
+                  size: 22,
+                ),
             const SizedBox(width: SpacingTokens.md),
           ],
           Expanded(
@@ -233,7 +269,9 @@ class AppTile extends StatelessWidget {
                     overflow:
                         subtitleMaxLines == null ? null : TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: selected
+                          ? theme.colorScheme.onPrimaryContainer
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -252,21 +290,30 @@ class AppTile extends StatelessWidget {
                 buildContent(constraints.maxWidth / 2),
           );
     if (flat) {
-      return Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: trailing == null ? onTap : null,
-          child: ConstrainedBox(
-            constraints:
-                const BoxConstraints(minHeight: SpacingTokens.minTapTarget),
-            child: Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(
-                SpacingTokens.sm,
-                SpacingTokens.xs,
-                flatTrailingEdgeAligned ? 0 : SpacingTokens.sm,
-                SpacingTokens.xs,
+      return Semantics(
+        selected: selected ? true : null,
+        child: Material(
+          type: selected ? MaterialType.canvas : MaterialType.transparency,
+          color: selected ? theme.colorScheme.primaryContainer : null,
+          borderRadius: selected
+              ? BorderRadius.circular(SpacingTokens.radiusSmall)
+              : null,
+          clipBehavior: selected ? Clip.antiAlias : Clip.none,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+            onTap: trailing == null ? onTap : null,
+            child: ConstrainedBox(
+              constraints:
+                  const BoxConstraints(minHeight: SpacingTokens.minTapTarget),
+              child: Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(
+                  SpacingTokens.sm,
+                  SpacingTokens.xs,
+                  flatTrailingEdgeAligned ? 0 : SpacingTokens.sm,
+                  SpacingTokens.xs,
+                ),
+                child: content,
               ),
-              child: content,
             ),
           ),
         ),

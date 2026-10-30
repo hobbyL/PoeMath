@@ -1533,7 +1533,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('详情目录紧邻返回右侧，旋转保留位置，跳转保存续读且重试屏蔽旧回调', (tester) async {
+  testWidgets('详情目录跟随双页右页选中，旋转保留位置，跳转保存续读且重试屏蔽旧回调', (tester) async {
     repo.books[book.pdfSha256] = book;
     TextbookViewerOptions? options;
     final jumps = <int>[];
@@ -1558,7 +1558,10 @@ void main() {
             total: 3,
             result: TextbookTocResult(
               source: TextbookTocSource.bookmarks,
-              entries: [TextbookTocEntry(title: '第三页章节', page: 3)],
+              entries: [
+                TextbookTocEntry(title: '第二页章节', page: 2),
+                TextbookTocEntry(title: '第三页章节', page: 3),
+              ],
             ),
           ),
         );
@@ -1588,6 +1591,10 @@ void main() {
     );
     await tester.tap(toc);
     await tester.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate((widget) => widget is AppTile && widget.selected),
+      findsNothing,
+    );
     tester.view.physicalSize = const Size(1000, 700);
     await tester.pumpAndSettle();
     await tester.tap(find.text('第三页章节'));
@@ -1602,6 +1609,18 @@ void main() {
       SpacingTokens.minTapTarget,
     );
     expect(repo.saved, [(profile: 'default', page: 3)]);
+    await tester.tap(toc);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<AppTile>(find.byKey(const ValueKey('textbook-toc-entry-1')))
+          .selected,
+      isTrue,
+    );
+    expect(jumps, [3]);
+    expect(repo.saved, [(profile: 'default', page: 3)]);
+    await tester.tapAt(const Offset(999, 1));
+    await tester.pumpAndSettle();
     final old = options!;
     old.onRetry();
     await tester.pumpAndSettle();
@@ -1612,7 +1631,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('原书目录跳转保存当前档案位置，重建后的旧目录回调无效', (tester) async {
+  testWidgets('原书目录重开时选中双页右页并保留当前档案进度，重建后旧回调无效', (tester) async {
     repo.books[book.pdfSha256] = book;
     ProfileScope.switchTo('toc-profile');
     TextbookViewerOptions? options;
@@ -1634,7 +1653,10 @@ void main() {
             total: 3,
             result: TextbookTocResult(
               source: TextbookTocSource.bookmarks,
-              entries: [TextbookTocEntry(title: '第三页章节', page: 3)],
+              entries: [
+                TextbookTocEntry(title: '第二页章节', page: 2),
+                TextbookTocEntry(title: '第三页章节', page: 3),
+              ],
             ),
           ),
         );
@@ -1654,6 +1676,20 @@ void main() {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 400));
     expect(repo.reading('toc-profile', book.pdfSha256).page, 3);
+    final savedBeforeOpen = List.of(repo.saved);
+    tester.view.physicalSize = const Size(1000, 700);
+    await tester.pumpAndSettle();
+    await tester.tap(toc);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<AppTile>(find.byKey(const ValueKey('textbook-toc-entry-1')))
+          .selected,
+      isTrue,
+    );
+    expect(repo.saved, savedBeforeOpen);
+    await tester.tapAt(const Offset(999, 1));
+    await tester.pumpAndSettle();
     final old = options!;
     old.onRetry();
     await tester.pumpAndSettle();

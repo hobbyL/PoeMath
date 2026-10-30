@@ -123,7 +123,11 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
   Future<void> _showToc() async {
     final toc = _toc;
     if (toc == null) return;
-    final page = await showTextbookToc(context: context, load: toc);
+    final page = await showTextbookToc(
+      context: context,
+      load: toc,
+      currentPage: _page,
+    );
     if (page != null && mounted) await _navigate(page);
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,22 +27,29 @@ void main() {
     WidgetTester tester,
     TextbookTocLoader load, {
     ValueChanged<int?>? selected,
+    int? currentPage,
     bool large = false,
+    bool reduceMotion = false,
     bool settle = true,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(large ? 2 : 1)),
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(large ? 2 : 1),
+            disableAnimations: reduceMotion,
+          ),
           child: child!,
         ),
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
               onPressed: () async {
-                final page =
-                    await showTextbookToc(context: context, load: load);
+                final page = await showTextbookToc(
+                  context: context,
+                  load: load,
+                  currentPage: currentPage,
+                );
                 selected?.call(page);
               },
               child: const Text('打开'),
@@ -91,6 +99,230 @@ void main() {
     await tester.tap(entry);
     await tester.pumpAndSettle();
     expect(find.byType(TextbookTocDrawer), findsNothing);
+  });
+
+  testWidgets('打开目录时选中当前页最近的深层目录并将长列表目标滚入视口', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final entries = [
+      const TextbookTocEntry(title: '单元', isGroup: true),
+      for (var page = 1; page <= 60; page++)
+        TextbookTocEntry(
+          title: '第$page课',
+          page: page,
+          lessonNumber: page,
+          level: 1,
+        ),
+    ];
+    await open(
+      tester,
+      (_) => Stream.value(
+        _ready(
+          TextbookTocResult(
+            source: TextbookTocSource.text,
+            entries: entries,
+          ),
+        ),
+      ),
+      currentPage: 47,
+    );
+    final entry = find.byKey(const ValueKey('textbook-toc-entry-47'));
+    final tile = tester.widget<AppTile>(entry);
+    expect(tile.title, '47：第47课');
+    expect(tile.selected, isTrue);
+    final semantics = tester.ensureSemantics();
+    final selectedState = tester.getSemantics(entry).flagsCollection.isSelected;
+    semantics.dispose();
+    expect(selectedState, ui.Tristate.isTrue);
+    final theme = Theme.of(tester.element(entry));
+    final material = tester.widget<Material>(
+      find.descendant(of: entry, matching: find.byType(Material)).first,
+    );
+    expect(material.color, theme.colorScheme.primaryContainer);
+    expect(
+      tester.widget<Text>(find.text(tile.title)).style!.color,
+      theme.colorScheme.onPrimaryContainer,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is AppTile && widget.selected,
+      ),
+      findsOneWidget,
+    );
+    final viewport = tester.getRect(
+      find.byType(CustomScrollView),
+    );
+    final target = tester.getRect(entry);
+    expect(target.top, greaterThanOrEqualTo(viewport.top));
+    expect(target.bottom, lessThanOrEqualTo(viewport.bottom));
+    expect(target.center.dy, closeTo(viewport.center.dy, 30));
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final currentPage in [303, 999]) {
+    testWidgets('短屏双倍大字和不等高长目录仍能定位正文页 $currentPage', (tester) async {
+      tester.view.physicalSize = const Size(320, 420);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final entries = [
+        for (var unit = 0; unit < 80; unit++) ...[
+          TextbookTocEntry(
+            title: '第$unit单元：这是一行很长的单元目录标题，需要自动换行',
+            isGroup: true,
+          ),
+          TextbookTocEntry(title: '第$unit课', page: unit * 4 + 1, level: 1),
+          TextbookTocEntry(
+            title: '附加阅读篇目$unit',
+            printedPage: unit * 4 + 2,
+            level: 2,
+          ),
+        ],
+      ];
+      await open(
+        tester,
+        (_) => Stream.value(
+          _ready(
+            TextbookTocResult(source: TextbookTocSource.text, entries: entries),
+          ),
+        ),
+        currentPage: currentPage,
+        large: true,
+        reduceMotion: true,
+      );
+      final index = currentPage == 303 ? 226 : 238;
+      final entry = find.byKey(ValueKey('textbook-toc-entry-$index'));
+      expect(entry, findsOneWidget);
+      expect(tester.widget<AppTile>(entry).selected, isTrue);
+      final viewport = tester.getRect(find.byType(CustomScrollView));
+      final target = tester.getRect(entry);
+      expect(target.top, greaterThanOrEqualTo(viewport.top));
+      expect(target.bottom, lessThanOrEqualTo(viewport.bottom));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('当前页早于首项不误选，正文中间页按最近页码、深度和目录顺序选中', (tester) async {
+    const entries = [
+      TextbookTocEntry(title: '第一章', page: 5, level: 0),
+      TextbookTocEntry(title: '第一章子节', page: 8, level: 1),
+      TextbookTocEntry(title: '第二章', page: 8, level: 0),
+      TextbookTocEntry(title: '第二章子节甲', page: 8, level: 1),
+      TextbookTocEntry(title: '第二章子节乙', page: 8, level: 1),
+    ];
+    await open(
+      tester,
+      (_) => Stream.value(
+        _ready(
+          const TextbookTocResult(
+            source: TextbookTocSource.text,
+            entries: entries,
+          ),
+        ),
+      ),
+      currentPage: 3,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is AppTile && widget.selected,
+      ),
+      findsNothing,
+    );
+    await tester.tapAt(
+      Offset(
+        tester.view.physicalSize.width / tester.view.devicePixelRatio - 1,
+        1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await open(
+      tester,
+      (_) => Stream.value(
+        _ready(
+          const TextbookTocResult(
+            source: TextbookTocSource.text,
+            entries: entries,
+          ),
+        ),
+      ),
+      currentPage: 9,
+    );
+    expect(
+      tester
+          .widget<AppTile>(
+            find.byKey(const ValueKey('textbook-toc-entry-4')),
+          )
+          .selected,
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('重试后等目录就绪再展开当前章节，随后尊重手动收起并取消迟到回调', (tester) async {
+    var cancelled = false;
+    final stream = StreamController<TextbookTocProgress>(
+      onCancel: () => cancelled = true,
+    );
+    final tree = TextbookTocResult(
+      source: TextbookTocSource.text,
+      entries: [
+        const TextbookTocEntry(title: '阅读单元', isGroup: true),
+        for (var page = 1; page <= 60; page++)
+          TextbookTocEntry(title: '课文$page', page: page, level: 1),
+      ],
+    );
+    var selectedCalls = 0;
+    await open(
+      tester,
+      (refresh) => refresh ? stream.stream : Stream.error(StateError('测试重试')),
+      currentPage: 47,
+      selected: (_) => selectedCalls++,
+    );
+    await tester.tap(find.text('重试'));
+    stream.add(
+      TextbookTocProgress(
+        phase: TextbookTocPhase.resolving,
+        scanned: 50,
+        total: 60,
+        result: tree,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('收起阅读单元'));
+    await tester.pumpAndSettle();
+    expect(find.text('课文1'), findsNothing);
+    stream.add(
+      const TextbookTocProgress(
+        phase: TextbookTocPhase.ready,
+        scanned: 60,
+        total: 60,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final target = find.byKey(const ValueKey('textbook-toc-entry-47'));
+    expect(tester.widget<AppTile>(target).selected, isTrue);
+    expect(target.hitTestable(), findsOneWidget);
+    // 定位仅改变目录滚动位置，不返回一个跳页结果。
+    expect(selectedCalls, 0);
+    final scroll =
+        tester.widget<CustomScrollView>(find.byType(CustomScrollView));
+    scroll.controller!.jumpTo(0);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('收起阅读单元'));
+    await tester.pumpAndSettle();
+    stream.add(_ready(tree));
+    await tester.pumpAndSettle();
+    expect(find.text('课文1'), findsNothing);
+    expect(find.byTooltip('展开阅读单元'), findsOneWidget);
+    await tester.tapAt(const Offset(799, 1));
+    await tester.pumpAndSettle();
+    expect(cancelled, isTrue);
+    stream.add(_ready(tree));
+    unawaited(stream.close());
+    await tester.pump();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('左侧滑栏普通树行保留课号，可收起单元和子篇且父章节仍能跳页', (tester) async {

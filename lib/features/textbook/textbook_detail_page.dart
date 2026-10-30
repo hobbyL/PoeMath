@@ -190,7 +190,11 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   Future<void> _showToc(Textbook book) async {
     final toc = _toc;
     if (toc == null) return;
-    final page = await showTextbookToc(context: context, load: toc);
+    final page = await showTextbookToc(
+      context: context,
+      load: toc,
+      currentPage: _previewPage,
+    );
     if (page != null && mounted) await _turnPage(page, book.pageCount);
   }
 
