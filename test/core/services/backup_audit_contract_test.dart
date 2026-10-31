@@ -10,6 +10,7 @@ import 'package:poemath/data/models/assistant_message.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _Store extends SecureCredentialStore {
   final keys = <String, String>{};
@@ -43,8 +44,14 @@ class _Store extends SecureCredentialStore {
 }
 
 void main() {
-  setUp(setUpHiveForTesting);
-  tearDown(tearDownHiveForTesting);
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
+  });
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
+  });
 
   Future<void> providers(_Store store) async {
     final settings = SettingsRepository(credentialStore: store);

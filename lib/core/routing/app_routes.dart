@@ -82,6 +82,7 @@ class AppRoutes {
   static const String splash = '/splash';
   static const String onboarding = '/onboarding';
   static const String settings = '/profile/settings';
+  static const String parentProtection = '/profile/settings/parent-protection';
   static const String speechRecognitionSettings =
       '/profile/settings/speech-recognition';
   static const String llmSettings = '/profile/settings/llm';

@@ -14,6 +14,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/ai_settings_page.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 测试环境无平台安全存储通道，覆写为内存实现（页面经
 /// settingsRepositoryProvider 间接依赖它，须可构造）。
@@ -38,9 +39,11 @@ Future<void> _pumpPage(WidgetTester tester) async {
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 

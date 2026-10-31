@@ -14,6 +14,7 @@ import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/features/profile/providers/stats_chart_providers.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _FailingMeta extends Fake implements Box<dynamic> {
   _FailingMeta(this.real);
@@ -145,6 +146,8 @@ void main() {
   });
 
   test('冻结完成日跨日重试不写入重试日，备份保留结算事实', () async {
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     final date = DateTime(2026, 10, 19, 23, 59);
     final repo = CheckInRepository();
     await repo.updateForDate(date, activityId: 'yesterday', addMathTotal: 10);

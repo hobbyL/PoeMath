@@ -18,9 +18,10 @@ class ParentAccessDenied implements Exception {
 
 /// PIN 与一次性恢复码仅保存加盐摘要，设备绑定，不参与任何备份。
 class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
-  ParentAccessService(
-      {SecureCredentialStore? store, DateTime Function()? clock,})
-      : _store = store ?? SecureCredentialStore(),
+  ParentAccessService({
+    SecureCredentialStore? store,
+    DateTime Function()? clock,
+  })  : _store = store ?? SecureCredentialStore(),
         _clock = clock ?? DateTime.now;
   static final instance = ParentAccessService();
   static const unlockDuration = Duration(minutes: 2);
@@ -29,6 +30,7 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? _until;
   Timer? _expiry;
   bool _observing = false;
+  bool _foreground = true;
   Future<void>? _operation;
   int _lockGeneration = 0;
   Object? _storageError;
@@ -40,7 +42,17 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
           true;
   bool get isUnlocked =>
       _storageError == null &&
-      (!enabled || (_until?.isAfter(_clock()) ?? false));
+      _foreground &&
+      enabled &&
+      (_until?.isAfter(_clock()) ?? false);
+
+  /// 首次建立 PIN 的资格不授予设置、额度或数据管理权限。
+  bool get canSetPin =>
+      _storageError == null &&
+      _foreground &&
+      Hive.isBoxOpen('settings') &&
+      (!enabled || isUnlocked);
+  bool get hasStorageError => _storageError != null;
   bool get needsResetNotice =>
       Hive.isBoxOpen('settings') &&
       HiveBoxes.settings
@@ -51,7 +63,8 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
   /// 读取异常时保持锁定，绝不把异常当成新设备放行。
   Future<void> initialize() => _serial(() async {
         try {
-          if (enabled && await _store.readParentProtection() == null) {
+          final raw = await _readRecord();
+          if (enabled && raw == null) {
             await HiveBoxes.settings
                 .put('parent_protection_reset_notice', true);
             await HiveBoxes.settings.put('parent_protection_enabled', false);
@@ -69,10 +82,61 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
     if (!isUnlocked) throw const ParentAccessDenied();
   }
 
+  void _assertCanSetPin() {
+    if (!canSetPin) throw const ParentAccessDenied();
+  }
+
+  static Map<String, dynamic> _decodeRecord(String raw) {
+    final data = jsonDecode(raw) as Map<String, dynamic>;
+    for (final field in ['salt', 'recoverySalt', 'digest', 'recoveryDigest']) {
+      final bytes = base64Decode(data[field] as String);
+      final expectedLength =
+          field.endsWith('Salt') || field == 'salt' ? 16 : 32;
+      if (bytes.length != expectedLength) {
+        throw const FormatException('家长验证记录不完整，请稍后重试');
+      }
+    }
+    final failures = data['failures'];
+    if (failures != null && (failures is! int || failures < 0)) {
+      throw const FormatException('家长验证记录不完整，请稍后重试');
+    }
+    final blocked = data['blockedUntil'];
+    if (blocked != null &&
+        (blocked is! String || DateTime.tryParse(blocked) == null)) {
+      throw const FormatException('家长验证记录不完整，请稍后重试');
+    }
+    return data;
+  }
+
+  Future<String?> _readRecord() async {
+    try {
+      final raw = await _store.readParentProtection();
+      if (raw != null) _decodeRecord(raw);
+      return raw;
+    } on Object catch (error) {
+      _storageError = error;
+      lock();
+      rethrow;
+    }
+  }
+
+  Future<void> _saveAuthenticationRecord(Map<String, dynamic> data) async {
+    try {
+      await _store.saveParentProtection(jsonEncode(data));
+    } on Object catch (error) {
+      _storageError = error;
+      lock();
+      rethrow;
+    }
+  }
+
   void observeLifecycle() {
     if (_observing) return;
     WidgetsBinding.instance.addObserver(this);
     _observing = true;
+    _foreground = WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    if (!_foreground) lock();
   }
 
   void lock() {
@@ -83,9 +147,11 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _unlock() {
-    if (_observing &&
-        WidgetsBinding.instance.lifecycleState != null &&
-        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+    if (!_foreground ||
+        (_observing &&
+            WidgetsBinding.instance.lifecycleState != null &&
+            WidgetsBinding.instance.lifecycleState !=
+                AppLifecycleState.resumed)) {
       return;
     }
     _until = _clock().add(unlockDuration);
@@ -101,8 +167,9 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
     final key =
         await Pbkdf2(macAlgorithm: Hmac.sha256(), iterations: 120000, bits: 256)
             .deriveKey(
-                secretKey: SecretKey(utf8.encode(secret)),
-                nonce: base64Decode(salt),);
+      secretKey: SecretKey(utf8.encode(secret)),
+      nonce: base64Decode(salt),
+    );
     return base64Encode(await key.extractBytes());
   }
 
@@ -130,9 +197,18 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<String> configure(String pin) => _serial(() async {
-        assertAllowed();
+  bool _isOperationCurrent(int generation, bool Function()? isCurrent) =>
+      generation == _lockGeneration &&
+      _foreground &&
+      (isCurrent?.call() ?? true);
+
+  Future<String> configure(String pin, {bool Function()? isCurrent}) =>
+      _serial(() async {
+        _assertCanSetPin();
         final generation = _lockGeneration;
+        if (!_isOperationCurrent(generation, isCurrent)) {
+          throw const ParentAccessDenied();
+        }
         if (!validPin(pin)) throw const FormatException('PIN 须为 6 位数字');
         final salt = _salt();
         final recoverySalt = _salt();
@@ -149,16 +225,24 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
           'failures': 0,
         };
         // 哈希期间后台失效时不允许悄悄改 PIN。
-        assertAllowed();
-        if (generation != _lockGeneration) throw const ParentAccessDenied();
+        _assertCanSetPin();
+        if (!_isOperationCurrent(generation, isCurrent)) {
+          throw const ParentAccessDenied();
+        }
         final wasEnabled = enabled;
-        final oldRecord = await _store.readParentProtection();
-        if (generation != _lockGeneration) throw const ParentAccessDenied();
+        final oldRecord = await _readRecord();
+        if (!_isOperationCurrent(generation, isCurrent)) {
+          throw const ParentAccessDenied();
+        }
         try {
           await _store.saveParentProtection(jsonEncode(record));
-          if (generation != _lockGeneration) throw const ParentAccessDenied();
+          if (!_isOperationCurrent(generation, isCurrent)) {
+            throw const ParentAccessDenied();
+          }
           await HiveBoxes.settings.put('parent_protection_enabled', true);
-          if (generation != _lockGeneration) throw const ParentAccessDenied();
+          if (!_isOperationCurrent(generation, isCurrent)) {
+            throw const ParentAccessDenied();
+          }
         } on Object catch (error, stackTrace) {
           // 两个存储分别补偿，不能留下开启标记却没有可用验证记录。
           Object? compensationError;
@@ -188,20 +272,30 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
         } on Object catch (error) {
           AppLogger.e('家长保护迁移提示清理失败', tag: 'ParentAccess', error: error);
         }
-        if (generation == _lockGeneration) _unlock();
+        if (_isOperationCurrent(generation, isCurrent)) _unlock();
         return RegExp('.{1,4}')
             .allMatches(recovery)
             .map((m) => m.group(0))
             .join('-');
       });
 
-  Future<bool> authenticate(String secret, {bool recovery = false}) =>
+  Future<bool> authenticate(
+    String secret, {
+    bool recovery = false,
+    bool Function()? isCurrent,
+  }) =>
       _serial(() async {
-        if (!enabled) return !recovery;
+        if (!enabled || !_foreground || _storageError != null) return false;
         final generation = _lockGeneration;
-        final raw = await _store.readParentProtection();
-        if (raw == null) throw StateError('此设备缺少验证记录，请返回后重试以重设保护');
-        final data = jsonDecode(raw) as Map<String, dynamic>;
+        if (!_isOperationCurrent(generation, isCurrent)) return false;
+        final raw = await _readRecord();
+        if (raw == null) {
+          final error = StateError('此设备缺少验证记录，请返回后重试以重设保护');
+          _storageError = error;
+          lock();
+          throw error;
+        }
+        final data = _decodeRecord(raw);
         final blocked =
             DateTime.tryParse(data['blockedUntil'] as String? ?? '');
         if (blocked != null && blocked.isAfter(_clock())) {
@@ -210,33 +304,43 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
         final salt = data[recovery ? 'recoverySalt' : 'salt'] as String;
         final actual =
             await _digest(recovery ? _normalizeRecovery(secret) : secret, salt);
-        if (generation != _lockGeneration) return false;
+        if (!_isOperationCurrent(generation, isCurrent)) return false;
         if (!_same(
-            actual, data[recovery ? 'recoveryDigest' : 'digest'] as String,)) {
+          actual,
+          data[recovery ? 'recoveryDigest' : 'digest'] as String,
+        )) {
           final failures = (data['failures'] as int? ?? 0) + 1;
           data['failures'] = failures;
           if (failures >= 5) {
             data['blockedUntil'] =
                 _clock().add(const Duration(seconds: 30)).toIso8601String();
           }
-          await _store.saveParentProtection(jsonEncode(data));
+          await _saveAuthenticationRecord(data);
           return false;
         }
         if (recovery) {
-          // 恢复码只能使用一次：关闭保护并删除整份验证记录。
+          // 恢复码只允许重设 PIN，不能解锁未配置的管理区。
           await HiveBoxes.settings.put('parent_protection_enabled', false);
           try {
             await _store.deleteParentProtection();
           } on Object catch (error, stackTrace) {
-            AppLogger.e('保护已关闭，旧验证摘要清理失败',
-                tag: 'ParentAccess', error: error, stackTrace: stackTrace,);
+            AppLogger.e(
+              '保护已关闭，旧验证摘要清理失败',
+              tag: 'ParentAccess',
+              error: error,
+              stackTrace: stackTrace,
+            );
           }
         } else {
           data['failures'] = 0;
           data.remove('blockedUntil');
-          await _store.saveParentProtection(jsonEncode(data));
+          await _saveAuthenticationRecord(data);
         }
-        if (generation != _lockGeneration) return false;
+        if (!_isOperationCurrent(generation, isCurrent)) return false;
+        if (recovery) {
+          lock();
+          return true;
+        }
         _unlock();
         return isUnlocked;
       });
@@ -247,15 +351,24 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
         try {
           await _store.deleteParentProtection();
         } on Object catch (error, stackTrace) {
-          AppLogger.e('保护已关闭，旧验证摘要清理失败',
-              tag: 'ParentAccess', error: error, stackTrace: stackTrace,);
+          AppLogger.e(
+            '保护已关闭，旧验证摘要清理失败',
+            tag: 'ParentAccess',
+            error: error,
+            stackTrace: stackTrace,
+          );
         }
         lock();
       });
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) lock();
+    _foreground = state == AppLifecycleState.resumed;
+    if (!_foreground) {
+      lock();
+    } else {
+      notifyListeners();
+    }
   }
 
   @override

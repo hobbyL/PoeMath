@@ -9,6 +9,7 @@ import 'package:poemath/data/repositories/llm_problem_repository.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 写出真实旧字段格式，确保新 adapter 的缺字段默认值可从磁盘读取。
 class _LegacyProblemAdapter extends TypeAdapter<LlmProblem> {
@@ -87,8 +88,14 @@ LlmProblem problem({String id = 'p1', bool legacy = false}) {
 }
 
 void main() {
-  setUp(setUpHiveForTesting);
-  tearDown(tearDownHiveForTesting);
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
+  });
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
+  });
 
   test('新版逆向题和二年级两步题经入库、作答、关闭重开及备份恢复保留', () async {
     final plans = [

@@ -23,6 +23,7 @@ import 'package:poemath/features/assistant/assistant_chat_state.dart';
 import 'package:poemath/features/assistant/assistant_session_provider.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 脚本化假控制器：send 一次追加 user+assistant；regenerate 分两步
 /// （先截断末条 assistant，再追加新 assistant），与真实控制器的状态轨迹
@@ -139,6 +140,8 @@ void main() {
   }
 
   test('恢复同 ID 会话后重载消息与上下文切点，随后不混入旧消息', () async {
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     final session = container.read(assistantSessionProvider.notifier);
     await session.ensureOpen();
     await session.send('local');

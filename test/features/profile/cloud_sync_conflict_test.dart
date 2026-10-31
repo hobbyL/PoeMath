@@ -41,6 +41,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/cloud_sync_page.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 只报告「凭据不存在」的假安全存储：不触发任何平台通道。
 final class _NoCredentialStore extends SecureCredentialStore {
@@ -233,13 +234,17 @@ void main() {
   }) async {
     await tester.runAsync(() async {
       await setUpHiveForTesting();
+      await unlockParentForTesting();
       await HiveBoxes.settings.put(
         'webdav_configs',
         jsonEncode([remoteConfig.toJson()]),
       );
       await before?.call();
     });
-    addTearDown(() => tester.runAsync(tearDownHiveForTesting));
+    addTearDown(() async {
+      lockParentForTesting();
+      await tester.runAsync(tearDownHiveForTesting);
+    });
 
     final historyDir = await tester
         .runAsync(() => Directory.systemTemp.createTemp('cloud_history_'));

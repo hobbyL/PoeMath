@@ -14,6 +14,8 @@ import 'package:poemath/features/textbook/widgets/textbook_cache_manager_sheet.d
 import 'package:poemath/features/textbook/providers/textbook_generation_controller.dart';
 
 import '../../helpers/textbook_fixture.dart';
+import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _FakeFiles extends TextbookFileService {
   _FakeFiles(this.usage, {void Function(String)? onAction})
@@ -158,6 +160,14 @@ class _SeededDownloads extends TextbookDownloadController {
 }
 
 void main() {
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
+  });
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
+  });
   final book = textbookFixture();
   const usage = TextbookStorageUsage(
     pdfBytes: 12 * 1024 * 1024,
@@ -183,7 +193,7 @@ void main() {
         overrides: [
           textbookFileServiceProvider.overrideWithValue(files),
           textbookCourseRepositoryProvider.overrideWithValue(courses),
-          // 默认空状态，避免测试环境初始化 Hive。
+          // 固定生成状态，避免触发真实生成链。
           textbookGenerationProvider.overrideWith((ref) {
             return TextbookGenerationController(
               ref.watch(textbookGenerationServiceProvider),

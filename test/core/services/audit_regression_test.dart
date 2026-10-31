@@ -37,6 +37,7 @@ import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/data/repositories/learning_activity_repository.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class MemoryStore extends SecureCredentialStore {
   final keys = <String, String>{};
@@ -234,6 +235,8 @@ void main() {
   tearDown(tearDownHiveForTesting);
 
   test('恢复失败后精确删除原本不存在的设置', () async {
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     final store = MemoryStore()..failWorkerWrite = true;
     final backup = BackupService(secureStore: store);
     expect(HiveBoxes.settings.containsKey('theme_mode'), isFalse);
@@ -255,6 +258,8 @@ void main() {
   });
 
   test('多厂商备份包含所有厂商的 Key', () async {
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     final store = MemoryStore();
     final settings = SettingsRepository(credentialStore: store);
     for (final id in ['p1', 'p2']) {
@@ -281,6 +286,7 @@ void main() {
     );
     store.keys.clear();
     await HiveBoxes.settings.clear();
+    await unlockParentForTesting();
     await BackupService(secureStore: store)
         .restoreFromJson(jsonEncode(node), passphrase: 'fake-passphrase');
     expect(store.keys, {'p1': 'fake-key-p1', 'p2': 'fake-key-p2'});
@@ -291,6 +297,8 @@ void main() {
   });
 
   test('清除上下文后工具调用保留完整展示历史', () async {
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     final store = MemoryStore();
     await SettingsRepository(credentialStore: store).saveLlmProviderConfig(
       id: 'p1',
@@ -679,6 +687,8 @@ void main() {
   });
 
   test('备份拒绝越界题量，读取回退安全默认', () async {
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     final backup = BackupService(secureStore: MemoryStore());
     final data =
         jsonDecode(await backup.exportToJson()) as Map<String, dynamic>;

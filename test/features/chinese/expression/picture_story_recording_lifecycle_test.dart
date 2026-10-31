@@ -16,6 +16,7 @@ import 'package:poemath/features/chinese/expression/picture_story_practice_page.
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 
 import '../../../helpers/hive_test_helper.dart';
+import '../../../helpers/parent_access_test_helper.dart';
 import '../../../helpers/picture_story_fixture.dart';
 
 class _Speech
@@ -225,17 +226,22 @@ void main() {
   setUp(() async {
     changeLifecycle(AppLifecycleState.resumed);
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     repository = _Repository(Zone.current);
     promptId = (await repository.savePrompt(
       prompt: pictureStoryFixture(),
       profileId: 'default',
     ))
         .id;
+    lockParentForTesting();
     audio = _Audio();
     speeches = [];
     queued = [];
   });
-  tearDown(tearDownHiveForTesting);
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
+  });
 
   Future<void> mount(WidgetTester tester) async {
     tester.view.physicalSize = const Size(800, 1400);

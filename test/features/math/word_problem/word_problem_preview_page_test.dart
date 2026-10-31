@@ -19,6 +19,7 @@ import 'package:poemath/features/math/word_problem/word_problem_generation_servi
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../../helpers/hive_test_helper.dart';
+import '../../../helpers/parent_access_test_helper.dart';
 
 /// addAll 恒抛异常的假仓储（模拟磁盘满/Box 损坏），W2 防护测试注入。
 class _FailingLlmProblemRepository extends LlmProblemRepository {
@@ -97,9 +98,11 @@ WordProblemPreviewItem _validItem(
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 

@@ -19,6 +19,7 @@ import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
 
@@ -224,6 +225,8 @@ void main() {
   test('云端缓存按总字节淘汰旧段，停止立即取消在途合成', () async {
     await setUpHiveForTesting();
     addTearDown(tearDownHiveForTesting);
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     await CloudUsageService.instance.setLimit(CloudUsageKind.tts, null);
     final counter = _RequestCounter();
     final client = WorkerTtsClient(
@@ -261,6 +264,8 @@ void main() {
     await setUpHiveForTesting();
     addTearDown(tearDownHiveForTesting);
     final usage = CloudUsageService.instance;
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     await usage.setLimit(CloudUsageKind.tts, 1);
     final counter = _RequestCounter();
     final tts = _FakeFlutterTts();

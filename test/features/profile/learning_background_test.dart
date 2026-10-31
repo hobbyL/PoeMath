@@ -16,6 +16,7 @@ import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
   setUp(setUpHiveForTesting);
@@ -68,6 +69,8 @@ void main() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     expect(container.read(mathGradeProvider), 2);
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     await backup.restoreFromJson(exported);
     invalidateAllHiveProviders(container.invalidate);
     expect(container.read(mathGradeProvider), 4);

@@ -25,6 +25,7 @@ import 'package:poemath/features/textbook/textbook_management_page.dart';
 
 import '../../helpers/day_key_override.dart';
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/textbook_fixture.dart';
 
 class _MissingFiles extends TextbookFileService {
@@ -244,6 +245,8 @@ void main() {
     expect(_bookCard(other), findsOneWidget);
     expect(_bookCard(current), findsNothing);
     final learningCoverSize = tester.getSize(_bookCard(other));
+    await tester.runAsync(unlockParentForTesting);
+    addTearDown(lockParentForTesting);
     app.router.push<void>(AppRoutes.textbookManagement);
     await tester.pumpAndSettle();
     expect(find.byType(TextbookManagementPage), findsOneWidget);

@@ -5,11 +5,18 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/textbook_fixture.dart';
 
 void main() {
-  setUp(setUpHiveForTesting);
-  tearDown(tearDownHiveForTesting);
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
+  });
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
+  });
   test('实际备份导出不包含教材，恢复保留本机书目阅读状态和学习背景', () async {
     final repo = TextbookRepository();
     final book = textbookFixture();

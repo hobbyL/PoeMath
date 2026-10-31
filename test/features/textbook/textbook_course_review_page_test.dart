@@ -22,6 +22,8 @@ import 'package:poemath/features/textbook/textbook_source_page.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
 
 import '../../helpers/textbook_course_fixture.dart';
+import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _Courses extends TextbookCourseRepository {
   TextbookCoursePack? current;
@@ -76,9 +78,15 @@ class _Files extends TextbookFileService {
 void main() {
   final book = courseFixtureBook();
   late _Courses courses;
-  setUp(() {
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
     courses = _Courses()
       ..current = TextbookCoursePack.fromJson(courseFixture());
+  });
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
   });
 
   Future<void> pump(

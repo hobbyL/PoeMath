@@ -28,6 +28,8 @@ import 'package:poemath/features/textbook/widgets/textbook_pdf_cover.dart';
 import 'package:poemath/features/textbook/widgets/textbook_search_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
 import '../../helpers/textbook_fixture.dart';
+import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _MemoryRepository implements TextbookRepository {
   final books = <String, Textbook>{};
@@ -193,12 +195,18 @@ void main() {
   late _MemoryRepository repo;
   late _Files files;
   final book = textbookFixture();
-  setUp(() {
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
     repo = _MemoryRepository();
     files = _Files();
     ProfileScope.reset();
   });
   tearDown(ProfileScope.reset);
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
+  });
   Future<void> pump(
     WidgetTester tester,
     Widget page, {

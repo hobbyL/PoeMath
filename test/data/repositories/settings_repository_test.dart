@@ -9,6 +9,7 @@ import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
   late SettingsRepository repo;
@@ -155,6 +156,11 @@ void main() {
     });
 
     group('AI 讲解提示词覆盖', () {
+      setUp(() async {
+        await unlockParentForTesting();
+      });
+      tearDown(lockParentForTesting);
+
       test('poemExplainPromptOverride 默认 null（未自定义）', () {
         expect(repo.poemExplainPromptOverride, isNull);
       });

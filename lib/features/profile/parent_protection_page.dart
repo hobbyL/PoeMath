@@ -8,7 +8,8 @@ import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/features/profile/cloud_usage_history_page.dart';
 
 class ParentProtectionPage extends StatefulWidget {
-  const ParentProtectionPage({super.key});
+  const ParentProtectionPage({super.key, this.returnAfterSetup = false});
+  final bool returnAfterSetup;
   @override
   State<ParentProtectionPage> createState() => _ParentProtectionPageState();
 }
@@ -19,15 +20,16 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
   bool _busy = false;
   String? _error;
   ParentAccessService get _access => ParentAccessService.instance;
+
+  bool _isCurrentConfiguration() =>
+      mounted &&
+      ModalRoute.of(context)?.isCurrent != false &&
+      (WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed);
   Future<void> _configure() async {
     if (_busy) return;
-    setState(() => _busy = true);
-    if (!await ensureParentAccess(context) || !mounted) {
-      if (mounted) setState(() => _busy = false);
-      return;
-    }
-    if (_pin.text != _confirmation.text ||
-        !ParentAccessService.validPin(_pin.text)) {
+    final pin = _pin.text;
+    if (pin != _confirmation.text || !ParentAccessService.validPin(pin)) {
       setState(() {
         _error = '请输入两次相同的 6 位数字 PIN';
         _busy = false;
@@ -39,31 +41,69 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
       _error = null;
     });
     try {
-      final recovery = await _access.configure(_pin.text);
-      if (!mounted) return;
+      if (_access.enabled) {
+        if (!await ensureParentAccess(context) || !mounted) return;
+      } else {
+        await _access.initialize();
+      }
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent == false ||
+          !_access.canSetPin) {
+        return;
+      }
+      final recovery =
+          await _access.configure(pin, isCurrent: _isCurrentConfiguration);
+      if (!mounted ||
+          ModalRoute.of(context)?.isCurrent == false ||
+          !_access.isUnlocked) {
+        return;
+      }
       _pin.clear();
       _confirmation.clear();
-      await showDialog<void>(
+      final saved = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (dialog) => AlertDialog(
           title: const Text('保存一次性恢复码'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('请抄写并放在孩子无法取得的地方。只显示这一次，忘记 PIN 时可用它关闭保护。'),
-              const SizedBox(height: SpacingTokens.md),
-              SelectableText(recovery),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('请抄写并放在孩子无法取得的地方。只显示这一次，忘记 PIN 时可用它重新设置家长密码。'),
+                const SizedBox(height: SpacingTokens.md),
+                SelectableText(recovery),
+              ],
+            ),
           ),
           actions: [
             FilledButton(
-              onPressed: () => Navigator.pop(dialog),
+              onPressed: () => Navigator.pop(dialog, true),
               child: const Text('我已保存'),
             ),
           ],
         ),
       );
+      if (saved == true &&
+          mounted &&
+          ModalRoute.of(context)?.isCurrent != false &&
+          _access.isUnlocked &&
+          widget.returnAfterSetup) {
+        Navigator.pop(context);
+      }
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _removePin() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      if (!await ensureParentAccess(context) || !mounted) return;
+      assertParentAccess(context);
+      await _access.disable();
     } on Object catch (error) {
       if (mounted) setState(() => _error = '$error');
     } finally {
@@ -104,7 +144,7 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => input.dispose());
     if (value != null && mounted) {
       try {
-        _access.assertAllowed();
+        assertParentAccess(context);
         final parsed = value.isEmpty ? null : int.tryParse(value);
         if (value.isNotEmpty && parsed == null) {
           throw const FormatException('请输入有效整数');
@@ -138,7 +178,7 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
             child: Text(
               _access.enabled
                   ? '保护已开启。解锁有效 2 分钟，离开应用立即失效。PIN 与恢复码不会随备份迁移。'
-                  : '保护默认关闭。开启后，设置、服务配置、覆盖恢复和应用题最终入库需要家长解锁。',
+                  : '设置与管理需要家长密码，请先设置 6 位数字 PIN。设置后 2 分钟内免重复验证，切到后台立即锁定。',
             ),
           ),
           if (_access.needsResetNotice)
@@ -172,103 +212,103 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
           const SizedBox(height: SpacingTokens.md),
           FilledButton(
             onPressed: _busy ? null : _configure,
-            child: Text(_access.enabled ? '更新 PIN 与恢复码' : '开启保护'),
+            child: Text(
+              _busy
+                  ? '正在保存…'
+                  : _access.enabled
+                      ? '更新 PIN 与恢复码'
+                      : '设置家长密码',
+            ),
           ),
           if (_access.enabled)
             TextButton(
-              onPressed: _busy
-                  ? null
-                  : () async {
-                      if (!await ensureParentAccess(context)) return;
-                      try {
-                        await _access.disable();
-                      } on Object catch (error) {
-                        if (mounted) setState(() => _error = '$error');
-                      }
-                      if (mounted) setState(() {});
-                    },
-              child: const Text('关闭保护'),
+              onPressed: _busy ? null : _removePin,
+              child: const Text('移除家长密码'),
             ),
-          const SizedBox(height: SpacingTokens.lg),
-          // 标题行带「查看历史」入口：本页只显示当天，历史在独立页。
-          // 新页同样包 ParentAccessBoundary —— 用量属家长可见范畴。
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '今日云请求用量（${usage.dayKey}）',
-                  style: theme.textTheme.titleMedium,
+          if (_access.enabled) const Text('移除密码后，再次进入设置或管理页面需要重新设置家长密码。'),
+          if (_access.enabled && _access.isUnlocked) ...[
+            const SizedBox(height: SpacingTokens.lg),
+            // 标题行带「查看历史」入口：本页只显示当天，历史在独立页。
+            // 新页同样包 ParentAccessBoundary —— 用量属家长可见范畴。
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '今日云请求用量（${usage.dayKey}）',
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
-              ),
-              // 手写 InkWell 而非 TextButton：TextButton 的排版受
-              // `labelLarge` 的 `height`（行高倍数）与 `minimumSize` 影响，
-              // 盒子高度不等于内容高度，"文字 + 图标"这类混排会出现肉眼
-              // 可见的垂直错位。这里把行高、内边距、图标盒全部显式钉死。
-              InkWell(
-                onTap: () => Navigator.push<void>(
-                  context,
-                  fadeSlideRoute(
-                    builder: (_) => const ParentAccessBoundary(
-                      child: CloudUsageHistoryPage(),
+                // 手写 InkWell 而非 TextButton：TextButton 的排版受
+                // `labelLarge` 的 `height`（行高倍数）与 `minimumSize` 影响，
+                // 盒子高度不等于内容高度，"文字 + 图标"这类混排会出现肉眼
+                // 可见的垂直错位。这里把行高、内边距、图标盒全部显式钉死。
+                InkWell(
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    fadeSlideRoute(
+                      builder: (_) => const ParentAccessBoundary(
+                        child: CloudUsageHistoryPage(),
+                      ),
+                    ),
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(SpacingTokens.radiusSmall),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.xs,
+                      vertical: 2,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '查看历史',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        // 像素实测（扫描墨迹范围）：盒中心虽与文字一致
+                        // （均为 352），但字形墨迹的垂直中心比汉字高 2.5px，
+                        // 表现为箭头"浮在文字上方、底部与汉字中线齐平"。
+                        // 这是 Material Icons 字形在 em 框内的基线偏移，
+                        // 调盒子高度/对齐方式都改不掉 —— 只能显式下移。
+                        // 同时把 size 提到 20，让墨迹高度（原 12px）接近
+                        // 汉字的 15px，视觉等重。
+                        Transform.translate(
+                          offset: const Offset(0, 2.5),
+                          child: Icon(
+                            Icons.chevron_right,
+                            size: 20,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SpacingTokens.xs,
-                    vertical: 2,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '查看历史',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      // 像素实测（扫描墨迹范围）：盒中心虽与文字一致
-                      // （均为 352），但字形墨迹的垂直中心比汉字高 2.5px，
-                      // 表现为箭头"浮在文字上方、底部与汉字中线齐平"。
-                      // 这是 Material Icons 字形在 em 框内的基线偏移，
-                      // 调盒子高度/对齐方式都改不掉 —— 只能显式下移。
-                      // 同时把 size 提到 20，让墨迹高度（原 12px）接近
-                      // 汉字的 15px，视觉等重。
-                      Transform.translate(
-                        offset: const Offset(0, 2.5),
-                        child: Icon(
-                          Icons.chevron_right,
-                          size: 20,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              ],
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+            for (final kind in CloudUsageKind.values) ...[
+              if (kind != CloudUsageKind.values.first)
+                const SizedBox(height: SpacingTokens.sm),
+              AppTile(
+                icon: _usageIcon(kind),
+                iconColor: theme.colorScheme.primary,
+                title: kind.label,
+                subtitle:
+                    '已用 ${usage.used(kind)} 次 · ${usage.limit(kind) == null ? '不限' : '每日上限 ${usage.limit(kind)} 次'}',
+                onTap: () => _changeLimit(kind),
               ),
             ],
-          ),
-          const SizedBox(height: SpacingTokens.xs),
-          for (final kind in CloudUsageKind.values) ...[
-            if (kind != CloudUsageKind.values.first)
-              const SizedBox(height: SpacingTokens.sm),
-            AppTile(
-              icon: _usageIcon(kind),
-              iconColor: theme.colorScheme.primary,
-              title: kind.label,
-              subtitle:
-                  '已用 ${usage.used(kind)} 次 · ${usage.limit(kind) == null ? '不限' : '每日上限 ${usage.limit(kind)} 次'}',
-              onTap: () => _changeLimit(kind),
+            const SizedBox(height: SpacingTokens.md),
+            const Text('默认每天 AI 30 次、语音识别 60 次、云朗读 120 次。可按需调整、暂停或设为不限。'),
+            const SizedBox(height: SpacingTokens.sm),
+            const Text(
+              '额度按本设备当天实际发送的请求计数，跨重启保留，不随备份重置。失败、验证与重试也计数；AI 一次操作可能有多次请求，云朗读按新合成的段落计数，缓存和本地朗读不计。模型/音色目录读取不计。额度不是精确费用账单，请同时设置供应商账户预算。',
             ),
           ],
-          const SizedBox(height: SpacingTokens.md),
-          const Text('默认每天 AI 30 次、语音识别 60 次、云朗读 120 次。可按需调整、暂停或设为不限。'),
-          const SizedBox(height: SpacingTokens.sm),
-          const Text(
-            '额度按本设备当天实际发送的请求计数，跨重启保留，不随备份重置。失败、验证与重试也计数；AI 一次操作可能有多次请求，云朗读按新合成的段落计数，缓存和本地朗读不计。模型/音色目录读取不计。额度不是精确费用账单，请同时设置供应商账户预算。',
-          ),
         ],
       ),
     );

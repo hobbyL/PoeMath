@@ -16,6 +16,7 @@ import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 随备份迁移的顶层字段。新增 box 时必须同时加到 `exportToJson` 和这里。
 const Set<String> _travelingFields = {
@@ -47,9 +48,11 @@ const Set<String> _nonTravelingFields = <String>{'credentials'};
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 

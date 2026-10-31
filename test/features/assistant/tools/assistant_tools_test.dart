@@ -36,6 +36,7 @@ import 'package:poemath/features/math/word_problem/word_problem_preview_page.dar
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../../helpers/hive_test_helper.dart';
+import '../../../helpers/parent_access_test_helper.dart';
 
 const _apiKey = 'key-p1';
 
@@ -139,6 +140,7 @@ MathMistake _mistake({
 final _containerRefProvider = Provider<Ref>((ref) => ref);
 
 Future<void> _seedWordProblemProvider(SecureCredentialStore store) async {
+  await unlockParentForTesting();
   await SettingsRepository(
     credentialStore: store,
   ).saveLlmProviderConfig(
@@ -159,6 +161,7 @@ void main() {
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 
@@ -292,6 +295,7 @@ void main() {
 
   group('generate_word_problems', () {
     test('同服务商失败切换只导航一次，并保存成功模型', () async {
+      await unlockParentForTesting();
       final repo = SettingsRepository(credentialStore: store);
       await repo.saveLlmProviderConfig(
         id: 'p1',
@@ -327,6 +331,7 @@ void main() {
     });
 
     test('失败时取消，不尝试备用模型、不回写或导航', () async {
+      await unlockParentForTesting();
       final repo = SettingsRepository(credentialStore: store);
       await repo.saveLlmProviderConfig(
         id: 'p1',

@@ -17,6 +17,7 @@ import 'package:poemath/core/services/speech/tencent_realtime_asr_client.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../../helpers/hive_test_helper.dart';
+import '../../../helpers/parent_access_test_helper.dart';
 
 class _Settings extends Mock implements SettingsRepository {}
 
@@ -402,6 +403,8 @@ void main() {
         .thenAnswer((_) async => _realtimeCredentials);
     await usage.reserve(CloudUsageKind.asr);
     // 将临时测试库中的每日额度设为一次。
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     await usage.setLimit(CloudUsageKind.asr, 1);
     var connections = 0;
     final service = build(

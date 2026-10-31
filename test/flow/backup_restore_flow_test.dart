@@ -23,6 +23,7 @@ import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 
 import '../helpers/hive_test_helper.dart';
+import '../helpers/parent_access_test_helper.dart';
 
 class _MockPoemFavoriteBox extends Mock implements Box<PoemFavorite> {}
 
@@ -65,10 +66,12 @@ void main() {
 
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     backupService = BackupService();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 
@@ -510,6 +513,7 @@ void main() {
     await HiveBoxes.settings.clear();
     expect(HiveBoxes.settings.isEmpty, isTrue);
 
+    await unlockParentForTesting();
     await backupService.restoreFromJson(json);
 
     expect(HiveBoxes.settings.get('tts_speed'), equals(0.8));

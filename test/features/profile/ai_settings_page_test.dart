@@ -17,6 +17,7 @@ import 'package:poemath/features/profile/llm_scenario_settings_page.dart';
 import 'package:poemath/features/profile/prompt_settings_page.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 测试环境无平台安全存储通道，覆写为内存实现。
 final class _MemoryCredentialStore extends SecureCredentialStore {
@@ -56,9 +57,11 @@ Future<void> _pumpPage(WidgetTester tester) async {
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 

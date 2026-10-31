@@ -15,6 +15,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 内存凭据存储（真实 FlutterSecureStorage 在测试环境不可用）。
 final class _MemoryCredentialStore extends SecureCredentialStore {
@@ -85,11 +86,13 @@ void main() {
 
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     credentialStore = _MemoryCredentialStore();
     backupService = BackupService(secureStore: credentialStore);
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 
@@ -623,6 +626,7 @@ void main() {
       expect(settings.containsKey('llm_active_provider_id'), isTrue);
 
       await HiveBoxes.settings.clear();
+      await unlockParentForTesting();
       await backupService.restoreFromJson(json);
 
       final restored =

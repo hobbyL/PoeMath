@@ -12,6 +12,7 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _DelayedSettingsRepository extends SettingsRepository {
   final writeStarted = Completer<void>();
@@ -45,9 +46,11 @@ Finder _switchOf(String title) => find.descendant(
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 

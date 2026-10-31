@@ -19,6 +19,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/prompt_settings_page.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 提示词长度上限（与页面常量一致；断言用「恰好 +1」边界）。
 const int _maxLength = 2000;
@@ -111,9 +112,11 @@ String _fieldText(WidgetTester tester, int index) {
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 

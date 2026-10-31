@@ -15,9 +15,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
+import 'package:poemath/core/services/secure_credential_store.dart';
+import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
+
+final class _UnreadableCredentialStore extends SecureCredentialStore {
+  @override
+  Future<TencentAsrCredentials?> readTencentAsrCredentials() async =>
+      throw StateError('synthetic credential read failure');
+}
 
 /// 恶意备份中的注入 settings 节：外部服务端点 + 凭据绑定状态 key。
 ///
@@ -112,10 +121,12 @@ void main() {
 
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     backupService = BackupService();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 
@@ -372,8 +383,9 @@ void main() {
     );
     await HiveBoxes.settings.put('llm_active_provider_id', 'p1');
 
-    // 该测试的 BackupService 用真实 SecureCredentialStore（测试环境无
-    // 平台通道），读取必定抛异常 —— 这正是「安全存储不可用」的真实形态。
+    // 家长 fixture 使用可写的安全存储 mock；凭据读取故障须独立注入，
+    // 不能依赖测试环境缺少平台通道来制造失败。
+    backupService = BackupService(secureStore: _UnreadableCredentialStore());
     // 契约变更后导出不再静默降级，而是抛 BackupCredentialExportException；
     // 这里走用户的降级路径（无口令重导），继续断言明文 JSON 层：
     // llm_api_key_hint 作为凭据白名单键只允许出现在加密载荷内，
@@ -483,6 +495,7 @@ void main() {
     final json = await backupService.exportToJson();
 
     await HiveBoxes.settings.clear();
+    await unlockParentForTesting();
     await backupService.restoreFromJson(json);
 
     final settings = _fullWhitelistSettings();

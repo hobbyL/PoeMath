@@ -9,6 +9,7 @@ import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/domain/today_plan.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 Map<TodayTaskKind, List<TodayTaskCandidate>> candidates(String suffix) => {
       for (final kind in TodayTaskKind.values)
@@ -22,6 +23,7 @@ Map<TodayTaskKind, List<TodayTaskCandidate>> candidates(String suffix) => {
 void main() {
   setUp(setUpHiveForTesting);
   tearDown(() async {
+    lockParentForTesting();
     ProfileScope.reset();
     await tearDownHiveForTesting();
   });
@@ -55,6 +57,7 @@ void main() {
   });
 
   test('家长数量与顺序持久化，次日生效；没有候选时不强行凑数', () async {
+    await unlockParentForTesting();
     final repository = TodayPlanRepository();
     final date = DateTime(2026, 10, 16);
     final first = await repository.getOrCreate(
@@ -91,6 +94,7 @@ void main() {
   });
 
   test('最多每类五项，跨档案隔离，恢复清队列保留配置，最多保留十四日', () async {
+    await unlockParentForTesting();
     final repository = TodayPlanRepository();
     await repository.saveConfig(const TodayPlanConfig(
         reviewCount: 5, mistakeCount: 5, newPoemCount: 5,),);

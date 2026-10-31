@@ -15,6 +15,7 @@ import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/picture_story_fixture.dart';
 
 class _PartialWriteBox extends Fake implements Box<dynamic> {
@@ -71,8 +72,10 @@ void main() {
   setUp(() async {
     ProfileScope.reset();
     await setUpHiveForTesting();
+    await unlockParentForTesting();
   });
   tearDown(() async {
+    lockParentForTesting();
     ProfileScope.reset();
     await tearDownHiveForTesting();
   });

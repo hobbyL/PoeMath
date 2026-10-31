@@ -51,6 +51,7 @@ import 'package:poemath/features/poem/quiz/quiz_models.dart';
 import 'package:poemath/features/profile/about_page.dart';
 import 'package:poemath/features/profile/achievement_page.dart';
 import 'package:poemath/features/profile/learning_stats_page.dart';
+import 'package:poemath/features/profile/parent_protection_page.dart';
 import 'package:poemath/features/profile/llm_provider_settings_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/picture_story_management_page.dart';
@@ -521,6 +522,16 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         ),
       ),
       // ============ 设置（非 Shell 子路由，全屏） ============
+      GoRoute(
+        path: AppRoutes.parentProtection,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: ParentAccessBoundary(
+            allowSetup: true,
+            child: ParentProtectionPage(returnAfterSetup: state.extra == true),
+          ),
+        ),
+      ),
       GoRoute(
         path: AppRoutes.settings,
         pageBuilder: (context, state) => fadeSlideTransitionPage(

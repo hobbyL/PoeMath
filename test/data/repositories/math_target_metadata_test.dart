@@ -14,6 +14,7 @@ import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
   setUp(setUpHiveForTesting);
@@ -52,6 +53,8 @@ void main() {
     expect(repo.getById(id)!.semester, '下');
     final backup = BackupService();
     final json = await backup.exportToJson();
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     await backup.restoreFromJson(json);
     final restored = repo.getById(id)!;
     expect(jsonDecode(restored.problemJson!), p.toJson());

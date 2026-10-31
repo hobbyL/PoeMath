@@ -15,6 +15,7 @@ import 'package:poemath/data/repositories/textbook_recognition_repository.dart';
 import 'package:poemath/domain/textbook_recognition_content.dart';
 import 'package:poemath/domain/textbook_recognition_session.dart';
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/recognition_fixture.dart';
 import '../../helpers/textbook_course_fixture.dart';
 
@@ -178,6 +179,8 @@ void main() {
     expect(HiveBoxes.settings.get(repo.key), jsonEncode(p.toJson()));
   });
   test('档案隔离及旧scope拒写；备份不导出/注入本机记录', () async {
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     final p = await answer(await start());
     final raw = HiveBoxes.settings.get(repo.key);
     ProfileScope.switchTo('other');

@@ -25,6 +25,7 @@ import 'package:poemath/features/poem/poem_explain/poem_explain_models.dart';
 import 'package:poemath/features/poem/poem_explain/poem_explain_prompts.dart';
 
 import '../../../helpers/hive_test_helper.dart';
+import '../../../helpers/parent_access_test_helper.dart';
 
 /// 测试环境无平台安全存储通道，覆写为内存实现。
 final class _MemoryCredentialStore extends SecureCredentialStore {
@@ -95,11 +96,13 @@ void main() {
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 
   /// 预置两条厂商配置（p1 生效 + p2）。
   Future<void> seedProviders() async {
+    await unlockParentForTesting();
     final repo = SettingsRepository(credentialStore: store);
     await repo.saveLlmProviderConfig(
       id: 'p1',
@@ -129,6 +132,7 @@ void main() {
   }
 
   test('当前场景模型失败后切换成功，提升默认并同步当前显式选择', () async {
+    await unlockParentForTesting();
     final repo = SettingsRepository(credentialStore: store);
     await repo.saveLlmProviderConfig(
       id: 'p1',
@@ -161,6 +165,7 @@ void main() {
   });
 
   test('正文后断开保留段落，不切换备用模型', () async {
+    await unlockParentForTesting();
     final repo = SettingsRepository(credentialStore: store);
     await repo.saveLlmProviderConfig(
       id: 'p1',
@@ -192,6 +197,7 @@ void main() {
   });
 
   test('provider销毁后失败晚到，不重试备用模型或访问失效状态', () async {
+    await unlockParentForTesting();
     final repo = SettingsRepository(credentialStore: store);
     await repo.saveLlmProviderConfig(
       id: 'p1',

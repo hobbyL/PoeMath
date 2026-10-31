@@ -21,6 +21,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 测试环境无平台安全存储通道，覆写为内存实现。
 /// 按 configId 存 Key（对齐真实存储键 `llm_api_key_{configId}`）；
@@ -74,11 +75,13 @@ void main() {
 
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     credentialStore = _MemoryCredentialStore();
     repository = SettingsRepository(credentialStore: credentialStore);
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 
@@ -1229,6 +1232,7 @@ void main() {
     // 凭据 Store，避免上面恢复写入的条目残留干扰断言）。
     await tearDownHiveForTesting();
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     final freshStore = _MemoryCredentialStore();
     final fresh = BackupService(secureStore: freshStore);
     await fresh.restoreFromJson(
@@ -1284,6 +1288,7 @@ void main() {
     // 恢复到「地址/模型都不同」的机器：只有 p9。
     await tearDownHiveForTesting();
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     final freshStore = _MemoryCredentialStore();
     final freshRepo = SettingsRepository(credentialStore: freshStore);
     await freshRepo.saveLlmProviderConfig(
@@ -1323,6 +1328,7 @@ void main() {
 
     await tearDownHiveForTesting();
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     final freshStore = _MemoryCredentialStore();
     final freshRepo = SettingsRepository(credentialStore: freshStore);
     await freshRepo.saveLlmProviderConfig(

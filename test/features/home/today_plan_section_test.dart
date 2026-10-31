@@ -20,11 +20,18 @@ import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(setUpHiveForTesting);
-  tearDown(tearDownHiveForTesting);
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
+  });
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
+  });
 
   for (final scale in [1.0, 1.7]) {
     testWidgets('今日任务卡片保持高度、独立调整计划；字号 $scale', (tester) async {

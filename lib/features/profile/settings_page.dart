@@ -5,7 +5,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
-import 'package:poemath/features/profile/parent_protection_page.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -131,15 +130,8 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.lock_outline,
                 iconColor: theme.colorScheme.primary,
                 title: '家长保护与云额度',
-                subtitle: '可选 PIN、恢复码与每日请求次数',
-                onTap: () => Navigator.push<void>(
-                  context,
-                  fadeSlideRoute(
-                    builder: (_) => const ParentAccessBoundary(
-                      child: ParentProtectionPage(),
-                    ),
-                  ),
-                ),
+                subtitle: '家长密码、恢复码与每日请求次数',
+                onTap: () => context.push(AppRoutes.parentProtection),
               ),
               const SizedBox(height: SpacingTokens.sm),
               AppTile(

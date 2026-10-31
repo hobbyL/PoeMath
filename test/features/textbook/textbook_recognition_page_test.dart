@@ -11,7 +11,6 @@ import 'package:poemath/core/services/speech/tencent_asr_client.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:hive/hive.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
-import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/tts/narration_audio_identity.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -31,6 +30,7 @@ import 'package:poemath/features/textbook/recognition/textbook_recognition_pract
 import 'package:poemath/features/textbook/recognition/textbook_recognition_prepare_page.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_check_page.dart';
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/narration_fakes.dart';
 import '../../helpers/recognition_fixture.dart';
 import '../../helpers/textbook_course_fixture.dart';
@@ -152,7 +152,7 @@ void main() {
     await setUpHiveForTesting();
     // The singleton outlives each widget test's fake clock. Initialize its
     // serialized authorization chain in this setup zone for each fresh box.
-    await ParentAccessService.instance.initialize();
+    await unlockParentForTesting();
     courses = MemoryCourses(recognitionFixture());
     box = MemoryBox();
     settings = NarrationSettings();
@@ -173,6 +173,7 @@ void main() {
     );
   });
   tearDown(() async {
+    lockParentForTesting();
     tts.dispose();
     ProfileScope.reset();
     await tearDownHiveForWidgetTesting();

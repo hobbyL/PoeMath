@@ -10,6 +10,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
   late Directory directory;
@@ -18,6 +19,7 @@ void main() {
   var now = DateTime(2026, 10, 16);
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     directory = await Directory.systemTemp.createTemp('backup_protection_');
     backup = BackupService();
     now = DateTime(2026, 10, 16);
@@ -30,15 +32,17 @@ void main() {
     );
   });
   tearDown(() async {
+    lockParentForTesting();
     await directory.delete(recursive: true);
     await tearDownHiveForTesting();
   });
 
   test('快照无凭据且有界，每日快照默认关与并发幂等', () async {
-    await HiveBoxes.settings.put('parent_protection_enabled', false);
     await history.maybeCreateDaily();
     expect(await history.list(), isEmpty);
     await history.setDailyEnabled(true);
+    // 自动快照在未配置/锁定时仍可运行，管理门禁只限制修改保护设置。
+    await HiveBoxes.settings.put('parent_protection_enabled', false);
     await Future.wait(List.generate(8, (_) => history.maybeCreateDaily()));
     expect(await history.list(), hasLength(1));
     for (var index = 0; index < 4; index++) {

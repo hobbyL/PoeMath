@@ -11,6 +11,7 @@ import 'package:poemath/features/chinese/expression/widgets/picture_story_illust
 import 'package:poemath/features/profile/picture_story_management_page.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _TrackingPictureStoryRepository extends PictureStoryRepository {
   late Future<void> lastWrite;
@@ -105,8 +106,14 @@ void _verifyPromptLayout(WidgetTester tester) {
 }
 
 void main() {
-  setUp(setUpHiveForTesting);
-  tearDown(tearDownHiveForWidgetTesting);
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
+  });
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForWidgetTesting();
+  });
 
   testWidgets('题库插图应贴住卡片左侧并铺满高度，开关居中', (tester) async {
     await _pumpPage(tester);

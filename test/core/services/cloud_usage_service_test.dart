@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
@@ -16,6 +17,7 @@ import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
   test('用量队列等待后复验取消状态，拒绝不占用次数且后续仍可预留', () async {
@@ -37,9 +39,24 @@ void main() {
     expect(usage.used(CloudUsageKind.asr), 2);
   });
   setUp(setUpHiveForTesting);
-  tearDown(tearDownHiveForTesting);
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
+  });
+
+  test('未设置家长PIN不能直改每日额度，普通学习请求仍可预留', () async {
+    final usage = CloudUsageService();
+    await expectLater(
+      usage.setLimit(CloudUsageKind.llm, null),
+      throwsA(isA<ParentAccessDenied>()),
+    );
+    expect(usage.limit(CloudUsageKind.llm), 30);
+    await usage.reserve(CloudUsageKind.llm);
+    expect(usage.used(CloudUsageKind.llm), 1);
+  });
 
   test('默认每日AI30/识别60/云朗读120，可暂停或明确设为不限', () async {
+    await unlockParentForTesting();
     final usage = CloudUsageService();
     expect(CloudUsageKind.values.map(usage.limit), [30, 60, 120]);
     await usage.setLimit(CloudUsageKind.llm, 0);
@@ -53,6 +70,7 @@ void main() {
   });
 
   test('多个实例并发请求也不能超额，拒绝的请求不计数', () async {
+    await unlockParentForTesting();
     final first = CloudUsageService();
     final second = CloudUsageService();
     await first.setLimit(CloudUsageKind.llm, 3);
@@ -71,6 +89,7 @@ void main() {
   });
 
   test('额度及用量跨实例保留，备份只迁移额度而保留本机用量', () async {
+    await unlockParentForTesting();
     var now = DateTime(2026, 10, 16, 23, 59);
     final usage = CloudUsageService(clock: () => now);
     await usage.setLimit(CloudUsageKind.asr, 1);
@@ -101,6 +120,7 @@ void main() {
   });
 
   test('三类真实客户端的0额度均在HTTP之前拒绝', () async {
+    await unlockParentForTesting();
     var sends = 0;
     final httpClient = MockClient((request) async {
       sends++;
@@ -162,6 +182,7 @@ void main() {
   });
 
   test('发送后失败仍计数，再次请求达额不发网', () async {
+    await unlockParentForTesting();
     var sends = 0;
     final usage = CloudUsageService();
     await usage.setLimit(CloudUsageKind.llm, 1);
@@ -191,6 +212,7 @@ void main() {
 
   for (final crossProvider in [false, true]) {
     test('${crossProvider ? '跨供应商' : '模型'}切换按每次请求计数，额度用完立即停止遍历', () async {
+      await unlockParentForTesting();
       var sends = 0;
       final usage = CloudUsageService();
       await usage.setLimit(CloudUsageKind.llm, 1);

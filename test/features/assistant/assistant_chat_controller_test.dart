@@ -27,6 +27,7 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/assistant/assistant_chat_controller.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 测试环境无平台安全存储通道，覆写为内存实现。
 final class _MemoryCredentialStore extends SecureCredentialStore {
@@ -137,11 +138,13 @@ void main() {
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 
   /// 预置两条厂商配置（p1 自动成为生效配置）。
   Future<void> seedProviders() async {
+    await unlockParentForTesting();
     final repo = SettingsRepository(credentialStore: store);
     await repo.saveLlmProviderConfig(
       id: 'p1',
@@ -164,6 +167,7 @@ void main() {
   }
 
   test('仅重试失败单跳，工具不重放，最终回答成功才提升默认并刷新选择', () async {
+    await unlockParentForTesting();
     final repo = SettingsRepository(credentialStore: store);
     await repo.saveLlmProviderConfig(
       id: 'p1',
@@ -225,6 +229,7 @@ void main() {
   });
 
   test('工具执行后跨供应商恢复只重试失败单跳，最终成功只更新助手绑定', () async {
+    await unlockParentForTesting();
     final repo = SettingsRepository(credentialStore: store);
     for (final id in ['p1', 'p2']) {
       await repo.saveLlmProviderConfig(
@@ -298,6 +303,7 @@ void main() {
   });
 
   test('已经有正文后中断保留部分回答，不重试或提升', () async {
+    await unlockParentForTesting();
     final repo = SettingsRepository(credentialStore: store);
     await repo.saveLlmProviderConfig(
       id: 'p1',
@@ -333,6 +339,7 @@ void main() {
 
   for (final cancel in ['停止', '销毁']) {
     test('$cancel后失败响应晚到，不切换备用模型或回写默认', () async {
+      await unlockParentForTesting();
       final repo = SettingsRepository(credentialStore: store);
       await repo.saveLlmProviderConfig(
         id: 'p1',

@@ -24,6 +24,7 @@ import 'package:poemath/features/profile/llm_provider_settings_page.dart';
 import 'package:poemath/features/profile/widgets/llm_provider_edit_dialog.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 测试环境无平台安全存储通道，覆写为内存实现。
 /// 按 configId 存 Key（对齐真实存储键 `llm_api_key_{configId}`）；
@@ -132,9 +133,11 @@ Future<void> _tapReal(
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 

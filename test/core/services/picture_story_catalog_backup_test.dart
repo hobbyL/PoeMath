@@ -23,6 +23,7 @@ import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/picture_story_fixture.dart';
 
 class _FailingFavorites extends Fake implements Box<PoemFavorite> {
@@ -66,10 +67,12 @@ void main() {
   setUp(() async {
     ProfileScope.reset();
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     directory = await Directory.systemTemp.createTemp('picture_story_backup_');
     images = PictureStoryImageService(directoryProvider: () async => directory);
   });
   tearDown(() async {
+    lockParentForTesting();
     ProfileScope.reset();
     await tearDownHiveForTesting();
     await directory.delete(recursive: true);
@@ -126,6 +129,7 @@ void main() {
     expect(backup().inspectJson(text).counts['题目图片'], 2);
     await tearDownHiveForTesting();
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     final target = Directory('${directory.path}/new-device');
     final targetImages =
         PictureStoryImageService(directoryProvider: () async => target);

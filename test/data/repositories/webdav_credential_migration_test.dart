@@ -15,6 +15,7 @@ import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 /// 不触达平台通道的底层存储。
 ///
@@ -217,6 +218,11 @@ void main() {
   });
 
   group('saveWebDavConfig 不落盘凭据（不变量）', () {
+    setUp(() async {
+      await unlockParentForTesting();
+    });
+    tearDown(lockParentForTesting);
+
     test('写入后 Hive 中凭据为空，安全存储有值', () async {
       useStore();
 

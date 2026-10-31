@@ -17,6 +17,7 @@ import 'package:poemath/features/chinese/expression/providers/picture_story_prov
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 
 import '../../../helpers/hive_test_helper.dart';
+import '../../../helpers/parent_access_test_helper.dart';
 import '../../../helpers/picture_story_fixture.dart';
 
 /// 页面自动创建草稿时仍走真实仓储，I/O 固定在测试 setUp 的真实异步域。
@@ -71,9 +72,11 @@ void main() {
   setUp(() async {
     ProfileScope.reset();
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     repository = _Repository(Zone.current);
   });
   tearDown(() async {
+    lockParentForTesting();
     ProfileScope.reset();
     await tearDownHiveForTesting();
   });

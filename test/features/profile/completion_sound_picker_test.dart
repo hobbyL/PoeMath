@@ -12,6 +12,7 @@ import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/widgets/completion_sound_picker.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _PreviewSound extends SoundService {
   _PreviewSound() : super(SettingsRepository());
@@ -204,6 +205,8 @@ void main() {
   });
 
   testWidgets('设置入口打开选择面板，关闭重开保持选择', (tester) async {
+    await tester.runAsync(unlockParentForTesting);
+    addTearDown(lockParentForTesting);
     final settings = SettingsRepository();
     await tester
         .runAsync(() => settings.setCompletionSound(CompletionSound.steelDrum));

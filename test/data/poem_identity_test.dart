@@ -12,6 +12,7 @@ import 'package:poemath/data/repositories/poem_progress_repository.dart';
 import 'package:poemath/data/repositories/poem_favorite_repository.dart';
 import 'package:poemath/data/repositories/review_repository.dart';
 import '../helpers/hive_test_helper.dart';
+import '../helpers/parent_access_test_helper.dart';
 
 void main() {
   const alias = 'poem_exp_661';
@@ -132,6 +133,8 @@ void main() {
   });
 
   test('旧备份的双 ID 在恢复前合并，再次恢复仍为相同计数', () async {
+    await unlockParentForTesting();
+    addTearDown(lockParentForTesting);
     await seed();
     final backup = BackupService();
     final data = jsonDecode(await backup.exportToJson());

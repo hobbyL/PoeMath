@@ -11,6 +11,7 @@ import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 class _Store extends SecureCredentialStore {
   String? raw;
@@ -41,9 +42,11 @@ void main() {
       '{"version":1,"exportedAt":"2026-10-20T12:00:00Z","settings":{"theme_mode":"light"}}';
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     root = await Directory.systemTemp.createTemp('whole_backup_test_');
   });
   tearDown(() async {
+    lockParentForTesting();
     await root.delete(recursive: true);
     await tearDownHiveForTesting();
   });

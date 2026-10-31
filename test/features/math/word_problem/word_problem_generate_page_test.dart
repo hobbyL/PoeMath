@@ -26,6 +26,7 @@ import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../../helpers/hive_test_helper.dart';
+import '../../../helpers/parent_access_test_helper.dart';
 
 /// 测试环境无平台安全存储通道，覆写为内存实现。
 /// 多配置版按 configId 读 Key（readLlmConfig 走 readLlmApiKeyFor）。
@@ -97,9 +98,11 @@ Future<void> _pumpDelayedGenerator(
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     // 用例体末尾已用 `drainHiveWritesForTesting` 排空写链，此处用
     // widget 版 tearDown（见 helper 注释：fake 时钟下 close() 需要先解链）。
     await tearDownHiveForWidgetTesting();

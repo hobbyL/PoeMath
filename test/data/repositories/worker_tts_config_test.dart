@@ -10,6 +10,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 final class _MemoryCredentialStore extends SecureCredentialStore {
   String? workerApiKey;
@@ -34,11 +35,13 @@ void main() {
 
   setUp(() async {
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     credentialStore = _MemoryCredentialStore();
     repository = SettingsRepository(credentialStore: credentialStore);
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 

@@ -5,11 +5,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/app.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
+import 'package:poemath/features/profile/parent_protection_page.dart';
+import 'package:poemath/features/profile/settings_page.dart';
 
 import '../helpers/day_key_override.dart';
 import '../helpers/hive_test_helper.dart';
@@ -37,9 +41,15 @@ int _selectedTab(WidgetTester tester) {
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    FlutterSecureStorage.setMockInitialValues({});
+    final access = ParentAccessService.instance;
+    access.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await access.initialize();
+    access.lock();
   });
 
   tearDown(() async {
+    ParentAccessService.instance.lock();
     await tearDownHiveForWidgetTesting();
   });
 
@@ -120,7 +130,7 @@ void main() {
     await drainHiveWritesForTesting(tester);
   });
 
-  testWidgets('我的页设置按钮应打开设置页', (tester) async {
+  testWidgets('我的页设置按钮在未配置时先打开家长设置', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: App()));
 
     await _pumpPastSplashAndAnimations(tester);
@@ -133,10 +143,9 @@ void main() {
     await tester.tap(find.byTooltip('设置'));
     await tester.pumpAndSettle();
 
-    expect(find.text('设置'), findsOneWidget);
-    expect(find.text('外观与反馈'), findsOneWidget);
-    expect(find.text('语音与音频'), findsOneWidget);
-    expect(find.text('数据与同步'), findsOneWidget);
+    expect(find.byType(ParentProtectionPage), findsOneWidget);
+    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    expect(find.textContaining('设置与管理需要家长密码，请先设置'), findsOneWidget);
 
     // 消耗剩余 flutter_animate 计时器
     await tester.pump(const Duration(seconds: 2));

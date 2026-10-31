@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
@@ -19,13 +18,14 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/profile/widgets/backup_import_flow.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
   testWidgets('直接访问设置路由也需家长验证，取消后不能挂载设置页', (tester) async {
-    FlutterSecureStorage.setMockInitialValues({'parent_protection': '{}'});
     await tester.runAsync(() async {
       await setUpHiveForTesting();
-      await HiveBoxes.settings.put('parent_protection_enabled', true);
+      await unlockParentForTesting();
+      lockParentForTesting();
     });
     final router = createAppRouter(initialLocation: AppRoutes.settings);
     addTearDown(() => tester.runAsync(tearDownHiveForTesting));
@@ -39,7 +39,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('家长解锁'), findsWidgets);
     expect(find.text('家长保护与云额度'), findsNothing);
-    await tester.tap(find.text('取消'));
+    await tester.runAsync(() => tester.tap(find.text('取消')));
     await tester.pumpAndSettle();
     expect(find.text('请由家长解锁后继续'), findsOneWidget);
     expect(find.text('家长保护与云额度'), findsNothing);
@@ -53,6 +53,7 @@ void main() {
     await tester.runAsync(() async {
       await setUpHiveForTesting();
       root = await Directory.systemTemp.createTemp('encrypted_preview_');
+      await unlockParentForTesting();
       await HiveBoxes.settings.put('theme_mode', 'dark');
       final credentialNode = await encryptCredentials(
           {'future_vendor_key': 'synthetic-key'}, 'synthetic-passphrase',);
@@ -67,6 +68,7 @@ void main() {
     });
     addTearDown(
       () => tester.runAsync(() async {
+        lockParentForTesting();
         await root.delete(recursive: true);
         await tearDownHiveForTesting();
       }),
