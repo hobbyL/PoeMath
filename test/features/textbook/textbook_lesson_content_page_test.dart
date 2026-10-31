@@ -42,7 +42,10 @@ class _Books implements TextbookRepository {
   Textbook? find(String id) =>
       list().where((book) => book.pdfSha256 == id).firstOrNull;
   @override
-  Future<void> addIfAbsent(Textbook book) async {}
+  Future<void> addIfAbsent(Textbook book, {void Function()? authorize}) async {
+    authorize?.call();
+  }
+
   @override
   Future<void> setMatch(
     String profileId,

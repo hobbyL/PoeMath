@@ -7,6 +7,7 @@ import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_cache_manager_sheet.dart';
@@ -39,6 +40,7 @@ class _TextbookManagementPageState
     final files = ref.read(textbookFileServiceProvider);
     String? pickedPath;
     try {
+      assertParentAccess(context);
       final file = widget.pickPdf != null
           ? await widget.pickPdf!()
           : (await FilePicker.pickFiles(
@@ -50,6 +52,7 @@ class _TextbookManagementPageState
               .firstOrNull;
       pickedPath = file?.path;
       if (!mounted || file == null) return;
+      assertParentAccess(context);
       if (file.path == null) {
         throw const TextbookFileException('文件无法读取，请选择设备上的 PDF');
       }
@@ -59,7 +62,10 @@ class _TextbookManagementPageState
         builder: (_) => TextbookImportDialog(fileName: file.name),
       );
       if (!mounted || details == null) return;
-      final token = TextbookImportToken();
+      assertParentAccess(context);
+      final token = TextbookImportToken(
+        authorize: () => assertParentAccess(context),
+      );
       _token = token;
       setState(() => _progress = 0);
       final imported = await files.importPdf(
@@ -70,6 +76,7 @@ class _TextbookManagementPageState
         },
       );
       if (!mounted) return;
+      assertParentAccess(context);
       await ref.read(textbookRepositoryProvider).addIfAbsent(
             Textbook(
               pdfSha256: imported.sha256,
@@ -83,6 +90,7 @@ class _TextbookManagementPageState
               fileSize: imported.size,
               importedAt: DateTime.now(),
             ),
+            authorize: () => assertParentAccess(context),
           );
       if (!mounted) return;
       ref.invalidate(textbookLocalListProvider);
@@ -243,10 +251,9 @@ class _TextbookManagementPageState
                               data: (path) => path == null
                                   ? TextbookCoverPlaceholder(
                                       title: title,
-                                      status:
-                                          cloudIds.contains(book.pdfSha256)
-                                              ? '可重新下载'
-                                              : '需重新导入',
+                                      status: cloudIds.contains(book.pdfSha256)
+                                          ? '可重新下载'
+                                          : '需重新导入',
                                     )
                                   : TextbookPdfCover(
                                       path: path,
@@ -272,7 +279,8 @@ class _TextbookManagementPageState
                         child: IconButton(
                           key: ValueKey('textbook-cache-${book.pdfSha256}'),
                           tooltip: '缓存管理',
-                          onPressed: () => showTextbookCacheSheet(context, book),
+                          onPressed: () =>
+                              showTextbookCacheSheet(context, book),
                           style: IconButton.styleFrom(
                             backgroundColor: theme.colorScheme.surface
                                 .withValues(alpha: 0.9),

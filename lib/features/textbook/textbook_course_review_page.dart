@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_course_review.dart';
@@ -64,6 +65,7 @@ class _TextbookCourseReviewPageState
     if (_starting || _importing) return;
     _starting = true;
     try {
+      assertParentAccess(context);
       final catalog = await ref.read(textbookCatalogProvider.future);
       if (!mounted) return;
       final entry =
@@ -82,7 +84,14 @@ class _TextbookCourseReviewPageState
         );
         return;
       }
-      await _generationController.start(book, entry, path, refresh: refresh);
+      assertParentAccess(context);
+      await _generationController.start(
+        book,
+        entry,
+        path,
+        refresh: refresh,
+        authorize: () => assertParentAccess(context),
+      );
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '课程整理准备失败',
@@ -104,8 +113,10 @@ class _TextbookCourseReviewPageState
 
   Future<void> _export(Textbook book) async {
     try {
+      assertParentAccess(context);
       final pack = await ref.read(textbookCourseRepositoryProvider).load(book);
       if (pack == null || !mounted) return;
+      assertParentAccess(context);
       await FilePicker.saveFile(
         dialogTitle: '导出待审核草稿',
         fileName: 'course-${book.pdfSha256.substring(0, 12)}-draft.json',
@@ -219,6 +230,7 @@ class _TextbookCourseReviewPageState
     setState(() => _importing = true);
     String? pickerPath;
     try {
+      assertParentAccess(context);
       if (widget.pickDraftPath != null) {
         pickerPath = await widget.pickDraftPath!();
       } else {
@@ -229,6 +241,7 @@ class _TextbookCourseReviewPageState
         pickerPath = selection?.files.single.path;
       }
       if (pickerPath == null || !mounted) return;
+      assertParentAccess(context);
       final repository = ref.read(textbookCourseRepositoryProvider);
       final pack = await repository.readDraft(book, pickerPath);
       if (!mounted) return;
@@ -252,8 +265,15 @@ class _TextbookCourseReviewPageState
         ),
       );
       if (confirmed != true || !mounted) return;
+      assertParentAccess(context);
       await _generationController.stop(book.pdfSha256);
-      await repository.importDraft(book, pack);
+      if (!mounted) return;
+      assertParentAccess(context);
+      await repository.importDraft(
+        book,
+        pack,
+        authorize: () => assertParentAccess(context),
+      );
       if (mounted) {
         ref.invalidate(textbookCourseProvider(book.pdfSha256));
         ref.invalidate(textbookCourseDocumentProvider(book.pdfSha256));
@@ -300,6 +320,7 @@ class _TextbookCourseReviewPageState
       pack =
           await ref.read(textbookCourseRepositoryProvider).load(book) ?? pack;
       if (!mounted) return;
+      assertParentAccess(context);
       await Navigator.of(context).push<Object?>(
         MaterialPageRoute(
           builder: (_) => lessonId != null
@@ -958,9 +979,12 @@ class _TextbookCoveragePageState extends ConsumerState<_TextbookCoveragePage> {
     try {
       final pack =
           updateTextbookCourseCoverage(widget.pack, widget.lesson.id, _values);
-      await ref
-          .read(textbookCourseRepositoryProvider)
-          .save(widget.book, pack, previous: widget.pack);
+      await ref.read(textbookCourseRepositoryProvider).save(
+            widget.book,
+            pack,
+            previous: widget.pack,
+            authorize: () => assertParentAccess(context),
+          );
       if (mounted) Navigator.pop(context, pack);
     } on Object catch (error) {
       if (mounted) {

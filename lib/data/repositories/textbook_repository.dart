@@ -36,7 +36,9 @@ class TextbookRepository {
     }
   }
 
-  Future<void> addIfAbsent(Textbook book) => _enqueue(() async {
+  Future<void> addIfAbsent(Textbook book, {void Function()? authorize}) =>
+      _enqueue(() async {
+        authorize?.call();
         // 同一文件重导不覆盖原书登记或阅读位置。
         if (find(book.pdfSha256) != null) return;
         final validated = Textbook.fromJson(book.toJson());

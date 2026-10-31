@@ -40,8 +40,11 @@ class _MemoryRepository implements TextbookRepository {
   @override
   Textbook? find(String id) => books[id];
   @override
-  Future<void> addIfAbsent(Textbook book) async =>
-      books.putIfAbsent(book.pdfSha256, () => book);
+  Future<void> addIfAbsent(Textbook book, {void Function()? authorize}) async {
+    authorize?.call();
+    books.putIfAbsent(book.pdfSha256, () => book);
+  }
+
   @override
   TextbookReading reading(String profileId, String id) =>
       readings['$profileId:$id'] ?? const TextbookReading();

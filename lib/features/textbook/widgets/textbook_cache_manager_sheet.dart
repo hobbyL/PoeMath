@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 
@@ -55,9 +56,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
 
   Future<void> _load() async {
     try {
-      final usage = await ref
-          .read(textbookFileServiceProvider)
-          .storageUsage(widget.book);
+      final usage =
+          await ref.read(textbookFileServiceProvider).storageUsage(widget.book);
       if (!mounted) return;
       setState(() {
         _usage = usage;
@@ -119,6 +119,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
     if (!mounted) return;
     setState(() => _busy = true);
     try {
+      assertParentAccess(context);
       await action();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -174,18 +175,21 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
     final id = widget.book.pdfSha256;
     setState(() => _busy = true);
     try {
+      assertParentAccess(context);
       await ref
           .read(textbookProgressCleanupProvider)
           .deleteBookProgress(id); // 1. 学习进度（可先删，重导入后从零开始）
+      if (!mounted) return;
+      assertParentAccess(context);
       await ref
           .read(textbookCourseRepositoryProvider)
           .clear(widget.book); // 2. 课程数据
-      await ref
-          .read(textbookFileServiceProvider)
-          .removePdf(id); // 3. 原书与派生缓存
-      await ref
-          .read(textbookRepositoryProvider)
-          .delete(id); // 4. 书目与阅读位置
+      if (!mounted) return;
+      assertParentAccess(context);
+      await ref.read(textbookFileServiceProvider).removePdf(id); // 3. 原书与派生缓存
+      if (!mounted) return;
+      assertParentAccess(context);
+      await ref.read(textbookRepositoryProvider).delete(id); // 4. 书目与阅读位置
       if (!mounted) return;
       // 先关闭 sheet 再失效 provider，否则 sheet 会因 provider 失效重建。
       Navigator.of(context).pop();
@@ -240,7 +244,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                     child: Icon(
                       Icons.delete_outline,
                       size: SpacingTokens.md,
-                      color: _busy ? theme.disabledColor : theme.colorScheme.error,
+                      color:
+                          _busy ? theme.disabledColor : theme.colorScheme.error,
                     ),
                   ),
                 ),
@@ -446,10 +451,9 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                                 .watch(textbookGenerationProvider)[id]
                                 ?.running ??
                             false;
-                        final downloading = ref
-                                .watch(textbookDownloadsProvider)[id]
-                                ?.active ??
-                            false;
+                        final downloading =
+                            ref.watch(textbookDownloadsProvider)[id]?.active ??
+                                false;
                         final blocked = generationBusy || downloading;
                         final button = OutlinedButton.icon(
                           key: const ValueKey('cache-delete-book'),
@@ -463,9 +467,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                         );
                         if (!blocked) return button;
                         return Tooltip(
-                          message: generationBusy
-                              ? '课程整理进行中，请稍后再试'
-                              : '下载进行中，请稍后再试',
+                          message:
+                              generationBusy ? '课程整理进行中，请稍后再试' : '下载进行中，请稍后再试',
                           child: button,
                         );
                       },

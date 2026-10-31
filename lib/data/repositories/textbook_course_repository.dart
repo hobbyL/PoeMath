@@ -99,8 +99,18 @@ class TextbookCourseRepository {
       _serial(() async => action((await _loadDocument(book))?.pack));
 
   /// 只有用户明确确认导入时才替换；失败保留此前可用草稿。
-  Future<void> importDraft(Textbook book, TextbookCoursePack pack) =>
-      _serial(() => _writeDocument(book, TextbookCourseDocument(pack)));
+  Future<void> importDraft(
+    Textbook book,
+    TextbookCoursePack pack, {
+    void Function()? authorize,
+  }) =>
+      _serial(
+        () => _writeDocument(
+            book,
+            TextbookCourseDocument(pack),
+            check: authorize,
+          ),
+      );
 
   /// 防止另一审核页或重新导入后，旧页面把新数据覆盖掉。
   Future<void> save(
@@ -141,6 +151,7 @@ class TextbookCourseRepository {
             pack,
             generation?.copyWith(removed: removed.toList()),
           ),
+          check: authorize,
         );
       });
 
@@ -312,8 +323,10 @@ class TextbookCourseRepository {
     String lessonId, {
     required bool accept,
     required TextbookCoursePack previous,
+    void Function()? authorize,
   }) =>
       _serial(() async {
+        authorize?.call();
         final document = await _loadDocument(book);
         if (document == null ||
             jsonEncode(document.pack.toJson()) !=
@@ -342,6 +355,7 @@ class TextbookCourseRepository {
               },
             ),
           ),
+          check: authorize,
         );
       });
 

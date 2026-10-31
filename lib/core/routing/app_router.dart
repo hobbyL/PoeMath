@@ -134,16 +134,18 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         path: AppRoutes.textbookManagement,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: const TextbookManagementPage(),
+          child: const ParentAccessBoundary(child: TextbookManagementPage()),
         ),
       ),
       GoRoute(
         path: AppRoutes.textbookManageDetail,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: TextbookDetailPage(
-            bookId: state.pathParameters['id']!,
-            manage: true,
+          child: ParentAccessBoundary(
+            child: TextbookDetailPage(
+              bookId: state.pathParameters['id']!,
+              manage: true,
+            ),
           ),
         ),
       ),
@@ -196,7 +198,10 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         path: AppRoutes.textbookReview,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: TextbookCourseReviewPage(bookId: state.pathParameters['id']!),
+          child: ParentAccessBoundary(
+            child:
+                TextbookCourseReviewPage(bookId: state.pathParameters['id']!),
+          ),
         ),
       ),
       GoRoute(

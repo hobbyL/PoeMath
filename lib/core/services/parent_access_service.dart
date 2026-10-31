@@ -126,6 +126,7 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
       return await action();
     } finally {
       done.complete();
+      if (identical(_operation, done.future)) _operation = null;
     }
   }
 

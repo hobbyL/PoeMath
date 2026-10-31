@@ -30,13 +30,14 @@ class TextbookGenerationController
     String path, {
     bool refresh = false,
     String? lessonId,
+    void Function()? authorize,
   }) {
     if (_disposed) return Future.value();
     if (_activeId == book.pdfSha256 && _active != null) return _active!;
     final previous = _active;
     _token?.cancel();
     _activeId = book.pdfSha256;
-    final token = TextbookDraftToken();
+    final token = TextbookDraftToken(authorize: authorize);
     _token = token;
     // Reserve synchronously so rapid taps share one task, including PDF opening.
     late final Future<void> future;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/theme/typography_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -111,6 +112,7 @@ class _TextbookDraftDetailsState
             widget.lessonId,
             accept: accept,
             previous: doc.pack,
+            authorize: () => assertParentAccess(context),
           );
       if (mounted) _reload();
     } on Object catch (error) {
@@ -248,6 +250,7 @@ class _TextbookDraftDetailsState
                     .toList(),
               },
             ),
+            check: () => assertParentAccess(context),
           );
       if (mounted) _reload();
     } on Object catch (error) {
@@ -386,6 +389,7 @@ class _TextbookDraftDetailsState
                 ),
           ],
         ),
+        check: () => assertParentAccess(context),
       );
       if (mounted) _reload();
     } on Object catch (error) {
@@ -425,11 +429,13 @@ class _TextbookDraftDetailsState
       }
       await controller.stop(widget.book.pdfSha256);
       if (!mounted) return;
+      assertParentAccess(context);
       await controller.start(
         widget.book,
         entry,
         path,
         lessonId: widget.lessonId,
+        authorize: () => assertParentAccess(context),
       );
       if (mounted) _reload();
     } on Object catch (error) {

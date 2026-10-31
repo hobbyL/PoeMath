@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 
+/// 弹窗、文件选择或排队写入后重新校验，不重复弹出解锁提示。
+void assertParentAccess(BuildContext context, {ParentAccessService? service}) {
+  if (!context.mounted || ModalRoute.of(context)?.isCurrent == false) {
+    throw const ParentAccessDenied();
+  }
+  (service ?? ParentAccessService.instance).assertAllowed();
+}
+
 Future<bool> ensureParentAccess(BuildContext context,
     {ParentAccessService? service,}) async {
   final access = service ?? ParentAccessService.instance;

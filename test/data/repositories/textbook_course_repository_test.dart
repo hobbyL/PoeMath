@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_course_review.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
@@ -148,18 +150,68 @@ void main() {
     final blocker = File('${directory.path}/not-a-directory');
     await blocker.writeAsString('blocker');
     final repo = TextbookCourseRepository(
-        directoryProvider: () async =>
-            blocked ? Directory(blocker.path) : directory,);
+      directoryProvider: () async =>
+          blocked ? Directory(blocker.path) : directory,
+    );
     final previous = TextbookCoursePack.fromJson(courseFixture());
     await repo.importDraft(book, previous);
     final edited = editTextbookCourseNode(
-        previous, 'word-001', {'requirement': 'dictation'},);
+      previous,
+      'word-001',
+      {'requirement': 'dictation'},
+    );
     blocked = true;
     await expectLater(
-        repo.importDraft(book, edited), throwsA(isA<FileSystemException>()),);
+      repo.importDraft(book, edited),
+      throwsA(isA<FileSystemException>()),
+    );
     blocked = false;
     expect((await repo.load(book))!.toJson(), previous.toJson());
     await repo.save(book, edited, previous: previous);
     expect((await repo.load(book))!.toJson(), edited.toJson());
   });
+
+  for (final importing in [false, true]) {
+    test('课程${importing ? '导入' : '保存'}在写入目录等待期间失去授权，保留旧文件并可重试', () async {
+      var allowed = true;
+      var hold = false;
+      var directoryReads = 0;
+      final entered = Completer<void>();
+      final release = Completer<Directory>();
+      final repo = TextbookCourseRepository(
+        directoryProvider: () async {
+          if (hold && ++directoryReads == (importing ? 1 : 2)) {
+            entered.complete();
+            return release.future;
+          }
+          return directory;
+        },
+      );
+      final previous = TextbookCoursePack.fromJson(courseFixture());
+      final edited = editTextbookCourseNode(
+        previous,
+        'word-001',
+        {'requirement': 'dictation'},
+      );
+      await repo.importDraft(book, previous);
+      void authorize() {
+        if (!allowed) throw const ParentAccessDenied();
+      }
+
+      hold = true;
+      final saving = importing
+          ? repo.importDraft(book, edited, authorize: authorize)
+          : repo.save(book, edited, previous: previous, authorize: authorize);
+      final failed = expectLater(saving, throwsA(isA<ParentAccessDenied>()));
+      await entered.future;
+      allowed = false;
+      release.complete(directory);
+      await failed;
+      hold = false;
+      expect((await repo.load(book))!.toJson(), previous.toJson());
+      allowed = true;
+      await repo.save(book, edited, previous: previous, authorize: authorize);
+      expect((await repo.load(book))!.toJson(), edited.toJson());
+    });
+  }
 }

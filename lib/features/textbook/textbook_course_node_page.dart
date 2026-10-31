@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -178,9 +179,12 @@ class _TextbookCourseNodePageState
         );
       }
       final reviewed = TextbookCoursePack.fromJson(reviewedJson);
-      await ref
-          .read(textbookCourseRepositoryProvider)
-          .save(widget.book, reviewed, previous: _pack);
+      await ref.read(textbookCourseRepositoryProvider).save(
+            widget.book,
+            reviewed,
+            previous: _pack,
+            authorize: () => assertParentAccess(context),
+          );
       if (mounted) Navigator.pop(context, reviewed);
     } on Object catch (error, stackTrace) {
       AppLogger.e(
@@ -240,9 +244,12 @@ class _TextbookCourseNodePageState
       final updated =
           removeTextbookCourseTarget(_pack, node.id, removeReferences: true);
       setState(() => _saving = true);
-      await ref
-          .read(textbookCourseRepositoryProvider)
-          .save(widget.book, updated, previous: _pack);
+      await ref.read(textbookCourseRepositoryProvider).save(
+            widget.book,
+            updated,
+            previous: _pack,
+            authorize: () => assertParentAccess(context),
+          );
       if (mounted) Navigator.pop(context, updated);
     } on Object catch (error) {
       if (mounted) {

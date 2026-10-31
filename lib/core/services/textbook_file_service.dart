@@ -27,6 +27,8 @@ class TextbookDownloadCancelled extends TextbookFileException {
 }
 
 class TextbookImportToken {
+  TextbookImportToken({void Function()? authorize}) : _authorize = authorize;
+  final void Function()? _authorize;
   bool _cancelled = false;
   final _abort = Completer<void>();
   Future<void> get abortTrigger => _abort.future;
@@ -37,6 +39,7 @@ class TextbookImportToken {
 
   void check() {
     if (_cancelled) throw const TextbookImportCancelled();
+    _authorize?.call();
   }
 }
 
@@ -88,8 +91,7 @@ class TextbookStorageUsage {
 
   int get derivedBytes => coverBytes + contentBytes + audioBytes;
 
-  bool get hasDerived =>
-      coverBytes > 0 || contentBytes > 0 || audioBytes > 0;
+  bool get hasDerived => coverBytes > 0 || contentBytes > 0 || audioBytes > 0;
 }
 
 /// 大文件始终流式读取；文件名只从 SHA 派生，不信任来源文件名。

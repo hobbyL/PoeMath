@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -371,9 +372,12 @@ class _TextbookCourseEditorPageState
     try {
       final pack =
           editTextbookCourseNode(widget.pack, widget.node.id, _changes());
-      await ref
-          .read(textbookCourseRepositoryProvider)
-          .save(widget.book, pack, previous: widget.previous ?? widget.pack);
+      await ref.read(textbookCourseRepositoryProvider).save(
+            widget.book,
+            pack,
+            previous: widget.previous ?? widget.pack,
+            authorize: () => assertParentAccess(context),
+          );
       if (mounted) Navigator.pop(context, pack);
     } on Object catch (error, stackTrace) {
       AppLogger.e(
@@ -720,7 +724,8 @@ class _TextbookCourseEditorPageState
                     child: TextField(
                       controller: blank.id,
                       enabled: !_saving,
-                      decoration: InputDecoration(labelText: '第 ${index + 1} 空'),
+                      decoration:
+                          InputDecoration(labelText: '第 ${index + 1} 空'),
                     ),
                   ),
                   const SizedBox(width: SpacingTokens.sm),

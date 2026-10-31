@@ -40,7 +40,12 @@ class _Courses extends TextbookCourseRepository {
   Future<TextbookCoursePack> readDraft(Textbook book, String path) async =>
       TextbookCoursePack.fromJson(courseFixture());
   @override
-  Future<void> importDraft(Textbook book, TextbookCoursePack pack) async {
+  Future<void> importDraft(
+    Textbook book,
+    TextbookCoursePack pack, {
+    void Function()? authorize,
+  }) async {
+    authorize?.call();
     imports++;
     current = pack;
   }
