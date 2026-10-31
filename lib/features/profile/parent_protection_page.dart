@@ -97,20 +97,6 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
     }
   }
 
-  Future<void> _removePin() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      if (!await ensureParentAccess(context) || !mounted) return;
-      assertParentAccess(context);
-      await _access.disable();
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = '$error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<void> _changeLimit(CloudUsageKind kind) async {
     if (!await ensureParentAccess(context) || !mounted) return;
     final usage = CloudUsageService.instance;
@@ -216,16 +202,10 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
               _busy
                   ? '正在保存…'
                   : _access.enabled
-                      ? '更新 PIN 与恢复码'
+                      ? '修改家长密码'
                       : '设置家长密码',
             ),
           ),
-          if (_access.enabled)
-            TextButton(
-              onPressed: _busy ? null : _removePin,
-              child: const Text('移除家长密码'),
-            ),
-          if (_access.enabled) const Text('移除密码后，再次进入设置或管理页面需要重新设置家长密码。'),
           if (_access.enabled && _access.isUnlocked) ...[
             const SizedBox(height: SpacingTokens.lg),
             // 标题行带「查看历史」入口：本页只显示当天，历史在独立页。

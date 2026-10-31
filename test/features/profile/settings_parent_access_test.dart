@@ -398,8 +398,9 @@ void main() {
     );
   });
 
-  testWidgets('移除PIN后返回旧设置入口会要求重新设置，不放行旧编辑页', (tester) async {
-    await tester.runAsync(unlockParentForTesting);
+  testWidgets('修改家长密码保持保护生效，新PIN与恢复码替换旧凭据', (tester) async {
+    final oldRecovery = (await tester.runAsync(unlockParentForTesting))!;
+    const newPin = '135790';
     final router = createAppRouter(initialLocation: AppRoutes.settings);
     await _mount(tester, router);
     await _pumpUntil(
@@ -411,19 +412,58 @@ void main() {
       tester,
       () => find.byType(ParentProtectionPage).evaluate().isNotEmpty,
     );
-    await tester.runAsync(() => tester.tap(find.text('移除家长密码')));
+    expect(find.text('移除家长密码'), findsNothing);
+    await tester.enterText(
+      find.widgetWithText(TextField, '新的 6 位数字 PIN'),
+      newPin,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, '再次输入 PIN'),
+      newPin,
+    );
+    await tester.runAsync(
+      () => tester.tap(find.widgetWithText(FilledButton, '修改家长密码')),
+    );
     await _pumpUntil(
       tester,
-      () => !access.enabled && _setupButton.evaluate().isNotEmpty,
+      () => find.text('保存一次性恢复码').evaluate().isNotEmpty,
     );
-    expect(access.isUnlocked, isFalse);
-    expect(find.text('查看历史'), findsNothing);
+    final newRecovery = tester
+        .widget<SelectableText>(
+          find.descendant(
+            of: find.widgetWithText(AlertDialog, '保存一次性恢复码'),
+            matching: find.byType(SelectableText),
+          ),
+        )
+        .data!;
+    expect(newRecovery, isNot(oldRecovery));
+    await tester.runAsync(() => tester.tap(find.text('我已保存')));
+    await _pumpUntil(
+      tester,
+      () => find.text('保存一次性恢复码').evaluate().isEmpty,
+    );
+    expect(access.enabled, isTrue);
+    expect(access.isUnlocked, isTrue);
     await tester.runAsync(() => tester.pageBack());
     await _pumpUntil(
       tester,
-      () => router.routerDelegate.state.uri.path == AppRoutes.parentProtection,
+      () => find.byType(SettingsPage).evaluate().isNotEmpty,
     );
-    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    // 退出页面后，用新旧凭据检查实际保存结果。
+    await tester.runAsync(() => tester.pumpWidget(const SizedBox.shrink()));
+    await _drainFrames(tester);
+    await tester.runAsync(() async {
+      access.lock();
+      expect(await access.authenticate(testParentPin), isFalse);
+      expect(await access.authenticate(oldRecovery, recovery: true), isFalse);
+      expect(access.enabled, isTrue);
+      expect(await access.authenticate(newPin), isTrue);
+      access.lock();
+      expect(await access.authenticate(newRecovery, recovery: true), isTrue);
+    });
+    expect(access.enabled, isFalse);
+    expect(access.isUnlocked, isFalse);
+    expect(access.canSetPin, isTrue);
   });
 
   testWidgets('在家长设置页使用恢复码只切换为重设，不叠加自身路由', (tester) async {
