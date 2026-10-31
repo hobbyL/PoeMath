@@ -88,8 +88,7 @@ class CloudUsageService {
       return DailyCloudUsage(
         date: date,
         counts: {
-          for (final kind in CloudUsageKind.values)
-            kind: usedOn(date, kind),
+          for (final kind in CloudUsageKind.values) kind: usedOn(date, kind),
         },
       );
     });
@@ -140,13 +139,15 @@ class CloudUsageService {
     await HiveBoxes.meta.putAll(valid);
   }
 
-  Future<void> reserve(CloudUsageKind kind) {
+  Future<void> reserve(CloudUsageKind kind, {void Function()? check}) {
+    check?.call();
     if (!_ready) return Future<void>.value();
     final previous = _tail;
     final work = () async {
       try {
         await previous;
       } on Object {/* 失败不阻塞下一次请求。 */}
+      check?.call();
       final maximum = limit(kind);
       final key = '$_usagePrefix$dayKey:${kind.key}';
       final saved = HiveBoxes.meta.get(key);

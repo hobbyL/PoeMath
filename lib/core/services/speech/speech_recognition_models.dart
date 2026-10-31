@@ -2,6 +2,8 @@
 //
 // Shared contracts for Tencent Cloud speech recognition.
 
+import 'dart:async';
+
 /// Tencent Cloud API credentials.
 ///
 /// The values must never be persisted outside platform secure storage or
@@ -76,4 +78,36 @@ class SpeechRecognitionException implements Exception {
 
 final class SpeechPermissionDeniedException extends SpeechRecognitionException {
   const SpeechPermissionDeniedException() : super('未获得麦克风权限');
+}
+
+final class SpeechRecognitionCancelled extends SpeechRecognitionException {
+  const SpeechRecognitionCancelled() : super('录音已取消');
+}
+
+/// 一次录音的取消状态，同时用于等待中断和单请求 HTTP abort。
+final class SpeechRecognitionCancelToken {
+  final _aborted = Completer<void>();
+  bool _cancelled = false;
+
+  bool get isCancelled => _cancelled;
+  Future<void> get abortTrigger => _aborted.future;
+
+  void cancel() {
+    if (_cancelled) return;
+    _cancelled = true;
+    _aborted.complete();
+  }
+
+  void check() {
+    if (_cancelled) throw const SpeechRecognitionCancelled();
+  }
+
+  Future<T> wait<T>(Future<T> operation) async {
+    final result = await Future.any<T>([
+      operation,
+      abortTrigger.then<T>((_) => throw const SpeechRecognitionCancelled()),
+    ]);
+    check();
+    return result;
+  }
 }

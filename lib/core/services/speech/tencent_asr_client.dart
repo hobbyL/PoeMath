@@ -68,7 +68,9 @@ final class TencentAsrClient {
     required Uint8List pcmBytes,
     required TencentAsrCredentials credentials,
     bool reserveUsage = true,
+    SpeechRecognitionCancelToken? cancelToken,
   }) async {
+    cancelToken?.check();
     if (!credentials.isComplete) {
       throw const TencentAsrException(
         '腾讯云凭据未填写完整',
@@ -123,7 +125,9 @@ final class TencentAsrClient {
       timestamp: timestamp,
       host: host,
       reserveUsage: reserveUsage,
+      cancelToken: cancelToken,
     );
+    cancelToken?.check();
     return _parseResponse(response);
   }
 
@@ -133,43 +137,65 @@ final class TencentAsrClient {
     required int timestamp,
     required String host,
     required bool reserveUsage,
+    SpeechRecognitionCancelToken? cancelToken,
   }) async {
+    cancelToken?.check();
     if (reserveUsage) {
       try {
-        await _usage.reserve(CloudUsageKind.asr);
+        final reservation = _usage.reserve(
+          CloudUsageKind.asr,
+          check: cancelToken?.check,
+        );
+        await (cancelToken?.wait(reservation) ?? reservation);
       } on CloudQuotaExceededException catch (error) {
+        cancelToken?.check();
         throw TencentAsrException(
           error.message,
           kind: TencentAsrErrorKind.quota,
         );
       }
     }
+    cancelToken?.check();
     try {
-      return await _httpClient
-          .post(
-            _endpoint,
-            headers: <String, String>{
-              'Authorization': signature.authorization,
-              'Content-Type': _tencentAsrContentType,
-              'Host': host,
-              'X-TC-Action': action,
-              'X-TC-Version': version,
-              'X-TC-Timestamp': '$timestamp',
-            },
-            body: body,
-          )
-          .timeout(_timeout);
+      final request = http.AbortableRequest(
+        'POST',
+        _endpoint,
+        abortTrigger: cancelToken?.abortTrigger,
+      )
+        ..headers.addAll(<String, String>{
+          'Authorization': signature.authorization,
+          'Content-Type': _tencentAsrContentType,
+          'Host': host,
+          'X-TC-Action': action,
+          'X-TC-Version': version,
+          'X-TC-Timestamp': '$timestamp',
+        })
+        ..body = body;
+      final response = await http.Response.fromStream(
+        await _httpClient.sendBounded(request, deadline: _timeout),
+      );
+      cancelToken?.check();
+      return response;
+    } on http.RequestAbortedException {
+      cancelToken?.check();
+      throw const TencentAsrException(
+        '腾讯云识别请求已中止',
+        kind: TencentAsrErrorKind.network,
+      );
     } on TimeoutException {
+      cancelToken?.check();
       throw const TencentAsrException(
         '腾讯云识别请求超时',
         kind: TencentAsrErrorKind.network,
       );
     } on SocketException {
+      cancelToken?.check();
       throw const TencentAsrException(
         '网络不可用，请检查网络后重试',
         kind: TencentAsrErrorKind.network,
       );
     } on http.ClientException {
+      cancelToken?.check();
       throw const TencentAsrException(
         '腾讯云识别网络请求失败',
         kind: TencentAsrErrorKind.network,

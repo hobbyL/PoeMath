@@ -18,6 +18,24 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import '../../helpers/hive_test_helper.dart';
 
 void main() {
+  test('用量队列等待后复验取消状态，拒绝不占用次数且后续仍可预留', () async {
+    final usage = CloudUsageService();
+    final first = usage.reserve(CloudUsageKind.asr);
+    var active = true;
+    final next = usage.reserve(
+      CloudUsageKind.asr,
+      check: () {
+        if (!active) throw StateError('synthetic cancellation');
+      },
+    );
+    final rejection = expectLater(next, throwsStateError);
+    active = false;
+    await first;
+    await rejection;
+    expect(usage.used(CloudUsageKind.asr), 1);
+    await usage.reserve(CloudUsageKind.asr);
+    expect(usage.used(CloudUsageKind.asr), 2);
+  });
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
 

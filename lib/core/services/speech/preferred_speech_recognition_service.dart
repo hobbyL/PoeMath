@@ -47,13 +47,11 @@ final class PreferredSpeechRecognitionService
 
   final _transcriptController = StreamController<String>.broadcast();
   _RecordingSession? _session;
-  TencentRealtimeAsrSession? _realtimeSession;
-  TencentRealtimeAsrException? _realtimeStartFailure;
   int _generation = 0;
   bool _isRecording = false;
   bool _starting = false;
+  bool _disposed = false;
   bool _usedFallback = false;
-  bool _realtimeAttempted = false;
   Uint8List? _lastAudio;
   String _mode = 'sentence';
   Future<void> _recorderQueue = Future<void>.value();
@@ -86,22 +84,54 @@ final class PreferredSpeechRecognitionService
   @override
   Future<void> initialize() async {}
 
+  bool _current(_RecordingSession session) =>
+      !_disposed &&
+      identical(_session, session) &&
+      session.generation == _generation &&
+      !session.cancelToken.isCancelled;
+
+  void _check(_RecordingSession session) {
+    if (!_current(session)) throw const SpeechRecognitionCancelled();
+  }
+
+  Future<void> _release(_RecordingSession session) =>
+      session.cleanup ??= () async {
+        try {
+          await session.subscription?.cancel();
+        } on Exception {
+          AppLogger.w('取消录音订阅失败', tag: 'Speech');
+        }
+        session.bytes.clear();
+        try {
+          await session.realtime?.cancel();
+        } on Exception {
+          AppLogger.w('取消实时识别失败', tag: 'Speech');
+        }
+      }();
+
   @override
   Future<void> start() async {
+    if (_disposed) throw const SpeechRecognitionException('语音识别已关闭');
     if (_isRecording || _starting) {
       throw const SpeechRecognitionException('语音识别正在录音');
     }
+    final previous = _session;
+    if (previous != null) {
+      previous.cancelToken.cancel();
+      previous.finish();
+      unawaited(_release(previous));
+    }
     _starting = true;
-    final generation = ++_generation;
-    final session = _RecordingSession();
+    final session = _RecordingSession(++_generation);
+    _session = session;
     _usedFallback = false;
     _lastAudio = null;
     _mode = 'sentence';
-    _realtimeStartFailure = null;
-    _realtimeSession = null;
-    _realtimeAttempted = false;
     try {
-      final credentials = await _settingsRepository.readTencentAsrCredentials();
+      final credentials = await session.cancelToken.wait(
+        _settingsRepository.readTencentAsrCredentials(),
+      );
+      _check(session);
       if (credentials == null) {
         throw const TencentAsrException(
           '请先保存腾讯云密钥',
@@ -109,40 +139,46 @@ final class PreferredSpeechRecognitionService
         );
       }
       await _withRecorder(() async {
-        if (!await _recorder.hasPermission()) {
+        _check(session);
+        final permission =
+            await session.cancelToken.wait(_recorder.hasPermission());
+        _check(session);
+        if (!permission) {
           throw const SpeechPermissionDeniedException();
         }
-        if (generation != _generation) return;
-        _session = session;
-        _isRecording = true;
         if (credentials.hasRealtimeCredentials) {
-          _realtimeAttempted = true;
+          session.realtimeAttempted = true;
           try {
-            _realtimeSession = await _realtimeClient.connect(
+            session.realtime = await _realtimeClient.connect(
               credentials: credentials,
+              cancelToken: session.cancelToken,
               onText: (text, {required stable}) {
-                if (generation != _generation || text.isEmpty) return;
+                if (!_current(session) || text.isEmpty) return;
                 _mode = 'realtime';
                 _transcriptController.add(text);
               },
             );
+            _check(session);
             _mode = 'realtime';
           } on TencentRealtimeAsrException catch (error) {
+            _check(session);
             // 本地保护额度不是腾讯云月度额度，不能通过回退绕过它。
             if (error.code == -1) rethrow;
-            _realtimeStartFailure = error;
+            session.realtimeStartFailure = error;
           }
         }
+        _check(session);
         final audioStream = await _recorder.startStream();
-        if (generation != _generation) {
+        if (!_current(session)) {
           await audioStream.listen((_) {}).cancel();
           await _recorder.cancel();
-          return;
+          throw const SpeechRecognitionCancelled();
         }
         session.subscription = audioStream.listen(
           (chunk) {
+            if (!_current(session)) return;
             session.add(chunk);
-            _realtimeSession?.add(chunk);
+            session.realtime?.add(chunk);
           },
           onError: (Object error, StackTrace stack) {
             session.error ??= error;
@@ -150,17 +186,20 @@ final class PreferredSpeechRecognitionService
           },
           onDone: session.finish,
         );
+        _isRecording = true;
       });
+      _check(session);
     } on Object {
+      session.cancelToken.cancel();
+      session.finish();
       if (identical(_session, session)) {
         _session = null;
         _isRecording = false;
       }
-      await _realtimeSession?.cancel();
-      _realtimeSession = null;
+      await _release(session);
       rethrow;
     } finally {
-      _starting = false;
+      if (session.generation == _generation) _starting = false;
     }
   }
 
@@ -170,18 +209,14 @@ final class PreferredSpeechRecognitionService
     if (!_isRecording || session == null) {
       throw const SpeechRecognitionException('当前没有正在进行的录音');
     }
-    final generation = _generation;
     _isRecording = false;
     try {
       final pcm = await _withRecorder(() async {
-        if (generation != _generation) {
-          throw const SpeechRecognitionException('录音已取消');
-        }
+        _check(session);
         await _recorder.stop();
-        await session.done.future;
-        if (generation != _generation) {
-          throw const SpeechRecognitionException('录音已取消');
-        }
+        _check(session);
+        await session.cancelToken.wait(session.done.future);
+        _check(session);
         if (session.error != null) {
           Error.throwWithStackTrace(
             const SpeechRecognitionException('录音失败'),
@@ -191,33 +226,36 @@ final class PreferredSpeechRecognitionService
         final length = session.bytes.length - session.bytes.length % 2;
         return Uint8List(length)..setRange(0, length, session.bytes);
       });
+      _check(session);
       _lastAudio = Uint8List.fromList(pcm);
 
-      if (_realtimeStartFailure != null) {
-        if (_realtimeStartFailure!.kind != TencentRealtimeErrorKind.quota) {
-          throw _realtimeStartFailure!;
+      final startFailure = session.realtimeStartFailure;
+      if (startFailure != null) {
+        if (startFailure.kind != TencentRealtimeErrorKind.quota) {
+          throw startFailure;
         }
-        return _recognizeSentence(
+        return await _recognizeSentence(
           pcm,
-          credentialsGeneration: generation,
+          session: session,
           usedFallback: true,
         );
       }
 
       // APPID 是实时接口新增的配置项。旧用户仍只有 SecretId/SecretKey
       // 时，继续走原有的一句话识别，避免升级后已有功能失效。
-      if (!_realtimeAttempted) {
-        return _recognizeSentence(
+      if (!session.realtimeAttempted) {
+        return await _recognizeSentence(
           pcm,
-          credentialsGeneration: generation,
+          session: session,
           usedFallback: false,
         );
       }
 
-      final realtime = _realtimeSession;
+      final realtime = session.realtime;
       if (realtime != null) {
         try {
-          final text = await realtime.end();
+          final text = await session.cancelToken.wait(realtime.end());
+          _check(session);
           if (text.isNotEmpty) {
             _mode = 'realtime';
             return SpeechRecognitionResult(text: text, mode: 'realtime');
@@ -227,20 +265,21 @@ final class PreferredSpeechRecognitionService
             kind: TencentRealtimeErrorKind.response,
           );
         } on TencentRealtimeAsrException catch (error) {
+          _check(session);
           if (error.kind != TencentRealtimeErrorKind.quota) rethrow;
-          return _recognizeSentence(
+          return await _recognizeSentence(
             pcm,
-            credentialsGeneration: generation,
+            session: session,
             usedFallback: true,
           );
         }
       }
       throw const SpeechRecognitionException('腾讯云实时识别未建立连接');
     } on Object {
-      if (generation == _generation) {
+      if (_current(session)) {
         try {
           await _withRecorder(() async {
-            if (generation == _generation) await _recorder.cancel();
+            if (_current(session)) await _recorder.cancel();
           });
         } on Exception {
           AppLogger.w('识别失败后取消录音失败', tag: 'Speech');
@@ -248,23 +287,22 @@ final class PreferredSpeechRecognitionService
       }
       rethrow;
     } finally {
-      await session.subscription?.cancel();
-      session.bytes.clear();
-      await _realtimeSession?.cancel();
-      _realtimeSession = null;
+      session.cancelToken.cancel();
       if (identical(_session, session)) _session = null;
+      await _release(session);
     }
   }
 
   Future<SpeechRecognitionResult> _recognizeSentence(
     Uint8List pcm, {
-    required int credentialsGeneration,
+    required _RecordingSession session,
     required bool usedFallback,
   }) async {
-    if (credentialsGeneration != _generation) {
-      throw const SpeechRecognitionException('录音已取消');
-    }
-    final credentials = await _settingsRepository.readTencentAsrCredentials();
+    _check(session);
+    final credentials = await session.cancelToken.wait(
+      _settingsRepository.readTencentAsrCredentials(),
+    );
+    _check(session);
     if (credentials == null) {
       throw const TencentAsrException(
         '请先保存腾讯云密钥',
@@ -274,8 +312,10 @@ final class PreferredSpeechRecognitionService
     final result = await _sentenceClient.recognizePcm16(
       pcmBytes: pcm,
       credentials: credentials,
-      reserveUsage: !_realtimeAttempted,
+      reserveUsage: !session.realtimeAttempted,
+      cancelToken: session.cancelToken,
     );
+    _check(session);
     _mode = 'sentence';
     _usedFallback = usedFallback;
     return SpeechRecognitionResult(
@@ -291,23 +331,26 @@ final class PreferredSpeechRecognitionService
     final session = _session;
     _session = null;
     final wasRecording = _isRecording;
+    final wasStarting = _starting;
     _isRecording = false;
+    _starting = false;
+    _lastAudio = null;
+    session?.cancelToken.cancel();
     session?.finish();
-    if (wasRecording || _starting) {
+    if (wasRecording || wasStarting) {
       try {
         await _withRecorder(_recorder.cancel);
       } on Exception {
         AppLogger.w('取消录音失败', tag: 'Speech');
       }
     }
-    await _realtimeSession?.cancel();
-    _realtimeSession = null;
-    await session?.subscription?.cancel();
-    session?.bytes.clear();
+    if (session != null) await _release(session);
   }
 
   @override
   Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
     await cancel();
     await _recorder.dispose();
     await _transcriptController.close();
@@ -315,6 +358,13 @@ final class PreferredSpeechRecognitionService
 }
 
 final class _RecordingSession {
+  _RecordingSession(this.generation);
+  final int generation;
+  final cancelToken = SpeechRecognitionCancelToken();
+  TencentRealtimeAsrSession? realtime;
+  TencentRealtimeAsrException? realtimeStartFailure;
+  bool realtimeAttempted = false;
+  Future<void>? cleanup;
   final bytes = <int>[];
   final done = Completer<void>();
   StreamSubscription<Uint8List>? subscription;

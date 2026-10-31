@@ -33,20 +33,28 @@ final class TencentRealtimeAsrClient {
     Random? random,
     Duration timeout = const Duration(seconds: 12),
     CloudUsageService? usage,
+    Future<WebSocket> Function(Uri)? connectSocket,
   })  : _clock = clock ?? DateTime.now,
         _random = random ?? Random.secure(),
         _timeout = timeout,
-        _usage = usage ?? CloudUsageService.instance;
+        _usage = usage ?? CloudUsageService.instance,
+        _connectSocket = connectSocket ?? _openSocket;
 
   final DateTime Function() _clock;
   final Random _random;
   final Duration _timeout;
   final CloudUsageService _usage;
+  final Future<WebSocket> Function(Uri) _connectSocket;
+
+  static Future<WebSocket> _openSocket(Uri uri) =>
+      WebSocket.connect(uri.toString());
 
   Future<TencentRealtimeAsrSession> connect({
     required TencentAsrCredentials credentials,
     void Function(String text, {required bool stable})? onText,
+    SpeechRecognitionCancelToken? cancelToken,
   }) async {
+    cancelToken?.check();
     if (!credentials.hasRealtimeCredentials) {
       throw const TencentRealtimeAsrException(
         '未配置腾讯云实时识别所需的 APPID',
@@ -54,14 +62,20 @@ final class TencentRealtimeAsrClient {
       );
     }
     try {
-      await _usage.reserve(CloudUsageKind.asr);
+      final reservation = _usage.reserve(
+        CloudUsageKind.asr,
+        check: cancelToken?.check,
+      );
+      await (cancelToken?.wait(reservation) ?? reservation);
     } on CloudQuotaExceededException catch (error) {
+      cancelToken?.check();
       throw TencentRealtimeAsrException(
         error.message,
         kind: TencentRealtimeErrorKind.quota,
         code: -1,
       );
     }
+    cancelToken?.check();
     final now = _clock().millisecondsSinceEpoch ~/ 1000;
     final nonce = _random.nextInt(0x7fffffff) + 1;
     final expired = now + 3600;
@@ -97,18 +111,28 @@ final class TencentRealtimeAsrClient {
 
     late final WebSocket socket;
     try {
-      socket = await WebSocket.connect(uri.toString()).timeout(_timeout);
+      final connecting = _connectSocket(uri).then((socket) {
+        if (cancelToken?.isCancelled ?? false) {
+          unawaited(socket.close(WebSocketStatus.goingAway));
+          throw const SpeechRecognitionCancelled();
+        }
+        return socket;
+      }).timeout(_timeout);
+      socket = await (cancelToken?.wait(connecting) ?? connecting);
     } on TimeoutException {
+      cancelToken?.check();
       throw const TencentRealtimeAsrException(
         '腾讯云实时识别连接超时',
         kind: TencentRealtimeErrorKind.network,
       );
     } on SocketException {
+      cancelToken?.check();
       throw const TencentRealtimeAsrException(
         '腾讯云实时识别网络不可用',
         kind: TencentRealtimeErrorKind.network,
       );
     } on WebSocketException catch (error) {
+      cancelToken?.check();
       throw TencentRealtimeAsrException(
         '腾讯云实时识别连接失败：${error.message}',
         kind: TencentRealtimeErrorKind.network,
@@ -117,6 +141,8 @@ final class TencentRealtimeAsrClient {
 
     final ready = Completer<void>();
     final finished = Completer<void>();
+    // 握手期间可能同时失败；保留 end() 的错误，但不留下尚未被等待的错误。
+    unawaited(finished.future.then<void>((_) {}, onError: (Object _) {}));
     TencentRealtimeAsrException? failure;
     var finalText = '';
     final sentenceTexts = <int, String>{};
@@ -185,7 +211,8 @@ final class TencentRealtimeAsrClient {
     );
 
     try {
-      await ready.future.timeout(_timeout);
+      final handshake = ready.future.timeout(_timeout);
+      await (cancelToken?.wait(handshake) ?? handshake);
     } on TimeoutException {
       await subscription.cancel();
       await socket.close(WebSocketStatus.goingAway);
@@ -270,6 +297,7 @@ final class TencentRealtimeAsrSession {
   final String Function() _getFinalText;
   bool _ended = false;
   bool _ending = false;
+  Future<void>? _closing;
   final _pendingAudio = <int>[];
   final _audioDrained = Completer<void>();
   Timer? _sendTimer;
@@ -303,9 +331,11 @@ final class TencentRealtimeAsrSession {
   }
 
   Future<void> cancel() async {
-    if (_ended) return;
     _ended = true;
     _sendTimer?.cancel();
+    _pendingAudio.clear();
+    if (!_audioDrained.isCompleted) _audioDrained.complete();
+    if (!_finished.isCompleted) _finished.complete();
     await _close();
   }
 
@@ -332,7 +362,9 @@ final class TencentRealtimeAsrSession {
     if (!_audioDrained.isCompleted) _audioDrained.complete();
   }
 
-  Future<void> _close() async {
+  Future<void> _close() => _closing ??= _closeSocket();
+
+  Future<void> _closeSocket() async {
     _sendTimer?.cancel();
     await _subscription.cancel();
     await _socket.close(WebSocketStatus.normalClosure);

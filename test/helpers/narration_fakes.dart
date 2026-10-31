@@ -189,7 +189,8 @@ class NarrationUsage extends Fake implements CloudUsageService {
   bool exhausted = false;
   int reservations = 0;
   @override
-  Future<void> reserve(CloudUsageKind kind) async {
+  Future<void> reserve(CloudUsageKind kind, {void Function()? check}) async {
+    check?.call();
     reservations++;
     if (exhausted) throw CloudQuotaExceededException(kind);
   }
