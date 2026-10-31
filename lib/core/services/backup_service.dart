@@ -359,6 +359,9 @@ class BackupService {
       if (tencent != null) {
         payload[kCredKeyTencentSecretId] = tencent.secretId;
         payload[kCredKeyTencentSecretKey] = tencent.secretKey;
+        if (tencent.appId.trim().isNotEmpty) {
+          payload[kCredKeyTencentAppId] = tencent.appId;
+        }
       }
       final workerApiKey = await _secureStore.readWorkerTtsApiKey();
       if (workerApiKey != null && workerApiKey.isNotEmpty) {
@@ -737,13 +740,25 @@ class BackupService {
     final secretKey = credentials[kCredKeyTencentSecretKey];
     if (secretId != null && secretKey != null) {
       final old = await _secureStore.readTencentAsrCredentials();
+      var appId = credentials[kCredKeyTencentAppId];
+      // 旧备份未携带 APPID，只能在两项密钥都一致时沿用本机同账户的值。
+      if (appId == null &&
+          old != null &&
+          old.secretId == secretId &&
+          old.secretKey == secretKey) {
+        appId = old.appId;
+      }
       undo.add(
         () => old == null
             ? _secureStore.deleteTencentAsrCredentials()
             : _secureStore.saveTencentAsrCredentials(old),
       );
       await _secureStore.saveTencentAsrCredentials(
-        TencentAsrCredentials(secretId: secretId, secretKey: secretKey),
+        TencentAsrCredentials(
+          secretId: secretId,
+          secretKey: secretKey,
+          appId: appId ?? '',
+        ),
       );
     }
     final apiKey = credentials[kCredKeyWorkerTtsApiKey];

@@ -24,6 +24,7 @@ const String _cipherAlgorithm = 'aes-256-gcm';
 /// [decryptCredentials] 对未知键的处理。
 const String kCredKeyTencentSecretId = 'tencent_asr_secret_id';
 const String kCredKeyTencentSecretKey = 'tencent_asr_secret_key';
+const String kCredKeyTencentAppId = 'tencent_asr_app_id';
 const String kCredKeyWorkerTtsApiKey = 'worker_tts_api_key';
 const String kCredKeyLlmApiKey = 'llm_api_key';
 const String kCredKeyLlmApiKeyHint = 'llm_api_key_hint';
@@ -37,6 +38,7 @@ const String kCredKeyLlmProviderKeys = 'llm_provider_keys';
 const List<String> kBackupCredentialKeys = [
   kCredKeyTencentSecretId,
   kCredKeyTencentSecretKey,
+  kCredKeyTencentAppId,
   kCredKeyWorkerTtsApiKey,
   kCredKeyLlmApiKey,
   kCredKeyLlmApiKeyHint,

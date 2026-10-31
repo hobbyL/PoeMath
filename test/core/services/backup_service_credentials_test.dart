@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
+import 'package:poemath/core/services/backup_payload_cipher.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
@@ -20,7 +21,9 @@ import '../../helpers/hive_test_helper.dart';
 final class _MemoryCredentialStore extends SecureCredentialStore {
   String? tencentSecretId;
   String? tencentSecretKey;
+  String tencentAppId = '';
   String? workerApiKey;
+  bool failNextWorkerWrite = false;
 
   /// 模拟安全存储不可用（系统密钥库被重置 / 桌面无插件）。
   bool throwOnRead = false;
@@ -36,6 +39,7 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   ) async {
     tencentSecretId = credentials.secretId;
     tencentSecretKey = credentials.secretKey;
+    tencentAppId = credentials.appId;
   }
 
   @override
@@ -44,7 +48,11 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
     final id = tencentSecretId;
     final key = tencentSecretKey;
     if (id == null || key == null) return null;
-    final credentials = TencentAsrCredentials(secretId: id, secretKey: key);
+    final credentials = TencentAsrCredentials(
+      secretId: id,
+      secretKey: key,
+      appId: tencentAppId,
+    );
     return credentials.isComplete ? credentials : null;
   }
 
@@ -52,10 +60,15 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   Future<void> deleteTencentAsrCredentials() async {
     tencentSecretId = null;
     tencentSecretKey = null;
+    tencentAppId = '';
   }
 
   @override
   Future<void> saveWorkerTtsApiKey(String apiKey) async {
+    if (failNextWorkerWrite) {
+      failNextWorkerWrite = false;
+      throw StateError('synthetic credential write failure');
+    }
     workerApiKey = apiKey;
   }
 
@@ -109,6 +122,7 @@ void main() {
       const TencentAsrCredentials(
         secretId: 'AKID-private-secret-id',
         secretKey: 'SK-private-secret-key',
+        appId: '100000001',
       ),
     );
     await credentialStore.saveWorkerTtsApiKey('worker-tts-private-key');
@@ -125,6 +139,133 @@ void main() {
     );
   }
 
+  Future<String> tencentBackup({
+    String secretId = 'AKID-private-secret-id',
+    String secretKey = 'SK-private-secret-key',
+    String? appId,
+    String? workerKey,
+  }) async {
+    final data = jsonDecode(
+      await backupService.exportToJson(
+        includeCredentials: false,
+      ),
+    ) as Map<String, dynamic>;
+    data['credentials'] = await encryptCredentials(
+      {
+        kCredKeyTencentSecretId: secretId,
+        kCredKeyTencentSecretKey: secretKey,
+        if (appId != null) kCredKeyTencentAppId: appId,
+        if (workerKey != null) kCredKeyWorkerTtsApiKey: workerKey,
+      },
+      '同步口令',
+    );
+    return jsonEncode(data);
+  }
+
+  test('完整加密备份往返恢复腾讯三项，APPID 不进入明文设置', () async {
+    await seedCredentials();
+    final json = await backupService.exportToJson(
+      passphrase: '同步口令',
+      encryptPayload: true,
+    );
+    expect(isEncryptedBackup(json), isTrue);
+    expect(json, isNot(contains('100000001')));
+    expect(HiveBoxes.settings.containsKey(kCredKeyTencentAppId), isFalse);
+    await credentialStore.deleteTencentAsrCredentials();
+    await backupService.restoreFromJson(json, passphrase: '同步口令');
+    final restored = (await credentialStore.readTencentAsrCredentials())!;
+    expect(restored.secretId, 'AKID-private-secret-id');
+    expect(restored.secretKey, 'SK-private-secret-key');
+    expect(restored.appId, '100000001');
+    expect(restored.hasRealtimeCredentials, isTrue);
+  });
+
+  test('旧备份缺 APPID 且两项密钥相同，保留本机实时配置', () async {
+    await seedCredentials();
+    final oldBackup = await tencentBackup();
+    await backupService.restoreFromJson(oldBackup, passphrase: '同步口令');
+    expect(credentialStore.tencentAppId, '100000001');
+    expect(
+      (await credentialStore.readTencentAsrCredentials())!
+          .hasRealtimeCredentials,
+      isTrue,
+    );
+  });
+
+  for (final changed in ['secretId', 'secretKey']) {
+    test('旧备份缺 APPID 且 $changed 不同，不继承另一账户 APPID', () async {
+      await seedCredentials();
+      final oldBackup = await tencentBackup(
+        secretId:
+            changed == 'secretId' ? 'different-id' : 'AKID-private-secret-id',
+        secretKey:
+            changed == 'secretKey' ? 'different-key' : 'SK-private-secret-key',
+      );
+      await backupService.restoreFromJson(oldBackup, passphrase: '同步口令');
+      final restored = (await credentialStore.readTencentAsrCredentials())!;
+      expect(restored.appId, isEmpty);
+      expect(restored.hasRealtimeCredentials, isFalse);
+      expect(restored.isComplete, isTrue);
+    });
+  }
+
+  test('旧备份恢复到无本机凭据的设备，继续提供一句话识别', () async {
+    final oldBackup = await tencentBackup();
+    await backupService.restoreFromJson(oldBackup, passphrase: '同步口令');
+    final restored = (await credentialStore.readTencentAsrCredentials())!;
+    expect(restored.isComplete, isTrue);
+    expect(restored.appId, isEmpty);
+  });
+
+  test('新备份明确携带 APPID 时覆盖本机同账户的旧值', () async {
+    await seedCredentials();
+    final backup = await tencentBackup(appId: '200000001');
+    await backupService.restoreFromJson(backup, passphrase: '同步口令');
+    expect(credentialStore.tencentAppId, '200000001');
+  });
+
+  test('跳过凭据恢复保留本机腾讯三项，学习数据仍恢复', () async {
+    await seedCredentials();
+    await seedProgress('poem_1');
+    final backup = await backupService.exportToJson(passphrase: '同步口令');
+    await credentialStore.saveTencentAsrCredentials(
+      const TencentAsrCredentials(
+        secretId: 'local-id',
+        secretKey: 'local-key',
+        appId: '300000001',
+      ),
+    );
+    await HiveBoxes.poemProgress.clear();
+    await backupService.restoreFromJson(backup, passphrase: '');
+    final restored = (await credentialStore.readTencentAsrCredentials())!;
+    expect(restored.secretId, 'local-id');
+    expect(restored.secretKey, 'local-key');
+    expect(restored.appId, '300000001');
+    expect(HiveBoxes.poemProgress.values.single.poemId, 'poem_1');
+  });
+
+  test('腾讯恢复完成后其他凭据失败，三项与本地学习记录一起补偿', () async {
+    await seedCredentials();
+    final backup = await tencentBackup(
+      secretId: 'backup-id',
+      secretKey: 'backup-key',
+      appId: '200000001',
+      workerKey: 'backup-worker',
+    );
+    await seedProgress('local-progress');
+    credentialStore.failNextWorkerWrite = true;
+    await expectLater(
+      backupService.restoreFromJson(backup, passphrase: '同步口令'),
+      throwsStateError,
+    );
+    final restored = (await credentialStore.readTencentAsrCredentials())!;
+    expect(restored.secretId, 'AKID-private-secret-id');
+    expect(restored.secretKey, 'SK-private-secret-key');
+    expect(restored.appId, '100000001');
+    expect(credentialStore.workerApiKey, 'worker-tts-private-key');
+    expect(HiveBoxes.poemProgress.values.single.poemId, 'local-progress');
+  });
+
   test('AC1 roundtrip：导出 → 清空 → 同口令恢复，凭据与数据齐回', () async {
     await seedCredentials();
     await seedProgress('poem_1');
@@ -139,12 +280,12 @@ void main() {
     expect(count, greaterThan(0));
     expect(credentialStore.tencentSecretId, 'AKID-private-secret-id');
     expect(credentialStore.tencentSecretKey, 'SK-private-secret-key');
+    expect(credentialStore.tencentAppId, '100000001');
     expect(credentialStore.workerApiKey, 'worker-tts-private-key');
     expect(HiveBoxes.poemProgress.values.single.poemId, 'poem_1');
   });
 
-  test('跨版本恢复：备份含未来版本的凭据键，学习数据与已知凭据照常恢复',
-      () async {
+  test('跨版本恢复：备份含未来版本的凭据键，学习数据与已知凭据照常恢复', () async {
     // 回归「旧版本读不了新版本备份」：此前 decryptCredentials 对任一
     // 未知键直接抛 FormatException，而解密发生在 _doRestore **之前**，
     // 异常一路冒到 UI —— 用户的诗词进度、错题本、复习计划全都恢复不了，
@@ -157,12 +298,15 @@ void main() {
 
     // 伪造「更高版本」的备份：凭据节里多一个本版本不认识的键。
     final data = jsonDecode(json) as Map<String, dynamic>;
-    data['credentials'] = await encryptCredentials({
-      kCredKeyTencentSecretId: 'AKID-private-secret-id',
-      kCredKeyTencentSecretKey: 'SK-private-secret-key',
-      kCredKeyWorkerTtsApiKey: 'worker-tts-private-key',
-      'future_vendor_api_key': '来自更高版本',
-    }, '同步口令',);
+    data['credentials'] = await encryptCredentials(
+      {
+        kCredKeyTencentSecretId: 'AKID-private-secret-id',
+        kCredKeyTencentSecretKey: 'SK-private-secret-key',
+        kCredKeyWorkerTtsApiKey: 'worker-tts-private-key',
+        'future_vendor_api_key': '来自更高版本',
+      },
+      '同步口令',
+    );
     final futureJson = jsonEncode(data);
 
     await credentialStore.deleteTencentAsrCredentials();
@@ -181,7 +325,8 @@ void main() {
     expect(credentialStore.workerApiKey, 'worker-tts-private-key');
   });
 
-  test('AC2 错口令：写入前失败，Hive 与安全存储零变更', () async {    await seedCredentials();
+  test('AC2 错口令：写入前失败，Hive 与安全存储零变更', () async {
+    await seedCredentials();
     await seedProgress('poem_1');
     final json = await backupService.exportToJson(passphrase: '同步口令');
 
@@ -200,8 +345,10 @@ void main() {
       ),
     );
 
-    expect(HiveBoxes.poemProgress.values.map((p) => p.poemId),
-        containsAll(['poem_1', 'poem_2']),);
+    expect(
+      HiveBoxes.poemProgress.values.map((p) => p.poemId),
+      containsAll(['poem_1', 'poem_2']),
+    );
     expect(credentialStore.workerApiKey, '本地新Key');
   });
 
@@ -229,8 +376,7 @@ void main() {
     await credentialStore.deleteWorkerTtsApiKey();
     await HiveBoxes.poemProgress.clear();
 
-    final count =
-        await backupService.restoreFromJson(json, passphrase: '');
+    final count = await backupService.restoreFromJson(json, passphrase: '');
 
     expect(count, greaterThan(0));
     expect(HiveBoxes.poemProgress.values.single.poemId, 'poem_1');
@@ -255,14 +401,15 @@ void main() {
 
     expect(json, isNot(contains('AKID-private-secret-id')));
     expect(json, isNot(contains('SK-private-secret-key')));
+    expect(json, isNot(contains('100000001')));
     expect(json, isNot(contains('worker-tts-private-key')));
   });
 
   test('凭据节结构：kdf/cipher 参数写入备份', () async {
     await credentialStore.saveWorkerTtsApiKey('worker-tts-private-key');
     final json = await backupService.exportToJson(passphrase: '同步口令');
-    final node =
-        (jsonDecode(json) as Map<String, dynamic>)['credentials'] as Map<String, dynamic>;
+    final node = (jsonDecode(json) as Map<String, dynamic>)['credentials']
+        as Map<String, dynamic>;
 
     final kdf = node['kdf'] as Map<String, dynamic>;
     expect(kdf['algorithm'], 'pbkdf2-sha256');

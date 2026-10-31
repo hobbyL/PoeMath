@@ -13,6 +13,7 @@ void main() {
   const payload = <String, String>{
     'tencent_asr_secret_id': 'AKID-demo-secret-id',
     'tencent_asr_secret_key': 'SK-demo-secret-key',
+    'tencent_asr_app_id': '100000001',
     'worker_tts_api_key': 'worker-tts-demo-key',
   };
 
@@ -208,6 +209,7 @@ void main() {
     expect(kBackupCredentialKeys, <String>[
       kCredKeyTencentSecretId,
       kCredKeyTencentSecretKey,
+      kCredKeyTencentAppId,
       kCredKeyWorkerTtsApiKey,
       kCredKeyLlmApiKey,
       kCredKeyLlmApiKeyHint,
@@ -217,6 +219,7 @@ void main() {
     expect(kBackupCredentialKeys, <String>[
       'tencent_asr_secret_id',
       'tencent_asr_secret_key',
+      'tencent_asr_app_id',
       'worker_tts_api_key',
       'llm_api_key',
       'llm_api_key_hint',
