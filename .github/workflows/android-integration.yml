@@ -34,4 +34,4 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: flutter test integration_test/app_journeys_test.dart -d emulator-5554
+          script: flutter test integration_test/app_journeys_test.dart -d emulator-5554 --dart-define=POEMATH_INTEGRATION_TEST=true --no-uninstall

@@ -1,5 +1,6 @@
 // Android-first end-to-end journeys. Run locally with:
 // flutter test integration_test/app_journeys_test.dart -d <android-device-id>
+//   --dart-define=POEMATH_INTEGRATION_TEST=true --no-uninstall
 
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:integration_test/integration_test.dart';
