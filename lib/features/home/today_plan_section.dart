@@ -84,6 +84,7 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                   iconColor: task.completed
                       ? theme.semantic.success
                       : theme.colorScheme.primary,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   title: '${task.kind.label} · ${task.title}',
                   subtitle: task.completed
                       ? '今日已完成'
