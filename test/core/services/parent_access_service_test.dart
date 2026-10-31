@@ -61,7 +61,7 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  test('未设置时管理锁定，首次PIN可建立且仅存盐化摘要', () async {
+  test('未设置时管理锁定，首次PIN仅存盐化摘要且解锁精确15分钟', () async {
     expect(access.enabled, isFalse);
     expect(access.isUnlocked, isFalse);
     expect(access.canSetPin, isTrue);
@@ -78,13 +78,18 @@ void main() {
     expect(access.isUnlocked, isFalse);
     expect(await access.authenticate('999999'), isFalse);
     expect(await access.authenticate('123456'), isTrue);
-    now = now.add(
-      ParentAccessService.unlockDuration - const Duration(microseconds: 1),
+    final unlockedAt = now;
+    now = unlockedAt.add(const Duration(minutes: 2));
+    expect(access.isUnlocked, isTrue);
+    expect(access.assertAllowed, returnsNormally);
+    now = unlockedAt.add(
+      const Duration(minutes: 15) - const Duration(microseconds: 1),
     );
     expect(access.isUnlocked, isTrue);
-    now = now.add(const Duration(microseconds: 1));
+    now = unlockedAt.add(const Duration(minutes: 15));
     expect(access.isUnlocked, isFalse);
     expect(access.canSetPin, isFalse);
+    expect(access.assertAllowed, throwsA(isA<ParentAccessDenied>()));
   });
 
   test('后台事件使进行中的验证失效，不能在await后重新解锁', () async {

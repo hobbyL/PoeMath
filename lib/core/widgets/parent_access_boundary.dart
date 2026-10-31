@@ -165,7 +165,9 @@ class _ParentUnlockDialogState extends State<_ParentUnlockDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _recovery ? '恢复成功后需重新设置家长密码，此恢复码随即失效。' : '解锁有效 2 分钟，切到后台会立即锁定。',
+                _recovery
+                    ? '恢复成功后需重新设置家长密码，此恢复码随即失效。'
+                    : '解锁有效 ${ParentAccessService.unlockDuration.inMinutes} 分钟，切到后台会立即锁定。',
               ),
               const SizedBox(height: SpacingTokens.md),
               TextField(

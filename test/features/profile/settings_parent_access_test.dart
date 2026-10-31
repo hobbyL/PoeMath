@@ -321,7 +321,7 @@ void main() {
     expect(router.routerDelegate.state.uri.path, AppRoutes.llmSettings);
   });
 
-  testWidgets('错误或取消验证保持锁定，正确PIN进入且跨设置复用两分钟窗口', (tester) async {
+  testWidgets('错误或取消验证保持锁定，正确PIN进入且跨设置复用15分钟窗口', (tester) async {
     await tester.runAsync(unlockParentForTesting);
     access.lock();
     final router = createAppRouter(initialLocation: AppRoutes.settings);
