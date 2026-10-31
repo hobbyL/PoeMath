@@ -413,16 +413,37 @@ void main() {
       () => find.byType(ParentProtectionPage).evaluate().isNotEmpty,
     );
     expect(find.text('移除家长密码'), findsNothing);
+    expect(
+      find.widgetWithText(TextField, '新的 6 位数字 PIN'),
+      findsNothing,
+    );
+    await tester.runAsync(() => tester.tap(find.byTooltip('修改家长密码')));
+    await _pumpUntil(
+      tester,
+      () => find.widgetWithText(AlertDialog, '修改家长密码').evaluate().isNotEmpty,
+    );
     await tester.enterText(
       find.widgetWithText(TextField, '新的 6 位数字 PIN'),
       newPin,
     );
     await tester.enterText(
       find.widgetWithText(TextField, '再次输入 PIN'),
+      testParentPin,
+    );
+    await tester.runAsync(
+      () => tester.tap(find.widgetWithText(FilledButton, '保存')),
+    );
+    await _pumpUntil(
+      tester,
+      () => find.text('请输入两次相同的 6 位数字 PIN').evaluate().isNotEmpty,
+    );
+    expect(find.text('保存一次性恢复码'), findsNothing);
+    await tester.enterText(
+      find.widgetWithText(TextField, '再次输入 PIN'),
       newPin,
     );
     await tester.runAsync(
-      () => tester.tap(find.widgetWithText(FilledButton, '修改家长密码')),
+      () => tester.tap(find.widgetWithText(FilledButton, '保存')),
     );
     await _pumpUntil(
       tester,
@@ -464,6 +485,85 @@ void main() {
     expect(access.enabled, isFalse);
     expect(access.isUnlocked, isFalse);
     expect(access.canSetPin, isTrue);
+  });
+
+  testWidgets('修改密码弹窗取消或提交后立即转后台都保留原凭据', (tester) async {
+    await tester.runAsync(unlockParentForTesting);
+    final store = SecureCredentialStore();
+    final oldRecord = (await tester.runAsync(store.readParentProtection))!;
+    const newPin = '135790';
+    final router = createAppRouter(initialLocation: AppRoutes.parentProtection);
+    await _mount(tester, router);
+    await _pumpUntil(
+      tester,
+      () => find.byType(ParentProtectionPage).evaluate().isNotEmpty,
+    );
+    // 在窄屏上同时检查输入弹窗与导航图标仍可操作。
+    tester.view.physicalSize = const Size(360, 640);
+    await _drainFrames(tester);
+    await tester.runAsync(() => tester.tap(find.byTooltip('修改家长密码')));
+    await _pumpUntil(
+      tester,
+      () => find.widgetWithText(AlertDialog, '修改家长密码').evaluate().isNotEmpty,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, '新的 6 位数字 PIN'),
+      newPin,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, '再次输入 PIN'),
+      newPin,
+    );
+    await tester.runAsync(() => tester.tap(find.text('取消')));
+    await _pumpUntil(tester, () => find.byType(AlertDialog).evaluate().isEmpty);
+    expect(await tester.runAsync(store.readParentProtection), oldRecord);
+    expect(access.enabled, isTrue);
+    expect(access.isUnlocked, isTrue);
+
+    await tester.runAsync(() => tester.tap(find.byTooltip('修改家长密码')));
+    await _pumpUntil(
+      tester,
+      () => find.widgetWithText(AlertDialog, '修改家长密码').evaluate().isNotEmpty,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, '新的 6 位数字 PIN'),
+      newPin,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, '再次输入 PIN'),
+      newPin,
+    );
+    await tester.runAsync(
+      () => tester.tap(find.widgetWithText(FilledButton, '保存')),
+    );
+    await _background(tester);
+    await _drainFrames(tester);
+    expect(await tester.runAsync(store.readParentProtection), oldRecord);
+    expect(access.enabled, isTrue);
+    expect(access.isUnlocked, isFalse);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(
+      find.byType(ParentProtectionPage, skipOffstage: false),
+      findsNothing,
+    );
+
+    await _foreground(tester);
+    await tester
+        .runAsync(() => tester.tap(find.widgetWithText(FilledButton, '家长解锁')));
+    await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
+    await tester.enterText(
+      find.widgetWithText(TextField, '6 位数字 PIN'),
+      testParentPin,
+    );
+    await tester.runAsync(() => tester.tap(_unlockButton));
+    await _pumpUntil(
+      tester,
+      () => find.byType(ParentProtectionPage).evaluate().isNotEmpty,
+    );
+    expect(access.isUnlocked, isTrue);
+    expect(find.byTooltip('修改家长密码'), findsOneWidget);
+    expect(find.text('保存一次性恢复码'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('在家长设置页使用恢复码只切换为重设，不叠加自身路由', (tester) async {

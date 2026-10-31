@@ -18,6 +18,7 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
   final _pin = TextEditingController();
   final _confirmation = TextEditingController();
   bool _busy = false;
+  bool _changingPin = false;
   String? _error;
   ParentAccessService get _access => ParentAccessService.instance;
 
@@ -26,10 +27,48 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
       ModalRoute.of(context)?.isCurrent != false &&
       (WidgetsBinding.instance.lifecycleState == null ||
           WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed);
-  Future<void> _configure() async {
+  Future<void> _changePin() async {
+    if (_busy || _changingPin) return;
+    setState(() {
+      _changingPin = true;
+      _error = null;
+    });
+    try {
+      if (!await ensureParentAccess(context) ||
+          !mounted ||
+          !_isCurrentConfiguration() ||
+          !_access.enabled) {
+        return;
+      }
+      final navigator = Navigator.of(context, rootNavigator: true);
+      final route = DialogRoute<String>(
+        context: context,
+        themes: InheritedTheme.capture(from: context, to: navigator.context),
+        builder: (_) => const _ChangeParentPinDialog(),
+      );
+      final pin = await navigator.push(route);
+      // 等输入弹窗完整退出，再保存并展示恢复码。
+      await route.completed;
+      if (pin == null ||
+          !mounted ||
+          !_isCurrentConfiguration() ||
+          !_access.enabled ||
+          !_access.isUnlocked) {
+        return;
+      }
+      await _configure(newPin: pin);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _changingPin = false);
+    }
+  }
+
+  Future<void> _configure({String? newPin}) async {
     if (_busy) return;
-    final pin = _pin.text;
-    if (pin != _confirmation.text || !ParentAccessService.validPin(pin)) {
+    final pin = newPin ?? _pin.text;
+    final confirmation = newPin ?? _confirmation.text;
+    if (pin != confirmation || !ParentAccessService.validPin(pin)) {
       setState(() {
         _error = '请输入两次相同的 6 位数字 PIN';
         _busy = false;
@@ -155,7 +194,21 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
     final theme = Theme.of(context);
     final usage = CloudUsageService.instance;
     return Scaffold(
-      appBar: AppBar(title: const Text('家长保护与云额度')),
+      appBar: AppBar(
+        title: const Text(
+          '家长保护与云额度',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          if (_access.enabled && _access.isUnlocked)
+            IconButton(
+              onPressed: _busy || _changingPin ? null : _changePin,
+              tooltip: '修改家长密码',
+              icon: const Icon(Icons.password_outlined),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),
         children: [
@@ -173,20 +226,22 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
             ),
           if (!_access.enabled || _access.needsResetNotice)
             const SizedBox(height: SpacingTokens.md),
-          TextField(
-            controller: _pin,
-            enabled: !_busy,
-            obscureText: true,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: '新的 6 位数字 PIN'),
-          ),
-          TextField(
-            controller: _confirmation,
-            enabled: !_busy,
-            obscureText: true,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: '再次输入 PIN'),
-          ),
+          if (!_access.enabled) ...[
+            TextField(
+              controller: _pin,
+              enabled: !_busy,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: '新的 6 位数字 PIN'),
+            ),
+            TextField(
+              controller: _confirmation,
+              enabled: !_busy,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: '再次输入 PIN'),
+            ),
+          ],
           if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: SpacingTokens.sm),
@@ -195,19 +250,14 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
                 style: TextStyle(color: theme.colorScheme.error),
               ),
             ),
-          const SizedBox(height: SpacingTokens.md),
-          FilledButton(
-            onPressed: _busy ? null : _configure,
-            child: Text(
-              _busy
-                  ? '正在保存…'
-                  : _access.enabled
-                      ? '修改家长密码'
-                      : '设置家长密码',
+          if (!_access.enabled) ...[
+            const SizedBox(height: SpacingTokens.md),
+            FilledButton(
+              onPressed: _busy ? null : _configure,
+              child: Text(_busy ? '正在保存…' : '设置家长密码'),
             ),
-          ),
+          ],
           if (_access.enabled && _access.isUnlocked) ...[
-            const SizedBox(height: SpacingTokens.lg),
             // 标题行带「查看历史」入口：本页只显示当天，历史在独立页。
             // 新页同样包 ParentAccessBoundary —— 用量属家长可见范畴。
             Row(
@@ -307,4 +357,87 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
         CloudUsageKind.asr => Icons.mic_none_rounded,
         CloudUsageKind.tts => Icons.record_voice_over_outlined,
       };
+}
+
+class _ChangeParentPinDialog extends StatefulWidget {
+  const _ChangeParentPinDialog();
+
+  @override
+  State<_ChangeParentPinDialog> createState() => _ChangeParentPinDialogState();
+}
+
+class _ChangeParentPinDialogState extends State<_ChangeParentPinDialog> {
+  final _pin = TextEditingController();
+  final _confirmation = TextEditingController();
+  String? _error;
+  bool _submitted = false;
+
+  void _close([String? pin]) {
+    if (!mounted || _submitted || ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    setState(() => _submitted = true);
+    Navigator.pop(context, pin);
+  }
+
+  void _submit() {
+    if (!mounted || _submitted) return;
+    final pin = _pin.text;
+    if (pin != _confirmation.text || !ParentAccessService.validPin(pin)) {
+      setState(() => _error = '请输入两次相同的 6 位数字 PIN');
+      return;
+    }
+    _close(pin);
+  }
+
+  @override
+  void dispose() {
+    _pin.dispose();
+    _confirmation.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('修改家长密码'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _pin,
+                autofocus: true,
+                enabled: !_submitted,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(labelText: '新的 6 位数字 PIN'),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+              TextField(
+                controller: _confirmation,
+                enabled: !_submitted,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: '再次输入 PIN',
+                  errorText: _error,
+                ),
+                onSubmitted: (_) => _submit(),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _submitted ? null : _close,
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: _submitted ? null : _submit,
+            child: const Text('保存'),
+          ),
+        ],
+      );
 }
