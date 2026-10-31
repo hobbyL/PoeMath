@@ -7,6 +7,11 @@ import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/services/picture_story_editor_service.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
+import 'package:poemath/features/chinese/expression/picture_story_audio_service.dart';
+
+final pictureStoryAudioServiceProvider = Provider<PictureStoryAudioService>(
+  (ref) => PictureStoryAudioService(),
+);
 
 final pictureStoryImageServiceProvider = Provider<PictureStoryImageService>(
   (ref) => PictureStoryImageService.instance,

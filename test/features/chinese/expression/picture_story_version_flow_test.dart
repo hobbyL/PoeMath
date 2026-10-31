@@ -25,8 +25,13 @@ class _Repository extends PictureStoryRepository {
   final Zone ioZone;
   Future<void>? lastRecordSave;
   @override
-  Future<void> save(PictureStoryPracticeRecord record) =>
-      lastRecordSave = ioZone.run<Future<void>>(() => super.save(record));
+  Future<void> save(
+    PictureStoryPracticeRecord record, {
+    void Function()? check,
+  }) =>
+      lastRecordSave = ioZone.run<Future<void>>(
+        () => super.save(record, check: check),
+      );
 }
 
 void main() {

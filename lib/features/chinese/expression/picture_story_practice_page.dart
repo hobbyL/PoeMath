@@ -43,9 +43,11 @@ class PictureStoryPracticePage extends ConsumerStatefulWidget {
 }
 
 class _PictureStoryPracticePageState
-    extends ConsumerState<PictureStoryPracticePage> {
-  final _audio = PictureStoryAudioService();
+    extends ConsumerState<PictureStoryPracticePage>
+    with WidgetsBindingObserver {
+  late final PictureStoryAudioService _audio;
   final _player = AudioPlayer();
+  final _disposals = Expando<Future<void>>();
   final _textControllers = <String, TextEditingController>{};
   final _illustrationKey = GlobalKey();
   Timer? _timer;
@@ -57,6 +59,10 @@ class _PictureStoryPracticePageState
   String? _message;
   String? _playingId;
   int _elapsedSeconds = 0;
+  int _generation = 0;
+  int _draftRevision = 0;
+  bool _foreground = false;
+  bool _starting = false;
   bool _recording = false;
   bool _processing = false;
   bool _finishing = false;
@@ -69,6 +75,10 @@ class _PictureStoryPracticePageState
   @override
   void initState() {
     super.initState();
+    _foreground =
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
+    _audio = ref.read(pictureStoryAudioServiceProvider);
     _repository = ref.read(pictureStoryRepositoryProvider);
     try {
       _prompt = _repository.findPrompt(widget.promptId)?.copyWith();
@@ -91,10 +101,8 @@ class _PictureStoryPracticePageState
 
   @override
   void dispose() {
-    _timer?.cancel();
-    _transcriptSubscription?.cancel();
-    final speech = _speech;
-    if (speech != null) unawaited(speech.dispose());
+    WidgetsBinding.instance.removeObserver(this);
+    _invalidateRecording();
     for (final controller in _textControllers.values) {
       controller.dispose();
     }
@@ -102,33 +110,110 @@ class _PictureStoryPracticePageState
     super.dispose();
   }
 
-  Future<void> _startRecording() async {
-    if (_recording || _processing || _finishing) return;
-    final factory = ref.read(speechRecognitionServiceFactoryProvider);
-    final speech = _speech ??= factory();
+  bool _current(int generation) =>
+      mounted && _foreground && generation == _generation;
+
+  Future<void> _disposeSpeech(SpeechRecognitionService speech) {
+    return _disposals[speech] ??= () async {
+      try {
+        await speech.dispose();
+      } on Object catch (error) {
+        AppLogger.e('看图说话录音清理失败', tag: 'PictureStory', error: error);
+      }
+    }();
+  }
+
+  Future<void> _cancelSpeech(SpeechRecognitionService speech) async {
     try {
+      await speech.cancel();
+    } on Object catch (error) {
+      AppLogger.e('看图说话取消录音失败', tag: 'PictureStory', error: error);
+    } finally {
+      await _disposeSpeech(speech);
+    }
+  }
+
+  void _invalidateRecording() {
+    ++_generation;
+    _timer?.cancel();
+    _timer = null;
+    final subscription = _transcriptSubscription;
+    _transcriptSubscription = null;
+    if (subscription != null) unawaited(subscription.cancel());
+    final speech = _speech;
+    _speech = null;
+    if (speech != null) unawaited(_cancelSpeech(speech));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (!_foreground) {
+      final active = _starting || _recording || _processing;
+      _invalidateRecording();
+      unawaited(_player.stop());
+      // Persist only the segments already accepted while the page was active.
+      unawaited(_saveDraft());
+      if (mounted) {
+        setState(() {
+          _starting = false;
+          _recording = false;
+          _processing = false;
+          _finishing = false;
+          _elapsedSeconds = 0;
+          _liveText = '';
+          _playingId = null;
+          if (active) _message = '录音已取消，回到前台后请重新开始';
+        });
+      }
+    } else if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _startRecording() async {
+    if (!_foreground || _starting || _recording || _processing || _finishing) {
+      return;
+    }
+    final generation = ++_generation;
+    setState(() {
+      _starting = true;
+      _liveText = '';
+      _message = null;
+    });
+    SpeechRecognitionService? speech;
+    StreamSubscription<String>? subscription;
+    var started = false;
+    try {
+      final factory = ref.read(speechRecognitionServiceFactoryProvider);
+      // Each attempt owns its recorder; a late old start cannot cancel a new one.
+      speech = factory();
+      _speech = speech;
       await speech.initialize();
+      if (!_current(generation)) return;
       if (speech is StreamingSpeechRecognitionService) {
         final streaming = speech as StreamingSpeechRecognitionService;
-        await _transcriptSubscription?.cancel();
-        _transcriptSubscription =
-            streaming.transcriptStream.listen((String text) {
-          if (mounted && (_recording || _processing)) {
+        subscription = streaming.transcriptStream.listen((String text) {
+          if (_current(generation) &&
+              (_starting || _recording || _processing)) {
             setState(() => _liveText = text);
           }
         });
+        _transcriptSubscription = subscription;
       }
       await speech.start();
-      if (!mounted) return;
+      if (!_current(generation)) return;
+      started = true;
       _timer?.cancel();
       setState(() {
+        _starting = false;
         _recording = true;
         _elapsedSeconds = 0;
         _liveText = '';
         _message = null;
       });
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (!mounted || !_recording) {
+        if (!_current(generation) || !_recording) {
           timer.cancel();
           return;
         }
@@ -137,8 +222,7 @@ class _PictureStoryPracticePageState
         if (next >= 60) unawaited(_finishSegment());
       });
     } on SpeechRecognitionException catch (error) {
-      if (mounted) setState(() => _message = error.message);
-      await speech.cancel();
+      if (_current(generation)) setState(() => _message = error.message);
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '看图说话开始录音失败',
@@ -146,43 +230,69 @@ class _PictureStoryPracticePageState
         error: error,
         stackTrace: stackTrace,
       );
-      if (mounted) setState(() => _message = '无法开始录音，请检查麦克风权限');
-      await speech.cancel();
+      if (_current(generation)) {
+        setState(() => _message = '无法开始录音，请检查麦克风权限');
+      }
+    } finally {
+      if (!started) {
+        if (identical(_transcriptSubscription, subscription)) {
+          _transcriptSubscription = null;
+        }
+        if (subscription != null) unawaited(subscription.cancel());
+        if (identical(_speech, speech)) _speech = null;
+        if (speech != null) unawaited(_cancelSpeech(speech));
+        if (_current(generation)) {
+          setState(() {
+            _starting = false;
+            _recording = false;
+            _processing = false;
+          });
+        }
+      }
     }
   }
 
   Future<void> _finishSegment() async {
-    if (!_recording || _processing || _speech == null) return;
+    final speech = _speech;
+    final generation = _generation;
+    if (!_current(generation) || !_recording || _processing || speech == null) {
+      return;
+    }
+    final subscription = _transcriptSubscription;
     _timer?.cancel();
     setState(() {
       _recording = false;
       _processing = true;
       _message = null;
     });
-    SpeechRecognitionResult? result;
-    Object? recognitionError;
     try {
-      result = await _speech!.stop();
-    } on Object catch (error) {
-      recognitionError = error;
-    }
-    final retained = _speech is RetainedAudioSpeechRecognitionService
-        ? (_speech! as RetainedAudioSpeechRecognitionService).takeLastAudio()
-        : null;
-    if (!mounted) return;
-    if (retained == null || retained.isEmpty) {
-      setState(() {
-        _processing = false;
-        _message = recognitionError is SpeechRecognitionException
-            ? recognitionError.message
-            : '录音没有保存成功，请再试一次';
-      });
-      return;
-    }
-    final segmentId =
-        '${_record!.id}-${_segments.length + 1}-${DateTime.now().microsecondsSinceEpoch}';
-    try {
+      SpeechRecognitionResult? result;
+      Object? recognitionError;
+      try {
+        result = await speech.stop();
+      } on Object catch (error) {
+        recognitionError = error;
+      }
+      if (!_current(generation)) return;
+      final retained = speech is RetainedAudioSpeechRecognitionService
+          ? (speech as RetainedAudioSpeechRecognitionService).takeLastAudio()
+          : null;
+      if (retained == null || retained.isEmpty) {
+        setState(() {
+          _message = recognitionError is SpeechRecognitionException
+              ? recognitionError.message
+              : '录音没有保存成功，请再试一次';
+        });
+        return;
+      }
+      final segmentId =
+          '${_record!.id}-${_segments.length + 1}-${DateTime.now().microsecondsSinceEpoch}';
       final audioPath = await _audio.savePcm16(id: segmentId, pcm: retained);
+      if (!_current(generation)) {
+        // The new file has no record reference; keep all earlier saved clips.
+        await _audio.delete(audioPath);
+        return;
+      }
       final transcript = result?.text.trim().isNotEmpty == true
           ? result!.text.trim()
           : _liveText.trim();
@@ -205,7 +315,7 @@ class _PictureStoryPracticePageState
       });
       _controllerFor(segment);
       _record!.setSegments(_segments);
-      await _saveDraft();
+      await _saveDraft(generation: generation);
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '看图说话保存录音失败',
@@ -213,10 +323,17 @@ class _PictureStoryPracticePageState
         error: error,
         stackTrace: stackTrace,
       );
-      setState(() {
-        _processing = false;
-        _message = '录音保存失败，请检查设备空间后重试';
-      });
+      if (_current(generation)) {
+        setState(() => _message = '录音保存失败，请检查设备空间后重试');
+      }
+    } finally {
+      if (identical(_transcriptSubscription, subscription)) {
+        _transcriptSubscription = null;
+      }
+      if (subscription != null) unawaited(subscription.cancel());
+      if (identical(_speech, speech)) _speech = null;
+      unawaited(_disposeSpeech(speech));
+      if (_current(generation)) setState(() => _processing = false);
     }
   }
 
@@ -250,13 +367,16 @@ class _PictureStoryPracticePageState
   }
 
   Future<void> _complete() async {
-    if (_finishing ||
+    if (!_foreground ||
+        _starting ||
+        _finishing ||
         _record == null ||
         _segments.isEmpty ||
         _recording ||
         _processing) {
       return;
     }
+    final generation = _generation;
     setState(() => _finishing = true);
     final before = _record!.copy();
     try {
@@ -274,34 +394,49 @@ class _PictureStoryPracticePageState
             ? '可以先填写听到的文字，再请家长一起回听。'
             : '再补充一个动作或人物的心情，故事会更生动。',
       });
-      if (!await _saveDraft()) {
+      if (!await _saveDraft(generation: generation)) {
+        if (!_current(generation)) return;
         _record = before;
         return;
       }
-      if (!mounted) return;
-      final aiFeedback = await _generateAiFeedback(prompt: _prompt!);
+      if (!_current(generation)) return;
+      final aiFeedback = await _generateAiFeedback(
+        prompt: _prompt!,
+        generation: generation,
+      );
+      if (!_current(generation)) return;
       if (aiFeedback != null) {
         _record!.feedbackJson = jsonEncode(<String, Object>{
           'source': 'vision',
           'text': aiFeedback,
         });
-        await _saveDraft();
+        await _saveDraft(generation: generation);
       }
+      if (!_current(generation)) return;
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('本次练习已保存')));
       context.pop();
     } finally {
-      if (mounted) setState(() => _finishing = false);
+      if (_current(generation)) setState(() => _finishing = false);
     }
   }
 
-  Future<bool> _saveDraft() async {
-    final record = _record;
+  Future<bool> _saveDraft({int? generation}) async {
+    final record = _record?.copy();
     if (record == null) return false;
+    final revision = ++_draftRevision;
+    void check() {
+      if (generation != null && !_current(generation)) {
+        throw const _PictureStoryRecordingCancelled();
+      }
+    }
+
     try {
-      await _repository.save(record);
+      await _repository.save(record, check: check);
       return true;
+    } on _PictureStoryRecordingCancelled {
+      return false;
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '看图说话记录保存失败',
@@ -309,7 +444,12 @@ class _PictureStoryPracticePageState
         error: error,
         stackTrace: stackTrace,
       );
-      if (mounted) setState(() => _message = '练习暂时没有保存，请检查设备空间后重试');
+      if (mounted &&
+          _foreground &&
+          revision == _draftRevision &&
+          (generation == null || _current(generation))) {
+        setState(() => _message = '练习暂时没有保存，请检查设备空间后重试');
+      }
       return false;
     }
   }
@@ -353,20 +493,25 @@ class _PictureStoryPracticePageState
 
   Future<String?> _generateAiFeedback({
     required PictureStoryPrompt prompt,
+    required int generation,
   }) async {
     final image = await _captureIllustration();
-    if (image == null || !mounted) return null;
+    if (image == null || !_current(generation)) return null;
     final settings = ref.read(settingsRepositoryProvider);
     try {
       final config =
           await settings.readLlmConfigForScenario(LlmScenario.assistant);
-      if (config == null || !config.supportsVision || !mounted) return null;
+      if (config == null || !config.supportsVision || !_current(generation)) {
+        return null;
+      }
       final client = createRuntimeLlmClient(
         httpClient: ref.read(llmExplainHttpClientProvider),
         settings: settings,
-        isActive: () => mounted,
+        isActive: () => _current(generation),
         onSelectionChanged: () {
-          if (mounted) ref.read(llmSelectionVersionProvider.notifier).state++;
+          if (_current(generation)) {
+            ref.read(llmSelectionVersionProvider.notifier).state++;
+          }
         },
       );
       final promptText =
@@ -410,11 +555,17 @@ class _PictureStoryPracticePageState
   }
 
   Future<void> _play(PictureStorySegment segment) async {
+    final generation = _generation;
+    if (!_current(generation)) return;
     if (!await File(segment.audioPath).exists()) {
-      if (mounted) setState(() => _message = '录音文件已清理，文字记录仍然保留');
+      if (_current(generation)) {
+        setState(() => _message = '录音文件已清理，文字记录仍然保留');
+      }
       return;
     }
+    if (!_current(generation)) return;
     await _player.stop();
+    if (!_current(generation)) return;
     if (_playingId == segment.id) {
       setState(() => _playingId = null);
       return;
@@ -422,7 +573,7 @@ class _PictureStoryPracticePageState
     setState(() => _playingId = segment.id);
     await _player.play(DeviceFileSource(segment.audioPath));
     _player.onPlayerComplete.first.then((_) {
-      if (mounted && _playingId == segment.id) {
+      if (_current(generation) && _playingId == segment.id) {
         setState(() => _playingId = null);
       }
     });
@@ -596,7 +747,7 @@ class _PictureStoryPracticePageState
                   ),
                 ),
               ),
-            if (_processing) const LinearProgressIndicator(),
+            if (_starting || _processing) const LinearProgressIndicator(),
             if (_message != null) ...[
               const SizedBox(height: SpacingTokens.sm),
               Text(
@@ -609,13 +760,16 @@ class _PictureStoryPracticePageState
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _processing || _finishing
-                        ? null
-                        : (_recording ? _finishSegment : _startRecording),
+                    onPressed:
+                        !_foreground || _starting || _processing || _finishing
+                            ? null
+                            : (_recording ? _finishSegment : _startRecording),
                     icon: Icon(
                       _recording ? Icons.stop : Icons.mic_none_outlined,
                     ),
-                    label: Text(_recording ? '说好了' : '开始录音'),
+                    label: Text(
+                      _starting ? '正在准备…' : (_recording ? '说好了' : '开始录音'),
+                    ),
                   ),
                 ),
                 if (_segments.isNotEmpty) ...[
@@ -694,4 +848,8 @@ class _PictureStoryPracticePageState
       ),
     );
   }
+}
+
+class _PictureStoryRecordingCancelled implements Exception {
+  const _PictureStoryRecordingCancelled();
 }

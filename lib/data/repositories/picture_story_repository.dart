@@ -294,7 +294,11 @@ class PictureStoryRepository {
     return record?.profileId == ProfileScope.currentId ? record : null;
   }
 
-  Future<void> save(PictureStoryPracticeRecord record) async {
+  Future<void> save(
+    PictureStoryPracticeRecord record, {
+    void Function()? check,
+  }) async {
+    check?.call();
     if (record.profileId != ProfileScope.currentId) {
       throw StateError('看图说话记录档案不匹配');
     }
