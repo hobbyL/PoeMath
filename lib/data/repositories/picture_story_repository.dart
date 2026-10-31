@@ -194,17 +194,18 @@ class PictureStoryRepository {
         }
         if (current != null && current.sameContent(candidate)) return current;
 
-        await _images.ensureStored(candidate.image);
-        _authorize();
-        _checkProfile(profileId);
         final saved = candidate.copyWith(version: (current?.version ?? 0) + 1);
         final versions = [...state.versions];
         if (current != null && !versions.any((item) => item.id == current.id)) {
           versions.add(current.copyWith());
         }
         versions.add(saved);
+        final merged = PictureStoryCatalogState(versions);
+        await _images.ensureStored(candidate.image);
+        _authorize();
+        _checkProfile(profileId);
         final values = <String, Object>{
-          catalogKey: jsonEncode(PictureStoryCatalogState(versions).toJson()),
+          catalogKey: jsonEncode(merged.toJson()),
         };
         if (original == null && enableForProfile) {
           final ids = _savedEnabledIds(profileId) ??

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,9 +18,10 @@ import '../../helpers/hive_test_helper.dart';
 import '../../helpers/picture_story_fixture.dart';
 
 class _PartialWriteBox extends Fake implements Box<dynamic> {
-  _PartialWriteBox(this.delegate);
+  _PartialWriteBox(this.delegate, {this.failNext = true});
   final Box<dynamic> delegate;
-  bool failNext = true;
+  bool failNext;
+  int writes = 0;
 
   @override
   Iterable<dynamic> get keys => delegate.keys;
@@ -34,12 +36,23 @@ class _PartialWriteBox extends Fake implements Box<dynamic> {
   Future<void> deleteAll(Iterable<dynamic> keys) => delegate.deleteAll(keys);
   @override
   Future<void> putAll(Map<dynamic, dynamic> entries) async {
+    writes++;
     if (failNext && entries.isNotEmpty) {
       failNext = false;
       await delegate.putAll({entries.keys.first: entries.values.first});
       throw StateError('模拟第二个键写入失败');
     }
     await delegate.putAll(entries);
+  }
+}
+
+class _CountingImages extends PictureStoryImageService {
+  _CountingImages({super.directoryProvider});
+  int checks = 0;
+  @override
+  Future<void> ensureStored(PictureStoryImage image) async {
+    checks++;
+    await super.ensureStored(image);
   }
 }
 
@@ -64,6 +77,170 @@ void main() {
     await tearDownHiveForTesting();
   });
 
+  List<PictureStoryPrompt> versions(int count, {PictureStoryImage? image}) =>
+      List.generate(
+        count,
+        (i) => pictureStoryFixture(
+          image: image ?? const PictureStoryImage.builtin('kite'),
+        ).copyWith(version: i + 1, title: '版本 ${i + 1}'),
+      );
+
+  Future<void> seedVersions(int count, {PictureStoryImage? image}) async {
+    await HiveBoxes.settings.put(
+      PictureStoryRepository.catalogKey,
+      jsonEncode(
+        PictureStoryCatalogState(versions(count, image: image)).toJson(),
+      ),
+    );
+  }
+
+  test('目录生产与解码共用累计版本上限，10000可读、10001拒绝', () {
+    expect(PictureStoryCatalogState.maxVersions, 10000);
+    final entries = versions(10000);
+    final atLimit = PictureStoryCatalogState(entries).toJson();
+    expect(PictureStoryCatalogState.fromJson(atLimit).versions.length, 10000);
+    final extra = entries.last.copyWith(version: 10001);
+    expect(
+      () => PictureStoryCatalogState([...entries, extra]),
+      throwsFormatException,
+    );
+    expect(
+      () => PictureStoryCatalogState.fromJson({
+        'schemaVersion': PictureStoryCatalogState.schemaVersion,
+        'versions': [...entries.map((p) => p.toJson()), extra.toJson()],
+      }),
+      throwsFormatException,
+    );
+  });
+
+  test('9999编辑可到10000；满容量无变化成功，再修改零写入且重开仍可读', () async {
+    await seedVersions(9999);
+    final settings = _PartialWriteBox(HiveBoxes.settings, failNext: false);
+    final images = _CountingImages();
+    var repository = PictureStoryRepository(settings: settings, images: images);
+    final original = repository.findPrompt('local-fixture')!;
+    final saved = await repository.savePrompt(
+      prompt: original.copyWith(title: '上限版本'),
+      original: original,
+      profileId: 'default',
+    );
+    expect(saved.version, 10000);
+    expect(repository.catalogState().versions.length, 10000);
+    expect(settings.writes, 1);
+    expect(images.checks, 1);
+    final before = repository.storageSnapshot();
+    final unchanged = await repository.savePrompt(
+      prompt: saved.copyWith(),
+      original: saved,
+      profileId: 'default',
+    );
+    expect(unchanged.toJson(), saved.toJson());
+    await expectLater(
+      repository.savePrompt(
+        prompt: saved.copyWith(title: '不应发布'),
+        original: saved,
+        profileId: 'default',
+      ),
+      throwsFormatException,
+    );
+    expect(settings.writes, 1);
+    expect(images.checks, 1);
+    expect(repository.storageSnapshot(), before);
+    expect(repository.findPrompt('local-fixture', version: 1)!.title, '版本 1');
+    await HiveBoxes.close();
+    await HiveBoxes.init();
+    repository = PictureStoryRepository();
+    expect(repository.findPrompt('local-fixture')!.version, 10000);
+    expect(repository.listPrompts().length, 4);
+  });
+
+  test('满容量拒绝新增，目录、两档案选择、历史版本和实际图片完整保留', () async {
+    final directory =
+        await Directory.systemTemp.createTemp('picture_capacity_');
+    addTearDown(() => directory.delete(recursive: true));
+    final images = _CountingImages(directoryProvider: () async => directory);
+    final source = File('${directory.path}/source.png');
+    await source.writeAsBytes(await pictureStoryPng());
+    final image = await images.importPath(source.path);
+    final storedPath = (await images.imagePath(image.value))!;
+    final stored = File(storedPath);
+    final imageBytes = await stored.readAsBytes();
+    await seedVersions(10000, image: image);
+    await HiveBoxes.settings.putAll({
+      PictureStoryRepository.enabledKeyFor('default'): '[ "local-fixture" ]',
+      PictureStoryRepository.enabledKeyFor('child-b'): '[ ]',
+    });
+    final settings = _PartialWriteBox(HiveBoxes.settings, failNext: false);
+    final repository =
+        PictureStoryRepository(settings: settings, images: images);
+    final record = PictureStoryPracticeRecord(
+      id: 'capacity-history',
+      profileId: 'default',
+      promptId: 'local-fixture',
+      promptVersion: 1,
+      startedAt: DateTime(2026),
+      status: 'completed',
+      segmentsJson: '[]',
+      answerText: '已经保存的表达',
+    );
+    await repository.save(record);
+    final before = repository.storageSnapshot();
+    await expectLater(
+      repository.savePrompt(
+        prompt: pictureStoryFixture(id: 'local-new', image: image),
+        profileId: 'default',
+      ),
+      throwsFormatException,
+    );
+    expect(settings.writes, 0);
+    expect(images.checks, 0);
+    expect(repository.storageSnapshot(), before);
+    expect(repository.findPrompt('local-new'), isNull);
+    expect(repository.findPrompt('local-fixture', version: 1)!.image, image);
+    expect(repository.find(record.id)!.answerText, '已经保存的表达');
+    expect(repository.find(record.id)!.promptVersion, 1);
+    expect(await images.imagePath(image.value), storedPath);
+    expect(await stored.readAsBytes(), imageBytes);
+    expect(await source.exists(), isTrue);
+  });
+
+  test('首次编辑内置题把补入的v1计入容量，9999拒绝、9998可发布v2', () async {
+    await seedVersions(9999);
+    final settings = _PartialWriteBox(HiveBoxes.settings, failNext: false);
+    final repository = PictureStoryRepository(settings: settings);
+    final original = repository.findPrompt('kite-in-the-park')!;
+    final before = repository.storageSnapshot();
+    await expectLater(
+      repository.savePrompt(
+        prompt: original.copyWith(title: '内置题修改'),
+        original: original,
+        profileId: 'default',
+      ),
+      throwsFormatException,
+    );
+    expect(settings.writes, 0);
+    expect(repository.storageSnapshot(), before);
+    expect(repository.findPrompt(original.id)!.toJson(), original.toJson());
+    await seedVersions(9998);
+    final saved = await repository.savePrompt(
+      prompt: original.copyWith(title: '内置题修改'),
+      original: original,
+      profileId: 'default',
+    );
+    expect(saved.version, 2);
+    expect(repository.catalogState().versions.length, 10000);
+    expect(
+      repository.findPrompt(original.id, version: 1)!.toJson(),
+      original.toJson(),
+    );
+    expect(
+      repository
+          .storageSnapshot()
+          .containsKey(PictureStoryRepository.enabledKeyFor('default')),
+      isFalse,
+    );
+  });
+
   test('工作草稿修改不会通过 Hive 实例缓存提前改变持久记录', () async {
     final repository = PictureStoryRepository();
     final working = PictureStoryPracticeRecord(
@@ -81,11 +258,12 @@ void main() {
     working.answerText = '尚未保存的表达';
     working.setSegments([
       const PictureStorySegment(
-          id: 'new-segment',
-          position: 0,
-          audioPath: '/device/new.wav',
-          durationSeconds: 2,
-          editedText: '尚未保存',),
+        id: 'new-segment',
+        position: 0,
+        audioPath: '/device/new.wav',
+        durationSeconds: 2,
+        editedText: '尚未保存',
+      ),
     ]);
     final cached = repository.find(working.id)!;
     expect(cached.status, 'draft');

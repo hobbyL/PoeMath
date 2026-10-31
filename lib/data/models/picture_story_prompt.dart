@@ -260,10 +260,25 @@ class PictureStoryCatalogState {
   const PictureStoryCatalogState.empty() : versions = const [];
 
   PictureStoryCatalogState(Iterable<PictureStoryPrompt> versions)
-      : versions = List.unmodifiable(versions);
+      : versions = _checkedVersions(versions);
 
   static const schemaVersion = 1;
+  static const maxVersions = 10000;
   final List<PictureStoryPrompt> versions;
+
+  static void _checkCount(int count) {
+    if (count > maxVersions) {
+      throw const FormatException('题库最多保留 $maxVersions 个版本，请保留当前输入');
+    }
+  }
+
+  static List<PictureStoryPrompt> _checkedVersions(
+    Iterable<PictureStoryPrompt> versions,
+  ) {
+    final result = List<PictureStoryPrompt>.unmodifiable(versions);
+    _checkCount(result.length);
+    return result;
+  }
 
   Set<String> get imageIds => {
         for (final prompt in versions)
@@ -282,9 +297,7 @@ class PictureStoryCatalogState {
       throw const FormatException('看图说话题库格式或版本不支持');
     }
     final rawVersions = value['versions'] as List<dynamic>;
-    if (rawVersions.length > 10000) {
-      throw const FormatException('看图说话题库条目过多');
-    }
+    _checkCount(rawVersions.length);
     final versions = rawVersions.map(PictureStoryPrompt.fromJson).toList();
     final seen = <String, Set<int>>{};
     for (final prompt in versions) {
