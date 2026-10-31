@@ -173,20 +173,20 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
       body: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),
         children: [
-          ColoredCard(
-            color: theme.colorScheme.primary,
-            child: Text(
-              _access.enabled
-                  ? '保护已开启。解锁有效 2 分钟，离开应用立即失效。PIN 与恢复码不会随备份迁移。'
-                  : '设置与管理需要家长密码，请先设置 6 位数字 PIN。设置后 2 分钟内免重复验证，切到后台立即锁定。',
+          if (!_access.enabled)
+            ColoredCard(
+              color: theme.colorScheme.primary,
+              child: const Text(
+                '设置与管理需要家长密码，请先设置 6 位数字 PIN。设置后 2 分钟内免重复验证，切到后台立即锁定。',
+              ),
             ),
-          ),
           if (_access.needsResetNotice)
             const Padding(
               padding: EdgeInsets.all(SpacingTokens.sm),
               child: Text('原设备的家长验证未迁移，此设备的保护已重设，请重新设置 PIN。'),
             ),
-          const SizedBox(height: SpacingTokens.md),
+          if (!_access.enabled || _access.needsResetNotice)
+            const SizedBox(height: SpacingTokens.md),
           TextField(
             controller: _pin,
             enabled: !_busy,
