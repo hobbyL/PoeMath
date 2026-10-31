@@ -77,7 +77,7 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
                       Text('暂无$volume课本', style: theme.textTheme.titleMedium),
                       const SizedBox(height: SpacingTokens.sm),
                       const Text(
-                        '请家长在“设置 → 数据与同步 → 书籍管理”中添加。',
+                        '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
                         textAlign: TextAlign.center,
                       ),
                     ],

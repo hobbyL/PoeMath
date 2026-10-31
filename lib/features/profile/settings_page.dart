@@ -1,7 +1,7 @@
 // lib/features/profile/settings_page.dart
 //
 // 层级：features/profile
-// 职责：应用设置页 — 主题、音频、显示等设置项逐行展示。
+// 职责：设置分类首页及子页，按用途组织学习、服务、反馈和应用管理。
 
 import 'package:flutter/material.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
@@ -30,21 +30,15 @@ import 'package:poemath/features/profile/widgets/completion_sound_picker.dart';
 
 /// 设置页分区。
 ///
-/// 分组原则是「谁管什么」：同一分区内的项服务同一类决策，不同分区的项
-/// 不应有语义重叠。历史上的 `learning` 曾同时装学习背景、练习参数、通知
-/// 与 AI 配置四件不相干的事，`appearance` 曾装与外观无关的项，均已按
-/// 此原则拆开。
-///
-/// **本文件内每个分区的 render 代码必须连续排列**（见 `build` 的注释）：
-/// 早先按"功能"顺序撰写，导致同一分区的 widget 散落在数百行之间，新增
-/// 一项时极易放错分区。
+/// 首页只展示用途分类，具体设置放在子页。
+/// 每个分区的渲染代码连续排列，新增设置时放入对应分区。
 enum _SettingsSection {
   hub,
   learning,
-  ai,
-  speech,
+  intelligence,
   appearance,
   data,
+  application,
 }
 
 class SettingsPage extends ConsumerWidget {
@@ -103,10 +97,10 @@ class SettingsPage extends ConsumerWidget {
     final pageTitle = switch (_section) {
       _SettingsSection.hub => '设置',
       _SettingsSection.learning => '学习与内容',
-      _SettingsSection.ai => 'AI 设置',
-      _SettingsSection.speech => '语音与音频',
+      _SettingsSection.intelligence => 'AI 与语音',
       _SettingsSection.appearance => '外观与反馈',
-      _SettingsSection.data => '数据与同步',
+      _SettingsSection.data => '家长与数据',
+      _SettingsSection.application => '应用与提醒',
     };
 
     return Scaffold(
@@ -117,53 +111,26 @@ class SettingsPage extends ConsumerWidget {
             horizontal: SpacingTokens.md,
             vertical: SpacingTokens.sm,
           ),
-          // 编排约定：**每个分区的 render 代码连续排列**，分区之间用
-          // 注释分隔。新增设置项时整块加进对应分区即可，不必在文件里
-          // 寻找散落的 `if (_section == ...)`。
-          //
-          // 分区顺序即 hub 页入口顺序，按「先个人/内容，后设备/系统」：
-          // 家长保护 → 学习 → AI → 语音 → 外观 → 提醒 → 数据 → 关于。
+          // 分区顺序与首页一致：学习内容 → 智能语音 → 外观反馈 →
+          // 家长数据 → 应用提醒。每个分区的渲染代码连续排列。
           children: <Widget>[
             // ==================== hub：分组入口 ====================
             if (_section == _SettingsSection.hub) ...[
               AppTile(
-                icon: Icons.lock_outline,
-                iconColor: theme.colorScheme.primary,
-                title: '家长保护与云额度',
-                subtitle: '家长密码、恢复码与每日请求次数',
-                onTap: () => context.push(AppRoutes.parentProtection),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              AppTile(
                 icon: Icons.menu_book_outlined,
                 iconColor: theme.colorScheme.primary,
                 title: '学习与内容',
-                subtitle: '学习背景、练习参数与看图说话题库',
+                subtitle: '学习背景、练习参数、书籍与题库',
                 onTap: () => _openSection(context, _SettingsSection.learning),
               ),
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.smart_toy_outlined,
                 iconColor: theme.colorScheme.tertiary,
-                title: 'AI 设置',
-                subtitle: settingsRepo.llmProviders.isEmpty
-                    ? '未配置'
-                    : '已配置 ${settingsRepo.llmProviders.length} 个服务',
-                onTap: () => Navigator.push<void>(
-                  context,
-                  fadeSlideRoute(
-                    builder: (_) =>
-                        const ParentAccessBoundary(child: AiSettingsPage()),
-                  ),
-                ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              AppTile(
-                icon: Icons.record_voice_over_outlined,
-                iconColor: theme.colorScheme.secondary,
-                title: '语音与音频',
-                subtitle: '朗读音色与语音识别',
-                onTap: () => _openSection(context, _SettingsSection.speech),
+                title: 'AI 与语音',
+                subtitle: '模型服务、朗读音色与语音识别',
+                onTap: () =>
+                    _openSection(context, _SettingsSection.intelligence),
               ),
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
@@ -174,45 +141,27 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => _openSection(context, _SettingsSection.appearance),
               ),
               const SizedBox(height: SpacingTokens.sm),
-              // 「通知提醒」直接进通知设置页。原实现先开一个只含一个
-              // 入口的「提醒」分组页、再点进去 —— 单入口的中间页纯属
-              // 多一次点击。
               AppTile(
-                icon: Icons.notifications_outlined,
-                iconColor: theme.colorScheme.secondary,
-                title: '通知提醒',
-                subtitle: '学习提醒与每周报告',
-                onTap: () => Navigator.push<void>(
-                  context,
-                  fadeSlideRoute(
-                    builder: (_) => const ParentAccessBoundary(
-                      child: NotificationSettingsPage(),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              AppTile(
-                icon: Icons.cloud_sync_outlined,
+                icon: Icons.lock_outline,
                 iconColor: theme.colorScheme.tertiary,
-                title: '数据与同步',
-                subtitle: '书籍管理、本地备份与 WebDAV 同步',
+                title: '家长与数据',
+                subtitle: '家长密码、云额度、备份与同步',
                 onTap: () => _openSection(context, _SettingsSection.data),
               ),
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
-                icon: Icons.info_outline,
+                icon: Icons.settings_suggest_outlined,
                 iconColor: theme.colorScheme.onSurfaceVariant,
-                title: '关于韵算',
-                subtitle: '版本信息、更新与隐私政策',
-                onTap: () => context.push(AppRoutes.about),
+                title: '应用与提醒',
+                subtitle: '学习提醒、周报、版本与隐私',
+                onTap: () =>
+                    _openSection(context, _SettingsSection.application),
               ),
               const SizedBox(height: SpacingTokens.md),
             ],
 
             // ==================== 学习与内容 ====================
-            // 学习者档案 + 练习参数 + 内容展示偏好（拼音）。这三者共同
-            // 决定"练什么、怎么练、看到什么"，故归一组。
+            // 学习背景与练习参数、教材书库与看图说话题库。
             if (_section == _SettingsSection.learning) ...[
               AppTile(
                 icon: Icons.school_outlined,
@@ -235,6 +184,16 @@ class SettingsPage extends ConsumerWidget {
                 },
               ),
               const SizedBox(height: SpacingTokens.sm),
+              _buildPracticeSettings(context, ref),
+              const SizedBox(height: SpacingTokens.sm),
+              AppTile(
+                icon: Icons.library_books_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '书籍管理',
+                subtitle: '阅读书籍、导入 PDF 与下载教材',
+                onTap: () => context.push(AppRoutes.textbookManagement),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.image_outlined,
                 iconColor: theme.colorScheme.secondary,
@@ -242,15 +201,12 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: '管理内置题目与启用状态',
                 onTap: () => context.push(AppRoutes.pictureStoryManagement),
               ),
-              const SizedBox(height: SpacingTokens.sm),
-              _buildPracticeSettings(context, ref),
               const SizedBox(height: SpacingTokens.md),
             ],
 
-            // ==================== AI 设置 ====================
-            // AI 有独立的页面群（厂商 / 模型 / 提示词 / 助手），从 hub
-            // 直接进入其枢纽页，不再作为某个分区的二级项。
-            if (_section == _SettingsSection.ai)
+            // ==================== AI 与语音 ====================
+            // AI、朗读和识别均在此配置外部服务或设备语音。
+            if (_section == _SettingsSection.intelligence) ...[
               AppTile(
                 icon: Icons.smart_toy_outlined,
                 iconColor: theme.colorScheme.tertiary,
@@ -266,13 +222,7 @@ class SettingsPage extends ConsumerWidget {
                   ),
                 ),
               ),
-            if (_section == _SettingsSection.ai)
-              const SizedBox(height: SpacingTokens.md),
-
-            // ==================== 语音与音频 ====================
-            // 两项都是带子页的重配置（音色/密钥），与「外观与反馈」里的
-            // 即时开关（音效/触觉）性质不同，故分开。
-            if (_section == _SettingsSection.speech) ...[
+              const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.volume_up_outlined,
                 iconColor: theme.semantic.caution,
@@ -375,14 +325,14 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.md),
             ],
 
-            // ==================== 数据与同步 ====================
+            // ==================== 家长与数据 ====================
             if (_section == _SettingsSection.data) ...[
               AppTile(
-                icon: Icons.library_books_outlined,
+                icon: Icons.lock_outline,
                 iconColor: theme.colorScheme.primary,
-                title: '书籍管理',
-                subtitle: '阅读书籍、导入 PDF 与下载教材',
-                onTap: () => context.push(AppRoutes.textbookManagement),
+                title: '家长保护与云额度',
+                subtitle: '家长密码、恢复码与每日请求次数',
+                onTap: () => context.push(AppRoutes.parentProtection),
               ),
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
@@ -411,6 +361,33 @@ class SettingsPage extends ConsumerWidget {
                         const ParentAccessBoundary(child: CloudSyncPage()),
                   ),
                 ),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+            ],
+
+            // ==================== 应用与提醒 ====================
+            if (_section == _SettingsSection.application) ...[
+              AppTile(
+                icon: Icons.notifications_outlined,
+                iconColor: theme.colorScheme.secondary,
+                title: '通知提醒',
+                subtitle: '学习提醒与每周报告',
+                onTap: () => Navigator.push<void>(
+                  context,
+                  fadeSlideRoute(
+                    builder: (_) => const ParentAccessBoundary(
+                      child: NotificationSettingsPage(),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              AppTile(
+                icon: Icons.info_outline,
+                iconColor: theme.colorScheme.onSurfaceVariant,
+                title: '关于韵算',
+                subtitle: '版本信息、更新与隐私政策',
+                onTap: () => context.push(AppRoutes.about),
               ),
               const SizedBox(height: SpacingTokens.md),
             ],

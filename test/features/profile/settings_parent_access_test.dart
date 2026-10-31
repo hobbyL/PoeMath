@@ -262,6 +262,8 @@ void main() {
     expect(router.routerDelegate.state.uri.path, AppRoutes.settings);
     expect(find.byType(ParentProtectionPage), findsNothing);
     expect(access.isUnlocked, isTrue);
+    await tester.runAsync(() => tester.tap(find.text('AI 与语音')));
+    await _pumpUntil(tester, () => find.text('AI 设置').evaluate().isNotEmpty);
     await tester.runAsync(() => tester.tap(find.text('AI 设置')));
     await _pumpUntil(
       tester,
@@ -349,11 +351,21 @@ void main() {
       tester,
       () => find.byType(SettingsPage).evaluate().isNotEmpty,
     );
-    await tester.runAsync(() => tester.tap(find.text('语音与音频')));
+    await tester.runAsync(() => tester.tap(find.text('AI 与语音')));
     await _pumpUntil(tester, () => find.text('语音识别设置').evaluate().isNotEmpty);
     expect(_unlockButton, findsNothing);
     await tester.runAsync(() => tester.pageBack());
     await _drainFrames(tester);
+    await tester.runAsync(() => tester.tap(find.text('家长与数据')));
+    await _pumpUntil(
+      tester,
+      () => find.text('家长保护与云额度').evaluate().isNotEmpty,
+    );
+    expect(_unlockButton, findsNothing);
+    await tester.runAsync(() => tester.pageBack());
+    await _drainFrames(tester);
+    await tester.runAsync(() => tester.tap(find.text('AI 与语音')));
+    await _pumpUntil(tester, () => find.text('AI 设置').evaluate().isNotEmpty);
     await tester.runAsync(() => tester.tap(find.text('AI 设置')));
     await _pumpUntil(
       tester,
@@ -406,6 +418,11 @@ void main() {
     await _pumpUntil(
       tester,
       () => find.byType(SettingsPage).evaluate().isNotEmpty,
+    );
+    await tester.runAsync(() => tester.tap(find.text('家长与数据')));
+    await _pumpUntil(
+      tester,
+      () => find.text('家长保护与云额度').evaluate().isNotEmpty,
     );
     await tester.runAsync(() => tester.tap(find.text('家长保护与云额度')));
     await _pumpUntil(

@@ -54,7 +54,7 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  testWidgets('设置页应只显示八个分类入口', (tester) async {
+  testWidgets('设置首页只显示五个用途分类', (tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -66,14 +66,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(AppTile), findsNWidgets(8));
+    expect(find.byType(AppTile), findsNWidgets(5));
     expect(find.text('学习与内容'), findsOneWidget);
-    expect(find.text('AI 设置'), findsOneWidget);
-    expect(find.text('语音与音频'), findsOneWidget);
+    expect(find.text('AI 与语音'), findsOneWidget);
     expect(find.text('外观与反馈'), findsOneWidget);
-    expect(find.text('通知提醒'), findsOneWidget);
-    expect(find.text('数据与同步'), findsOneWidget);
-    expect(find.text('关于韵算'), findsOneWidget);
+    expect(find.text('家长与数据'), findsOneWidget);
+    expect(find.text('应用与提醒'), findsOneWidget);
+    expect(find.text('AI 设置'), findsNothing);
+    expect(find.text('家长保护与云额度'), findsNothing);
+    expect(find.text('通知提醒'), findsNothing);
+    expect(find.text('关于韵算'), findsNothing);
     expect(find.text('主题设置'), findsNothing);
     expect(find.text('音效'), findsNothing);
     expect(find.byType(Switch), findsNothing);
@@ -81,7 +83,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('四个分类入口应展示对应设置项', (tester) async {
+  testWidgets('五个分类展示对应设置项并能进入AI与提醒子页', (tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -93,33 +95,36 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 学习与内容：学习背景 + 看图说话题库 + 练习参数。
+    // 学习与内容：学习配置、书籍和题库。
     await tester.tap(find.text('学习与内容'));
     await tester.pumpAndSettle();
     expect(find.text('学习背景'), findsOneWidget);
     expect(find.text('看图说话题库'), findsOneWidget);
     expect(find.text('管理内置题目与启用状态'), findsOneWidget);
     expect(find.text('练习设置'), findsOneWidget);
+    expect(find.text('书籍管理'), findsOneWidget);
     expect(find.text('拼音显示'), findsNothing);
-    // 通知与 AI 已不在此组。
     expect(find.text('通知设置'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // AI 设置：一级入口，点击直接进枢纽页。
+    // AI 与语音：模型服务、朗读与识别配置集中展示。
+    await tester.tap(find.text('AI 与语音'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI 设置'), findsOneWidget);
+    expect(find.text('音频设置'), findsOneWidget);
+    expect(find.text('语音识别设置'), findsOneWidget);
+    expect(find.text('音效'), findsNothing);
+    expect(find.text('触觉反馈'), findsNothing);
     await tester.tap(find.text('AI 设置'));
     await tester.pumpAndSettle();
+    expect(find.text('供应商设置'), findsOneWidget);
+    expect(find.text('使用场景设置'), findsOneWidget);
+    expect(find.text('提示词设置'), findsOneWidget);
     await tester.pageBack();
-    await tester.pumpAndSettle();
-
-    // 语音与音频：音频设置 + 语音识别（音效/触觉已移出）。
-    await tester.tap(find.text('语音与音频'));
     await tester.pumpAndSettle();
     expect(find.text('音频设置'), findsOneWidget);
     expect(find.text('语音识别设置'), findsOneWidget);
-    expect(find.text('认一认口语评测'), findsNothing);
-    expect(find.text('音效'), findsNothing);
-    expect(find.text('触觉反馈'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -134,17 +139,25 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // 通知提醒：hub 直达通知设置页，无中间分组页（点一次即进目标页，
-    // 返回即回 hub）。
+    // 应用与提醒：通知配置和版本、隐私入口。
+    await tester.tap(find.text('应用与提醒'));
+    await tester.pumpAndSettle();
+    expect(find.text('通知提醒'), findsOneWidget);
+    expect(find.text('关于韵算'), findsOneWidget);
     await tester.tap(find.text('通知提醒'));
     await tester.pumpAndSettle();
-    expect(find.text('通知设置'), findsOneWidget, reason: '应直达通知设置页');
+    expect(find.text('通知设置'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('关于韵算'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('数据与同步'));
+    // 家长与数据：保护、额度与备份集中管理。
+    await tester.tap(find.text('家长与数据'));
     await tester.pumpAndSettle();
-    expect(find.text('书籍管理'), findsOneWidget);
+    expect(find.text('家长保护与云额度'), findsOneWidget);
+    expect(find.text('书籍管理'), findsNothing);
     expect(find.text('备份与恢复'), findsOneWidget);
     expect(find.text('云端同步'), findsOneWidget);
 
