@@ -312,9 +312,15 @@ class MainActivity : FlutterActivity() {
      * 路径位于下载目录内 —— 「路径边界」由 `installApk` 单独把关。
      */
     private fun apkSignatures(path: String): Set<String>? {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            @Suppress("DEPRECATION")
+            PackageManager.GET_SIGNATURES
+        }
         val info = packageManager.getPackageArchiveInfo(
             path,
-            PackageManager.GET_SIGNING_CERTIFICATES,
+            flags,
         ) ?: return null
         val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             info.signingInfo?.apkContentsSigners
