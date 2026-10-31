@@ -47,6 +47,7 @@ dependencies:
 
   share_plus: ^12.0.2
   file_picker: ^11.0.2
+  image_picker: 1.2.4
   # PDF 离线阅读；2.5+ 要求 Flutter 3.47，固定当前 SDK 兼容版。
   pdfrx: 2.4.8
   fl_chart: ^1.2.0

@@ -10,6 +10,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
+import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 
 void invalidateLearningBackground(void Function(ProviderOrFamily) invalidate) {
   // 学习背景的年级/学期与练习类型都由 `settingsRepositoryProvider` 派生
@@ -51,6 +52,15 @@ void invalidateAllHiveProviders(void Function(ProviderOrFamily) invalidate) {
   invalidate(dueReviewCountProvider);
   invalidate(learnedCountProvider);
   invalidate(filteredPoemsProvider);
+
+  // ---- 看图说话 ----
+  invalidate(pictureStoryCatalogProvider);
+  invalidate(pictureStoryPromptByIdProvider);
+  invalidate(pictureStoryPromptVersionProvider);
+  invalidate(pictureStoryPromptProvider);
+  invalidate(pictureStoryPromptCountProvider);
+  invalidate(pictureStoryHistoryProvider);
+  invalidate(pictureStoryImageBytesProvider);
 
   // 助手由 whileRestoring 排空队列后重载，不能再次失效而清空当前会话。
 

@@ -10,7 +10,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
-import 'package:poemath/features/chinese/expression/widgets/picture_story_illustration.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 
 class PictureStoryHistoryPage extends ConsumerStatefulWidget {
   const PictureStoryHistoryPage({super.key});
@@ -63,7 +63,16 @@ class _PictureStoryHistoryPageState
               itemCount: records.length,
               itemBuilder: (context, index) {
                 final record = records[index];
-                final prompt = PictureStoryCatalog.find(record.promptId);
+                PictureStoryPrompt? prompt;
+                try {
+                  prompt = ref.watch(
+                    pictureStoryPromptVersionProvider(
+                      (id: record.promptId, version: record.promptVersion),
+                    ),
+                  );
+                } on Object {
+                  // 历史缺失时明确提示，不用新版题目代替原版本。
+                }
                 return Padding(
                   padding: const EdgeInsets.only(bottom: SpacingTokens.md),
                   child: ColoredCard(
@@ -72,7 +81,9 @@ class _PictureStoryHistoryPageState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (prompt != null)
-                          PictureStoryIllustration(kind: prompt.illustration),
+                          PictureStoryImageView(image: prompt.image),
+                        if (prompt == null)
+                          const Text('原题版本暂时无法读取，表达与录音记录仍保留。'),
                         const SizedBox(height: SpacingTokens.sm),
                         Text(
                           prompt?.title ?? '看图说话',
@@ -87,7 +98,7 @@ class _PictureStoryHistoryPageState
                           Text(record.answerText),
                         ],
                         ..._feedbackWidgets(theme, record),
-                        if (prompt != null) ...[
+                        if (prompt != null && prompt.reference.isNotEmpty) ...[
                           const SizedBox(height: SpacingTokens.sm),
                           Text('参考表达', style: theme.textTheme.labelLarge),
                           const SizedBox(height: SpacingTokens.xs),
@@ -95,25 +106,18 @@ class _PictureStoryHistoryPageState
                         ],
                         const SizedBox(height: SpacingTokens.sm),
                         for (final segment in record.segments)
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: IconButton(
-                              onPressed: () => _play(segment),
-                              icon: Icon(
-                                _playing == segment.id
-                                    ? Icons.stop_circle_outlined
-                                    : Icons.play_circle_outline,
-                              ),
-                              tooltip: _playing == segment.id ? '停止' : '播放',
-                            ),
-                            title: Text(
-                              segment.answerText.isEmpty
-                                  ? '未填写文字'
-                                  : segment.answerText,
-                            ),
-                            subtitle: Text(
-                              '${segment.durationSeconds} 秒 · ${segment.recognitionMode == 'realtime' ? '实时识别' : '一句话识别'}',
-                            ),
+                          AppTile(
+                            flat: true,
+                            iconColor: theme.colorScheme.primary,
+                            icon: _playing == segment.id
+                                ? Icons.stop_circle_outlined
+                                : Icons.play_circle_outline,
+                            title: segment.answerText.isEmpty
+                                ? '未填写文字'
+                                : segment.answerText,
+                            subtitle:
+                                '${segment.durationSeconds} 秒 · ${segment.recognitionMode == 'realtime' ? '实时识别' : '一句话识别'}',
+                            onTap: () => _play(segment),
                           ),
                       ],
                     ),

@@ -37,6 +37,7 @@ class AppTile extends StatelessWidget {
     this.titleSuffix,
     required this.subtitle,
     this.onTap,
+    this.allowTapWithTrailing = false,
     this.trailing,
     this.trailingText,
     this.trailingAction,
@@ -80,8 +81,12 @@ class AppTile extends StatelessWidget {
   /// 副标题文本。
   final String subtitle;
 
-  /// 点击回调；若 [trailing] 不为空则忽略（由 trailing 自行处理交互）。
+  /// 点击回调；自定义 [trailing] 默认独立处理交互，开启
+  /// [allowTapWithTrailing] 后卡片内容也可响应此回调。
   final VoidCallback? onTap;
+
+  /// 自定义尾部控件仍独立响应；为 true 时也允许点击卡片内容。
+  final bool allowTapWithTrailing;
 
   /// 尾部组件。为 null 时显示 chevron 箭头。
   final Widget? trailing;
@@ -301,7 +306,7 @@ class AppTile extends StatelessWidget {
           clipBehavior: selected ? Clip.antiAlias : Clip.none,
           child: InkWell(
             borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-            onTap: trailing == null ? onTap : null,
+            onTap: trailing == null || allowTapWithTrailing ? onTap : null,
             child: ConstrainedBox(
               constraints:
                   const BoxConstraints(minHeight: SpacingTokens.minTapTarget),
@@ -349,7 +354,7 @@ class AppTile extends StatelessWidget {
           );
     return ColoredCard(
       color: iconColor,
-      onTap: trailing == null ? onTap : null,
+      onTap: trailing == null || allowTapWithTrailing ? onTap : null,
       constraints: const BoxConstraints(
         minHeight: SpacingTokens.minTapTarget + SpacingTokens.md,
       ),

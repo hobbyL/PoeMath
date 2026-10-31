@@ -54,6 +54,8 @@ import 'package:poemath/features/profile/learning_stats_page.dart';
 import 'package:poemath/features/profile/llm_provider_settings_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/picture_story_management_page.dart';
+import 'package:poemath/features/profile/picture_story_detail_page.dart';
+import 'package:poemath/features/profile/picture_story_editor_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 import 'package:poemath/features/profile/update_page.dart';
@@ -543,6 +545,33 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           state: state,
           child: const ParentAccessBoundary(
             child: PictureStoryManagementPage(),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.pictureStoryCreate,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const ParentAccessBoundary(child: PictureStoryEditorPage()),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.pictureStoryDetail,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: ParentAccessBoundary(
+            child:
+                PictureStoryDetailPage(promptId: state.pathParameters['id']!),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.pictureStoryEdit,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: ParentAccessBoundary(
+            child:
+                PictureStoryEditorPage(promptId: state.pathParameters['id']!),
           ),
         ),
       ),

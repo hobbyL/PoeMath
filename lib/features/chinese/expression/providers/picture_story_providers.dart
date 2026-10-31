@@ -1,23 +1,66 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/services/picture_story_image_service.dart';
+import 'package:poemath/core/services/picture_story_editor_service.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 
+final pictureStoryImageServiceProvider = Provider<PictureStoryImageService>(
+  (ref) => PictureStoryImageService.instance,
+);
+
+final pictureStoryEditorServiceProvider = Provider<PictureStoryEditorService>(
+  (ref) => PictureStoryEditorService.instance,
+);
+
+final pictureStoryImageBytesProvider =
+    FutureProvider.autoDispose.family<Uint8List, String>((ref, id) {
+  return ref.watch(pictureStoryImageServiceProvider).readImage(id);
+});
+
 final pictureStoryRepositoryProvider = Provider<PictureStoryRepository>((ref) {
-  return PictureStoryRepository();
+  return PictureStoryRepository(
+    images: ref.watch(pictureStoryImageServiceProvider),
+  );
 });
 
 final pictureStoryCatalogProvider = Provider<List<PictureStoryPrompt>>((ref) {
-  return PictureStoryCatalog.prompts;
+  final repository = ref.watch(pictureStoryRepositoryProvider);
+  final changes = repository.watchCatalog().listen((_) => ref.invalidateSelf());
+  ref.onDispose(changes.cancel);
+  return repository.listPrompts();
+});
+
+final pictureStoryPromptByIdProvider =
+    Provider.family<PictureStoryPrompt?, String>((ref, id) {
+  ref.watch(pictureStoryCatalogProvider);
+  return ref.watch(pictureStoryRepositoryProvider).findPrompt(id);
+});
+
+final pictureStoryPromptVersionProvider =
+    Provider.family<PictureStoryPrompt?, ({String id, int version})>(
+        (ref, key) {
+  ref.watch(pictureStoryCatalogProvider);
+  return ref
+      .watch(pictureStoryRepositoryProvider)
+      .findPrompt(key.id, version: key.version);
 });
 
 final pictureStoryPromptProvider = Provider<List<PictureStoryPrompt>>((ref) {
   final profile = ProfileScope.changes.listen((_) => ref.invalidateSelf());
   ref.onDispose(profile.cancel);
+  final repository = ref.watch(pictureStoryRepositoryProvider);
+  final enabled = repository
+      .watchEnabled(ProfileScope.currentId)
+      .listen((_) => ref.invalidateSelf());
+  ref.onDispose(enabled.cancel);
   return ref
-      .watch(pictureStoryRepositoryProvider)
-      .listPrompts(enabledOnly: true);
+      .watch(pictureStoryCatalogProvider)
+      .where((prompt) => repository.isEnabled(prompt.id))
+      .toList();
 });
 
 final pictureStoryPromptCountProvider = Provider<int>((ref) {
@@ -28,5 +71,8 @@ final pictureStoryHistoryProvider =
     Provider<List<PictureStoryPracticeRecord>>((ref) {
   final profile = ProfileScope.changes.listen((_) => ref.invalidateSelf());
   ref.onDispose(profile.cancel);
-  return ref.watch(pictureStoryRepositoryProvider).records();
+  final repository = ref.watch(pictureStoryRepositoryProvider);
+  final records = repository.watchRecords().listen((_) => ref.invalidateSelf());
+  ref.onDispose(records.cancel);
+  return repository.records();
 });

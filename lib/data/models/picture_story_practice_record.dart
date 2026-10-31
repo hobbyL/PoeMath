@@ -107,6 +107,21 @@ class PictureStoryPracticeRecord extends HiveObject {
   int totalDurationSeconds;
   bool usedHints;
 
+  PictureStoryPracticeRecord copy() => PictureStoryPracticeRecord(
+        id: id,
+        profileId: profileId,
+        promptId: promptId,
+        promptVersion: promptVersion,
+        startedAt: startedAt,
+        completedAt: completedAt,
+        status: status,
+        segmentsJson: segmentsJson,
+        answerText: answerText,
+        feedbackJson: feedbackJson,
+        totalDurationSeconds: totalDurationSeconds,
+        usedHints: usedHints,
+      );
+
   List<PictureStorySegment> get segments {
     try {
       final raw = jsonDecode(segmentsJson);
@@ -144,9 +159,9 @@ final class PictureStoryPracticeRecordAdapter
 
   @override
   PictureStoryPracticeRecord read(BinaryReader reader) {
+    final fieldCount = reader.readByte();
     final fields = <int, Object?>{
-      for (var i = 0; i < reader.readByte(); i++)
-        reader.readByte(): reader.read(),
+      for (var i = 0; i < fieldCount; i++) reader.readByte(): reader.read(),
     };
     return PictureStoryPracticeRecord(
       id: fields[0] as String,

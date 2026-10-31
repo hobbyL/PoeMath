@@ -11,6 +11,7 @@ import 'package:poemath/core/services/hive_encryption_key_resolver.dart';
 import 'package:poemath/core/services/hive_encryption_key_provider.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
+import 'package:poemath/core/services/picture_story_editor_service.dart';
 import 'package:poemath/core/services/speech/legacy_speech_cleanup.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -70,10 +71,37 @@ Future<void> initializeCoreStorage() async {
   }
 }
 
-Future<void> initializeOptionalServices() async {
-  await NotificationService.instance.initialize();
-  // 清理移除本地语音识别后的遗留模型与设置键；失败不影响启动。
-  await LegacySpeechCleanup.run();
+Future<void> initializeOptionalServices({
+  AppInitializer? notificationInitializer,
+  AppInitializer? speechCleanup,
+  AppInitializer? pictureStoryRecovery,
+}) async {
+  final services = <({String name, AppInitializer initialize})>[
+    (
+      name: '通知',
+      initialize:
+          notificationInitializer ?? NotificationService.instance.initialize
+    ),
+    (name: '遗留语音清理', initialize: speechCleanup ?? LegacySpeechCleanup.run),
+    (
+      name: '看图说话选图恢复',
+      initialize: pictureStoryRecovery ??
+          PictureStoryEditorService.instance.recoverLostImage
+    ),
+  ];
+  // 可选初始化独立处理失败，通知异常也不能跳过 Android 丢失选图恢复。
+  for (final service in services) {
+    try {
+      await service.initialize();
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '${service.name}初始化失败，应用继续启动',
+        tag: 'Startup',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
 }
 
 /// 迁移用的 `SettingsRepository`：惰性单例，须在 Hive 初始化之后调用

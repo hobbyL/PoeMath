@@ -161,8 +161,8 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
                   const SizedBox(width: SpacingTokens.sm),
                   Expanded(
                     child: Text(
-                      '备份包含所有学习进度、打卡记录和设置。'
-                      '诗词、公式等静态数据由应用内置，不参与备份。',
+                      '备份包含学习记录、打卡、设置、助手聊天，以及看图说话题库版本、题图和各孩子的启用选择。'
+                      '看图说话练习历史与录音、教材 PDF 保留在本机。诗词、公式等静态数据由应用内置。',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

@@ -6,6 +6,55 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_tile.dart';
 
 void main() {
+  for (final flat in [false, true]) {
+    for (final allowTap in [false, true]) {
+      testWidgets('尾部开关独立交互，行点击遵循显式设置 flat=$flat allowTap=$allowTap',
+          (tester) async {
+        var rowCalls = 0;
+        var switchCalls = 0;
+        var enabled = true;
+        final theme = AppTheme.resolve(
+          subject: AppSubject.poem,
+          brightness: Brightness.light,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: StatefulBuilder(
+                builder: (context, setState) => AppTile(
+                  flat: flat,
+                  allowTapWithTrailing: allowTap,
+                  iconColor: theme.colorScheme.primary,
+                  title: '题目详情',
+                  subtitle: '独立启用选择',
+                  onTap: () => rowCalls++,
+                  trailing: Switch(
+                    value: enabled,
+                    onChanged: (value) {
+                      switchCalls++;
+                      setState(() => enabled = value);
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('题目详情'));
+        await tester.pump();
+        expect(rowCalls, allowTap ? 1 : 0);
+        expect(switchCalls, 0);
+        await tester.tap(find.byType(Switch));
+        await tester.pumpAndSettle();
+        expect(enabled, isFalse);
+        expect(switchCalls, 1);
+        expect(rowCalls, allowTap ? 1 : 0);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('自定义前导内容应替换图标，并和尾部开关垂直居中', (tester) async {
     const previewKey = ValueKey('preview');
     final theme = AppTheme.resolve(

@@ -8,7 +8,8 @@ import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
-import 'package:poemath/features/chinese/expression/widgets/picture_story_illustration.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
 
 class PictureStoryPage extends ConsumerWidget {
   const PictureStoryPage({
@@ -23,7 +24,12 @@ class PictureStoryPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final prompts = ref.watch(pictureStoryPromptProvider);
+    List<PictureStoryPrompt>? prompts;
+    try {
+      prompts = ref.watch(pictureStoryPromptProvider);
+    } on Object {
+      // 保留损坏目录原值，恢复后可重试；不能误显示成空题库。
+    }
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -40,23 +46,51 @@ class PictureStoryPage extends ConsumerWidget {
       ),
       body: SafeArea(
         top: false,
-        child: prompts.isEmpty
-            ? _emptyState(context, theme)
-            : LayoutBuilder(
-                builder: (context, constraints) => GridView.builder(
-                  padding: const EdgeInsets.all(SpacingTokens.md),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount:
-                        ResponsiveLayout.columns(constraints.maxWidth),
-                    mainAxisSpacing: SpacingTokens.sm,
-                    crossAxisSpacing: SpacingTokens.sm,
-                    childAspectRatio: 4 / 3,
+        child: prompts == null
+            ? PictureStoryUnavailableView(
+                message: '题库暂时无法读取，请家长检查题库或恢复有效备份。',
+                onRetry: () => ref.invalidate(pictureStoryCatalogProvider),
+              )
+            : prompts.isEmpty
+                ? _emptyState(context, theme)
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columns =
+                          ResponsiveLayout.columns(constraints.maxWidth);
+                      final available = prompts!;
+                      return ListView(
+                        padding: const EdgeInsets.all(SpacingTokens.md),
+                        children: [
+                          for (var start = 0;
+                              start < available.length;
+                              start += columns) ...[
+                            if (start > 0)
+                              const SizedBox(height: SpacingTokens.sm),
+                            IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (var column = 0;
+                                      column < columns;
+                                      column++) ...[
+                                    if (column > 0)
+                                      const SizedBox(width: SpacingTokens.sm),
+                                    Expanded(
+                                      child: start + column < available.length
+                                          ? _PromptCard(
+                                              prompt: available[start + column],
+                                            )
+                                          : const SizedBox.shrink(),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
                   ),
-                  itemCount: prompts.length,
-                  itemBuilder: (context, index) =>
-                      _PromptCard(prompt: prompts[index]),
-                ),
-              ),
       ),
     );
   }
@@ -101,7 +135,7 @@ class _PromptCard extends ConsumerWidget {
         context.push(AppRoutes.pictureStoryPracticeOf(prompt.id));
 
     return Semantics(
-      label: prompt.title,
+      label: '${prompt.title}，${prompt.levelLabel}',
       value: practiced ? '已练习' : null,
       button: true,
       excludeSemantics: true,
@@ -110,24 +144,50 @@ class _PromptCard extends ConsumerWidget {
         color: theme.colorScheme.secondary,
         padding: EdgeInsets.zero,
         onTap: openPractice,
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            PictureStoryIllustration(kind: prompt.illustration),
-            if (practiced)
-              Positioned(
-                top: SpacingTokens.sm,
-                right: SpacingTokens.sm,
-                child: Icon(
-                  Icons.check_circle_outline,
-                  color: theme.colorScheme.primary,
+            Stack(
+              children: [
+                PictureStoryImageView(
+                  image: prompt.image,
+                  preview: true,
+                  borderRadius: BorderRadius.zero,
                 ),
-              ),
-            Positioned(
-              right: SpacingTokens.xs,
-              bottom: SpacingTokens.sm,
-              child: Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant,
+                if (practiced)
+                  Positioned(
+                    top: SpacingTokens.sm,
+                    right: SpacingTokens.sm,
+                    child: Icon(
+                      Icons.check_circle_outline,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(prompt.title, style: theme.textTheme.titleMedium),
+                        const SizedBox(height: SpacingTokens.xs),
+                        Text(
+                          prompt.levelLabel,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: SpacingTokens.sm),
+                  Icon(
+                    Icons.chevron_right,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
               ),
             ),
           ],

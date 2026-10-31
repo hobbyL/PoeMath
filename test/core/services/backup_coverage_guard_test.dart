@@ -36,6 +36,7 @@ const Set<String> _travelingFields = {
   'conversations',
   'messages',
   'activitySettlements',
+  'pictureStoryCatalog',
   'settings',
   // credentials 仅在提供口令时出现，不在此断言。
 };

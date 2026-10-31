@@ -11,7 +11,7 @@ const int _iterations = 120000;
 void validateBackupSize(String json) {
   if (json.length > maxBackupBytes ||
       utf8.encode(json).length > maxBackupBytes) {
-    throw const FormatException('备份超过 32 MiB，请缩减聊天历史后再导出');
+    throw const FormatException('备份超过 32 MiB，请减少题目图片或聊天历史后再导出');
   }
 }
 

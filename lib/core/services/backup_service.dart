@@ -46,6 +46,9 @@ import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
+import 'package:poemath/core/services/picture_story_catalog_backup.dart';
+import 'package:poemath/core/services/picture_story_image_service.dart';
+import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 import 'package:poemath/math_engine/validators/expression_evaluator.dart';
@@ -176,14 +179,29 @@ class BackupCredentialExportException implements Exception {
 }
 
 class BackupService {
-  BackupService({SecureCredentialStore? secureStore})
-      : _secureStore = secureStore ?? SecureCredentialStore();
+  BackupService({
+    SecureCredentialStore? secureStore,
+    PictureStoryImageService? pictureStoryImages,
+    PictureStoryRepository? pictureStoryRepository,
+  })  : _secureStore = secureStore ?? SecureCredentialStore(),
+        _pictureStoryImages =
+            pictureStoryImages ?? PictureStoryImageService.instance,
+        _pictureStoryRepository = pictureStoryRepository;
 
   final SecureCredentialStore _secureStore;
+  final PictureStoryImageService _pictureStoryImages;
+  final PictureStoryRepository? _pictureStoryRepository;
+
+  // BackupService 可在 Hive 初始化前构造，仓储要等操作开始时再读取 boxes。
+  PictureStoryRepository get _pictureStories =>
+      _pictureStoryRepository ??
+      PictureStoryRepository(images: _pictureStoryImages);
 
   /// 只读预览复用与提交相同的完整校验；固定原始内容，提交时不重读文件。
   BackupPreview inspectJson(String jsonString) {
     final data = _decodeAndValidate(jsonString);
+    final pictureStories =
+        data[PictureStoryCatalogBackup.jsonKey] as PictureStoryCatalogBackup?;
     const labels = <String, String>{
       'poemProgress': '诗词进度',
       'poemFavorites': '诗词收藏',
@@ -211,6 +229,10 @@ class BackupService {
             final List<dynamic> list => list.length,
             _ => 0,
           },
+        if (pictureStories != null) ...{
+          '看图说话题目': pictureStories.promptCount,
+          '题目图片': pictureStories.images.length,
+        },
       }),
       hasCredentials: data.containsKey('credentials'),
       endpointChanges: detectLlmEndpointChanges(jsonString),
@@ -244,6 +266,20 @@ class BackupService {
     String? passphrase,
     bool encryptPayload = false,
     bool includeCredentials = true,
+  }) =>
+      PictureStoryRepository.exclusive(
+        () => _exportToJson(
+          passphrase: passphrase,
+          encryptPayload: encryptPayload,
+          includeCredentials: includeCredentials,
+        ),
+      );
+
+  Future<String> _exportToJson({
+    String? passphrase,
+    bool encryptPayload = false,
+    bool includeCredentials = true,
+    bool includePictureStoryCatalog = true,
   }) async {
     final data = <String, dynamic>{
       'version': _backupVersion,
@@ -291,6 +327,14 @@ class BackupService {
         includeCredentials ? await _exportCredentials(passphrase) : null;
     if (credentials != null) {
       data['credentials'] = credentials;
+    }
+    if (includePictureStoryCatalog) {
+      data[PictureStoryCatalogBackup.jsonKey] =
+          await PictureStoryCatalogBackup.export(
+        repository: _pictureStories,
+        images: _pictureStoryImages,
+        parentPayload: data,
+      );
     }
     final json = const JsonEncoder.withIndent('  ').convert(data);
     validateBackupSize(json);
@@ -529,7 +573,9 @@ class BackupService {
   Future<int> restoreFromJson(String jsonString, {String? passphrase}) async {
     ParentAccessService.instance.assertAllowed();
     return PracticeDraftRepository.whileRestoring(
-      () => _restoreFromJson(jsonString, passphrase: passphrase),
+      () => PictureStoryRepository.exclusive(
+        () => _restoreFromJson(jsonString, passphrase: passphrase),
+      ),
     );
   }
 
@@ -539,6 +585,9 @@ class BackupService {
           await decryptBackupPayload(jsonString, passphrase: passphrase);
     }
     final data = _decodeAndValidate(jsonString);
+    final pictureStories =
+        data[PictureStoryCatalogBackup.jsonKey] as PictureStoryCatalogBackup?;
+    final pictureRepository = _pictureStories;
 
     // 凭据解密在快照与任何写入之前完成：口令错误时数据零变更。
     Map<String, String>? plainCredentials;
@@ -557,7 +606,9 @@ class BackupService {
 
     ParentAccessService.instance.assertAllowed();
     // 恢复前先快照当前数据（不含凭据节），失败时用于回滚
-    final snapshot = await exportToJson();
+    // 题库补偿保留原始键和值，不能依赖旧图片可读或目录 JSON 有效。
+    final snapshot = await _exportToJson(includePictureStoryCatalog: false);
+    final pictureSnapshot = pictureRepository.storageSnapshot();
     final settingsSnapshot = <String, dynamic>{
       for (final key in _settingsValueType.keys)
         if (HiveBoxes.settings.containsKey(key))
@@ -567,10 +618,23 @@ class BackupService {
     final hadDraftEpoch = HiveBoxes.meta.containsKey('practice_draft_epoch');
     final oldDraftEpoch =
         HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int;
+    final preparedImages = pictureStories == null
+        ? null
+        : await _pictureStoryImages.prepareImages(pictureStories.images);
+    var startedRestore = false;
 
     try {
+      ParentAccessService.instance.assertAllowed();
+      await preparedImages?.publish();
+      startedRestore = true;
       // 先持久失效代次；若无法落盘则整次恢复失败，主体不会先被替换。
       await HiveBoxes.meta.put('practice_draft_epoch', oldDraftEpoch + 1);
+      if (pictureStories != null) {
+        await pictureRepository.replaceCatalogForRestore(
+          pictureStories.catalog,
+          pictureStories.enabledByProfile,
+        );
+      }
       final count = await _doRestore(data);
       if (plainCredentials != null) {
         await _restoreCredentials(plainCredentials, undo: credentialUndo);
@@ -596,8 +660,10 @@ class BackupService {
           stackTrace: stackTrace,
         );
       }
-      return count;
+      return count + (pictureStories?.promptCount ?? 0);
     } on Object catch (error, stackTrace) {
+      // 图片发布或授权检查失败时可见数据尚未变化，无需重写原有数据。
+      if (!startedRestore) Error.throwWithStackTrace(error, stackTrace);
       // 恢复失败，回滚到快照
       final rollbackErrors = <Object>[];
       try {
@@ -626,6 +692,13 @@ class BackupService {
       } on Object catch (rollbackError) {
         rollbackErrors.add(rollbackError);
       }
+      if (pictureStories != null) {
+        try {
+          await pictureRepository.restoreStorageSnapshot(pictureSnapshot);
+        } on Object catch (rollbackError) {
+          rollbackErrors.add(rollbackError);
+        }
+      }
       for (final undo in credentialUndo.reversed) {
         try {
           await undo();
@@ -641,6 +714,17 @@ class BackupService {
         );
       }
       Error.throwWithStackTrace(error, stackTrace);
+    } finally {
+      try {
+        await preparedImages?.discard();
+      } on Object catch (error, stackTrace) {
+        AppLogger.e(
+          '题库恢复临时图片清理失败',
+          tag: 'Backup',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
     }
   }
 
@@ -1641,6 +1725,13 @@ class BackupService {
     _validateUniqueLearningActivityIds(data);
     _validateActivitySettlements(data);
     _validateCloudUsage(data);
+    if (data.containsKey(PictureStoryCatalogBackup.jsonKey)) {
+      // 下游只消费已经验证的类型，图片不会重复解码分配。
+      data[PictureStoryCatalogBackup.jsonKey] =
+          PictureStoryCatalogBackup.fromJson(
+        data[PictureStoryCatalogBackup.jsonKey],
+      );
+    }
 
     if (data.containsKey('settings')) {
       final settings = data['settings'];

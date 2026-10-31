@@ -53,6 +53,9 @@ class AppRoutes {
   static const String pictureStoryHistory = '/chinese/expression/history';
   static const String pictureStoryManagement =
       '/profile/settings/picture-story';
+  static const String pictureStoryCreate = '$pictureStoryManagement/new';
+  static const String pictureStoryDetail = '$pictureStoryManagement/detail/:id';
+  static const String pictureStoryEdit = '$pictureStoryManagement/edit/:id';
 
   // ============ 口算模块 ============
   static const String mathPractice = '/math/practice';
@@ -140,4 +143,8 @@ class AppRoutes {
       '/profile/settings/books/$id';
   static String pictureStoryPracticeOf(String id) =>
       '/chinese/expression/practice/${Uri.encodeComponent(id)}';
+  static String pictureStoryDetailOf(String id) =>
+      '$pictureStoryManagement/detail/${Uri.encodeComponent(id)}';
+  static String pictureStoryEditOf(String id) =>
+      '$pictureStoryManagement/edit/${Uri.encodeComponent(id)}';
 }

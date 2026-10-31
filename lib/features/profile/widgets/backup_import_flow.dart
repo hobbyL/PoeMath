@@ -23,8 +23,10 @@ Future<RestoreResult?> previewAndRestoreBackup(
   final coordinator = ref.read(restoreCoordinatorProvider(notifications));
   String? passphrase;
   if (isEncryptedBackup(json)) {
-    passphrase = await showBackupPassphraseInputDialog(context,
-        requiredForPayload: true,);
+    passphrase = await showBackupPassphraseInputDialog(
+      context,
+      requiredForPayload: true,
+    );
     if (passphrase == null || !context.mounted) return null;
     json = await decryptBackupPayload(json, passphrase: passphrase);
     if (!context.mounted) return null;
@@ -57,15 +59,18 @@ Future<RestoreResult?> previewAndRestoreBackup(
               ),
               if (preview.hasCredentials && passphrase != null)
                 StatefulBuilder(
-                    builder: (context, setState) => AppTile(
-                          iconColor: Theme.of(context).colorScheme.primary,
-                          title: '同时恢复安全凭据',
-                          subtitle: '关闭可只恢复学习数据',
-                          trailing: Checkbox(
-                              value: restoreCredentials,
-                              onChanged: (value) => setState(
-                                  () => restoreCredentials = value ?? false,),),
-                        ),),
+                  builder: (context, setState) => AppTile(
+                    iconColor: Theme.of(context).colorScheme.primary,
+                    title: '同时恢复安全凭据',
+                    subtitle: '关闭可只恢复学习数据',
+                    trailing: Checkbox(
+                      value: restoreCredentials,
+                      onChanged: (value) => setState(
+                        () => restoreCredentials = value ?? false,
+                      ),
+                    ),
+                  ),
+                ),
               if (preview.endpointChanges case final changes?) ...[
                 Text(
                   changes.isEmpty ? '服务地址：无新增或变更' : '服务地址变更（下一步需再次确认）：',
@@ -76,7 +81,7 @@ Future<RestoreResult?> previewAndRestoreBackup(
                 for (final host in changes.removed) Text('移除：$host'),
               ],
               const SizedBox(height: SpacingTokens.md),
-              const Text('确认后将先保存不含凭据的本地保护快照，再覆盖学习数据。旧备份未包含的助手聊天会保留。'),
+              const Text('确认后将先保存不含凭据的本地保护快照，再恢复备份数据。旧备份未包含的助手聊天和看图说话题库会保留。'),
             ],
           ),
         ),
@@ -104,6 +109,8 @@ Future<RestoreResult?> previewAndRestoreBackup(
     final trusted = await showLlmEndpointConfirmDialog(context, changes);
     if (trusted != true || !context.mounted) return null;
   }
-  return coordinator.restore(preview,
-      passphrase: restoreCredentials ? passphrase : '',);
+  return coordinator.restore(
+    preview,
+    passphrase: restoreCredentials ? passphrase : '',
+  );
 }

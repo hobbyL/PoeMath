@@ -21,6 +21,7 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/theme/typography_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -28,7 +29,8 @@ import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_audio_service.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
-import 'package:poemath/features/chinese/expression/widgets/picture_story_illustration.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
 
 class PictureStoryPracticePage extends ConsumerStatefulWidget {
   const PictureStoryPracticePage({super.key, required this.promptId});
@@ -60,17 +62,26 @@ class _PictureStoryPracticePageState
   bool _finishing = false;
   bool _showHints = false;
   bool _usedHints = false;
-
-  PictureStoryPrompt? get _prompt => PictureStoryCatalog.find(widget.promptId);
+  late final PictureStoryRepository _repository;
+  PictureStoryPrompt? _prompt;
+  bool _promptReadFailed = false;
 
   @override
   void initState() {
     super.initState();
+    _repository = ref.read(pictureStoryRepositoryProvider);
+    try {
+      _prompt = _repository.findPrompt(widget.promptId)?.copyWith();
+    } on Object {
+      _promptReadFailed = true;
+    }
+    // 入口捕获不可变版本；失效题目不能创建一个没有原题的草稿。
+    if (_prompt == null) return;
     _record = PictureStoryPracticeRecord(
       id: '${DateTime.now().microsecondsSinceEpoch}',
       profileId: ProfileScope.currentId,
       promptId: widget.promptId,
-      promptVersion: _prompt?.version ?? 1,
+      promptVersion: _prompt!.version,
       startedAt: DateTime.now(),
       status: 'draft',
       segmentsJson: '[]',
@@ -247,39 +258,50 @@ class _PictureStoryPracticePageState
       return;
     }
     setState(() => _finishing = true);
-    _record!.setSegments(_segments);
-    _record!.status = 'completed';
-    _record!.completedAt = DateTime.now();
-    _record!.usedHints = _usedHints;
-    _record!.feedbackJson = jsonEncode(<String, Object>{
-      'source': 'local',
-      'highlights': ['你愿意把看到的内容说出来了。', if (_segments.length > 1) '你用了多段话补充细节。'],
-      'suggestion': _record!.answerText.trim().isEmpty
-          ? '可以先填写听到的文字，再请家长一起回听。'
-          : '再补充一个动作或人物的心情，故事会更生动。',
-    });
-    await _saveDraft();
-    final aiFeedback = await _generateAiFeedback(prompt: _prompt!);
-    if (aiFeedback != null && _record != null) {
+    final before = _record!.copy();
+    try {
+      _record!.setSegments(_segments);
+      _record!.status = 'completed';
+      _record!.completedAt = DateTime.now();
+      _record!.usedHints = _usedHints;
       _record!.feedbackJson = jsonEncode(<String, Object>{
-        'source': 'vision',
-        'text': aiFeedback,
+        'source': 'local',
+        'highlights': [
+          '你愿意把看到的内容说出来了。',
+          if (_segments.length > 1) '你用了多段话补充细节。',
+        ],
+        'suggestion': _record!.answerText.trim().isEmpty
+            ? '可以先填写听到的文字，再请家长一起回听。'
+            : '再补充一个动作或人物的心情，故事会更生动。',
       });
-      await _saveDraft();
+      if (!await _saveDraft()) {
+        _record = before;
+        return;
+      }
+      if (!mounted) return;
+      final aiFeedback = await _generateAiFeedback(prompt: _prompt!);
+      if (aiFeedback != null) {
+        _record!.feedbackJson = jsonEncode(<String, Object>{
+          'source': 'vision',
+          'text': aiFeedback,
+        });
+        await _saveDraft();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('本次练习已保存')));
+      context.pop();
+    } finally {
+      if (mounted) setState(() => _finishing = false);
     }
-    if (!mounted) return;
-    setState(() => _finishing = false);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('本次练习已保存')));
-    context.pop();
   }
 
-  Future<void> _saveDraft() async {
+  Future<bool> _saveDraft() async {
     final record = _record;
-    if (record == null) return;
+    if (record == null) return false;
     try {
-      await ref.read(pictureStoryRepositoryProvider).save(record);
-      ref.invalidate(pictureStoryHistoryProvider);
+      await _repository.save(record);
+      return true;
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '看图说话记录保存失败',
@@ -287,10 +309,30 @@ class _PictureStoryPracticePageState
         error: error,
         stackTrace: stackTrace,
       );
+      if (mounted) setState(() => _message = '练习暂时没有保存，请检查设备空间后重试');
+      return false;
     }
   }
 
   Future<Uint8List?> _captureIllustration() async {
+    final prompt = _prompt;
+    if (!mounted || prompt == null) return null;
+    if (prompt.image.isLocal) {
+      try {
+        // AI 使用完整的永久图片，不采集列表裁切或图片加载占位。
+        return await ref
+            .read(pictureStoryImageServiceProvider)
+            .readImage(prompt.image.value);
+      } on Object catch (error, stackTrace) {
+        AppLogger.e(
+          '读取评价题图失败',
+          tag: 'PictureStory',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        return null;
+      }
+    }
     final renderObject = _illustrationKey.currentContext?.findRenderObject();
     if (renderObject is! RenderRepaintBoundary) return null;
     try {
@@ -313,7 +355,7 @@ class _PictureStoryPracticePageState
     required PictureStoryPrompt prompt,
   }) async {
     final image = await _captureIllustration();
-    if (image == null) return null;
+    if (image == null || !mounted) return null;
     final settings = ref.read(settingsRepositoryProvider);
     try {
       final config =
@@ -323,8 +365,9 @@ class _PictureStoryPracticePageState
         httpClient: ref.read(llmExplainHttpClientProvider),
         settings: settings,
         isActive: () => mounted,
-        onSelectionChanged: () =>
-            ref.read(llmSelectionVersionProvider.notifier).state++,
+        onSelectionChanged: () {
+          if (mounted) ref.read(llmSelectionVersionProvider.notifier).state++;
+        },
       );
       final promptText =
           '请评价孩子的看图说话：${_record?.answerText ?? ''}\n练习目标：${prompt.goals.join('；')}';
@@ -390,7 +433,12 @@ class _PictureStoryPracticePageState
     final theme = Theme.of(context);
     final prompt = _prompt;
     if (prompt == null) {
-      return const Scaffold(body: Center(child: Text('题目不存在')));
+      return Scaffold(
+        appBar: AppBar(title: const Text('看图说话')),
+        body: PictureStoryUnavailableView(
+          message: _promptReadFailed ? '题目暂时无法读取，请返回题库重试。' : '题目不存在，请返回选择其他题目。',
+        ),
+      );
     }
     return Scaffold(
       appBar: AppBar(
@@ -406,15 +454,20 @@ class _PictureStoryPracticePageState
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 760;
+            final wide =
+                constraints.maxWidth >= ResponsiveLayout.wideBreakpoint;
             final content = _buildContent(theme, prompt);
             return wide
-                ? Row(
-                    children: [
-                      Expanded(child: content[0]),
-                      const SizedBox(width: SpacingTokens.lg),
-                      Expanded(child: content[1]),
-                    ],
+                ? SingleChildScrollView(
+                    padding: const EdgeInsets.all(SpacingTokens.md),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: content[0]),
+                        const SizedBox(width: SpacingTokens.lg),
+                        Expanded(child: content[1]),
+                      ],
+                    ),
                   )
                 : ListView(
                     padding: const EdgeInsets.all(SpacingTokens.md),
@@ -448,7 +501,7 @@ class _PictureStoryPracticePageState
               children: [
                 RepaintBoundary(
                   key: _illustrationKey,
-                  child: PictureStoryIllustration(kind: prompt.illustration),
+                  child: PictureStoryImageView(image: prompt.image),
                 ),
                 Positioned(
                   top: SpacingTokens.sm,
