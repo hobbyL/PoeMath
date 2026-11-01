@@ -5,7 +5,7 @@ enum TextbookContentSection {
   recognition('认一认', 'recognitionCharacters'),
   recitation('背一背', 'recitations'),
   writing('写一写', 'writingCharacters'),
-  exercise('习题', 'exercises');
+  exercise('练一练', 'exercises');
 
   const TextbookContentSection(this.label, this.category);
   final String label;

@@ -566,12 +566,12 @@ void main() {
       await tester.pumpAndSettle();
       current!.onPageChanged(2);
       await tester.pumpAndSettle();
-      final entry = find.widgetWithText(TextButton, '习题');
+      final entry = find.widgetWithText(TextButton, '练一练');
       expect(entry, findsOneWidget);
       await tester.ensureVisible(entry);
       await tester.tap(entry);
       await tester.pumpAndSettle();
-      expect(find.widgetWithText(AppBar, '习题·星月测试'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, '练一练·星月测试'), findsOneWidget);
       final overview = tester.widget<TextbookExerciseOverview>(
         find.byType(TextbookExerciseOverview),
       );
@@ -643,7 +643,7 @@ void main() {
     }
     current!.onPageChanged(2);
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(TextButton, '习题'), findsNothing);
+    expect(find.widgetWithText(TextButton, '练一练'), findsNothing);
     void expectCompactActionsBelowPdf() {
       final pdf = tester.getRect(
         find.byKey(const ValueKey('textbook-detail-preview-card')),

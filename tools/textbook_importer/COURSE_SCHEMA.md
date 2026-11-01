@@ -277,7 +277,7 @@ Last-decision reviewer/time/checks/notes persist; this is not an append-only
 audit history. Saving compares the prior complete pack to the current file,
 rejecting stale pages, and renames an atomically completed sibling file.
 Review operations do not write a child's learning progress. An individually
-approved exercise is available through the textbook detail's `习题` action on
+approved exercise is available through the textbook detail's `练一练` action on
 pages matching its lesson. Exercise practice depends on the exercise's current
 approval, without waiting for whole-pack status, lesson review or complete
 exercise coverage. Practice records use the same eligibility rule; changed or
