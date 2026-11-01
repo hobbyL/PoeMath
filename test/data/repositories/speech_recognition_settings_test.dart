@@ -187,4 +187,33 @@ void main() {
     expect(state.hasCredentials, isFalse);
     expect(state.isVerified, isFalse);
   });
+
+  test('重新保存相同 AK/SK 保留手动 APPID 和已通过的录音验证', () async {
+    const credentials = TencentAsrCredentials(
+      secretId: 'AKID',
+      secretKey: 'SK',
+      appId: '1250000000',
+    );
+    await repository.saveTencentAsrCredentials(
+      secretId: credentials.secretId,
+      secretKey: credentials.secretKey,
+    );
+    await repository.saveTencentAsrAppId(credentials.appId);
+    final verifiedAt = DateTime.utc(2026, 11, 1);
+    await repository.markTencentAsrCredentialsVerified(
+      testedCredentials: credentials,
+      verifiedAt: verifiedAt,
+    );
+    await repository.saveTencentAsrCredentials(
+      secretId: ' ${credentials.secretId} ',
+      secretKey: ' ${credentials.secretKey} ',
+    );
+    expect(
+      (await repository.readTencentAsrCredentials())?.appId,
+      credentials.appId,
+    );
+    final state = await repository.loadSpeechRecognitionSettings();
+    expect(state.isVerified, isTrue);
+    expect(state.verifiedAt, verifiedAt.toLocal());
+  });
 }

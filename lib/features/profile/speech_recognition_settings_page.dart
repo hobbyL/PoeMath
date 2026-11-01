@@ -359,7 +359,7 @@ class _SpeechRecognitionSettingsPageState
               icon: Icon(
                 _showRealtimeSettings ? Icons.expand_less : Icons.expand_more,
               ),
-              label: const Text('实时识别设置（可选）'),
+              label: const Text('高级设置：手动填写 APPID'),
             ),
             if (_showRealtimeSettings) ...[
               TextField(
@@ -368,7 +368,7 @@ class _SpeechRecognitionSettingsPageState
                 decoration: const InputDecoration(
                   labelText: 'APPID',
                   prefixIcon: Icon(Icons.swap_horiz_outlined),
-                  helperText: '填写后优先使用实时识别；留空则使用一句话识别',
+                  helperText: '默认自动获取；无法获取时可从腾讯云账号信息页复制填写',
                 ),
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.done,
@@ -386,6 +386,13 @@ class _SpeechRecognitionSettingsPageState
               ),
             ),
             const SizedBox(height: SpacingTokens.lg),
+            Text(
+              '优先使用实时识别，仅当实时资源包耗尽时切换为一句话识别。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
             ColoredCard(
               color: theme.colorScheme.primary,
               width: double.infinity,

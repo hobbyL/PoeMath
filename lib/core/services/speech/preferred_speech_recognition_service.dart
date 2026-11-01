@@ -126,7 +126,7 @@ final class PreferredSpeechRecognitionService
     _session = session;
     _usedFallback = false;
     _lastAudio = null;
-    _mode = 'sentence';
+    _mode = 'realtime';
     try {
       final credentials = await session.cancelToken.wait(
         _settingsRepository.readTencentAsrCredentials(),
@@ -146,26 +146,22 @@ final class PreferredSpeechRecognitionService
         if (!permission) {
           throw const SpeechPermissionDeniedException();
         }
-        if (credentials.hasRealtimeCredentials) {
-          session.realtimeAttempted = true;
-          try {
-            session.realtime = await _realtimeClient.connect(
-              credentials: credentials,
-              cancelToken: session.cancelToken,
-              onText: (text, {required stable}) {
-                if (!_current(session) || text.isEmpty) return;
-                _mode = 'realtime';
-                _transcriptController.add(text);
-              },
-            );
-            _check(session);
-            _mode = 'realtime';
-          } on TencentRealtimeAsrException catch (error) {
-            _check(session);
-            // 本地保护额度不是腾讯云月度额度，不能通过回退绕过它。
-            if (error.code == -1) rethrow;
-            session.realtimeStartFailure = error;
-          }
+        try {
+          session.realtime = await _realtimeClient.connect(
+            credentials: credentials,
+            cancelToken: session.cancelToken,
+            onText: (text, {required stable}) {
+              if (!_current(session) || text.isEmpty) return;
+              _transcriptController.add(text);
+            },
+          );
+          _check(session);
+        } on TencentRealtimeAsrException catch (error) {
+          _check(session);
+          if (!_isRealtimeQuotaExhausted(error)) rethrow;
+          session.realtimeStartFailure = error;
+          _mode = 'sentence';
+          _usedFallback = true;
         }
         _check(session);
         final audioStream = await _recorder.startStream();
@@ -231,23 +227,13 @@ final class PreferredSpeechRecognitionService
 
       final startFailure = session.realtimeStartFailure;
       if (startFailure != null) {
-        if (startFailure.kind != TencentRealtimeErrorKind.quota) {
+        if (!_isRealtimeQuotaExhausted(startFailure)) {
           throw startFailure;
         }
         return await _recognizeSentence(
           pcm,
           session: session,
           usedFallback: true,
-        );
-      }
-
-      // APPID 是实时接口新增的配置项。旧用户仍只有 SecretId/SecretKey
-      // 时，继续走原有的一句话识别，避免升级后已有功能失效。
-      if (!session.realtimeAttempted) {
-        return await _recognizeSentence(
-          pcm,
-          session: session,
-          usedFallback: false,
         );
       }
 
@@ -266,7 +252,7 @@ final class PreferredSpeechRecognitionService
           );
         } on TencentRealtimeAsrException catch (error) {
           _check(session);
-          if (error.kind != TencentRealtimeErrorKind.quota) rethrow;
+          if (!_isRealtimeQuotaExhausted(error)) rethrow;
           return await _recognizeSentence(
             pcm,
             session: session,
@@ -312,7 +298,7 @@ final class PreferredSpeechRecognitionService
     final result = await _sentenceClient.recognizePcm16(
       pcmBytes: pcm,
       credentials: credentials,
-      reserveUsage: !session.realtimeAttempted,
+      reserveUsage: false,
       cancelToken: session.cancelToken,
     );
     _check(session);
@@ -324,6 +310,9 @@ final class PreferredSpeechRecognitionService
       usedFallback: usedFallback,
     );
   }
+
+  static bool _isRealtimeQuotaExhausted(TencentRealtimeAsrException error) =>
+      error.kind == TencentRealtimeErrorKind.quota && error.code == 4004;
 
   @override
   Future<void> cancel() async {
@@ -363,7 +352,6 @@ final class _RecordingSession {
   final cancelToken = SpeechRecognitionCancelToken();
   TencentRealtimeAsrSession? realtime;
   TencentRealtimeAsrException? realtimeStartFailure;
-  bool realtimeAttempted = false;
   Future<void>? cleanup;
   final bytes = <int>[];
   final done = Completer<void>();

@@ -13,6 +13,7 @@ import 'package:crypto/crypto.dart';
 
 import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
+import 'package:poemath/core/services/tencent/tencent_app_id_client.dart';
 
 enum TencentRealtimeErrorKind { authentication, quota, network, response }
 
@@ -33,17 +34,22 @@ final class TencentRealtimeAsrClient {
     Random? random,
     Duration timeout = const Duration(seconds: 12),
     CloudUsageService? usage,
+    TencentAppIdClient? appIdClient,
     Future<WebSocket> Function(Uri)? connectSocket,
   })  : _clock = clock ?? DateTime.now,
         _random = random ?? Random.secure(),
         _timeout = timeout,
         _usage = usage ?? CloudUsageService.instance,
+        _appIdClient = appIdClient ?? TencentAppIdClient(),
+        _ownsAppIdClient = appIdClient == null,
         _connectSocket = connectSocket ?? _openSocket;
 
   final DateTime Function() _clock;
   final Random _random;
   final Duration _timeout;
   final CloudUsageService _usage;
+  final TencentAppIdClient _appIdClient;
+  final bool _ownsAppIdClient;
   final Future<WebSocket> Function(Uri) _connectSocket;
 
   static Future<WebSocket> _openSocket(Uri uri) =>
@@ -55,9 +61,17 @@ final class TencentRealtimeAsrClient {
     SpeechRecognitionCancelToken? cancelToken,
   }) async {
     cancelToken?.check();
-    if (!credentials.hasRealtimeCredentials) {
+    if (!credentials.isComplete) {
       throw const TencentRealtimeAsrException(
-        '未配置腾讯云实时识别所需的 APPID',
+        '请先填写腾讯云 SecretId 和 SecretKey',
+        kind: TencentRealtimeErrorKind.authentication,
+      );
+    }
+    final configuredAppId = credentials.appId.trim();
+    if (configuredAppId.isNotEmpty &&
+        !RegExp(r'^[1-9]\d*$').hasMatch(configuredAppId)) {
+      throw const TencentRealtimeAsrException(
+        '腾讯云 APPID 应为账号信息页中的数字',
         kind: TencentRealtimeErrorKind.authentication,
       );
     }
@@ -73,6 +87,26 @@ final class TencentRealtimeAsrClient {
         error.message,
         kind: TencentRealtimeErrorKind.quota,
         code: -1,
+      );
+    }
+    cancelToken?.check();
+    late final String appId;
+    try {
+      appId = configuredAppId.isNotEmpty
+          ? configuredAppId
+          : await _appIdClient.resolve(
+              credentials: credentials,
+              cancelToken: cancelToken,
+            );
+    } on TencentAppIdException catch (error) {
+      throw TencentRealtimeAsrException(
+        error.message,
+        kind: switch (error.kind) {
+          TencentAppIdErrorKind.authentication =>
+            TencentRealtimeErrorKind.authentication,
+          TencentAppIdErrorKind.network => TencentRealtimeErrorKind.network,
+          TencentAppIdErrorKind.response => TencentRealtimeErrorKind.response,
+        },
       );
     }
     cancelToken?.check();
@@ -94,7 +128,7 @@ final class TencentRealtimeAsrClient {
       'voice_format': '1',
       'voice_id': voiceId,
     };
-    final signatureBase = 'asr.cloud.tencent.com/asr/v2/${credentials.appId}?'
+    final signatureBase = 'asr.cloud.tencent.com/asr/v2/$appId?'
         '${_canonicalQuery(query)}';
     final signature = base64Encode(
       Hmac(sha1, utf8.encode(credentials.secretKey))
@@ -105,7 +139,7 @@ final class TencentRealtimeAsrClient {
     final uri = Uri(
       scheme: 'wss',
       host: 'asr.cloud.tencent.com',
-      pathSegments: <String>['asr', 'v2', credentials.appId],
+      pathSegments: <String>['asr', 'v2', appId],
       queryParameters: query,
     );
 
@@ -131,10 +165,16 @@ final class TencentRealtimeAsrClient {
         '腾讯云实时识别网络不可用',
         kind: TencentRealtimeErrorKind.network,
       );
-    } on WebSocketException catch (error) {
+    } on HandshakeException {
       cancelToken?.check();
-      throw TencentRealtimeAsrException(
-        '腾讯云实时识别连接失败：${error.message}',
+      throw const TencentRealtimeAsrException(
+        '腾讯云实时识别安全连接失败，请检查网络后重试',
+        kind: TencentRealtimeErrorKind.network,
+      );
+    } on WebSocketException {
+      cancelToken?.check();
+      throw const TencentRealtimeAsrException(
+        '腾讯云实时识别连接失败，请检查网络后重试',
         kind: TencentRealtimeErrorKind.network,
       );
     }
@@ -161,8 +201,8 @@ final class TencentRealtimeAsrClient {
       final code = (json['code'] as num?)?.toInt();
       if (code != null && code != 0) {
         failure = TencentRealtimeAsrException(
-          _messageForCode(code, json['message'] as String?),
-          kind: _kindForCode(code, json['message'] as String?),
+          _messageForCode(code),
+          kind: _kindForCode(code),
           code: code,
         );
         if (!ready.isCompleted) ready.completeError(failure!);
@@ -231,6 +271,7 @@ final class TencentRealtimeAsrClient {
       subscription: subscription,
       finished: finished,
       getFinalText: () => finalText,
+      getFailure: () => failure,
     );
   }
 
@@ -244,39 +285,32 @@ final class TencentRealtimeAsrClient {
         .join('&');
   }
 
-  static TencentRealtimeErrorKind _kindForCode(int code, String? message) {
-    final text = '${message ?? ''} $code'.toLowerCase();
-    if (code == 4004 ||
-        text.contains('quota') ||
-        text.contains('limit') ||
-        text.contains('resource exhausted') ||
-        text.contains('resourceinsufficient') ||
-        text.contains('nofree') ||
-        text.contains('no free') ||
-        text.contains('额度') ||
-        text.contains('资源不足') ||
-        text.contains('资源包')) {
+  static TencentRealtimeErrorKind _kindForCode(int code) {
+    if (code == 4004) {
       return TencentRealtimeErrorKind.quota;
     }
-    if (code == 4002 ||
-        code == 4003 ||
-        code == 401 ||
-        code == 403 ||
-        text.contains('auth')) {
+    if (code == 4002 || code == 4003 || code == 401 || code == 403) {
       return TencentRealtimeErrorKind.authentication;
     }
     return TencentRealtimeErrorKind.response;
   }
 
-  static String _messageForCode(int code, String? message) {
-    return switch (_kindForCode(code, message)) {
-      TencentRealtimeErrorKind.quota => '腾讯云实时识别额度已用完',
-      TencentRealtimeErrorKind.authentication => '腾讯云实时识别鉴权失败，请检查 APPID 和密钥',
-      TencentRealtimeErrorKind.network => '腾讯云实时识别网络失败',
-      TencentRealtimeErrorKind.response => message?.trim().isNotEmpty == true
-          ? '腾讯云实时识别失败：${message!.trim()}'
-          : '腾讯云实时识别失败',
+  static String _messageForCode(int code) {
+    return switch (code) {
+      4002 || 401 || 403 => '腾讯云实时识别鉴权失败，请检查 APPID 和密钥',
+      4003 => '腾讯云实时识别服务未开通，请在腾讯云控制台开通',
+      4004 => '腾讯云实时识别资源包已耗尽',
+      4005 => '腾讯云账户欠费，实时识别已停用，请检查腾讯云账户',
+      4006 => '腾讯云实时识别并发已达上限，请稍后重试',
+      4007 => '腾讯云实时识别无法解码音频，请重试',
+      4008 || 4009 => '腾讯云实时识别连接中断，请重试',
+      6001 => '腾讯云实时识别不支持当前访问区域，请检查账号地区和网络',
+      _ => '腾讯云实时识别失败（错误码 $code）',
     };
+  }
+
+  void close() {
+    if (_ownsAppIdClient) _appIdClient.close();
   }
 }
 
@@ -286,15 +320,18 @@ final class TencentRealtimeAsrSession {
     required StreamSubscription<Object?> subscription,
     required Completer<void> finished,
     required String Function() getFinalText,
+    required TencentRealtimeAsrException? Function() getFailure,
   })  : _socket = socket,
         _subscription = subscription,
         _finished = finished,
-        _getFinalText = getFinalText;
+        _getFinalText = getFinalText,
+        _getFailure = getFailure;
 
   final WebSocket _socket;
   final StreamSubscription<Object?> _subscription;
   final Completer<void> _finished;
   final String Function() _getFinalText;
+  final TencentRealtimeAsrException? Function() _getFailure;
   bool _ended = false;
   bool _ending = false;
   Future<void>? _closing;
@@ -305,7 +342,7 @@ final class TencentRealtimeAsrSession {
   static const int _packetBytes = 6400;
 
   void add(Uint8List bytes) {
-    if (_ended || _ending || bytes.isEmpty) return;
+    if (_ended || _ending || bytes.isEmpty || _getFailure() != null) return;
     _pendingAudio.addAll(bytes);
     _sendTimer ??= Timer.periodic(
       const Duration(milliseconds: 200),
@@ -314,20 +351,25 @@ final class TencentRealtimeAsrSession {
   }
 
   Future<String> end() async {
-    if (_ended) return _getFinalText();
-    _ending = true;
-    if (_pendingAudio.isEmpty) {
-      _sendEndMarker();
-    } else {
-      _sendTimer ??= Timer.periodic(
-        const Duration(milliseconds: 200),
-        (_) => _sendPendingAudio(),
-      );
+    try {
+      final failure = _getFailure();
+      if (failure != null) throw failure;
+      if (_ended) return _getFinalText();
+      _ending = true;
+      if (_pendingAudio.isEmpty) {
+        _sendEndMarker();
+      } else {
+        _sendTimer ??= Timer.periodic(
+          const Duration(milliseconds: 200),
+          (_) => _sendPendingAudio(),
+        );
+      }
+      await _audioDrained.future.timeout(const Duration(seconds: 15));
+      await _finished.future.timeout(const Duration(seconds: 15));
+      return _getFinalText().trim();
+    } finally {
+      await _close();
     }
-    await _audioDrained.future.timeout(const Duration(seconds: 15));
-    await _finished.future.timeout(const Duration(seconds: 15));
-    await _close();
-    return _getFinalText().trim();
   }
 
   Future<void> cancel() async {
@@ -341,6 +383,12 @@ final class TencentRealtimeAsrSession {
 
   void _sendPendingAudio() {
     if (_ended) return;
+    if (_getFailure() != null) {
+      _sendTimer?.cancel();
+      _pendingAudio.clear();
+      if (!_audioDrained.isCompleted) _audioDrained.complete();
+      return;
+    }
     final count = _pendingAudio.length >= _packetBytes
         ? _packetBytes
         : _ending
@@ -366,6 +414,7 @@ final class TencentRealtimeAsrSession {
 
   Future<void> _closeSocket() async {
     _sendTimer?.cancel();
+    _pendingAudio.clear();
     await _subscription.cancel();
     await _socket.close(WebSocketStatus.normalClosure);
   }

@@ -14,10 +14,12 @@ import 'package:poemath/core/services/speech/speech_audio_recorder.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
 import 'package:poemath/core/services/speech/tencent_realtime_asr_client.dart';
+import 'package:poemath/core/services/tencent/tencent_app_id_client.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../../helpers/hive_test_helper.dart';
 import '../../../helpers/parent_access_test_helper.dart';
+import '../../../helpers/tencent_realtime_socket.dart';
 
 class _Settings extends Mock implements SettingsRepository {}
 
@@ -71,58 +73,7 @@ class _Usage extends CloudUsageService {
   }
 }
 
-class _Socket extends Fake implements WebSocket {
-  final incoming = StreamController<Object?>();
-  final endSent = Completer<void>();
-  Completer<void>? closeGate;
-  int? errorCode;
-  bool holdResult = false;
-  bool closed = false;
-  @override
-  StreamSubscription<dynamic> listen(
-    void Function(dynamic)? onData, {
-    Function? onError,
-    void Function()? onDone,
-    bool? cancelOnError,
-  }) {
-    final subscription = incoming.stream.listen(
-      onData,
-      onError: onError,
-      onDone: onDone,
-      cancelOnError: cancelOnError,
-    );
-    incoming.add(
-      jsonEncode({
-        'code': errorCode ?? 0,
-        'voice_id': 'synthetic-voice',
-      }),
-    );
-    return subscription;
-  }
-
-  @override
-  void add(dynamic data) {
-    if (data is String && data.contains('"end"')) {
-      if (!endSent.isCompleted) endSent.complete();
-      if (!holdResult) {
-        incoming.add(
-          jsonEncode({
-            'code': 0,
-            'result': {'index': 0, 'voice_text_str': '实时新结果', 'slice_type': 2},
-            'final': 1,
-          }),
-        );
-      }
-    }
-  }
-
-  @override
-  Future<void> close([int? code, String? reason]) async {
-    await closeGate?.future;
-    closed = true;
-    await incoming.close();
-  }
-}
+class _Socket extends TestTencentRealtimeSocket {}
 
 class _ProbeClient extends http.BaseClient {
   _ProbeClient(this.inner);
@@ -184,15 +135,31 @@ void main() {
             );
           }),
     );
+    final appIdClient = TencentAppIdClient(
+      httpClient: MockClient(
+        (_) async => http.Response(
+          '{"Response":{"AppId":100000001}}',
+          200,
+        ),
+      ),
+    );
+    final realtimeClient = realtime ??
+        TencentRealtimeAsrClient(
+          usage: usage,
+          appIdClient: appIdClient,
+          connectSocket: (_) async => _Socket()..errorCode = 4004,
+        );
     final service = PreferredSpeechRecognitionService(
       recorder: recorder,
       sentenceClient: sentence,
-      realtimeClient: realtime ?? TencentRealtimeAsrClient(usage: usage),
+      realtimeClient: realtimeClient,
       settingsRepository: settings,
     );
     addTearDown(() async {
       await service.dispose();
       sentence.close();
+      realtimeClient.close();
+      appIdClient.close();
     });
     return service;
   }
@@ -231,20 +198,21 @@ void main() {
     credentials.complete(_credentials);
     await Future<void>.delayed(Duration.zero);
     expect(sends, 0);
-    expect(usage.used(CloudUsageKind.asr), 0);
+    expect(usage.used(CloudUsageKind.asr), 2);
     expect(service.isRecording, isTrue);
     expect(service.takeLastAudio(), isNull);
   });
 
-  test('用量预留等待期间取消，晚到预留不计数、不发送', () async {
+  test('实时准备期用量预留等待期间取消，晚到预留不计数、不发送', () async {
     final heldUsage = _Usage();
     final gate = Completer<void>();
     heldUsage.gate = gate;
     usage = heldUsage;
     final service = build();
-    await service.start();
-    recorder.emit();
-    final failure = cancelled(service.stop());
+    final failure = expectLater(
+      service.start(),
+      throwsA(isA<SpeechRecognitionCancelled>()),
+    );
     await heldUsage.entered.future;
     await service.cancel();
     await failure.timeout(const Duration(seconds: 2));
@@ -255,6 +223,7 @@ void main() {
     );
     expect(sends, 0);
     expect(usage.used(CloudUsageKind.asr), 0);
+    expect(recorder.starts, 0);
   });
 
   test('取消准备期释放状态，旧凭据晚到不能启动或清理新录音', () async {

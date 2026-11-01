@@ -178,7 +178,9 @@ final tencentAsrClientProvider = Provider<TencentAsrClient>((ref) {
 
 final tencentRealtimeAsrClientProvider =
     Provider<TencentRealtimeAsrClient>((ref) {
-  return TencentRealtimeAsrClient();
+  final client = TencentRealtimeAsrClient();
+  ref.onDispose(client.close);
+  return client;
 });
 
 /// Pages own and dispose their recording service, so leaving one cannot cancel another.

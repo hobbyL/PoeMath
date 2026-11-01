@@ -1053,15 +1053,19 @@ class SettingsRepository {
     required String secretKey,
   }) async {
     ParentAccessService.instance.assertAllowed();
-    final credentials = TencentAsrCredentials(
-      secretId: secretId.trim(),
-      secretKey: secretKey.trim(),
-    );
-    if (!credentials.isComplete) {
+    final normalizedId = secretId.trim();
+    final normalizedKey = secretKey.trim();
+    if (normalizedId.isEmpty || normalizedKey.isEmpty) {
       throw ArgumentError('SecretId 和 SecretKey 不能为空');
     }
-
     final existing = await readTencentAsrCredentials();
+    final keysUnchanged = existing?.secretId == normalizedId &&
+        existing?.secretKey == normalizedKey;
+    final credentials = TencentAsrCredentials(
+      secretId: normalizedId,
+      secretKey: normalizedKey,
+      appId: keysUnchanged ? existing!.appId : '',
+    );
     final changed = existing == null ||
         _credentialFingerprint(existing) != _credentialFingerprint(credentials);
     if (changed) {
