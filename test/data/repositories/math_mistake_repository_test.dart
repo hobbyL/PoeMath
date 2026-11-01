@@ -1,11 +1,13 @@
 // test/data/repositories/math_mistake_repository_test.dart
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
   late MathMistakeRepository repo;
@@ -13,10 +15,12 @@ void main() {
   setUp(() async {
     await setUpHiveForTesting();
     ProfileScope.reset();
+    lockParentForTesting();
     repo = MathMistakeRepository();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 
@@ -55,15 +59,17 @@ void main() {
 
       ProfileScope.switchTo('kid2');
       final kid2Repo = MathMistakeRepository();
-      await kid2Repo.add(MathMistake(
-        id: 'm2',
-        profileId: 'kid2',
-        problemText: '2 + 2 = ?',
-        correctAnswer: '4',
-        userAnswer: '5',
-        problemType: 'arithmetic',
-        grade: 1,
-      ),);
+      await kid2Repo.add(
+        MathMistake(
+          id: 'm2',
+          profileId: 'kid2',
+          problemText: '2 + 2 = ?',
+          correctAnswer: '4',
+          userAnswer: '5',
+          problemType: 'arithmetic',
+          grade: 1,
+        ),
+      );
 
       ProfileScope.reset();
       expect(repo.getAll().length, 1);
@@ -106,8 +112,7 @@ void main() {
 
     test('recordRepracticeResult 答错只增加一次重练次数且不入巩固队列', () async {
       await repo.add(makeMistake(id: 'm1'));
-      final outcome =
-          await repo.recordRepracticeResult('m1', isCorrect: false);
+      final outcome = await repo.recordRepracticeResult('m1', isCorrect: false);
 
       expect(outcome, RepracticeOutcome.reset);
       final m = repo.getById('m1')!;
@@ -143,9 +148,29 @@ void main() {
     });
 
     test('delete 删除错题', () async {
+      await unlockParentForTesting();
       await repo.add(makeMistake(id: 'm1'));
       await repo.delete('m1');
       expect(repo.getById('m1'), isNull);
+    });
+
+    test('未设置或锁定时禁止删除，授权检查拒绝时保留错题', () async {
+      await repo.add(makeMistake(id: 'm1'));
+      await expectLater(repo.delete('m1'), throwsA(isA<ParentAccessDenied>()));
+      await unlockParentForTesting();
+      lockParentForTesting();
+      await expectLater(repo.delete('m1'), throwsA(isA<ParentAccessDenied>()));
+      expect(repo.getById('m1'), isNotNull);
+
+      // 回练属于学习行为，不受删除权限影响。
+      await repo.recordRepracticeResult('m1', isCorrect: true);
+      expect(repo.getById('m1')!.retryCount, 1);
+      await unlockParentForTesting();
+      await expectLater(
+        repo.delete('m1', authorize: () => throw const ParentAccessDenied()),
+        throwsA(isA<ParentAccessDenied>()),
+      );
+      expect(repo.getById('m1'), isNotNull);
     });
   });
 
@@ -373,8 +398,7 @@ void main() {
       await passTimes('m1', 3);
       expect(repo.getById('m1')!.consolidationRound, 3);
 
-      final outcome =
-          await repo.recordRepracticeResult('m1', isCorrect: false);
+      final outcome = await repo.recordRepracticeResult('m1', isCorrect: false);
 
       expect(outcome, RepracticeOutcome.reset);
       final m = repo.getById('m1')!;
@@ -433,8 +457,7 @@ void main() {
       await repo.add(makeMistake(id: 'm_due'));
       await passTimes('m_due', 1);
       final due = repo.getById('m_due')!;
-      due.nextConsolidationDate =
-          _today().subtract(const Duration(days: 1));
+      due.nextConsolidationDate = _today().subtract(const Duration(days: 1));
       await due.save();
 
       // 未到期：抽查日为 1 天后

@@ -10,9 +10,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/features/math/mistake_consolidation_labels.dart';
@@ -340,7 +343,7 @@ class _AnswerChip extends StatelessWidget {
 }
 
 /// 操作按钮区 — 一行展示所有按钮。
-class _ActionButtons extends ConsumerWidget {
+class _ActionButtons extends ConsumerStatefulWidget {
   const _ActionButtons({
     required this.mistake,
     required this.problem,
@@ -352,7 +355,16 @@ class _ActionButtons extends ConsumerWidget {
   final VoidCallback onDeleted;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ActionButtons> createState() => _ActionButtonsState();
+}
+
+class _ActionButtonsState extends ConsumerState<_ActionButtons> {
+  bool _deleting = false;
+  MathMistake get mistake => widget.mistake;
+  MathProblem? get problem => widget.problem;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Row(
@@ -393,48 +405,86 @@ class _ActionButtons extends ConsumerWidget {
         _buildActionButton(
           icon: Icons.delete_outline,
           label: '删除',
-          onTap: () async {
-            // 在首个 await（对话框）之前捕获 messenger，供写入失败时提示。
-            final messenger = ScaffoldMessenger.of(context);
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('删除错题'),
-                content: const Text('确定要删除这道错题吗？'),
-                actions: [
-                  TextButton(
-                    onPressed: () => ctx.pop(false),
-                    child: const Text('取消'),
-                  ),
-                  TextButton(
-                    onPressed: () => ctx.pop(true),
-                    child: Text(
-                      '删除',
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                  ),
-                ],
-              ),
-            );
-            if (confirmed != true) return;
-            final repo = ref.read(mathMistakeRepoProvider);
-            final ok = await _writeMistake(messenger, '删除错题', () async {
-              await repo.delete(mistake.id);
-            });
-            if (!ok) return;
-            ref.invalidate(mathMistakeRepoProvider);
-            if (context.mounted) onDeleted();
-          },
+          onTap: _deleting ? null : _delete,
           color: theme.colorScheme.error,
         ),
       ],
     );
   }
 
+  Future<void> _delete() async {
+    if (_deleting) return;
+    setState(() => _deleting = true);
+    final id = mistake.id;
+    final onDeleted = widget.onDeleted;
+    final repo = ref.read(mathMistakeRepoProvider);
+    final revision = ProfileScope.revision;
+    void authorize() {
+      if (!mounted) throw const ParentAccessDenied();
+      assertParentAccess(context);
+      if (ProfileScope.revision != revision) throw const ParentAccessDenied();
+    }
+
+    try {
+      if (!await ensureParentAccess(context) || !mounted) return;
+      authorize();
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('删除错题'),
+          content: const Text('确定要删除这道错题吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => dialogContext.pop(false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => dialogContext.pop(true),
+              child: Text(
+                '删除',
+                style: TextStyle(
+                  color: Theme.of(dialogContext).colorScheme.error,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      authorize();
+      await repo.delete(id, authorize: authorize);
+      if (!mounted) return;
+      ref.invalidate(mathMistakeRepoProvider);
+      if (ProfileScope.revision == revision &&
+          ModalRoute.of(context)?.isCurrent != false) {
+        onDeleted();
+      }
+    } on ParentAccessDenied {
+      _showDeleteError('家长验证已失效，删除已停止，请重新验证');
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '删除错题失败',
+        tag: 'MathMistakeDetail',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _showDeleteError('删除错题失败，请重试');
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  void _showDeleteError(String message) {
+    if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Widget _buildActionButton({
     required IconData icon,
     required String label,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     required Color color,
     String? tooltip,
   }) {
@@ -462,7 +512,7 @@ class _ActionButtons extends ConsumerWidget {
 
   /// 执行一次错题写入，失败时提示用户。
   ///
-  /// `resolve` / `delete` / `recordRepracticeResult` 内部都是 `Hive.put/delete`，
+  /// `resolve` / `recordRepracticeResult` 内部都是 `Hive.put`，
   /// 磁盘满或 Box 损坏会抛 —— 且抛的是 `HiveError extends Error`，**不是**
   /// `Exception`，所以必须捕 `Object`。
   ///
@@ -470,7 +520,7 @@ class _ActionButtons extends ConsumerWidget {
   /// ——「已掌握」按钮点了没变化、确认删除后错题还在原地。界面与真实状态
   /// 脱节且无任何解释，用户会反复点。这里统一补上日志 + 提示。
   ///
-  /// 返回 true 表示写入成功，调用方据此决定是否 invalidate / 回调 onDeleted。
+  /// 返回 true 表示写入成功，调用方据此刷新状态。
   ///
   /// 传入 [messenger] 而非 `BuildContext`：调用点普遍是「先 await 一个对话框、
   /// 再 await 写入」，`context` 会跨越 async gap，直接用它会被

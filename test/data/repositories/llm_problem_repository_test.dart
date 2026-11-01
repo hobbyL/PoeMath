@@ -4,13 +4,17 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:poemath/core/services/parent_access_service.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/repositories/llm_problem_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
 
 LlmProblem _problem({
   required String id,
+  String profileId = 'default',
   String batchId = 'batch-1',
   String topic = 'addition',
   int grade = 3,
@@ -19,7 +23,7 @@ LlmProblem _problem({
 }) =>
     LlmProblem(
       id: id,
-      profileId: 'default',
+      profileId: profileId,
       questionText: '小明有12支铅笔，妈妈又买了4支，现在有多少支铅笔？',
       unit: '支',
       operands: const [12, 4],
@@ -39,10 +43,14 @@ void main() {
 
   setUp(() async {
     await setUpHiveForTesting();
+    ProfileScope.reset();
+    lockParentForTesting();
     repository = LlmProblemRepository();
   });
 
   tearDown(() async {
+    lockParentForTesting();
+    ProfileScope.reset();
     await tearDownHiveForTesting();
   });
 
@@ -123,6 +131,7 @@ void main() {
   });
 
   test('delete / deleteBatch / clearAll', () async {
+    await unlockParentForTesting();
     await repository.addAll([
       _problem(id: 'p1', batchId: 'b1'),
       _problem(id: 'p2', batchId: 'b1'),
@@ -139,6 +148,89 @@ void main() {
 
     await repository.clearAll();
     expect(repository.getAll(), isEmpty);
+  });
+
+  test('未设置和锁定时拒绝所有删除，仍可正常作答', () async {
+    await repository.addAll([
+      _problem(id: 'p1'),
+      _problem(id: 'p2'),
+    ]);
+    final actions = <Future<void> Function()>[
+      () => repository.delete('p1'),
+      () => repository.deleteBatch('batch-1'),
+      () => repository.clearAll(),
+    ];
+    for (final action in actions) {
+      await expectLater(action(), throwsA(isA<ParentAccessDenied>()));
+    }
+    await unlockParentForTesting();
+    lockParentForTesting();
+    for (final action in actions) {
+      await expectLater(action(), throwsA(isA<ParentAccessDenied>()));
+    }
+    expect(repository.getAll(), hasLength(2));
+    await repository.recordAttempt('p1', correct: true);
+    expect(repository.getById('p1')!.attempts, 1);
+  });
+
+  for (final clearAll in [false, true]) {
+    test('${clearAll ? '清空' : '批次删除'}在每题删除前复验，锁定后停止', () async {
+      await unlockParentForTesting();
+      await repository.addAll([
+        _problem(id: 'p1'),
+        _problem(id: 'p2'),
+        _problem(id: 'p3'),
+      ]);
+      void authorize() {
+        if (repository.getAll().length < 3) lockParentForTesting();
+      }
+
+      await expectLater(
+        clearAll
+            ? repository.clearAll(authorize: authorize)
+            : repository.deleteBatch('batch-1', authorize: authorize),
+        throwsA(isA<ParentAccessDenied>()),
+      );
+      expect(repository.getAll(), hasLength(2));
+    });
+
+    test('${clearAll ? '清空' : '批次删除'}等待期间切换档案，不删除新档案同 ID 题目', () async {
+      await unlockParentForTesting();
+      await repository.addAll([_problem(id: 'p1'), _problem(id: 'p2')]);
+      ProfileScope.switchTo('other');
+      await repository.addAll([
+        _problem(id: 'p1', profileId: 'other'),
+        _problem(id: 'p2', profileId: 'other'),
+      ]);
+      ProfileScope.reset();
+      void authorize() {
+        if (repository.getAll().length < 2) ProfileScope.switchTo('other');
+      }
+
+      await expectLater(
+        clearAll
+            ? repository.clearAll(authorize: authorize)
+            : repository.deleteBatch('batch-1', authorize: authorize),
+        throwsA(isA<ParentAccessDenied>()),
+      );
+      expect(ProfileScope.currentId, 'other');
+      expect(repository.getAll(), hasLength(2));
+      ProfileScope.reset();
+      expect(repository.getAll(), hasLength(1));
+    });
+  }
+
+  test('实际删除前执行调用方授权检查', () async {
+    await unlockParentForTesting();
+    await repository.addAll([_problem(id: 'p1')]);
+    await expectLater(
+      repository.delete(
+        'p1',
+        authorize: () => throw const ParentAccessDenied(),
+      ),
+      throwsA(isA<ParentAccessDenied>()),
+    );
+    expect(repository.getById('p1'), isNotNull);
   });
 
   test('expressionText 组装算式文本', () async {

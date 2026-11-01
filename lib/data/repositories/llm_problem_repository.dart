@@ -3,6 +3,7 @@
 // 层级：data/repositories
 // 职责：LLM 应用题仓储。Profile-scoped。
 
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/llm_problem.dart';
@@ -148,21 +149,35 @@ class LlmProblemRepository {
   }
 
   /// 删除单题。
-  Future<void> delete(String id) async {
+  Future<void> delete(String id, {void Function()? authorize}) async {
+    authorize?.call();
+    ParentAccessService.instance.assertAllowed();
     await HiveBoxes.llmProblems.delete(ProfileScope.key(id));
   }
 
   /// 删除整个批次。
-  Future<void> deleteBatch(String batchId) async {
-    for (final problem in byBatch(batchId)) {
-      await delete(problem.id);
-    }
-  }
+  Future<void> deleteBatch(String batchId, {void Function()? authorize}) =>
+      _deleteProblems(byBatch(batchId), authorize: authorize);
 
   /// 清空当前 profile 的全部题目。
-  Future<void> clearAll() async {
-    for (final problem in getAll()) {
-      await delete(problem.id);
+  Future<void> clearAll({void Function()? authorize}) =>
+      _deleteProblems(getAll(), authorize: authorize);
+
+  Future<void> _deleteProblems(
+    List<LlmProblem> problems, {
+    void Function()? authorize,
+  }) async {
+    final revision = ProfileScope.revision;
+    void assertCurrent() {
+      authorize?.call();
+      if (ProfileScope.revision != revision) throw const ParentAccessDenied();
+    }
+
+    assertCurrent();
+    ParentAccessService.instance.assertAllowed();
+    for (final problem in problems) {
+      // 每题删除前复验，等待落盘期间失效或切换档案后停止余下删除。
+      await delete(problem.id, authorize: assertCurrent);
     }
   }
 

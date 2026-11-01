@@ -6,6 +6,7 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_mistake.dart';
@@ -239,7 +240,9 @@ class MathMistakeRepository {
   int get unresolvedCount => getUnresolved().length;
 
   /// 删除某个错题
-  Future<void> delete(String id) async {
+  Future<void> delete(String id, {void Function()? authorize}) async {
+    authorize?.call();
+    ParentAccessService.instance.assertAllowed();
     await HiveBoxes.mathMistakes.delete(ProfileScope.key(id));
   }
 }

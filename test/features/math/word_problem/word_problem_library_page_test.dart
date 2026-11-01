@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/repositories/llm_problem_repository.dart';
@@ -18,6 +19,7 @@ import 'package:poemath/features/math/word_problem/word_problem_library_page.dar
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 
 import '../../../helpers/hive_test_helper.dart';
+import '../../../helpers/parent_access_test_helper.dart';
 
 /// 内存实现：删除即时完成，getAll/stats 继承基类（基于 getAll）。
 class _MemoryLlmProblemRepository extends LlmProblemRepository {
@@ -32,7 +34,9 @@ class _MemoryLlmProblemRepository extends LlmProblemRepository {
   }
 
   @override
-  Future<void> delete(String id) async {
+  Future<void> delete(String id, {void Function()? authorize}) async {
+    authorize?.call();
+    ParentAccessService.instance.assertAllowed();
     store.remove(ProfileScope.key(id));
   }
 }
@@ -95,13 +99,16 @@ Widget _wrap(_MemoryLlmProblemRepository repo) {
 void main() {
   setUp(() async {
     await setUpHiveForTesting();
+    lockParentForTesting();
   });
 
   tearDown(() async {
+    lockParentForTesting();
     await tearDownHiveForTesting();
   });
 
   testWidgets('多知识点批次展示全部分类，筛选后的批次删除仍提示完整题数', (tester) async {
+    await tester.runAsync(unlockParentForTesting);
     final repo = _MemoryLlmProblemRepository()
       ..store['default_add'] = _problem(
         id: 'add',
@@ -229,6 +236,7 @@ void main() {
   });
 
   testWidgets('点击单题删除按钮弹确认并删除该题', (tester) async {
+    await tester.runAsync(unlockParentForTesting);
     final repo = _MemoryLlmProblemRepository()
       ..store['default_p1'] = _problem(
         id: 'p1',
@@ -251,6 +259,7 @@ void main() {
   });
 
   testWidgets('清空题库需二次确认', (tester) async {
+    await tester.runAsync(unlockParentForTesting);
     final repo = _MemoryLlmProblemRepository()
       ..store['default_p1'] = _problem(
         id: 'p1',

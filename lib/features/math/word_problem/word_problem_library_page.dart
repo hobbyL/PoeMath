@@ -9,8 +9,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/features/math/word_problem/word_problem_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
@@ -40,6 +44,7 @@ class _WordProblemLibraryPageState
   /// 筛选状态；null = 不过滤。
   WordProblemTopic? _topicFilter;
   bool? _doneFilter;
+  bool _deleting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +168,7 @@ class _WordProblemLibraryPageState
                     ),
                     const SizedBox(width: SpacingTokens.sm),
                     OutlinedButton.icon(
-                      onPressed: () => _clearAll(context),
+                      onPressed: _deleting ? null : () => _clearAll(context),
                       icon: const Icon(Icons.delete_sweep_outlined),
                       label: const Text('清空'),
                     ),
@@ -340,7 +345,8 @@ class _WordProblemLibraryPageState
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded, size: 20),
                   tooltip: '删除该批次',
-                  onPressed: () => _deleteBatch(context, batchId),
+                  onPressed:
+                      _deleting ? null : () => _deleteBatch(context, batchId),
                 ),
               ],
             ),
@@ -402,7 +408,9 @@ class _WordProblemLibraryPageState
                     IconButton(
                       icon: const Icon(Icons.delete_outline_rounded, size: 20),
                       tooltip: '删除此题',
-                      onPressed: () => _confirmDelete(context, problem),
+                      onPressed: _deleting
+                          ? null
+                          : () => _confirmDelete(context, problem),
                       visualDensity: VisualDensity.compact,
                     ),
                   ],
@@ -427,84 +435,113 @@ class _WordProblemLibraryPageState
     context.push(AppRoutes.wordProblemPractice, extra: sorted);
   }
 
-  Future<void> _confirmDelete(BuildContext context, LlmProblem problem) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除该题'),
-        content: Text(problem.questionText),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+  Future<void> _confirmDelete(BuildContext context, LlmProblem problem) {
+    final repo = ref.read(llmProblemRepositoryProvider);
+    return _deleteWithParentVerification(
+      context,
+      title: '删除该题',
+      content: problem.questionText,
+      delete: (authorize) => repo.delete(problem.id, authorize: authorize),
     );
-    if (confirmed != true) return;
-    await ref.read(llmProblemRepositoryProvider).delete(problem.id);
-    ref.read(llmLibraryVersionProvider.notifier).state++;
   }
 
   Future<void> _deleteBatch(
     BuildContext context,
     String batchId,
-  ) async {
-    final count = ref
-        .read(llmProblemRepositoryProvider)
-        .getAll()
-        .where((problem) => problem.batchId == batchId)
-        .length;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除该批次'),
-        content: Text('将删除该批次的 $count 道应用题，'
-            '含做题记录，不可恢复。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+  ) {
+    final repo = ref.read(llmProblemRepositoryProvider);
+    final count =
+        repo.getAll().where((problem) => problem.batchId == batchId).length;
+    return _deleteWithParentVerification(
+      context,
+      title: '删除该批次',
+      content: '将删除该批次的 $count 道应用题，含做题记录，不可恢复。',
+      delete: (authorize) => repo.deleteBatch(batchId, authorize: authorize),
     );
-    if (confirmed != true) return;
-    await ref.read(llmProblemRepositoryProvider).deleteBatch(batchId);
-    ref.read(llmLibraryVersionProvider.notifier).state++;
   }
 
-  Future<void> _clearAll(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('清空题库'),
-        content: const Text('将删除全部应用题及其做题记录，不可恢复。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('清空'),
-          ),
-        ],
-      ),
+  Future<void> _clearAll(BuildContext context) {
+    final repo = ref.read(llmProblemRepositoryProvider);
+    return _deleteWithParentVerification(
+      context,
+      title: '清空题库',
+      content: '将删除全部应用题及其做题记录，不可恢复。',
+      confirmLabel: '清空',
+      delete: (authorize) => repo.clearAll(authorize: authorize),
     );
-    if (confirmed != true) return;
-    await ref.read(llmProblemRepositoryProvider).clearAll();
-    ref.read(llmLibraryVersionProvider.notifier).state++;
+  }
+
+  Future<void> _deleteWithParentVerification(
+    BuildContext context, {
+    required String title,
+    required String content,
+    required Future<void> Function(VoidCallback authorize) delete,
+    String confirmLabel = '删除',
+  }) async {
+    if (_deleting) return;
+    setState(() => _deleting = true);
+    final revision = ProfileScope.revision;
+    var deletionStarted = false;
+    void authorize() {
+      assertParentAccess(context);
+      if (ProfileScope.revision != revision) throw const ParentAccessDenied();
+    }
+
+    try {
+      if (!await ensureParentAccess(context) || !context.mounted) return;
+      authorize();
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(title),
+          content: Text(content),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              style: confirmLabel == '清空'
+                  ? FilledButton.styleFrom(
+                      backgroundColor:
+                          Theme.of(dialogContext).colorScheme.error,
+                    )
+                  : null,
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(confirmLabel),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+      authorize();
+      deletionStarted = true;
+      await delete(authorize);
+    } on ParentAccessDenied {
+      _showDeleteError('家长验证已失效，删除已停止，请重新验证');
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '$title失败',
+        tag: 'WordProblemLibrary',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _showDeleteError('删除未完成，请重试');
+    } finally {
+      if (mounted) {
+        // 批量删除中途停止也刷新，显示已经完成的删除结果。
+        if (deletionStarted) {
+          ref.read(llmLibraryVersionProvider.notifier).state++;
+        }
+        setState(() => _deleting = false);
+      }
+    }
+  }
+
+  void _showDeleteError(String message) {
+    if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
