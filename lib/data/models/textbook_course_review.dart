@@ -109,10 +109,9 @@ Map<String, dynamic> reviewTextbookCourse({
 }) {
   final pack = TextbookCoursePack.fromJson(input);
   if (reviewer.trim().isEmpty ||
-      notes.trim().isEmpty ||
       !const ['approved', 'rejected'].contains(decision) ||
       checks.toSet().length != checks.length) {
-    throw const FormatException('须填写审核人、决定、核对说明和不重复的核对项');
+    throw const FormatException('须填写审核人、决定和不重复的核对项');
   }
   final output = pack.toJson();
   Map<String, dynamic> selected;

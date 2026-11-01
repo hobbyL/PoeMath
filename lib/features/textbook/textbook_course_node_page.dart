@@ -559,6 +559,7 @@ class _TextbookCourseNodePageState
                 onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   labelText: '核对说明 / 退回原因',
+                  helperText: '选填，可留空',
                   alignLabelWithHint: true,
                 ),
               ),
@@ -576,9 +577,7 @@ class _TextbookCourseNodePageState
               alignment: WrapAlignment.end,
               children: [
                 OutlinedButton(
-                  onPressed: _saving ||
-                          _reviewer.text.trim().isEmpty ||
-                          _notes.text.trim().isEmpty
+                  onPressed: _saving || _reviewer.text.trim().isEmpty
                       ? null
                       : () => _decide('rejected'),
                   child: const Text('退回修改'),
@@ -586,8 +585,7 @@ class _TextbookCourseNodePageState
                 FilledButton.icon(
                   onPressed: _saving ||
                           !required.every(_checks.contains) ||
-                          _reviewer.text.trim().isEmpty ||
-                          _notes.text.trim().isEmpty
+                          _reviewer.text.trim().isEmpty
                       ? null
                       : () => _decide('approved'),
                   icon: const Icon(Icons.check),

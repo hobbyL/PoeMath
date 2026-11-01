@@ -61,6 +61,39 @@ void main() {
     );
   });
 
+  for (final decision in [
+    TextbookReviewStatus.approved,
+    TextbookReviewStatus.rejected,
+  ]) {
+    test('习题${decision.name}的空审核说明在保存重建后完整恢复', () async {
+      final original = TextbookCoursePack.fromJson(courseFixture());
+      await repository.importDraft(book, original);
+      final reviewed = TextbookCoursePack.fromJson(
+        reviewTextbookCourse(
+          input: original.toJson(),
+          nodeId: 'exercise-001',
+          reviewer: '测试家长',
+          decision: decision.name,
+          checks: decision == TextbookReviewStatus.approved
+              ? ['sourcePages', 'content', 'answer']
+              : <String>[],
+          notes: '',
+          at: DateTime.utc(2026, 11, 1),
+        ),
+      );
+      await repository.save(book, reviewed, previous: original);
+      final reopened = TextbookCourseRepository(
+        directoryProvider: () async => directory,
+      );
+      final restored = (await reopened.load(book))!;
+      expect(restored.toJson(), reviewed.toJson());
+      final exercise = restored.lessons.single.exercises.single;
+      expect(exercise.review.notes, '');
+      expect(exercise.review.status, decision);
+      expect(exercise.isApproved, decision == TextbookReviewStatus.approved);
+    });
+  }
+
   test('删除课程数据后读取为空，原书与目录不受影响且可重复删除', () async {
     await repository.importDraft(
       book,

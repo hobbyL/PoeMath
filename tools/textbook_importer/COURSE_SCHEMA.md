@@ -39,7 +39,8 @@ python tools/textbook_importer/cli.py extract /path/book.pdf --output /tmp/pages
 
 # Review all applicable nodes individually, then review the pack with:
 # --node @pack --checks coverage,content
-# Rejection uses --decision rejected plus a reason. No bulk approval command.
+# Rejection uses --decision rejected; --notes '' leaves the reason empty.
+# Review notes are optional for both decisions. No bulk approval command.
 
 # Strict release check: exits 2 for any review/coverage/permission blocker.
 ~/.pub-cache/bin/fvm dart run tools/textbook_importer/course.dart validate \
@@ -126,6 +127,10 @@ reviewer, ISO timestamp with timezone and SHA-256. Approval also requires the
 node's checks below and a current digest. The CLI records the explicit human
 decision; it does not infer approval from successful extraction, a TOC, a model
 response, or a book-matching flag.
+
+Review notes and rejection reasons may be empty. The CLI accepts `--notes ''`;
+the app's review-notes field is optional. Saved empty notes remain empty when
+the course is reopened.
 
 | Node | Required checks |
 | --- | --- |
@@ -251,8 +256,9 @@ Settings → book management → textbook detail → content review (fact-check 
 Import a course JSON for this exact PDF hash/size/page count and grade/semester.
 Replacing an existing local draft requires explicit confirmation. The app lists
 units, lessons and all six content categories; individual items support editing,
-source-page comparison, explicit checklists and reviewer/notes before approval
-or rejection. Lesson coverage is confirmed separately, never inferred from an
+source-page comparison, explicit checklists and a reviewer before approval
+or rejection; review notes and rejection reasons are optional. Lesson coverage
+is confirmed separately, never inferred from an
 empty array. Missing targets still require supplementing the draft and importing
 it again; the app edits existing items rather than creating a whole curriculum.
 

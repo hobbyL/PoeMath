@@ -171,6 +171,57 @@ void main() {
     return data;
   }
 
+  for (final decision in [
+    TextbookReviewStatus.approved,
+    TextbookReviewStatus.rejected,
+  ]) {
+    testWidgets('习题${decision.name}允许说明留空并保存决定', (tester) async {
+      await pump(
+        tester,
+        launcher(
+          TextbookCourseNodePage(
+            book: book,
+            pack: courses.current!,
+            nodeId: 'exercise-001',
+          ),
+        ),
+      );
+      await tap(tester, find.text('打开审核'));
+      final notes = tester.widget<TextField>(
+        find.widgetWithText(TextField, '核对说明 / 退回原因'),
+      );
+      expect(notes.controller!.text, isEmpty);
+      if (decision == TextbookReviewStatus.approved) {
+        await tap(tester, find.text('通过审核'));
+        expect(courses.saves, 0);
+        await tap(
+          tester,
+          find.byKey(const ValueKey('course-review-select-all')),
+        );
+      }
+      await tap(
+        tester,
+        find.text(
+          decision == TextbookReviewStatus.approved ? '通过审核' : '退回修改',
+        ),
+      );
+      final exercise = courses.current!.lessons.single.exercises.single;
+      expect(courses.saves, 1);
+      expect(exercise.review.status, decision);
+      expect(exercise.review.reviewer, '家长');
+      expect(exercise.review.notes, '');
+      expect(
+        exercise.review.checks,
+        decision == TextbookReviewStatus.approved
+            ? ['sourcePages', 'content', 'answer']
+            : <String>[],
+      );
+      expect(exercise.isApproved, decision == TextbookReviewStatus.approved);
+      expect(find.byType(TextbookCourseNodePage), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('习题审核隐藏来源标题，词组逐列对齐并居中，加点在正常和大字下保留', (tester) async {
     final raw = courseFixture();
     final exercise =
