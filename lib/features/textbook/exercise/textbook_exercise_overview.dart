@@ -191,7 +191,7 @@ class _TextbookExerciseOverviewState
           _answerHint(exercise),
           style: theme.textTheme.bodySmall,
         ),
-        const SizedBox(height: SpacingTokens.sm),
+        if (!oral) const SizedBox(height: SpacingTokens.sm),
         if (exercise.questionType == TextbookExerciseQuestionType.choice &&
             choiceMode != null)
           Material(
@@ -200,11 +200,6 @@ class _TextbookExerciseOverviewState
           ),
         if (exercise.questionType == TextbookExerciseQuestionType.fillBlank)
           ..._blankFields(context, exercise),
-        if (oral)
-          Text(
-            '请完成口答，完成后点击“我已完成”。',
-            style: theme.textTheme.bodyMedium,
-          ),
         if (!oral) ...[
           const SizedBox(height: SpacingTokens.sm),
           Wrap(
