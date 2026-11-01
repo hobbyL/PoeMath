@@ -186,8 +186,8 @@ void main() {
               textScale: textScale,
             );
 
-            final complete = find.widgetWithText(FilledButton, '我已完成');
-            final parent = find.widgetWithText(OutlinedButton, '家长核对');
+            final complete = find.widgetWithText(TextButton, '我已完成');
+            final parent = find.widgetWithText(TextButton, '家长核对');
             expect(complete, findsOneWidget);
             expect(parent, parentPending ? findsOneWidget : findsNothing);
 
@@ -234,7 +234,7 @@ void main() {
 
   testWidgets('标题右侧的家长核对按钮仍能打开核对弹窗', (tester) async {
     await pumpOralExercise(tester, parentPending: true);
-    await tester.tap(find.widgetWithText(OutlinedButton, '家长核对'));
+    await tester.tap(find.widgetWithText(TextButton, '家长核对'));
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsOneWidget);

@@ -582,8 +582,8 @@ void main() {
       expect(find.text('我已完成'), findsOneWidget);
       expect(
         tester
-            .widget<FilledButton>(
-              find.byWidgetPredicate((widget) => widget is FilledButton),
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, '我已完成'),
             )
             .onPressed,
         isNotNull,

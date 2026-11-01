@@ -139,7 +139,7 @@ class _TextbookExerciseOverviewState
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Flexible(
-                      child: FilledButton(
+                      child: TextButton(
                         style: oralButtonStyle,
                         onPressed:
                             busy ? null : () => _submit(exercise, progress),
@@ -150,7 +150,7 @@ class _TextbookExerciseOverviewState
                         TextbookExerciseResult.parentPending) ...[
                       const SizedBox(width: SpacingTokens.xs),
                       Flexible(
-                        child: OutlinedButton(
+                        child: TextButton(
                           style: oralButtonStyle,
                           onPressed: busy
                               ? null
