@@ -113,13 +113,60 @@ class _TextbookExerciseOverviewState
     final theme = Theme.of(context);
     final choiceMode = exercise.choiceMode;
     final busy = _busyExerciseId == exercise.id;
+    final oral = exercise.questionType == TextbookExerciseQuestionType.oral;
+    final title = Text(
+      exercise.questionType.label,
+      style: theme.textTheme.titleMedium,
+    );
+    const oralButtonStyle = ButtonStyle(
+      minimumSize: WidgetStatePropertyAll(
+        Size(SpacingTokens.minTapTarget, SpacingTokens.minTapTarget),
+      ),
+      padding: WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: SpacingTokens.sm),
+      ),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          exercise.questionType.label,
-          style: theme.textTheme.titleMedium,
-        ),
+        if (oral)
+          Row(
+            children: [
+              title,
+              const SizedBox(width: SpacingTokens.sm),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: FilledButton(
+                        style: oralButtonStyle,
+                        onPressed:
+                            busy ? null : () => _submit(exercise, progress),
+                        child: const Text('我已完成', textAlign: TextAlign.center),
+                      ),
+                    ),
+                    if (record?.lastResult ==
+                        TextbookExerciseResult.parentPending) ...[
+                      const SizedBox(width: SpacingTokens.xs),
+                      Flexible(
+                        child: OutlinedButton(
+                          style: oralButtonStyle,
+                          onPressed: busy
+                              ? null
+                              : () => _parentCheck(exercise, progress, record),
+                          child:
+                              const Text('家长核对', textAlign: TextAlign.center),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          )
+        else
+          title,
         const SizedBox(height: SpacingTokens.sm),
         TextbookExercisePrompt(exercise: exercise),
         const SizedBox(height: SpacingTokens.xs),
@@ -133,36 +180,34 @@ class _TextbookExerciseOverviewState
           _choiceFields(context, exercise, choiceMode),
         if (exercise.questionType == TextbookExerciseQuestionType.fillBlank)
           ..._blankFields(context, exercise),
-        if (exercise.questionType == TextbookExerciseQuestionType.oral)
+        if (oral)
           Text(
             '请完成口答，完成后点击“我已完成”。',
             style: theme.textTheme.bodyMedium,
           ),
-        const SizedBox(height: SpacingTokens.sm),
-        Wrap(
-          spacing: SpacingTokens.sm,
-          runSpacing: SpacingTokens.xs,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            FilledButton.icon(
-              onPressed: busy ? null : () => _submit(exercise, progress),
-              icon: const Icon(Icons.check),
-              label: Text(
-                exercise.questionType == TextbookExerciseQuestionType.oral
-                    ? '我已完成'
-                    : '提交答案',
+        if (!oral) ...[
+          const SizedBox(height: SpacingTokens.sm),
+          Wrap(
+            spacing: SpacingTokens.sm,
+            runSpacing: SpacingTokens.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: busy ? null : () => _submit(exercise, progress),
+                icon: const Icon(Icons.check),
+                label: const Text('提交答案'),
               ),
-            ),
-            if (record?.lastResult == TextbookExerciseResult.parentPending)
-              OutlinedButton.icon(
-                onPressed: busy
-                    ? null
-                    : () => _parentCheck(exercise, progress, record),
-                icon: const Icon(Icons.family_restroom),
-                label: const Text('家长核对'),
-              ),
-          ],
-        ),
+              if (record?.lastResult == TextbookExerciseResult.parentPending)
+                OutlinedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () => _parentCheck(exercise, progress, record),
+                  icon: const Icon(Icons.family_restroom),
+                  label: const Text('家长核对'),
+                ),
+            ],
+          ),
+        ],
         if (record != null) ...[
           const SizedBox(height: SpacingTokens.xs),
           _recordSummary(context, record),
