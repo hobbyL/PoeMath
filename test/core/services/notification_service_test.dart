@@ -529,7 +529,7 @@ void main() {
     expect(await service.consumePendingLaunchPayload(), isNull);
   });
 
-  test('调度每日提醒与周报时写入点击跳转 payload 常量', () async {
+  test('每日提醒与周报包含点击载荷并分别贡献一个未读角标', () async {
     final plugin = _createPlugin();
     when(
       () => plugin.initialize(
@@ -572,29 +572,33 @@ void main() {
     await HiveBoxes.settings.put('weekly_report_enabled', true);
     await service.reconcileWithStoredSettings();
 
-    verify(
+    final dailyDetails = verify(
       () => plugin.zonedSchedule(
         1001,
         any(),
         any(),
         any(),
-        any(),
+        captureAny(),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
         payload: NotificationService.payloadDailyReminder,
       ),
-    ).called(1);
-    verify(
+    ).captured.single as NotificationDetails;
+    final weeklyDetails = verify(
       () => plugin.zonedSchedule(
         1002,
         any(),
         any(),
         any(),
-        any(),
+        captureAny(),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         payload: NotificationService.payloadWeeklyReport,
       ),
-    ).called(1);
+    ).captured.single as NotificationDetails;
+    for (final details in [dailyDetails, weeklyDetails]) {
+      expect(details.android!.channelShowBadge, isTrue);
+      expect(details.android!.number, 1);
+    }
   });
 }

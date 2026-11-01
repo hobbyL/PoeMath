@@ -299,8 +299,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         vertical: SpacingTokens.sm,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.tertiary
-                            .withValues(alpha: 0.08),
+                        color:
+                            theme.colorScheme.tertiary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(
                           SpacingTokens.radiusSmall,
                         ),
@@ -337,10 +337,11 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
 
             // ============ 说明 ============
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
+              padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
               child: Text(
-                '提示：如果通知无法开启，请前往系统设置 → 应用 → 韵算 → 通知，手动开启通知权限。',
+                '未查看的提醒会显示应用图标角标，打开应用后自动清除通知和角标。'
+                '数字角标需系统桌面支持，部分桌面只显示圆点。\n\n'
+                '如果通知无法开启，请前往系统设置 → 应用 → 韵算 → 通知，手动开启通知权限。',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   height: 1.6,
