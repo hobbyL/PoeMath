@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_exercise_progress.dart';
 import 'package:poemath/data/repositories/textbook_exercise_repository.dart';
@@ -80,6 +81,7 @@ class _TextbookExerciseOverviewState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final progress = ref.watch(textbookExerciseProgressProvider(widget.bookId));
     return progress.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -88,15 +90,29 @@ class _TextbookExerciseOverviewState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final (index, exercise) in widget.exercises.indexed) ...[
-            if (index > 0) const Divider(height: SpacingTokens.xl),
-            _exercise(
-              context,
-              exercise,
-              value?.records[TextbookExerciseProgress.targetKey(
-                widget.lesson.id,
-                exercise.id,
-              )],
-              value,
+            if (index > 0) const SizedBox(height: SpacingTokens.md),
+            ColoredCard(
+              key: ValueKey(
+                'textbook-exercise-${widget.lesson.id}-${exercise.id}',
+              ),
+              color: theme.colorScheme.primary,
+              padding: EdgeInsets.only(
+                left: SpacingTokens.md,
+                right: SpacingTokens.md,
+                top: exercise.questionType == TextbookExerciseQuestionType.oral
+                    ? SpacingTokens.xs
+                    : SpacingTokens.md,
+                bottom: SpacingTokens.md,
+              ),
+              child: _exercise(
+                context,
+                exercise,
+                value?.records[TextbookExerciseProgress.targetKey(
+                  widget.lesson.id,
+                  exercise.id,
+                )],
+                value,
+              ),
             ),
           ],
         ],
@@ -125,6 +141,7 @@ class _TextbookExerciseOverviewState
       padding: WidgetStatePropertyAll(
         EdgeInsets.symmetric(horizontal: SpacingTokens.sm),
       ),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -177,7 +194,10 @@ class _TextbookExerciseOverviewState
         const SizedBox(height: SpacingTokens.sm),
         if (exercise.questionType == TextbookExerciseQuestionType.choice &&
             choiceMode != null)
-          _choiceFields(context, exercise, choiceMode),
+          Material(
+            type: MaterialType.transparency,
+            child: _choiceFields(context, exercise, choiceMode),
+          ),
         if (exercise.questionType == TextbookExerciseQuestionType.fillBlank)
           ..._blankFields(context, exercise),
         if (oral)

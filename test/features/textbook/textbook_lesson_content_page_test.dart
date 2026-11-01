@@ -580,6 +580,14 @@ void main() {
         ['exercise-001'],
       );
       expect(find.text('我已完成'), findsOneWidget);
+      expect(find.byType(ColoredCard), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.byType(TextbookExerciseOverview),
+          matching: find.byType(ColoredCard),
+        ),
+        findsNothing,
+      );
       expect(
         tester
             .widget<TextButton>(

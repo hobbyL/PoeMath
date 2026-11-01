@@ -370,10 +370,10 @@ class _TextbookLessonContentPageState
     );
     return KeyedSubtree(
       key: _lessonKeys.putIfAbsent(lesson.id, GlobalKey.new),
-      // 认一认与写一写的字卡自带背景，再套一层 ColoredCard 只会多一层
-      // 同色内边距（用户反馈「字卡外面不用再套一层」）。
+      // 字卡与练习题自带卡片，不再增加整课的背景和内边距。
       child: section == TextbookContentSection.recognition ||
-              section == TextbookContentSection.writing
+              section == TextbookContentSection.writing ||
+              section == TextbookContentSection.exercise
           ? KeyedSubtree(
               key: ValueKey('textbook-content-${lesson.id}'),
               child: content,

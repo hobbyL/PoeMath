@@ -111,18 +111,13 @@ Future<TextbookCourseLesson> pumpOralExercise(
           ),
           child: child!,
         ),
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              child: ColoredCard(
-                color: Theme.of(context).colorScheme.primary,
-                child: TextbookExerciseOverview(
-                  bookId: bookId,
-                  lesson: lesson,
-                  exercises: lesson.exercises,
-                ),
-              ),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            child: TextbookExerciseOverview(
+              bookId: bookId,
+              lesson: lesson,
+              exercises: lesson.exercises,
             ),
           ),
         ),
@@ -134,7 +129,7 @@ Future<TextbookCourseLesson> pumpOralExercise(
 }
 
 void main() {
-  testWidgets('按结构化题型渲染单选、多选和多空控件', (tester) async {
+  testWidgets('每道习题使用独立卡片并渲染结构化答题控件', (tester) async {
     final lesson = lessonWithExercises();
     final bookId = courseFixtureBook().pdfSha256;
     await tester.pumpWidget(
@@ -168,6 +163,25 @@ void main() {
     expect(find.byType(TextField), findsNWidgets(2));
     expect(find.text('选择题'), findsNWidgets(2));
     expect(find.text('填空题'), findsOneWidget);
+    expect(find.byType(ColoredCard), findsNWidgets(lesson.exercises.length));
+    final cardRects = <Rect>[];
+    for (final exercise in lesson.exercises) {
+      final card = find.byKey(
+        ValueKey('textbook-exercise-${lesson.id}-${exercise.id}'),
+      );
+      expect(
+        find.ancestor(of: card, matching: find.byType(ColoredCard)),
+        findsNothing,
+      );
+      cardRects.add(tester.getRect(card));
+    }
+    for (var index = 1; index < cardRects.length; index++) {
+      expect(
+        cardRects[index].top - cardRects[index - 1].bottom,
+        closeTo(SpacingTokens.md, 0.01),
+      );
+    }
+    expect(tester.takeException(), isNull);
   });
 
   for (final width in [320.0, 360.0]) {
@@ -193,8 +207,13 @@ void main() {
 
             final titleRect = tester.getRect(find.text('口答题'));
             final completeRect = tester.getRect(complete);
-            final contentRect =
-                tester.getRect(find.byType(TextbookExerciseOverview));
+            final cardRect = tester.getRect(
+              find.byKey(
+                ValueKey(
+                  'textbook-exercise-${lesson.id}-${lesson.exercises.single.id}',
+                ),
+              ),
+            );
             final actions = [
               completeRect,
               if (parentPending) tester.getRect(parent),
@@ -220,7 +239,17 @@ void main() {
                 lessThanOrEqualTo(actions.last.left),
               );
             }
-            expect(actions.last.right, closeTo(contentRect.right, 0.01));
+            expect(
+              actions.last.right,
+              closeTo(cardRect.right - SpacingTokens.md, 0.01),
+            );
+            final headerTop = [titleRect, ...actions]
+                .map((rect) => rect.top)
+                .reduce((first, next) => first < next ? first : next);
+            expect(
+              headerTop - cardRect.top,
+              closeTo(SpacingTokens.xs, 0.01),
+            );
             expect(
               tester.getRect(find.text(lesson.exercises.single.prompt)).top,
               greaterThanOrEqualTo(actions.first.bottom + SpacingTokens.sm),
