@@ -325,12 +325,23 @@ class _TextbookExerciseOverviewState
       TextbookExerciseResult.incorrect => '最近作答：再试一次',
       TextbookExerciseResult.parentPending => '最近作答：待家长核对',
       TextbookExerciseResult.parentCorrect => '家长已确认完成',
-      TextbookExerciseResult.parentAgain => '家长建议再练习',
+      TextbookExerciseResult.parentAgain => null,
       null => '尚未作答',
     };
-    return Text(
-      '$label · 已作答 ${record.attempts} 次',
-      style: Theme.of(context).textTheme.bodySmall,
+    final style = Theme.of(context).textTheme.bodySmall;
+    final attempts = Text(
+      '已作答 ${record.attempts} 次',
+      style: style,
+      textAlign: TextAlign.right,
+    );
+    if (label == null) return attempts;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: Text(label, style: style)),
+        const SizedBox(width: SpacingTokens.sm),
+        attempts,
+      ],
     );
   }
 
