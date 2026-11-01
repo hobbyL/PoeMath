@@ -6,6 +6,7 @@ import 'package:poemath/math_engine/math_engine_api.dart';
 class GeneratedWordProblem {
   GeneratedWordProblem({
     required this.plan,
+    required this.topic,
     required this.source,
     required this.text,
     required this.explanation,
@@ -13,6 +14,7 @@ class GeneratedWordProblem {
   });
 
   final WordProblemPlan plan;
+  final WordProblemTopic topic;
   final WordProblemSource source;
   final String text;
   final String explanation;
@@ -34,38 +36,58 @@ class WordProblemGenerationService {
     required LlmConfig config,
     required int grade,
     required String semester,
-    required WordProblemTopic topic,
+    required List<WordProblemTopic> topics,
     required int count,
     DifficultyLevel difficulty = DifficultyLevel.medium,
     required bool Function() isActive,
   }) async {
     if (!isActive()) throw const LlmGenerationCancelled();
-    final plans = WordProblemPlanGenerator.generate(
-      grade: grade,
-      semester: semester,
-      topic: topic.name,
-      count: count,
-      difficulty: difficulty,
-      skeletonFactory: skeletonFactory,
-    );
+    final selectedTopics = topics.toSet().toList(growable: false);
+    if (selectedTopics.isEmpty) throw ArgumentError('请至少选择一个知识点');
+    if (count < selectedTopics.length || count > 20) {
+      throw ArgumentError('生成数量不能少于知识点数量，且不能超过 20 题');
+    }
+    final plansByTopic = <WordProblemTopic, List<WordProblemPlan>>{
+      for (var i = 0; i < selectedTopics.length; i++)
+        selectedTopics[i]: WordProblemPlanGenerator.generate(
+          grade: grade,
+          semester: semester,
+          topic: selectedTopics[i].name,
+          count: count ~/ selectedTopics.length +
+              (i < count % selectedTopics.length ? 1 : 0),
+          difficulty: difficulty,
+          skeletonFactory: skeletonFactory,
+        ),
+    };
+    final plans = [
+      for (var i = 0; i < count; i++)
+        plansByTopic[selectedTopics[i % selectedTopics.length]]![
+            i ~/ selectedTopics.length],
+    ];
     final result = await client.chooseWordProblemScenes(
       config: config,
       plans: plans,
       grade: grade,
       semester: semester,
-      topic: topic.label,
+      topic: selectedTopics.map((topic) => topic.label).join('、'),
       isActive: isActive,
     );
     if (!isActive()) throw const LlmGenerationCancelled();
     final choices = {for (final choice in result.choices) choice.index: choice};
     return List.unmodifiable([
-      for (var i = 0; i < plans.length; i++) _render(plans[i], choices[i + 1]),
+      for (var i = 0; i < plans.length; i++)
+        _render(
+          plans[i],
+          choices[i + 1],
+          selectedTopics[i % selectedTopics.length],
+        ),
     ]);
   }
 
   GeneratedWordProblem _render(
     WordProblemPlan initial,
     LlmWordProblemSceneChoice? choice,
+    WordProblemTopic topic,
   ) {
     final plan = choice == null
         ? initial
@@ -80,6 +102,7 @@ class WordProblemGenerationService {
     final rendered = WordProblemRenderer.render(plan);
     return GeneratedWordProblem(
       plan: plan,
+      topic: topic,
       source: choice == null
           ? WordProblemSource.localTemplate
           : WordProblemSource.aiScene,

@@ -119,7 +119,7 @@ class GenerateWordProblemsTool extends AssistantTool {
                 config: config,
                 grade: grade,
                 semester: semester,
-                topic: topic,
+                topics: [topic],
                 count: count,
                 difficulty: difficulty,
                 isActive: isActive,
@@ -136,7 +136,7 @@ class GenerateWordProblemsTool extends AssistantTool {
             extra: WordProblemPreviewData(
               grade: grade,
               semester: semester,
-              topicName: topic.name,
+              topics: [topic],
               items: items,
             ),
           );

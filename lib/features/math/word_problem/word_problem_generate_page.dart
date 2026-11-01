@@ -31,7 +31,7 @@ class _WordProblemGeneratePageState
     extends ConsumerState<WordProblemGeneratePage> {
   int _grade = 2;
   String _semester = '上';
-  WordProblemTopic _topic = WordProblemTopic.addition;
+  final Set<WordProblemTopic> _topics = {WordProblemTopic.addition};
 
   /// 生成数量：PRD 约定默认 10，范围 5–20。
   int _count = 10;
@@ -43,23 +43,22 @@ class _WordProblemGeneratePageState
         ref.read(settingsRepositoryProvider).mathDifficulty,
       );
 
-  /// 年级/学期变更后，若当前知识点在新学期不教授，回退到首个可用项。
-  /// 加法/减法在全部预设中恒存在，可用列表不会为空。调用方须自行置于 setState 内。
-  void _ensureTopicAvailable() {
+  /// 保留新学期仍教授的已选知识点；全部不可用时回退到首个可用项。
+  /// 加法/减法在全部预设中恒存在，可用列表不会为空。
+  void _ensureTopicsAvailable() {
     final topics = WordProblemSkeletonGenerator.availableTopics(
       grade: _grade,
       semester: _semester,
       difficulty: _difficulty,
     );
-    if (!topics.contains(_topic)) {
-      _topic = topics.first;
-    }
+    _topics.removeWhere((topic) => !topics.contains(topic));
+    if (_topics.isEmpty) _topics.add(topics.first);
   }
 
   Future<void> _generate() async {
     if (_generating) return;
 
-    _ensureTopicAvailable();
+    _ensureTopicsAvailable();
 
     setState(() {
       _generating = true;
@@ -67,7 +66,9 @@ class _WordProblemGeneratePageState
     });
     final grade = _grade;
     final semester = _semester;
-    final topic = _topic;
+    final topics = List<WordProblemTopic>.unmodifiable(
+      WordProblemTopic.values.where(_topics.contains),
+    );
     final count = _count;
     final difficulty = _difficulty;
     final settings = ref.read(settingsRepositoryProvider);
@@ -91,7 +92,7 @@ class _WordProblemGeneratePageState
         config: config,
         grade: grade,
         semester: semester,
-        topic: topic,
+        topics: topics,
         count: count,
         difficulty: difficulty,
         isActive: () => mounted,
@@ -107,7 +108,7 @@ class _WordProblemGeneratePageState
         extra: WordProblemPreviewData(
           grade: grade,
           semester: semester,
-          topicName: topic.name,
+          topics: topics,
           items: items,
         ),
       );
@@ -138,7 +139,7 @@ class _WordProblemGeneratePageState
     final theme = Theme.of(context);
     final configAsync = ref.watch(llmConfigProvider);
     ref.watch(settingsRepositoryProvider);
-    _ensureTopicAvailable();
+    _ensureTopicsAvailable();
 
     return Scaffold(
       appBar: AppBar(title: const Text('应用题 AI 出题')),
@@ -267,7 +268,7 @@ class _WordProblemGeneratePageState
                   selected: _grade == grade,
                   onSelected: (_) => setState(() {
                     _grade = grade;
-                    _ensureTopicAvailable();
+                    _ensureTopicsAvailable();
                   }),
                 ),
               ],
@@ -292,7 +293,7 @@ class _WordProblemGeneratePageState
           selected: {_semester},
           onSelectionChanged: (selection) => setState(() {
             _semester = selection.first;
-            _ensureTopicAvailable();
+            _ensureTopicsAvailable();
           }),
         ),
       ],
@@ -310,23 +311,25 @@ class _WordProblemGeneratePageState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('知识点', style: theme.textTheme.titleSmall),
+        Text('知识点（可多选）', style: theme.textTheme.titleSmall),
         const SizedBox(height: SpacingTokens.xs),
-        // 一行展示，宽度不够时横向滚动（参考错题本页年级行）。
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (var i = 0; i < topics.length; i++) ...[
-                if (i > 0) const SizedBox(width: SpacingTokens.xs),
-                ChoiceChip(
-                  label: Text(topics[i].label),
-                  selected: _topic == topics[i],
-                  onSelected: (_) => setState(() => _topic = topics[i]),
-                ),
-              ],
-            ],
-          ),
+        Wrap(
+          spacing: SpacingTokens.xs,
+          runSpacing: SpacingTokens.xs,
+          children: [
+            for (final topic in topics)
+              FilterChip(
+                label: Text(topic.label),
+                selected: _topics.contains(topic),
+                onSelected: (selected) => setState(() {
+                  if (selected) {
+                    _topics.add(topic);
+                  } else if (_topics.length > 1) {
+                    _topics.remove(topic);
+                  }
+                }),
+              ),
+          ],
         ),
       ],
     );

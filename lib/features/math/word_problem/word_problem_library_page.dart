@@ -309,8 +309,13 @@ class _WordProblemLibraryPageState
   ) {
     final theme = Theme.of(context);
     final first = problems.first;
-    final topicLabel =
-        WordProblemTopic.tryParse(first.topic)?.label ?? first.topic;
+    final topicLabel = problems
+        .map(
+          (problem) =>
+              WordProblemTopic.tryParse(problem.topic)?.label ?? problem.topic,
+        )
+        .toSet()
+        .join('、');
 
     return Padding(
       padding: const EdgeInsets.only(bottom: SpacingTokens.md),
@@ -335,7 +340,7 @@ class _WordProblemLibraryPageState
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded, size: 20),
                   tooltip: '删除该批次',
-                  onPressed: () => _deleteBatch(context, batchId, problems),
+                  onPressed: () => _deleteBatch(context, batchId),
                 ),
               ],
             ),
@@ -448,13 +453,17 @@ class _WordProblemLibraryPageState
   Future<void> _deleteBatch(
     BuildContext context,
     String batchId,
-    List<LlmProblem> problems,
   ) async {
+    final count = ref
+        .read(llmProblemRepositoryProvider)
+        .getAll()
+        .where((problem) => problem.batchId == batchId)
+        .length;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('删除该批次'),
-        content: Text('将删除该批次的 ${problems.length} 道应用题，'
+        content: Text('将删除该批次的 $count 道应用题，'
             '含做题记录，不可恢复。'),
         actions: [
           TextButton(

@@ -27,15 +27,19 @@ import 'word_problem_generation_service.dart';
 class WordProblemPreviewItem {
   const WordProblemPreviewItem({
     required this.skeleton,
+    required this.topic,
     required this.draft,
     required this.rejectReason,
     this.generationMetadataJson = '',
   });
 
-  factory WordProblemPreviewItem.fromGenerated(GeneratedWordProblem generated,
-          {required int index,}) =>
+  factory WordProblemPreviewItem.fromGenerated(
+    GeneratedWordProblem generated, {
+    required int index,
+  }) =>
       WordProblemPreviewItem(
         skeleton: generated.plan.skeleton,
+        topic: generated.topic,
         draft: LlmWordProblemDraft(
           index: index,
           text: generated.text,
@@ -49,6 +53,7 @@ class WordProblemPreviewItem {
       );
 
   final ProblemSkeleton skeleton;
+  final WordProblemTopic topic;
 
   /// 最终题面；兼容展示旧自由草稿，null 表示没有可展示的题目。
   final LlmWordProblemDraft? draft;
@@ -104,24 +109,30 @@ class WordProblemPreviewData {
   const WordProblemPreviewData({
     required this.grade,
     required this.semester,
-    required this.topicName,
+    required this.topics,
     required this.items,
   });
 
   final int grade;
   final String semester;
-  final String topicName;
+  final List<WordProblemTopic> topics;
   final List<WordProblemPreviewItem> items;
 
   WordProblemValidationResult validationFor(WordProblemPreviewItem item) {
     final result = item.validation;
     if (!result.canSave) return result;
+    if (!topics.contains(item.topic)) {
+      return WordProblemValidationResult(
+        WordProblemValidationStatus.rejected,
+        [const WordProblemIssue('topic', '题目知识点不在所选范围内')],
+      );
+    }
     final metadata = WordProblemMetadata.decode(item.generationMetadataJson)!;
     return WordProblemPlanRules.validateContext(
       metadata.plan,
       grade: grade,
       semester: semester,
-      topic: topicName,
+      topic: item.topic.name,
     );
   }
 }
@@ -193,7 +204,8 @@ class _WordProblemPreviewPageState
     var seq = 0;
     for (var i = 0; i < widget.data.items.length; i++) {
       final item = widget.data.items[i];
-      if (!widget.data.validationFor(item).canSave || !(_selected[i] ?? false)) {
+      if (!widget.data.validationFor(item).canSave ||
+          !(_selected[i] ?? false)) {
         continue;
       }
       problems.add(
@@ -213,7 +225,7 @@ class _WordProblemPreviewPageState
           createdAt: now,
           grade: widget.data.grade,
           semester: widget.data.semester,
-          topic: widget.data.topicName,
+          topic: item.topic.name,
           difficulty: item.skeleton.difficulty,
         ),
       );

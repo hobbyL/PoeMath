@@ -101,6 +101,46 @@ void main() {
     await tearDownHiveForTesting();
   });
 
+  testWidgets('多知识点批次展示全部分类，筛选后的批次删除仍提示完整题数', (tester) async {
+    final repo = _MemoryLlmProblemRepository()
+      ..store['default_add'] = _problem(
+        id: 'add',
+        questionText: '苹果题',
+        topic: 'addition',
+      )
+      ..store['default_subtract'] = _problem(
+        id: 'subtract',
+        questionText: '文具题',
+      );
+    await tester.pumpWidget(_wrap(repo));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining(RegExp('加法.*减法|减法.*加法')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('共 2 题'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('筛选'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilterChip, '加法'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    expect(find.text('苹果题'), findsOneWidget);
+    expect(find.text('文具题'), findsNothing);
+    expect(find.textContaining('共 1 题'), findsOneWidget);
+    await tester.tap(find.byTooltip('删除该批次'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('将删除该批次的 2 道应用题，含做题记录，不可恢复。'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(repo.store, hasLength(2));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('空题库显示引导态', (tester) async {
     await tester.pumpWidget(_wrap(_MemoryLlmProblemRepository()));
     await tester.pumpAndSettle();
@@ -112,9 +152,10 @@ void main() {
   testWidgets('未知未来版本保留题目并提示不能校验', (tester) async {
     final repo = _MemoryLlmProblemRepository()
       ..store['default_future'] = _problem(
-          id: 'future',
-          questionText: '未来版本的历史题目',
-          generationMetadataJson: '{"schemaVersion":2}',);
+        id: 'future',
+        questionText: '未来版本的历史题目',
+        generationMetadataJson: '{"schemaVersion":2}',
+      );
     await tester.pumpWidget(_wrap(repo));
     await tester.pumpAndSettle();
     expect(find.text('未来版本的历史题目'), findsOneWidget);

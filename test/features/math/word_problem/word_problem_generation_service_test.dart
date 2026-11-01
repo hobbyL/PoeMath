@@ -56,6 +56,114 @@ WordProblemGenerationService service(
     );
 
 void main() {
+  test('多知识点共享总题数、均匀交错出题并保留各题课程信息', () async {
+    var requests = 0;
+    String? capturedPrompt;
+    final client = LlmClient(
+      httpClient: MockClient((request) async {
+        requests++;
+        final body = jsonDecode(request.body) as Map;
+        final prompt = body['messages'].last['content'] as String;
+        capturedPrompt = prompt;
+        final candidates =
+            jsonDecode(prompt.substring(prompt.indexOf('['))) as List;
+        return response([
+          for (final item in candidates)
+            {
+              'index': item['index'],
+              'sceneId': item['sceneCandidates'].first['sceneId'],
+              'variantId': 'standard',
+            },
+        ]);
+      }),
+    );
+    addTearDown(client.close);
+    final random = Random(2026);
+    final generation = WordProblemGenerationService(
+      client: client,
+      skeletonFactory: ({
+        required grade,
+        required semester,
+        required topic,
+        required count,
+        DifficultyLevel difficulty = DifficultyLevel.medium,
+      }) =>
+          WordProblemSkeletonGenerator.generate(
+        grade: grade,
+        semester: semester,
+        topic: topic,
+        count: count,
+        difficulty: difficulty,
+        random: random,
+      ),
+    );
+    final items = await generation.generate(
+      config: config,
+      grade: 3,
+      semester: '上',
+      topics: [...WordProblemTopic.values, WordProblemTopic.addition],
+      count: 7,
+      isActive: () => true,
+    );
+
+    expect(requests, 1);
+    expect(capturedPrompt, startsWith('小学3年级上学期，加法、减法、乘法、除法、混合运算。'));
+    expect(items, hasLength(7));
+    expect(items.map((item) => item.topic), [
+      WordProblemTopic.addition,
+      WordProblemTopic.subtraction,
+      WordProblemTopic.multiplication,
+      WordProblemTopic.division,
+      WordProblemTopic.mixed,
+      WordProblemTopic.addition,
+      WordProblemTopic.subtraction,
+    ]);
+    for (final item in items) {
+      expect(item.source, WordProblemSource.aiScene);
+      expect(item.validation.canSave, isTrue);
+      expect(
+        WordProblemMetadata.decode(item.metadataJson)!.matchesContext(
+          grade: 3,
+          semester: '上',
+          topic: item.topic.name,
+        ),
+        isTrue,
+      );
+    }
+  });
+
+  test('空知识点、无法覆盖全部知识点的数量及未学知识点不发送AI请求', () async {
+    var requests = 0;
+    final generation = service(
+      MockClient(
+        (request) async {
+          requests++;
+          return response([]);
+        },
+      ),
+    );
+    addTearDown(generation.client.close);
+    for (final (grade, topics, count) in [
+      (2, <WordProblemTopic>[], 5),
+      (2, [WordProblemTopic.addition, WordProblemTopic.subtraction], 1),
+      (2, [WordProblemTopic.addition], 21),
+      (1, [WordProblemTopic.division], 5),
+    ]) {
+      await expectLater(
+        generation.generate(
+          config: config,
+          grade: grade,
+          semester: '上',
+          topics: topics,
+          count: count,
+          isActive: () => true,
+        ),
+        throwsArgumentError,
+      );
+    }
+    expect(requests, 0);
+  });
+
   test('二年级混合题经AI更换情境后保留乘除配比、版本和课程校验', () async {
     final client = LlmClient(
       httpClient: MockClient((request) async {
@@ -98,7 +206,7 @@ void main() {
         config: config,
         grade: 2,
         semester: semester,
-        topic: WordProblemTopic.mixed,
+        topics: const [WordProblemTopic.mixed],
         count: 5,
         difficulty: DifficultyLevel.hard,
         isActive: () => true,
@@ -176,7 +284,7 @@ void main() {
       config: crossProvider,
       grade: 2,
       semester: '上',
-      topic: WordProblemTopic.addition,
+      topics: const [WordProblemTopic.addition],
       count: 2,
       isActive: () => true,
     );
@@ -233,7 +341,7 @@ void main() {
         config: crossProvider,
         grade: 2,
         semester: '上',
-        topic: WordProblemTopic.addition,
+        topics: const [WordProblemTopic.addition],
         count: 2,
         isActive: () => true,
       );
@@ -293,7 +401,7 @@ void main() {
       config: multi,
       grade: 2,
       semester: '上',
-      topic: WordProblemTopic.addition,
+      topics: const [WordProblemTopic.addition],
       count: 2,
       isActive: () => true,
     );
@@ -336,7 +444,7 @@ void main() {
       config: multi,
       grade: 2,
       semester: '上',
-      topic: WordProblemTopic.addition,
+      topics: const [WordProblemTopic.addition],
       count: 2,
       isActive: () => true,
     );
@@ -370,7 +478,7 @@ void main() {
         config: multi,
         grade: 2,
         semester: '上',
-        topic: WordProblemTopic.addition,
+        topics: const [WordProblemTopic.addition],
         count: 1,
         isActive: () => active,
       ),
@@ -393,7 +501,7 @@ void main() {
       config: config,
       grade: 2,
       semester: '上',
-      topic: WordProblemTopic.addition,
+      topics: const [WordProblemTopic.addition],
       count: 1,
       isActive: () => true,
     );
@@ -446,7 +554,7 @@ void main() {
       config: config,
       grade: 2,
       semester: '上',
-      topic: WordProblemTopic.addition,
+      topics: const [WordProblemTopic.addition],
       count: 3,
       isActive: () => true,
     );
@@ -487,7 +595,7 @@ void main() {
       config: config,
       grade: 2,
       semester: '上',
-      topic: WordProblemTopic.addition,
+      topics: const [WordProblemTopic.addition],
       count: 1,
       isActive: () => true,
     ))
@@ -512,7 +620,7 @@ void main() {
         config: config,
         grade: 2,
         semester: '上',
-        topic: WordProblemTopic.addition,
+        topics: const [WordProblemTopic.addition],
         count: 1,
         isActive: () => true,
       ),
@@ -534,7 +642,7 @@ void main() {
         config: config,
         grade: 2,
         semester: '上',
-        topic: WordProblemTopic.addition,
+        topics: const [WordProblemTopic.addition],
         count: 1,
         isActive: () => active,
       ),

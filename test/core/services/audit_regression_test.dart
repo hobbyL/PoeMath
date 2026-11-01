@@ -485,10 +485,11 @@ void main() {
     final data = WordProblemPreviewData(
       grade: 2,
       semester: '上',
-      topicName: 'subtraction',
+      topics: const [WordProblemTopic.subtraction],
       items: [
         WordProblemPreviewItem(
           skeleton: plan.skeleton,
+          topic: WordProblemTopic.subtraction,
           draft: LlmWordProblemDraft(
             index: 1,
             text: rendered.text,

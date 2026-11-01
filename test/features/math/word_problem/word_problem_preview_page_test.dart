@@ -29,6 +29,21 @@ class _FailingLlmProblemRepository extends LlmProblemRepository {
   }
 }
 
+class _ObservedLlmProblemRepository extends LlmProblemRepository {
+  final saved = Completer<void>();
+
+  @override
+  Future<void> addAll(List<LlmProblem> problems) async {
+    try {
+      await super.addAll(problems);
+      saved.complete();
+    } on Object catch (error, stack) {
+      saved.completeError(error, stack);
+      rethrow;
+    }
+  }
+}
+
 ProblemSkeleton _skeleton({
   List<int> operands = const [12, 4],
   List<Operator> operators = const [Operator.subtract],
@@ -43,11 +58,14 @@ ProblemSkeleton _skeleton({
   );
 }
 
-WordProblemPreviewData _previewData(List<WordProblemPreviewItem> items) {
+WordProblemPreviewData _previewData(
+  List<WordProblemPreviewItem> items, {
+  List<WordProblemTopic> topics = const [WordProblemTopic.subtraction],
+}) {
   return WordProblemPreviewData(
     grade: 2,
     semester: '上',
-    topicName: 'subtraction',
+    topics: topics,
     items: items,
   );
 }
@@ -72,20 +90,28 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) {
   );
 }
 
-WordProblemPreviewItem _validItem(
-    {int index = 1,
-    List<int> operands = const [12, 4],
-    String scene = 'apples',
-    WordProblemSource source = WordProblemSource.aiScene,}) {
+WordProblemPreviewItem _validItem({
+  int index = 1,
+  List<int> operands = const [12, 4],
+  String scene = 'apples',
+  bool addition = false,
+  WordProblemSource source = WordProblemSource.aiScene,
+}) {
   final plan = WordProblemPlanGenerator.withScene(
-    _skeleton(operands: operands, answer: operands[0] - operands[1]),
-    WordProblemRelation.decrease,
+    _skeleton(
+      operands: operands,
+      operators: [addition ? Operator.add : Operator.subtract],
+      answer: addition ? operands[0] + operands[1] : operands[0] - operands[1],
+    ),
+    addition ? WordProblemRelation.merge : WordProblemRelation.decrease,
     scene,
   );
   final rendered = WordProblemRenderer.render(plan);
   return WordProblemPreviewItem.fromGenerated(
     GeneratedWordProblem(
       plan: plan,
+      topic:
+          addition ? WordProblemTopic.addition : WordProblemTopic.subtraction,
       source: source,
       text: rendered.text,
       explanation: rendered.explanation,
@@ -106,10 +132,77 @@ void main() {
     await tearDownHiveForTesting();
   });
 
+  testWidgets('多知识点预览限定所选范围，入库保留每道题自己的知识点', (tester) async {
+    final addition = _validItem(addition: true);
+    final subtraction = _validItem(index: 2);
+    expect(
+      _previewData([addition]).validationFor(addition).status,
+      WordProblemValidationStatus.rejected,
+    );
+    final data = _previewData(
+      [addition, subtraction],
+      topics: const [WordProblemTopic.addition, WordProblemTopic.subtraction],
+    );
+    final repository = _ObservedLlmProblemRepository();
+    await tester.pumpWidget(
+      _wrap(
+        WordProblemPreviewPage(data: data),
+        overrides: [llmProblemRepositoryProvider.overrideWithValue(repository)],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('确认入库 2 题'), findsOneWidget);
+    expect(find.byType(Checkbox), findsNWidgets(2));
+    var saved = false;
+    final saving = repository.saved.future;
+    unawaited(saving.then((_) => saved = true));
+    await tester.runAsync(() => tester.tap(find.text('确认入库 2 题')));
+    for (var i = 0; i < 100 && !saved; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    expect(saved, isTrue);
+    await saving;
+    await tester.pumpAndSettle();
+
+    final stored = HiveBoxes.llmProblems.values.toList();
+    expect(stored, hasLength(2));
+    expect(
+      stored.map((problem) => problem.topic).toSet(),
+      {'addition', 'subtraction'},
+    );
+    expect(stored.map((problem) => problem.batchId).toSet(), hasLength(1));
+    expect(
+      stored.map((problem) => problem.questionText).toSet(),
+      {addition.draft!.text, subtraction.draft!.text},
+    );
+    for (final problem in stored) {
+      expect(
+        WordProblemMetadata.decode(problem.generationMetadataJson)!
+            .matchesContext(
+          grade: problem.grade,
+          semester: problem.semester,
+          topic: problem.topic,
+        ),
+        isTrue,
+      );
+    }
+    expect(tester.takeException(), isNull);
+    await drainHiveWritesForTesting(tester);
+  });
+
   testWidgets('全部素材失效的本地批次明确说明来源', (tester) async {
-    await tester.pumpWidget(_wrap(WordProblemPreviewPage(
-      data: _previewData([_validItem(source: WordProblemSource.localTemplate)]),
-    ),),);
+    await tester.pumpWidget(
+      _wrap(
+        WordProblemPreviewPage(
+          data: _previewData(
+            [_validItem(source: WordProblemSource.localTemplate)],
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.textContaining('AI 未返回可用素材，本批使用本地生成。'), findsOneWidget);
     expect(find.text('本地生成 · 数量关系与计算已校验'), findsOneWidget);
@@ -119,9 +212,14 @@ void main() {
   testWidgets('旧自由题面需要复核，篡改新版题面不可使用，两者均不默认选中', (tester) async {
     final valid = _validItem();
     final legacy = WordProblemPreviewItem(
-        skeleton: valid.skeleton, draft: valid.draft, rejectReason: null,);
+      skeleton: valid.skeleton,
+      topic: valid.topic,
+      draft: valid.draft,
+      rejectReason: null,
+    );
     final tampered = WordProblemPreviewItem(
       skeleton: valid.skeleton,
+      topic: valid.topic,
       draft: LlmWordProblemDraft(
         index: 2,
         text: '妈妈又给12个苹果，原来有4个，问小红有多少个？',
@@ -132,7 +230,8 @@ void main() {
       generationMetadataJson: valid.generationMetadataJson,
     );
     await tester.pumpWidget(
-        _wrap(WordProblemPreviewPage(data: _previewData([legacy, tampered]))),);
+      _wrap(WordProblemPreviewPage(data: _previewData([legacy, tampered]))),
+    );
     await tester.pumpAndSettle();
     expect(find.text('需要复核'), findsOneWidget);
     expect(find.text('不可使用'), findsOneWidget);
@@ -179,10 +278,9 @@ void main() {
     expect(stored.answer, 2);
     expect(stored.unit, '朵');
     expect(
-        WordProblemMetadata.decode(stored.generationMetadataJson)!
-            .plan
-            .relation,
-        WordProblemRelation.decrease,);
+      WordProblemMetadata.decode(stored.generationMetadataJson)!.plan.relation,
+      WordProblemRelation.decrease,
+    );
     expect(stored.topic, equals('subtraction'));
     expect(stored.profileId, isNotEmpty);
     expect(stored.done, isFalse);
@@ -193,6 +291,7 @@ void main() {
       _validItem(),
       WordProblemPreviewItem(
         skeleton: _skeleton(operands: const [6, 2], answer: 4),
+        topic: WordProblemTopic.subtraction,
         draft: const LlmWordProblemDraft(
           index: 2,
           text: '商店有 6 箱牛奶，卖出 2 箱，还剩几箱？',

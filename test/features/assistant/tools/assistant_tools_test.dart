@@ -494,7 +494,7 @@ void main() {
       final data = extra as WordProblemPreviewData;
       expect(data.grade, 2);
       expect(data.semester, '上');
-      expect(data.topicName, 'addition');
+      expect(data.topics, [WordProblemTopic.addition]);
       expect(data.items, hasLength(3));
       for (final item in data.items) {
         final plan =

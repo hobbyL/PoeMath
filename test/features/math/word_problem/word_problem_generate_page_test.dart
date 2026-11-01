@@ -108,6 +108,116 @@ void main() {
     await tearDownHiveForWidgetTesting();
   });
 
+  testWidgets('多选知识点共用总题数，后续修改选项不改变已发起的题组', (tester) async {
+    final settings = _DelayedSettingsRepository();
+    final skeletonCounts = <String, int>{};
+    WordProblemPreviewData? preview;
+    await _pumpDelayedGenerator(
+      tester,
+      settings,
+      skeletons: ({
+        required int grade,
+        required String semester,
+        required String topic,
+        required int count,
+        DifficultyLevel difficulty = DifficultyLevel.medium,
+      }) {
+        skeletonCounts.putIfAbsent(topic, () => count);
+        return List.generate(
+          count,
+          (index) => ProblemSkeleton(
+            operands: [12 + index, 4],
+            operators: [
+              topic == 'addition' ? Operator.add : Operator.subtract,
+            ],
+            answer: topic == 'addition' ? 16 + index : 8 + index,
+            unitHint: '个',
+            difficulty: 1,
+          ),
+        );
+      },
+      client: MockClient((request) async {
+        final body = jsonDecode(request.body) as Map;
+        final prompt = body['messages'].last['content'] as String;
+        final candidates =
+            jsonDecode(prompt.substring(prompt.indexOf('['))) as List;
+        return http.Response.bytes(
+          utf8.encode(
+            jsonEncode(
+              {
+                'choices': [
+                  {
+                    'message': {
+                      'content': jsonEncode([
+                        for (final item in candidates)
+                          {
+                            'index': item['index'],
+                            'sceneId': item['sceneCandidates'].first['sceneId'],
+                            'variantId': 'standard',
+                          },
+                      ]),
+                    },
+                  },
+                ],
+              },
+            ),
+          ),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }),
+      onPreview: (data) => preview = data,
+    );
+
+    await tester.tap(find.widgetWithText(FilterChip, '减法'));
+    await tester.pump();
+    for (final label in ['加法', '减法']) {
+      expect(
+        tester
+            .widget<FilterChip>(find.widgetWithText(FilterChip, label))
+            .selected,
+        isTrue,
+      );
+    }
+    tester.widget<Slider>(find.byType(Slider)).onChanged!(7);
+    await tester.pump();
+    await tester.runAsync(() => tester.tap(find.text('生成 7 题')));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilterChip, '除法'));
+    await tester.pump();
+    settings.pending.complete(_config);
+    for (var i = 0; i < 40 && preview == null; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(skeletonCounts, {'addition': 4, 'subtraction': 3});
+    expect(preview, isNotNull);
+    expect(
+      preview!.topics,
+      [WordProblemTopic.addition, WordProblemTopic.subtraction],
+    );
+    expect(preview!.items, hasLength(7));
+    expect(preview!.items.map((item) => item.topic), [
+      WordProblemTopic.addition,
+      WordProblemTopic.subtraction,
+      WordProblemTopic.addition,
+      WordProblemTopic.subtraction,
+      WordProblemTopic.addition,
+      WordProblemTopic.subtraction,
+      WordProblemTopic.addition,
+    ]);
+    expect(
+      preview!.items.map((item) => preview!.validationFor(item).canSave),
+      everyElement(isTrue),
+    );
+    expect(tester.takeException(), isNull);
+    await drainHiveWritesForTesting(tester);
+  });
+
   testWidgets('生成页失败后切换同服务商候选，保存默认且只进入一次预览', (tester) async {
     final settings = (await tester.runAsync(() async {
       final repo =
@@ -363,7 +473,7 @@ void main() {
       onPreview: (data) => preview = data,
     );
     expect(find.textContaining('出题难度'), findsNothing);
-    expect(find.widgetWithText(ChoiceChip, '混合运算'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, '混合运算'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '困难'), findsNothing);
     await tester.tap(find.text('生成 10 题'));
     await tester.pump();
@@ -389,7 +499,7 @@ void main() {
     }
     expect(capturedSkeleton, (2, '上', 'addition', 10, DifficultyLevel.hard));
     expect(request, isNotNull);
-    await tester.tap(find.widgetWithText(ChoiceChip, '减法'));
+    await tester.tap(find.widgetWithText(FilterChip, '减法'));
     await tester.pump();
     final countSelector = tester.widget<Slider>(find.byType(Slider));
     countSelector.onChanged!(5);
@@ -430,7 +540,7 @@ void main() {
     expect(preview, isNotNull);
     expect(preview!.grade, 2);
     expect(preview!.semester, '上');
-    expect(preview!.topicName, 'addition');
+    expect(preview!.topics, [WordProblemTopic.addition]);
     expect(preview!.items, hasLength(10));
     expect(tester.takeException(), isNull);
 
@@ -453,7 +563,7 @@ void main() {
     expect(find.text('尚未配置 AI 出题服务'), findsOneWidget);
     expect(find.text('去配置'), findsOneWidget);
     // 不显示生成表单
-    expect(find.text('知识点'), findsNothing);
+    expect(find.text('知识点（可多选）'), findsNothing);
     expect(find.text('生成 5 题'), findsNothing);
   });
 
@@ -514,7 +624,7 @@ void main() {
     expect(find.textContaining('StateError'), findsNothing);
   });
 
-  testWidgets('二年级上下学期均可选除法，切换一年级自动回退选中', (tester) async {
+  testWidgets('知识点多选至少保留一项，切换学期保留已学项、移除未学项', (tester) async {
     // 配置就绪才会渲染生成表单（含知识点选择器），按先例在 runAsync 播种。
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_base_url', 'http://localhost:11434');
@@ -545,28 +655,34 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    ChoiceChip chip(String label) =>
-        tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, label));
+    FilterChip chip(String label) =>
+        tester.widget<FilterChip>(find.widgetWithText(FilterChip, label));
 
     // 默认二年级上学期：加/减/乘/除可见，混合运算隐藏。
-    expect(find.text('知识点'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '加法'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '减法'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '乘法'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '除法'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '混合运算'), findsNothing);
+    expect(find.text('知识点（可多选）'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, '加法'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, '减法'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, '乘法'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, '除法'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, '混合运算'), findsNothing);
     expect(chip('加法').selected, isTrue);
 
     // 二年级上学期即可选中除法。
-    await tester.tap(find.widgetWithText(ChoiceChip, '除法'));
+    await tester.tap(find.widgetWithText(FilterChip, '除法'));
     await tester.pumpAndSettle();
     expect(chip('除法').selected, isTrue);
+    expect(chip('加法').selected, isTrue);
+    await tester.tap(find.widgetWithText(FilterChip, '减法'));
+    await tester.tap(find.widgetWithText(FilterChip, '加法'));
+    await tester.pumpAndSettle();
+    expect(chip('加法').selected, isFalse);
+    expect(chip('减法').selected, isTrue);
 
     // 切到二年级下学期保留除法选中态，混合运算仍无。
     await tester.tap(find.text('下学期'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(ChoiceChip, '除法'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '混合运算'), findsNothing);
+    expect(find.widgetWithText(FilterChip, '除法'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, '混合运算'), findsNothing);
 
     expect(chip('除法').selected, isTrue);
 
@@ -575,10 +691,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(chip('除法').selected, isTrue);
 
-    // 一年级尚未开放除法，选中态自动回退为加法。
+    // 一年级尚未开放除法，保留仍教授的减法而不重新选中加法。
     await tester.tap(find.widgetWithText(ChoiceChip, '1 年级'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(ChoiceChip, '除法'), findsNothing);
+    expect(find.widgetWithText(FilterChip, '除法'), findsNothing);
+    expect(chip('减法').selected, isTrue);
+    expect(chip('加法').selected, isFalse);
+    await tester.tap(find.widgetWithText(FilterChip, '减法'));
+    await tester.pumpAndSettle();
+    expect(chip('减法').selected, isTrue);
+
+    // 仅选除法再切到一年级时，回退到首个可用项。
+    await tester.tap(find.widgetWithText(ChoiceChip, '2 年级'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilterChip, '除法'));
+    await tester.tap(find.widgetWithText(FilterChip, '减法'));
+    await tester.pumpAndSettle();
+    expect(chip('除法').selected, isTrue);
+    expect(chip('减法').selected, isFalse);
+    await tester.tap(find.widgetWithText(ChoiceChip, '1 年级'));
+    await tester.pumpAndSettle();
     expect(chip('加法').selected, isTrue);
   });
 }
