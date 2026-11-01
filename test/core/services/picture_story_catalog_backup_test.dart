@@ -160,6 +160,89 @@ void main() {
     expect(reopened.isEnabled('rainy-day-umbrella'), isFalse);
   });
 
+  test('已删除题目及历史图片在真实备份和新目录恢复后仍保留删除状态', () async {
+    await populatedBackup();
+    final repository = PictureStoryRepository(images: images);
+    for (final id in ['local-fixture', 'kite-in-the-park']) {
+      await repository.deletePrompt(
+        prompt: repository.findPrompt(id)!,
+        profileId: 'default',
+      );
+    }
+    final catalog = repository.catalogState().toJson();
+    final bytes = <String, Uint8List>{
+      for (final id in repository.catalogState().imageIds)
+        id: await images.readImage(id),
+    };
+    final text = await backup().exportToJson();
+    final node = jsonDecode(text)['pictureStoryCatalog'] as Map;
+    expect(node['schemaVersion'], 2);
+    expect(
+      (node['deletedIds'] as List).toSet(),
+      {'local-fixture', 'kite-in-the-park'},
+    );
+    final preview = backup().inspectJson(text);
+    expect(preview.counts['看图说话题目'], 0);
+    expect(preview.counts['已删除题目'], 2);
+    expect(preview.counts['题目图片'], 2);
+    await tearDownHiveForTesting();
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
+    final targetImages = PictureStoryImageService(
+      directoryProvider: () async =>
+          Directory('${directory.path}/restored-deletions'),
+    );
+    await backup(imageService: targetImages).restoreFromJson(text);
+    await HiveBoxes.close();
+    await HiveBoxes.init();
+    final reopened = PictureStoryRepository(images: targetImages);
+    expect(reopened.catalogState().toJson(), catalog);
+    expect(reopened.listPrompts().length, 2);
+    for (final id in ['local-fixture', 'kite-in-the-park']) {
+      expect(reopened.findPrompt(id), isNull);
+      expect(reopened.findPrompt(id, version: 1), isNotNull);
+      expect(reopened.findPrompt(id, version: 2), isNotNull);
+      expect(reopened.isEnabled(id), isFalse);
+    }
+    for (final profile in ['child-a', 'child-b']) {
+      ProfileScope.switchTo(profile);
+      expect(reopened.isEnabled('local-fixture'), isFalse);
+      expect(reopened.isEnabled('kite-in-the-park'), isFalse);
+    }
+    for (final entry in bytes.entries) {
+      expect(await targetImages.readImage(entry.key), entry.value);
+    }
+  });
+
+  test('全部内置题删除后加密恢复仍为空，缺题库段的旧备份不撤销删除', () async {
+    final repository = PictureStoryRepository(images: images);
+    for (final prompt in PictureStoryCatalog.prompts) {
+      await repository.deletePrompt(prompt: prompt, profileId: 'default');
+    }
+    final expected = repository.storageSnapshot();
+    final text = await backup().exportToJson(
+      passphrase: 'picture-delete-passphrase',
+      encryptPayload: true,
+      includeCredentials: false,
+    );
+    expect(isEncryptedBackup(text), isTrue);
+    await HiveBoxes.settings.delete(PictureStoryRepository.catalogKey);
+    await backup()
+        .restoreFromJson(text, passphrase: 'picture-delete-passphrase');
+    expect(repository.listPrompts(), isEmpty);
+    expect(repository.listPrompts(enabledOnly: true), isEmpty);
+    expect(repository.catalogState().deletedIds.length, 3);
+    expect(repository.storageSnapshot(), expected);
+    await backup().restoreFromJson(jsonEncode({'version': 1}));
+    expect(repository.storageSnapshot(), expected);
+    for (final prompt in PictureStoryCatalog.prompts) {
+      expect(
+        repository.findPrompt(prompt.id, version: 1)!.toJson(),
+        prompt.toJson(),
+      );
+    }
+  });
+
   test('整包加密和本机保护快照共用完整题库段，临时表单与录音历史不迁移', () async {
     await populatedBackup();
     final repository = PictureStoryRepository(images: images);
@@ -293,6 +376,23 @@ void main() {
             'child-a': <bool>[true],
           },
       (node) => node['enabledByProfile'] = {'': <String>[]},
+      (node) {
+        node['schemaVersion'] = 2;
+        node['deletedIds'] = null;
+      },
+      (node) {
+        node['schemaVersion'] = 2;
+        node['deletedIds'] = [true];
+      },
+      (node) {
+        node['schemaVersion'] = 2;
+        node['deletedIds'] = ['local-fixture', 'local-fixture'];
+      },
+      (node) {
+        node['schemaVersion'] = 2;
+        node['deletedIds'] = ['local-unavailable'];
+      },
+      (node) => node['deletedIds'] = ['local-fixture'],
       (node) => node['images'] = <String, String>{},
       (node) =>
           (node['images'] as Map)[(node['images'] as Map).keys.first] = '!!!',

@@ -100,6 +100,7 @@ class PictureStoryRepository {
   }
 
   bool isEnabled(String promptId) =>
+      !catalogState().deletedIds.contains(promptId) &&
       (_savedEnabledIds(ProfileScope.currentId) ??
               PictureStoryCatalog.prompts.map((p) => p.id).toList())
           .contains(promptId);
@@ -129,6 +130,7 @@ class PictureStoryRepository {
     String id, {
     int? version,
   }) {
+    if (version == null && state.deletedIds.contains(id)) return null;
     final local = state.versions.where((prompt) => prompt.id == id);
     if (version != null) {
       return local.where((prompt) => prompt.version == version).firstOrNull ??
@@ -142,13 +144,19 @@ class PictureStoryRepository {
 
   List<PictureStoryPrompt> listPrompts({bool enabledOnly = false}) {
     final state = catalogState();
+    final enabledIds = enabledOnly
+        ? (_savedEnabledIds(ProfileScope.currentId) ??
+                PictureStoryCatalog.prompts.map((prompt) => prompt.id).toList())
+            .toSet()
+        : null;
     final ids = <String>{
       ...PictureStoryCatalog.prompts.map((prompt) => prompt.id),
       ...state.versions.map((prompt) => prompt.id),
     };
     return ids
+        .where((id) => !state.deletedIds.contains(id))
         .map((id) => _findPrompt(state, id)!)
-        .where((prompt) => !enabledOnly || isEnabled(prompt.id))
+        .where((prompt) => enabledIds == null || enabledIds.contains(prompt.id))
         .toList();
   }
 
@@ -184,7 +192,9 @@ class PictureStoryRepository {
         final state = catalogState();
         final current = _findPrompt(state, prompt.id);
         if (original == null) {
-          if (current != null || !prompt.id.startsWith('local-')) {
+          if (current != null ||
+              state.deletedIds.contains(prompt.id) ||
+              !prompt.id.startsWith('local-')) {
             throw const FormatException('新题标识已存在，请重新打开新增页面');
           }
         } else if (current == null ||
@@ -200,7 +210,10 @@ class PictureStoryRepository {
           versions.add(current.copyWith());
         }
         versions.add(saved);
-        final merged = PictureStoryCatalogState(versions);
+        final merged = PictureStoryCatalogState(
+          versions,
+          deletedIds: state.deletedIds,
+        );
         await _images.ensureStored(candidate.image);
         _authorize();
         _checkProfile(profileId);
@@ -213,35 +226,74 @@ class PictureStoryRepository {
           if (!ids.contains(saved.id)) ids.add(saved.id);
           values[enabledKeyFor(profileId)] = jsonEncode(ids);
         }
-        final before = <String, Object?>{
-          for (final key in values.keys)
-            if (_settings.containsKey(key)) key: _settings.get(key),
-        };
-        try {
-          await _settings.putAll(values);
-        } on Object catch (error, stackTrace) {
-          try {
-            for (final key in values.keys) {
-              if (!before.containsKey(key)) await _settings.delete(key);
-            }
-            await _settings.putAll(before);
-          } on Object catch (rollbackError) {
-            AppLogger.e(
-              '看图说话保存补偿失败',
-              tag: 'PictureStory',
-              error: rollbackError,
-              stackTrace: stackTrace,
-            );
-            throw const FormatException('题目保存及恢复失败，请保留输入并检查本地存储');
-          }
-          Error.throwWithStackTrace(error, stackTrace);
-        }
+        await _writeSettingsWithRollback(values);
         return saved;
       });
 
+  /// 移出所有孩子的题库；原题版本和图片继续供已开始的练习及历史使用。
+  Future<void> deletePrompt({
+    required PictureStoryPrompt prompt,
+    required String profileId,
+  }) =>
+      exclusive(() async {
+        _authorize();
+        _checkProfile(profileId);
+        final state = catalogState();
+        if (state.deletedIds.contains(prompt.id)) return;
+        final current = _findPrompt(state, prompt.id);
+        if (current == null ||
+            current.version != prompt.version ||
+            !current.sameContent(prompt)) {
+          throw const FormatException('题目不存在或已更新，请重新打开题库后再删除');
+        }
+        final versions = [...state.versions];
+        if (!versions.any((item) => item.id == current.id)) {
+          versions.add(current.copyWith());
+        }
+        final merged = PictureStoryCatalogState(
+          versions,
+          deletedIds: {...state.deletedIds, current.id},
+        );
+        await _writeSettingsWithRollback(
+          {catalogKey: jsonEncode(merged.toJson())},
+          operation: '删除',
+        );
+      });
+
+  Future<void> _writeSettingsWithRollback(
+    Map<String, Object> values, {
+    String operation = '保存',
+  }) async {
+    final before = <String, Object?>{
+      for (final key in values.keys)
+        if (_settings.containsKey(key)) key: _settings.get(key),
+    };
+    try {
+      await _settings.putAll(values);
+    } on Object catch (error, stackTrace) {
+      try {
+        for (final key in values.keys) {
+          if (!before.containsKey(key)) await _settings.delete(key);
+        }
+        await _settings.putAll(before);
+      } on Object catch (rollbackError) {
+        AppLogger.e(
+          '看图说话$operation补偿失败',
+          tag: 'PictureStory',
+          error: rollbackError,
+          stackTrace: stackTrace,
+        );
+        throw FormatException(
+          operation == '删除' ? '题目删除及恢复失败，请检查本地存储' : '题目保存及恢复失败，请保留输入并检查本地存储',
+        );
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
   static void _checkProfile(String profileId) {
     if (ProfileScope.currentId != profileId) {
-      throw const FormatException('孩子档案已切换，请重新打开题目编辑');
+      throw const FormatException('孩子档案已切换，请重新打开题库');
     }
   }
 

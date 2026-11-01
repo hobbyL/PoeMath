@@ -91,20 +91,25 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final container = ProviderContainer(overrides: [
-      pictureStoryRepositoryProvider.overrideWithValue(repository),
-    ],);
+    final container = ProviderContainer(
+      overrides: [
+        pictureStoryRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
           theme: AppTheme.resolve(
-              subject: AppSubject.poem, brightness: Brightness.light,),
+            subject: AppSubject.poem,
+            brightness: Brightness.light,
+          ),
           builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(textScaler: TextScaler.linear(textScale)),
-              child: child!,),
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(textScale)),
+            child: child!,
+          ),
           home: page,
         ),
       ),
@@ -120,17 +125,25 @@ void main() {
   }
 
   testWidgets('练习开始冻结题目，编辑后当前练习仍为 v1，下一次使用 v2', (tester) async {
-    final first = (await tester.runAsync(() => repository.savePrompt(
-        prompt: pictureStoryFixture(), profileId: 'default',),))!;
+    final first = (await tester.runAsync(
+      () => repository.savePrompt(
+        prompt: pictureStoryFixture(),
+        profileId: 'default',
+      ),
+    ))!;
     await pumpPage(tester, PictureStoryPracticePage(promptId: first.id));
     await tester.runAsync(
-        () => repository.lastRecordSave!.timeout(const Duration(seconds: 5)),);
+      () => repository.lastRecordSave!.timeout(const Duration(seconds: 5)),
+    );
     expect(find.text(first.title), findsOneWidget);
     expect(HiveBoxes.pictureStoryPractice.values.single.promptVersion, 1);
-    final second = (await tester.runAsync(() => repository.savePrompt(
+    final second = (await tester.runAsync(
+      () => repository.savePrompt(
         prompt: first.copyWith(title: '第二版题目', reference: '第二版参考表达'),
         original: first,
-        profileId: 'default',),))!;
+        profileId: 'default',
+      ),
+    ))!;
     await tester.pumpAndSettle();
     expect(find.text(first.title), findsOneWidget);
     expect(find.text(second.title), findsNothing);
@@ -139,21 +152,27 @@ void main() {
     await unmount(tester);
     await pumpPage(tester, PictureStoryPracticePage(promptId: first.id));
     await tester.runAsync(
-        () => repository.lastRecordSave!.timeout(const Duration(seconds: 5)),);
+      () => repository.lastRecordSave!.timeout(const Duration(seconds: 5)),
+    );
     expect(find.text(second.title), findsOneWidget);
     expect(
-        HiveBoxes.pictureStoryPractice.values
-            .map((record) => record.promptVersion)
-            .toList()
-          ..sort(),
-        [1, 2],);
+      HiveBoxes.pictureStoryPractice.values
+          .map((record) => record.promptVersion)
+          .toList()
+        ..sort(),
+      [1, 2],
+    );
     expect(tester.takeException(), isNull);
     await unmount(tester);
   });
 
   testWidgets('历史按保存的题目版本显示完整题图和参考，不替换成当前版本', (tester) async {
-    final first = (await tester.runAsync(() => repository.savePrompt(
-        prompt: pictureStoryFixture(), profileId: 'default',),))!;
+    final first = (await tester.runAsync(
+      () => repository.savePrompt(
+        prompt: pictureStoryFixture(),
+        profileId: 'default',
+      ),
+    ))!;
     await tester.runAsync(
       () => repository.save(
         PictureStoryPracticeRecord(
@@ -168,10 +187,13 @@ void main() {
         ),
       ),
     );
-    await tester.runAsync(() => repository.savePrompt(
+    await tester.runAsync(
+      () => repository.savePrompt(
         prompt: first.copyWith(title: '第二版题目', reference: '新版参考内容'),
         original: first,
-        profileId: 'default',),);
+        profileId: 'default',
+      ),
+    );
     await pumpPage(tester, const PictureStoryHistoryPage());
     expect(find.text(first.title), findsOneWidget);
     expect(find.text(first.reference), findsOneWidget);
@@ -182,6 +204,70 @@ void main() {
         .widget<PictureStoryImageView>(find.byType(PictureStoryImageView));
     expect(image.image, first.image);
     expect(image.preview, isFalse);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  testWidgets('删除题目保留正在进行的练习，新入口不再创建草稿', (tester) async {
+    final prompt = (await tester.runAsync(
+      () => repository.savePrompt(
+        prompt: pictureStoryFixture(),
+        profileId: 'default',
+      ),
+    ))!;
+    await pumpPage(tester, PictureStoryPracticePage(promptId: prompt.id));
+    await tester.runAsync(
+      () => repository.lastRecordSave!.timeout(const Duration(seconds: 5)),
+    );
+    await tester.runAsync(
+      () => repository.deletePrompt(prompt: prompt, profileId: 'default'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(prompt.title), findsOneWidget);
+    expect(HiveBoxes.pictureStoryPractice.values.single.promptVersion, 1);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+    await pumpPage(tester, PictureStoryPracticePage(promptId: prompt.id));
+    expect(find.text('题目不存在，请返回选择其他题目。'), findsOneWidget);
+    expect(HiveBoxes.pictureStoryPractice.length, 1);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  testWidgets('已删除题目的历史仍显示原题图、参考表达和已保存作答', (tester) async {
+    final prompt = (await tester.runAsync(
+      () => repository.savePrompt(
+        prompt: pictureStoryFixture(),
+        profileId: 'default',
+      ),
+    ))!;
+    await tester.runAsync(
+      () => repository.save(
+        PictureStoryPracticeRecord(
+          id: 'deleted-prompt-history',
+          profileId: 'default',
+          promptId: prompt.id,
+          promptVersion: prompt.version,
+          startedAt: DateTime(2026),
+          status: 'completed',
+          segmentsJson: '[]',
+          answerText: '删除后仍保留的表达',
+        ),
+      ),
+    );
+    await tester.runAsync(
+      () => repository.deletePrompt(prompt: prompt, profileId: 'default'),
+    );
+    await pumpPage(tester, const PictureStoryHistoryPage());
+    expect(find.text(prompt.title), findsOneWidget);
+    expect(find.text(prompt.reference), findsOneWidget);
+    expect(find.text('删除后仍保留的表达'), findsOneWidget);
+    expect(
+      tester
+          .widget<PictureStoryImageView>(find.byType(PictureStoryImageView))
+          .image,
+      prompt.image,
+    );
     expect(tester.takeException(), isNull);
     await unmount(tester);
   });
@@ -212,7 +298,9 @@ void main() {
 
   testWidgets('不存在的练习入口显示可返回提示，不能创建没有题目的草稿', (tester) async {
     await pumpPage(
-        tester, const PictureStoryPracticePage(promptId: 'missing-original'),);
+      tester,
+      const PictureStoryPracticePage(promptId: 'missing-original'),
+    );
     expect(find.text('题目不存在，请返回选择其他题目。'), findsOneWidget);
     expect(HiveBoxes.pictureStoryPractice.isEmpty, isTrue);
     expect(tester.takeException(), isNull);
@@ -221,10 +309,18 @@ void main() {
 
   testWidgets('孩子题库在窄屏大字号下自然展开，新增题立即可见', (tester) async {
     final title = List.filled(10, '窗前的小猫和小鸟').join();
-    await tester.runAsync(() => repository.savePrompt(
-        prompt: pictureStoryFixture(title: title), profileId: 'default',),);
-    final container = await pumpPage(tester, const PictureStoryPage(),
-        size: const Size(320, 1000), textScale: 2,);
+    await tester.runAsync(
+      () => repository.savePrompt(
+        prompt: pictureStoryFixture(title: title),
+        profileId: 'default',
+      ),
+    );
+    final container = await pumpPage(
+      tester,
+      const PictureStoryPage(),
+      size: const Size(320, 1000),
+      textScale: 2,
+    );
     expect(container.read(pictureStoryPromptCountProvider), 4);
     await tester.scrollUntilVisible(find.text(title), 300);
     expect(find.text(title), findsOneWidget);

@@ -18,8 +18,11 @@ class PictureStoryCatalogBackup {
   final Map<String, List<String>> enabledByProfile;
   final Map<String, Uint8List> images;
 
-  int get promptCount =>
-      catalog.versions.map((prompt) => prompt.id).toSet().length;
+  int get promptCount => catalog.versions
+      .map((prompt) => prompt.id)
+      .where((id) => !catalog.deletedIds.contains(id))
+      .toSet()
+      .length;
 
   factory PictureStoryCatalogBackup.fromJson(Object? value) {
     final catalog = PictureStoryCatalogState.fromJson(value);

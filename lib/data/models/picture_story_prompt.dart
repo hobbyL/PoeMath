@@ -257,14 +257,26 @@ extension PictureStoryLevelLabel on PictureStoryLevel {
 }
 
 class PictureStoryCatalogState {
-  const PictureStoryCatalogState.empty() : versions = const [];
+  const PictureStoryCatalogState.empty()
+      : versions = const [],
+        deletedIds = const {};
 
-  PictureStoryCatalogState(Iterable<PictureStoryPrompt> versions)
-      : versions = _checkedVersions(versions);
+  PictureStoryCatalogState(
+    Iterable<PictureStoryPrompt> versions, {
+    Iterable<String> deletedIds = const [],
+  })  : versions = _checkedVersions(versions),
+        deletedIds = _checkedDeletedIds(deletedIds) {
+    final ids = this.versions.map((prompt) => prompt.id).toSet();
+    if (!ids.containsAll(this.deletedIds)) {
+      throw const FormatException('已删除题目缺少保留的原题版本');
+    }
+  }
 
-  static const schemaVersion = 1;
+  static const schemaVersion = 2;
+  static const legacySchemaVersion = 1;
   static const maxVersions = 10000;
   final List<PictureStoryPrompt> versions;
+  final Set<String> deletedIds;
 
   static void _checkCount(int count) {
     if (count > maxVersions) {
@@ -280,19 +292,33 @@ class PictureStoryCatalogState {
     return result;
   }
 
+  static Set<String> _checkedDeletedIds(Iterable<String> ids) {
+    final values = ids.toList(growable: false);
+    if (values.length > maxVersions ||
+        values.any((id) => !PictureStoryPrompt.isValidId(id)) ||
+        values.toSet().length != values.length) {
+      throw const FormatException('题库的删除标记无效');
+    }
+    return Set.unmodifiable(values);
+  }
+
   Set<String> get imageIds => {
         for (final prompt in versions)
           if (prompt.image.isLocal) prompt.image.value,
       };
 
   Map<String, Object> toJson() => {
-        'schemaVersion': schemaVersion,
+        // 删除状态需新版识别；未删除的目录仍可供旧版读取。
+        'schemaVersion':
+            deletedIds.isEmpty ? legacySchemaVersion : schemaVersion,
         'versions': versions.map((prompt) => prompt.toJson()).toList(),
+        if (deletedIds.isNotEmpty) 'deletedIds': deletedIds.toList(),
       };
 
   factory PictureStoryCatalogState.fromJson(Object? value) {
     if (value is! Map<String, dynamic> ||
-        value['schemaVersion'] != schemaVersion ||
+        (value['schemaVersion'] != schemaVersion &&
+            value['schemaVersion'] != legacySchemaVersion) ||
         value['versions'] is! List) {
       throw const FormatException('看图说话题库格式或版本不支持');
     }
@@ -312,6 +338,21 @@ class PictureStoryCatalogState {
         throw const FormatException('题库的题目版本不连续');
       }
     }
-    return PictureStoryCatalogState(versions);
+    final rawDeletedIds = value['deletedIds'];
+    if (value.containsKey('deletedIds') &&
+        (rawDeletedIds is! List || rawDeletedIds.any((id) => id is! String))) {
+      throw const FormatException('题库的删除标记必须是文字列表');
+    }
+    if (rawDeletedIds is List &&
+        rawDeletedIds.isNotEmpty &&
+        value['schemaVersion'] != schemaVersion) {
+      throw const FormatException('题库的删除标记需要新版格式');
+    }
+    return PictureStoryCatalogState(
+      versions,
+      deletedIds: rawDeletedIds == null
+          ? const []
+          : (rawDeletedIds as List).cast<String>(),
+    );
   }
 }

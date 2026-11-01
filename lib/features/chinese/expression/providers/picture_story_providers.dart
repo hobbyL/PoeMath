@@ -62,10 +62,8 @@ final pictureStoryPromptProvider = Provider<List<PictureStoryPrompt>>((ref) {
       .watchEnabled(ProfileScope.currentId)
       .listen((_) => ref.invalidateSelf());
   ref.onDispose(enabled.cancel);
-  return ref
-      .watch(pictureStoryCatalogProvider)
-      .where((prompt) => repository.isEnabled(prompt.id))
-      .toList();
+  ref.watch(pictureStoryCatalogProvider);
+  return repository.listPrompts(enabledOnly: true);
 });
 
 final pictureStoryPromptCountProvider = Provider<int>((ref) {

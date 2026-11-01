@@ -234,6 +234,8 @@ class BackupService {
         if (pictureStories != null) ...{
           '看图说话题目': pictureStories.promptCount,
           '题目图片': pictureStories.images.length,
+          if (pictureStories.catalog.deletedIds.isNotEmpty)
+            '已删除题目': pictureStories.catalog.deletedIds.length,
         },
       }),
       hasCredentials: data.containsKey('credentials'),

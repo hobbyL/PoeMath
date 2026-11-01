@@ -126,6 +126,11 @@ class _PictureStoryManagementPageState
             return ListView(
               padding: const EdgeInsets.all(SpacingTokens.md),
               children: [
+                if (tiles.isEmpty)
+                  ColoredCard(
+                    color: theme.colorScheme.primary,
+                    child: const Text('题库里还没有题目，点击右上角「新增题目」添加。'),
+                  ),
                 for (var start = 0; start < tiles.length; start += columns) ...[
                   if (start > 0) const SizedBox(height: SpacingTokens.sm),
                   IntrinsicHeight(

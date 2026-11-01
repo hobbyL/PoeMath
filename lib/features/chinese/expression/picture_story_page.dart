@@ -111,7 +111,7 @@ class PictureStoryPage extends ConsumerWidget {
                 const SizedBox(height: SpacingTokens.md),
                 const Text('暂时没有可练习的题目'),
                 const SizedBox(height: SpacingTokens.xs),
-                const Text('请家长在设置中启用看图说话题目。', textAlign: TextAlign.center),
+                const Text('请家长在设置中添加或启用看图说话题目。', textAlign: TextAlign.center),
               ],
             ),
           ),

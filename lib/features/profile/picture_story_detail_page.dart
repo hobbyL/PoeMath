@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
@@ -11,31 +14,112 @@ import 'package:poemath/features/chinese/expression/providers/picture_story_prov
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
 
-class PictureStoryDetailPage extends ConsumerWidget {
+class PictureStoryDetailPage extends ConsumerStatefulWidget {
   const PictureStoryDetailPage({super.key, required this.promptId});
   final String promptId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PictureStoryDetailPage> createState() =>
+      _PictureStoryDetailPageState();
+}
+
+class _PictureStoryDetailPageState
+    extends ConsumerState<PictureStoryDetailPage> {
+  bool _deleting = false;
+
+  Future<void> _delete(PictureStoryPrompt prompt) async {
+    if (_deleting) return;
+    final profileId = ProfileScope.currentId;
+    final repository = ref.read(pictureStoryRepositoryProvider);
+    setState(() => _deleting = true);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          scrollable: true,
+          title: const Text('删除题目'),
+          content: Text('「${prompt.title}」将从所有孩子的题库中移除。已有练习记录会保留。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(dialogContext).colorScheme.error,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('删除'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+      await repository.deletePrompt(prompt: prompt, profileId: profileId);
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(AppRoutes.pictureStoryManagement);
+      }
+      messenger.showSnackBar(const SnackBar(content: Text('题目已删除')));
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '看图说话题目删除失败',
+        tag: 'PictureStory',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        final message = switch (error) {
+          ParentAccessDenied() => error.toString(),
+          FormatException() => error.message,
+          _ => '题目没有删除，请重试',
+        };
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     PictureStoryPrompt? prompt;
     var failed = false;
     try {
-      prompt = ref.watch(pictureStoryPromptByIdProvider(promptId));
+      prompt = ref.watch(pictureStoryPromptByIdProvider(widget.promptId));
     } on Object {
       failed = true;
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('题目详情'),
+        title: const Text(
+          '题目详情',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
-          if (prompt != null)
+          if (prompt != null) ...[
             IconButton(
               tooltip: '编辑题目',
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () =>
-                  context.push(AppRoutes.pictureStoryEditOf(promptId)),
+              onPressed: _deleting
+                  ? null
+                  : () => context.push(
+                        AppRoutes.pictureStoryEditOf(widget.promptId),
+                      ),
             ),
+            IconButton(
+              tooltip: '删除题目',
+              icon: const Icon(Icons.delete_outline),
+              color: theme.colorScheme.error,
+              onPressed: _deleting ? null : () => _delete(prompt!),
+            ),
+          ],
         ],
       ),
       body: prompt == null

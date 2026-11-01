@@ -293,6 +293,303 @@ void main() {
     );
   });
 
+  test('删除目录保留原题版本，旧格式兼容而无效删除标记拒绝', () {
+    final prompt = pictureStoryFixture();
+    final legacy = PictureStoryCatalogState([prompt]).toJson();
+    expect(legacy['schemaVersion'], 1);
+    expect(legacy.containsKey('deletedIds'), isFalse);
+    expect(PictureStoryCatalogState.fromJson(legacy).deletedIds, isEmpty);
+    final deleted = PictureStoryCatalogState(
+      [prompt],
+      deletedIds: [prompt.id],
+    ).toJson();
+    expect(deleted['schemaVersion'], 2);
+    expect(PictureStoryCatalogState.fromJson(deleted).deletedIds, {prompt.id});
+    for (final invalid in <Object?>[
+      null,
+      prompt.id,
+      [1],
+      [prompt.id, prompt.id],
+      ['../outside'],
+      ['local-unknown'],
+    ]) {
+      expect(
+        () => PictureStoryCatalogState.fromJson({
+          ...deleted,
+          'deletedIds': invalid,
+        }),
+        throwsFormatException,
+      );
+    }
+    expect(
+      () => PictureStoryCatalogState.fromJson({...deleted, 'schemaVersion': 1}),
+      throwsFormatException,
+    );
+    expect(
+      () => PictureStoryCatalogState([prompt], deletedIds: ['local-unknown']),
+      throwsFormatException,
+    );
+  });
+
+  test('删除内置题移出全部档案题库，重开仍可读取原版', () async {
+    var repository = PictureStoryRepository();
+    final original = PictureStoryCatalog.prompts.first;
+    await repository.deletePrompt(prompt: original, profileId: 'default');
+    expect(repository.findPrompt(original.id), isNull);
+    expect(repository.isEnabled(original.id), isFalse);
+    expect(repository.listPrompts().length, 2);
+    expect(repository.listPrompts(enabledOnly: true).length, 2);
+    expect(
+      repository.catalogState().versions.single.toJson(),
+      original.toJson(),
+    );
+    expect(repository.catalogState().deletedIds, {original.id});
+    expect(
+      HiveBoxes.settings
+          .containsKey(PictureStoryRepository.enabledKeyFor('default')),
+      isFalse,
+    );
+    ProfileScope.switchTo('child-b');
+    expect(repository.isEnabled(original.id), isFalse);
+    expect(repository.listPrompts(enabledOnly: true).length, 2);
+    await expectLater(
+      repository.setEnabled(original.id, true),
+      throwsArgumentError,
+    );
+    await HiveBoxes.close();
+    await HiveBoxes.init();
+    repository = PictureStoryRepository();
+    expect(repository.findPrompt(original.id), isNull);
+    expect(
+      repository.findPrompt(original.id, version: 1)!.toJson(),
+      original.toJson(),
+    );
+    expect(repository.catalogState().deletedIds, {original.id});
+  });
+
+  test('删除本地题保留所有历史版本、练习记录与实际题图，已有启用选择均失效', () async {
+    final directory = await Directory.systemTemp.createTemp('picture_delete_');
+    addTearDown(() => directory.delete(recursive: true));
+    final images =
+        PictureStoryImageService(directoryProvider: () async => directory);
+    final source = File('${directory.path}/source.png');
+    await source.writeAsBytes(await pictureStoryPng());
+    final image = await images.importPath(source.path);
+    var repository = PictureStoryRepository(images: images);
+    final first = await repository.savePrompt(
+      prompt: pictureStoryFixture(image: image),
+      profileId: 'default',
+    );
+    final second = await repository.savePrompt(
+      prompt: first.copyWith(title: '第二版小猫'),
+      original: first,
+      profileId: 'default',
+    );
+    final record = PictureStoryPracticeRecord(
+      id: 'deleted-history',
+      profileId: 'default',
+      promptId: first.id,
+      promptVersion: first.version,
+      startedAt: DateTime(2026),
+      status: 'completed',
+      segmentsJson: '[]',
+      answerText: '已经保存的表达',
+    );
+    await repository.save(record);
+    final beforeBytes = await images.readImage(image.value);
+    ProfileScope.switchTo('child-b');
+    await repository.setEnabled(first.id, true);
+    ProfileScope.reset();
+    final enabled = repository.enabledByProfile();
+    await repository.deletePrompt(prompt: second, profileId: 'default');
+    expect(repository.findPrompt(first.id), isNull);
+    expect(repository.isEnabled(first.id), isFalse);
+    expect(repository.enabledByProfile(), enabled);
+    ProfileScope.switchTo('child-b');
+    expect(repository.isEnabled(first.id), isFalse);
+    ProfileScope.reset();
+    await HiveBoxes.close();
+    await HiveBoxes.init();
+    repository = PictureStoryRepository(images: images);
+    expect(repository.findPrompt(first.id), isNull);
+    expect(
+      repository.findPrompt(first.id, version: 1)!.toJson(),
+      first.toJson(),
+    );
+    expect(
+      repository.findPrompt(first.id, version: 2)!.toJson(),
+      second.toJson(),
+    );
+    expect(repository.find(record.id)!.answerText, record.answerText);
+    expect(repository.find(record.id)!.promptVersion, 1);
+    expect(await images.readImage(image.value), beforeBytes);
+    expect(await source.exists(), isTrue);
+  });
+
+  test('过期确认不能删除新版，删除后旧编辑和同标识新增均不能复活题目', () async {
+    final repository = PictureStoryRepository();
+    final first = await repository.savePrompt(
+      prompt: pictureStoryFixture(),
+      profileId: 'default',
+    );
+    final updated = await repository.savePrompt(
+      prompt: first.copyWith(title: '新版题目'),
+      original: first,
+      profileId: 'default',
+    );
+    final before = repository.storageSnapshot();
+    await expectLater(
+      repository.deletePrompt(prompt: first, profileId: 'default'),
+      throwsFormatException,
+    );
+    expect(repository.storageSnapshot(), before);
+    await repository.deletePrompt(prompt: updated, profileId: 'default');
+    await repository.deletePrompt(prompt: updated, profileId: 'default');
+    final deleted = repository.storageSnapshot();
+    for (final original in <PictureStoryPrompt?>[updated, null]) {
+      await expectLater(
+        repository.savePrompt(
+          prompt: updated.copyWith(title: '不能复活'),
+          original: original,
+          profileId: 'default',
+        ),
+        throwsFormatException,
+      );
+    }
+    expect(repository.storageSnapshot(), deleted);
+    await repository.savePrompt(
+      prompt: pictureStoryFixture(id: 'local-next'),
+      profileId: 'default',
+    );
+    final builtin = PictureStoryCatalog.prompts.first;
+    await repository.savePrompt(
+      prompt: builtin.copyWith(title: '改另一题'),
+      original: builtin,
+      profileId: 'default',
+    );
+    expect(repository.findPrompt(first.id), isNull);
+    expect(repository.catalogState().deletedIds, {first.id});
+  });
+
+  for (final hasCatalog in [false, true]) {
+    test('删除部分写入失败补偿原目录和键缺失，重试可成功（原目录=$hasCatalog）', () async {
+      final original = PictureStoryCatalog.prompts.first;
+      final prompt = hasCatalog
+          ? await PictureStoryRepository().savePrompt(
+              prompt: original.copyWith(title: '已编辑的题目'),
+              original: original,
+              profileId: 'default',
+            )
+          : original;
+      final repository = PictureStoryRepository(
+        settings: _PartialWriteBox(HiveBoxes.settings),
+      );
+      final before = repository.storageSnapshot();
+      await expectLater(
+        repository.deletePrompt(prompt: prompt, profileId: 'default'),
+        throwsStateError,
+      );
+      expect(repository.storageSnapshot(), before);
+      expect(repository.findPrompt(prompt.id)!.toJson(), prompt.toJson());
+      await repository.deletePrompt(prompt: prompt, profileId: 'default');
+      expect(repository.findPrompt(prompt.id), isNull);
+      expect(
+        repository.findPrompt(prompt.id, version: 1)!.toJson(),
+        original.toJson(),
+      );
+    });
+  }
+
+  for (final relock in [true, false]) {
+    test('排队期间${relock ? '家长锁定' : '档案切换'}不能删除题目', () async {
+      var allowed = true;
+      final repository = PictureStoryRepository(
+        authorize: () {
+          if (!allowed) throw const ParentAccessDenied();
+        },
+      );
+      final reached = Completer<void>();
+      final proceed = Completer<void>();
+      final blocking = PictureStoryRepository.exclusive(() async {
+        reached.complete();
+        await proceed.future;
+      });
+      await reached.future;
+      final deleting = repository.deletePrompt(
+        prompt: PictureStoryCatalog.prompts.first,
+        profileId: 'default',
+      );
+      final result = expectLater(
+        deleting,
+        relock ? throwsA(isA<ParentAccessDenied>()) : throwsFormatException,
+      );
+      if (relock) {
+        allowed = false;
+      } else {
+        ProfileScope.switchTo('child-b');
+      }
+      proceed.complete();
+      await blocking;
+      await result;
+      expect(repository.storageSnapshot(), isEmpty);
+    });
+  }
+
+  test('删除后题库与启用数量立即刷新，历史版本 Provider 保留原题', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final repository = container.read(pictureStoryRepositoryProvider);
+    final prompt = await repository.savePrompt(
+      prompt: pictureStoryFixture(),
+      profileId: 'default',
+    );
+    final versionProvider =
+        pictureStoryPromptVersionProvider((id: prompt.id, version: 1));
+    expect(container.read(pictureStoryPromptCountProvider), 4);
+    expect(
+      container.read(pictureStoryPromptByIdProvider(prompt.id)),
+      isNotNull,
+    );
+    expect(container.read(versionProvider)!.toJson(), prompt.toJson());
+    await repository.deletePrompt(prompt: prompt, profileId: 'default');
+    expect(container.read(pictureStoryPromptCountProvider), 3);
+    expect(
+      container
+          .read(pictureStoryCatalogProvider)
+          .any((item) => item.id == prompt.id),
+      isFalse,
+    );
+    expect(container.read(pictureStoryPromptByIdProvider(prompt.id)), isNull);
+    expect(container.read(versionProvider)!.toJson(), prompt.toJson());
+  });
+
+  test('满容量删除已有题目保留全部历史，内置原版补入超限不会挤掉历史', () async {
+    await seedVersions(PictureStoryCatalogState.maxVersions);
+    final repository = PictureStoryRepository();
+    final prompt = repository.findPrompt('local-fixture')!;
+    await repository.deletePrompt(prompt: prompt, profileId: 'default');
+    expect(repository.findPrompt(prompt.id), isNull);
+    expect(repository.catalogState().versions.length, 10000);
+    expect(
+      repository.findPrompt(prompt.id, version: 10000)!.toJson(),
+      prompt.toJson(),
+    );
+    final before = repository.storageSnapshot();
+    await expectLater(
+      repository.deletePrompt(
+        prompt: PictureStoryCatalog.prompts.first,
+        profileId: 'default',
+      ),
+      throwsFormatException,
+    );
+    expect(repository.storageSnapshot(), before);
+    expect(
+      repository.findPrompt(PictureStoryCatalog.prompts.first.id),
+      isNotNull,
+    );
+    expect(repository.findPrompt(prompt.id, version: 1), isNotNull);
+  });
+
   test('A/B 共用内容，各自启用；关闭重开仍保留内容和选择', () async {
     ProfileScope.switchTo('child-a');
     var repository = PictureStoryRepository();
