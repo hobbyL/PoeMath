@@ -128,6 +128,7 @@ class _TextbookExerciseOverviewState
   ) {
     final theme = Theme.of(context);
     final choiceMode = exercise.choiceMode;
+    final answerHint = _answerHint(exercise);
     final busy = _busyExerciseId == exercise.id;
     final oral = exercise.questionType == TextbookExerciseQuestionType.oral;
     final prompt = TextbookExercisePrompt(
@@ -196,11 +197,13 @@ class _TextbookExerciseOverviewState
           const SizedBox(height: SpacingTokens.sm),
           prompt,
         ],
-        const SizedBox(height: SpacingTokens.xs),
-        Text(
-          _answerHint(exercise),
-          style: theme.textTheme.bodySmall,
-        ),
+        if (answerHint != null) ...[
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            answerHint,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
         if (!oral) const SizedBox(height: SpacingTokens.sm),
         if (exercise.questionType == TextbookExerciseQuestionType.choice &&
             choiceMode != null)
@@ -331,14 +334,14 @@ class _TextbookExerciseOverviewState
     );
   }
 
-  String _answerHint(TextbookCourseExercise exercise) =>
+  String? _answerHint(TextbookCourseExercise exercise) =>
       switch (exercise.answerType) {
         TextbookAnswerType.exact => exercise.answerOrigin == 'textbook'
             ? '原书标准答案，提交后自动核对。'
             : '标准答案，提交后自动核对。',
         TextbookAnswerType.reference => '审核者整理的参考要点，请提交后由家长核对。',
         TextbookAnswerType.parentCheck => '这道题需要家长核对完成情况。',
-        TextbookAnswerType.none => '这道题没有标准答案，请提交后由家长核对。',
+        TextbookAnswerType.none => null,
       };
 
   Future<void> _submit(
