@@ -21,12 +21,115 @@ import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/settings_constraints.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
+import 'package:poemath/data/models/image_generation_config.dart';
+import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
 
 class SettingsRepository {
+  static final Set<Object> _pendingLlmSaves = {};
+  bool get hasPendingLlmSave => _pendingLlmSaves.isNotEmpty;
+  static int _imageGenerationRevision = 0;
+  int get imageGenerationRevision => _imageGenerationRevision;
+  String get pictureStoryGenerationSignature => jsonEncode({
+        'imageRevision': _imageGenerationRevision,
+        'image': imageGenerationProvider?.toJson(),
+        'llmVersions': _llmProviderVersions,
+        'llm': LlmProviderConfig.encodeList(llmProviders),
+        'active': HiveBoxes.settings.get('llm_active_provider_id'),
+        'provider':
+            HiveBoxes.settings.get(LlmScenario.pictureStory.settingsKey),
+        'model': HiveBoxes.settings.get(LlmScenario.pictureStory.modelKey),
+      });
+
+  ImageGenerationProviderConfig? get imageGenerationProvider {
+    final raw =
+        HiveBoxes.settings.get(ImageGenerationProviderConfig.settingsKey);
+    if (raw == null) return null;
+    try {
+      return ImageGenerationProviderConfig.fromJson(raw);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<ImageGenerationConfig?> readImageGenerationConfig() =>
+      PictureStoryRepository.exclusive(() async {
+        final revision = _imageGenerationRevision;
+        final provider = imageGenerationProvider;
+        if (provider == null) return null;
+        final key = await _credentialStore.readImageGenerationApiKey() ?? '';
+        if (revision != _imageGenerationRevision ||
+            provider.encode() != imageGenerationProvider?.encode()) {
+          throw const FormatException('生图配置已变化，请重新开始');
+        }
+        return ImageGenerationConfig(provider: provider, apiKey: key);
+      });
+
+  Future<void> saveImageGenerationConfig({
+    required ImageGenerationProviderConfig provider,
+    required String apiKey,
+    bool clearApiKey = false,
+  }) {
+    ParentAccessService.instance.assertAllowed();
+    final value = provider.normalized();
+    if (apiKey.length > 8192) {
+      throw const FormatException('密钥过长，请检查输入');
+    }
+    _imageGenerationRevision++;
+    return PictureStoryRepository.exclusive(() async {
+      final parent = ParentAccessService.instance;
+      parent.assertAllowed();
+      const key = ImageGenerationProviderConfig.settingsKey;
+      final existed = HiveBoxes.settings.containsKey(key);
+      final previous = HiveBoxes.settings.get(key);
+      final previousSecret = await _credentialStore.readImageGenerationApiKey();
+      parent.assertAllowed();
+      final secret = apiKey.trim();
+      final changesSecret = clearApiKey || secret.isNotEmpty;
+      try {
+        if (changesSecret) {
+          if (clearApiKey) {
+            await _credentialStore.deleteImageGenerationApiKey();
+          } else {
+            await _credentialStore.saveImageGenerationApiKey(secret);
+          }
+        }
+        parent.assertAllowed();
+        await HiveBoxes.settings.put(key, value.encode());
+        parent.assertAllowed();
+      } on Object {
+        var rollbackFailed = false;
+        try {
+          if (existed) {
+            await HiveBoxes.settings.put(key, previous);
+          } else {
+            await HiveBoxes.settings.delete(key);
+          }
+        } on Object {
+          rollbackFailed = true;
+        }
+        if (changesSecret) {
+          try {
+            if (previousSecret == null) {
+              await _credentialStore.deleteImageGenerationApiKey();
+            } else {
+              await _credentialStore.saveImageGenerationApiKey(previousSecret);
+            }
+          } on Object {
+            rollbackFailed = true;
+          }
+        }
+        if (rollbackFailed) {
+          throw const FormatException('生图配置保存失败，请重新检查配置与密钥');
+        }
+        rethrow;
+      }
+    });
+  }
+
   // 跨仓储实例记录本进程内的手动配置写入，覆盖多次凭据复核之间的异步窗口。
   static final Map<String, int> _llmProviderVersions = {};
 
@@ -692,42 +795,48 @@ class SettingsRepository {
     // 先校验地址合法（非法抛 FormatException，不落盘）。
     final normalized = LlmClient.normalizeBaseUrl(baseUrl);
     _markLlmProviderWrite(id);
-    final key = apiKey.trim();
-    if (key.isNotEmpty) {
-      await _credentialStore.saveLlmApiKeyFor(id, key);
-    }
-
-    final list = llmProviders;
-    final config = LlmProviderConfig(
-      id: id,
-      name: name.trim(),
-      baseUrl: normalized.toString(),
-      model: model.trim(),
-      models: LlmProviderConfig.normalizeModels(models, model.trim()),
-    );
-    final index = list.indexWhere((c) => c.id == id);
-    if (index >= 0) {
-      list[index] = config;
-    } else {
-      list.add(config);
-    }
-    await HiveBoxes.settings.put(
-      _keyLlmProviders,
-      LlmProviderConfig.encodeList(list),
-    );
-    // 追加且无有效 active 时自动设为生效。
-    //
-    // 读「原始存储值」而非 llmActiveProviderId getter：getter 自带
-    // 回落写回的自愈副作用（列表非空时永不返回 null），用它判断会让
-    // 本分支语义隐性且条件不可达。
-    if (index < 0) {
-      final storedActive =
-          HiveBoxes.settings.get(_keyLlmActiveProviderId) as String?;
-      final hasValidActive =
-          storedActive != null && list.any((c) => c.id == storedActive);
-      if (!hasValidActive) {
-        await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
+    final operation = Object();
+    _pendingLlmSaves.add(operation);
+    try {
+      final key = apiKey.trim();
+      if (key.isNotEmpty) {
+        await _credentialStore.saveLlmApiKeyFor(id, key);
       }
+
+      final list = llmProviders;
+      final config = LlmProviderConfig(
+        id: id,
+        name: name.trim(),
+        baseUrl: normalized.toString(),
+        model: model.trim(),
+        models: LlmProviderConfig.normalizeModels(models, model.trim()),
+      );
+      final index = list.indexWhere((c) => c.id == id);
+      if (index >= 0) {
+        list[index] = config;
+      } else {
+        list.add(config);
+      }
+      await HiveBoxes.settings.put(
+        _keyLlmProviders,
+        LlmProviderConfig.encodeList(list),
+      );
+      // 追加且无有效 active 时自动设为生效。
+      //
+      // 读「原始存储值」而非 llmActiveProviderId getter：getter 自带
+      // 回落写回的自愈副作用（列表非空时永不返回 null），用它判断会让
+      // 本分支语义隐性且条件不可达。
+      if (index < 0) {
+        final storedActive =
+            HiveBoxes.settings.get(_keyLlmActiveProviderId) as String?;
+        final hasValidActive =
+            storedActive != null && list.any((c) => c.id == storedActive);
+        if (!hasValidActive) {
+          await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
+        }
+      }
+    } finally {
+      _pendingLlmSaves.remove(operation);
     }
   }
 

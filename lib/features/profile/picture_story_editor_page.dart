@@ -18,6 +18,7 @@ import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
+import 'package:poemath/features/profile/widgets/picture_story_text_field.dart';
 
 class PictureStoryEditorPage extends ConsumerStatefulWidget {
   const PictureStoryEditorPage({super.key, this.promptId});
@@ -563,68 +564,10 @@ class _PictureStoryEditorPageState
         ),
       );
 
-  Widget _field(PictureStoryEditorField field) {
-    final (label, maxLength, multiline, required) = switch (field) {
-      PictureStoryEditorField.title => (
-          '题目标题',
-          PictureStoryPrompt.maxTitleLength,
-          false,
-          true
-        ),
-      PictureStoryEditorField.theme => (
-          '主题（选填）',
-          PictureStoryPrompt.maxThemeLength,
-          false,
-          false
-        ),
-      PictureStoryEditorField.questions => ('引导问题', null, true, true),
-      PictureStoryEditorField.sceneFacts => ('观察提示（选填）', null, true, false),
-      PictureStoryEditorField.goals => ('练习目标（选填）', null, true, false),
-      PictureStoryEditorField.reference => (
-          '参考表达（选填）',
-          PictureStoryPrompt.maxReferenceLength,
-          true,
-          false
-        ),
-    };
-    return TextFormField(
-      key: ValueKey('picture-story-${field.name}'),
-      controller: _controllers[field],
-      enabled: !_busy,
-      minLines: multiline ? 3 : 1,
-      maxLines: null,
-      maxLength: maxLength,
-      keyboardType: multiline ? TextInputType.multiline : TextInputType.text,
-      textInputAction:
-          multiline ? TextInputAction.newline : TextInputAction.next,
-      decoration: InputDecoration(
-        labelText: label,
-        helperText: maxLength == null
-            ? '每行一条，最多 ${PictureStoryPrompt.maxLines} 条'
-            : null,
-      ),
-      onChanged: _textChanged,
-      validator: (value) {
-        try {
-          if (maxLength == null) {
-            PictureStoryPrompt.checkedLines(
-              (value ?? '').split('\n'),
-              label: label,
-              required: required,
-            );
-          } else {
-            PictureStoryPrompt.checkedText(
-              value ?? '',
-              label: label,
-              maxLength: maxLength,
-              required: required,
-            );
-          }
-          return null;
-        } on FormatException catch (error) {
-          return error.message;
-        }
-      },
-    );
-  }
+  Widget _field(PictureStoryEditorField field) => PictureStoryTextField(
+        field: field,
+        controller: _controllers[field]!,
+        enabled: !_busy,
+        onChanged: _textChanged,
+      );
 }

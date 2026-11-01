@@ -260,16 +260,94 @@ class PictureStoryRepository {
         );
       });
 
+  /// AI 候选仅在家长确认后一次性发布；失败补偿目录及当前孩子启用选择。
+  /// 固定的新题 id 允许暂存清理失败后的同内容重试，不生成重复题。
+  Future<List<PictureStoryPrompt>> saveGeneratedPrompts({
+    required List<PictureStoryPrompt> prompts,
+    required String profileId,
+    required void Function() check,
+    required Future<void> Function(
+      PictureStoryCatalogState catalog,
+      Map<String, List<String>> enabled,
+    ) beforeCommit,
+  }) {
+    final revision = ProfileScope.revision;
+    void verify() {
+      _authorize();
+      _checkProfile(profileId);
+      if (revision != ProfileScope.revision) {
+        throw const FormatException('孩子档案已切换，请重新打开题库');
+      }
+      check();
+    }
+
+    return exclusive(() async {
+      verify();
+      if (prompts.isEmpty || prompts.length > 5) {
+        throw const FormatException('每次请选择 1–5 道题');
+      }
+      final candidates = prompts.map((p) => p.normalized()).toList();
+      if (candidates.map((p) => p.id).toSet().length != candidates.length) {
+        throw const FormatException('生成题目标识重复，请重新生成');
+      }
+      final state = catalogState();
+      final versions = [...state.versions];
+      final saved = <PictureStoryPrompt>[];
+      for (final candidate in candidates) {
+        if (!candidate.id.startsWith('local-') ||
+            candidate.version != 1 ||
+            state.deletedIds.contains(candidate.id)) {
+          throw const FormatException('生成题目标识已失效，请重新生成');
+        }
+        final existing = _findPrompt(state, candidate.id);
+        if (existing != null &&
+            (existing.version != 1 || !existing.sameContent(candidate))) {
+          throw const FormatException('题目已更新，请重新打开题库');
+        }
+        if (existing == null) versions.add(candidate);
+        saved.add(existing ?? candidate);
+      }
+      final merged = PictureStoryCatalogState(
+        versions,
+        deletedIds: state.deletedIds,
+      );
+      final ids = <String>{
+        ...?_savedEnabledIds(profileId),
+        if (_savedEnabledIds(profileId) == null)
+          ...PictureStoryCatalog.prompts.map((p) => p.id),
+        ...saved.map((p) => p.id),
+      }.toList();
+      final enabled = {...enabledByProfile(), profileId: ids};
+      for (final prompt in saved) {
+        await _images.ensureStored(prompt.image);
+        verify();
+      }
+      await beforeCommit(merged, enabled);
+      verify();
+      await _writeSettingsWithRollback(
+        {
+          catalogKey: jsonEncode(merged.toJson()),
+          enabledKeyFor(profileId): jsonEncode(ids),
+        },
+        check: verify,
+      );
+      return saved;
+    });
+  }
+
   Future<void> _writeSettingsWithRollback(
     Map<String, Object> values, {
     String operation = '保存',
+    void Function()? check,
   }) async {
     final before = <String, Object?>{
       for (final key in values.keys)
         if (_settings.containsKey(key)) key: _settings.get(key),
     };
     try {
+      check?.call();
       await _settings.putAll(values);
+      check?.call();
     } on Object catch (error, stackTrace) {
       try {
         for (final key in values.keys) {

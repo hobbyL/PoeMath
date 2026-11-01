@@ -18,7 +18,11 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 const int kUsageHistoryDays = 7;
 
 class CloudUsageHistoryPage extends StatelessWidget {
-  const CloudUsageHistoryPage({super.key, this.usage, this.days = kUsageHistoryDays});
+  const CloudUsageHistoryPage({
+    super.key,
+    this.usage,
+    this.days = kUsageHistoryDays,
+  });
 
   /// 注入点（测试用）；null 时读全局单例。
   final CloudUsageService? usage;
@@ -28,18 +32,21 @@ class CloudUsageHistoryPage extends StatelessWidget {
     CloudUsageKind.llm: Icons.smart_toy_outlined,
     CloudUsageKind.asr: Icons.mic_none_rounded,
     CloudUsageKind.tts: Icons.record_voice_over_outlined,
+    CloudUsageKind.imageGeneration: Icons.image_outlined,
   };
 
   static const Map<CloudUsageKind, Color Function(ColorScheme)> _colors = {
     CloudUsageKind.llm: _llmColor,
     CloudUsageKind.asr: _asrColor,
     CloudUsageKind.tts: _ttsColor,
+    CloudUsageKind.imageGeneration: _imageColor,
   };
 
   // 三类固定用主题的三个色位，与柱、图例、图标保持一致。
   static Color _llmColor(ColorScheme s) => s.primary;
   static Color _asrColor(ColorScheme s) => s.secondary;
   static Color _ttsColor(ColorScheme s) => s.tertiary;
+  static Color _imageColor(ColorScheme s) => s.outline;
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +77,7 @@ class CloudUsageHistoryPage extends StatelessWidget {
                     Text('暂无用量记录', style: theme.textTheme.titleMedium),
                     const SizedBox(height: SpacingTokens.xs),
                     Text(
-                      '最近 $days 天没有发送过云端请求。使用 AI 讲解、语音识别或云朗读后，'
+                      '最近 $days 天没有发送过云端请求。使用 AI、图片生成、语音识别或云朗读后，'
                       '这里会按天记录次数。',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,

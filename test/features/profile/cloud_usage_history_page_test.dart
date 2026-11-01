@@ -39,7 +39,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
   }
 
-  testWidgets('有数据时三类各一张图，并显示今日与近 7 天合计', (tester) async {
+  testWidgets('有数据时包含图片生成的四类图，并显示今日与近 7 天合计', (tester) async {
     final usage = svc();
     await tester.runAsync(() async {
       await HiveBoxes.meta.put(key(today, CloudUsageKind.llm), 4);
@@ -52,9 +52,9 @@ void main() {
     await pump(tester, usage);
 
     // 三张图（三个 kind 各一张）。
-    expect(find.byType(BarChart), findsNWidgets(3));
+    expect(find.byType(BarChart), findsNWidgets(4));
     // 三类标题。
-    for (final label in ['AI', '语音识别', '云朗读']) {
+    for (final label in ['AI', '语音识别', '云朗读', '图片生成']) {
       expect(find.text(label), findsOneWidget);
     }
     // AI：今日 4、近 7 天合计 10（4 + 6）。
@@ -104,7 +104,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     // 脏数据读作 0，云朗读为 3。
-    expect(find.text('今日 0 · 近 7 天 0'), findsNWidgets(2));
+    expect(find.text('今日 0 · 近 7 天 0'), findsNWidgets(3));
     expect(find.text('今日 3 · 近 7 天 3'), findsOneWidget);
   });
 }

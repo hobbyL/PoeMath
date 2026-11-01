@@ -1,0 +1,351 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/image_generation_client.dart';
+import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/llm/llm_config.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
+import 'package:poemath/core/services/picture_story_generation_service.dart';
+import 'package:poemath/core/services/picture_story_image_service.dart';
+import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/widgets/page_animation_scope.dart';
+import 'package:poemath/core/widgets/parent_access_boundary.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/image_generation_config.dart';
+import 'package:poemath/data/models/picture_story_editor_draft.dart';
+import 'package:poemath/data/models/picture_story_generation_draft.dart';
+import 'package:poemath/data/repositories/picture_story_repository.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
+import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
+import 'package:poemath/features/profile/image_generation_settings_page.dart';
+import 'package:poemath/features/profile/picture_story_candidate_editor_page.dart';
+import 'package:poemath/features/profile/picture_story_generate_page.dart';
+import 'package:poemath/features/profile/picture_story_management_page.dart';
+
+import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
+import '../../helpers/picture_story_fixture.dart';
+
+class _GenerationFlow extends PictureStoryGenerationService {
+  _GenerationFlow({
+    required this.image,
+    required PictureStoryRepository repository,
+    required PictureStoryImageService images,
+  }) : super(
+          repository: repository,
+          images: images,
+          backup: BackupService(
+            pictureStoryImages: images,
+            pictureStoryRepository: repository,
+          ),
+        );
+  final PictureStoryImage image;
+  @override
+  Future<void> run({
+    required PictureStoryGenerationDraft draft,
+    required LlmConfig config,
+    required ImageGenerationConfig imageConfig,
+    required bool Function() isActive,
+    void Function()? onChanged,
+    String? candidateId,
+    bool regenerateImage = false,
+  }) async {
+    if (!isActive()) throw const ImageGenerationCancelled();
+    final items = [
+      for (var i = 0; i < draft.options.count; i++) _candidate(draft, i),
+    ];
+    await HiveBoxes.settings.put(
+      PictureStoryGenerationService.keyFor(draft.profileId),
+      draft.copyWith(items).encode(),
+    );
+    onChanged?.call();
+  }
+
+  PictureStoryGenerationCandidate _candidate(
+    PictureStoryGenerationDraft draft,
+    int index,
+  ) {
+    final prompt = pictureStoryFixture(
+      id: 'local-${draft.id}-$index',
+      title: '生成题目 ${index + 1}',
+      image: image,
+    );
+    final filled = PictureStoryEditorDraft.create(
+      id: prompt.id,
+      profileId: draft.profileId,
+      original: prompt,
+    );
+    return PictureStoryGenerationCandidate(
+      edit: PictureStoryEditorDraft(
+        id: prompt.id,
+        profileId: draft.profileId,
+        fields: filled.fields,
+        level: prompt.level,
+        image: image,
+      ),
+      imagePrompt: '一个场景',
+      requestId: 'request-$index',
+      stage: PictureStoryGenerationStage.ready,
+    );
+  }
+}
+
+Future<void> _until(WidgetTester tester, bool Function() condition) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 8));
+  while (!condition() && DateTime.now().isBefore(deadline)) {
+    await tester.runAsync(() async {
+      await tester.pump(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    });
+  }
+  expect(condition(), isTrue);
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  late PictureStoryRepository repository;
+  late PictureStoryGenerationService service;
+  late Directory directory;
+  late PictureStoryImageService images;
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
+    directory =
+        await Directory.systemTemp.createTemp('picture_story_generation_ui_');
+    images = PictureStoryImageService(directoryProvider: () async => directory);
+    repository = PictureStoryRepository(images: images);
+    service =
+        PictureStoryGenerationService(repository: repository, images: images);
+    await HiveBoxes.settings.put('page_animations_enabled', false);
+  });
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForWidgetTesting();
+    await directory.delete(recursive: true);
+  });
+
+  Future<GoRouter> mount(
+    WidgetTester tester, {
+    Size size = const Size(420, 900),
+    double scale = 1,
+  }) async {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final router = GoRouter(
+      initialLocation: AppRoutes.pictureStoryManagement,
+      routes: [
+        GoRoute(
+          path: AppRoutes.pictureStoryManagement,
+          builder: (context, state) => const ParentAccessBoundary(
+            child: PictureStoryManagementPage(),
+          ),
+        ),
+        GoRoute(
+          path: AppRoutes.pictureStoryGenerate,
+          builder: (context, state) =>
+              const ParentAccessBoundary(child: PictureStoryGeneratePage()),
+        ),
+        GoRoute(
+          path: AppRoutes.imageGenerationSettings,
+          builder: (context, state) => const ParentAccessBoundary(
+            child: ImageGenerationSettingsPage(),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          pictureStoryRepositoryProvider.overrideWithValue(repository),
+          pictureStoryGenerationServiceProvider.overrideWithValue(service),
+          pictureStoryImageServiceProvider.overrideWithValue(images),
+        ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          theme: AppTheme.resolve(
+            subject: AppSubject.poem,
+            brightness: Brightness.light,
+          ),
+          builder: (context, child) => PageAnimationScope(
+            enabled: false,
+            child: MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('AI 出题'));
+    await tester.pumpAndSettle();
+    return router;
+  }
+
+  testWidgets('真实题库入口可打开生成页；缺配置给出明确提示且不创建草稿', (tester) async {
+    await mount(tester);
+    expect(find.byType(PictureStoryGeneratePage), findsOneWidget);
+    expect(find.text('主题（可多选）'), findsOneWidget);
+    await tester.ensureVisible(find.text('生成图文题目'));
+    await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
+    await _until(tester, () => find.text('请先配置图片生成服务').evaluate().isNotEmpty);
+    expect(service.readDraft('default'), isNull);
+    expect(repository.catalogState().versions, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await drainHiveWritesForTesting(tester);
+  });
+
+  for (final (size, scale) in [
+    (const Size(320, 1100), 2.0),
+    (const Size(1200, 900), 1.0),
+  ]) {
+    testWidgets('生成表单在宽度 ${size.width}、字号 $scale 下可操作且不溢出', (tester) async {
+      await mount(tester, size: size, scale: scale);
+      await tester.ensureVisible(find.text('自然观察'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('自然观察'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilterChip>(find.widgetWithText(FilterChip, '自然观察'))
+            .selected,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<FilterChip>(find.widgetWithText(FilterChip, '日常生活'))
+            .selected,
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await drainHiveWritesForTesting(tester);
+    });
+  }
+
+  testWidgets('生成、编辑草稿、勾选后确认入库的真实页面链路', (tester) async {
+    final png = await tester.runAsync(() => pictureStoryPng());
+    // 测试使用已验证的本地图片，HTTP 图文生成由服务专项测试覆盖。
+    final image = await tester.runAsync(() => images.importBytes(png!));
+    service =
+        _GenerationFlow(image: image!, repository: repository, images: images);
+    await tester.runAsync(() async {
+      final settings = SettingsRepository();
+      await settings.saveImageGenerationConfig(
+        provider: const ImageGenerationProviderConfig(
+          name: '测试',
+          baseUrl: 'https://image.example.com/v1',
+          model: 'image',
+        ),
+        apiKey: '',
+      );
+      await settings.saveLlmProviderConfig(
+        id: 'vision',
+        name: '看图',
+        baseUrl: 'https://llm.example.com',
+        model: 'gpt-4o-mini',
+        apiKey: '',
+      );
+    });
+    final router = await mount(tester);
+    await tester.ensureVisible(find.text('生成图文题目'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
+    await _until(tester, () => service.readDraft('default')?.readyCount == 3);
+    expect(repository.catalogState().versions, isEmpty);
+    final first = service.readDraft('default')!.candidates.first;
+    final firstCard = find.byKey(ValueKey(first.id));
+    final editButton =
+        find.descendant(of: firstCard, matching: find.text('编辑内容'));
+    await tester.ensureVisible(editButton);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => tester.tap(editButton));
+    await _until(
+      tester,
+      () => find.byType(PictureStoryCandidateEditorPage).evaluate().isNotEmpty,
+    );
+    final titleField = find.byKey(const ValueKey('picture-story-title'));
+    await tester.ensureVisible(titleField);
+    await tester.pumpAndSettle();
+    await tester.enterText(titleField, '家长修改后的题目');
+    await tester.runAsync(() async {
+      ParentAccessService.instance.lock();
+    });
+    await _until(
+      tester,
+      () => find.byType(PictureStoryCandidateEditorPage).evaluate().isEmpty,
+    );
+    await tester.runAsync(() => unlockParentForTesting());
+    await _until(
+      tester,
+      () => find.byType(PictureStoryCandidateEditorPage).evaluate().isNotEmpty,
+    );
+    expect(
+      tester.widget<TextFormField>(titleField).controller!.text,
+      '家长修改后的题目',
+    );
+    await tester.runAsync(() => tester.tap(find.text('保存修改')));
+    await _until(
+      tester,
+      () => find.byType(PictureStoryCandidateEditorPage).evaluate().isEmpty,
+    );
+    expect(
+      service
+          .readDraft('default')!
+          .candidates
+          .first
+          .edit
+          .fields[PictureStoryEditorField.title],
+      '家长修改后的题目',
+    );
+    expect(repository.catalogState().versions, isEmpty);
+    final last = service.readDraft('default')!.candidates.last;
+    final checkbox = find.descendant(
+      of: find.byKey(ValueKey(last.id)),
+      matching: find.byType(Checkbox),
+    );
+    await tester.scrollUntilVisible(
+      checkbox,
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => tester.tap(checkbox));
+    await _until(
+      tester,
+      () => !service.readDraft('default')!.candidates.last.selected,
+    );
+    final selectedDraft = service.readDraft('default')!;
+    expect(
+      selectedDraft.selectedPrompts.length,
+      2,
+      reason: selectedDraft.candidates
+          .map((candidate) => '${candidate.stage.name}:${candidate.selected}')
+          .join(', '),
+    );
+    final publishButton = find.text('确认入库（2 道）');
+    await _until(tester, () => publishButton.evaluate().isNotEmpty);
+    await tester.runAsync(() => tester.tap(publishButton));
+    await _until(tester, () => repository.catalogState().versions.length == 2);
+    expect(repository.findPrompt(first.id)!.title, '家长修改后的题目');
+    expect(repository.findPrompt(last.id), isNull);
+    expect(repository.enabledByProfile()['default'], contains(first.id));
+    expect(tester.takeException(), isNull);
+    // 尚有未选题，因此预览页保留草稿，用户可继续处理。
+    expect(
+      router.routerDelegate.state.uri.path,
+      AppRoutes.pictureStoryGenerate,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await drainHiveWritesForTesting(tester);
+  });
+}

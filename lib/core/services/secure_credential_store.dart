@@ -145,6 +145,13 @@ class SecureCredentialStore {
     await _storage.delete(key: _llmApiKeyKeyFor(configId));
   }
 
+  Future<String?> readImageGenerationApiKey() =>
+      _storage.read(key: 'image_generation_api_key');
+  Future<void> saveImageGenerationApiKey(String apiKey) =>
+      _storage.write(key: 'image_generation_api_key', value: apiKey);
+  Future<void> deleteImageGenerationApiKey() =>
+      _storage.delete(key: 'image_generation_api_key');
+
   // ============ 备份加密口令 ============
 
   /// 保存备份加密口令（本地导出与 WebDAV 上传共用）。

@@ -88,7 +88,10 @@ final class LlmClient {
     return models;
   }
 
-  List<({LlmConfig provider, String model})> _attemptsFor(LlmConfig config) {
+  List<({LlmConfig provider, String model})> _attemptsFor(
+    LlmConfig config, {
+    bool requiresVision = false,
+  }) {
     final preferred = _preferredProviders[config];
     final providers = <LlmConfig>{
       if (preferred != null) preferred,
@@ -99,7 +102,8 @@ final class LlmClient {
       for (final provider in providers)
         if (!_unavailableProviders.contains(provider))
           for (final model in _modelsFor(provider))
-            (provider: provider, model: model),
+            if (!requiresVision || LlmConfig.isVisionModelName(model))
+              (provider: provider, model: model),
     ];
     if (attempts.isEmpty) _throwExhausted(config);
     return attempts;
@@ -159,8 +163,9 @@ final class LlmClient {
     LlmConfig config,
     Future<T> Function(LlmConfig candidate) request, {
     bool reportSuccess = true,
+    bool requiresVision = false,
   }) async {
-    final attempts = _attemptsFor(config);
+    final attempts = _attemptsFor(config, requiresVision: requiresVision);
     for (final (:provider, :model) in attempts) {
       _checkActive();
       if (_unavailableProviders.contains(provider)) continue;
@@ -843,6 +848,7 @@ final class LlmClient {
     List<Map<String, Object?>> tools = const <Map<String, Object?>>[],
     String toolChoice = 'auto',
     int maxTokens = 1024,
+    bool requiresVision = false,
   }) =>
       _withModels(
         config,
@@ -856,6 +862,7 @@ final class LlmClient {
         ),
         // 工具探测并非最终回答，只有后续流完整成功才持久化。
         reportSuccess: false,
+        requiresVision: requiresVision,
       );
 
   Future<ChatCompletion> _chatComplete({

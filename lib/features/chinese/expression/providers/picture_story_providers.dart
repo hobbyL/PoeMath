@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/services/picture_story_editor_service.dart';
+import 'package:poemath/core/services/picture_story_generation_service.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_audio_service.dart';
@@ -29,6 +31,15 @@ final pictureStoryImageBytesProvider =
 final pictureStoryRepositoryProvider = Provider<PictureStoryRepository>((ref) {
   return PictureStoryRepository(
     images: ref.watch(pictureStoryImageServiceProvider),
+  );
+});
+
+final pictureStoryGenerationServiceProvider =
+    Provider<PictureStoryGenerationService>((ref) {
+  return PictureStoryGenerationService(
+    images: ref.watch(pictureStoryImageServiceProvider),
+    repository: ref.watch(pictureStoryRepositoryProvider),
+    backup: ref.watch(backupServiceProvider),
   );
 });
 

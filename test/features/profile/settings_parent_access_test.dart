@@ -19,6 +19,8 @@ import 'package:poemath/features/profile/parent_protection_page.dart';
 import 'package:poemath/features/profile/picture_story_detail_page.dart';
 import 'package:poemath/features/profile/picture_story_editor_page.dart';
 import 'package:poemath/features/profile/picture_story_management_page.dart';
+import 'package:poemath/features/profile/picture_story_generate_page.dart';
+import 'package:poemath/features/profile/image_generation_settings_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 import 'package:poemath/features/textbook/textbook_course_review_page.dart';
@@ -158,6 +160,8 @@ void main() {
     (AppRoutes.textbookReviewOf('synthetic'), TextbookCourseReviewPage),
     (AppRoutes.pictureStoryManagement, PictureStoryManagementPage),
     (AppRoutes.pictureStoryCreate, PictureStoryEditorPage),
+    (AppRoutes.pictureStoryGenerate, PictureStoryGeneratePage),
+    (AppRoutes.imageGenerationSettings, ImageGenerationSettingsPage),
     (AppRoutes.pictureStoryDetailOf('synthetic'), PictureStoryDetailPage),
     (AppRoutes.pictureStoryEditOf('synthetic'), PictureStoryEditorPage),
   ]) {

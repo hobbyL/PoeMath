@@ -235,7 +235,7 @@ void main() {
       expect(repo.llmActiveProviderId, explicit ? 'p1' : 'p2');
       expect(
         find.text('跟随默认（${explicit ? 'DeepSeek' : '配置 2'}）'),
-        findsNWidgets(explicit ? 3 : 4),
+        findsNWidgets(explicit ? 4 : 5),
       );
       expect(container.read(llmSelectionVersionProvider), 1);
       expect(
@@ -245,7 +245,7 @@ void main() {
     });
   }
 
-  testWidgets('有配置时四行均显示「跟随默认（生效配置名）」', (tester) async {
+  testWidgets('有配置时五个场景均显示「跟随默认（生效配置名）」', (tester) async {
     final store = _MemoryCredentialStore();
     await tester.runAsync(() => _seedTwo(store));
     await _pumpPage(tester, credentialStore: store);
@@ -255,7 +255,7 @@ void main() {
     expect(find.text('口算解析'), findsOneWidget);
     expect(find.text('AI 助手'), findsOneWidget);
     // 四场景默认未绑定 → 跟随 active（p1 = DeepSeek）。
-    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(4));
+    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(5));
   });
 
   testWidgets('点行弹层点选厂商：持久化、副标题更新、重进页面保持', (tester) async {
@@ -310,7 +310,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(3));
+    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(4));
 
     // 重进页面保持。
     await _pumpPage(tester, credentialStore: store);
@@ -353,6 +353,6 @@ void main() {
     final repo = _repoOf(tester);
     expect(repo.providerIdForScenario(LlmScenario.mathExplain), isNull);
     expect(HiveBoxes.settings.get('llm_provider_math_explain'), isNull);
-    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(4));
+    expect(find.text('跟随默认（DeepSeek）'), findsNWidgets(5));
   });
 }

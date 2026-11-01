@@ -27,6 +27,7 @@ import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
+import 'package:poemath/data/models/image_generation_config.dart';
 import 'package:poemath/data/models/poem_favorite.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/data/models/review_schedule.dart';
@@ -93,6 +94,7 @@ const int _backupVersion = 1;
 ///
 /// 新增 settings key 时必须同步登记本白名单（并注明类型），否则不会随备份迁移。
 const Map<String, String> _settingsValueType = <String, String>{
+  ImageGenerationProviderConfig.settingsKey: 'string', // 生图地址/模型，无密钥；恢复前确认
   'theme_mode': 'string', // 外观模式 system/light/dark
   'active_subject': 'string', // 当前主题 poem/math
   SettingsRepository.pageAnimationsEnabledKey: 'bool', // 页面动画开关，跨设备用户偏好
@@ -120,6 +122,8 @@ const Map<String, String> _settingsValueType = <String, String>{
   'llm_model_assistant': 'string', // AI 助手选中的模型名
   'llm_provider_word_problem': 'string', // AI 出题绑定的配置 id
   'llm_model_word_problem': 'string', // AI 出题选中的模型名
+  'llm_provider_picture_story': 'string', // 看图说话出题绑定
+  'llm_model_picture_story': 'string', // 看图说话视觉模型
   'llm_provider_poem_explain': 'string', // 诗词讲解绑定的配置 id
   'llm_model_poem_explain': 'string', // 诗词讲解选中的模型名
   'llm_provider_math_explain': 'string', // 口算解析绑定的配置 id
@@ -160,6 +164,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   'cloud_daily_limit_llm': 'int',
   'cloud_daily_limit_tts': 'int',
   'cloud_daily_limit_asr': 'int',
+  'cloud_daily_limit_image': 'int',
   // 备份策略偏好（用户设定，换机该带走）。
   'daily_snapshot_enabled': 'bool',
   'external_backup_reminder': 'bool',
@@ -347,6 +352,24 @@ class BackupService {
         : json;
   }
 
+  /// 调用者持有题库 exclusive；不再进入公开导出队列，避免嵌套等待。
+  Future<void> validatePictureStoryPublication(
+    PictureStoryCatalogState catalog,
+    Map<String, List<String>> enabled,
+  ) async {
+    final base = await _exportToJson(
+      includeCredentials: false,
+      includePictureStoryCatalog: false,
+    );
+    await PictureStoryCatalogBackup.validateBudget(
+      catalog: catalog,
+      enabledByProfile: enabled,
+      images: _pictureStoryImages,
+      parentPayload: jsonDecode(base) as Map<String, dynamic>,
+      reserveBytes: 128 * 1024,
+    );
+  }
+
   /// 读取安全存储凭据并加密。
   ///
   /// 两种「没有凭据」是合法的，返回 `null` 让调用方省略 `credentials` 节：
@@ -359,6 +382,13 @@ class BackupService {
     if (normalized.isEmpty) return null;
     try {
       final payload = <String, String>{};
+      final imageKey = await _secureStore.readImageGenerationApiKey();
+      final imageProvider = SettingsRepository(credentialStore: _secureStore)
+          .imageGenerationProvider;
+      if (imageKey != null && imageKey.isNotEmpty && imageProvider != null) {
+        payload[kCredKeyImageGenerationApiKey] = imageKey;
+        payload[kCredKeyImageGenerationHint] = imageProvider.credentialHint;
+      }
       final tencent = await _secureStore.readTencentAsrCredentials();
       if (tencent != null) {
         payload[kCredKeyTencentSecretId] = tencent.secretId;
@@ -552,7 +582,33 @@ class BackupService {
       }
     }
 
-    // 既无厂商列表也无 legacy 端点 → 无端点可注入，不弹框。
+    final imageProvider = settings[ImageGenerationProviderConfig.settingsKey];
+    if (imageProvider != null) {
+      try {
+        final config = ImageGenerationProviderConfig.fromJson(imageProvider);
+        final host = _endpointOf(config.endpoint.toString());
+        ImageGenerationProviderConfig? previous;
+        try {
+          final raw =
+              HiveBoxes.settings.get(ImageGenerationProviderConfig.settingsKey);
+          if (raw != null) {
+            previous = ImageGenerationProviderConfig.fromJson(raw);
+          }
+        } on FormatException {/* 坏本机配置按新增处理。 */}
+        if (previous == null) {
+          added.add(host);
+        } else {
+          final previousHost = _endpointOf(previous.endpoint.toString());
+          if (host != previousHost) {
+            changed.add(
+              LlmEndpointChange(label: '图片生成', from: previousHost, to: host),
+            );
+          }
+        }
+      } on FormatException {/* 非法备份配置由恢复过滤器丢弃。 */}
+    }
+
+    // 既无厂商列表也无有效外部端点 → 不弹框。
     if (incoming == null && added.isEmpty && changed.isEmpty) return null;
 
     final incomingIds = incoming?.map((c) => c.id).toSet() ?? const <String>{};
@@ -740,6 +796,22 @@ class BackupService {
     Map<String, String> credentials, {
     required List<Future<void> Function()> undo,
   }) async {
+    final imageKey = credentials[kCredKeyImageGenerationApiKey];
+    final imageProvider = SettingsRepository(credentialStore: _secureStore)
+        .imageGenerationProvider;
+    if (imageKey != null &&
+        imageKey.isNotEmpty &&
+        imageProvider != null &&
+        credentials[kCredKeyImageGenerationHint] ==
+            imageProvider.credentialHint) {
+      final old = await _secureStore.readImageGenerationApiKey();
+      undo.add(
+        () => old == null
+            ? _secureStore.deleteImageGenerationApiKey()
+            : _secureStore.saveImageGenerationApiKey(old),
+      );
+      await _secureStore.saveImageGenerationApiKey(imageKey);
+    }
     final secretId = credentials[kCredKeyTencentSecretId];
     final secretKey = credentials[kCredKeyTencentSecretKey];
     if (secretId != null && secretKey != null) {
@@ -1250,6 +1322,13 @@ class BackupService {
     for (final key in box.keys) {
       final name = key.toString();
       if (!_settingsValueType.containsKey(name)) continue;
+      if (name == ImageGenerationProviderConfig.settingsKey) {
+        try {
+          result[name] =
+              ImageGenerationProviderConfig.fromJson(box.get(key)).encode();
+        } on FormatException {/* 无效配置不进入备份。 */}
+        continue;
+      }
       result[name] = box.get(key);
     }
     return result;
@@ -1588,8 +1667,17 @@ class BackupService {
     // 非 LLM key 透传。
     final out = <String, Object>{
       for (final entry in values.entries)
-        if (!_isLlmSettingKey(entry.key)) entry.key: entry.value,
+        if (!_isLlmSettingKey(entry.key) &&
+            entry.key != ImageGenerationProviderConfig.settingsKey)
+          entry.key: entry.value,
     };
+    final rawImage = values[ImageGenerationProviderConfig.settingsKey];
+    if (rawImage != null) {
+      try {
+        out[ImageGenerationProviderConfig.settingsKey] =
+            ImageGenerationProviderConfig.fromJson(rawImage).encode();
+      } on FormatException {/* 单项无效不影响其他设置。 */}
+    }
 
     // 1. llm_providers：结构探测。区分「坏结构 → 跳过」与「合法空列表 → 放行」
     //    （用户主动清空厂商列表必须能恢复）。

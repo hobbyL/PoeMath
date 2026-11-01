@@ -6,7 +6,8 @@ import 'package:poemath/core/services/parent_access_service.dart';
 enum CloudUsageKind {
   llm('AI', 'llm', 30),
   asr('语音识别', 'asr', 60),
-  tts('云朗读', 'tts', 120);
+  tts('云朗读', 'tts', 120),
+  imageGeneration('图片生成', 'image', 10);
 
   const CloudUsageKind(this.label, this.key, this.defaultLimit);
   final String label;
@@ -22,7 +23,7 @@ class CloudQuotaExceededException implements Exception {
   String toString() => message;
 }
 
-/// 某一天的云请求用量快照（三类齐全，缺失的为 0）。
+/// 某一天的云请求用量快照（所有种类齐全，缺失的为 0）。
 class DailyCloudUsage {
   const DailyCloudUsage({required this.date, required this.counts});
 
@@ -32,7 +33,7 @@ class DailyCloudUsage {
 
   int of(CloudUsageKind kind) => counts[kind] ?? 0;
 
-  /// 三类合计。
+  /// 所有种类合计。
   int get total => CloudUsageKind.values.fold(0, (sum, k) => sum + of(k));
 }
 

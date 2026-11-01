@@ -54,6 +54,7 @@ class AppRoutes {
   static const String pictureStoryManagement =
       '/profile/settings/picture-story';
   static const String pictureStoryCreate = '$pictureStoryManagement/new';
+  static const String pictureStoryGenerate = '$pictureStoryManagement/generate';
   static const String pictureStoryDetail = '$pictureStoryManagement/detail/:id';
   static const String pictureStoryEdit = '$pictureStoryManagement/edit/:id';
 
@@ -86,6 +87,8 @@ class AppRoutes {
   static const String speechRecognitionSettings =
       '/profile/settings/speech-recognition';
   static const String llmSettings = '/profile/settings/llm';
+  static const String imageGenerationSettings =
+      '/profile/settings/image-generation';
   static const String learningStats = '/profile/stats';
   static const String learningCalendar = '/profile/calendar';
   static const String achievements = '/profile/achievements';

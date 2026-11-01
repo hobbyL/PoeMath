@@ -55,6 +55,8 @@ import 'package:poemath/features/profile/parent_protection_page.dart';
 import 'package:poemath/features/profile/llm_provider_settings_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/picture_story_management_page.dart';
+import 'package:poemath/features/profile/picture_story_generate_page.dart';
+import 'package:poemath/features/profile/image_generation_settings_page.dart';
 import 'package:poemath/features/profile/picture_story_detail_page.dart';
 import 'package:poemath/features/profile/picture_story_editor_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
@@ -562,6 +564,21 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           child: const ParentAccessBoundary(
             child: PictureStoryManagementPage(),
           ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.pictureStoryGenerate,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: const ParentAccessBoundary(child: PictureStoryGeneratePage()),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.imageGenerationSettings,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child:
+              const ParentAccessBoundary(child: ImageGenerationSettingsPage()),
         ),
       ),
       GoRoute(

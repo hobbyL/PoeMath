@@ -356,6 +356,7 @@ class _ParentProtectionPageState extends State<ParentProtectionPage> {
         CloudUsageKind.llm => Icons.smart_toy_outlined,
         CloudUsageKind.asr => Icons.mic_none_rounded,
         CloudUsageKind.tts => Icons.record_voice_over_outlined,
+        CloudUsageKind.imageGeneration => Icons.image_outlined,
       };
 }
 

@@ -462,7 +462,7 @@ class _PictureStoryPracticePageState
         // AI 使用完整的永久图片，不采集列表裁切或图片加载占位。
         return await ref
             .read(pictureStoryImageServiceProvider)
-            .readImage(prompt.image.value);
+            .readForVision(prompt.image.value);
       } on Object catch (error, stackTrace) {
         AppLogger.e(
           '读取评价题图失败',
@@ -537,6 +537,7 @@ class _PictureStoryPracticePageState
             ),
           ],
           maxTokens: 240,
+          requiresVision: true,
         );
         final text = completion.content?.trim();
         return text == null || text.isEmpty ? null : text;

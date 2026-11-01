@@ -1,5 +1,8 @@
 import 'dart:io';
+import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,6 +61,48 @@ void main() {
       bytes.length,
       lessThanOrEqualTo(PictureStoryImageService.maxStoredBytes),
     );
+  });
+
+  test('复杂题图的视觉上传副本不超过 512 KiB，保持比例且不修改永久题图', () async {
+    const width = 1024;
+    const height = 768;
+    final pixels = Uint8List(width * height * 4);
+    final random = Random(42);
+    for (var i = 0; i < pixels.length; i += 4) {
+      pixels[i] = random.nextInt(256);
+      pixels[i + 1] = random.nextInt(256);
+      pixels[i + 2] = random.nextInt(256);
+      pixels[i + 3] = 255;
+    }
+    final ready = Completer<ui.Image>();
+    ui.decodeImageFromPixels(
+      pixels,
+      width,
+      height,
+      ui.PixelFormat.rgba8888,
+      ready.complete,
+    );
+    final image = await ready.future;
+    final data = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+    final source = Uint8List.fromList(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+    );
+    image.dispose();
+    final storedImage = await service.importBytes(source);
+    final stored = await service.readImage(storedImage.value);
+    expect(stored.length, greaterThan(PictureStoryImageService.maxUploadBytes));
+    final upload = await service.readForVision(storedImage.value);
+    expect(
+      upload.length,
+      lessThanOrEqualTo(PictureStoryImageService.maxUploadBytes),
+    );
+    final header = ByteData.sublistView(upload);
+    expect(header.getUint32(16) / header.getUint32(20), closeTo(4 / 3, .01));
+    expect(await service.readImage(storedImage.value), stored);
+    final codec = await ui.instantiateImageCodec(upload);
+    final frame = await codec.getNextFrame();
+    frame.image.dispose();
+    codec.dispose();
   });
 
   test('超限来源在规范化之前拒绝，不发布图片', () async {

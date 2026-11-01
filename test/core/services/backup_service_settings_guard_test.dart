@@ -113,6 +113,7 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       'cloud_daily_limit_llm': 25,
       'cloud_daily_limit_asr': 40,
       'cloud_daily_limit_tts': 80,
+      'cloud_daily_limit_image': 8,
       // 备份策略偏好。
       'daily_snapshot_enabled': true,
       'external_backup_reminder': false,

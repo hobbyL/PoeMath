@@ -6,13 +6,18 @@
 // 绑定关系存于 settings box（key 见 [LlmScenario.settingsKey]），
 // 值为 llm_providers 中某条配置的 id；未绑定 = 跟随默认生效配置。
 //
-// 这些 key 指向外部服务配置（依赖 llm_providers 存在），与
-// llm_active_provider_id 同类，一律不入备份白名单（设备绑定，换机重配）。
+// 这些 key 随厂商配置备份；恢复前通过服务地址确认闸门检查端点变更。
 
 /// LLM 使用场景。
 enum LlmScenario {
   /// AI 出题（应用题生成）。
   wordProblem('llm_provider_word_problem', 'llm_model_word_problem', 'AI 出题'),
+
+  pictureStory(
+    'llm_provider_picture_story',
+    'llm_model_picture_story',
+    '看图说话出题',
+  ),
 
   /// 诗词 AI 讲解。
   poemExplain('llm_provider_poem_explain', 'llm_model_poem_explain', '诗词讲解'),
@@ -29,7 +34,7 @@ enum LlmScenario {
   final String settingsKey;
 
   /// 该场景选中的「模型名」在 settings box 中的存储键（须 ∈ 该配置 models，
-  /// 悬空回落配置默认 model）。与 settingsKey 同类，不入备份白名单。
+  /// 悬空回落配置默认 model）。与 settingsKey 一起随厂商配置备份。
   final String modelKey;
 
   /// 面向用户的场景名称。

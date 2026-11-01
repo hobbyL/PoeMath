@@ -27,21 +27,25 @@ class PictureStoryImageService {
     Future<Directory> Function()? directoryProvider,
     PictureStoryImageNormalizer? normalizer,
     PictureStoryImageDecoder? decoder,
+    PictureStoryImageNormalizer? uploadNormalizer,
   })  : _directoryProvider =
             directoryProvider ?? getApplicationSupportDirectory,
         _normalizer = normalizer ?? _normalize,
-        _decoder = decoder ?? _decodeStored;
+        _decoder = decoder ?? _decodeStored,
+        _uploadNormalizer = uploadNormalizer ?? _normalizeUpload;
 
   static final instance = PictureStoryImageService();
   static const maxSourceBytes = 20 * 1024 * 1024;
   static const maxStoredBytes = 2 * 1024 * 1024;
   static const maxDimension = 1600;
+  static const maxUploadBytes = 512 * 1024;
   static const _maxSourcePixels = 40 * 1000 * 1000;
   static const _pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
 
   final Future<Directory> Function() _directoryProvider;
   final PictureStoryImageNormalizer _normalizer;
   final PictureStoryImageDecoder _decoder;
+  final PictureStoryImageNormalizer _uploadNormalizer;
 
   Future<File> _file(String id) async {
     if (!PictureStoryImage.isValidSha(id)) {
@@ -74,6 +78,19 @@ class PictureStoryImageService {
       if (bytes.length != size || bytes.length > maxSourceBytes) {
         throw const PictureStoryImageException('图片读取不完整，请重新选择');
       }
+      return await importBytes(bytes);
+    } on PictureStoryImageException {
+      rethrow;
+    } on Exception {
+      throw const PictureStoryImageException('图片无法读取或保存，请重新选择并检查存储空间');
+    }
+  }
+
+  Future<PictureStoryImage> importBytes(Uint8List bytes) async {
+    if (bytes.isEmpty || bytes.length > maxSourceBytes) {
+      throw const PictureStoryImageException('图片为空或超过 20 MiB');
+    }
+    try {
       final normalized = await _normalizer(bytes);
       final id = sha256.convert(normalized).toString();
       final prepared = await prepareImages({id: normalized});
@@ -85,9 +102,20 @@ class PictureStoryImageService {
       return PictureStoryImage.local(id);
     } on PictureStoryImageException {
       rethrow;
-    } on Exception {
+    } on Object {
       throw const PictureStoryImageException('图片无法读取或保存，请重新选择并检查存储空间');
     }
+  }
+
+  /// 保留完整画面，只压缩上传副本；正式题图与内容 SHA 不变。
+  Future<Uint8List> readForVision(String id) async {
+    final bytes = await readImage(id);
+    await _decoder(bytes);
+    final compact = await _uploadNormalizer(bytes);
+    if (compact.isEmpty || compact.length > maxUploadBytes) {
+      throw const PictureStoryImageException('图片无法压缩到可上传大小');
+    }
+    return compact;
   }
 
   Future<void> ensureStored(PictureStoryImage image) async {
@@ -203,7 +231,17 @@ class PictureStoryImageService {
     }
   }
 
-  static Future<Uint8List> _normalize(Uint8List bytes) async {
+  static Future<Uint8List> _normalize(Uint8List bytes) =>
+      _normalizeWithin(bytes, maxDimension, maxStoredBytes);
+
+  static Future<Uint8List> _normalizeUpload(Uint8List bytes) =>
+      _normalizeWithin(bytes, 1024, maxUploadBytes);
+
+  static Future<Uint8List> _normalizeWithin(
+    Uint8List bytes,
+    int dimensionLimit,
+    int byteLimit,
+  ) async {
     final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
     ui.ImageDescriptor? descriptor;
     try {
@@ -214,7 +252,7 @@ class PictureStoryImageService {
         throw const PictureStoryImageException('图片尺寸过大，请选择较小的图片');
       }
       final longest = math.max(width, height);
-      var edge = math.min(longest, maxDimension);
+      var edge = math.min(longest, dimensionLimit);
       while (edge >= math.min(longest, 256)) {
         final ratio = edge / longest;
         final codec = await descriptor.instantiateCodec(
@@ -229,7 +267,7 @@ class PictureStoryImageService {
           try {
             final encoded =
                 await frame.image.toByteData(format: ui.ImageByteFormat.png);
-            if (encoded != null && encoded.lengthInBytes <= maxStoredBytes) {
+            if (encoded != null && encoded.lengthInBytes <= byteLimit) {
               return Uint8List.fromList(
                 encoded.buffer.asUint8List(
                   encoded.offsetInBytes,
@@ -245,7 +283,7 @@ class PictureStoryImageService {
         }
         edge = (edge * .75).floor();
       }
-      throw const PictureStoryImageException('图片保存后仍超过 2 MiB，请选择较小的图片');
+      throw const PictureStoryImageException('图片压缩后仍过大，请选择较小的图片');
     } finally {
       descriptor?.dispose();
       buffer.dispose();

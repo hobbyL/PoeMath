@@ -12,6 +12,10 @@ import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/routing/page_transitions.dart';
+import 'package:poemath/core/routing/app_routes.dart';
+import 'package:go_router/go_router.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/image_generation_config.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -28,6 +32,24 @@ class AiSettingsPage extends ConsumerStatefulWidget {
 }
 
 class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
+  late final _imageConfigChanges = HiveBoxes.settings
+      .watch(key: ImageGenerationProviderConfig.settingsKey)
+      .listen((_) {
+    if (mounted) setState(() {});
+  });
+
+  @override
+  void initState() {
+    super.initState();
+    _imageConfigChanges;
+  }
+
+  @override
+  void dispose() {
+    _imageConfigChanges.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -61,7 +83,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
               context,
               fadeSlideRoute(
                 builder: (_) => const ParentAccessBoundary(
-                    child: LlmProviderSettingsPage(),),
+                  child: LlmProviderSettingsPage(),
+                ),
               ),
             ),
           ),
@@ -75,9 +98,19 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
               context,
               fadeSlideRoute(
                 builder: (_) => const ParentAccessBoundary(
-                    child: LlmScenarioSettingsPage(),),
+                  child: LlmScenarioSettingsPage(),
+                ),
               ),
             ),
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          AppTile(
+            icon: Icons.image_outlined,
+            iconColor: theme.colorScheme.secondary,
+            title: '图片生成设置',
+            subtitle:
+                settingsRepo.imageGenerationProvider?.model ?? '为看图说话单独配置生图服务',
+            onTap: () => context.push(AppRoutes.imageGenerationSettings),
           ),
           const SizedBox(height: SpacingTokens.sm),
           AppTile(

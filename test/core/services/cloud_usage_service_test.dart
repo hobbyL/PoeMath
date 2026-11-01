@@ -55,10 +55,10 @@ void main() {
     expect(usage.used(CloudUsageKind.llm), 1);
   });
 
-  test('默认每日AI30/识别60/云朗读120，可暂停或明确设为不限', () async {
+  test('默认每日AI30/识别60/云朗读120/生图10，可暂停或明确设为不限', () async {
     await unlockParentForTesting();
     final usage = CloudUsageService();
-    expect(CloudUsageKind.values.map(usage.limit), [30, 60, 120]);
+    expect(CloudUsageKind.values.map(usage.limit), [30, 60, 120, 10]);
     await usage.setLimit(CloudUsageKind.llm, 0);
     await expectLater(
       usage.reserve(CloudUsageKind.llm),

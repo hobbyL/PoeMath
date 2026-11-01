@@ -113,6 +113,11 @@ class _PictureStoryManagementPageState
         title: const Text('看图说话题库'),
         actions: [
           IconButton(
+            tooltip: 'AI 出题',
+            icon: const Icon(Icons.auto_awesome_outlined),
+            onPressed: () => context.push(AppRoutes.pictureStoryGenerate),
+          ),
+          IconButton(
             tooltip: '新增题目',
             icon: const Icon(Icons.add),
             onPressed: () => context.push(AppRoutes.pictureStoryCreate),

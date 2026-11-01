@@ -79,9 +79,11 @@ class LlmConfig {
   /// Whether the configured model name identifies a commonly supported
   /// vision/multimodal model. Providers expose this capability through model
   /// naming; text-only models are never sent image content by default.
-  bool get supportsVision => candidateModels.any(_looksLikeVisionModel);
+  bool get supportsVision =>
+      candidateModels.any(isVisionModelName) ||
+      fallbacks.any((config) => config.candidateModels.any(isVisionModelName));
 
-  static bool _looksLikeVisionModel(String value) {
+  static bool isVisionModelName(String value) {
     final model = value.toLowerCase();
     const markers = <String>[
       'vision',
@@ -89,6 +91,9 @@ class LlmConfig {
       'gpt-4o',
       'gpt-4.1',
       'gpt-4.5',
+      'gpt-5.6-sol',
+      'gpt-6-astra',
+      'grok-4.7',
       'gemini',
       'claude-3',
       'claude-4',

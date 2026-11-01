@@ -89,15 +89,43 @@ class PictureStoryCatalogBackup {
       'enabledByProfile': _checkedEnabled(repository.enabledByProfile()),
       'images': encodedImages,
     };
+    await validateBudget(
+      catalog: catalog,
+      enabledByProfile: repository.enabledByProfile(),
+      images: images,
+      parentPayload: parentPayload,
+    );
+    for (final id in catalog.imageIds) {
+      final bytes = await images.readImage(id);
+      await images.validateImageBytes(id, bytes);
+      encodedImages[id] = base64Encode(bytes);
+    }
+    return result;
+  }
+
+  /// 在读取和 Base64 分配之前校验完整目录（包括历史图片）的备份预算。
+  static Future<void> validateBudget({
+    required PictureStoryCatalogState catalog,
+    required Map<String, List<String>> enabledByProfile,
+    required PictureStoryImageService images,
+    required Map<String, dynamic> parentPayload,
+    int reserveBytes = 0,
+  }) async {
+    final result = <String, Object>{
+      ...catalog.toJson(),
+      'enabledByProfile': _checkedEnabled(enabledByProfile),
+      'images': <String, String>{},
+    };
     const encoder = JsonEncoder.withIndent('  ');
     var estimated = utf8
-        .encode(
-          encoder.convert({
-            ...parentPayload,
-            jsonKey: result,
-          }),
-        )
-        .length;
+            .encode(
+              encoder.convert({
+                ...parentPayload,
+                jsonKey: result,
+              }),
+            )
+            .length +
+        reserveBytes;
     if (estimated > maxBackupBytes) {
       throw const FormatException('备份超过 32 MiB，请减少题目图片或聊天历史后再导出');
     }
@@ -109,11 +137,5 @@ class PictureStoryCatalogBackup {
         throw const FormatException('备份超过 32 MiB，请减少题目图片或聊天历史后再导出');
       }
     }
-    for (final id in catalog.imageIds) {
-      final bytes = await images.readImage(id);
-      await images.validateImageBytes(id, bytes);
-      encodedImages[id] = base64Encode(bytes);
-    }
-    return result;
   }
 }
