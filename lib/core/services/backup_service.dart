@@ -95,6 +95,8 @@ const int _backupVersion = 1;
 /// 新增 settings key 时必须同步登记本白名单（并注明类型），否则不会随备份迁移。
 const Map<String, String> _settingsValueType = <String, String>{
   ImageGenerationProviderConfig.settingsKey: 'string', // 生图地址/模型，无密钥；恢复前确认
+  ImageGenerationProviderConfig.providersSettingsKey: 'string', // 生图供应商列表
+  ImageGenerationProviderConfig.activeProviderSettingsKey: 'string', // 生效生图供应商
   'theme_mode': 'string', // 外观模式 system/light/dark
   'active_subject': 'string', // 当前主题 poem/math
   SettingsRepository.pageAnimationsEnabledKey: 'bool', // 页面动画开关，跨设备用户偏好
@@ -259,8 +261,12 @@ class BackupService {
       data['credentials'] as Map<String, dynamic>,
       normalized,
     );
-    if (credentials.containsKey(kCredKeyLlmProviderKeys)) {
-      _decodeProviderKeys(credentials[kCredKeyLlmProviderKeys]!);
+    for (final key in const [
+      kCredKeyLlmProviderKeys,
+      kCredKeyImageGenerationProviderKeys,
+      kCredKeyImageGenerationProviderHints,
+    ]) {
+      if (credentials.containsKey(key)) _decodeProviderKeys(credentials[key]!);
     }
   }
 
@@ -382,12 +388,24 @@ class BackupService {
     if (normalized.isEmpty) return null;
     try {
       final payload = <String, String>{};
-      final imageKey = await _secureStore.readImageGenerationApiKey();
-      final imageProvider = SettingsRepository(credentialStore: _secureStore)
-          .imageGenerationProvider;
-      if (imageKey != null && imageKey.isNotEmpty && imageProvider != null) {
-        payload[kCredKeyImageGenerationApiKey] = imageKey;
-        payload[kCredKeyImageGenerationHint] = imageProvider.credentialHint;
+      final imageSettings = SettingsRepository(credentialStore: _secureStore);
+      final imageKeys = <String, String>{};
+      final imageHints = <String, String>{};
+      for (final config in imageSettings.imageGenerationProviders) {
+        final key = await _secureStore.readImageGenerationApiKeyFor(config.id);
+        if (key == null || key.isEmpty) continue;
+        final hint =
+            ImageGenerationProviderConfig.fromProvider(config).credentialHint;
+        imageKeys[config.id] = key;
+        imageHints[config.id] = hint;
+        if (config.id == imageSettings.imageGenerationActiveProviderId) {
+          payload[kCredKeyImageGenerationApiKey] = key;
+          payload[kCredKeyImageGenerationHint] = hint;
+        }
+      }
+      if (imageKeys.isNotEmpty) {
+        payload[kCredKeyImageGenerationProviderKeys] = jsonEncode(imageKeys);
+        payload[kCredKeyImageGenerationProviderHints] = jsonEncode(imageHints);
       }
       final tencent = await _secureStore.readTencentAsrCredentials();
       if (tencent != null) {
@@ -502,7 +520,7 @@ class BackupService {
     if (decoded is! Map) return null;
 
     final settings = decoded['settings'];
-    if (settings is! Map) return null;
+    if (settings is! Map<String, Object?>) return null;
 
     // 本机侧：数据可信，坏数据退化为空列表即「无本地端点」，语义正确。
     final local = LlmProviderConfig.decodeList(
@@ -582,39 +600,45 @@ class BackupService {
       }
     }
 
-    final imageProvider = settings[ImageGenerationProviderConfig.settingsKey];
-    if (imageProvider != null) {
-      try {
-        final config = ImageGenerationProviderConfig.fromJson(imageProvider);
-        final host = _endpointOf(config.endpoint.toString());
-        ImageGenerationProviderConfig? previous;
-        try {
-          final raw =
-              HiveBoxes.settings.get(ImageGenerationProviderConfig.settingsKey);
-          if (raw != null) {
-            previous = ImageGenerationProviderConfig.fromJson(raw);
-          }
-        } on FormatException {/* 坏本机配置按新增处理。 */}
+    List<LlmProviderConfig>? incomingImages;
+    final localImages = SettingsRepository().imageGenerationProviders;
+    try {
+      incomingImages = SettingsRepository.imageProvidersFromSettings(settings);
+      for (final config in incomingImages ?? const <LlmProviderConfig>[]) {
+        final host = _endpointOf(config.baseUrl);
+        final previous = localImages
+            .where((provider) => provider.id == config.id)
+            .firstOrNull;
         if (previous == null) {
           added.add(host);
         } else {
-          final previousHost = _endpointOf(previous.endpoint.toString());
-          if (host != previousHost) {
+          final previousHost = _endpointOf(previous.baseUrl);
+          if (previousHost != host) {
             changed.add(
-              LlmEndpointChange(label: '图片生成', from: previousHost, to: host),
+              LlmEndpointChange(
+                label: config.name.isEmpty ? '图片生成' : config.name,
+                from: previousHost,
+                to: host,
+              ),
             );
           }
         }
-      } on FormatException {/* 非法备份配置由恢复过滤器丢弃。 */}
-    }
+      }
+    } on FormatException {/* 非法备份配置由恢复过滤器丢弃。 */}
 
-    // 既无厂商列表也无有效外部端点 → 不弹框。
-    if (incoming == null && added.isEmpty && changed.isEmpty) return null;
+    // 没有普通供应商列表，也没有新增或变更端点 → 不弹框。
+    if (incoming == null && added.isEmpty && changed.isEmpty) {
+      return null;
+    }
 
     final incomingIds = incoming?.map((c) => c.id).toSet() ?? const <String>{};
     final removed = <String>[
       for (final config in local)
         if (!incomingIds.contains(config.id)) _endpointOf(config.baseUrl),
+      if (incomingImages != null)
+        for (final config in localImages)
+          if (!incomingImages.any((provider) => provider.id == config.id))
+            _endpointOf(config.baseUrl),
     ];
 
     return LlmEndpointChangeSet(
@@ -661,8 +685,14 @@ class BackupService {
           data['credentials'] as Map<String, dynamic>,
           normalized,
         );
-        if (plainCredentials.containsKey(kCredKeyLlmProviderKeys)) {
-          _decodeProviderKeys(plainCredentials[kCredKeyLlmProviderKeys]!);
+        for (final key in const [
+          kCredKeyLlmProviderKeys,
+          kCredKeyImageGenerationProviderKeys,
+          kCredKeyImageGenerationProviderHints,
+        ]) {
+          if (plainCredentials.containsKey(key)) {
+            _decodeProviderKeys(plainCredentials[key]!);
+          }
         }
       }
     }
@@ -791,27 +821,64 @@ class BackupService {
     }
   }
 
+  Future<void> _restoreImageGenerationCredentials(
+    Map<String, String> credentials,
+    List<Future<void> Function()> undo,
+  ) async {
+    final providers = SettingsRepository(credentialStore: _secureStore)
+        .imageGenerationProviders;
+    final rawKeys = credentials[kCredKeyImageGenerationProviderKeys];
+    if (rawKeys != null) {
+      final keys = _decodeProviderKeys(rawKeys);
+      final rawHints = credentials[kCredKeyImageGenerationProviderHints];
+      final hints = rawHints == null
+          ? const <String, String>{}
+          : _decodeProviderKeys(rawHints);
+      for (final config in providers) {
+        final key = keys[config.id];
+        if (key != null &&
+            key.isNotEmpty &&
+            hints[config.id] ==
+                ImageGenerationProviderConfig.fromProvider(config)
+                    .credentialHint) {
+          await _writeImageGenerationKey(config.id, key, undo);
+        }
+      }
+      return;
+    }
+    final key = credentials[kCredKeyImageGenerationApiKey];
+    final hint = credentials[kCredKeyImageGenerationHint];
+    final matches = providers.where(
+      (config) =>
+          ImageGenerationProviderConfig.fromProvider(config).credentialHint ==
+          hint,
+    );
+    if (key != null && key.isNotEmpty && matches.length == 1) {
+      await _writeImageGenerationKey(matches.single.id, key, undo);
+    }
+  }
+
+  Future<void> _writeImageGenerationKey(
+    String id,
+    String key,
+    List<Future<void> Function()> undo,
+  ) async {
+    if (key.length > 8192) throw const FormatException('备份生图密钥过长');
+    final old = await _secureStore.readImageGenerationApiKeyFor(id);
+    undo.add(
+      () => old == null
+          ? _secureStore.deleteImageGenerationApiKeyFor(id)
+          : _secureStore.saveImageGenerationApiKeyFor(id, old),
+    );
+    await _secureStore.saveImageGenerationApiKeyFor(id, key);
+  }
+
   /// 把解密后的凭据写入安全存储（覆盖式）。
   Future<void> _restoreCredentials(
     Map<String, String> credentials, {
     required List<Future<void> Function()> undo,
   }) async {
-    final imageKey = credentials[kCredKeyImageGenerationApiKey];
-    final imageProvider = SettingsRepository(credentialStore: _secureStore)
-        .imageGenerationProvider;
-    if (imageKey != null &&
-        imageKey.isNotEmpty &&
-        imageProvider != null &&
-        credentials[kCredKeyImageGenerationHint] ==
-            imageProvider.credentialHint) {
-      final old = await _secureStore.readImageGenerationApiKey();
-      undo.add(
-        () => old == null
-            ? _secureStore.deleteImageGenerationApiKey()
-            : _secureStore.saveImageGenerationApiKey(old),
-      );
-      await _secureStore.saveImageGenerationApiKey(imageKey);
-    }
+    await _restoreImageGenerationCredentials(credentials, undo);
     final secretId = credentials[kCredKeyTencentSecretId];
     final secretKey = credentials[kCredKeyTencentSecretKey];
     if (secretId != null && secretKey != null) {
@@ -1322,15 +1389,35 @@ class BackupService {
     for (final key in box.keys) {
       final name = key.toString();
       if (!_settingsValueType.containsKey(name)) continue;
-      if (name == ImageGenerationProviderConfig.settingsKey) {
-        try {
-          result[name] =
-              ImageGenerationProviderConfig.fromJson(box.get(key)).encode();
-        } on FormatException {/* 无效配置不进入备份。 */}
+      if (name == ImageGenerationProviderConfig.settingsKey ||
+          name == ImageGenerationProviderConfig.providersSettingsKey ||
+          name == ImageGenerationProviderConfig.activeProviderSettingsKey) {
         continue;
       }
       result[name] = box.get(key);
     }
+    try {
+      final providers = SettingsRepository.imageProvidersFromSettings({
+        for (final key in const [
+          ImageGenerationProviderConfig.settingsKey,
+          ImageGenerationProviderConfig.providersSettingsKey,
+        ])
+          if (box.containsKey(key)) key: box.get(key),
+      });
+      if (providers != null) {
+        final activeId = SettingsRepository().imageGenerationActiveProviderId;
+        result[ImageGenerationProviderConfig.providersSettingsKey] =
+            ImageGenerationProviderConfig.encodeProviders(providers);
+        result[ImageGenerationProviderConfig.activeProviderSettingsKey] =
+            activeId ?? '';
+        final active =
+            providers.where((config) => config.id == activeId).firstOrNull;
+        if (active != null) {
+          result[ImageGenerationProviderConfig.settingsKey] =
+              ImageGenerationProviderConfig.fromProvider(active).encode();
+        }
+      }
+    } on FormatException {/* 无效配置不进入备份，不能冒充合法空列表。 */}
     return result;
   }
 
@@ -1668,16 +1755,30 @@ class BackupService {
     final out = <String, Object>{
       for (final entry in values.entries)
         if (!_isLlmSettingKey(entry.key) &&
-            entry.key != ImageGenerationProviderConfig.settingsKey)
+            entry.key != ImageGenerationProviderConfig.settingsKey &&
+            entry.key != ImageGenerationProviderConfig.providersSettingsKey &&
+            entry.key !=
+                ImageGenerationProviderConfig.activeProviderSettingsKey)
           entry.key: entry.value,
     };
-    final rawImage = values[ImageGenerationProviderConfig.settingsKey];
-    if (rawImage != null) {
-      try {
-        out[ImageGenerationProviderConfig.settingsKey] =
-            ImageGenerationProviderConfig.fromJson(rawImage).encode();
-      } on FormatException {/* 单项无效不影响其他设置。 */}
-    }
+    try {
+      final providers = SettingsRepository.imageProvidersFromSettings(values);
+      if (providers != null) {
+        final rawActive =
+            values[ImageGenerationProviderConfig.activeProviderSettingsKey];
+        final active =
+            providers.where((config) => config.id == rawActive).firstOrNull ??
+                providers.firstOrNull;
+        out[ImageGenerationProviderConfig.providersSettingsKey] =
+            ImageGenerationProviderConfig.encodeProviders(providers);
+        out[ImageGenerationProviderConfig.activeProviderSettingsKey] =
+            active?.id ?? '';
+        if (active != null) {
+          out[ImageGenerationProviderConfig.settingsKey] =
+              ImageGenerationProviderConfig.fromProvider(active).encode();
+        }
+      }
+    } on FormatException {/* 单项无效不影响其他设置。 */}
 
     // 1. llm_providers：结构探测。区分「坏结构 → 跳过」与「合法空列表 → 放行」
     //    （用户主动清空厂商列表必须能恢复）。

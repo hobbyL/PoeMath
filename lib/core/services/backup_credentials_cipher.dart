@@ -31,6 +31,10 @@ const String kCredKeyLlmApiKeyHint = 'llm_api_key_hint';
 const String kCredKeyLlmProviderKeys = 'llm_provider_keys';
 const String kCredKeyImageGenerationApiKey = 'image_generation_api_key';
 const String kCredKeyImageGenerationHint = 'image_generation_key_hint';
+const String kCredKeyImageGenerationProviderKeys =
+    'image_generation_provider_keys';
+const String kCredKeyImageGenerationProviderHints =
+    'image_generation_provider_hints';
 
 /// 本版本可识别的全部载荷键。
 ///
@@ -47,6 +51,8 @@ const List<String> kBackupCredentialKeys = [
   kCredKeyLlmProviderKeys,
   kCredKeyImageGenerationApiKey,
   kCredKeyImageGenerationHint,
+  kCredKeyImageGenerationProviderKeys,
+  kCredKeyImageGenerationProviderHints,
 ];
 
 /// 用口令加密凭据明文，产出备份 `credentials` 节的 JSON 结构。

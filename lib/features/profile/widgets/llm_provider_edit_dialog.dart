@@ -16,17 +16,24 @@
 // Messenger 弹确认（弹窗已 pop，局部 Messenger 随之消失）。
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:poemath/core/services/llm/llm_client.dart';
+import 'package:poemath/core/services/image_generation_client.dart';
+import 'package:poemath/core/services/picture_story_image_service.dart';
+import 'package:poemath/core/services/cloud_usage_service.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
+import 'package:poemath/data/models/image_generation_config.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 
 /// 弹窗内 LlmClient 的 http.Client 注入口：默认按 ProviderScope 缓存
@@ -52,20 +59,25 @@ enum LlmProviderEditResult { saved, deleted }
 Future<LlmProviderEditResult?> showLlmProviderEditDialog(
   BuildContext context, {
   LlmProviderConfig? config,
+  bool imageGeneration = false,
 }) {
   return showDialog<LlmProviderEditResult>(
     context: context,
     useSafeArea: false,
     builder: (_) => Dialog.fullscreen(
-      child: _LlmProviderEditDialog(config: config),
+      child: _LlmProviderEditDialog(
+        config: config,
+        imageGeneration: imageGeneration,
+      ),
     ),
   );
 }
 
 class _LlmProviderEditDialog extends ConsumerStatefulWidget {
-  const _LlmProviderEditDialog({this.config});
+  const _LlmProviderEditDialog({this.config, this.imageGeneration = false});
 
   final LlmProviderConfig? config;
+  final bool imageGeneration;
 
   @override
   ConsumerState<_LlmProviderEditDialog> createState() =>
@@ -100,6 +112,11 @@ class _LlmProviderEditDialogState
   bool _fetchingModels = false;
   _TestState _testState = _TestState.idle;
   String? _testMessage;
+  Uint8List? _testImage;
+  ImageGenerationClient? _imageProbe;
+  bool get _busy =>
+      _saving || _fetchingModels || _testState == _TestState.loading;
+  bool get _requestActive => mounted && ParentAccessService.instance.isUnlocked;
 
   @override
   void initState() {
@@ -123,6 +140,7 @@ class _LlmProviderEditDialogState
 
   @override
   void dispose() {
+    _imageProbe?.close();
     _providerNameController.dispose();
     _baseUrlController.dispose();
     _modelController.dispose();
@@ -140,12 +158,16 @@ class _LlmProviderEditDialogState
   Future<void> _loadStoredKey(String id) async {
     late final String? stored;
     try {
-      stored = await ref.read(settingsRepositoryProvider).readLlmApiKeyFor(id);
+      final settings = ref.read(settingsRepositoryProvider);
+      stored = await (widget.imageGeneration
+          ? settings.readImageGenerationApiKeyFor(id)
+          : settings.readLlmApiKeyFor(id));
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '读取已存 LLM API Key 失败（「留空沿用已存 Key」将不可用）',
         tag: 'LlmProviderEdit',
-        error: error,
+        error:
+            widget.imageGeneration ? const FormatException('无法读取生图密钥') : error,
         stackTrace: stackTrace,
       );
       return;
@@ -154,7 +176,9 @@ class _LlmProviderEditDialogState
     final hasKey = stored != null && stored.trim().isNotEmpty;
     setState(() {
       _hasStoredKey = hasKey;
-      if (hasKey) _apiKeyController.text = stored!;
+      if (hasKey && _apiKeyController.text.isEmpty) {
+        _apiKeyController.text = stored!;
+      }
     });
   }
 
@@ -176,8 +200,10 @@ class _LlmProviderEditDialogState
   Future<String?> _fallbackStoredKey() async {
     final editingId = _editingId;
     if (editingId == null) return null;
-    final stored =
-        await ref.read(settingsRepositoryProvider).readLlmApiKeyFor(editingId);
+    final settings = ref.read(settingsRepositoryProvider);
+    final stored = await (widget.imageGeneration
+        ? settings.readImageGenerationApiKeyFor(editingId)
+        : settings.readLlmApiKeyFor(editingId));
     if (stored == null || stored.trim().isEmpty) return null;
     return stored;
   }
@@ -185,7 +211,7 @@ class _LlmProviderEditDialogState
   /// 点击拉取按钮：用表单 url/key（Key 空回退已存 Key）请求模型列表，
   /// 成功弹底部列表供选择，失败提示继续手填。
   Future<void> _fetchModels() async {
-    if (_fetchingModels) return;
+    if (_busy) return;
     final config = _buildConfigFromForm(modelEmpty: true);
     if (config == null) {
       _messengerKey.currentState?.showSnackBar(
@@ -198,6 +224,7 @@ class _LlmProviderEditDialogState
     setState(() => _fetchingModels = true);
     final client = LlmClient(
       httpClient: ref.read(llmSettingsHttpClientProvider),
+      isActive: () => _requestActive,
     );
     List<String> models;
     try {
@@ -210,11 +237,28 @@ class _LlmProviderEditDialogState
           model: config.model,
         );
       }
+      if (widget.imageGeneration) {
+        configToFetch = LlmConfig(
+          baseUrl: ImageGenerationProviderConfig(
+            name: '',
+            baseUrl: configToFetch.baseUrl,
+            model: configToFetch.model,
+          ).baseEndpoint.toString(),
+          apiKey: configToFetch.apiKey,
+          model: configToFetch.model,
+        );
+      }
       models = await client.listModels(configToFetch);
     } on LlmException catch (e) {
       if (mounted) {
         _messengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text('拉取模型失败：${e.message}，可手动填写')),
+          SnackBar(
+            content: Text(
+              widget.imageGeneration
+                  ? '拉取模型失败，请检查服务地址与 API Key，也可手动填写'
+                  : '拉取模型失败：${e.message}，可手动填写',
+            ),
+          ),
         );
       }
       return;
@@ -222,6 +266,13 @@ class _LlmProviderEditDialogState
       if (mounted) {
         _messengerKey.currentState?.showSnackBar(
           SnackBar(content: Text('服务地址无效：${e.message}')),
+        );
+      }
+      return;
+    } on Object {
+      if (mounted) {
+        _messengerKey.currentState?.showSnackBar(
+          const SnackBar(content: Text('拉取模型失败，请检查配置后重试，也可手动填写')),
         );
       }
       return;
@@ -261,6 +312,16 @@ class _LlmProviderEditDialogState
         final theme = Theme.of(sheetContext);
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
+            void choose(String model, bool selected) {
+              setSheetState(() {
+                if (selected) {
+                  chosen.add(model);
+                } else {
+                  chosen.remove(model);
+                }
+              });
+            }
+
             return SafeArea(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
@@ -283,17 +344,21 @@ class _LlmProviderEditDialogState
                         shrinkWrap: true,
                         children: [
                           for (final model in models)
-                            CheckboxListTile(
-                              value: chosen.contains(model),
-                              title: Text(model),
-                              controlAffinity: ListTileControlAffinity.leading,
-                              onChanged: (v) => setSheetState(() {
-                                if (v ?? false) {
-                                  chosen.add(model);
-                                } else {
-                                  chosen.remove(model);
-                                }
-                              }),
+                            AppTile(
+                              leading: Checkbox(
+                                value: chosen.contains(model),
+                                onChanged: (value) =>
+                                    choose(model, value ?? false),
+                              ),
+                              iconColor: theme.colorScheme.primary,
+                              title: model,
+                              subtitle: '',
+                              flat: true,
+                              selected: chosen.contains(model),
+                              allowTapWithTrailing: true,
+                              onTap: () =>
+                                  choose(model, !chosen.contains(model)),
+                              trailing: const SizedBox.shrink(),
                             ),
                         ],
                       ),
@@ -322,7 +387,7 @@ class _LlmProviderEditDialogState
   /// 测试连接：用表单 url/model/key（Key 空回退已存 Key）发一次最小请求，
   /// 结果以行内反馈（_testState/_testMessage）呈现，不弹 SnackBar。
   Future<void> _testConnection() async {
-    if (_testState == _TestState.loading) return;
+    if (_busy) return;
     final config = _buildConfigFromForm();
     if (config == null) {
       setState(() {
@@ -335,26 +400,50 @@ class _LlmProviderEditDialogState
     setState(() {
       _testState = _TestState.loading;
       _testMessage = null;
+      _testImage = null;
     });
-    var configToTest = config;
-    if (_apiKeyController.text.trim().isEmpty && _hasStoredKey) {
-      final stored = await _fallbackStoredKey();
-      if (!mounted) return;
-      configToTest = LlmConfig(
-        baseUrl: config.baseUrl,
-        apiKey: stored ?? '',
-        model: config.model,
-      );
-    }
-    final client = LlmClient(
-      httpClient: ref.read(llmSettingsHttpClientProvider),
-    );
+    final httpClient = ref.read(llmSettingsHttpClientProvider);
+    final client = widget.imageGeneration
+        ? null
+        : LlmClient(httpClient: httpClient, isActive: () => _requestActive);
+    final imageClient = widget.imageGeneration
+        ? ImageGenerationClient(
+            httpClient: httpClient,
+            isActive: () => _requestActive,
+          )
+        : null;
+    _imageProbe = imageClient;
     try {
-      await client.testConnection(configToTest);
+      var configToTest = config;
+      if (_apiKeyController.text.trim().isEmpty && _hasStoredKey) {
+        final stored = await _fallbackStoredKey();
+        if (!mounted) return;
+        configToTest = LlmConfig(
+          baseUrl: config.baseUrl,
+          apiKey: stored ?? '',
+          model: config.model,
+        );
+      }
+      Uint8List? preview;
+      if (imageClient != null) {
+        preview = await imageClient.testConnection(
+          ImageGenerationConfig(
+            provider: ImageGenerationProviderConfig(
+              name: _providerNameController.text.trim(),
+              baseUrl: configToTest.baseUrl,
+              model: configToTest.model,
+            ),
+            apiKey: configToTest.apiKey,
+          ),
+        );
+      } else {
+        await client!.testConnection(configToTest);
+      }
       if (mounted) {
         setState(() {
           _testState = _TestState.success;
-          _testMessage = '连接成功，模型可用';
+          _testMessage = widget.imageGeneration ? '连接成功，生图模型可用' : '连接成功，模型可用';
+          _testImage = preview;
         });
       }
     } on LlmException catch (e) {
@@ -371,8 +460,22 @@ class _LlmProviderEditDialogState
           _testMessage = '服务地址无效：${e.message}';
         });
       }
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() {
+          _testState = _TestState.failure;
+          _testMessage = switch (error) {
+            ImageGenerationException() => error.message,
+            PictureStoryImageException() => error.message,
+            CloudQuotaExceededException() => error.message,
+            _ => '连接测试失败，请检查配置后重试',
+          };
+        });
+      }
     } finally {
-      client.close();
+      client?.close();
+      imageClient?.close();
+      _imageProbe = null;
     }
   }
 
@@ -380,6 +483,7 @@ class _LlmProviderEditDialogState
   /// 读回明文）→ 成功回传 [LlmProviderEditResult.saved] 并关闭弹窗
   /// （列表页据此刷新并在应用级 Messenger 弹确认）。
   Future<void> _save() async {
+    if (_busy) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     // 防重入守卫先于任何 await（Key 回退读取要过平台通道）。
     if (_saving) return;
@@ -388,14 +492,25 @@ class _LlmProviderEditDialogState
     final navigator = Navigator.of(context);
     final id = _editingId ?? LlmProviderConfig.generateId();
     try {
-      await settingsRepo.saveLlmProviderConfig(
-        id: id,
-        name: _providerNameController.text.trim(),
-        baseUrl: _baseUrlController.text.trim(),
-        model: _modelController.text.trim(),
-        apiKey: _apiKeyController.text.trim(),
-        models: _models,
-      );
+      if (widget.imageGeneration) {
+        await settingsRepo.saveImageGenerationProviderConfig(
+          id: id,
+          name: _providerNameController.text.trim(),
+          baseUrl: _baseUrlController.text.trim(),
+          model: _modelController.text.trim(),
+          apiKey: _apiKeyController.text.trim(),
+          models: _models,
+        );
+      } else {
+        await settingsRepo.saveLlmProviderConfig(
+          id: id,
+          name: _providerNameController.text.trim(),
+          baseUrl: _baseUrlController.text.trim(),
+          model: _modelController.text.trim(),
+          apiKey: _apiKeyController.text.trim(),
+          models: _models,
+        );
+      }
     } on FormatException catch (e) {
       if (mounted) {
         setState(() => _saving = false);
@@ -411,7 +526,11 @@ class _LlmProviderEditDialogState
       if (mounted) {
         setState(() => _saving = false);
         _messengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text('保存失败：$error')),
+          SnackBar(
+            content: Text(
+              widget.imageGeneration ? '生图配置保存失败，请重试' : '保存失败：$error',
+            ),
+          ),
         );
       }
       return;
@@ -425,6 +544,7 @@ class _LlmProviderEditDialogState
   /// 占位提示回退到「无鉴权服务可留空」。服务地址与模型保留；「留空 = 保留
   /// 旧 Key」语义不变（清除后无已存 Key，留空即不带 Key）。
   Future<void> _clearStoredKey() async {
+    if (_busy) return;
     final editingId = _editingId;
     if (editingId == null || !_hasStoredKey) return;
     final confirmed = await showDialog<bool>(
@@ -449,13 +569,22 @@ class _LlmProviderEditDialogState
     );
     if (confirmed != true) return;
     try {
-      await ref.read(settingsRepositoryProvider).clearLlmApiKey(editingId);
+      final settings = ref.read(settingsRepositoryProvider);
+      if (widget.imageGeneration) {
+        await settings.clearImageGenerationApiKey(editingId);
+      } else {
+        await settings.clearLlmApiKey(editingId);
+      }
     } on Object catch (error) {
       // UI 边界兜底：清除走平台通道，失败必须给用户可见反馈，
       // 否则弹窗无任何变化、用户以为已清除。
       if (mounted) {
         _messengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text('清除失败：$error')),
+          SnackBar(
+            content: Text(
+              widget.imageGeneration ? '生图密钥清除失败，请重试' : '清除失败：$error',
+            ),
+          ),
         );
       }
       return;
@@ -476,6 +605,7 @@ class _LlmProviderEditDialogState
   /// [LlmProviderEditResult.deleted] 并关闭弹窗。删的是生效配置时，
   /// 仓储侧自动把生效切到剩余第一条。
   Future<void> _deleteEditing() async {
+    if (_busy) return;
     final editingId = _editingId;
     if (editingId == null) return;
     final name = _providerNameController.text.trim();
@@ -503,14 +633,21 @@ class _LlmProviderEditDialogState
     );
     if (confirmed != true) return;
     try {
-      await ref
-          .read(settingsRepositoryProvider)
-          .deleteLlmProviderConfig(editingId);
+      final settings = ref.read(settingsRepositoryProvider);
+      if (widget.imageGeneration) {
+        await settings.deleteImageGenerationProviderConfig(editingId);
+      } else {
+        await settings.deleteLlmProviderConfig(editingId);
+      }
     } on Object catch (error) {
       // UI 边界兜底：删除失败必须给反馈，否则弹窗既不关闭也无提示。
       if (mounted) {
         _messengerKey.currentState?.showSnackBar(
-          SnackBar(content: Text('删除失败：$error')),
+          SnackBar(
+            content: Text(
+              widget.imageGeneration ? '生图配置删除失败，请重试' : '删除失败：$error',
+            ),
+          ),
         );
       }
       return;
@@ -546,17 +683,23 @@ class _LlmProviderEditDialogState
             children: [
               TextFormField(
                 controller: _providerNameController,
-                decoration: const InputDecoration(
+                enabled: !_busy,
+                decoration: InputDecoration(
                   labelText: '供应商名称（可选）',
-                  hintText: '例如 DeepSeek、通义千问',
-                  prefixIcon: Icon(Icons.business_outlined),
-                  border: OutlineInputBorder(),
+                  hintText: widget.imageGeneration
+                      ? '填写供应商或配置名称'
+                      : '例如 DeepSeek、通义千问',
+                  prefixIcon: const Icon(Icons.business_outlined),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: SpacingTokens.md),
 
               TextFormField(
                 controller: _baseUrlController,
+                enabled: !_busy,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
                 decoration: const InputDecoration(
                   labelText: '服务地址（Base URL）',
                   hintText: '例如 https://api.example.com/v1',
@@ -573,6 +716,9 @@ class _LlmProviderEditDialogState
 
               TextFormField(
                 controller: _apiKeyController,
+                enabled: !_busy,
+                autocorrect: false,
+                enableSuggestions: false,
                 obscureText: !_apiKeyVisible,
                 decoration: InputDecoration(
                   labelText: 'API Key（可选）',
@@ -597,7 +743,7 @@ class _LlmProviderEditDialogState
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
-                    onPressed: _clearStoredKey,
+                    onPressed: _busy ? null : _clearStoredKey,
                     icon: const Icon(Icons.key_off_outlined),
                     label: const Text('清除已保存的 Key'),
                   ),
@@ -606,6 +752,7 @@ class _LlmProviderEditDialogState
 
               TextFormField(
                 controller: _modelController,
+                enabled: !_busy,
                 decoration: InputDecoration(
                   labelText: '默认模型',
                   hintText: '手动填写，或点击下方候选模型',
@@ -625,7 +772,7 @@ class _LlmProviderEditDialogState
                       : IconButton(
                           icon: const Icon(Icons.download_outlined),
                           tooltip: '从服务拉取模型列表（可多选）',
-                          onPressed: _fetchModels,
+                          onPressed: _busy ? null : _fetchModels,
                         ),
                 ),
                 onChanged: (_) => setState(() {}),
@@ -657,29 +804,34 @@ class _LlmProviderEditDialogState
                       InputChip(
                         label: Text(m),
                         selected: _modelController.text.trim() == m,
-                        onSelected: _saving
+                        onSelected: _busy
                             ? null
                             : (_) => setState(() => _modelController.text = m),
-                        onDeleted: () => setState(() {
-                          _models.remove(m);
-                          if (_modelController.text.trim() == m) {
-                            _modelController.text =
-                                _models.isNotEmpty ? _models.first : '';
-                          }
-                        }),
+                        onDeleted: _busy
+                            ? null
+                            : () => setState(() {
+                                  _models.remove(m);
+                                  if (_modelController.text.trim() == m) {
+                                    _modelController.text =
+                                        _models.isNotEmpty ? _models.first : '';
+                                  }
+                                }),
                       ),
                   ],
                 ),
               ],
               const SizedBox(height: SpacingTokens.lg),
 
+              if (widget.imageGeneration) ...[
+                const Text('连接测试会生成一张预览图，计入图片生成额度。'),
+                const SizedBox(height: SpacingTokens.sm),
+              ],
+
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _testState == _TestState.loading
-                          ? null
-                          : _testConnection,
+                      onPressed: _busy ? null : _testConnection,
                       icon: _testState == _TestState.loading
                           ? const SizedBox(
                               width: 16,
@@ -693,7 +845,7 @@ class _LlmProviderEditDialogState
                   const SizedBox(width: SpacingTokens.sm),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: _saving ? null : _save,
+                      onPressed: _busy ? null : _save,
                       icon: _saving
                           ? const SizedBox(
                               width: 16,
@@ -736,11 +888,26 @@ class _LlmProviderEditDialogState
                 ),
               ],
 
+              if (_testImage != null) ...[
+                const SizedBox(height: SpacingTokens.md),
+                ColoredCard(
+                  color: theme.colorScheme.primary,
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: Image.memory(
+                      _testImage!,
+                      key: const ValueKey('image-generation-test-preview'),
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ],
+
               // 删除入口：仅编辑已有配置时出现（新增态无删除对象）。
               if (isEditing) ...[
                 const SizedBox(height: SpacingTokens.xl),
                 TextButton.icon(
-                  onPressed: _deleteEditing,
+                  onPressed: _busy ? null : _deleteEditing,
                   icon: Icon(
                     Icons.delete_outline_rounded,
                     color: theme.colorScheme.error,

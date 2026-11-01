@@ -50,6 +50,19 @@ class ImageGenerationClient {
     }
   }
 
+  /// 家长主动测试时生成一张预览图，经过完整解码校验后才认定模型可用。
+  Future<Uint8List> testConnection(ImageGenerationConfig config) async {
+    final bytes = await generate(
+      config: config,
+      prompt: '生成一张简单的儿童绘本插画：一只小猫坐在花园里看一朵花。'
+          '画面清晰、温暖，不要文字。',
+    );
+    _check();
+    final preview = await PictureStoryImageService.normalizePreview(bytes);
+    _check();
+    return preview;
+  }
+
   Future<Uint8List> generate({
     required ImageGenerationConfig config,
     required String prompt,

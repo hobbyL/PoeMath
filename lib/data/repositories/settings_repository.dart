@@ -36,6 +36,10 @@ class SettingsRepository {
   String get pictureStoryGenerationSignature => jsonEncode({
         'imageRevision': _imageGenerationRevision,
         'image': imageGenerationProvider?.toJson(),
+        'imageProviders': ImageGenerationProviderConfig.encodeProviders(
+          imageGenerationProviders,
+        ),
+        'imageActive': imageGenerationActiveProviderId,
         'llmVersions': _llmProviderVersions,
         'llm': LlmProviderConfig.encodeList(llmProviders),
         'active': HiveBoxes.settings.get('llm_active_provider_id'),
@@ -44,24 +48,79 @@ class SettingsRepository {
         'model': HiveBoxes.settings.get(LlmScenario.pictureStory.modelKey),
       });
 
-  ImageGenerationProviderConfig? get imageGenerationProvider {
-    final raw =
-        HiveBoxes.settings.get(ImageGenerationProviderConfig.settingsKey);
-    if (raw == null) return null;
+  List<LlmProviderConfig> get imageGenerationProviders {
     try {
-      return ImageGenerationProviderConfig.fromJson(raw);
+      return imageProvidersFromSettings({
+            for (final key in const [
+              ImageGenerationProviderConfig.providersSettingsKey,
+              ImageGenerationProviderConfig.settingsKey,
+            ])
+              if (HiveBoxes.settings.containsKey(key))
+                key: HiveBoxes.settings.get(key),
+          }) ??
+          const [];
     } on FormatException {
-      return null;
+      return const [];
     }
   }
+
+  /// 本机读取、备份导出/恢复和恢复前地址检查共用的生图配置解释器。
+  static List<LlmProviderConfig>? imageProvidersFromSettings(
+    Map<String, Object?> values,
+  ) {
+    if (values
+        .containsKey(ImageGenerationProviderConfig.providersSettingsKey)) {
+      return ImageGenerationProviderConfig.decodeProviders(
+        values[ImageGenerationProviderConfig.providersSettingsKey],
+      );
+    }
+    final legacy = values[ImageGenerationProviderConfig.settingsKey];
+    if (legacy == null) return null;
+    final config = ImageGenerationProviderConfig.fromJson(legacy);
+    return [
+      ImageGenerationProviderConfig.normalizeProvider(
+        LlmProviderConfig(
+          id: SecureCredentialStore.legacyImageGenerationProviderId,
+          name: config.name,
+          baseUrl: config.baseUrl,
+          model: config.model,
+        ),
+      ),
+    ];
+  }
+
+  String? get imageGenerationActiveProviderId {
+    final providers = imageGenerationProviders;
+    if (providers.isEmpty) return null;
+    final raw = HiveBoxes.settings
+        .get(ImageGenerationProviderConfig.activeProviderSettingsKey);
+    return providers.any((provider) => provider.id == raw)
+        ? raw as String
+        : providers.first.id;
+  }
+
+  ImageGenerationProviderConfig? get imageGenerationProvider {
+    final id = imageGenerationActiveProviderId;
+    final provider = imageGenerationProviders
+        .where((provider) => provider.id == id)
+        .firstOrNull;
+    return provider == null
+        ? null
+        : ImageGenerationProviderConfig.fromProvider(provider);
+  }
+
+  Future<String?> readImageGenerationApiKeyFor(String id) =>
+      _credentialStore.readImageGenerationApiKeyFor(id);
 
   Future<ImageGenerationConfig?> readImageGenerationConfig() =>
       PictureStoryRepository.exclusive(() async {
         final revision = _imageGenerationRevision;
+        final id = imageGenerationActiveProviderId;
         final provider = imageGenerationProvider;
-        if (provider == null) return null;
-        final key = await _credentialStore.readImageGenerationApiKey() ?? '';
+        if (provider == null || id == null) return null;
+        final key = await readImageGenerationApiKeyFor(id) ?? '';
         if (revision != _imageGenerationRevision ||
+            id != imageGenerationActiveProviderId ||
             provider.encode() != imageGenerationProvider?.encode()) {
           throw const FormatException('生图配置已变化，请重新开始');
         }
@@ -73,51 +132,204 @@ class SettingsRepository {
     required String apiKey,
     bool clearApiKey = false,
   }) {
+    final id = imageGenerationActiveProviderId ??
+        SecureCredentialStore.legacyImageGenerationProviderId;
+    final previous =
+        imageGenerationProviders.where((config) => config.id == id).firstOrNull;
+    return _saveImageGenerationProvider(
+      provider: LlmProviderConfig(
+        id: id,
+        name: provider.name,
+        baseUrl: provider.baseUrl,
+        model: provider.model,
+        models: previous?.models ?? const [],
+      ),
+      apiKey: apiKey,
+      clearApiKey: clearApiKey,
+    );
+  }
+
+  Future<void> saveImageGenerationProviderConfig({
+    required String id,
+    required String name,
+    required String baseUrl,
+    required String model,
+    required String apiKey,
+    List<String> models = const [],
+  }) =>
+      _saveImageGenerationProvider(
+        provider: LlmProviderConfig(
+          id: id,
+          name: name,
+          baseUrl: baseUrl,
+          model: model,
+          models: models,
+        ),
+        apiKey: apiKey,
+      );
+
+  Future<void> _saveImageGenerationProvider({
+    required LlmProviderConfig provider,
+    required String apiKey,
+    bool clearApiKey = false,
+  }) {
     ParentAccessService.instance.assertAllowed();
-    final value = provider.normalized();
+    final value = ImageGenerationProviderConfig.normalizeProvider(provider);
     if (apiKey.length > 8192) {
       throw const FormatException('密钥过长，请检查输入');
     }
+    return _changeImageGenerationProviders((undo) async {
+      final providers = imageGenerationProviders.toList();
+      final activeId = imageGenerationActiveProviderId;
+      final index = providers.indexWhere((config) => config.id == value.id);
+      final key = apiKey.trim();
+      if (clearApiKey || key.isNotEmpty) {
+        await _changeImageGenerationKey(
+          value.id,
+          clearApiKey ? null : key,
+          undo,
+        );
+      }
+      if (index < 0) {
+        providers.add(value);
+      } else {
+        providers[index] = value;
+      }
+      await _writeImageGenerationProviders(providers, activeId ?? value.id);
+    });
+  }
+
+  Future<void> setImageGenerationActiveProvider(String id) =>
+      _changeImageGenerationProviders((_) async {
+        final providers = imageGenerationProviders;
+        if (!providers.any((config) => config.id == id)) {
+          throw ArgumentError.value(id, 'id', '生图配置不存在');
+        }
+        await _writeImageGenerationProviders(providers, id);
+      });
+
+  Future<void> clearImageGenerationApiKey(String id) =>
+      _changeImageGenerationProviders((undo) async {
+        if (!imageGenerationProviders.any((config) => config.id == id)) {
+          throw const FormatException('生图配置不存在');
+        }
+        await _changeImageGenerationKey(id, null, undo);
+      });
+
+  Future<void> deleteImageGenerationProviderConfig(String id) =>
+      _changeImageGenerationProviders((undo) async {
+        final providers = imageGenerationProviders;
+        if (!providers.any((config) => config.id == id)) {
+          throw const FormatException('生图配置不存在');
+        }
+        final remaining = providers.where((config) => config.id != id).toList();
+        final activeId = imageGenerationActiveProviderId;
+        await _changeImageGenerationKey(id, null, undo);
+        await _writeImageGenerationProviders(
+          remaining,
+          activeId == id ? remaining.firstOrNull?.id : activeId,
+        );
+      });
+
+  Future<void> migrateLegacyImageGenerationConfigIfNeeded() {
+    if (HiveBoxes.settings
+            .containsKey(ImageGenerationProviderConfig.providersSettingsKey) ||
+        imageGenerationProviders.isEmpty) {
+      return Future.value();
+    }
+    return _changeImageGenerationProviders((_) async {
+      if (HiveBoxes.settings
+          .containsKey(ImageGenerationProviderConfig.providersSettingsKey)) {
+        return;
+      }
+      final providers = imageGenerationProviders;
+      await _writeImageGenerationProviders(
+        providers,
+        providers.firstOrNull?.id,
+      );
+    });
+  }
+
+  Future<void> _changeImageGenerationKey(
+    String id,
+    String? key,
+    List<Future<void> Function()> undo,
+  ) async {
+    final previous = await readImageGenerationApiKeyFor(id);
+    ParentAccessService.instance.assertAllowed();
+    undo.add(
+      () => previous == null
+          ? _credentialStore.deleteImageGenerationApiKeyFor(id)
+          : _credentialStore.saveImageGenerationApiKeyFor(id, previous),
+    );
+    if (key == null) {
+      await _credentialStore.deleteImageGenerationApiKeyFor(id);
+    } else {
+      await _credentialStore.saveImageGenerationApiKeyFor(id, key);
+    }
+    ParentAccessService.instance.assertAllowed();
+  }
+
+  Future<void> _writeImageGenerationProviders(
+    List<LlmProviderConfig> providers,
+    String? activeId,
+  ) async {
+    ParentAccessService.instance.assertAllowed();
+    await HiveBoxes.settings.putAll({
+      ImageGenerationProviderConfig.providersSettingsKey:
+          ImageGenerationProviderConfig.encodeProviders(providers),
+      ImageGenerationProviderConfig.activeProviderSettingsKey: activeId ?? '',
+    });
+    ParentAccessService.instance.assertAllowed();
+    await HiveBoxes.settings.delete(ImageGenerationProviderConfig.settingsKey);
+    ParentAccessService.instance.assertAllowed();
+  }
+
+  Future<void> _changeImageGenerationProviders(
+    Future<void> Function(List<Future<void> Function()> undo) work,
+  ) {
+    ParentAccessService.instance.assertAllowed();
     _imageGenerationRevision++;
     return PictureStoryRepository.exclusive(() async {
       final parent = ParentAccessService.instance;
       parent.assertAllowed();
-      const key = ImageGenerationProviderConfig.settingsKey;
-      final existed = HiveBoxes.settings.containsKey(key);
-      final previous = HiveBoxes.settings.get(key);
-      final previousSecret = await _credentialStore.readImageGenerationApiKey();
-      parent.assertAllowed();
-      final secret = apiKey.trim();
-      final changesSecret = clearApiKey || secret.isNotEmpty;
-      try {
-        if (changesSecret) {
-          if (clearApiKey) {
-            await _credentialStore.deleteImageGenerationApiKey();
-          } else {
-            await _credentialStore.saveImageGenerationApiKey(secret);
+      const keys = [
+        ImageGenerationProviderConfig.settingsKey,
+        ImageGenerationProviderConfig.providersSettingsKey,
+        ImageGenerationProviderConfig.activeProviderSettingsKey,
+      ];
+      final previous = <String, ({bool exists, Object? value})>{
+        for (final key in keys)
+          key: (
+            exists: HiveBoxes.settings.containsKey(key),
+            value: HiveBoxes.settings.get(key),
+          ),
+      };
+      final undo = <Future<void> Function()>[
+        () async {
+          var failed = false;
+          for (final entry in previous.entries) {
+            try {
+              if (entry.value.exists) {
+                await HiveBoxes.settings.put(entry.key, entry.value.value);
+              } else {
+                await HiveBoxes.settings.delete(entry.key);
+              }
+            } on Object {
+              failed = true;
+            }
           }
-        }
-        parent.assertAllowed();
-        await HiveBoxes.settings.put(key, value.encode());
+          if (failed) throw const FormatException('生图配置恢复失败');
+        },
+      ];
+      try {
+        await work(undo);
         parent.assertAllowed();
       } on Object {
         var rollbackFailed = false;
-        try {
-          if (existed) {
-            await HiveBoxes.settings.put(key, previous);
-          } else {
-            await HiveBoxes.settings.delete(key);
-          }
-        } on Object {
-          rollbackFailed = true;
-        }
-        if (changesSecret) {
+        for (final restore in undo.reversed) {
           try {
-            if (previousSecret == null) {
-              await _credentialStore.deleteImageGenerationApiKey();
-            } else {
-              await _credentialStore.saveImageGenerationApiKey(previousSecret);
-            }
+            await restore();
           } on Object {
             rollbackFailed = true;
           }

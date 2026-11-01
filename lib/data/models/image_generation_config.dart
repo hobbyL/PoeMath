@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:poemath/core/services/llm/llm_client.dart';
+import 'package:poemath/data/models/llm_provider_config.dart';
 
 /// 可备份的生图配置。密钥仅由运行时配置持有。
 class ImageGenerationProviderConfig {
@@ -11,10 +12,87 @@ class ImageGenerationProviderConfig {
   });
 
   static const settingsKey = 'image_generation_provider_v1';
+  static const providersSettingsKey = 'image_generation_providers_v1';
+  static const activeProviderSettingsKey =
+      'image_generation_active_provider_id';
   final String name;
   final String baseUrl;
   final String model;
   String get credentialHint => '${endpoint.origin}|$model';
+
+  Uri get baseEndpoint => endpoint.replace(
+        path: endpoint.path.replaceFirst(RegExp(r'/images/generations$'), ''),
+      );
+
+  factory ImageGenerationProviderConfig.fromProvider(
+    LlmProviderConfig config,
+  ) =>
+      ImageGenerationProviderConfig(
+        name: config.name,
+        baseUrl: config.baseUrl,
+        model: config.model,
+      );
+
+  static LlmProviderConfig normalizeProvider(LlmProviderConfig config) {
+    if (!RegExp(r'^[A-Za-z0-9_-]{1,128}$').hasMatch(config.id) ||
+        config.models.any((model) => model.runes.length > 200)) {
+      throw const FormatException('生图供应商或候选模型配置无效');
+    }
+    final image =
+        ImageGenerationProviderConfig.fromProvider(config).normalized();
+    return LlmProviderConfig(
+      id: config.id,
+      name: image.name,
+      baseUrl: image.baseEndpoint.toString(),
+      model: image.model,
+      models: LlmProviderConfig.normalizeModels(config.models, image.model),
+    );
+  }
+
+  /// 复用普通供应商的数据结构，并在本层校验生图地址及模型约束。
+  static List<LlmProviderConfig> decodeProviders(Object? raw) {
+    final data = raw is String ? jsonDecode(raw) : raw;
+    if (data is! List) {
+      throw const FormatException('生图供应商列表格式无效');
+    }
+    final providers = <LlmProviderConfig>[];
+    final ids = <String>{};
+    for (final item in data) {
+      if (item is! Map ||
+          item['id'] is! String ||
+          item['name'] is! String ||
+          item['baseUrl'] is! String ||
+          item['model'] is! String ||
+          item.containsKey('models') &&
+              (item['models'] is! List ||
+                  (item['models'] as List).any((model) => model is! String))) {
+        throw const FormatException('生图供应商配置格式无效');
+      }
+      final provider = normalizeProvider(
+        LlmProviderConfig(
+          id: item['id'] as String,
+          name: item['name'] as String,
+          baseUrl: item['baseUrl'] as String,
+          model: item['model'] as String,
+          models: item['models'] == null
+              ? const <String>[]
+              : (item['models'] as List).cast<String>(),
+        ),
+      );
+      if (!ids.add(provider.id)) {
+        throw const FormatException('生图供应商配置重复');
+      }
+      providers.add(provider);
+    }
+    return List.unmodifiable(providers);
+  }
+
+  static String encodeProviders(List<LlmProviderConfig> providers) =>
+      LlmProviderConfig.encodeList(
+        decodeProviders(
+          providers.map((provider) => provider.toJson()).toList(),
+        ),
+      );
 
   Uri get endpoint {
     final raw = baseUrl.trim();

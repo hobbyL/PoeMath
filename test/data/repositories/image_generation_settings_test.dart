@@ -21,6 +21,7 @@ const _config = ImageGenerationProviderConfig(
 
 class _Store extends SecureCredentialStore {
   String? key;
+  final providerKeys = <String, String>{};
   bool failNext = false;
   Completer<void>? entered;
   Completer<void>? waitWrite;
@@ -40,6 +41,10 @@ class _Store extends SecureCredentialStore {
   @override
   Future<void> saveImageGenerationApiKey(String apiKey) async {
     key = apiKey;
+    await _afterWrite();
+  }
+
+  Future<void> _afterWrite() async {
     if (failNext) {
       failNext = false;
       throw StateError('synthetic write failure');
@@ -55,6 +60,31 @@ class _Store extends SecureCredentialStore {
   @override
   Future<void> deleteImageGenerationApiKey() async {
     key = null;
+  }
+
+  @override
+  Future<String?> readImageGenerationApiKeyFor(String id) async =>
+      id == SecureCredentialStore.legacyImageGenerationProviderId
+          ? key
+          : providerKeys[id];
+
+  @override
+  Future<void> saveImageGenerationApiKeyFor(String id, String apiKey) async {
+    if (id == SecureCredentialStore.legacyImageGenerationProviderId) {
+      await saveImageGenerationApiKey(apiKey);
+    } else {
+      providerKeys[id] = apiKey;
+      await _afterWrite();
+    }
+  }
+
+  @override
+  Future<void> deleteImageGenerationApiKeyFor(String id) async {
+    if (id == SecureCredentialStore.legacyImageGenerationProviderId) {
+      await deleteImageGenerationApiKey();
+    } else {
+      providerKeys.remove(id);
+    }
   }
 }
 
@@ -83,8 +113,23 @@ void main() {
       'image-private-secret',
     );
     expect(
-      HiveBoxes.settings.get(ImageGenerationProviderConfig.settingsKey),
-      _config.encode(),
+      jsonDecode(
+        HiveBoxes.settings
+            .get(ImageGenerationProviderConfig.providersSettingsKey) as String,
+      ),
+      [
+        {
+          'id': 'image-legacy',
+          'name': '生图',
+          'baseUrl': 'https://image.example.com/v1',
+          'model': 'image-model',
+          'models': ['image-model'],
+        },
+      ],
+    );
+    expect(
+      HiveBoxes.settings.containsKey(ImageGenerationProviderConfig.settingsKey),
+      isFalse,
     );
     expect(
       HiveBoxes.settings.values.toString(),
@@ -313,6 +358,161 @@ void main() {
       _config.encode(),
     );
     expect(await backup.exportToJson(), isNot(contains('must-not-land')));
+  });
+
+  test('多供应商各自保存候选模型和密钥，切换、清除、删除不修改普通供应商', () async {
+    await settings.saveLlmProviderConfig(
+      id: 'chat',
+      name: '普通服务',
+      baseUrl: 'https://chat.example.com',
+      model: 'chat-model',
+      apiKey: '',
+    );
+    final chatBefore = HiveBoxes.settings.get('llm_providers');
+    await settings.saveImageGenerationProviderConfig(
+      id: 'first',
+      name: '第一个',
+      baseUrl: 'https://first.example.com/v1',
+      model: 'image-a',
+      models: ['image-b', 'image-a', 'image-b'],
+      apiKey: 'first-key',
+    );
+    await settings.saveImageGenerationProviderConfig(
+      id: 'second',
+      name: '',
+      baseUrl: 'https://second.example.com/v1/images/generations',
+      model: 'image-c',
+      apiKey: 'second-key',
+    );
+    expect(settings.imageGenerationActiveProviderId, 'first');
+    expect(
+      settings.imageGenerationProviders.first.models,
+      ['image-a', 'image-b'],
+    );
+    await settings.setImageGenerationActiveProvider('second');
+    final runtime = (await SettingsRepository(credentialStore: store)
+        .readImageGenerationConfig())!;
+    expect(runtime.provider.baseUrl, 'https://second.example.com/v1');
+    expect(runtime.apiKey, 'second-key');
+    await settings.saveImageGenerationProviderConfig(
+      id: 'second',
+      name: '',
+      baseUrl: 'https://second.example.com/v1',
+      model: 'image-c',
+      apiKey: '',
+    );
+    expect(await settings.readImageGenerationApiKeyFor('second'), 'second-key');
+    await settings.clearImageGenerationApiKey('second');
+    expect(await settings.readImageGenerationApiKeyFor('second'), isNull);
+    expect(settings.imageGenerationActiveProviderId, 'second');
+    await settings.deleteImageGenerationProviderConfig('second');
+    expect(settings.imageGenerationActiveProviderId, 'first');
+    expect(store.providerKeys, {'first': 'first-key'});
+    expect(HiveBoxes.settings.get('llm_providers'), chatBefore);
+    expect(HiveBoxes.settings.get('llm_active_provider_id'), 'chat');
+    expect(HiveBoxes.settings.values.toString(), isNot(contains('first-key')));
+  });
+
+  test('旧单供应商迁移保留密钥和模型，重复迁移不新增配置', () async {
+    await HiveBoxes.settings
+        .put(ImageGenerationProviderConfig.settingsKey, _config.encode());
+    store.key = 'legacy-key';
+    await settings.migrateLegacyImageGenerationConfigIfNeeded();
+    await settings.migrateLegacyImageGenerationConfigIfNeeded();
+    expect(settings.imageGenerationProviders.single.id, 'image-legacy');
+    expect(settings.imageGenerationProviders.single.models, ['image-model']);
+    expect((await settings.readImageGenerationConfig())!.apiKey, 'legacy-key');
+    expect(
+      HiveBoxes.settings.containsKey(ImageGenerationProviderConfig.settingsKey),
+      isFalse,
+    );
+    await settings.saveImageGenerationProviderConfig(
+      id: 'other',
+      name: '',
+      baseUrl: 'https://other.example.com/v1',
+      model: 'other-image',
+      apiKey: 'other-key',
+    );
+    await settings.setImageGenerationActiveProvider('other');
+    await settings.deleteImageGenerationProviderConfig('image-legacy');
+    expect(store.key, isNull);
+    expect((await settings.readImageGenerationConfig())!.apiKey, 'other-key');
+  });
+
+  test('多供应商与各自加密密钥完整备份恢复，所有供应商地址都参与预检', () async {
+    for (final id in ['one', 'two']) {
+      await settings.saveImageGenerationProviderConfig(
+        id: id,
+        name: id,
+        baseUrl: 'https://$id.example.com/v1',
+        model: 'image-$id',
+        models: ['image-$id', 'alternate-$id'],
+        apiKey: '$id-private-key',
+      );
+    }
+    await settings.setImageGenerationActiveProvider('two');
+    final before = HiveBoxes.settings
+        .get(ImageGenerationProviderConfig.providersSettingsKey);
+    final backup = BackupService(secureStore: store);
+    final data = await backup.exportToJson(passphrase: 'test-passphrase');
+    expect(data, isNot(contains('one-private-key')));
+    expect(data, isNot(contains('two-private-key')));
+    await HiveBoxes.settings.clear();
+    await unlockParentForTesting();
+    store.providerKeys.clear();
+    store.key = null;
+    expect(
+      BackupService.detectLlmEndpointChanges(data)!.added,
+      ['one.example.com', 'two.example.com'],
+    );
+    await backup.restoreFromJson(data, passphrase: 'test-passphrase');
+    expect(
+      HiveBoxes.settings
+          .get(ImageGenerationProviderConfig.providersSettingsKey),
+      before,
+    );
+    expect(settings.imageGenerationActiveProviderId, 'two');
+    expect(
+      store.providerKeys,
+      {'one': 'one-private-key', 'two': 'two-private-key'},
+    );
+    expect(
+      (await settings.readImageGenerationConfig())!.apiKey,
+      'two-private-key',
+    );
+  });
+
+  test('坏供应商列表不会回退旧配置覆盖本机，明确空列表保持停用', () async {
+    await settings.saveImageGenerationProviderConfig(
+      id: 'good',
+      name: '当前',
+      baseUrl: 'https://current.example.com/v1',
+      model: 'image',
+      apiKey: 'current-key',
+    );
+    final backup = BackupService(secureStore: store);
+    await backup.restoreFromJson(
+      jsonEncode({
+        'version': 1,
+        'settings': {
+          ImageGenerationProviderConfig.providersSettingsKey: '[{"id":"bad"}]',
+          ImageGenerationProviderConfig.activeProviderSettingsKey: 'bad',
+          ImageGenerationProviderConfig.settingsKey: _config.encode(),
+        },
+      }),
+    );
+    expect(settings.imageGenerationProviders.single.id, 'good');
+    expect((await settings.readImageGenerationConfig())!.apiKey, 'current-key');
+    await backup.restoreFromJson(
+      jsonEncode({
+        'version': 1,
+        'settings': {ImageGenerationProviderConfig.providersSettingsKey: '[]'},
+      }),
+    );
+    expect(settings.imageGenerationActiveProviderId, isNull);
+    expect(await settings.readImageGenerationConfig(), isNull);
+    await settings.migrateLegacyImageGenerationConfigIfNeeded();
+    expect(settings.imageGenerationProviders, isEmpty);
   });
 
   test('恢复过程中生图密钥部分写失败，补偿原密钥及原服务地址', () async {

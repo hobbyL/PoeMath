@@ -107,6 +107,20 @@ class PictureStoryImageService {
     }
   }
 
+  /// 校验并压缩连接测试的预览图，复用视觉上传约束，不写入正式题图目录。
+  static Future<Uint8List> normalizePreview(Uint8List bytes) async {
+    if (bytes.isEmpty || bytes.length > maxSourceBytes) {
+      throw const PictureStoryImageException('图片为空或超过 20 MiB');
+    }
+    try {
+      return await _normalizeUpload(bytes);
+    } on PictureStoryImageException {
+      rethrow;
+    } on Object {
+      throw const PictureStoryImageException('服务没有返回可以读取的图片');
+    }
+  }
+
   /// 保留完整画面，只压缩上传副本；正式题图与内容 SHA 不变。
   Future<Uint8List> readForVision(String id) async {
     final bytes = await readImage(id);

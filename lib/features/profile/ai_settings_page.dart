@@ -33,7 +33,14 @@ class AiSettingsPage extends ConsumerStatefulWidget {
 
 class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
   late final _imageConfigChanges = HiveBoxes.settings
-      .watch(key: ImageGenerationProviderConfig.settingsKey)
+      .watch()
+      .where(
+        (event) =>
+            event.key == ImageGenerationProviderConfig.settingsKey ||
+            event.key == ImageGenerationProviderConfig.providersSettingsKey ||
+            event.key ==
+                ImageGenerationProviderConfig.activeProviderSettingsKey,
+      )
       .listen((_) {
     if (mounted) setState(() {});
   });

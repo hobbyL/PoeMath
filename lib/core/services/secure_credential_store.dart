@@ -152,6 +152,23 @@ class SecureCredentialStore {
   Future<void> deleteImageGenerationApiKey() =>
       _storage.delete(key: 'image_generation_api_key');
 
+  static const legacyImageGenerationProviderId = 'image-legacy';
+
+  Future<String?> readImageGenerationApiKeyFor(String id) =>
+      id == legacyImageGenerationProviderId
+          ? readImageGenerationApiKey()
+          : _storage.read(key: 'image_generation_api_key_$id');
+
+  Future<void> saveImageGenerationApiKeyFor(String id, String apiKey) =>
+      id == legacyImageGenerationProviderId
+          ? saveImageGenerationApiKey(apiKey)
+          : _storage.write(key: 'image_generation_api_key_$id', value: apiKey);
+
+  Future<void> deleteImageGenerationApiKeyFor(String id) =>
+      id == legacyImageGenerationProviderId
+          ? deleteImageGenerationApiKey()
+          : _storage.delete(key: 'image_generation_api_key_$id');
+
   // ============ 备份加密口令 ============
 
   /// 保存备份加密口令（本地导出与 WebDAV 上传共用）。

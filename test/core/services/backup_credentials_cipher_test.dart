@@ -216,6 +216,8 @@ void main() {
       kCredKeyLlmProviderKeys,
       kCredKeyImageGenerationApiKey,
       kCredKeyImageGenerationHint,
+      kCredKeyImageGenerationProviderKeys,
+      kCredKeyImageGenerationProviderHints,
     ]);
     // 2) 常量的字面值也锁定：改动会让已发布版本导出的备份读不出对应项。
     expect(kBackupCredentialKeys, <String>[
@@ -228,6 +230,8 @@ void main() {
       'llm_provider_keys',
       'image_generation_api_key',
       'image_generation_key_hint',
+      'image_generation_provider_keys',
+      'image_generation_provider_hints',
     ]);
 
     // 3) 每个白名单键都必须能真正往返：防止「加进白名单但密码学层处理
