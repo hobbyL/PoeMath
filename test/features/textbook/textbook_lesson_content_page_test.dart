@@ -12,6 +12,8 @@ import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/domain/textbook_lesson_content.dart';
 import 'package:poemath/domain/textbook_text_display.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
+import 'package:poemath/features/textbook/exercise/exercise_providers.dart';
+import 'package:poemath/features/textbook/exercise/textbook_exercise_overview.dart';
 import 'package:poemath/features/textbook/textbook_detail_page.dart';
 import 'package:poemath/features/textbook/textbook_lesson_content_page.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
@@ -122,6 +124,8 @@ void main() {
             (_) async => const WritingStrokeAsset({}),
           ),
           textbookWritingProgressProvider(book.pdfSha256)
+              .overrideWith((_) async => null),
+          textbookExerciseProgressProvider(book.pdfSha256)
               .overrideWith((_) async => null),
         ],
         child: MaterialApp(
@@ -510,6 +514,91 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('单题审核通过即可从教材详情进入做题页（字号=$scale）', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var creates = 0;
+      var disposes = 0;
+      final books = _Books();
+      TextbookViewerOptions? current;
+      final router = createAppRouter(
+        initialLocation: AppRoutes.textbookDetailOf(book.pdfSha256),
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            textbookListProvider.overrideWithValue([book]),
+            textbookRepositoryProvider.overrideWithValue(books),
+            textbookCatalogProvider.overrideWith((_) async => []),
+            textbookFileServiceProvider.overrideWithValue(_Files()),
+            textbookReadingContentProvider.overrideWith((_, __) async => null),
+            textbookCourseProvider(book.pdfSha256).overrideWith(
+              (_) async => TextbookCoursePack.fromJson(
+                courseFixtureWithReviewedExercise(),
+              ),
+            ),
+            textbookExerciseProgressProvider(book.pdfSha256)
+                .overrideWith((_) async => null),
+            textbookPreviewBuilderProvider.overrideWithValue((_, options) {
+              current = options;
+              return _Preview(
+                options: options,
+                onCreate: () => creates++,
+                onDispose: () => disposes++,
+              );
+            }),
+          ],
+          child: MaterialApp.router(
+            routerConfig: router,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(scale),
+              ),
+              child: child!,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      current!.onPageChanged(2);
+      await tester.pumpAndSettle();
+      final entry = find.widgetWithText(TextButton, '习题');
+      expect(entry, findsOneWidget);
+      await tester.ensureVisible(entry);
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(AppBar, '习题·星月测试'), findsOneWidget);
+      final overview = tester.widget<TextbookExerciseOverview>(
+        find.byType(TextbookExerciseOverview),
+      );
+      expect(
+        overview.exercises.map((exercise) => exercise.id),
+        ['exercise-001'],
+      );
+      expect(find.text('我已完成'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byWidgetPredicate((widget) => widget is FilledButton),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(TextbookDetailPage), findsOneWidget);
+      expect(find.text('2 / 3'), findsOneWidget);
+      expect(creates, 1);
+      expect(disposes, 0);
+      expect(books.saved, [2]);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('详情四入口随翻页变化，真实路由返回保留页码和 PDF 实例', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
@@ -554,6 +643,7 @@ void main() {
     }
     current!.onPageChanged(2);
     await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextButton, '习题'), findsNothing);
     void expectCompactActionsBelowPdf() {
       final pdf = tester.getRect(
         find.byKey(const ValueKey('textbook-detail-preview-card')),

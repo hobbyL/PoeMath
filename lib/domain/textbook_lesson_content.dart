@@ -29,11 +29,7 @@ List<TextbookCourseNode> textbookVisibleTargets(
   if (section != TextbookContentSection.exercise) {
     return section.targets(lesson);
   }
-  if (pack.status != 'reviewed' ||
-      lesson.coverage['exercises'] != TextbookCoverage.complete ||
-      !lesson.isApproved) {
-    return const [];
-  }
+  // 单题审核完成即可练习；整包与课目审核用于内容发布。
   return [
     for (final exercise in lesson.exercises)
       if (exercise.isApproved) exercise,

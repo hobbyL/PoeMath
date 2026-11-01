@@ -195,3 +195,20 @@ Map<String, dynamic> courseFixture({
   }
   return TextbookCoursePack.fromJson(pack).toJson();
 }
+
+/// 只有单道习题完成审核；整包、课目和习题范围仍待审。
+Map<String, dynamic> courseFixtureWithReviewedExercise() {
+  final raw = courseFixture();
+  final lesson =
+      (raw['lessons'] as List<dynamic>).single as Map<String, dynamic>;
+  (lesson['coverage'] as Map<String, dynamic>)['exercises'] = 'pending';
+  return tool.reviewTextbookCourse(
+    input: raw,
+    nodeId: 'exercise-001',
+    reviewer: '合成测试审核者',
+    decision: 'approved',
+    checks: ['sourcePages', 'content', 'answer'],
+    notes: '',
+    at: DateTime.utc(2026, 11, 1),
+  );
+}

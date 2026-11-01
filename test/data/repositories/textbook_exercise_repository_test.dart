@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_course_review.dart';
 import 'package:poemath/data/models/textbook_exercise_progress.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_exercise_repository.dart';
@@ -80,5 +81,74 @@ void main() {
       courses: courses,
     );
     expect((await reopened.load()).toJson(), checked.toJson());
+  });
+
+  test('单题审核通过即可保存作答，其他内容审核不影响当前题目记录', () async {
+    final pack = TextbookCoursePack.fromJson(
+      courseFixtureWithReviewedExercise(),
+    );
+    await courses.importDraft(book, pack);
+    final first = await repository.load();
+    final attempted = await repository.recordAttempt(
+      lessonId: 'lesson-001',
+      exerciseId: 'exercise-001',
+      answer: const TextbookExerciseAnswer.oral(),
+      day: '2026-11-01',
+      operationId: 'single-approved-attempt',
+      expectedRevision: first.revision,
+    );
+    final key =
+        TextbookExerciseProgress.targetKey('lesson-001', 'exercise-001');
+    expect(attempted.revision, 1);
+    expect(attempted.records[key]!.attempts, 1);
+    expect(
+      attempted.records[key]!.lastResult,
+      TextbookExerciseResult.parentPending,
+    );
+
+    final checked = await repository.recordParentCheck(
+      lessonId: 'lesson-001',
+      exerciseId: 'exercise-001',
+      passed: true,
+      day: '2026-11-01',
+      operationId: 'single-approved-parent-check',
+      expectedRevision: attempted.revision,
+    );
+    expect(checked.records[key]!.parentConfirms, 1);
+    expect(
+      checked.records[key]!.lastResult,
+      TextbookExerciseResult.parentCorrect,
+    );
+
+    final edited = editTextbookCourseNode(pack, 'paragraph-001', {
+      'text': '月𠀀，星。',
+      'pinyin': ['yuè', 'hē', '，', 'xīng', '。'],
+    });
+    await courses.save(book, edited, previous: pack);
+    final reopened = TextbookExerciseRepository(
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+    );
+    expect((await reopened.load()).toJson(), checked.toJson());
+
+    final changedQuestion = editTextbookCourseNode(
+      edited,
+      'exercise-001',
+      {'prompt': '请描述你看到的内容。'},
+    );
+    await courses.save(book, changedQuestion, previous: edited);
+    expect((await reopened.load()).records, isEmpty);
+    await expectLater(
+      reopened.recordAttempt(
+        lessonId: 'lesson-001',
+        exerciseId: 'exercise-001',
+        answer: const TextbookExerciseAnswer.oral(),
+        day: '2026-11-01',
+        operationId: 'stale-exercise-attempt',
+        expectedRevision: checked.revision,
+      ),
+      throwsStateError,
+    );
   });
 }

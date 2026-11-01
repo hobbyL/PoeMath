@@ -9,6 +9,7 @@ import 'package:poemath/data/models/textbook_exercise_progress.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/domain/textbook_exercise.dart';
+import 'package:poemath/domain/textbook_lesson_content.dart';
 
 class TextbookExerciseRepository {
   TextbookExerciseRepository({
@@ -66,17 +67,9 @@ class TextbookExerciseRepository {
   List<TextbookCourseExercise> _approvedExercises(
     TextbookCoursePack pack,
     TextbookCourseLesson lesson,
-  ) {
-    if (pack.status != 'reviewed' ||
-        lesson.coverage['exercises'] != TextbookCoverage.complete ||
-        !lesson.isApproved) {
-      return const [];
-    }
-    return [
-      for (final exercise in lesson.exercises)
-        if (exercise.isApproved) exercise,
-    ];
-  }
+  ) =>
+      textbookVisibleTargets(pack, lesson, TextbookContentSection.exercise)
+          .cast<TextbookCourseExercise>();
 
   TextbookExerciseProgress _currentContent(
     TextbookExerciseProgress progress,

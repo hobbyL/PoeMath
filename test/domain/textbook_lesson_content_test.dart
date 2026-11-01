@@ -1,10 +1,55 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_course_review.dart';
 import 'package:poemath/domain/textbook_lesson_content.dart';
 
 import '../helpers/textbook_course_fixture.dart';
 
 void main() {
+  test('单道习题通过审核即可练习，不等待整包、课目和范围审核', () {
+    final pack = TextbookCoursePack.fromJson(
+      courseFixtureWithReviewedExercise(),
+    );
+    final lesson = pack.lessons.single;
+    expect(pack.status, 'draft');
+    expect(lesson.isApproved, isFalse);
+    expect(lesson.coverage['exercises'], TextbookCoverage.pending);
+    expect(lesson.exercises.single.isApproved, isTrue);
+    expect(
+      textbookVisibleTargets(pack, lesson, TextbookContentSection.exercise)
+          .map((node) => node.id),
+      ['exercise-001'],
+    );
+  });
+
+  test('未审核、已退回和审核过期的习题不进入做题列表', () {
+    final reviewed = courseFixtureWithReviewedExercise();
+    final stale = courseFixtureWithReviewedExercise();
+    final staleLesson =
+        (stale['lessons'] as List<dynamic>).single as Map<String, dynamic>;
+    ((staleLesson['exercises'] as List<dynamic>).single
+        as Map<String, dynamic>)['prompt'] = '题目内容已修改。';
+    final rejected = reviewTextbookCourse(
+      input: reviewed,
+      nodeId: 'exercise-001',
+      reviewer: '测试家长',
+      decision: 'rejected',
+      checks: [],
+      notes: '',
+    );
+    for (final raw in [courseFixture(), rejected, stale]) {
+      final pack = TextbookCoursePack.fromJson(raw);
+      expect(
+        textbookVisibleTargets(
+          pack,
+          pack.lessons.single,
+          TextbookContentSection.exercise,
+        ),
+        isEmpty,
+      );
+    }
+  });
+
   test('正文页找到整课，认字和写字不受册末字表来源页限制', () {
     final raw = courseFixture();
     final lesson = (raw['lessons'] as List).single as Map;
