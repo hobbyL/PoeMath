@@ -215,8 +215,9 @@ void main() {
             expect(complete, findsOneWidget);
             expect(parent, parentPending ? findsOneWidget : findsNothing);
             expect(find.text('口答题'), findsNothing);
-            final title = find.text(lesson.exercises.single.prompt);
+            final title = find.text('请说出测试句中的天体');
             expect(title, findsOneWidget);
+            expect(find.text(lesson.exercises.single.prompt), findsNothing);
 
             final titleRect = tester.getRect(title);
             final completeRect = tester.getRect(complete);
@@ -304,7 +305,7 @@ void main() {
       raw: raw,
     );
 
-    final heading = find.text('分角色朗读课文。');
+    final heading = find.text('分角色朗读课文');
     final complete = find.widgetWithText(TextButton, '完成');
     final body = find.text('请按顺序讲述星月的故事。');
     expect(heading, findsOneWidget);
@@ -364,7 +365,7 @@ void main() {
         raw: raw,
       );
 
-      final heading = find.text('读一读，注意加点的词。');
+      final heading = find.text('读一读，注意加点的词');
       expect(heading, findsOneWidget);
       expect(find.text('口答题'), findsNothing);
       expect(find.text('春风'), findsOneWidget);

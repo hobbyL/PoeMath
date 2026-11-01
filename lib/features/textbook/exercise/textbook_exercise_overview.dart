@@ -138,7 +138,10 @@ class _TextbookExerciseOverviewState
     final title = oral
         ? heading == null
             ? TextbookExercisePrompt(exercise: exercise)
-            : SelectableText(heading, style: theme.textTheme.titleMedium)
+            : SelectableText(
+                heading.replaceFirst(RegExp(r'。\s*$'), ''),
+                style: theme.textTheme.titleMedium,
+              )
         : Text(
             exercise.questionType.label,
             style: theme.textTheme.titleMedium,
