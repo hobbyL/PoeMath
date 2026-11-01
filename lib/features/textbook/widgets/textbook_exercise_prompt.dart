@@ -16,28 +16,47 @@ class TextbookExercisePrompt extends StatelessWidget {
   final TextbookCourseExercise exercise;
   final bool showHeading;
 
+  /// 普通文本取首行，词组排版只取独占首行作为题目。
+  String? get heading {
+    if (exercise.promptLayout.isNotEmpty) {
+      final firstRow = exercise.promptLayout.first;
+      return firstRow.length == 1 && firstRow.single.emphasis.isEmpty
+          ? exercise.promptHeading
+          : null;
+    }
+    final firstLine = exercise.prompt.split('\n').first.trim();
+    return firstLine.isEmpty ? null : firstLine;
+  }
+
+  String get _visiblePrompt {
+    final lines = exercise.prompt.split('\n');
+    return (!showHeading && heading != null ? lines.skip(1) : lines)
+        .where((line) => line.trim() != _readingObservation)
+        .join('\n');
+  }
+
+  List<List<TextbookExerciseCell>> get _visibleRows => (!showHeading &&
+              heading != null
+          ? exercise.promptLayout.skip(1)
+          : exercise.promptLayout)
+      .where(
+        (row) =>
+            row.length != 1 || row.single.text.trim() != _readingObservation,
+      )
+      .toList(growable: false);
+
+  bool get hasContent => exercise.promptLayout.isEmpty
+      ? _visiblePrompt.trim().isNotEmpty
+      : _visibleRows.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.titleSmall;
+    if (!hasContent) return const SizedBox.shrink();
     if (exercise.promptLayout.isEmpty) {
-      final prompt = !showHeading && exercise.promptHeading != null
-          ? exercise.prompt.substring(exercise.prompt.indexOf('\n') + 1)
-          : exercise.prompt;
-      final visiblePrompt = prompt
-          .split('\n')
-          .where((line) => line.trim() != _readingObservation)
-          .join('\n');
-      return SelectableText(visiblePrompt, style: style);
+      return SelectableText(_visiblePrompt, style: style);
     }
-    final rows = (!showHeading && exercise.promptHeading != null
-            ? exercise.promptLayout.skip(1)
-            : exercise.promptLayout)
-        .where(
-          (row) =>
-              row.length != 1 || row.single.text.trim() != _readingObservation,
-        )
-        .toList(growable: false);
-    if (rows.isEmpty) return const SizedBox.shrink();
+    final rows = _visibleRows;
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = rows.map((r) => r.length).reduce(math.max);

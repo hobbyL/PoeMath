@@ -76,11 +76,11 @@ Future<TextbookCourseLesson> pumpOralExercise(
   WidgetTester tester, {
   required bool parentPending,
   double textScale = 1,
+  Map<String, dynamic>? raw,
 }) async {
-  final lesson =
-      TextbookCoursePack.fromJson(courseFixtureWithReviewedExercise())
-          .lessons
-          .single;
+  final lesson = TextbookCoursePack.fromJson(
+    raw ?? courseFixtureWithReviewedExercise(),
+  ).lessons.single;
   final exercise = lesson.exercises.single;
   final bookId = courseFixtureBook().pdfSha256;
   final progress = TextbookExerciseProgress(
@@ -126,6 +126,16 @@ Future<TextbookCourseLesson> pumpOralExercise(
   );
   await tester.pumpAndSettle();
   return lesson;
+}
+
+double baselineFor(WidgetTester tester, Finder finder) {
+  final box = tester.renderObject<RenderBox>(finder);
+  final distance = box.getDryBaseline(
+    box.constraints,
+    TextBaseline.alphabetic,
+  );
+  expect(distance, isNotNull);
+  return tester.getRect(finder).top + distance!;
 }
 
 void main() {
@@ -188,7 +198,7 @@ void main() {
     for (final textScale in [1.0, 2.0]) {
       for (final parentPending in [false, true]) {
         testWidgets(
-          '口答标题同行靠右显示操作：宽$width、字号$textScale、待核对$parentPending',
+          '题目替代题型标题且操作靠右：宽$width、字号$textScale、待核对$parentPending',
           (tester) async {
             tester.view.physicalSize = Size(width, 800);
             tester.view.devicePixelRatio = 1;
@@ -200,12 +210,15 @@ void main() {
               textScale: textScale,
             );
 
-            final complete = find.widgetWithText(TextButton, '我已完成');
-            final parent = find.widgetWithText(TextButton, '家长核对');
+            final complete = find.widgetWithText(TextButton, '完成');
+            final parent = find.widgetWithText(TextButton, '核对');
             expect(complete, findsOneWidget);
             expect(parent, parentPending ? findsOneWidget : findsNothing);
+            expect(find.text('口答题'), findsNothing);
+            final title = find.text(lesson.exercises.single.prompt);
+            expect(title, findsOneWidget);
 
-            final titleRect = tester.getRect(find.text('口答题'));
+            final titleRect = tester.getRect(title);
             final completeRect = tester.getRect(complete);
             final cardRect = tester.getRect(
               find.byKey(
@@ -222,8 +235,12 @@ void main() {
               titleRect.right + SpacingTokens.sm,
               lessThanOrEqualTo(completeRect.left),
             );
-            for (final rect in actions) {
-              expect(rect.center.dy, closeTo(titleRect.center.dy, 0.01));
+            for (final action in [complete, if (parentPending) parent]) {
+              final rect = tester.getRect(action);
+              expect(
+                baselineFor(tester, action),
+                closeTo(baselineFor(tester, title), 0.01),
+              );
               expect(
                 rect.width,
                 greaterThanOrEqualTo(SpacingTokens.minTapTarget),
@@ -250,10 +267,6 @@ void main() {
               headerTop - cardRect.top,
               closeTo(SpacingTokens.xs, 0.01),
             );
-            expect(
-              tester.getRect(find.text(lesson.exercises.single.prompt)).top,
-              greaterThanOrEqualTo(actions.first.bottom + SpacingTokens.sm),
-            );
             expect(tester.takeException(), isNull);
           },
         );
@@ -261,9 +274,9 @@ void main() {
     }
   }
 
-  testWidgets('标题右侧的家长核对按钮仍能打开核对弹窗', (tester) async {
+  testWidgets('标题右侧的核对按钮仍能打开家长核对弹窗', (tester) async {
     await pumpOralExercise(tester, parentPending: true);
-    await tester.tap(find.widgetWithText(TextButton, '家长核对'));
+    await tester.tap(find.widgetWithText(TextButton, '核对'));
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsOneWidget);
@@ -272,6 +285,157 @@ void main() {
     Navigator.of(tester.element(find.byType(AlertDialog))).pop();
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('普通多行题将首行放到标题，后续题干独立保留', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final raw = courseFixture();
+    final exercise =
+        ((raw['lessons'] as List).single['exercises'] as List).single as Map;
+    exercise['prompt'] = '分角色朗读课文。\n请按顺序讲述星月的故事。';
+    await pumpOralExercise(
+      tester,
+      parentPending: true,
+      textScale: 2,
+      raw: raw,
+    );
+
+    final heading = find.text('分角色朗读课文。');
+    final complete = find.widgetWithText(TextButton, '完成');
+    final body = find.text('请按顺序讲述星月的故事。');
+    expect(heading, findsOneWidget);
+    expect(body, findsOneWidget);
+    expect(find.text('口答题'), findsNothing);
+    expect(
+      tester.getRect(heading).height,
+      greaterThan(tester.getRect(complete).height),
+    );
+    expect(
+      baselineFor(tester, heading),
+      closeTo(baselineFor(tester, complete), 0.01),
+    );
+    expect(
+      tester.getRect(body).top,
+      greaterThanOrEqualTo(tester.getRect(heading).bottom + SpacingTokens.sm),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final textScale in [1.0, 2.0]) {
+    testWidgets('排版题标题不重复，词组和加点保留（字号$textScale）', (tester) async {
+      tester.view.physicalSize = const Size(320, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final raw = courseFixture();
+      final exercise =
+          ((raw['lessons'] as List).single['exercises'] as List).single as Map;
+      exercise['prompt'] = '读一读，注意加点的词。\n𠀀月明亮\t看星星\n春风\t山河\n我发现这些加点的词是表示动作的。';
+      exercise['promptLayout'] = [
+        [
+          {'text': '读一读，注意加点的词。', 'emphasis': <int>[]},
+        ],
+        [
+          {
+            'text': '𠀀月明亮',
+            'emphasis': [0],
+          },
+          {
+            'text': '看星星',
+            'emphasis': [0],
+          },
+        ],
+        [
+          {'text': '春风', 'emphasis': <int>[]},
+          {'text': '山河', 'emphasis': <int>[]},
+        ],
+        [
+          {'text': '我发现这些加点的词是表示动作的。', 'emphasis': <int>[]},
+        ],
+      ];
+      await pumpOralExercise(
+        tester,
+        parentPending: true,
+        textScale: textScale,
+        raw: raw,
+      );
+
+      final heading = find.text('读一读，注意加点的词。');
+      expect(heading, findsOneWidget);
+      expect(find.text('口答题'), findsNothing);
+      expect(find.text('春风'), findsOneWidget);
+      expect(find.text('山河'), findsOneWidget);
+      expect(find.text('𠀀'), findsOneWidget);
+      expect(find.text('看'), findsOneWidget);
+      expect(find.byIcon(Icons.circle), findsNWidgets(2));
+      expect(find.textContaining('我发现这些加点的词是表示动作的。'), findsNothing);
+      expect(
+        tester.getRect(find.text('春风')).top,
+        greaterThan(tester.getRect(heading).bottom),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('没有独占题首行的词组排版也完整保留且不重复', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final raw = courseFixture();
+    final exercise =
+        ((raw['lessons'] as List).single['exercises'] as List).single as Map;
+    exercise['prompt'] = '星光\t月光\n春风\t山河';
+    exercise['promptLayout'] = [
+      [
+        {'text': '星光', 'emphasis': <int>[]},
+        {'text': '月光', 'emphasis': <int>[]},
+      ],
+      [
+        {'text': '春风', 'emphasis': <int>[]},
+        {'text': '山河', 'emphasis': <int>[]},
+      ],
+    ];
+    await pumpOralExercise(
+      tester,
+      parentPending: true,
+      textScale: 2,
+      raw: raw,
+    );
+    for (final word in ['星光', '月光', '春风', '山河']) {
+      expect(find.text(word), findsOneWidget);
+    }
+    expect(find.text('口答题'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('题首本身有加点时保留完整排版和Unicode文字', (tester) async {
+    final raw = courseFixture();
+    final exercise =
+        ((raw['lessons'] as List).single['exercises'] as List).single as Map;
+    exercise['prompt'] = '𠀀月\n春风\t山河';
+    exercise['promptLayout'] = [
+      [
+        {
+          'text': '𠀀月',
+          'emphasis': [0],
+        },
+      ],
+      [
+        {'text': '春风', 'emphasis': <int>[]},
+        {'text': '山河', 'emphasis': <int>[]},
+      ],
+    ];
+    await pumpOralExercise(tester, parentPending: true, raw: raw);
+    expect(find.text('𠀀'), findsOneWidget);
+    expect(find.byIcon(Icons.circle), findsOneWidget);
+    expect(find.text('春风'), findsOneWidget);
+    expect(find.text('山河'), findsOneWidget);
+    expect(find.text('口答题'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

@@ -130,10 +130,19 @@ class _TextbookExerciseOverviewState
     final choiceMode = exercise.choiceMode;
     final busy = _busyExerciseId == exercise.id;
     final oral = exercise.questionType == TextbookExerciseQuestionType.oral;
-    final title = Text(
-      exercise.questionType.label,
-      style: theme.textTheme.titleMedium,
+    final prompt = TextbookExercisePrompt(
+      exercise: exercise,
+      showHeading: !oral,
     );
+    final heading = oral ? prompt.heading : null;
+    final title = oral
+        ? heading == null
+            ? TextbookExercisePrompt(exercise: exercise)
+            : SelectableText(heading, style: theme.textTheme.titleMedium)
+        : Text(
+            exercise.questionType.label,
+            style: theme.textTheme.titleMedium,
+          );
     const oralButtonStyle = ButtonStyle(
       minimumSize: WidgetStatePropertyAll(
         Size(SpacingTokens.minTapTarget, SpacingTokens.minTapTarget),
@@ -148,44 +157,42 @@ class _TextbookExerciseOverviewState
       children: [
         if (oral)
           Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              title,
+              Expanded(child: title),
               const SizedBox(width: SpacingTokens.sm),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Flexible(
-                      child: TextButton(
-                        style: oralButtonStyle,
-                        onPressed:
-                            busy ? null : () => _submit(exercise, progress),
-                        child: const Text('我已完成', textAlign: TextAlign.center),
-                      ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  TextButton(
+                    style: oralButtonStyle,
+                    onPressed: busy ? null : () => _submit(exercise, progress),
+                    child: const Text('完成', textAlign: TextAlign.center),
+                  ),
+                  if (record?.lastResult ==
+                      TextbookExerciseResult.parentPending) ...[
+                    const SizedBox(width: SpacingTokens.xs),
+                    TextButton(
+                      style: oralButtonStyle,
+                      onPressed: busy
+                          ? null
+                          : () => _parentCheck(exercise, progress, record),
+                      child: const Text('核对', textAlign: TextAlign.center),
                     ),
-                    if (record?.lastResult ==
-                        TextbookExerciseResult.parentPending) ...[
-                      const SizedBox(width: SpacingTokens.xs),
-                      Flexible(
-                        child: TextButton(
-                          style: oralButtonStyle,
-                          onPressed: busy
-                              ? null
-                              : () => _parentCheck(exercise, progress, record),
-                          child:
-                              const Text('家长核对', textAlign: TextAlign.center),
-                        ),
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
             ],
           )
         else
           title,
-        const SizedBox(height: SpacingTokens.sm),
-        TextbookExercisePrompt(exercise: exercise),
+        if ((!oral || heading != null) && prompt.hasContent) ...[
+          const SizedBox(height: SpacingTokens.sm),
+          prompt,
+        ],
         const SizedBox(height: SpacingTokens.xs),
         Text(
           _answerHint(exercise),
@@ -218,7 +225,7 @@ class _TextbookExerciseOverviewState
                       ? null
                       : () => _parentCheck(exercise, progress, record),
                   icon: const Icon(Icons.family_restroom),
-                  label: const Text('家长核对'),
+                  label: const Text('核对'),
                 ),
             ],
           ),

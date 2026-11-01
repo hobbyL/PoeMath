@@ -579,7 +579,7 @@ void main() {
         overview.exercises.map((exercise) => exercise.id),
         ['exercise-001'],
       );
-      expect(find.text('我已完成'), findsOneWidget);
+      expect(find.text('完成'), findsOneWidget);
       expect(find.byType(ColoredCard), findsOneWidget);
       expect(
         find.ancestor(
@@ -591,7 +591,7 @@ void main() {
       expect(
         tester
             .widget<TextButton>(
-              find.widgetWithText(TextButton, '我已完成'),
+              find.widgetWithText(TextButton, '完成'),
             )
             .onPressed,
         isNotNull,
