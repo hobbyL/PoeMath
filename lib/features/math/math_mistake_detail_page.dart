@@ -184,7 +184,7 @@ class MathMistakeDetailPage extends ConsumerWidget {
                 ],
               ),
             )
-                .animate()
+                .animatePage(context)
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: 0.1, end: 0, duration: 400.ms),
 
@@ -214,7 +214,7 @@ class MathMistakeDetailPage extends ConsumerWidget {
                   ],
                 ),
               )
-                  .animate()
+                  .animatePage(context)
                   .fadeIn(delay: 100.ms, duration: 300.ms)
                   .slideX(begin: 0.1, end: 0, delay: 100.ms, duration: 300.ms),
               const SizedBox(height: SpacingTokens.md),
@@ -226,7 +226,10 @@ class MathMistakeDetailPage extends ConsumerWidget {
               ColoredCard(
                 color: theme.colorScheme.secondary,
                 child: _buildSteps(context, mistake.solutionStepsJson!),
-              ).animate().fadeIn(delay: 200.ms, duration: 300.ms).slideX(
+              )
+                  .animatePage(context)
+                  .fadeIn(delay: 200.ms, duration: 300.ms)
+                  .slideX(
                     begin: 0.1,
                     end: 0,
                     delay: 200.ms,
@@ -240,7 +243,7 @@ class MathMistakeDetailPage extends ConsumerWidget {
               mistake: mistake,
               problem: problem,
               onDeleted: () => context.pop(),
-            ).animate().fadeIn(delay: 300.ms, duration: 300.ms),
+            ).animatePage(context).fadeIn(delay: 300.ms, duration: 300.ms),
           ],
         ),
       ),

@@ -78,6 +78,28 @@ void main() {
       });
     });
 
+    group('pageAnimationsEnabled', () {
+      test('默认开启，关闭重开后保留选择，再开启也能保存', () async {
+        expect(repo.pageAnimationsEnabled, isTrue);
+        await repo.setPageAnimationsEnabled(false);
+        await HiveBoxes.close();
+        await HiveBoxes.init();
+        expect(SettingsRepository().pageAnimationsEnabled, isFalse);
+        await repo.setPageAnimationsEnabled(true);
+        await HiveBoxes.close();
+        await HiveBoxes.init();
+        expect(SettingsRepository().pageAnimationsEnabled, isTrue);
+      });
+
+      test('损坏的历史值回落开启且读取不改写存储', () async {
+        for (final value in <Object>['false', 0, 'unknown']) {
+          await HiveBoxes.settings.put('page_animations_enabled', value);
+          expect(repo.pageAnimationsEnabled, isTrue);
+          expect(HiveBoxes.settings.get('page_animations_enabled'), value);
+        }
+      });
+    });
+
     group('completionSound', () {
       test('旧安装默认小合奏，四种选择关闭重开后保持', () async {
         expect(repo.completionSound, CompletionSound.ensemble);

@@ -277,6 +277,22 @@ class SettingsPage extends ConsumerWidget {
               ),
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
+                icon: Icons.animation,
+                iconColor: theme.colorScheme.secondary,
+                title: '页面动画',
+                subtitle: settingsRepo.pageAnimationsEnabled
+                    ? '已开启 · 页面转场与内容入场'
+                    : '已关闭 · 使用系统默认动画',
+                trailing: Switch(
+                  value: settingsRepo.pageAnimationsEnabled,
+                  onChanged: (v) =>
+                      _writeSetting(context, ref, '页面动画', () async {
+                    await settingsRepo.setPageAnimationsEnabled(v);
+                  }),
+                ),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              AppTile(
                 icon: Icons.music_note_outlined,
                 iconColor: theme.colorScheme.tertiary,
                 title: '音效',

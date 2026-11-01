@@ -12,6 +12,7 @@ import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/learning_background_fields.dart';
+import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/providers/provider_invalidation.dart';
 
@@ -213,7 +214,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               color: theme.colorScheme.primary,
             ),
           )
-              .animate(
+              .animatePage(
+                context,
                 key: ValueKey('onboarding_icon_$index'),
               )
               .scaleXY(
@@ -234,7 +236,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               color: theme.colorScheme.primary,
             ),
           )
-              .animate(
+              .animatePage(
+                context,
                 key: ValueKey('onboarding_title_$index'),
               )
               .fadeIn(delay: 200.ms, duration: 400.ms)
@@ -249,7 +252,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           )
-              .animate(
+              .animatePage(
+                context,
                 key: ValueKey('onboarding_subtitle_$index'),
               )
               .fadeIn(delay: 300.ms, duration: 400.ms),
@@ -265,7 +269,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
               color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           )
-              .animate(
+              .animatePage(
+                context,
                 key: ValueKey('onboarding_desc_$index'),
               )
               .fadeIn(delay: 400.ms, duration: 400.ms),
@@ -280,7 +285,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 fontStyle: FontStyle.italic,
                 color: theme.colorScheme.primary.withValues(alpha: 0.5),
               ),
-            ).animate().fadeIn(delay: 600.ms, duration: 600.ms),
+            ).animatePage(context).fadeIn(delay: 600.ms, duration: 600.ms),
         ],
       ),
     );

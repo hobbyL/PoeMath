@@ -25,6 +25,7 @@ import 'package:poemath/data/repositories/learning_activity_repository.dart';
 import 'package:poemath/data/repositories/llm_problem_repository.dart';
 import 'package:poemath/data/repositories/assistant_conversation_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_audio_recorder.dart';
@@ -117,6 +118,16 @@ final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   final credentialStore = ref.watch(secureCredentialStoreProvider);
   return SettingsRepository(credentialStore: credentialStore);
+});
+
+/// 页面转场与内容入场共用偏好，保存或恢复设置后随仓储一起刷新。
+final pageAnimationsEnabledProvider = Provider<bool>((ref) {
+  final settings = ref.watch(settingsRepositoryProvider);
+  final subscription = HiveBoxes.settings
+      .watch(key: SettingsRepository.pageAnimationsEnabledKey)
+      .listen((_) => ref.invalidateSelf());
+  ref.onDispose(subscription.cancel);
+  return settings.pageAnimationsEnabled;
 });
 
 // ============ 服务 Provider ============

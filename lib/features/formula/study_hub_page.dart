@@ -202,7 +202,7 @@ class StudyHubPage extends ConsumerWidget {
                             ),
                           ),
                         )
-                            .animate()
+                            .animatePage(context)
                             .fadeIn(
                               delay: (80 * index).ms,
                               duration: 300.ms,
@@ -224,7 +224,6 @@ class StudyHubPage extends ConsumerWidget {
       ),
     );
   }
-
 
   void _showCategoryPicker(
     BuildContext context,

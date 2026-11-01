@@ -652,7 +652,9 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
 
           // 朗读状态提示（点击重听当前句；准备期禁用避免重入）
           InkWell(
-            onTap: _isPreparing ? null : () => unawaited(_speakLine(_currentLineIndex)),
+            onTap: _isPreparing
+                ? null
+                : () => unawaited(_speakLine(_currentLineIndex)),
             borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
             child: Padding(
               padding: const EdgeInsets.symmetric(
@@ -940,7 +942,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
             ],
           ),
         )
-            .animate()
+            .animatePage(context)
             .fadeIn(duration: 400.ms)
             .slideY(begin: 0.1, end: 0, duration: 400.ms),
       ),

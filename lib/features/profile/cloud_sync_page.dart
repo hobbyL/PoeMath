@@ -559,7 +559,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                                   ],
                                 ),
                               )
-                                  .animate()
+                                  .animatePage(context)
                                   .fadeIn(
                                     delay: (80 * index).ms,
                                     duration: 300.ms,

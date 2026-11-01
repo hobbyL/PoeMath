@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/page_animation_scope.dart';
 
 /// 单项统计数据：大号数值 + 说明文字。
 class StatOverviewItem {
@@ -69,7 +70,7 @@ class StatOverviewCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: children,
       ),
-    ).animate().fadeIn(duration: 400.ms).slideY(
+    ).animatePage(context).fadeIn(duration: 400.ms).slideY(
           begin: 0.1,
           end: 0,
           duration: 400.ms,

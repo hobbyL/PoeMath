@@ -107,7 +107,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
                               rowWidgets.add(
                                 Expanded(
                                   child: _RecordCard(record: record)
-                                      .animate()
+                                      .animatePage(context)
                                       .fadeIn(
                                         delay: (80 * idx).ms,
                                         duration: 300.ms,

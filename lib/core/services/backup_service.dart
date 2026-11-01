@@ -36,6 +36,7 @@ import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/repositories/today_plan_repository.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
 import 'package:poemath/domain/poem_review_history.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
@@ -94,6 +95,7 @@ const int _backupVersion = 1;
 const Map<String, String> _settingsValueType = <String, String>{
   'theme_mode': 'string', // 外观模式 system/light/dark
   'active_subject': 'string', // 当前主题 poem/math
+  SettingsRepository.pageAnimationsEnabledKey: 'bool', // 页面动画开关，跨设备用户偏好
   'sound_enabled': 'bool', // 音效开关
   CompletionSound.settingsKey: 'string', // 练习完成提示音，跨设备用户偏好
   AnswerFeedbackSound.settingsKey: 'string', // 答题反馈音，跨设备用户偏好
@@ -255,7 +257,7 @@ class BackupService {
     }
   }
 
-  /// 导出所有用户数据为 JSON 字符串。
+  /// 按同步清单导出可迁移的用户数据为 JSON 字符串。
   ///
   /// [passphrase] 非空且安全存储中存在凭据时，凭据以
   /// PBKDF2 + AES-256-GCM 加密写入 `credentials` 节；否则省略该节。

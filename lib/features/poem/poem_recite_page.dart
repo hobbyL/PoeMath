@@ -181,10 +181,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   final Map<int, List<PoemHandwrittenChar>> _dictLineResults = {};
 
   /// 当前句手写板目标字。
-  String get _dictCurrentChar =>
-      _dictCharIdx < _dictTargetChars.length
-          ? _dictTargetChars[_dictCharIdx]
-          : '';
+  String get _dictCurrentChar => _dictCharIdx < _dictTargetChars.length
+      ? _dictTargetChars[_dictCharIdx]
+      : '';
   int get _dictCharIdx => _dictConfirmed.length;
 
   /// 默写输入是否非空 —— 驱动「提交默写」按钮的启用状态。
@@ -875,7 +874,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                 ),
                 textAlign: TextAlign.center,
               ),
-            ).animate().fadeIn(duration: 300.ms),
+            ).animatePage(context).fadeIn(duration: 300.ms),
 
           const Spacer(),
 
@@ -1039,7 +1038,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                       color: theme.colorScheme.tertiary,
                       fontWeight: FontWeight.w600,
                     ),
-                  ).animate().fadeIn(duration: 300.ms).slideY(
+                  ).animatePage(context).fadeIn(duration: 300.ms).slideY(
                         begin: 0.3,
                         end: 0,
                         duration: 300.ms,
@@ -1097,7 +1096,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     return KeyedSubtree(
       key: ValueKey(_lineAnimKey),
       child: AutoFitLine(
-        child: lineWidget.animate().fadeIn(duration: 400.ms).slideX(
+        child: lineWidget.animatePage(context).fadeIn(duration: 400.ms).slideX(
               begin: 0.15,
               end: 0,
               duration: 400.ms,
@@ -1274,9 +1273,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
             child: PoemSentenceWritingSheet(
               targetChars: _dictTargetChars,
               confirmedChars: _dictConfirmed,
-              currentStrokeData: _strokeLoadingFailed
-                  ? null
-                  : _strokeCache[currentChar],
+              currentStrokeData:
+                  _strokeLoadingFailed ? null : _strokeCache[currentChar],
               onCharConfirmed: _onHandwriteCharConfirmed,
               maxBoardSide: min(
                 MediaQuery.sizeOf(context).width - SpacingTokens.lg * 2,
@@ -1408,7 +1406,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.primary,
               ),
-            ).animate().fadeIn(delay: 600.ms, duration: 400.ms),
+            ).animatePage(context).fadeIn(delay: 600.ms, duration: 400.ms),
 
             const SizedBox(height: SpacingTokens.lg),
 
@@ -1436,7 +1434,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                 ),
               ],
             )
-                .animate()
+                .animatePage(context)
                 .fadeIn(delay: 800.ms, duration: 400.ms)
                 .slideY(begin: 0.2, end: 0, delay: 800.ms, duration: 400.ms),
 
@@ -1471,7 +1469,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                   ),
                 ),
               ],
-            ).animate().fadeIn(delay: 1000.ms, duration: 400.ms),
+            ).animatePage(context).fadeIn(delay: 1000.ms, duration: 400.ms),
           ],
         ),
       ),

@@ -896,7 +896,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                                   ),
                                   textAlign: TextAlign.center,
                                 ))
-                          .animate()
+                          .animatePage(context)
                           .fadeIn(duration: 350.ms)
                           .slideX(
                             begin: 0.12,
@@ -910,7 +910,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                     // 判定反馈
                     if (_judgement != null) ...[
                       _buildJudgementFeedback(context)
-                          .animate()
+                          .animatePage(context)
                           .fadeIn(duration: 300.ms)
                           .scale(
                             begin: const Offset(0.9, 0.9),
@@ -1173,7 +1173,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                   : '下一题',
             ),
           ),
-        ).animate().fadeIn(duration: 250.ms).slideY(
+        ).animatePage(context).fadeIn(duration: 250.ms).slideY(
               begin: 0.2,
               end: 0,
               duration: 250.ms,

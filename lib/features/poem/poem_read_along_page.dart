@@ -998,7 +998,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
             ),
           ],
         )
-            .animate()
+            .animatePage(context)
             .scale(
               begin: const Offset(0.5, 0.5),
               end: const Offset(1.0, 1.0),
@@ -1233,7 +1233,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
               );
             }),
           )
-              .animate()
+              .animatePage(context)
               .scale(
                 begin: const Offset(0.3, 0.3),
                 end: const Offset(1.0, 1.0),
@@ -1254,7 +1254,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
               fontWeight: FontWeight.bold,
               color: _scoreColor(overall, theme),
             ),
-          ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+          ).animatePage(context).fadeIn(delay: 200.ms, duration: 400.ms),
           const SizedBox(height: SpacingTokens.xs),
           Text(
             _scoreLabel(overall),

@@ -477,7 +477,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                     if (_answered) ...[
                       const SizedBox(height: SpacingTokens.md),
                       _buildFeedback(context, session, q, theme)
-                          .animate()
+                          .animatePage(context)
                           .fadeIn(duration: 300.ms)
                           .scale(
                             begin: const Offset(0.9, 0.9),
@@ -628,7 +628,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
         // 交错入场
         optionWidget = optionWidget
-            .animate()
+            .animatePage(context)
             .fadeIn(delay: (100 * i).ms, duration: 300.ms)
             .slideX(
               begin: 0.15,
@@ -776,7 +776,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
+          ).animatePage(context).fadeIn(delay: 400.ms, duration: 400.ms),
           const SizedBox(height: SpacingTokens.xl),
 
           // 统计卡片（滑入）
@@ -859,7 +859,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                 ],
               ],
             ),
-          ).animate().fadeIn(delay: 600.ms, duration: 400.ms).slideY(
+          ).animatePage(context).fadeIn(delay: 600.ms, duration: 400.ms).slideY(
                 begin: 0.15,
                 end: 0,
                 delay: 600.ms,
@@ -927,7 +927,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                 ),
               ),
             ],
-          ).animate().fadeIn(delay: 800.ms, duration: 400.ms),
+          ).animatePage(context).fadeIn(delay: 800.ms, duration: 400.ms),
         ],
       ),
     );

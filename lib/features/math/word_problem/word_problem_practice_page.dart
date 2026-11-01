@@ -20,6 +20,7 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
+import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/user_stats.dart';
@@ -689,7 +690,10 @@ class _WordProblemPracticePageState
                                     height: 1.6,
                                     color: theme.colorScheme.onSurface,
                                   ),
-                                ).animate().fadeIn(duration: 350.ms).slideX(
+                                )
+                                    .animatePage(context)
+                                    .fadeIn(duration: 350.ms)
+                                    .slideX(
                                       begin: 0.12,
                                       end: 0,
                                       duration: 350.ms,
@@ -700,7 +704,7 @@ class _WordProblemPracticePageState
 
                               if (_isCorrect != null) ...[
                                 _buildJudgementFeedback(context)
-                                    .animate()
+                                    .animatePage(context)
                                     .fadeIn(duration: 300.ms)
                                     .scale(
                                       begin: const Offset(0.9, 0.9),
@@ -825,7 +829,7 @@ class _WordProblemPracticePageState
             _currentIndex + 1 >= _problems.length ? '查看成绩' : '下一题',
           ),
         ),
-      ).animate().fadeIn(duration: 250.ms).slideY(
+      ).animatePage(context).fadeIn(duration: 250.ms).slideY(
             begin: 0.2,
             end: 0,
             duration: 250.ms,

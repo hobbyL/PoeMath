@@ -3,16 +3,14 @@
 // 层级：core/widgets
 // 职责：带交错入场动画的页面内容容器，统一全局子页面内容动画。
 //
-// 动画效果完全复制自 poem_review_page 的 flutter_animate 风格：
-// - 卡片/大组件：fadeIn 400ms + slideY(0.1) 400ms
-// - 列表项/行：fadeIn 300ms + slideX(0.1) 300ms
-// - 交错间隔：80ms
-// - SizedBox 等间距组件自动跳过，不计入动画序列。
+// 开启页面动画时：fadeIn 300ms + slideX(0.1) 300ms，按原子项索引延迟 80ms。
+// SizedBox 等间距组件不生成动画。关闭时直接显示最终状态并保留子组件 State。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/page_animation_scope.dart';
 
 /// 带交错入场动画的可滚动页面内容。
 ///
@@ -53,10 +51,16 @@ class AnimatedPageBody extends StatelessWidget {
     return ListView(
       controller: controller,
       padding: padding,
-      children: children
-          .animate(interval: 80.ms)
-          .fadeIn(duration: 300.ms)
-          .slideX(begin: 0.1, end: 0, duration: 300.ms),
+      children: [
+        for (final entry in children.asMap().entries)
+          if (AnimateList.ignoreTypes.contains(entry.value.runtimeType))
+            entry.value
+          else
+            entry.value
+                .animatePage(context, delay: (entry.key * 80).ms)
+                .fadeIn(duration: 300.ms)
+                .slideX(begin: 0.1, end: 0, duration: 300.ms),
+      ],
     );
   }
 }

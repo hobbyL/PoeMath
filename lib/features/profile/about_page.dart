@@ -83,7 +83,7 @@ class _AboutPageState extends State<AboutPage> {
                         size: 72,
                         color: theme.colorScheme.primary,
                       )
-                          .animate()
+                          .animatePage(context)
                           .scaleXY(
                             begin: 0.8,
                             end: 1.0,

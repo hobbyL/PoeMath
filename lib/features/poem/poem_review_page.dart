@@ -70,7 +70,7 @@ class PoemReviewPage extends ConsumerWidget {
                 children: [
                   // 艾宾浩斯说明卡片
                   _buildInfoCard(context)
-                      .animate()
+                      .animatePage(context)
                       .fadeIn(duration: 400.ms)
                       .slideY(begin: 0.1, end: 0, duration: 400.ms),
                   const SizedBox(height: SpacingTokens.lg),
@@ -101,7 +101,7 @@ class PoemReviewPage extends ConsumerWidget {
                       '今日待复习',
                       '${dueToday.length} 首',
                       theme.colorScheme.primary,
-                    ).animate().fadeIn(duration: 300.ms).slideX(
+                    ).animatePage(context).fadeIn(duration: 300.ms).slideX(
                           begin: -0.1,
                           end: 0,
                           duration: 300.ms,
@@ -114,7 +114,7 @@ class PoemReviewPage extends ConsumerWidget {
                             e.value,
                             isDue: true,
                           )
-                              .animate()
+                              .animatePage(context)
                               .fadeIn(
                                 delay: (80 * e.key).ms,
                                 duration: 300.ms,
@@ -136,7 +136,7 @@ class PoemReviewPage extends ConsumerWidget {
                       '即将复习',
                       '${upcoming.length} 首',
                       theme.colorScheme.secondary,
-                    ).animate().fadeIn(duration: 300.ms).slideX(
+                    ).animatePage(context).fadeIn(duration: 300.ms).slideX(
                           begin: -0.1,
                           end: 0,
                           duration: 300.ms,
@@ -149,7 +149,7 @@ class PoemReviewPage extends ConsumerWidget {
                             e.value,
                             isDue: false,
                           )
-                              .animate()
+                              .animatePage(context)
                               .fadeIn(
                                 delay: (80 * e.key).ms,
                                 duration: 300.ms,

@@ -170,8 +170,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   void _goHome() {
     if (!mounted) return;
     // 首次启动 → 引导页，否则直接进首页
-    final hasOnboarded =
-        ref.read(settingsRepositoryProvider).hasOnboarded;
+    final hasOnboarded = ref.read(settingsRepositoryProvider).hasOnboarded;
     if (hasOnboarded) {
       context.go(AppRoutes.home);
     } else {
@@ -217,7 +216,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
                 style: theme.textTheme.displayLarge?.copyWith(
                   color: theme.colorScheme.primary,
                 ),
-              ).animate().fadeIn(duration: 600.ms).slideY(
+              ).animatePage(context).fadeIn(duration: 600.ms).slideY(
                     begin: 0.3,
                     end: 0,
                     duration: 600.ms,
@@ -229,7 +228,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
-              ).animate().fadeIn(delay: 300.ms, duration: 600.ms),
+              ).animatePage(context).fadeIn(delay: 300.ms, duration: 600.ms),
               if (_isImporting) ...[
                 const SizedBox(height: SpacingTokens.xl),
                 Padding(

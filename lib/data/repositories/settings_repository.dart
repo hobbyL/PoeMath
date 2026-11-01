@@ -58,6 +58,7 @@ class SettingsRepository {
   static const String _keyActiveSubject = 'active_subject'; // 'poem' | 'math'
   static const String _keySoundEnabled = 'sound_enabled';
   static const String _keyHapticEnabled = 'haptic_enabled';
+  static const String pageAnimationsEnabledKey = 'page_animations_enabled';
   static const String _keySelectedGrade = 'selected_grade';
   static const String _keySelectedSemester = 'selected_semester';
   static const String _keyTtsSpeed = 'tts_speed';
@@ -154,6 +155,16 @@ class SettingsRepository {
 
   Future<void> setThemeMode(String mode) async {
     await _putValidated(_keyThemeMode, mode);
+  }
+
+  /// 默认保留现有页面动画；缺失或损坏的历史值只读回落，不改写存储。
+  bool get pageAnimationsEnabled {
+    final value = HiveBoxes.settings.get(pageAnimationsEnabledKey);
+    return value is bool ? value : true;
+  }
+
+  Future<void> setPageAnimationsEnabled(bool enabled) async {
+    await HiveBoxes.settings.put(pageAnimationsEnabledKey, enabled);
   }
 
   // ============ 音效 ============

@@ -220,7 +220,9 @@ void main() {
     await tester.runAsync(() => tester.tap(find.text('我已保存')));
     await _pumpUntil(
       tester,
-      () => find.byType(LlmProviderSettingsPage).evaluate().isNotEmpty,
+      () =>
+          find.byType(LlmProviderSettingsPage).evaluate().isNotEmpty &&
+          find.byType(ParentProtectionPage).evaluate().isEmpty,
     );
     expect(router.routerDelegate.state.uri.path, AppRoutes.profile);
     await tester.runAsync(() => tester.pageBack());
@@ -257,7 +259,9 @@ void main() {
     await tester.runAsync(() => tester.tap(find.text('我已保存')));
     await _pumpUntil(
       tester,
-      () => find.byType(SettingsPage).evaluate().isNotEmpty,
+      () =>
+          find.byType(SettingsPage).evaluate().isNotEmpty &&
+          find.byType(ParentProtectionPage).evaluate().isEmpty,
     );
     expect(router.routerDelegate.state.uri.path, AppRoutes.settings);
     expect(find.byType(ParentProtectionPage), findsNothing);

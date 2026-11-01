@@ -17,11 +17,16 @@ import '../../helpers/parent_access_test_helper.dart';
 class _DelayedSettingsRepository extends SettingsRepository {
   final writeStarted = Completer<void>();
   final allowWrite = Completer<void>();
+  final writeCompleted = Completer<void>();
+  late Future<void> storageWrite;
 
   @override
-  Future<void> setSoundEnabled(bool enabled) {
+  Future<void> setPageAnimationsEnabled(bool enabled) async {
     writeStarted.complete();
-    return allowWrite.future;
+    await allowWrite.future;
+    storageWrite = Zone.root.run(() => super.setPageAnimationsEnabled(enabled));
+    await storageWrite;
+    writeCompleted.complete();
   }
 }
 
@@ -31,12 +36,17 @@ class _FailingSettingsRepository extends SettingsRepository {
   Future<void> setSoundEnabled(bool enabled) async {
     throw StateError('磁盘写入失败');
   }
+
+  @override
+  Future<void> setPageAnimationsEnabled(bool enabled) async {
+    throw StateError('磁盘写入失败');
+  }
 }
 
 /// 定位某设置项行内的开关。
 ///
 /// 不再用 `find.byType(Switch)`：同组开关数会随分组调整变化（如「外观与
-/// 反馈」含音效 + 触觉两个），裸 byType 会 ambiguous 失败。按标题定位对
+/// 反馈」含页面动画、音效和触觉反馈），裸 byType 会 ambiguous 失败。按标题定位对
 /// 分组变动免疫。
 Finder _switchOf(String title) => find.descendant(
       of: find.ancestor(of: find.text(title), matching: find.byType(AppTile)),
@@ -128,7 +138,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // 外观与反馈：主题 + 明暗 + 音效 + 触觉（拼音已移出）。
+    // 外观与反馈：主题、明暗、页面动画、音效与触觉。
     await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
     expect(find.text('主题设置'), findsOneWidget);
@@ -217,7 +227,17 @@ void main() {
     // 项 —— 拼音显示开关随详情页拼音改折叠卡一并移除）。
     await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
-    expect(find.byType(Switch), findsNWidgets(2));
+    expect(find.byType(Switch), findsNWidgets(3));
+    expect(find.text('页面动画'), findsOneWidget);
+    expect(settings.pageAnimationsEnabled, isTrue);
+    await tester.runAsync(() async {
+      await tester.tap(_switchOf('页面动画'));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pumpAndSettle();
+    expect(settings.pageAnimationsEnabled, isFalse);
+    expect(find.text('已关闭 · 使用系统默认动画'), findsOneWidget);
+
     final soundTile = find.ancestor(
       of: find.text('音效'),
       matching: find.byType(AppTile),
@@ -251,7 +271,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('设置写入期间离开分类页不应访问已销毁的 ref', (tester) async {
+  testWidgets('动画保存期间离开分类页不访问销毁的ref，保存结果仍刷新全局偏好', (tester) async {
     final settings = _DelayedSettingsRepository();
     final container = ProviderContainer(
       overrides: [
@@ -259,6 +279,13 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+
+    final subscription = container.listen(
+      pageAnimationsEnabledProvider,
+      (previous, next) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -270,7 +297,7 @@ void main() {
 
     await tester.tap(find.text('外观与反馈'));
     await tester.pumpAndSettle();
-    await tester.tap(_switchOf('音效'));
+    await tester.runAsync(() => tester.tap(_switchOf('页面动画')));
     await tester.pump();
     expect(settings.writeStarted.isCompleted, isTrue);
 
@@ -278,8 +305,12 @@ void main() {
     await tester.pumpAndSettle();
     settings.allowWrite.complete();
     await tester.pump();
+    await tester.runAsync(() => settings.storageWrite);
+    await tester.pump();
 
     expect(tester.takeException(), isNull);
+    expect(settings.writeCompleted.isCompleted, isTrue);
+    expect(container.read(pageAnimationsEnabledProvider), isFalse);
   });
 
   testWidgets('设置写入失败：提示用户、不回滚界面、不冒泡异常', (tester) async {
@@ -312,6 +343,12 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('音效设置保存失败，请重试'), findsOneWidget);
 
+    await tester.tap(_switchOf('页面动画'));
+    await tester.pumpAndSettle();
+    expect(find.text('页面动画设置保存失败，请重试'), findsOneWidget);
+    expect(settings.pageAnimationsEnabled, isTrue);
+    expect(tester.widget<Switch>(_switchOf('页面动画')).value, isTrue);
+
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
   });
@@ -336,6 +373,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('外观与反馈'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('外观与反馈'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(_switchOf('页面动画'));
+    await tester.pumpAndSettle();
+    expect(find.text('页面动画'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

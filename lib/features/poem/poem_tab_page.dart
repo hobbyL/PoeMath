@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/poem_card.dart';
@@ -240,7 +241,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                             );
                           },
                         )
-                            .animate()
+                            .animatePage(context)
                             .fadeIn(
                               delay: (80 * index).ms,
                               duration: 300.ms,

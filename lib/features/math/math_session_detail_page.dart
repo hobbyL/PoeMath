@@ -100,7 +100,7 @@ class MathSessionDetailPage extends ConsumerWidget {
                     ),
                   ),
                 )
-                    .animate()
+                    .animatePage(context)
                     .fadeIn(duration: 400.ms)
                     .slideY(begin: 0.1, end: 0, duration: 400.ms),
               ),
@@ -144,7 +144,7 @@ class MathSessionDetailPage extends ConsumerWidget {
                                 record: record,
                                 sessionId: session.id,
                               )
-                                  .animate()
+                                  .animatePage(context)
                                   .fadeIn(
                                     delay: (80 * idx).ms,
                                     duration: 300.ms,
@@ -181,7 +181,6 @@ class MathSessionDetailPage extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 class _SummaryItem extends StatelessWidget {

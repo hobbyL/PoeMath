@@ -126,7 +126,7 @@ class MathMistakePage extends ConsumerWidget {
                             ],
                           ),
                         )
-                            .animate()
+                            .animatePage(context)
                             .fadeIn(duration: 400.ms)
                             .slideY(begin: 0.1, end: 0, duration: 400.ms),
                       ),
@@ -330,7 +330,7 @@ class MathMistakePage extends ConsumerWidget {
                                       ),
                                       child: _MistakeCard(mistake: mistake),
                                     )
-                                        .animate()
+                                        .animatePage(context)
                                         .fadeIn(
                                           delay: (80 * idx).ms,
                                           duration: 300.ms,

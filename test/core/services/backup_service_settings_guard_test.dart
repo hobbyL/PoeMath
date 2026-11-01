@@ -18,6 +18,7 @@ import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
@@ -78,6 +79,7 @@ Map<String, dynamic> _llmEndpointSettings() => <String, dynamic>{
 Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       'theme_mode': 'light',
       'active_subject': 'math',
+      'page_animations_enabled': false,
       'sound_enabled': false,
       'completion_sound': 'pizzicato',
       'answer_feedback_sound': 'child_voice',
@@ -136,6 +138,30 @@ void main() {
       'settings': settings,
     });
   }
+
+  test('页面动画偏好真实导出恢复，旧备份缺失或类型损坏时保留本机选择', () async {
+    final settings = SettingsRepository();
+    await settings.setPageAnimationsEnabled(false);
+    final exported = await backupService.exportToJson();
+    final data = jsonDecode(exported) as Map<String, dynamic>;
+    expect((data['settings'] as Map)['page_animations_enabled'], false);
+    await settings.setPageAnimationsEnabled(true);
+    await backupService.restoreFromJson(exported);
+    expect(settings.pageAnimationsEnabled, isFalse);
+
+    await settings.setPageAnimationsEnabled(true);
+    (data['settings'] as Map).remove('page_animations_enabled');
+    await backupService.restoreFromJson(jsonEncode(data));
+    expect(settings.pageAnimationsEnabled, isTrue);
+    for (final invalid in <Object?>[null, 'false', 0]) {
+      await backupService.restoreFromJson(
+        await backupWithSettings({
+          'page_animations_enabled': invalid,
+        }),
+      );
+      expect(settings.pageAnimationsEnabled, isTrue);
+    }
+  });
 
   test('AC1 注入测试：排除 key 不落盘且本机原值保留', () async {
     // 本机已有真实值，恢复后必须原样保留（这些仍是排除项）。

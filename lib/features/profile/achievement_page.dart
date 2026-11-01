@@ -66,11 +66,11 @@ class AchievementPage extends ConsumerWidget {
                             SpacingTokens.radiusSmall,
                           ),
                           child: LinearProgressIndicator(
-                            value: totalCount > 0
-                                ? unlockedCount / totalCount
-                                : 0,
+                            value:
+                                totalCount > 0 ? unlockedCount / totalCount : 0,
                             minHeight: 8,
-                            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHighest,
                             color: theme.semantic.caution,
                           ),
                         ),
@@ -79,7 +79,7 @@ class AchievementPage extends ConsumerWidget {
                   ),
                 ],
               ),
-            ).animate().fadeIn(duration: 400.ms).slideY(
+            ).animatePage(context).fadeIn(duration: 400.ms).slideY(
                   begin: 0.1,
                   end: 0,
                   duration: 400.ms,
@@ -194,7 +194,7 @@ class _CategorySection extends StatelessWidget {
             achievement: achievement,
             color: color,
           )
-              .animate()
+              .animatePage(context)
               .fadeIn(delay: (60 * idx).ms, duration: 300.ms)
               .slideX(
                 begin: 0.08,
@@ -270,8 +270,7 @@ class _AchievementTile extends StatelessWidget {
                 size: 24,
                 color: isUnlocked
                     ? color
-                    : theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.4),
+                    : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
               ),
             ),
             const SizedBox(width: SpacingTokens.md),

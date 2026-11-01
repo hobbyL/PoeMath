@@ -105,7 +105,7 @@ class MathHistoryPage extends ConsumerWidget {
                                     ),
                                     child: _SessionCard(session: session),
                                   )
-                                      .animate()
+                                      .animatePage(context)
                                       .fadeIn(
                                         delay: (80 * idx).ms,
                                         duration: 300.ms,
@@ -142,7 +142,6 @@ class MathHistoryPage extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 class _SessionCard extends StatelessWidget {
