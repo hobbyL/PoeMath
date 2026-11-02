@@ -707,7 +707,7 @@ class _PictureStoryPracticePageState
                   if (_showHints) ...[
                     const SizedBox(height: SpacingTokens.sm),
                     Text(
-                      prompt.sceneFacts.join('；'),
+                      prompt.sceneFacts.join('\n'),
                       style: bodyStyle,
                     ),
                   ],
