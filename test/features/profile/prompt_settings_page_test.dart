@@ -2,7 +2,7 @@
 //
 // AI 提示词设置页 widget 测试：初始展示内置默认全文、编辑保存落 Hive、
 // 清空保存 = 恢复默认、超 2000 字拒绝、恢复默认确认弹层先展示默认全文
-// 再确认、已是默认时恢复按钮禁用、助手人设区块与另两区块同构。
+// 再确认、已是默认时恢复按钮禁用，两个出题场景和讲解、助手共用相同操作。
 //
 // Hive 写链 tap 须在 runAsync 真实异步区执行（本仓既有结论）。
 
@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/prompts/assistant_prompt_defaults.dart';
 import 'package:poemath/core/prompts/explain_prompt_defaults.dart';
+import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -47,9 +48,12 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   Future<String?> readLlmApiKey() => Future.value(null);
 }
 
-Future<void> _pumpPage(WidgetTester tester) async {
-  // 两区块多行编辑框内容较长，放大视口避免懒挂载与 tap 越界。
-  tester.view.physicalSize = const Size(800, 2400);
+Future<void> _pumpPage(
+  WidgetTester tester, {
+  Size size = const Size(800, 2400),
+  double scale = 1,
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   await tester.pumpWidget(
     ProviderScope(
@@ -58,7 +62,14 @@ Future<void> _pumpPage(WidgetTester tester) async {
           _MemoryCredentialStore(),
         ),
       ],
-      child: const MaterialApp(home: PromptSettingsPage()),
+      child: MaterialApp(
+        home: const PromptSettingsPage(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!,
+        ),
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -70,6 +81,8 @@ Future<void> _tapReal(
   Finder finder, {
   Duration delay = const Duration(milliseconds: 150),
 }) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
   await tester.runAsync(() async {
     await tester.tap(finder);
     await Future<void>.delayed(delay);
@@ -103,9 +116,9 @@ Finder _sectionField(String sectionTitle) {
   );
 }
 
-/// 取第 [index] 个 TextField 的当前文本（0 = 诗词，1 = 口算，2 = 助手）。
-String _fieldText(WidgetTester tester, int index) {
-  final field = tester.widget<TextField>(find.byType(TextField).at(index));
+/// 按场景标题读取当前文本，场景增减不会改变定位。
+String _fieldText(WidgetTester tester, String title) {
+  final field = tester.widget<TextField>(_sectionField(title));
   return field.controller?.text ?? '';
 }
 
@@ -120,36 +133,40 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  testWidgets('未自定义时：三区块展示内置默认全文与「内置默认」标注',
-      (tester) async {
+  testWidgets('未自定义时：五个场景展示内置默认全文与「内置默认」标注', (tester) async {
     await _pumpPage(tester);
 
+    expect(find.text('AI 生成应用题'), findsOneWidget);
+    expect(find.text('AI 生成看图说话题'), findsOneWidget);
+    expect(_fieldText(tester, 'AI 生成应用题'), kWordProblemGenerationSystemPrompt);
+    expect(
+      _fieldText(tester, 'AI 生成看图说话题'),
+      kPictureStoryGenerationSystemPrompt,
+    );
     expect(find.text('诗词讲解'), findsOneWidget);
     expect(find.text('口算解析'), findsOneWidget);
     expect(find.text('AI 助手人设'), findsOneWidget);
-    expect(find.text('内置默认'), findsNWidgets(3));
+    expect(find.text('内置默认'), findsNWidgets(5));
     expect(find.text('已自定义'), findsNothing);
 
-    expect(_fieldText(tester, 0), kPoemExplainSystemPrompt);
-    expect(_fieldText(tester, 1), kMathExplainSystemPrompt);
+    expect(_fieldText(tester, '诗词讲解'), kPoemExplainSystemPrompt);
+    expect(_fieldText(tester, '口算解析'), kMathExplainSystemPrompt);
   });
 
-  testWidgets('已有自定义时：标注「已自定义」且编辑框展示覆盖值',
-      (tester) async {
+  testWidgets('已有自定义时：标注「已自定义」且编辑框展示覆盖值', (tester) async {
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_poem_explain_prompt', '我的诗词风格');
     });
     await _pumpPage(tester);
 
     expect(find.text('已自定义'), findsOneWidget);
-    expect(find.text('内置默认'), findsNWidgets(2));
-    expect(_fieldText(tester, 0), '我的诗词风格');
-    expect(_fieldText(tester, 1), kMathExplainSystemPrompt);
-    expect(_fieldText(tester, 2), kAssistantSystemPrompt);
+    expect(find.text('内置默认'), findsNWidgets(4));
+    expect(_fieldText(tester, '诗词讲解'), '我的诗词风格');
+    expect(_fieldText(tester, '口算解析'), kMathExplainSystemPrompt);
+    expect(_fieldText(tester, 'AI 助手人设'), kAssistantSystemPrompt);
   });
 
-  testWidgets('编辑诗词提示词保存：落 Hive 且标注变「已自定义」',
-      (tester) async {
+  testWidgets('编辑诗词提示词保存：落 Hive 且标注变「已自定义」', (tester) async {
     await _pumpPage(tester);
 
     await tester.enterText(_sectionField('诗词讲解'), '新诗词提示');
@@ -171,8 +188,7 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('清空保存 = 恢复默认：删 key、标注回「内置默认」、框回默认全文',
-      (tester) async {
+  testWidgets('清空保存 = 恢复默认：删 key、标注回「内置默认」、框回默认全文', (tester) async {
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_math_explain_prompt', '我的口算风格');
     });
@@ -183,9 +199,9 @@ void main() {
     await _tapReal(tester, _sectionButton('口算解析', '保存'));
 
     expect(HiveBoxes.settings.get('llm_math_explain_prompt'), isNull);
-    expect(find.text('内置默认'), findsNWidgets(3));
+    expect(find.text('内置默认'), findsNWidgets(5));
     expect(find.text('已恢复默认'), findsOneWidget);
-    expect(_fieldText(tester, 1), kMathExplainSystemPrompt);
+    expect(_fieldText(tester, '口算解析'), kMathExplainSystemPrompt);
 
     await tester.pump(const Duration(seconds: 5));
   });
@@ -203,8 +219,7 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('恢复默认：确认弹层先展示默认全文，确认后删 key 回默认',
-      (tester) async {
+  testWidgets('恢复默认：确认弹层先展示默认全文，确认后删 key 回默认', (tester) async {
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_poem_explain_prompt', '改坏了的风格');
     });
@@ -236,8 +251,8 @@ void main() {
     await _tapReal(tester, find.widgetWithText(FilledButton, '恢复默认'));
 
     expect(HiveBoxes.settings.get('llm_poem_explain_prompt'), isNull);
-    expect(find.text('内置默认'), findsNWidgets(3));
-    expect(_fieldText(tester, 0), kPoemExplainSystemPrompt);
+    expect(find.text('内置默认'), findsNWidgets(5));
+    expect(_fieldText(tester, '诗词讲解'), kPoemExplainSystemPrompt);
 
     await tester.pump(const Duration(seconds: 5));
   });
@@ -248,7 +263,7 @@ void main() {
     });
     await _pumpPage(tester);
 
-    await tester.tap(_sectionButton('诗词讲解', '恢复默认'));
+    await _tapReal(tester, _sectionButton('诗词讲解', '恢复默认'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(TextButton, '取消'));
@@ -259,7 +274,7 @@ void main() {
       HiveBoxes.settings.get('llm_poem_explain_prompt'),
       '我的诗词风格',
     );
-    expect(_fieldText(tester, 0), '我的诗词风格');
+    expect(_fieldText(tester, '诗词讲解'), '我的诗词风格');
     expect(find.text('已自定义'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));
@@ -288,6 +303,70 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
+  for (final (title, key, defaultText) in [
+    ('AI 生成应用题', 'llm_word_problem_prompt', kWordProblemGenerationSystemPrompt),
+    (
+      'AI 生成看图说话题',
+      'llm_picture_story_prompt',
+      kPictureStoryGenerationSystemPrompt
+    ),
+  ]) {
+    testWidgets('$title：保存后重新进入保留内容，取消恢复不改写，确认和清空均恢复默认', (tester) async {
+      await _pumpPage(tester);
+      await tester.enterText(_sectionField(title), '  我的出题偏好  ');
+      await _tapReal(tester, _sectionButton(title, '保存'));
+      expect(HiveBoxes.settings.get(key), '我的出题偏好');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await _pumpPage(tester);
+      expect(_fieldText(tester, title), '我的出题偏好');
+      await _tapReal(tester, _sectionButton(title, '恢复默认'));
+      expect(find.text(defaultText), findsOneWidget);
+      await _tapReal(tester, find.widgetWithText(TextButton, '取消'));
+      expect(HiveBoxes.settings.get(key), '我的出题偏好');
+      expect(_fieldText(tester, title), '我的出题偏好');
+
+      await _tapReal(tester, _sectionButton(title, '恢复默认'));
+      await _tapReal(tester, find.widgetWithText(FilledButton, '恢复默认'));
+      expect(HiveBoxes.settings.containsKey(key), isFalse);
+      expect(_fieldText(tester, title), defaultText);
+      await tester.enterText(_sectionField(title), '再次自定义');
+      await _tapReal(tester, _sectionButton(title, '保存'));
+      await tester.enterText(_sectionField(title), '   ');
+      await _tapReal(tester, _sectionButton(title, '保存'));
+      expect(HiveBoxes.settings.containsKey(key), isFalse);
+      expect(_fieldText(tester, title), defaultText);
+      await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('$title：超过共同长度上限不保存', (tester) async {
+      await _pumpPage(tester);
+      await tester.enterText(_sectionField(title), '超' * (_maxLength + 1));
+      await _tapReal(tester, _sectionButton(title, '保存'));
+      expect(HiveBoxes.settings.containsKey(key), isFalse);
+      expect(find.text('$title提示词超长，已取消保存'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+    });
+  }
+
+  testWidgets('五个场景在小屏大字号下均可滚动到编辑和操作按钮，无布局溢出', (tester) async {
+    await _pumpPage(tester, size: const Size(320, 900), scale: 2);
+    for (final title in [
+      'AI 生成应用题',
+      'AI 生成看图说话题',
+      '诗词讲解',
+      '口算解析',
+      'AI 助手人设',
+    ]) {
+      await tester.ensureVisible(_sectionField(title));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(_sectionButton(title, '保存'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('助手人设区块：编辑保存落 llm_assistant_prompt 键', (tester) async {
     await _pumpPage(tester);
 
@@ -303,20 +382,18 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('助手人设区块：已有覆盖值时展示覆盖值并标注「已自定义」',
-      (tester) async {
+  testWidgets('助手人设区块：已有覆盖值时展示覆盖值并标注「已自定义」', (tester) async {
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_assistant_prompt', '你是严格老师');
     });
     await _pumpPage(tester);
 
-    expect(_fieldText(tester, 2), '你是严格老师');
+    expect(_fieldText(tester, 'AI 助手人设'), '你是严格老师');
     expect(find.text('已自定义'), findsOneWidget);
-    expect(find.text('内置默认'), findsNWidgets(2));
+    expect(find.text('内置默认'), findsNWidgets(4));
   });
 
-  testWidgets('助手人设区块：清空保存 = 恢复默认，框回 kAssistantSystemPrompt',
-      (tester) async {
+  testWidgets('助手人设区块：清空保存 = 恢复默认，框回 kAssistantSystemPrompt', (tester) async {
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_assistant_prompt', '你是严格老师');
     });
@@ -326,14 +403,13 @@ void main() {
     await _tapReal(tester, _sectionButton('AI 助手人设', '保存'));
 
     expect(HiveBoxes.settings.get('llm_assistant_prompt'), isNull);
-    expect(_fieldText(tester, 2), kAssistantSystemPrompt);
-    expect(find.text('内置默认'), findsNWidgets(3));
+    expect(_fieldText(tester, 'AI 助手人设'), kAssistantSystemPrompt);
+    expect(find.text('内置默认'), findsNWidgets(5));
 
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('助手人设区块：恢复默认确认后删 key 回内置默认全文',
-      (tester) async {
+  testWidgets('助手人设区块：恢复默认确认后删 key 回内置默认全文', (tester) async {
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('llm_assistant_prompt', '改坏了的助手人设');
     });
@@ -346,7 +422,7 @@ void main() {
     await _tapReal(tester, find.widgetWithText(FilledButton, '恢复默认'));
 
     expect(HiveBoxes.settings.get('llm_assistant_prompt'), isNull);
-    expect(_fieldText(tester, 2), kAssistantSystemPrompt);
+    expect(_fieldText(tester, 'AI 助手人设'), kAssistantSystemPrompt);
 
     await tester.pump(const Duration(seconds: 5));
   });

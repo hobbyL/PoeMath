@@ -44,6 +44,7 @@ class _GenerationFlow extends PictureStoryGenerationService {
           ),
         );
   final PictureStoryImage image;
+  String? capturedPrompt;
   @override
   Future<void> run({
     required PictureStoryGenerationDraft draft,
@@ -53,8 +54,10 @@ class _GenerationFlow extends PictureStoryGenerationService {
     void Function()? onChanged,
     String? candidateId,
     bool regenerateImage = false,
+    String? promptOverride,
   }) async {
     if (!isActive()) throw const ImageGenerationCancelled();
+    capturedPrompt = promptOverride;
     final items = [
       for (var i = 0; i < draft.options.count; i++) _candidate(draft, i),
     ];
@@ -232,7 +235,7 @@ void main() {
     });
   }
 
-  testWidgets('生成、编辑草稿、勾选后确认入库的真实页面链路', (tester) async {
+  testWidgets('使用自定义提示词生成、编辑草稿、勾选后确认入库的真实页面链路', (tester) async {
     final png = await tester.runAsync(() => pictureStoryPng());
     // 测试使用已验证的本地图片，HTTP 图文生成由服务专项测试覆盖。
     final image = await tester.runAsync(() => images.importBytes(png!));
@@ -240,6 +243,7 @@ void main() {
         _GenerationFlow(image: image!, repository: repository, images: images);
     await tester.runAsync(() async {
       final settings = SettingsRepository();
+      await settings.setPictureStoryGenerationPrompt('用儿童水彩场景引导观察和表达');
       await settings.saveImageGenerationConfig(
         provider: const ImageGenerationProviderConfig(
           name: '测试',
@@ -261,6 +265,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
     await _until(tester, () => service.readDraft('default')?.readyCount == 3);
+    expect((service as _GenerationFlow).capturedPrompt, '用儿童水彩场景引导观察和表达');
     expect(repository.catalogState().versions, isEmpty);
     final first = service.readDraft('default')!.candidates.first;
     final firstCard = find.byKey(ValueKey(first.id));

@@ -13,6 +13,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/bounded_http_client.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 
@@ -345,11 +346,13 @@ final class LlmClient {
     required String semester,
     required String topic,
     required bool Function() isActive,
+    String? promptOverride,
   }) async {
     if (plans.isEmpty) {
       return LlmWordProblemSceneResult(choices: [], requestCount: 0);
     }
     final accepted = <int, LlmWordProblemSceneChoice>{};
+    final systemPrompt = buildWordProblemGenerationPrompt(promptOverride);
     final attempts = _attemptsFor(config);
     final pending = [...attempts];
     ({LlmConfig provider, String model})? repair;
@@ -392,9 +395,7 @@ final class LlmClient {
         'messages': [
           {
             'role': 'system',
-            'content': '为小学应用题选择多样的生活情境素材。'
-                '只返回JSON数组，每项严格包含index、sceneId、variantId。'
-                '必须从每题候选中选择，不输出题面、数量、单位、算式、答案或讲解。',
+            'content': systemPrompt,
           },
           {
             'role': 'user',

@@ -440,9 +440,11 @@ void main() {
     await drainHiveWritesForTesting(tester);
   });
 
-  testWidgets('配置等待时修改练习难度及选项，生成始终使用发起时设置快照', (tester) async {
+  testWidgets('配置等待时修改难度、提示词及选项，生成始终使用发起时设置快照', (tester) async {
     final settings = _DelayedSettingsRepository();
     await tester.runAsync(() => settings.setMathDifficulty('hard'));
+    await tester
+        .runAsync(() => settings.setWordProblemGenerationPrompt('发起时的自然观察偏好'));
     final response = Completer<http.Response>();
     http.Request? request;
     (int, String, String, int, DifficultyLevel)? capturedSkeleton;
@@ -482,6 +484,8 @@ void main() {
     await tester.tap(find.text('下学期'));
     await tester.pump();
     await tester.runAsync(() => settings.setMathDifficulty('easy'));
+    await tester
+        .runAsync(() => settings.setWordProblemGenerationPrompt('等待时改为购物偏好'));
     settings.pending.complete(_config);
     // 放行配置读取后，`_generate` 才真正开跑，它将经过
     // `CloudUsageService.reserve` —— 其中 `HiveBoxes.meta.put` 的完成
@@ -533,6 +537,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     final body = jsonDecode(request!.body) as Map<String, dynamic>;
+    final systemPrompt = (body['messages'] as List).first['content'] as String;
+    expect(systemPrompt, startsWith('发起时的自然观察偏好\n\n'));
+    expect(systemPrompt, isNot(contains('等待时改为购物偏好')));
     final prompt = (body['messages'] as List).last['content'] as String;
     expect(prompt, contains('小学2年级'));
     expect(prompt, contains('上学期'));

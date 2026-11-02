@@ -40,6 +40,7 @@ class WordProblemGenerationService {
     required int count,
     DifficultyLevel difficulty = DifficultyLevel.medium,
     required bool Function() isActive,
+    String? promptOverride,
   }) async {
     if (!isActive()) throw const LlmGenerationCancelled();
     final selectedTopics = topics.toSet().toList(growable: false);
@@ -71,6 +72,7 @@ class WordProblemGenerationService {
       semester: semester,
       topic: selectedTopics.map((topic) => topic.label).join('、'),
       isActive: isActive,
+      promptOverride: promptOverride,
     );
     if (!isActive()) throw const LlmGenerationCancelled();
     final choices = {for (final choice in result.choices) choice.index: choice};

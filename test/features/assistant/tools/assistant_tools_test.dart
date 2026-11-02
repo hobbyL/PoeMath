@@ -467,6 +467,9 @@ void main() {
       await container
           .read(settingsRepositoryProvider)
           .setMathDifficulty('hard');
+      await container
+          .read(settingsRepositoryProvider)
+          .setWordProblemGenerationPrompt('助手出题优先选择自然观察情境');
       final tool = container
           .read(assistantToolsProvider)
           .whereType<GenerateWordProblemsTool>()
@@ -487,6 +490,10 @@ void main() {
       // 出题请求发往出题场景配置（p1），key 仅在头。
       expect(captured.headers['authorization'], 'Bearer $_apiKey');
       expect(captured.body, isNot(contains(_apiKey)));
+      final systemPrompt =
+          ((jsonDecode(captured.body) as Map)['messages'] as List)
+              .first['content'] as String;
+      expect(systemPrompt, startsWith('助手出题优先选择自然观察情境\n\n'));
 
       expect(router.pushes, hasLength(1));
       final (location, extra) = router.pushes.single;

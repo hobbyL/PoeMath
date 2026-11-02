@@ -98,6 +98,7 @@ class GenerateWordProblemsTool extends AssistantTool {
 
     // 出题走「AI 出题」场景配置，非助手配置。
     final settings = ref.read(settingsRepositoryProvider);
+    final promptOverride = settings.wordProblemGenerationPromptOverride;
     final difficulty = DifficultyLevel.values.byName(settings.mathDifficulty);
     final config =
         await settings.readLlmConfigForScenario(LlmScenario.wordProblem);
@@ -123,6 +124,7 @@ class GenerateWordProblemsTool extends AssistantTool {
                 count: count,
                 difficulty: difficulty,
                 isActive: isActive,
+                promptOverride: promptOverride,
               );
       final items = [
         for (var i = 0; i < generated.length; i++)

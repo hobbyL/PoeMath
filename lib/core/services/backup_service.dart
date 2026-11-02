@@ -136,11 +136,12 @@ const Map<String, String> _settingsValueType = <String, String>{
   'reminder_hour': 'int', // 每日提醒小时（24h 制）
   'reminder_minute': 'int', // 每日提醒分钟
   'weekly_report_enabled': 'bool', // 周报开关
-  // AI 讲解提示词用户覆盖（纯文本、非凭据、不指向外部服务，随备份迁移
-  // 换机不丢；与设备绑定的 llm_providers / 场景绑定 key 不同类）。
+  // AI 提示词用户覆盖（纯文本、非凭据，随备份迁移）。
   'llm_poem_explain_prompt': 'string', // 诗词讲解 system prompt 覆盖
   'llm_math_explain_prompt': 'string', // 口算解析 system prompt 覆盖
   'llm_assistant_prompt': 'string', // AI 助手 system prompt 覆盖
+  'llm_word_problem_prompt': 'string', // AI 应用题素材选择提示词
+  'llm_picture_story_prompt': 'string', // AI 看图说话出题提示词
   'assistant_enabled': 'bool', // AI 助手悬浮气泡开关（默认关闭）
   // AI 助手悬浮球停留位置（body 坐标系逻辑像素）。
   //

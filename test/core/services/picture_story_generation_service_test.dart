@@ -126,6 +126,7 @@ void main() {
   var imageCalls = 0;
   var failCaption = 0;
   final captionRequests = <Map<String, dynamic>>[];
+  final planRequests = <Map<String, dynamic>>[];
 
   PictureStoryGenerationService createService({
     PictureStoryImageService? imageService,
@@ -144,6 +145,7 @@ void main() {
             final messages = body['messages'] as List<dynamic>;
             final content = (messages.last as Map<String, dynamic>)['content'];
             if (content is String) {
+              planRequests.add(body);
               planCalls++;
               final saved = service.readDraft('default')!;
               return _completion([
@@ -182,7 +184,10 @@ void main() {
         ),
       );
 
-  Future<PictureStoryGenerationDraft> start({int count = 3}) async {
+  Future<PictureStoryGenerationDraft> start({
+    int count = 3,
+    String? promptOverride,
+  }) async {
     final draft = await service.createDraft(
       PictureStoryGenerationOptions(
         level: PictureStoryLevel.growing,
@@ -195,6 +200,7 @@ void main() {
       config: _llm,
       imageConfig: _imageConfig,
       isActive: () => true,
+      promptOverride: promptOverride,
     );
     return service.readDraft('default')!;
   }
@@ -213,6 +219,7 @@ void main() {
     imageCalls = 0;
     failCaption = 0;
     captionRequests.clear();
+    planRequests.clear();
     service = createService();
   });
   tearDown(() async {
@@ -221,6 +228,30 @@ void main() {
     ProfileScope.reset();
     await tearDownHiveForTesting();
     await directory.delete(recursive: true);
+  });
+
+  test('自定义看图说话提示词同时进入场景规划和实际图片出题，保留各阶段格式约束', () async {
+    final draft = await start(count: 2, promptOverride: '  先观察画面，再用短句表达  ');
+    expect(planCalls, 1);
+    expect(imageCalls, 2);
+    expect(captionCalls, 2);
+    expect(draft.readyCount, 2);
+    final planning =
+        (planRequests.single['messages'] as List).first['content'] as String;
+    expect(planning, startsWith('先观察画面，再用短句表达\n\n'));
+    expect(planning, contains('只输出严格 JSON 数组'));
+    expect(planning, contains('imagePrompt'));
+    expect(planning, contains('不要先编题目或答案'));
+    for (final request in captionRequests) {
+      final messages = request['messages'] as List;
+      final prompt = messages.first['content'] as String;
+      expect(prompt, startsWith('先观察画面，再用短句表达\n\n'));
+      expect(prompt, contains('只输出严格 JSON 对象'));
+      expect(prompt, contains('只依据实际图片'));
+      expect(prompt, contains('不要编造图中看不到'));
+      expect(messages.last['content'], isA<List<Object?>>());
+    }
+    expect(repository.catalogState().versions, isEmpty);
   });
 
   test('先生成实图再看图出题，批量草稿可重读且确认前目录零变化', () async {

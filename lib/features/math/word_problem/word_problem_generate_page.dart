@@ -72,6 +72,7 @@ class _WordProblemGeneratePageState
     final count = _count;
     final difficulty = _difficulty;
     final settings = ref.read(settingsRepositoryProvider);
+    final promptOverride = settings.wordProblemGenerationPromptOverride;
     final createService = ref.read(wordProblemGenerationServiceProvider);
     final client = createRuntimeLlmClient(
       httpClient: ref.read(llmExplainHttpClientProvider),
@@ -96,6 +97,7 @@ class _WordProblemGeneratePageState
         count: count,
         difficulty: difficulty,
         isActive: () => mounted,
+        promptOverride: promptOverride,
       );
       final items = [
         for (var i = 0; i < generated.length; i++)

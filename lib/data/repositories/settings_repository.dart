@@ -40,6 +40,7 @@ class SettingsRepository {
           imageGenerationProviders,
         ),
         'imageActive': imageGenerationActiveProviderId,
+        'prompt': pictureStoryGenerationPromptOverride,
         'llmVersions': _llmProviderVersions,
         'llm': LlmProviderConfig.encodeList(llmProviders),
         'active': HiveBoxes.settings.get('llm_active_provider_id'),
@@ -416,6 +417,10 @@ class SettingsRepository {
   static const String _keyPoemExplainPrompt = 'llm_poem_explain_prompt';
   static const String _keyMathExplainPrompt = 'llm_math_explain_prompt';
   static const String _keyAssistantPrompt = 'llm_assistant_prompt';
+  static const String _keyWordProblemGenerationPrompt =
+      'llm_word_problem_prompt';
+  static const String _keyPictureStoryGenerationPrompt =
+      'llm_picture_story_prompt';
   // AI 助手悬浮球位置（设备绑定，不入备份白名单）：坐标随屏幕尺寸
   // 变化而失效，换机/旋转后由 _clampToBounds 越界回落兜底，跨设备
   // 迁移无意义（对照：assistant_enabled 是用户偏好，在白名单内）。
@@ -1149,7 +1154,42 @@ class SettingsRepository {
     await HiveBoxes.settings.delete(_keyLlmProviderName);
   }
 
-  // ============ AI 讲解提示词（可编辑，覆盖 ?? 内置默认） ============
+  // ============ AI 提示词（可编辑，覆盖 ?? 内置默认） ============
+
+  /// 应用题素材选择提示词；缺失、空白或坏类型时沿用内置默认。
+  String? get wordProblemGenerationPromptOverride =>
+      _generationPromptOverride(_keyWordProblemGenerationPrompt);
+
+  /// 看图说话的场景规划与看图出题共用一份教学偏好。
+  String? get pictureStoryGenerationPromptOverride =>
+      _generationPromptOverride(_keyPictureStoryGenerationPrompt);
+
+  String? _generationPromptOverride(String key) {
+    final raw = HiveBoxes.settings.get(key);
+    return raw is String && raw.trim().isNotEmpty ? raw : null;
+  }
+
+  Future<void> setWordProblemGenerationPrompt(String value) =>
+      _setGenerationPrompt(_keyWordProblemGenerationPrompt, value);
+
+  Future<void> resetWordProblemGenerationPrompt() =>
+      setWordProblemGenerationPrompt('');
+
+  Future<void> setPictureStoryGenerationPrompt(String value) =>
+      _setGenerationPrompt(_keyPictureStoryGenerationPrompt, value);
+
+  Future<void> resetPictureStoryGenerationPrompt() =>
+      setPictureStoryGenerationPrompt('');
+
+  Future<void> _setGenerationPrompt(String key, String value) async {
+    ParentAccessService.instance.assertAllowed();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      await HiveBoxes.settings.delete(key);
+    } else {
+      await HiveBoxes.settings.put(key, trimmed);
+    }
+  }
 
   /// 诗词讲解 system prompt 用户覆盖值；null = 未自定义（用内置默认）。
   /// 空串/空白串防御性读作 null（历史脏数据不留隐患）。

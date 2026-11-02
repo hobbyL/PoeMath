@@ -1,7 +1,7 @@
 // lib/features/profile/prompt_settings_page.dart
 //
 // 层级：features/profile
-// 职责：AI 提示词设置页 —— 诗词讲解、口算解析、助手人设三份 system prompt
+// 职责：AI 提示词设置页 —— 出题、诗词讲解、口算解析和助手人设的 system prompt
 //       的查看、编辑与一键恢复默认。仅 system prompt 可编辑；user prompt
 //       为程序拼装（隐私载荷最小化），不在此页面范围。
 //
@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/prompts/assistant_prompt_defaults.dart';
 import 'package:poemath/core/prompts/explain_prompt_defaults.dart';
+import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -23,16 +24,27 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 
 /// 提示词长度上限：超出拒绝保存（防误粘贴巨量文本撑爆请求体）。
 ///
-/// 三个场景（诗词讲解 / 口算解析 / 助手人设）共用同一上限：
+/// 五个场景共用同一上限：
 /// 内置默认值都在 1.2k 字符以内，2000 已留足编辑余量，且仓储层无校验，
 /// UI 是唯一闸口，统一口径可避免「换个区块就能绕过」。
 const int kPromptMaxLength = 2000;
 
 /// 可编辑的提示词场景。
 ///
-/// 三个场景的读写、默认值与文案差异集中在此，页面主体只按枚举分发，
-/// 避免三份几乎相同的分支代码各自漂移。
+/// 各场景的读写、默认值与文案差异集中在此，页面主体只按枚举分发。
 enum _PromptScene {
+  wordProblem(
+    title: 'AI 生成应用题',
+    hintText: '输入应用题出题提示词',
+    resetTitle: '恢复应用题出题默认',
+    explanation: '调整应用题的生活情境与素材选择偏好。',
+  ),
+  pictureStory(
+    title: 'AI 生成看图说话题',
+    hintText: '输入看图说话出题提示词',
+    resetTitle: '恢复看图说话出题默认',
+    explanation: '调整单图场景的规划、观察引导与参考表达。',
+  ),
   poemExplain(
     title: '诗词讲解',
     hintText: '输入讲解提示词',
@@ -67,6 +79,8 @@ enum _PromptScene {
 
   /// 内置默认全文。
   String get defaultText => switch (this) {
+        _PromptScene.wordProblem => kWordProblemGenerationSystemPrompt,
+        _PromptScene.pictureStory => kPictureStoryGenerationSystemPrompt,
         _PromptScene.poemExplain => kPoemExplainSystemPrompt,
         _PromptScene.mathExplain => kMathExplainSystemPrompt,
         _PromptScene.assistant => kAssistantSystemPrompt,
@@ -74,6 +88,11 @@ enum _PromptScene {
 
   /// 当前生效内容：用户覆盖值 ?? 内置默认。
   String currentText(SettingsRepository repo) => switch (this) {
+        _PromptScene.wordProblem => repo.wordProblemGenerationPromptOverride ??
+            kWordProblemGenerationSystemPrompt,
+        _PromptScene.pictureStory =>
+          repo.pictureStoryGenerationPromptOverride ??
+              kPictureStoryGenerationSystemPrompt,
         _PromptScene.poemExplain =>
           repo.poemExplainPromptOverride ?? kPoemExplainSystemPrompt,
         _PromptScene.mathExplain =>
@@ -84,18 +103,25 @@ enum _PromptScene {
 
   /// 当前是否有用户覆盖（null = 内置默认态）。
   String? overrideOf(SettingsRepository repo) => switch (this) {
+        _PromptScene.wordProblem => repo.wordProblemGenerationPromptOverride,
+        _PromptScene.pictureStory => repo.pictureStoryGenerationPromptOverride,
         _PromptScene.poemExplain => repo.poemExplainPromptOverride,
         _PromptScene.mathExplain => repo.mathExplainPromptOverride,
         _PromptScene.assistant => repo.assistantPromptOverride,
       };
 
   Future<void> save(SettingsRepository repo, String value) => switch (this) {
+        _PromptScene.wordProblem => repo.setWordProblemGenerationPrompt(value),
+        _PromptScene.pictureStory =>
+          repo.setPictureStoryGenerationPrompt(value),
         _PromptScene.poemExplain => repo.setPoemExplainPrompt(value),
         _PromptScene.mathExplain => repo.setMathExplainPrompt(value),
         _PromptScene.assistant => repo.setAssistantPrompt(value),
       };
 
   Future<void> reset(SettingsRepository repo) => switch (this) {
+        _PromptScene.wordProblem => repo.resetWordProblemGenerationPrompt(),
+        _PromptScene.pictureStory => repo.resetPictureStoryGenerationPrompt(),
         _PromptScene.poemExplain => repo.resetPoemExplainPrompt(),
         _PromptScene.mathExplain => repo.resetMathExplainPrompt(),
         _PromptScene.assistant => repo.resetAssistantPrompt(),
@@ -106,8 +132,7 @@ class PromptSettingsPage extends ConsumerStatefulWidget {
   const PromptSettingsPage({super.key});
 
   @override
-  ConsumerState<PromptSettingsPage> createState() =>
-      _PromptSettingsPageState();
+  ConsumerState<PromptSettingsPage> createState() => _PromptSettingsPageState();
 }
 
 class _PromptSettingsPageState extends ConsumerState<PromptSettingsPage> {
@@ -186,8 +211,10 @@ class _PromptSettingsPageState extends ConsumerState<PromptSettingsPage> {
                 Text(
                   scene.defaultText,
                   style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(dialogContext).colorScheme.onSurfaceVariant,
-                  ),
+                        color: Theme.of(dialogContext)
+                            .colorScheme
+                            .onSurfaceVariant,
+                      ),
                 ),
               ],
             ),
@@ -232,8 +259,8 @@ class _PromptSettingsPageState extends ConsumerState<PromptSettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '调整 AI 的口吻与人设。只影响表达风格，不改变发给 AI 的'
-              '题目内容与隐私载荷；改得不如意可随时恢复内置默认。',
+              '调整 AI 出题、讲解的表达偏好与助手人设，'
+              '改得不如意可随时恢复内置默认。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -323,8 +350,7 @@ class _PromptSection extends StatelessWidget {
               filled: true,
               fillColor: theme.colorScheme.surface,
               border: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(SpacingTokens.radiusSmall),
+                borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
               ),
             ),
             style: theme.textTheme.bodySmall,

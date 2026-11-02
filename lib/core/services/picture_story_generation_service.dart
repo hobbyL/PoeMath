@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:hive/hive.dart';
+import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/image_generation_client.dart';
@@ -180,6 +181,7 @@ class PictureStoryGenerationService {
     void Function()? onChanged,
     String? candidateId,
     bool regenerateImage = false,
+    String? promptOverride,
   }) async {
     final profile = draft.profileId;
     final revision = ProfileScope.revision;
@@ -189,6 +191,8 @@ class PictureStoryGenerationService {
     if (![config, ...config.fallbacks].any((c) => c.supportsVision)) {
       throw const FormatException('请为看图说话出题配置支持看图的大模型');
     }
+    final planningPrompt = buildPictureStoryPlanningPrompt(promptOverride);
+    final questionPrompt = buildPictureStoryQuestionPrompt(promptOverride);
     late final _GenerationRun run;
     String? currentCandidate;
     String? currentRequest;
@@ -227,7 +231,7 @@ class PictureStoryGenerationService {
       check();
       var saved = readDraft(profile)!;
       if (saved.candidates.isEmpty) {
-        final items = await _plan(saved, config, run.llm);
+        final items = await _plan(saved, config, run.llm, planningPrompt);
         check();
         await _serial(() async {
           final current = readDraft(profile);
@@ -297,8 +301,13 @@ class PictureStoryGenerationService {
               item.copyWith(stage: PictureStoryGenerationStage.generatingText);
           await _update(saved, item, expectedRequest: item.requestId);
           changed();
-          final edit =
-              await _describe(item, saved.options.level, config, run.llm);
+          final edit = await _describe(
+            item,
+            saved.options.level,
+            config,
+            run.llm,
+            questionPrompt,
+          );
           check();
           item = item.copyWith(
             edit: edit,
@@ -352,13 +361,11 @@ class PictureStoryGenerationService {
     PictureStoryGenerationDraft draft,
     LlmConfig config,
     LlmClient client,
+    String systemPrompt,
   ) async {
     final response = await client.chatComplete(
       config: config,
-      systemPrompt: '你是小学语文口语表达老师。规划适合儿童观察、描述的单图场景。'
-          '一次每题一幅图，场景要有差异；不含暴力、成人、危险动作或可识别的真实孩子信息。'
-          '只输出严格 JSON 数组，每项包含 imagePrompt（中文画面描述，最多 1000 字）。'
-          '描述具体可见的人物、环境、动作和物体关系。不要先编题目或答案。',
+      systemPrompt: systemPrompt,
       messages: [
         ChatMessage(
           role: ChatRole.user,
@@ -402,6 +409,7 @@ class PictureStoryGenerationService {
     PictureStoryLevel level,
     LlmConfig config,
     LlmClient client,
+    String systemPrompt,
   ) async {
     final bytes = await _images.readForVision(item.edit.image!.value);
     final text = '观察这张实际图片，为${level.label}难度编写看图说话练习。'
@@ -409,13 +417,7 @@ class PictureStoryGenerationService {
     final response = await client.chatComplete(
       config: config,
       requiresVision: true,
-      systemPrompt: '你是小学语文口语表达老师，适合 6–12 岁儿童。只依据实际图片出题。'
-          '不要编造图中看不到的人数、物品、动作、情绪、人物关系或文字；'
-          '推测或续编问题必须标明“你猜”或“想象”。题目开放，不设置唯一标准答案。'
-          '只输出严格 JSON 对象：title（80 字以内）、theme（60 字以内，可空）、'
-          'sceneFacts（可见事实的字符串数组，可空）、questions（1–5 个引导问题的字符串数组）、'
-          'goals（字符串数组，可空）、reference（参考表达，可空，不能称标准答案）。'
-          '数组每项不超过 400 字，reference 不超过 4000 字。语言简洁自然。',
+      systemPrompt: systemPrompt,
       messages: [
         ChatMessage(
           role: ChatRole.user,

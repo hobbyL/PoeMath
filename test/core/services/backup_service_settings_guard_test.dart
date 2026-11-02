@@ -102,6 +102,8 @@ Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
       // AI 讲解提示词覆盖（随备份迁移的个性化内容）。
       'llm_poem_explain_prompt': '自定义诗词讲解提示词',
       'llm_math_explain_prompt': '自定义口算解析提示词',
+      'llm_word_problem_prompt': '优先选择自然观察情境',
+      'llm_picture_story_prompt': '引导先观察再表达',
       // AI 助手开关与悬浮球位置（坐标消费端会按当前屏幕夹取）。
       'assistant_enabled': true,
       'assistant_bubble_dx': 240.0,

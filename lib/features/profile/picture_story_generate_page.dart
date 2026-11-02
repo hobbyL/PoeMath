@@ -114,6 +114,7 @@ class _PictureStoryGeneratePageState
         throw const FormatException('大模型设置正在保存，请稍后重试');
       }
       final signature = settings.pictureStoryGenerationSignature;
+      final promptOverride = settings.pictureStoryGenerationPromptOverride;
       bool active() =>
           _active(token) &&
           !settings.hasPendingLlmSave &&
@@ -142,6 +143,7 @@ class _PictureStoryGeneratePageState
         onChanged: _reload,
         candidateId: candidateId,
         regenerateImage: regenerate,
+        promptOverride: promptOverride,
       );
     } on Object catch (error) {
       if (mounted) {

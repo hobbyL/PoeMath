@@ -56,6 +56,50 @@ WordProblemGenerationService service(
     );
 
 void main() {
+  test('自定义应用题提示词进入真实素材请求及格式修复，保留候选和本地数学校验', () async {
+    final systemPrompts = <String>[];
+    final generation = service(
+      MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final messages = body['messages'] as List<dynamic>;
+        systemPrompts.add((messages.first as Map)['content'] as String);
+        if (systemPrompts.length == 1) return response('格式需要修复');
+        final text = (messages.last as Map)['content'] as String;
+        final candidates =
+            jsonDecode(text.substring(text.indexOf('['))) as List;
+        return response([
+          for (final item in candidates)
+            {
+              'index': item['index'],
+              'sceneId': item['sceneCandidates'].first['sceneId'],
+              'variantId': 'standard',
+            },
+        ]);
+      }),
+    );
+    addTearDown(generation.client.close);
+    final items = await generation.generate(
+      config: config,
+      grade: 2,
+      semester: '上',
+      topics: [WordProblemTopic.addition],
+      count: 2,
+      isActive: () => true,
+      promptOverride: '  优先选择公园里的花草情境  ',
+    );
+    expect(systemPrompts, hasLength(2));
+    expect(systemPrompts.first, startsWith('优先选择公园里的花草情境\n\n'));
+    expect(systemPrompts.last, systemPrompts.first);
+    expect(systemPrompts.first, contains('index、sceneId、variantId'));
+    expect(systemPrompts.first, contains('必须从每题候选中选择'));
+    expect(items, hasLength(2));
+    for (final item in items) {
+      expect(item.source, WordProblemSource.aiScene);
+      expect(item.validation.canSave, isTrue);
+      expect(item.plan.skeleton.answer, 16);
+    }
+  });
+
   test('多知识点共享总题数、均匀交错出题并保留各题课程信息', () async {
     var requests = 0;
     String? capturedPrompt;
