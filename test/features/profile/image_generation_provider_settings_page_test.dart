@@ -38,14 +38,16 @@ Finder _field(String label) => find.byWidgetPredicate(
     );
 
 Future<void> _settle(WidgetTester tester, bool Function() condition) async {
+  bool completed() =>
+      condition() && find.byType(CircularProgressIndicator).evaluate().isEmpty;
   final deadline = DateTime.now().add(const Duration(seconds: 8));
-  while (!condition() && DateTime.now().isBefore(deadline)) {
+  while (!completed() && DateTime.now().isBefore(deadline)) {
     await tester.runAsync(() async {
       await tester.pump(const Duration(milliseconds: 100));
       await Future<void>.delayed(const Duration(milliseconds: 10));
     });
   }
-  expect(condition(), isTrue);
+  expect(completed(), isTrue);
   await tester.pumpAndSettle();
 }
 
@@ -56,7 +58,8 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
     await tester.tap(finder);
     await Future<void>.delayed(const Duration(milliseconds: 50));
   });
-  await tester.pumpAndSettle();
+  // 请求/保存仍可能在真实 IO 队列中；由调用方的 _settle 等待具体结果。
+  await tester.pump();
 }
 
 void main() {
