@@ -111,11 +111,18 @@ class SettingsPage extends ConsumerWidget {
             horizontal: SpacingTokens.md,
             vertical: SpacingTokens.sm,
           ),
-          // 分区顺序与首页一致：学习内容 → 智能语音 → 外观反馈 →
-          // 家长数据 → 应用提醒。每个分区的渲染代码连续排列。
+          // 首页按外观反馈、学习内容、智能语音、家长数据、应用提醒排列。
           children: <Widget>[
             // ==================== hub：分组入口 ====================
             if (_section == _SettingsSection.hub) ...[
+              AppTile(
+                icon: Icons.palette_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '外观与反馈',
+                subtitle: '主题、明暗模式、音效与触觉',
+                onTap: () => _openSection(context, _SettingsSection.appearance),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.menu_book_outlined,
                 iconColor: theme.colorScheme.primary,
@@ -131,14 +138,6 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: '模型服务、朗读音色与语音识别',
                 onTap: () =>
                     _openSection(context, _SettingsSection.intelligence),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              AppTile(
-                icon: Icons.palette_outlined,
-                iconColor: theme.colorScheme.primary,
-                title: '外观与反馈',
-                subtitle: '主题、明暗模式、音效与触觉',
-                onTap: () => _openSection(context, _SettingsSection.appearance),
               ),
               const SizedBox(height: SpacingTokens.sm),
               AppTile(

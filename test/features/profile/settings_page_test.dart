@@ -77,11 +77,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AppTile), findsNWidgets(5));
-    expect(find.text('学习与内容'), findsOneWidget);
-    expect(find.text('AI 与语音'), findsOneWidget);
-    expect(find.text('外观与反馈'), findsOneWidget);
-    expect(find.text('家长与数据'), findsOneWidget);
-    expect(find.text('应用与提醒'), findsOneWidget);
+    expect(
+      tester
+          .widgetList<AppTile>(find.byType(AppTile))
+          .map((tile) => tile.title),
+      ['外观与反馈', '学习与内容', 'AI 与语音', '家长与数据', '应用与提醒'],
+    );
     expect(find.text('AI 设置'), findsNothing);
     expect(find.text('家长保护与云额度'), findsNothing);
     expect(find.text('通知提醒'), findsNothing);
