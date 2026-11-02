@@ -35,6 +35,7 @@ class AppTile extends StatelessWidget {
     required this.iconColor,
     required this.title,
     this.titleSuffix,
+    this.titleSuffixInline = false,
     required this.subtitle,
     this.onTap,
     this.allowTapWithTrailing = false,
@@ -77,6 +78,9 @@ class AppTile extends StatelessWidget {
 
   /// 紧跟标题的辅助信息；标题过长时省略，大字号空间不足时辅助信息另起一行。
   final String? titleSuffix;
+
+  /// 将辅助信息作为标题内的文本，按基线对齐并随标题自然换行。
+  final bool titleSuffixInline;
 
   /// 副标题文本。
   final String subtitle;
@@ -125,16 +129,17 @@ class AppTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final titleStyle = theme.textTheme.titleSmall?.copyWith(
+      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+      color: selected ? theme.colorScheme.onPrimaryContainer : null,
+    );
     final titleText = Text(
       title,
       maxLines: titleSuffix == null && trailingText == null ? null : 1,
       overflow: titleSuffix == null && trailingText == null
           ? null
           : TextOverflow.ellipsis,
-      style: theme.textTheme.titleSmall?.copyWith(
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-        color: selected ? theme.colorScheme.onPrimaryContainer : null,
-      ),
+      style: titleStyle,
     );
     final titleWidget = titleSuffix == null
         ? titleText
@@ -145,6 +150,17 @@ class AppTile extends StatelessWidget {
                     ? theme.colorScheme.onPrimaryContainer
                     : theme.colorScheme.onSurfaceVariant,
               );
+              if (titleSuffixInline) {
+                return Text.rich(
+                  TextSpan(
+                    text: title,
+                    children: [
+                      TextSpan(text: ' $titleSuffix', style: suffixStyle),
+                    ],
+                  ),
+                  style: titleStyle,
+                );
+              }
               final suffix = Text(titleSuffix!, style: suffixStyle);
               final painter = TextPainter(
                 text: TextSpan(text: titleSuffix, style: suffixStyle),

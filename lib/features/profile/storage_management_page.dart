@@ -139,19 +139,29 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('缓存占用', style: theme.textTheme.titleMedium),
-                  const SizedBox(height: SpacingTokens.sm),
                   if (_loading) ...[
                     const Text('正在统计缓存…'),
                     const SizedBox(height: SpacingTokens.sm),
                     const LinearProgressIndicator(),
                   ] else if (snapshot != null) ...[
-                    Text('磁盘缓存 ${formatBytes(snapshot.diskBytes)}'),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text('内存缓存 ${formatBytes(snapshot.memoryBytes)}'),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '磁盘缓存 ${formatBytes(snapshot.diskBytes)}',
+                          ),
+                        ),
+                        const SizedBox(width: SpacingTokens.md),
+                        Expanded(
+                          child: Text(
+                            '内存缓存 ${formatBytes(snapshot.memoryBytes)}',
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                  const SizedBox(height: SpacingTokens.sm),
-                  const Text('清理后再次使用会重新生成缓存，教材、题库、学习记录和设置会保留。'),
                   if (_loadFailed || snapshot?.hasErrors == true) ...[
                     const SizedBox(height: SpacingTokens.sm),
                     Text(
@@ -168,15 +178,26 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
                 icon: entry.kind.icon,
                 iconColor: theme.colorScheme.primary,
                 title: entry.kind.label,
-                subtitle: _loading
+                titleSuffix: _loading
                     ? '正在统计…'
                     : entry.usage == null
                         ? '统计失败，请刷新重试'
-                        : '${entry.usage!.entries} ${entry.kind.isMemory ? '项' : '个文件'} · ${formatBytes(entry.usage!.bytes)}\n${entry.kind.description}',
-                trailingInTitle: true,
+                        : '${entry.usage!.entries}${entry.kind.isMemory ? '项' : '个文件'} · ${formatBytes(entry.usage!.bytes)}',
+                titleSuffixInline: true,
+                subtitle: entry.kind.description,
                 trailing: Tooltip(
                   message: '清理${entry.kind.label}',
                   child: TextButton(
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(
+                        SpacingTokens.minTapTarget,
+                        SpacingTokens.minTapTarget,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SpacingTokens.xs,
+                      ),
+                      alignment: AlignmentDirectional.centerEnd,
+                    ),
                     onPressed: _loading ||
                             _busy != null ||
                             entry.usage == null ||
@@ -198,16 +219,16 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
 
 extension _StorageCacheLabels on StorageCacheKind {
   String get label => switch (this) {
-        StorageCacheKind.textbookCovers => '教材封面缓存',
-        StorageCacheKind.textbookContent => '教材解析缓存',
-        StorageCacheKind.textbookAudio => '教材朗读缓存',
-        StorageCacheKind.cloudAudio => '云朗读内存缓存',
-        StorageCacheKind.images => '图片显示缓存',
+        StorageCacheKind.textbookCovers => '教材封面',
+        StorageCacheKind.textbookContent => '教材解析',
+        StorageCacheKind.textbookAudio => '教材朗读',
+        StorageCacheKind.cloudAudio => '云朗读',
+        StorageCacheKind.images => '图片显示',
         StorageCacheKind.updates => '更新安装包',
-        StorageCacheKind.pickers => '文件与图片选择缓存',
+        StorageCacheKind.pickers => '文件与图片选择',
         StorageCacheKind.sharing => '分享与导出临时文件',
         StorageCacheKind.systemTts => '系统朗读临时文件',
-        StorageCacheKind.legacySpeechModels => '旧版语音模型缓存',
+        StorageCacheKind.legacySpeechModels => '旧版语音模型',
       };
 
   IconData get icon => switch (this) {

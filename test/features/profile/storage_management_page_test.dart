@@ -65,7 +65,10 @@ class _StorageService extends StorageManagementService {
 }
 
 Finder _clearOf(String label) => find.descendant(
-      of: find.ancestor(of: find.text(label), matching: find.byType(AppTile)),
+      of: find.ancestor(
+        of: find.textContaining(label),
+        matching: find.byType(AppTile),
+      ),
       matching: find.widgetWithText(TextButton, '清理'),
     );
 
@@ -120,8 +123,8 @@ void main() {
     expect(find.byType(StorageManagementPage), findsOneWidget);
     expect(find.text('磁盘缓存 2.0 KB'), findsOneWidget);
     expect(find.text('内存缓存 0 B'), findsOneWidget);
-    expect(find.text('教材封面缓存'), findsOneWidget);
-    expect(find.textContaining('2 个文件 · 1.0 KB'), findsNWidgets(2));
+    expect(find.textContaining('教材封面'), findsOneWidget);
+    expect(find.textContaining('2个文件 · 1.0 KB'), findsNWidgets(2));
     expect(service.scans, 1);
     expect(service.cleared, isEmpty);
     await tester.pump(const Duration(seconds: 2));
@@ -129,38 +132,38 @@ void main() {
 
   testWidgets('取消不清理，确认只清理选中项并刷新占用', (tester) async {
     await show(tester);
-    await tester.tap(_clearOf('教材封面缓存'));
+    await tester.tap(_clearOf('教材封面'));
     await tester.pumpAndSettle();
-    expect(find.text('清理教材封面缓存？'), findsOneWidget);
+    expect(find.text('清理教材封面？'), findsOneWidget);
     await tester.tap(find.widgetWithText(TextButton, '取消'));
     await tester.pumpAndSettle();
     expect(service.cleared, isEmpty);
     expect(service.scans, 1);
-    await tester.tap(_clearOf('教材封面缓存'));
+    await tester.tap(_clearOf('教材封面'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '清理缓存'));
     await tester.pumpAndSettle();
     expect(service.cleared, [StorageCacheKind.textbookCovers]);
     expect(service.scans, 2);
     expect(find.text('磁盘缓存 1.0 KB'), findsOneWidget);
-    expect(find.textContaining('2 个文件 · 1.0 KB'), findsOneWidget);
-    expect(tester.widget<TextButton>(_clearOf('教材封面缓存')).onPressed, isNull);
-    expect(tester.widget<TextButton>(_clearOf('教材解析缓存')).onPressed, isNotNull);
+    expect(find.textContaining('2个文件 · 1.0 KB'), findsOneWidget);
+    expect(tester.widget<TextButton>(_clearOf('教材封面')).onPressed, isNull);
+    expect(tester.widget<TextButton>(_clearOf('教材解析')).onPressed, isNotNull);
     await tester.pump(const Duration(seconds: 5));
   });
 
   testWidgets('确认和清理期间防止重复操作，异步完成后按钮恢复', (tester) async {
     service.clearGate = Completer<void>();
     await show(tester);
-    await tester.tap(_clearOf('教材封面缓存'));
-    await tester.tap(_clearOf('教材封面缓存'));
+    await tester.tap(_clearOf('教材封面'));
+    await tester.tap(_clearOf('教材封面'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '清理缓存'));
     await tester.pumpAndSettle();
     expect(service.cleared, [StorageCacheKind.textbookCovers]);
     expect(find.text('清理中…'), findsOneWidget);
-    expect(tester.widget<TextButton>(_clearOf('教材解析缓存')).onPressed, isNull);
+    expect(tester.widget<TextButton>(_clearOf('教材解析')).onPressed, isNull);
     expect(
       tester.widget<IconButton>(_refreshButton).onPressed,
       isNull,
@@ -168,14 +171,14 @@ void main() {
     service.clearGate!.complete();
     await tester.pumpAndSettle();
     expect(service.scans, 2);
-    expect(tester.widget<TextButton>(_clearOf('教材解析缓存')).onPressed, isNotNull);
+    expect(tester.widget<TextButton>(_clearOf('教材解析')).onPressed, isNotNull);
     await tester.pump(const Duration(seconds: 5));
   });
 
   testWidgets('清理在用缓存提示重试，部分失败会刷新实际剩余占用', (tester) async {
     service.clearError = const CacheInUseException();
     await show(tester);
-    await tester.tap(_clearOf('教材封面缓存'));
+    await tester.tap(_clearOf('教材封面'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '清理缓存'));
     await tester.pumpAndSettle();
@@ -183,12 +186,12 @@ void main() {
     expect(service.scans, 1);
     service.clearError = StateError('第二个文件未清理');
     service.partialFailure = true;
-    await tester.tap(_clearOf('教材封面缓存'));
+    await tester.tap(_clearOf('教材封面'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '清理缓存'));
     await tester.pumpAndSettle();
     expect(find.text('清理未完成，请刷新后重试'), findsOneWidget);
-    expect(find.textContaining('1 个文件 · 512 B'), findsOneWidget);
+    expect(find.textContaining('1个文件 · 512 B'), findsOneWidget);
     expect(find.text('磁盘缓存 1.5 KB'), findsOneWidget);
     expect(service.scans, 2);
     await tester.pump(const Duration(seconds: 5));
@@ -206,10 +209,10 @@ void main() {
     service.usages[StorageCacheKind.textbookCovers] = null;
     await tester.tap(find.byTooltip('刷新缓存占用'));
     await tester.pumpAndSettle();
-    expect(find.text('统计失败，请刷新重试'), findsOneWidget);
+    expect(find.textContaining('统计失败，请刷新重试'), findsOneWidget);
     expect(find.text('部分缓存暂时无法统计，以上为已统计占用。'), findsOneWidget);
-    expect(tester.widget<TextButton>(_clearOf('教材封面缓存')).onPressed, isNull);
-    expect(tester.widget<TextButton>(_clearOf('教材解析缓存')).onPressed, isNotNull);
+    expect(tester.widget<TextButton>(_clearOf('教材封面')).onPressed, isNull);
+    expect(tester.widget<TextButton>(_clearOf('教材解析')).onPressed, isNotNull);
     expect(service.scans, 2);
     await tester.pump(const Duration(seconds: 2));
   });
@@ -219,7 +222,7 @@ void main() {
       tester,
       home: const ParentAccessBoundary(child: StorageManagementPage()),
     );
-    await tester.tap(_clearOf('教材封面缓存'));
+    await tester.tap(_clearOf('教材封面'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
     lockParentForTesting();
@@ -237,10 +240,10 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await show(tester, largeText: true);
-    await tester.scrollUntilVisible(find.text('文件与图片选择缓存'), 280);
+    await tester.scrollUntilVisible(find.textContaining('文件与图片选择'), 280);
     await tester.pumpAndSettle();
-    expect(find.text('文件与图片选择缓存'), findsOneWidget);
-    expect(_clearOf('文件与图片选择缓存'), findsOneWidget);
+    expect(find.textContaining('文件与图片选择'), findsOneWidget);
+    expect(_clearOf('文件与图片选择'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pump(const Duration(seconds: 2));
   });
