@@ -14,7 +14,7 @@ import 'package:poemath/core/services/picture_story_editor_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
-import 'package:poemath/core/widgets/app_tile.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/picture_story_editor_draft.dart';
@@ -262,6 +262,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  void expectImageAtCardEdges(WidgetTester tester) {
+    final image = find.descendant(
+      of: find.byType(PictureStoryEditorPage),
+      matching: find.byType(PictureStoryImageView),
+    );
+    final card = find.ancestor(of: image, matching: find.byType(ColoredCard));
+    final imageRect = tester.getRect(image);
+    final cardRect = tester.getRect(card);
+    expect(imageRect.left, closeTo(cardRect.left, 0.01));
+    expect(imageRect.top, closeTo(cardRect.top, 0.01));
+    expect(imageRect.right, closeTo(cardRect.right, 0.01));
+    expect(find.text('题目图片'), findsNothing);
+  }
+
   testWidgets('真实路由新增题目：必填校验、选图、保存详情和数量即时刷新', (tester) async {
     final (router, container) = await pumpFlow(tester);
     expect(find.byType(AppTile), findsNothing);
@@ -296,6 +310,9 @@ void main() {
     await enter(tester, 'title', '窗前的小猫');
     await enter(tester, 'questions', '小猫在哪里？\n它看到了什么？');
     await chooseFile(tester);
+    await tester.ensureVisible(find.byType(PictureStoryImageView));
+    await tester.pumpAndSettle();
+    expectImageAtCardEdges(tester);
     final selectedImage = editor.readDraft()!.image;
     await finishSave(tester);
     expect(find.byType(PictureStoryDetailPage), findsOneWidget);
@@ -561,6 +578,7 @@ void main() {
         textScale: 2,
       );
       expect(tester.takeException(), isNull);
+      expectImageAtCardEdges(tester);
       final reference = find.byKey(const ValueKey('picture-story-reference'));
       await tester.ensureVisible(reference);
       await tester.pumpAndSettle();

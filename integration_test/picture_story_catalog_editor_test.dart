@@ -21,10 +21,12 @@ import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/picture_story_editor_draft.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/profile/picture_story_detail_page.dart';
 import 'package:poemath/features/profile/picture_story_editor_page.dart';
 import 'package:poemath/features/profile/picture_story_management_page.dart';
@@ -275,6 +277,16 @@ void main() {
     } else {
       await choose(tester, '从文件选择', 'LOCAL_IMAGE_IMPORT');
     }
+    expect(find.text('题目图片'), findsNothing);
+    final image = find.byType(PictureStoryImageView);
+    await tester.ensureVisible(image);
+    await tester.pumpAndSettle();
+    final card = find.ancestor(of: image, matching: find.byType(ColoredCard));
+    final imageRect = tester.getRect(image);
+    final cardRect = tester.getRect(card);
+    expect(imageRect.left, closeTo(cardRect.left, 0.01));
+    expect(imageRect.top, closeTo(cardRect.top, 0.01));
+    expect(imageRect.right, closeTo(cardRect.right, 0.01));
     await saveAndVerify(tester);
   }, timeout: const Timeout(Duration(minutes: 17)),);
 }

@@ -135,7 +135,7 @@ class _PromptCard extends ConsumerWidget {
         context.push(AppRoutes.pictureStoryPracticeOf(prompt.id));
 
     return Semantics(
-      label: '${prompt.title}，${prompt.levelLabel}',
+      label: prompt.title,
       value: practiced ? '已练习' : null,
       button: true,
       excludeSemantics: true,
@@ -170,16 +170,9 @@ class _PromptCard extends ConsumerWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(prompt.title, style: theme.textTheme.titleMedium),
-                        const SizedBox(height: SpacingTokens.xs),
-                        Text(
-                          prompt.levelLabel,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
+                    child: Text(
+                      prompt.title,
+                      style: theme.textTheme.titleMedium,
                     ),
                   ),
                   const SizedBox(width: SpacingTokens.sm),

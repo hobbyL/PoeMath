@@ -409,56 +409,66 @@ class _PictureStoryEditorPageState
   Widget _imageSection(ThemeData theme, PictureStoryEditorDraft draft) =>
       ColoredCard(
         color: theme.colorScheme.primary,
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('题目图片', style: theme.textTheme.titleMedium),
-            const SizedBox(height: SpacingTokens.sm),
-            if (draft.image != null) ...[
-              PictureStoryImageView(image: draft.image!),
-              const SizedBox(height: SpacingTokens.sm),
-            ] else
-              const Text('选择一张图片，让孩子观察后讲一讲。'),
-            if (_editor.isPicking) ...[
-              const SizedBox(height: SpacingTokens.sm),
-              const Text('正在获取图片，返回后可继续编辑。'),
-            ],
-            if (_editor.supportsGallery)
-              AppTile(
-                flat: true,
-                iconColor: theme.colorScheme.primary,
-                icon: Icons.photo_library_outlined,
-                title: '从相册选择',
-                subtitle: '',
-                onTap: _busy
-                    ? null
-                    : () => _chooseImage(PictureStoryImageSource.gallery),
+            if (draft.image != null)
+              PictureStoryImageView(
+                image: draft.image!,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(SpacingTokens.radiusMedium),
+                ),
               ),
-            AppTile(
-              flat: true,
-              iconColor: theme.colorScheme.primary,
-              icon: Icons.folder_open_outlined,
-              title: '从文件选择',
-              subtitle: '',
-              onTap: _busy
-                  ? null
-                  : () => _chooseImage(PictureStoryImageSource.file),
-            ),
-            if (_editor.supportsCamera)
-              AppTile(
-                flat: true,
-                iconColor: theme.colorScheme.primary,
-                icon: Icons.camera_alt_outlined,
-                title: '拍照',
-                subtitle: '',
-                onTap: _busy
-                    ? null
-                    : () => _chooseImage(PictureStoryImageSource.camera),
+            Padding(
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (draft.image == null) const Text('选择一张图片，让孩子观察后讲一讲。'),
+                  if (_editor.isPicking) ...[
+                    const SizedBox(height: SpacingTokens.sm),
+                    const Text('正在获取图片，返回后可继续编辑。'),
+                  ],
+                  if (_editor.supportsGallery)
+                    AppTile(
+                      flat: true,
+                      iconColor: theme.colorScheme.primary,
+                      icon: Icons.photo_library_outlined,
+                      title: '从相册选择',
+                      subtitle: '',
+                      onTap: _busy
+                          ? null
+                          : () => _chooseImage(PictureStoryImageSource.gallery),
+                    ),
+                  AppTile(
+                    flat: true,
+                    iconColor: theme.colorScheme.primary,
+                    icon: Icons.folder_open_outlined,
+                    title: '从文件选择',
+                    subtitle: '',
+                    onTap: _busy
+                        ? null
+                        : () => _chooseImage(PictureStoryImageSource.file),
+                  ),
+                  if (_editor.supportsCamera)
+                    AppTile(
+                      flat: true,
+                      iconColor: theme.colorScheme.primary,
+                      icon: Icons.camera_alt_outlined,
+                      title: '拍照',
+                      subtitle: '',
+                      onTap: _busy
+                          ? null
+                          : () => _chooseImage(PictureStoryImageSource.camera),
+                    ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  Text(
+                    '图片保存在本机。使用已配置的 AI 评价时，会发送题图和表达文字。',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
               ),
-            const SizedBox(height: SpacingTokens.sm),
-            Text(
-              '图片保存在本机。使用已配置的 AI 评价时，会发送题图和表达文字。',
-              style: theme.textTheme.bodySmall,
             ),
           ],
         ),

@@ -363,6 +363,17 @@ void main() {
     expect(container.read(pictureStoryPromptCountProvider), 1);
     await tester.scrollUntilVisible(find.text(title), 300);
     expect(find.text(title), findsOneWidget);
+    final prompt = repository.listPrompts().single;
+    expect(find.text(prompt.levelLabel), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.button == true &&
+            widget.properties.label == title,
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
     await unmount(tester);
   });

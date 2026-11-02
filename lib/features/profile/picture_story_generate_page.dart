@@ -36,7 +36,6 @@ class _PictureStoryGeneratePageState
   late final int _profileRevision;
   final _requirements = TextEditingController();
   final _themes = <String>{'日常生活'};
-  PictureStoryLevel _level = PictureStoryLevel.starter;
   int _count = 3;
   int _generation = 0;
   bool _foreground = true;
@@ -132,7 +131,7 @@ class _PictureStoryGeneratePageState
       if (llm == null) throw const FormatException('请先配置用于看图出题的大模型');
       _draft ??= await _service.createDraft(
         PictureStoryGenerationOptions(
-          level: _level,
+          level: PictureStoryLevel.starter,
           count: _count,
           themes: _themes.toList(),
           requirements: _requirements.text.trim(),
@@ -307,6 +306,74 @@ class _PictureStoryGeneratePageState
     super.dispose();
   }
 
+  Future<void> _pickCount() async {
+    final count = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.7,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  '选择题目数量',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.md,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var i = 1; i <= 5; i++)
+                          AppTile(
+                            flat: true,
+                            selected: i == _count,
+                            icon: i == _count
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            iconColor: theme.colorScheme.primary,
+                            title: '$i 道',
+                            subtitle: '',
+                            trailing: const SizedBox.shrink(),
+                            allowTapWithTrailing: true,
+                            onTap: () => Navigator.pop(sheetContext, i),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (count == null ||
+        !mounted ||
+        !_foreground ||
+        !_sameProfile ||
+        _busy ||
+        _draft != null ||
+        !ParentAccessService.instance.isUnlocked ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    setState(() => _count = count);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -391,92 +458,66 @@ class _PictureStoryGeneratePageState
     );
   }
 
-  Widget _options(ThemeData theme, bool enabled) => ColoredCard(
-        color: theme.colorScheme.primary,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('生成内容', style: theme.textTheme.titleMedium),
-            const SizedBox(height: SpacingTokens.sm),
-            const Text('每道题一张图，每次可生成 1–5 道。先生成图片，再根据实际画面编写问题。'),
-            const SizedBox(height: SpacingTokens.md),
-            DropdownButtonFormField<PictureStoryLevel>(
-              initialValue: _level,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: '难度'),
-              items: [
-                for (final level in PictureStoryLevel.values)
-                  DropdownMenuItem(value: level, child: Text(level.label)),
-              ],
-              onChanged: enabled
-                  ? (v) {
-                      if (v != null) setState(() => _level = v);
-                    }
-                  : null,
+  Widget _options(ThemeData theme, bool enabled) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('生成内容', style: theme.textTheme.titleMedium),
+          const SizedBox(height: SpacingTokens.sm),
+          const Text('每道题一张图，每次可生成 1–5 道。先生成图片，再根据实际画面编写问题。'),
+          const SizedBox(height: SpacingTokens.md),
+          AppTile(
+            flat: true,
+            icon: Icons.format_list_numbered,
+            iconColor: theme.colorScheme.primary,
+            title: '题目数量',
+            subtitle: '',
+            trailingText: '$_count 道',
+            onTap: enabled ? _pickCount : null,
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          const Text('主题（可多选）'),
+          const SizedBox(height: SpacingTokens.xs),
+          Wrap(
+            spacing: SpacingTokens.xs,
+            runSpacing: SpacingTokens.xs,
+            children: [
+              for (final theme in PictureStoryGenerationOptions.availableThemes)
+                FilterChip(
+                  label: Text(theme),
+                  selected: _themes.contains(theme),
+                  onSelected: enabled
+                      ? (v) {
+                          setState(() {
+                            if (v) {
+                              _themes.add(theme);
+                            } else {
+                              _themes.remove(theme);
+                            }
+                          });
+                        }
+                      : null,
+                ),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          TextField(
+            controller: _requirements,
+            enabled: enabled,
+            minLines: 2,
+            maxLines: 4,
+            maxLength: 1000,
+            decoration: const InputDecoration(
+              labelText: '补充要求（选填）',
+              hintText: '例如：雨天互相帮助，画面里有小动物',
             ),
-            const SizedBox(height: SpacingTokens.md),
-            DropdownButtonFormField<int>(
-              initialValue: _count,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: '题目数量'),
-              items: [
-                for (var i = 1; i <= 5; i++)
-                  DropdownMenuItem(value: i, child: Text('$i 道')),
-              ],
-              onChanged: enabled
-                  ? (v) {
-                      if (v != null) setState(() => _count = v);
-                    }
-                  : null,
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            const Text('主题（可多选）'),
-            const SizedBox(height: SpacingTokens.xs),
-            Wrap(
-              spacing: SpacingTokens.xs,
-              runSpacing: SpacingTokens.xs,
-              children: [
-                for (final theme
-                    in PictureStoryGenerationOptions.availableThemes)
-                  FilterChip(
-                    label: Text(theme),
-                    selected: _themes.contains(theme),
-                    onSelected: enabled
-                        ? (v) {
-                            setState(() {
-                              if (v) {
-                                _themes.add(theme);
-                              } else {
-                                _themes.remove(theme);
-                              }
-                            });
-                          }
-                        : null,
-                  ),
-              ],
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            TextField(
-              controller: _requirements,
-              enabled: enabled,
-              minLines: 2,
-              maxLines: 4,
-              maxLength: 1000,
-              decoration: const InputDecoration(
-                labelText: '补充要求（选填）',
-                hintText: '例如：雨天互相帮助，画面里有小动物',
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            const Text('生成会使用云端服务和每日额度。请家长预览、核对后入库。'),
-            const SizedBox(height: SpacingTokens.sm),
-            FilledButton.icon(
-              onPressed: enabled ? () => _generate() : null,
-              icon: const Icon(Icons.auto_awesome_outlined),
-              label: Text(_busy ? '正在规划场景…' : '生成图文题目'),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          FilledButton.icon(
+            onPressed: enabled ? () => _generate() : null,
+            icon: const Icon(Icons.auto_awesome_outlined),
+            label: Text(_busy ? '正在规划场景…' : '生成图文题目'),
+          ),
+        ],
       );
 
   Widget _candidate(

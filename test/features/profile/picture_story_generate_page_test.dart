@@ -214,12 +214,85 @@ void main() {
     await drainHiveWritesForTesting(tester);
   });
 
+  Future<void> openCountSheet(WidgetTester tester) async {
+    await tester.ensureVisible(find.text('题目数量'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(find.text('题目数量'));
+      await tester.pump();
+    });
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.text('选择题目数量'), findsOneWidget);
+  }
+
+  Future<void> chooseCount(WidgetTester tester, int count) async {
+    final option = find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.widgetWithText(AppTile, '$count 道'),
+    );
+    await tester.ensureVisible(option);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(option);
+      await tester.pump();
+    });
+    await _until(
+      tester,
+      () =>
+          find.byType(BottomSheet).evaluate().isEmpty &&
+          find.text('$count 道').evaluate().isNotEmpty,
+    );
+  }
+
   for (final (size, scale) in [
     (const Size(320, 1100), 2.0),
     (const Size(1200, 900), 1.0),
   ]) {
     testWidgets('生成表单在宽度 ${size.width}、字号 $scale 下可操作且不溢出', (tester) async {
       await mount(tester, size: size, scale: scale);
+      expect(find.text('难度'), findsNothing);
+      expect(find.byType(DropdownButtonFormField<int>), findsNothing);
+      expect(
+        find.byType(DropdownButtonFormField<PictureStoryLevel>),
+        findsNothing,
+      );
+      expect(find.text('生成会使用云端服务和每日额度。请家长预览、核对后入库。'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(PictureStoryGeneratePage),
+          matching: find.byType(ColoredCard),
+        ),
+        findsNothing,
+      );
+      await openCountSheet(tester);
+      final selected = find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.widgetWithText(AppTile, '3 道'),
+      );
+      expect(tester.widget<AppTile>(selected).selected, isTrue);
+      for (final element in find
+          .descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(AppTile),
+          )
+          .evaluate()) {
+        expect(
+          tester.getSize(find.byWidget(element.widget)).height,
+          greaterThanOrEqualTo(SpacingTokens.minTapTarget),
+        );
+      }
+      await chooseCount(tester, 1);
+      await openCountSheet(tester);
+      await chooseCount(tester, 5);
+      await openCountSheet(tester);
+      final sheetContext = tester.element(find.byType(BottomSheet));
+      await tester.runAsync(() async {
+        Navigator.pop(sheetContext);
+        await tester.pump();
+      });
+      await _until(tester, () => find.byType(BottomSheet).evaluate().isEmpty);
+      expect(find.text('5 道'), findsOneWidget);
       await tester.ensureVisible(find.text('自然观察'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('自然观察'));
@@ -606,19 +679,22 @@ void main() {
       );
     });
     final router = await mount(tester);
+    await openCountSheet(tester);
+    await chooseCount(tester, 5);
     await tester.ensureVisible(find.text('生成图文题目'));
     await tester.pumpAndSettle();
     await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
-    final readyButton = find.widgetWithText(FilledButton, '确认入库（3 道）');
+    final readyButton = find.widgetWithText(FilledButton, '确认入库（5 道）');
     // 数据就绪不代表生成回调和页面刷新完成，等预览真正可操作。
     await _until(
       tester,
       () =>
-          service.readDraft('default')?.readyCount == 3 &&
+          service.readDraft('default')?.readyCount == 5 &&
           readyButton.evaluate().isNotEmpty &&
           tester.widget<FilledButton>(readyButton).onPressed != null,
     );
     expect((service as _GenerationFlow).capturedPrompt, '用儿童水彩场景引导观察和表达');
+    expect(service.readDraft('default')!.options.count, 5);
     expect(repository.catalogState().versions, isEmpty);
     final first = service.readDraft('default')!.candidates.first;
     final firstCard = find.byKey(ValueKey(first.id));
@@ -689,15 +765,15 @@ void main() {
     final selectedDraft = service.readDraft('default')!;
     expect(
       selectedDraft.selectedPrompts.length,
-      2,
+      4,
       reason: selectedDraft.candidates
           .map((candidate) => '${candidate.stage.name}:${candidate.selected}')
           .join(', '),
     );
-    final publishButton = find.text('确认入库（2 道）');
+    final publishButton = find.text('确认入库（4 道）');
     await _until(tester, () => publishButton.evaluate().isNotEmpty);
     await tester.runAsync(() => tester.tap(publishButton));
-    await _until(tester, () => repository.catalogState().versions.length == 2);
+    await _until(tester, () => repository.catalogState().versions.length == 4);
     expect(repository.findPrompt(first.id)!.title, '家长修改后的题目');
     expect(repository.findPrompt(last.id), isNull);
     expect(repository.enabledByProfile()['default'], contains(first.id));
