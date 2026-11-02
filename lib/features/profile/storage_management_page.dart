@@ -200,31 +200,29 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
                                 : '${entry.usage!.entries}${entry.kind.isMemory ? '项' : '个文件'} · ${formatBytes(entry.usage!.bytes)}',
                         titleSuffixInline: true,
                         subtitle: entry.kind.description,
-                        trailing: entry.kind.canClear
-                            ? Tooltip(
-                                message: '清理${entry.kind.label}',
-                                child: TextButton(
-                                  style: TextButton.styleFrom(
-                                    minimumSize: const Size(
-                                      SpacingTokens.minTapTarget,
-                                      SpacingTokens.minTapTarget,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: SpacingTokens.xs,
-                                    ),
-                                    alignment: AlignmentDirectional.centerEnd,
-                                  ),
-                                  onPressed: _loading ||
-                                          _busy != null ||
-                                          entry.usage == null ||
-                                          entry.usage!.entries == 0
-                                      ? null
-                                      : () => _clear(entry.kind),
-                                  child:
-                                      Text(_busy == entry.kind ? '清理中…' : '清理'),
-                                ),
-                              )
-                            : null,
+                        trailing: Tooltip(
+                          message: '清理${entry.kind.label}',
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(
+                                SpacingTokens.minTapTarget,
+                                SpacingTokens.minTapTarget,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: SpacingTokens.xs,
+                              ),
+                              alignment: AlignmentDirectional.centerEnd,
+                            ),
+                            onPressed: !entry.kind.canClear ||
+                                    _loading ||
+                                    _busy != null ||
+                                    entry.usage == null ||
+                                    entry.usage!.entries == 0
+                                ? null
+                                : () => _clear(entry.kind),
+                            child: Text(_busy == entry.kind ? '清理中…' : '清理'),
+                          ),
+                        ),
                       ),
                   ],
                 );

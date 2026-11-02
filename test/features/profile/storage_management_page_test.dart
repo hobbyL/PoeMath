@@ -236,7 +236,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('题图显示独立数量和占用，不提供清理按钮', (tester) async {
+  testWidgets('题图显示独立数量和占用，以禁用清理按钮替代箭头', (tester) async {
     service.usages[StorageCacheKind.pictureStoryImages] =
         const CacheUsage(bytes: 4096, entries: 3);
     await show(tester);
@@ -245,14 +245,19 @@ void main() {
       matching: find.byType(AppTile),
     );
     await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
     expect(find.textContaining('3个文件 · 4.0 KB'), findsOneWidget);
     expect(
-      find.descendant(of: tile, matching: find.byType(TextButton)),
+      find.descendant(of: tile, matching: find.byIcon(Icons.chevron_right)),
       findsNothing,
     );
-    expect(tester.widget<AppTile>(tile).trailing, isNull);
     expect(tester.widget<AppTile>(tile).onTap, isNull);
-    expect(_clearOf('看图说话题图'), findsNothing);
+    expect(_clearOf('看图说话题图'), findsOneWidget);
+    expect(tester.widget<TextButton>(_clearOf('看图说话题图')).onPressed, isNull);
+    await tester.tap(_clearOf('看图说话题图'));
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
     expect(service.cleared, isEmpty);
   });
 
