@@ -328,7 +328,7 @@ void main() {
       AppLifecycleState.detached,
     ]) {
       await foreground(tester);
-      await tap(tester, '开始录音');
+      await tap(tester, '说一说');
       final speech = speeches.last;
       expect(speech.active, isTrue);
       await background(tester, state);
@@ -347,7 +347,7 @@ void main() {
     final speech = _Speech()..initialization = Completer<void>();
     queued.add(speech);
     await mount(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     await tap(tester, '正在准备…');
     expect(speeches, [speech]);
     expect(speech.initialized, 1);
@@ -357,7 +357,7 @@ void main() {
     expect(speech.starts, 0);
     expect(speech.active, isFalse);
     await foreground(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     expect(speeches.last.active, isTrue);
   });
 
@@ -365,10 +365,10 @@ void main() {
     final old = _Speech()..starting = Completer<void>();
     queued.add(old);
     await mount(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     await background(tester);
     await foreground(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     final current = speeches.last;
     old.starting!.complete();
     await tester.pump();
@@ -382,11 +382,11 @@ void main() {
     final old = _Speech()..stopping = Completer<SpeechRecognitionResult>();
     queued.add(old);
     await mount(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     await tap(tester, '说好了');
     await background(tester);
     await foreground(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     old.stopping!.complete(const SpeechRecognitionResult(text: '过期识别文本'));
     await tester.pump();
     expect(audio.saves, 0);
@@ -399,12 +399,12 @@ void main() {
     final pending = Completer<String>();
     audio.nextSave = pending;
     await mount(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     await tap(tester, '说好了');
     expect(audio.saves, 1);
     await background(tester);
     await foreground(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     pending.complete('/synthetic-audio/late.wav');
     await tester.pump();
     expect(audio.deleted, ['/synthetic-audio/late.wav']);
@@ -415,14 +415,14 @@ void main() {
 
   testWidgets('已经保存的片段在后续录音后台取消后完整保留', (tester) async {
     await mount(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     await tap(tester, '说好了');
     await waitUntil(
       tester,
       () => HiveBoxes.pictureStoryPractice.values.single.segments.length == 1,
     );
     final before = HiveBoxes.pictureStoryPractice.values.single.segmentsJson;
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     await background(tester);
     await foreground(tester);
     await tester.runAsync(() => repository.writes.last);
@@ -437,9 +437,9 @@ void main() {
     await mount(tester);
     repository.nextSave = pending;
     repository.failHeldSave = true;
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     await tap(tester, '说好了');
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     pending.complete();
     await tester
         .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
@@ -454,7 +454,7 @@ void main() {
     final speech = _Speech()..starting = Completer<void>();
     queued.add(speech);
     await mount(tester);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     await tester.pumpWidget(const SizedBox.shrink());
     speech.starting!.complete();
     await tester.pump();
@@ -471,10 +471,10 @@ void main() {
         ..initializationError = const SpeechRecognitionException('合成初始化失败'),
     );
     await mount(tester);
-    await tap(tester, '开始录音');
-    expect(find.widgetWithText(FilledButton, '开始录音'), findsOneWidget);
+    await tap(tester, '说一说');
+    expect(find.widgetWithText(FilledButton, '说一说'), findsOneWidget);
     expect(find.text('合成初始化失败'), findsOneWidget);
-    await tap(tester, '开始录音');
+    await tap(tester, '说一说');
     expect(speeches.last.active, isTrue);
     expect(find.widgetWithText(FilledButton, '说好了'), findsOneWidget);
   });

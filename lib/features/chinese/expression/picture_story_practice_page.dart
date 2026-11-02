@@ -769,7 +769,7 @@ class _PictureStoryPracticePageState
                       _recording ? Icons.stop : Icons.mic_none_outlined,
                     ),
                     label: Text(
-                      _starting ? '正在准备…' : (_recording ? '说好了' : '开始录音'),
+                      _starting ? '正在准备…' : (_recording ? '说好了' : '说一说'),
                     ),
                   ),
                 ),
