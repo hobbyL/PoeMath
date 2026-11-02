@@ -24,9 +24,10 @@ import '../../helpers/parent_access_test_helper.dart';
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
 
 final class _FakeCloudAudioPlayer implements CloudAudioPlayer {
-  _FakeCloudAudioPlayer({this.events, this.holdPlayback = false});
+  _FakeCloudAudioPlayer({this.events, this.holdPlayback = false, this.started});
 
   final List<String>? events;
+  final Completer<void>? started;
   final List<Uint8List> played = <Uint8List>[];
   final List<Completer<void>> _gates = <Completer<void>>[];
   int stopCalls = 0;
@@ -41,6 +42,7 @@ final class _FakeCloudAudioPlayer implements CloudAudioPlayer {
   @override
   Future<void> play(Uint8List bytes) async {
     played.add(bytes);
+    if (started?.isCompleted == false) started!.complete();
     events?.add('play');
     if (throwOnPlay || playFailures < throwOnPlayLimit) {
       playFailures++;
@@ -121,6 +123,7 @@ class _ScriptedHttpClient extends http.BaseClient {
     this.failFirstOnly = false,
     this.synthGate,
     this.audioSize,
+    this.started,
   });
 
   final _RequestCounter counter;
@@ -130,6 +133,7 @@ class _ScriptedHttpClient extends http.BaseClient {
   /// 合成闸门：非空时每个请求先挂起直到闸门完成（模拟合成 await 窗口）。
   final Completer<void>? synthGate;
   final int? audioSize;
+  final Completer<void>? started;
 
   final List<Map<String, dynamic>> bodies = <Map<String, dynamic>>[];
 
@@ -141,6 +145,7 @@ class _ScriptedHttpClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (started?.isCompleted == false) started!.complete();
     final gate = synthGate;
     if (gate != null) await gate.future;
     counter.value++;
@@ -167,7 +172,8 @@ class _ScriptedHttpClient extends http.BaseClient {
     }
     return http.StreamedResponse(
       http.ByteStream.fromBytes(
-          audioSize == null ? _audioBytes : Uint8List(audioSize!),),
+        audioSize == null ? _audioBytes : Uint8List(audioSize!),
+      ),
       200,
       headers: const {'content-type': 'audio/mpeg'},
     );
@@ -194,6 +200,7 @@ WorkerTtsClient _client(
   WorkerTtsErrorKind? failKind,
   bool failFirstOnly = false,
   Completer<void>? synthGate,
+  Completer<void>? started,
 }) {
   return WorkerTtsClient(
     httpClient: _ScriptedHttpClient(
@@ -201,6 +208,7 @@ WorkerTtsClient _client(
       failKind: failKind,
       failFirstOnly: failFirstOnly,
       synthGate: synthGate,
+      started: started,
     ),
   );
 }
@@ -230,13 +238,16 @@ void main() {
     await CloudUsageService.instance.setLimit(CloudUsageKind.tts, null);
     final counter = _RequestCounter();
     final client = WorkerTtsClient(
-        httpClient:
-            _ScriptedHttpClient(counter: counter, audioSize: 5 * 1024 * 1024),);
+      httpClient:
+          _ScriptedHttpClient(counter: counter, audioSize: 5 * 1024 * 1024),
+    );
     addTearDown(client.close);
-    final service = TtsService(_stubSettings(cloudEnabled: true),
-        flutterTts: _FakeFlutterTts(),
-        cloudClient: client,
-        cloudPlayer: _FakeCloudAudioPlayer(),);
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: _FakeFlutterTts(),
+      cloudClient: client,
+      cloudPlayer: _FakeCloudAudioPlayer(),
+    );
     addTearDown(service.dispose);
     await service.previewCloud('第一段');
     await service.previewCloud('第二段');
@@ -248,10 +259,12 @@ void main() {
     final blocked =
         WorkerTtsClient(httpClient: _BlockingHttpClient(sent, aborted));
     addTearDown(blocked.close);
-    final stopped = TtsService(_stubSettings(cloudEnabled: true),
-        flutterTts: _FakeFlutterTts(),
-        cloudClient: blocked,
-        cloudPlayer: _FakeCloudAudioPlayer(),);
+    final stopped = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: _FakeFlutterTts(),
+      cloudClient: blocked,
+      cloudPlayer: _FakeCloudAudioPlayer(),
+    );
     addTearDown(stopped.dispose);
     final preview = stopped.previewCloud('停止测试');
     await sent.future;
@@ -611,6 +624,58 @@ void main() {
     await service.speak('床前明月光');
 
     expect(counter.value, 1);
+  });
+
+  test('清理云朗读内存不停止当前播放，下次朗读重新合成', () async {
+    final counter = _RequestCounter();
+    final started = Completer<void>();
+    final player = _FakeCloudAudioPlayer(holdPlayback: true, started: started);
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: _FakeFlutterTts(),
+      cloudClient: _client(counter),
+      cloudPlayer: player,
+    );
+    final speaking = service.speak('缓存样本');
+    await started.future;
+    expect(player.played, [_audioBytes]);
+    expect(service.cloudCacheUsage.bytes, _audioBytes.length);
+    expect(service.cloudCacheUsage.entries, 1);
+    service.clearCloudCache();
+    expect(service.cloudCacheUsage.bytes, 0);
+    expect(service.cloudCacheUsage.entries, 0);
+    expect(player.stopCalls, 0);
+    await player.stop();
+    await speaking;
+    player.holdPlayback = false;
+    await service.speak('缓存样本');
+    expect(counter.value, 2);
+    expect(service.cloudCacheUsage.entries, 1);
+    service.dispose();
+  });
+
+  test('清理云朗读缓存后旧合成返回仍可播放但不会填回缓存', () async {
+    final counter = _RequestCounter();
+    final gate = Completer<void>();
+    final started = Completer<void>();
+    final player = _FakeCloudAudioPlayer();
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: _FakeFlutterTts(),
+      cloudClient: _client(counter, synthGate: gate, started: started),
+      cloudPlayer: player,
+    );
+    final speaking = service.speak('在途缓存样本');
+    await started.future;
+    service.clearCloudCache();
+    gate.complete();
+    await speaking;
+    expect(player.played, [_audioBytes]);
+    expect(service.cloudCacheUsage.entries, 0);
+    await service.speak('在途缓存样本');
+    expect(counter.value, 2);
+    expect(service.cloudCacheUsage.entries, 1);
+    service.dispose();
   });
 
   test('stop 中断挂起的云端播放且不触发完成回调', () async {

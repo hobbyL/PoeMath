@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:poemath/core/services/cache_file_storage.dart';
+import 'package:poemath/core/services/textbook_cover_cache.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
@@ -255,9 +257,11 @@ class TextbookContentCache {
 
   /// 只清理目录与提取结果，保留封面 PNG：封面重新生成要打开原书渲染，
   /// 代价高于重新提取目录，缓存管理里应能单独保留。
-  Future<void> clearExtracted() => _clear(keepCover: true);
+  Future<void> clearExtracted({void Function()? authorize}) =>
+      _clear(keepCover: true, authorize: authorize);
 
-  Future<void> _clear({required bool keepCover}) {
+  Future<void> _clear({required bool keepCover, void Function()? authorize}) {
+    authorize?.call();
     _generation++;
     _toc = null;
     _texts.clear();
@@ -266,17 +270,19 @@ class TextbookContentCache {
     _pendingLayouts.clear();
     _characters = 0;
     final result = _writes.then((_) async {
+      authorize?.call();
       final directory = await _directory();
       if (!await directory.exists()) return;
+      authorize?.call();
       if (!keepCover) {
         await directory.delete(recursive: true);
         return;
       }
-      await for (final entity in directory.list(followLinks: false)) {
-        final name = entity.path.split(Platform.pathSeparator).last;
-        if (name.startsWith('cover-v') && name.endsWith('.png')) continue;
-        await entity.delete(recursive: true);
-      }
+      final files = await CacheFileStorage.files(directory);
+      await CacheFileStorage.clear(
+        files.where((file) => !TextbookCoverCache.isCoverFile(file.path)),
+        authorize: authorize ?? () {},
+      );
     });
     _writes = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return result;

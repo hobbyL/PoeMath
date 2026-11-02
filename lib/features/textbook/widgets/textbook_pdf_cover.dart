@@ -41,6 +41,7 @@ Future<ui.Image?> _renderFirstPage(
   String path,
   TextbookCoverToken token,
 ) async {
+  final generation = _coverCache.revision(path);
   final cached = await _coverCache.read(path);
   if (cached != null) {
     // 命中缓存：只做一次 PNG 解码，不再打开原书。
@@ -48,7 +49,7 @@ Future<ui.Image?> _renderFirstPage(
       cached.dispose();
       return null;
     }
-    _coverCache.remember(path, cached);
+    _coverCache.remember(path, cached, generation: generation);
     return cached;
   }
   await pdfrxFlutterInitialize();
@@ -73,8 +74,8 @@ Future<ui.Image?> _renderFirstPage(
     if (token.isCancelled || rendered == null) return null;
     final image = await rendered.createImage();
     // 落盘后再返回：即使组件随即销毁，下一次进入也能直接命中。
-    await _coverCache.write(path, image);
-    _coverCache.remember(path, image);
+    await _coverCache.write(path, image, generation: generation);
+    _coverCache.remember(path, image, generation: generation);
     return image;
   } finally {
     token._renderToken = null;

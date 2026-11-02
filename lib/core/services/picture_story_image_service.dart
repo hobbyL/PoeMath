@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 
 import 'package:poemath/data/models/picture_story_prompt.dart';
 
@@ -63,7 +64,12 @@ class PictureStoryImageService {
     return file.path;
   }
 
-  Future<PictureStoryImage> importPath(String path) async {
+  Future<PictureStoryImage> importPath(String path) => CacheActivity.use(
+        TemporaryCacheKind.pickers,
+        () => _importPath(path),
+      );
+
+  Future<PictureStoryImage> _importPath(String path) async {
     try {
       final source = File(path);
       final size = await source.length();

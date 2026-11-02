@@ -45,18 +45,17 @@ class _FakeFiles extends TextbookFileService {
   }
 
   @override
-  Future<TextbookStorageUsage> storageUsage(Textbook book) async =>
-      courseGone
-          ? TextbookStorageUsage(
-              pdfBytes: usage.pdfBytes,
-              coverBytes: usage.coverBytes,
-              contentBytes: usage.contentBytes,
-              contentFiles: usage.contentFiles,
-              audioBytes: usage.audioBytes,
-              audioFiles: usage.audioFiles,
-              courseBytes: 0,
-            )
-          : usage;
+  Future<TextbookStorageUsage> storageUsage(Textbook book) async => courseGone
+      ? TextbookStorageUsage(
+          pdfBytes: usage.pdfBytes,
+          coverBytes: usage.coverBytes,
+          contentBytes: usage.contentBytes,
+          contentFiles: usage.contentFiles,
+          audioBytes: usage.audioBytes,
+          audioFiles: usage.audioFiles,
+          courseBytes: 0,
+        )
+      : usage;
 
   @override
   Future<void> clearCover(Textbook book) async {
@@ -223,7 +222,7 @@ void main() {
       tester
           .widget<Text>(find.byKey(const ValueKey('cache-derived-total')))
           .data,
-      '6 KB',
+      '5.7 KB',
       reason: '800 + 3000 + 2048 字节',
     );
     for (final key in [
@@ -329,7 +328,7 @@ void main() {
       tester
           .widget<Text>(find.byKey(const ValueKey('cache-derived-total')))
           .data,
-      '0 KB',
+      '0 B',
     );
     final clearAll = tester.widget<OutlinedButton>(
       find.byKey(const ValueKey('cache-clear-all')),
@@ -353,14 +352,9 @@ void main() {
       tester.getTopLeft(find.byKey(const ValueKey('cache-clear-all'))).dy,
     );
     expect(
-      tester
-          .getRect(find.byKey(const ValueKey('cache-delete-book')))
-          .left,
+      tester.getRect(find.byKey(const ValueKey('cache-delete-book'))).left,
       greaterThan(
-        tester
-            .getRect(find.byKey(const ValueKey('cache-clear-all')))
-            .center
-            .dx,
+        tester.getRect(find.byKey(const ValueKey('cache-clear-all'))).center.dx,
       ),
     );
     // 确认对话框列出删除范围。

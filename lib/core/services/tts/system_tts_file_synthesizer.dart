@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 
 class NarrationException implements Exception {
   const NarrationException(this.message);
@@ -46,6 +47,22 @@ class AndroidSystemTtsFileSynthesizer implements SystemTtsFileSynthesizer {
 
   @override
   Future<Uint8List> synthesize({
+    required int sessionId,
+    required String text,
+    required Map<String, String>? voice,
+    required double speed,
+  }) =>
+      CacheActivity.use(
+        TemporaryCacheKind.systemTts,
+        () => _synthesize(
+          sessionId: sessionId,
+          text: text,
+          voice: voice,
+          speed: speed,
+        ),
+      );
+
+  Future<Uint8List> _synthesize({
     required int sessionId,
     required String text,
     required Map<String, String>? voice,

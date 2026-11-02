@@ -8,7 +8,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
+import 'package:poemath/core/services/cache_file_storage.dart';
 import 'package:poemath/data/models/textbook.dart';
 
 /// 封面 PNG 与原书派生缓存共用目录：
@@ -32,6 +32,28 @@ class TextbookCoverCache {
   /// 768px 封面约 2.3 MB，6 本约 14 MB。
   static final _memory = <String, ui.Image>{};
   static const _maxMemoryImages = 6;
+  static final _revisions = <String, int>{};
+  static final _writes = <String, Future<void>>{};
+  static int _memoryRevision = 0;
+
+  static Iterable<String> get trackedPaths =>
+      {..._memory.keys, ..._writes.keys};
+
+  int revision(String pdfPath) => (_revisions[pdfPath] ?? 0) + _memoryRevision;
+
+  static CacheUsage get memoryUsage => CacheUsage(
+        bytes: _memory.values
+            .where((image) => !image.debugDisposed)
+            .fold(0, (bytes, image) => bytes + image.width * image.height * 4),
+        entries: _memory.length,
+      );
+
+  static bool isCoverFile(String path) {
+    final name = path.split(Platform.pathSeparator).last;
+    return name.startsWith('cover-v') &&
+        (name.endsWith('.png') ||
+            name.contains('.png.') && name.endsWith('.pending'));
+  }
 
   /// 同步取出可独立释放的副本；没有则返回 null。
   ///
@@ -49,7 +71,8 @@ class TextbookCoverCache {
   }
 
   /// 记住一份位图（内部保存 clone），供下次挂载首帧使用。
-  void remember(String pdfPath, ui.Image image) {
+  void remember(String pdfPath, ui.Image image, {int? generation}) {
+    if (generation != null && generation != revision(pdfPath)) return;
     _memory.remove(pdfPath)?.dispose();
     _memory[pdfPath] = image.clone();
     while (_memory.length > _maxMemoryImages) {
@@ -59,11 +82,12 @@ class TextbookCoverCache {
 
   /// 封面失效（删除/重生成）时同步丢掉位图，避免继续显示旧封面。
   void forget(String pdfPath) {
+    _revisions[pdfPath] = (_revisions[pdfPath] ?? 0) + 1;
     _memory.remove(pdfPath)?.dispose();
   }
 
-  @visibleForTesting
   static void clearMemory() {
+    _memoryRevision++;
     for (final image in _memory.values) {
       image.dispose();
     }
@@ -113,13 +137,27 @@ class TextbookCoverCache {
   }
 
   /// 原子写入 PNG；空间不足等失败只损失缓存，不影响本次显示。
-  Future<void> write(String pdfPath, ui.Image image) async {
+  Future<void> write(String pdfPath, ui.Image image, {int? generation}) {
+    final captured = generation ?? revision(pdfPath);
+    final result = (_writes[pdfPath] ?? Future<void>.value()).then(
+      (_) => _write(pdfPath, image, captured),
+    );
+    _writes[pdfPath] =
+        result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return result;
+  }
+
+  Future<void> _write(String pdfPath, ui.Image image, int generation) async {
     final file = fileFor(pdfPath);
-    if (file == null) return;
+    if (file == null || generation != revision(pdfPath)) return;
     File? pending;
     try {
       final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (data == null || data.lengthInBytes > _maxBytes) return;
+      if (data == null ||
+          data.lengthInBytes > _maxBytes ||
+          generation != revision(pdfPath)) {
+        return;
+      }
       await file.parent.create(recursive: true);
       pending = File(
         '${file.path}.${Random.secure().nextInt(1 << 32)}.pending',
@@ -128,6 +166,7 @@ class TextbookCoverCache {
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
         flush: true,
       );
+      if (generation != revision(pdfPath)) return;
       await pending.rename(file.path);
       pending = null;
     } on Object {
@@ -141,5 +180,24 @@ class TextbookCoverCache {
         }
       }
     }
+  }
+
+  /// 等待已开始的封面写入，清理所有格式版本和未发布副本。
+  Future<void> clear(String pdfPath, {required void Function() authorize}) {
+    authorize();
+    forget(pdfPath);
+    final result = (_writes[pdfPath] ?? Future<void>.value()).then((_) async {
+      authorize();
+      final file = fileFor(pdfPath);
+      if (file == null) return;
+      final files = await CacheFileStorage.files(file.parent);
+      await CacheFileStorage.clear(
+        files.where((file) => isCoverFile(file.path)),
+        authorize: authorize,
+      );
+    });
+    _writes[pdfPath] =
+        result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return result;
   }
 }

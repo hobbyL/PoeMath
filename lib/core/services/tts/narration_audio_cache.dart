@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:poemath/core/services/cache_activity.dart';
+import 'package:poemath/core/services/cache_file_storage.dart';
 import 'package:poemath/core/services/tts/narration_audio_identity.dart';
 
 export 'package:poemath/core/services/tts/narration_audio_identity.dart';
@@ -37,6 +39,7 @@ class NarrationAudioCache {
   }) : _directoryProvider = directoryProvider ?? getTemporaryDirectory;
   final Future<Directory> Function() _directoryProvider;
   final int maxBytes;
+  int _allRevision = 0;
   final _revisions = <String, int>{};
   final _pins = <String, int>{};
   final _pending = <String, Future<Uint8List>>{};
@@ -44,7 +47,7 @@ class NarrationAudioCache {
 
   static String key(Object identity) =>
       sha256.convert(utf8.encode(jsonEncode(identity))).toString();
-  int revision(String book) => _revisions[book] ?? 0;
+  int revision(String book) => _allRevision + (_revisions[book] ?? 0);
   bool _valid(String value) => RegExp(r'^[a-f0-9]{64}$').hasMatch(value);
   Future<Directory> _root() async =>
       Directory('${(await _directoryProvider()).path}/textbook-audio');
@@ -128,6 +131,8 @@ class NarrationAudioCache {
     NarrationBackend? backend,
   }) async {
     final revision = this.revision(book);
+    await _writes;
+    if (revision != this.revision(book)) return null;
     try {
       final file = await _file(book, key, format);
       final metadata = File('${file.path}.json');
@@ -276,10 +281,27 @@ class NarrationAudioCache {
   /// 先失效在途写入，再删除本书派生音频。
   Future<void> clearBook(String book) {
     if (!_valid(book)) throw ArgumentError('无效的教材身份');
-    _revisions[book] = revision(book) + 1;
+    _revisions[book] = (_revisions[book] ?? 0) + 1;
     return _enqueue(() async {
       final folder = Directory('${(await _root()).path}/$book');
       if (await folder.exists()) await folder.delete(recursive: true);
+    });
+  }
+
+  /// 全部教材音频的物理占用，包含校验元数据和中断写入。
+  Future<CacheUsage> storageUsage() async =>
+      CacheFileStorage.usage(await CacheFileStorage.files(await _root()));
+
+  Future<void> clearAll({required void Function() authorize}) {
+    authorize();
+    if (_pins.isNotEmpty) throw const CacheInUseException();
+    _allRevision++;
+    _pending.clear();
+    return _enqueue(() async {
+      authorize();
+      if (_pins.isNotEmpty) throw const CacheInUseException();
+      final files = await CacheFileStorage.files(await _root());
+      await CacheFileStorage.clear(files, authorize: authorize);
     });
   }
 }

@@ -5,6 +5,8 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:poemath/core/services/cache_activity.dart';
+import 'package:poemath/core/services/cache_file_storage.dart';
 import 'package:poemath/core/services/textbook_content_cache.dart';
 import 'package:poemath/core/services/textbook_cover_cache.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
@@ -191,8 +193,12 @@ class TextbookFileService {
     required TextbookImportToken token,
     TextbookImportProgress? onProgress,
   }) {
-    final result =
-        _operations.then((_) => _importPdf(sourcePath, token, onProgress));
+    final result = _operations.then(
+      (_) => CacheActivity.use(
+        TemporaryCacheKind.pickers,
+        () => _importPdf(sourcePath, token, onProgress),
+      ),
+    );
     _operations =
         result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return result;
@@ -434,12 +440,74 @@ class TextbookFileService {
     );
   }
 
+  Future<List<File>> _cacheFiles() async => CacheFileStorage.files(
+        Directory('${(await _directoryProvider()).path}/textbooks/cache'),
+      );
+
+  /// 应用范围的派生缓存清单；包含未登记书目的遗留缓存，不读取原书。
+  Future<({CacheUsage covers, CacheUsage content})> cacheUsage() async {
+    final files = await _cacheFiles();
+    return (
+      covers: await CacheFileStorage.usage(
+        files.where((file) => TextbookCoverCache.isCoverFile(file.path)),
+      ),
+      content: await CacheFileStorage.usage(
+        files.where((file) => !TextbookCoverCache.isCoverFile(file.path)),
+      ),
+    );
+  }
+
+  Future<void> clearAllCovers({required void Function() authorize}) async {
+    authorize();
+    final base = '${(await _directoryProvider()).path}/textbooks';
+    final files = await _cacheFiles();
+    final paths = <String>{
+      for (final path in TextbookCoverCache.trackedPaths)
+        if (File(path).parent.path == base) path,
+    };
+    final orphanFiles = <File>[];
+    for (final file
+        in files.where((file) => TextbookCoverCache.isCoverFile(file.path))) {
+      final relative = file.path.substring('$base/cache/'.length);
+      final id = relative.split(Platform.pathSeparator).first;
+      if (Textbook.isValidId(id)) {
+        paths.add('$base/$id.pdf');
+      } else {
+        orphanFiles.add(file);
+      }
+    }
+    await Future.wait([
+      for (final path in paths)
+        const TextbookCoverCache().clear(path, authorize: authorize),
+    ]);
+    await CacheFileStorage.clear(orphanFiles, authorize: authorize);
+  }
+
+  Future<void> clearAllExtractedContent({
+    required void Function() authorize,
+  }) async {
+    authorize();
+    final base = '${(await _directoryProvider()).path}/textbooks/cache/';
+    // 先同步递增现有缓存的代次，随后等待写队列，晚到提取结果不复活。
+    final caches = Map<String, TextbookContentCache>.from(_contentCaches);
+    await Future.wait([
+      for (final cache in caches.values)
+        cache.clearExtracted(authorize: authorize),
+    ]);
+    final files = await _cacheFiles();
+    final orphanFiles = files.where((file) {
+      final id =
+          file.path.substring(base.length).split(Platform.pathSeparator).first;
+      return !caches.containsKey(id) &&
+          !TextbookCoverCache.isCoverFile(file.path);
+    });
+    await CacheFileStorage.clear(orphanFiles, authorize: authorize);
+  }
+
   /// 只删封面 PNG；目录缓存与朗读音频保留。
   Future<void> clearCover(Textbook book) async {
     final file = await _file(book.pdfSha256);
-    const TextbookCoverCache().forget(file.path);
-    final cover = const TextbookCoverCache().fileFor(file.path);
-    if (cover != null && await cover.exists()) await cover.delete();
+    await const TextbookCoverCache().clear(file.path, authorize: () {});
   }
 
   /// 清目录与逐页提取结果，保留封面（重新渲染封面比重新提取更贵）。

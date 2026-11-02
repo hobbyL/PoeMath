@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/services/backup_history_service.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/providers/backup_protection_providers.dart';
@@ -244,20 +245,22 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
         if (path == null) return;
         await history.markExternalBackup();
       } else {
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/poemath_backup_$timestamp.json');
-        try {
-          await file.writeAsString(json);
-          if (!context.mounted) return;
-          ParentAccessService.instance.assertAllowed();
-          final result = await SharePlus.instance
-              .share(ShareParams(files: [XFile(file.path)]));
-          if (result.status == ShareResultStatus.success) {
-            await history.markExternalBackup();
+        await CacheActivity.use(TemporaryCacheKind.sharing, () async {
+          final dir = await getTemporaryDirectory();
+          final file = File('${dir.path}/poemath_backup_$timestamp.json');
+          try {
+            await file.writeAsString(json);
+            if (!context.mounted) return;
+            ParentAccessService.instance.assertAllowed();
+            final result = await SharePlus.instance
+                .share(ShareParams(files: [XFile(file.path)]));
+            if (result.status == ShareResultStatus.success) {
+              await history.markExternalBackup();
+            }
+          } finally {
+            if (await file.exists()) await file.delete();
           }
-        } finally {
-          if (await file.exists()) await file.delete();
-        }
+        });
       }
       if (context.mounted) {
         ScaffoldMessenger.of(context)
@@ -298,7 +301,16 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
     }
   }
 
-  Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
+  Future<void> _importBackup(BuildContext context, WidgetRef ref) =>
+      CacheActivity.use(
+        TemporaryCacheKind.pickers,
+        () => _importBackupFromPicker(context, ref),
+      );
+
+  Future<void> _importBackupFromPicker(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {

@@ -87,6 +87,21 @@ void main() {
     expect(await file.exists(), isFalse, reason: '坏文件要清掉才能重新生成');
   });
 
+  test('清理会等待在途写入，旧渲染不能重新写回磁盘或内存', () async {
+    final image = await _renderImage(12, 16);
+    addTearDown(image.dispose);
+    final generation = cache.revision(pdfPath);
+    final writing = cache.write(pdfPath, image, generation: generation);
+    final clearing = cache.clear(pdfPath, authorize: () {});
+    await Future.wait([writing, clearing]);
+    await cache.write(pdfPath, image, generation: generation);
+    cache.remember(pdfPath, image, generation: generation);
+    expect(await cache.fileFor(pdfPath)!.exists(), isFalse);
+    expect(cache.take(pdfPath), isNull);
+    await cache.write(pdfPath, image);
+    expect(await cache.fileFor(pdfPath)!.exists(), isTrue);
+  });
+
   test('非法路径不读不写', () async {
     final bad = '${root.path}${Platform.pathSeparator}cover.pdf';
     expect(await cache.read(bad), isNull);

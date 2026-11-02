@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 
 void main() {
@@ -14,48 +15,96 @@ void main() {
     directory =
         await Directory.systemTemp.createTemp('poemath-narration-cache-');
     cache = NarrationAudioCache(
-        directoryProvider: () async => directory, maxBytes: 20,);
+      directoryProvider: () async => directory,
+      maxBytes: 20,
+    );
   });
   tearDown(() async {
     await directory.delete(recursive: true);
   });
   test('写入、重开命中和字节降级均保留实际来源/音频摘要', () async {
     final bytes = Uint8List.fromList([7, 8, 9]);
-    final generated = await cache.obtain(book, key, 'wav', backend: NarrationBackend.system,
-      revision: 0, isCurrent: () => true, generate: () async => bytes,);
+    final generated = await cache.obtain(
+      book,
+      key,
+      'wav',
+      backend: NarrationBackend.system,
+      revision: 0,
+      isCurrent: () => true,
+      generate: () async => bytes,
+    );
     expect(generated.identity!.audioSha256, sha256.convert(bytes).toString());
-    final expected = generated.identity!.signature; generated.release();
-    final hit = await NarrationAudioCache(directoryProvider: () async => directory).read(book, key, 'wav', backend: NarrationBackend.system);
-    expect(hit!.identity!.signature, expected); hit.release();
-    final blocker = File('${directory.path}/blocked'); await blocker.writeAsString('blocked');
-    final fallback = await NarrationAudioCache(directoryProvider: () async => Directory(blocker.path)).store(book, key, 'mp3', bytes,
-      backend: NarrationBackend.cloud, revision: 0, isCurrent: () => true,);
-    expect(fallback.path, isNull); expect(fallback.identity!.backend, NarrationBackend.cloud);
+    final expected = generated.identity!.signature;
+    generated.release();
+    final hit =
+        await NarrationAudioCache(directoryProvider: () async => directory)
+            .read(book, key, 'wav', backend: NarrationBackend.system);
+    expect(hit!.identity!.signature, expected);
+    hit.release();
+    final blocker = File('${directory.path}/blocked');
+    await blocker.writeAsString('blocked');
+    final fallback = await NarrationAudioCache(
+      directoryProvider: () async => Directory(blocker.path),
+    ).store(
+      book,
+      key,
+      'mp3',
+      bytes,
+      backend: NarrationBackend.cloud,
+      revision: 0,
+      isCurrent: () => true,
+    );
+    expect(fallback.path, isNull);
+    expect(fallback.identity!.backend, NarrationBackend.cloud);
     expect(fallback.identity!.audioSha256, sha256.convert(bytes).toString());
   });
   test('完整文件跨实例命中，损坏缓存重新生成；不同身份不串用', () async {
     final bytes = Uint8List.fromList([1, 2, 3, 4]);
-    final first = await cache.store(book, key, 'mp3', bytes,
-        revision: 0, isCurrent: () => true,);
+    final first = await cache.store(
+      book,
+      key,
+      'mp3',
+      bytes,
+      revision: 0,
+      isCurrent: () => true,
+    );
     first.release();
     final restored = NarrationAudioCache(
-        directoryProvider: () async => directory, maxBytes: 20,);
+      directoryProvider: () async => directory,
+      maxBytes: 20,
+    );
     final hit = await restored.read(book, key, 'mp3');
     expect(await File(hit!.path!).readAsBytes(), bytes);
     hit.release();
     expect(
-        await restored.read(
-            book, NarrationAudioCache.key(['otherVoice', 'text']), 'mp3',),
-        isNull,);
+      await restored.read(
+        book,
+        NarrationAudioCache.key(['otherVoice', 'text']),
+        'mp3',
+      ),
+      isNull,
+    );
     await File(first.path!).writeAsBytes([9, 9, 9, 9]);
     expect(await restored.read(book, key, 'mp3'), isNull);
   });
   test('容量淘汰旧文件，不删除活跃租约', () async {
-    final first = await cache.store(book, key, 'mp3', Uint8List(12),
-        revision: 0, isCurrent: () => true,);
+    final first = await cache.store(
+      book,
+      key,
+      'mp3',
+      Uint8List(12),
+      revision: 0,
+      isCurrent: () => true,
+    );
     final key2 = NarrationAudioCache.key(['second']);
-    final second = await cache.store(book, key2, 'wav', Uint8List(12),
-        revision: 0, isCurrent: () => true,);
+    final second = await cache.store(
+      book,
+      key2,
+      'wav',
+      Uint8List(12),
+      revision: 0,
+      isCurrent: () => true,
+    );
     expect(await File(first.path!).exists(), true);
     expect(await File(second.path!).exists(), true);
     first.release();
@@ -63,6 +112,108 @@ void main() {
     expect(await File(first.path!).exists(), false);
     expect(await File(second.path!).exists(), true);
     second.release();
+  });
+
+  test('全局清理拒绝活动租约，释放后删除所有教材音频和校验文件', () async {
+    final audio = await cache.store(
+      book,
+      key,
+      'mp3',
+      Uint8List.fromList([1, 2, 3]),
+      revision: cache.revision(book),
+      isCurrent: () => true,
+    );
+    expect(
+      () => cache.clearAll(authorize: () {}),
+      throwsA(isA<CacheInUseException>()),
+    );
+    expect(await File(audio.path!).exists(), isTrue);
+    audio.release();
+    final other = await cache.store(
+      'b' * 64,
+      key,
+      'wav',
+      Uint8List.fromList([4, 5, 6]),
+      revision: cache.revision('b' * 64),
+      isCurrent: () => true,
+    );
+    other.release();
+    expect((await cache.storageUsage()).entries, 4);
+    await cache.clearAll(authorize: () {});
+    expect((await cache.storageUsage()).entries, 0);
+    expect(await cache.read(book, key, 'mp3'), isNull);
+    expect(await cache.read('b' * 64, key, 'wav'), isNull);
+  });
+
+  test('全局清理使尚未落盘的教材音频失效，后续新音频可正常缓存', () async {
+    final started = Completer<void>();
+    final gate = Completer<Uint8List>();
+    final loading = cache.obtain(
+      book,
+      key,
+      'mp3',
+      revision: cache.revision(book),
+      isCurrent: () => true,
+      generate: () {
+        started.complete();
+        return gate.future;
+      },
+    );
+    await started.future;
+    await cache.clearAll(authorize: () {});
+    gate.complete(Uint8List.fromList([7, 8, 9]));
+    final late = await loading;
+    expect(late.path, isNull);
+    expect(late.bytes, [7, 8, 9]);
+    expect((await cache.storageUsage()).entries, 0);
+    final fresh = await cache.obtain(
+      book,
+      key,
+      'mp3',
+      revision: cache.revision(book),
+      isCurrent: () => true,
+      generate: () async => Uint8List.fromList([1, 2, 3]),
+    );
+    expect(await File(fresh.path!).readAsBytes(), [1, 2, 3]);
+    fresh.release();
+  });
+
+  test('清理与读取同时开始，旧读取不能取得待删除音频租约', () async {
+    final stored = await cache.store(
+      book,
+      key,
+      'mp3',
+      Uint8List.fromList([1, 2, 3]),
+      revision: cache.revision(book),
+      isCurrent: () => true,
+    );
+    stored.release();
+    await cache.clearBook('c' * 64);
+    var deleting = false;
+    var checks = 0;
+    final started = Completer<void>();
+    final directoryGate = Completer<Directory>();
+    cache = NarrationAudioCache(
+      directoryProvider: () =>
+          deleting ? directoryGate.future : Future.value(directory),
+      maxBytes: 20,
+    );
+    final reading = cache.read(book, key, 'mp3');
+    final clearing = cache.clearAll(
+      authorize: () {
+        if (++checks == 2) {
+          deleting = true;
+          started.complete();
+        }
+      },
+    );
+    await started.future;
+    final audio = await reading;
+    audio?.release();
+    directoryGate.complete(directory);
+    await clearing;
+    expect(audio, isNull);
+    expect((await cache.storageUsage()).entries, 0);
   });
   test('并发同键只生成一次，原书清理期间晚到音频不复活', () async {
     final gate = Completer<Uint8List>();
@@ -95,10 +246,17 @@ void main() {
     final blocker = File('${directory.path}/file');
     await blocker.writeAsString('occupied');
     final broken = NarrationAudioCache(
-        directoryProvider: () async => Directory(blocker.path),);
+      directoryProvider: () async => Directory(blocker.path),
+    );
     final bytes = Uint8List.fromList([3, 2, 1]);
-    final result = await broken.store(book, key, 'wav', bytes,
-        revision: 0, isCurrent: () => true,);
+    final result = await broken.store(
+      book,
+      key,
+      'wav',
+      bytes,
+      revision: 0,
+      isCurrent: () => true,
+    );
     expect(result.path, isNull);
     expect(result.bytes, bytes);
   });

@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/update/update_models.dart';
 
 /// Android 原生安装异常。
@@ -73,8 +74,10 @@ class AndroidUpdateInstaller {
     if (!isSupported) {
       throw const UpdateInstallException('当前平台不支持读取安装包信息');
     }
-    final value =
-        await _invokeNullable<List<Object?>>('inspectApkSignature', {'path': path});
+    final value = await _invokeNullable<List<Object?>>(
+      'inspectApkSignature',
+      {'path': path},
+    );
     return value?.map((item) => item! as String).toList(growable: false);
   }
 
@@ -97,7 +100,10 @@ class AndroidUpdateInstaller {
     if (!isSupported) {
       throw const UpdateInstallException('当前平台不支持应用内安装更新');
     }
-    await _invokeVoid('installApk', {'path': path});
+    await CacheActivity.use(
+      TemporaryCacheKind.updates,
+      () => _invokeVoid('installApk', {'path': path}),
+    );
   }
 
   Future<T> _invokeRequired<T>(String method, [Object? arguments]) async {

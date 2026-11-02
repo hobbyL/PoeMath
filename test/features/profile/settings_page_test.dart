@@ -168,6 +168,7 @@ void main() {
     await tester.tap(find.text('家长与数据'));
     await tester.pumpAndSettle();
     expect(find.text('家长保护与云额度'), findsOneWidget);
+    expect(find.text('存储管理'), findsOneWidget);
     expect(find.text('书籍管理'), findsNothing);
     expect(find.text('备份与恢复'), findsOneWidget);
     expect(find.text('云端同步'), findsOneWidget);

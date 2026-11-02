@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -224,7 +225,12 @@ class _TextbookCourseReviewPageState
     }
   }
 
-  Future<void> _import(Textbook book) async {
+  Future<void> _import(Textbook book) => CacheActivity.use(
+        TemporaryCacheKind.pickers,
+        () => _importFromPicker(book),
+      );
+
+  Future<void> _importFromPicker(Textbook book) async {
     if (_importing) return;
     final files = ref.read(textbookFileServiceProvider);
     setState(() => _importing = true);

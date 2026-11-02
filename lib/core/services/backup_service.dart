@@ -11,6 +11,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/data/hive/migrations/poem_identity_migration.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -453,7 +454,12 @@ class BackupService {
   }
 
   /// 导出并保存到临时文件，返回文件路径。
-  Future<String> exportToFile({String? passphrase}) async {
+  Future<String> exportToFile({String? passphrase}) => CacheActivity.use(
+        TemporaryCacheKind.sharing,
+        () => _exportToFile(passphrase: passphrase),
+      );
+
+  Future<String> _exportToFile({String? passphrase}) async {
     final json = await exportToJson(
       passphrase: passphrase,
       encryptPayload: passphrase?.trim().isNotEmpty == true,
@@ -1155,7 +1161,13 @@ class BackupService {
   }
 
   /// 从文件路径恢复。
-  Future<int> restoreFromFile(String filePath, {String? passphrase}) async {
+  Future<int> restoreFromFile(String filePath, {String? passphrase}) =>
+      CacheActivity.use(
+        TemporaryCacheKind.pickers,
+        () => _restoreFromFile(filePath, passphrase: passphrase),
+      );
+
+  Future<int> _restoreFromFile(String filePath, {String? passphrase}) async {
     final file = File(filePath);
     if (!file.existsSync()) {
       throw const FormatException('备份文件不存在');

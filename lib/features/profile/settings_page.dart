@@ -24,6 +24,7 @@ import 'package:poemath/features/profile/notification_settings_page.dart';
 import 'package:poemath/features/profile/practice_settings_page.dart';
 import 'package:poemath/features/profile/learning_background_page.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
+import 'package:poemath/features/profile/storage_management_page.dart';
 import 'package:poemath/features/profile/tts_settings_page.dart';
 import 'package:poemath/features/profile/ai_settings_page.dart';
 import 'package:poemath/features/profile/widgets/completion_sound_picker.dart';
@@ -144,7 +145,7 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.lock_outline,
                 iconColor: theme.colorScheme.tertiary,
                 title: '家长与数据',
-                subtitle: '家长密码、云额度、备份与同步',
+                subtitle: '家长密码、存储、备份与同步',
                 onTap: () => _openSection(context, _SettingsSection.data),
               ),
               const SizedBox(height: SpacingTokens.sm),
@@ -348,6 +349,21 @@ class SettingsPage extends ConsumerWidget {
                 title: '家长保护与云额度',
                 subtitle: '家长密码、恢复码与每日请求次数',
                 onTap: () => context.push(AppRoutes.parentProtection),
+              ),
+              const SizedBox(height: SpacingTokens.sm),
+              AppTile(
+                icon: Icons.storage_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '存储管理',
+                subtitle: '查看缓存占用，逐项清理',
+                onTap: () => Navigator.push<void>(
+                  context,
+                  fadeSlideRoute(
+                    builder: (_) => const ParentAccessBoundary(
+                      child: StorageManagementPage(),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: SpacingTokens.sm),
               AppTile(

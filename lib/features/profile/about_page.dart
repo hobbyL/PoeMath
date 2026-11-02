@@ -17,6 +17,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -340,16 +341,18 @@ class _AboutPageState extends State<AboutPage> {
           bytes: Uint8List.fromList(utf8.encode(text)),
         );
       } else {
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/$fileName');
-        try {
-          await file.writeAsString(text);
-          if (!mounted) return;
-          await SharePlus.instance
-              .share(ShareParams(files: [XFile(file.path)]));
-        } finally {
-          if (await file.exists()) await file.delete();
-        }
+        await CacheActivity.use(TemporaryCacheKind.sharing, () async {
+          final dir = await getTemporaryDirectory();
+          final file = File('${dir.path}/$fileName');
+          try {
+            await file.writeAsString(text);
+            if (!mounted) return;
+            await SharePlus.instance
+                .share(ShareParams(files: [XFile(file.path)]));
+          } finally {
+            if (await file.exists()) await file.delete();
+          }
+        });
       }
       if (!mounted) return;
       scaffold.showSnackBar(const SnackBar(content: Text('诊断日志导出完成')));
@@ -492,7 +495,7 @@ class _AboutPageState extends State<AboutPage> {
   /// Asset 加载失败时的精简兜底（与正式政策原则一致，避免空白）。
   static const String _privacyPolicyFallback = '''
 韵算 (PoeMath) 隐私政策摘要
-最后更新：2026 年 10 月 29 日
+最后更新：2026 年 11 月 2 日
 
 核心诗词与数学学习离线运行，不向开发者收集个人信息，无广告和追踪 SDK。
 学习记录主要保存本机，Hive 内容加密；本地历史快照以独立设备密钥整体加密。
@@ -503,6 +506,7 @@ class _AboutPageState extends State<AboutPage> {
 配置更新源的版本在启动及恢复前台自动检查版本信息，至少间隔一小时；下载与安装需您主动确认。
 可选语音识别、云朗读、AI 讲解/助手发送所需文本或音频到家长配置的第三方服务；助手可能携带您允许的学习背景。应用题出题只发送年级学期、知识点、数量关系类型及情境/句式候选，题面和讲解在本地生成。服务凭据存于设备安全存储，设口令时可加密备份。
 教材「读一读」播放时最多提前准备后两段；开启云端朗读后，这些分段文本发送至家长配置的语音服务并计入请求额度。系统及云端教材音频保存在私有缓存目录，未额外加密、最多100 MiB，不进JSON/WebDAV备份，删除原书时清理；系统清理或卸载后需重新生成。其他云朗读仍只用内存缓存。教材朗读离开页面或进入后台自动停止。
+家长可在「设置 → 家长与数据 → 存储管理」查看缓存数量和大小，确认后逐项清理教材封面、解析、朗读、内存图片和已知临时副本，保留教材、题库、练习录音、学习记录、配置与本机快照。正在使用的缓存需等操作完成后重试，待恢复选图会先恢复。统计和清理仅在本机进行；云端音频再次生成可能消耗额度。
 教材「写一写」随机听写支持纸上写和屏幕手写，整轮结束后由家长核对。笔迹、题序与对错仅在本轮内存保留，退出后不保留，不上传、不备份，不调用录音或手写识别服务；可选云朗读只发送当题播报文本，音频复用教材私有缓存。
 教材「认一认」保留单字／完整词句卡片朗读，导航栏右上角「认字」直接使用本课字卡，隐藏拼音开始认读，不要求家长核对或抽查。学习、提示、自评、辨认、自动认读、复习日期和历史家长抽查／试听确认摘要随Hive加密保存在本机，不进JSON/WebDAV备份；恢复保留累计记录但旧轮次失效，移除PDF保留，同版重导可复用，卸载可能丢失。认字复用已保存的语音识别密钥，无需额外AppID。孩子主动录音并结束后，仅向腾讯云ASR发送当次PCM，不发送目标字、拼音或目标热词；10秒自动结束并识别。识别结果按同音同调匹配，多音字请孩子自己组词消歧，读音不明确不记对错。结果仅表示本次认读匹配，不是专业发音评分。录音仅临时保存在内存，退出／后台取消；识别文本不长期保存，请求计入语音识别日额度。云端朗读仍只发送当前文本，不发送学习结果。
 AI 调用失败时先尝试当前服务商的已选模型，再按列表顺序尝试其余已配置服务商；相同请求内容可能发送到这些服务商。成功后保存可用模型，更新全局默认服务商或当前场景的显式绑定。每次发送计入云额度，重试可能增加等待与服务用量。流式正文输出后中断会保留已有内容和错误提示。

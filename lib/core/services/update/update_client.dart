@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:poemath/core/services/bounded_http_client.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/update/update_models.dart';
 
 typedef TemporaryDirectoryProvider = Future<Directory> Function();
@@ -229,6 +230,20 @@ class UpdateClient {
     AppUpdateInfo update, {
     void Function(int received, int? total)? onProgress,
     UpdateDownloadCancelToken? cancelToken,
+  }) =>
+      CacheActivity.use(
+        TemporaryCacheKind.updates,
+        () => _downloadApk(
+          update,
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+        ),
+      );
+
+  Future<File> _downloadApk(
+    AppUpdateInfo update, {
+    void Function(int received, int? total)? onProgress,
+    UpdateDownloadCancelToken? cancelToken,
   }) async {
     final uri = Uri.tryParse(update.apkUrl);
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
@@ -339,10 +354,10 @@ class UpdateClient {
   }
 
   /// 计算文件 SHA256 校验值。
-  Future<String> sha256Of(File file) async {
-    final digest = await sha256.bind(file.openRead()).first;
-    return digest.toString();
-  }
+  Future<String> sha256Of(File file) => CacheActivity.use(
+        TemporaryCacheKind.updates,
+        () async => (await sha256.bind(file.openRead()).first).toString(),
+      );
 
   Uri _updateUri() {
     if (!isConfigured) throw const UpdateConfigurationException();

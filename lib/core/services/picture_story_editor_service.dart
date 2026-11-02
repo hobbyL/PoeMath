@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -89,6 +90,15 @@ class PictureStoryEditorService extends ChangeNotifier {
   Future<void> chooseImage(
     PictureStoryEditorDraft draft,
     PictureStoryImageSource source,
+  ) =>
+      CacheActivity.use(
+        TemporaryCacheKind.pickers,
+        () => _chooseImage(draft, source),
+      );
+
+  Future<void> _chooseImage(
+    PictureStoryEditorDraft draft,
+    PictureStoryImageSource source,
   ) async {
     if (_picking) return;
     _picking = true;
@@ -159,7 +169,10 @@ class PictureStoryEditorService extends ChangeNotifier {
     });
   }
 
-  Future<void> recoverLostImage() => _recovery ??= _recoverLostImage();
+  Future<void> recoverLostImage() => _recovery ??= CacheActivity.use(
+        TemporaryCacheKind.pickers,
+        _recoverLostImage,
+      );
 
   Future<void> _recoverLostImage() async {
     if (!_supportsLostData || _picking) return;

@@ -10,6 +10,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_tts/flutter_tts.dart';
 
+import 'package:poemath/core/services/cache_file_storage.dart';
 import 'package:poemath/core/services/tts/tts_models.dart';
 import 'package:poemath/core/services/tts/worker_tts_client.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
@@ -45,6 +46,7 @@ class TtsService {
   static const int _cloudCacheCapacity = 32;
   static const int _cloudCacheByteLimit = 8 * 1024 * 1024;
   int _cloudCacheBytes = 0;
+  int _cloudCacheGeneration = 0;
 
   /// 云端全跳句（所有段合成成功但播放均失败）时上抛的异常消息。
   static const String _cloudAllPlaySkippedMessage = '云端音频播放失败，请稍后重试';
@@ -100,6 +102,18 @@ class TtsService {
 
   /// 当前是否正在朗读。
   bool get isSpeaking => _isSpeaking;
+
+  CacheUsage get cloudCacheUsage => CacheUsage(
+        bytes: _cloudCacheBytes,
+        entries: _cloudCache.length,
+      );
+
+  /// 释放缓存，不打断当前播放；旧合成结果不能重新填入缓存。
+  void clearCloudCache() {
+    _cloudCacheGeneration++;
+    _cloudCache.clear();
+    _cloudCacheBytes = 0;
+  }
 
   /// 当前会话代际令牌。
   ///
@@ -199,6 +213,7 @@ class TtsService {
     }
 
     final generation = _sessionGeneration;
+    final cacheGeneration = _cloudCacheGeneration;
     final bytes = await _cloudClient!.synthesize(
       config: _cloudConfig!,
       text: text,
@@ -206,7 +221,10 @@ class TtsService {
       style: style,
       rate: rate,
     );
-    if (generation == _sessionGeneration) _storeCache(cacheKey, bytes);
+    if (generation == _sessionGeneration &&
+        cacheGeneration == _cloudCacheGeneration) {
+      _storeCache(cacheKey, bytes);
+    }
     return bytes;
   }
 
@@ -684,8 +702,7 @@ class TtsService {
       unawaited(synthesizer.dispose().catchError((Object _) {}));
     }
     _cloudClient?.cancelPending();
-    _cloudCache.clear();
-    _cloudCacheBytes = 0;
+    clearCloudCache();
     _sessionGeneration++; // 使所有在途会话失效。
     _isSpeaking = false;
     final player = _cloudPlayer;

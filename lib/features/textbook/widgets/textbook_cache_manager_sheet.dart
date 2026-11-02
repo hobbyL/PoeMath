@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/utils/format_bytes.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -19,13 +20,6 @@ Future<void> showTextbookCacheSheet(BuildContext context, Textbook book) {
     showDragHandle: true,
     builder: (_) => TextbookCacheSheet(book: book),
   );
-}
-
-String _formatBytes(int bytes) {
-  if (bytes <= 0) return '0 KB';
-  if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
 /// 一本教材的存储清单。
@@ -316,7 +310,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                       ),
                       const Spacer(),
                       Text(
-                        _formatBytes(usage.derivedBytes),
+                        formatBytes(usage.derivedBytes),
                         key: const ValueKey('cache-derived-total'),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
@@ -342,7 +336,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   icon: Icons.picture_as_pdf_outlined,
                   title: '原书 PDF',
                   subtitle: usage.pdfBytes > 0
-                      ? '${_formatBytes(usage.pdfBytes)} · 阅读必需'
+                      ? '${formatBytes(usage.pdfBytes)} · 阅读必需'
                       : '未保存',
                 ),
                 const SizedBox(height: SpacingTokens.sm),
@@ -352,7 +346,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   icon: Icons.image_outlined,
                   title: '封面',
                   subtitle: usage.coverBytes > 0
-                      ? '${_formatBytes(usage.coverBytes)} · 可重新生成'
+                      ? '${formatBytes(usage.coverBytes)} · 可重新生成'
                       : '未生成',
                   onDelete: () => _clear(
                     '封面',
@@ -369,7 +363,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   title: '目录与提取内容',
                   subtitle: usage.contentFiles > 0
                       ? '${usage.contentFiles} 个文件 · '
-                          '${_formatBytes(usage.contentBytes)} · 可重新生成'
+                          '${formatBytes(usage.contentBytes)} · 可重新生成'
                       : '未生成',
                   onDelete: () => _clear(
                     '目录与提取内容',
@@ -386,7 +380,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   title: '朗读音频（句子/字/词）',
                   subtitle: usage.audioFiles > 0
                       ? '${usage.audioFiles} 段 · '
-                          '${_formatBytes(usage.audioBytes)} · 可重新生成'
+                          '${formatBytes(usage.audioBytes)} · 可重新生成'
                       : '未生成',
                   onDelete: () => _clear(
                     '朗读音频',
@@ -403,7 +397,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   icon: Icons.school_outlined,
                   title: '课程内容',
                   subtitle: usage.courseBytes > 0
-                      ? '${_formatBytes(usage.courseBytes)} · '
+                      ? '${formatBytes(usage.courseBytes)} · '
                           '读一读/认一认/写一写内容，删除后需重新生成'
                       : '未生成',
                   onDelete: () => _clear(
