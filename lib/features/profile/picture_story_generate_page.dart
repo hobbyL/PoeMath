@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
@@ -18,7 +17,6 @@ import 'package:poemath/data/models/picture_story_prompt.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
-import 'package:poemath/features/profile/llm_scenario_settings_page.dart';
 import 'package:poemath/features/profile/picture_story_candidate_editor_page.dart';
 
 class PictureStoryGeneratePage extends ConsumerStatefulWidget {
@@ -291,17 +289,6 @@ class _PictureStoryGeneratePageState
     }
   }
 
-  Future<void> _openScenarios() async {
-    await Navigator.push<void>(
-      context,
-      fadeSlideRoute(
-        builder: (_) =>
-            const ParentAccessBoundary(child: LlmScenarioSettingsPage()),
-      ),
-    );
-    if (mounted) setState(() {});
-  }
-
   @override
   void dispose() {
     _generation++;
@@ -317,8 +304,6 @@ class _PictureStoryGeneratePageState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final draft = _draft;
-    final settings = ref.watch(settingsRepositoryProvider);
-    final imageProvider = settings.imageGenerationProvider;
     final canOperate = !_busy && _sameProfile && !_loadFailed;
     final selectedCount = draft?.selectedPrompts.length ?? 0;
     return Scaffold(
@@ -343,32 +328,6 @@ class _PictureStoryGeneratePageState
               ),
               const SizedBox(height: SpacingTokens.md),
             ],
-            ...[
-              AppTile(
-                icon: Icons.image_outlined,
-                iconColor: theme.colorScheme.primary,
-                title: imageProvider == null ? '配置图片生成' : '图片生成服务',
-                subtitle: imageProvider == null
-                    ? '先配置生图服务，再开始生成'
-                    : imageProvider.model,
-                onTap: _busy
-                    ? null
-                    : () => context
-                            .push(AppRoutes.imageGenerationSettings)
-                            .then((_) {
-                          if (mounted) setState(() {});
-                        }),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-            ],
-            AppTile(
-              icon: Icons.smart_toy_outlined,
-              iconColor: theme.colorScheme.primary,
-              title: '看图说话出题模型',
-              subtitle: '在使用场景设置中选择支持看图的模型',
-              onTap: _busy ? null : _openScenarios,
-            ),
-            const SizedBox(height: SpacingTokens.md),
             if (_error != null) ...[
               Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
               if (_loadFailed)
@@ -399,21 +358,6 @@ class _PictureStoryGeneratePageState
                       onPressed: _pause,
                       icon: const Icon(Icons.pause),
                       label: const Text('暂停生成'),
-                    ),
-                  if (canOperate &&
-                          draft.candidates.any(
-                            (c) =>
-                                !c.isReady &&
-                                c.stage !=
-                                    PictureStoryGenerationStage.published &&
-                                c.stage !=
-                                    PictureStoryGenerationStage.needsEditing,
-                          ) ||
-                      canOperate && draft.candidates.isEmpty)
-                    TextButton.icon(
-                      onPressed: () => _generate(),
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('继续生成'),
                     ),
                 ],
               ),
@@ -538,99 +482,120 @@ class _PictureStoryGeneratePageState
     return ColoredCard(
       key: ValueKey(item.id),
       color: theme.colorScheme.primary,
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              if (item.isReady)
-                Checkbox(
-                  value: item.selected,
-                  semanticLabel: '选择第 ${index + 1} 道题',
-                  onChanged: enabled ? (v) => _select(item, v ?? false) : null,
-                ),
-              Expanded(
-                child: Text(
-                  edit.fields[PictureStoryEditorField.title]
-                              ?.trim()
-                              .isNotEmpty ==
-                          true
-                      ? edit.fields[PictureStoryEditorField.title]!
-                      : '第 ${index + 1} 道题',
-                  style: theme.textTheme.titleMedium,
-                ),
+          if (edit.image != null)
+            PictureStoryImageView(
+              image: edit.image!,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(SpacingTokens.radiusMedium),
               ),
-            ],
-          ),
-          Text(
-            item.stage.label,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          Text(
-            [
-              edit.level.label,
-              if (edit.fields[PictureStoryEditorField.theme]
-                      ?.trim()
-                      .isNotEmpty ==
-                  true)
-                edit.fields[PictureStoryEditorField.theme]!,
-            ].join(' · '),
-            style: theme.textTheme.bodySmall,
-          ),
-          if (edit.image != null) ...[
-            const SizedBox(height: SpacingTokens.sm),
-            PictureStoryImageView(image: edit.image!),
-          ],
-          if (item.isReady ||
-              published ||
-              item.stage == PictureStoryGenerationStage.needsEditing) ...[
-            for (final (field, label) in [
-              (PictureStoryEditorField.questions, '引导问题'),
-              (PictureStoryEditorField.sceneFacts, '观察提示'),
-              (PictureStoryEditorField.goals, '练习目标'),
-              (PictureStoryEditorField.reference, '参考表达'),
-            ])
-              if (edit.fields[field]?.trim().isNotEmpty == true) ...[
-                const SizedBox(height: SpacingTokens.md),
-                Text(label, style: theme.textTheme.labelLarge),
-                const SizedBox(height: SpacingTokens.xs),
-                Text(edit.fields[field]!),
-              ],
-          ],
-          if (item.error != null) ...[
-            const SizedBox(height: SpacingTokens.sm),
-            Text(
-              item.error!,
-              style: TextStyle(color: theme.colorScheme.error),
             ),
-          ],
-          if (!published)
-            Wrap(
-              spacing: SpacingTokens.sm,
+          Padding(
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (edit.image != null)
-                  TextButton.icon(
-                    onPressed: enabled ? () => _edit(item) : null,
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('编辑内容'),
+                Row(
+                  children: [
+                    if (item.isReady)
+                      Checkbox(
+                        value: item.selected,
+                        semanticLabel: '选择第 ${index + 1} 道题',
+                        onChanged:
+                            enabled ? (v) => _select(item, v ?? false) : null,
+                      ),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          text: edit.fields[PictureStoryEditorField.title]
+                                      ?.trim()
+                                      .isNotEmpty ==
+                                  true
+                              ? edit.fields[PictureStoryEditorField.title]!
+                              : '第 ${index + 1} 道题',
+                          children: [
+                            TextSpan(
+                              text: ' ${item.stage.label}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
+                ),
+                if (edit.fields[PictureStoryEditorField.theme]
+                        ?.trim()
+                        .isNotEmpty ==
+                    true)
+                  Text(
+                    edit.fields[PictureStoryEditorField.theme]!,
+                    style: theme.textTheme.bodySmall,
                   ),
                 if (item.isReady ||
-                    item.stage == PictureStoryGenerationStage.needsEditing)
-                  TextButton.icon(
-                    onPressed: enabled ? () => _regenerate(item) : null,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('重新生成'),
-                  )
-                else
-                  TextButton.icon(
-                    onPressed:
-                        enabled ? () => _generate(candidateId: item.id) : null,
-                    icon: const Icon(Icons.refresh),
-                    label: Text(edit.image == null ? '生成图片' : '重试出题'),
+                    published ||
+                    item.stage == PictureStoryGenerationStage.needsEditing) ...[
+                  for (final (field, label) in [
+                    (PictureStoryEditorField.questions, '引导问题'),
+                    (PictureStoryEditorField.sceneFacts, '观察提示'),
+                    (PictureStoryEditorField.goals, '练习目标'),
+                    (PictureStoryEditorField.reference, '参考表达'),
+                  ])
+                    if (edit.fields[field]?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: SpacingTokens.md),
+                      Text(label, style: theme.textTheme.labelLarge),
+                      const SizedBox(height: SpacingTokens.xs),
+                      Text(edit.fields[field]!),
+                    ],
+                ],
+                if (item.error != null) ...[
+                  const SizedBox(height: SpacingTokens.sm),
+                  Text(
+                    item.error!,
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+                ],
+                if (!published)
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: SpacingTokens.sm,
+                    runSpacing: SpacingTokens.sm,
+                    children: [
+                      if (edit.image != null)
+                        TextButton.icon(
+                          onPressed: enabled ? () => _edit(item) : null,
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('编辑内容'),
+                        ),
+                      if (item.isReady ||
+                          item.stage ==
+                              PictureStoryGenerationStage.needsEditing)
+                        TextButton.icon(
+                          onPressed: enabled ? () => _regenerate(item) : null,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('重新生成'),
+                        )
+                      else
+                        TextButton.icon(
+                          onPressed: enabled
+                              ? () => _generate(candidateId: item.id)
+                              : null,
+                          icon: const Icon(Icons.refresh),
+                          label: Text(
+                            edit.image == null ? '生成图片' : '重试出题',
+                          ),
+                        ),
+                    ],
                   ),
               ],
             ),
+          ),
         ],
       ),
     );
