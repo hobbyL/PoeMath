@@ -43,18 +43,47 @@ const _imageProvider = ImageGenerationProviderConfig(
 const _imageConfig =
     ImageGenerationConfig(provider: _imageProvider, apiKey: 'test-image-key');
 
-http.Response _completion(Object content) => http.Response.bytes(
-      utf8.encode(
-        jsonEncode({
-          'choices': [
-            {
-              'message': {'role': 'assistant', 'content': jsonEncode(content)},
-            }
-          ],
-        }),
-      ),
+http.Response _completion(
+  Object content, {
+  bool sse = false,
+  bool complete = true,
+}) {
+  final text = jsonEncode(content);
+  if (sse) {
+    final midpoint = text.length ~/ 2;
+    final events = [
+      for (final part in [
+        text.substring(0, midpoint),
+        text.substring(midpoint),
+      ])
+        'data: ${jsonEncode({
+              'choices': [
+                {
+                  'delta': {'content': part},
+                },
+              ],
+            })}\n\n',
+      if (complete) 'data: [DONE]\n\n',
+    ];
+    return http.Response.bytes(
+      utf8.encode(events.join()),
       200,
+      headers: const {'content-type': 'text/event-stream'},
     );
+  }
+  return http.Response.bytes(
+    utf8.encode(
+      jsonEncode({
+        'choices': [
+          {
+            'message': {'role': 'assistant', 'content': text},
+          },
+        ],
+      }),
+    ),
+    200,
+  );
+}
 
 class _ImageSecrets extends SecureCredentialStore {
   String? key;
@@ -126,12 +155,15 @@ void main() {
   var imageCalls = 0;
   var imageClients = 0;
   var failCaption = 0;
+  var incompleteSseCaptions = false;
   int? captionStatus;
   final captionRequests = <Map<String, dynamic>>[];
   final planRequests = <Map<String, dynamic>>[];
+  final requestOrder = <String>[];
 
   PictureStoryGenerationService createService({
     PictureStoryImageService? imageService,
+    bool sse = false,
   }) =>
       PictureStoryGenerationService(
         images: imageService ?? images,
@@ -149,28 +181,37 @@ void main() {
             if (content is String) {
               planRequests.add(body);
               planCalls++;
+              requestOrder.add('规划');
               final saved = service.readDraft('default')!;
-              return _completion([
-                for (var i = 0; i < saved.options.count; i++)
-                  {'imagePrompt': '场景 $i：公园里的孩子观察花朵。'},
-              ]);
+              return _completion(
+                [
+                  for (var i = 0; i < saved.options.count; i++)
+                    {'imagePrompt': '场景 $i：公园里的孩子观察花朵。'},
+                ],
+                sse: sse,
+              );
             }
             captionCalls++;
+            requestOrder.add('看图 $captionCalls');
             captionRequests.add(body);
             if (captionStatus != null) {
               return http.Response('private provider response', captionStatus!);
             }
             if (captionCalls == failCaption) {
-              return _completion({'title': '不完整内容'});
+              return _completion({'title': '不完整内容'}, sse: sse);
             }
-            return _completion({
-              'title': '观察花朵 $captionCalls',
-              'theme': '',
-              'sceneFacts': ['孩子在看花朵'],
-              'questions': ['你看到了什么？', '想象孩子接下来会做什么？'],
-              'goals': <String>[],
-              'reference': '',
-            });
+            return _completion(
+              {
+                'title': '观察花朵 $captionCalls',
+                'theme': '',
+                'sceneFacts': ['孩子在看花朵'],
+                'questions': ['你看到了什么？', '想象孩子接下来会做什么？'],
+                'goals': <String>[],
+                'reference': '',
+              },
+              sse: sse,
+              complete: !incompleteSseCaptions,
+            );
           }),
         ),
         imageFactory: (active) {
@@ -179,6 +220,7 @@ void main() {
             isActive: active,
             httpClient: MockClient((_) async {
               imageCalls++;
+              requestOrder.add('生图 $imageCalls');
               return http.Response(
                 jsonEncode({
                   'data': [
@@ -227,9 +269,11 @@ void main() {
     imageCalls = 0;
     imageClients = 0;
     failCaption = 0;
+    incompleteSseCaptions = false;
     captionStatus = null;
     captionRequests.clear();
     planRequests.clear();
+    requestOrder.clear();
     service = createService();
   });
   tearDown(() async {
@@ -238,6 +282,72 @@ void main() {
     ProfileScope.reset();
     await tearDownHiveForTesting();
     await directory.delete(recursive: true);
+  });
+
+  test('SSE 规划与逐题看图出题保留完整题图、内容和生成顺序', () async {
+    service = createService(sse: true);
+    final draft = await start(count: 2);
+    expect(requestOrder, ['规划', '生图 1', '看图 1', '生图 2', '看图 2']);
+    expect(draft.readyCount, 2);
+    expect(
+      draft.candidates.map((c) => c.edit.toPrompt().title),
+      ['观察花朵 1', '观察花朵 2'],
+    );
+    expect(planRequests.single['stream'], isTrue);
+    for (final (index, request) in captionRequests.indexed) {
+      expect(request['stream'], isTrue);
+      final candidate = draft.candidates[index];
+      expect(candidate.edit.toPrompt().questions, ['你看到了什么？', '想象孩子接下来会做什么？']);
+      final parts =
+          ((request['messages'] as List).last as Map)['content'] as List;
+      final url = ((parts.last as Map)['image_url'] as Map)['url'] as String;
+      expect(
+        base64Decode(url.split(',').last),
+        await images.readForVision(candidate.edit.image!.value),
+      );
+    }
+    expect(service.readDraft('default')!.encode(), draft.encode());
+    expect(repository.catalogState().versions, isEmpty);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 2);
+  });
+
+  test('SSE 中断即使 JSON 已闭合也不入库，重试复用原图只发看图请求', () async {
+    service = createService(sse: true);
+    incompleteSseCaptions = true;
+    var draft = await start(count: 1);
+    final failed = draft.candidates.single;
+    final image = failed.edit.image!;
+    final stored = await images.readImage(image.value);
+    expect(failed.stage, PictureStoryGenerationStage.failed);
+    expect(failed.error, '看图出题内容不完整或格式不正确，可保留图片重试');
+    expect(draft.readyCount, 0);
+    expect(failed.edit.fields[PictureStoryEditorField.title], '');
+    expect(repository.catalogState().versions, isEmpty);
+
+    incompleteSseCaptions = false;
+    await service.run(
+      draft: draft,
+      config: _llm,
+      imageConfig: _imageConfig,
+      isActive: () => true,
+      candidateId: failed.id,
+      reuseImageId: image.value,
+    );
+    draft = service.readDraft('default')!;
+    expect(draft.readyCount, 1);
+    expect(draft.candidates.single.id, failed.id);
+    expect(draft.candidates.single.edit.image, image);
+    expect(draft.candidates.single.edit.toPrompt().title, '观察花朵 2');
+    expect(await images.readImage(image.value), stored);
+    expect(requestOrder, ['规划', '生图 1', '看图 1', '看图 2']);
+    expect(planCalls, 1);
+    expect(imageCalls, 1);
+    expect(imageClients, 1);
+    expect(captionCalls, 2);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
+    expect(repository.catalogState().versions, isEmpty);
   });
 
   test('自定义看图说话提示词同时进入场景规划和实际图片出题，保留各阶段格式约束', () async {

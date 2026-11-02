@@ -381,6 +381,7 @@ class PictureStoryGenerationService {
     final response = await client.chatComplete(
       config: config,
       systemPrompt: systemPrompt,
+      stream: true,
       messages: [
         ChatMessage(
           role: ChatRole.user,
@@ -433,6 +434,7 @@ class PictureStoryGenerationService {
       config: config,
       requiresVision: true,
       systemPrompt: systemPrompt,
+      stream: true,
       messages: [
         ChatMessage(
           role: ChatRole.user,

@@ -1,9 +1,9 @@
 // lib/core/services/llm/chat_completion.dart
 //
 // 层级：core/services/llm
-// 职责：非流式工具调用（function calling）的响应 DTO（纯 Dart，无 Hive/Flutter）。
-//       chatComplete 一次性取回 choices[0].message 的 content 与 tool_calls，
-//       交由控制器判定是否进入工具循环（见 design §2/§5）。
+// 职责：完整对话补全的响应 DTO（纯 Dart，无 Hive/Flutter）。
+//       chatComplete 返回普通响应或汇总后的流式文本；非流式工具探测还携带
+//       tool_calls，交由控制器判定是否进入工具循环（见 design §2/§5）。
 //
 // 安全边界：content / argumentsJson 均为明文协议数据，绝不承载 API Key。
 
@@ -57,7 +57,7 @@ class ToolCall {
   String toString() => 'ToolCall(id: $id, name: $name)';
 }
 
-/// 非流式对话补全结果：模型的一次性回复。
+/// 完整对话补全结果：普通响应或汇总后的流式文本。
 ///
 /// [content] 可空（模型只发起工具调用时常为 null/空）；
 /// [toolCalls] 为空表示模型未请求任何工具，上层退化为纯聊天。

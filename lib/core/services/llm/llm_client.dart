@@ -47,7 +47,7 @@ final class LlmClient {
         _httpClient = BoundedHttpClient(
           httpClient ?? http.Client(),
           timeout: chatTimeout,
-          maxResponseBytes: 2 * 1024 * 1024,
+          maxResponseBytes: _maxResponseBytes,
         ),
         _ownsHttpClient = httpClient == null,
         _generateTimeout = generateTimeout,
@@ -224,6 +224,7 @@ final class LlmClient {
 
   static const String _chatPath = '/chat/completions';
   static const String _modelsPath = '/models';
+  static const int _maxResponseBytes = 2 * 1024 * 1024;
 
   /// 拼接端点路径。不用 `Uri.resolve`：它对以 `/` 开头的路径做根相对
   /// 解析，会丢弃 base 中的 `/v1` 前缀。
@@ -842,6 +843,10 @@ final class LlmClient {
   /// 端点 `/chat/completions`、Bearer 头（空 Key 省略）、错误分类同 [explain]：
   /// 401/403 → [LlmAuthError]、5xx → [LlmServerError]、网络/超时 →
   /// [LlmNetworkError]、响应结构无效 → [LlmResponseFormatError]。
+  ///
+  /// [stream] 用于完整文本生成：汇总 SSE 后返回完整结果，也接受普通 JSON
+  /// 响应。流式文本没有对外逐片展示，可在失败时丢弃片段并尝试下一模型。
+  /// 工具探测保留默认非流式方式；流式模式不接受 [tools]。
   Future<ChatCompletion> chatComplete({
     required LlmConfig config,
     required String systemPrompt,
@@ -850,6 +855,7 @@ final class LlmClient {
     String toolChoice = 'auto',
     int maxTokens = 1024,
     bool requiresVision = false,
+    bool stream = false,
   }) =>
       _withModels(
         config,
@@ -861,6 +867,7 @@ final class LlmClient {
           toolChoice: toolChoice,
           maxTokens: maxTokens,
           requiresVision: requiresVision,
+          stream: stream,
         ),
         // 工具探测并非最终回答，只有后续流完整成功才持久化。
         reportSuccess: false,
@@ -875,7 +882,11 @@ final class LlmClient {
     required String toolChoice,
     required int maxTokens,
     required bool requiresVision,
+    required bool stream,
   }) async {
+    if (stream && tools.isNotEmpty) {
+      throw ArgumentError('流式文本生成不能同时配置工具调用');
+    }
     final base = normalizeBaseUrl(config.baseUrl);
     final body = jsonEncode(<String, Object?>{
       'model': config.model,
@@ -888,11 +899,22 @@ final class LlmClient {
           message.toJson(),
       ],
       'max_tokens': maxTokens,
+      if (stream) 'stream': true,
       if (tools.isNotEmpty) ...<String, Object?>{
         'tools': tools,
         'tool_choice': toolChoice,
       },
     });
+    if (stream) {
+      final response = await _sendStream(
+        uri: _join(base, _chatPath),
+        body: body,
+        apiKey: config.apiKey,
+        timeout: _chatTimeout,
+        timeoutMessage: 'AI 助手响应超时，请稍后重试',
+      );
+      return _readChatCompletionStream(response);
+    }
     final response = await _send(
       uri: _join(base, _chatPath),
       body: body,
@@ -901,6 +923,102 @@ final class LlmClient {
       timeoutMessage: 'AI 助手响应超时，请稍后重试',
     );
     return _parseChatCompletion(response);
+  }
+
+  Future<ChatCompletion> _readChatCompletionStream(
+    http.StreamedResponse response,
+  ) async {
+    final json = StringBuffer();
+    final content = StringBuffer();
+    final eventData = <String>[];
+    bool? isSse;
+    var finished = false;
+
+    bool consumeEvent() {
+      final payload = eventData.join('\n').trim();
+      eventData.clear();
+      if (payload.isEmpty) return false;
+      if (payload == '[DONE]') {
+        finished = true;
+        return true;
+      }
+      Object? decoded;
+      try {
+        decoded = jsonDecode(payload);
+      } on FormatException {
+        throw const LlmResponseFormatError('模型流式响应不是有效 JSON');
+      }
+      if (decoded is! Map<String, dynamic> || decoded['error'] != null) {
+        throw const LlmResponseFormatError('模型流式响应结构无效');
+      }
+      final choices = decoded['choices'];
+      // include_usage 的末尾统计帧没有文本。
+      if (choices is List && choices.isEmpty) return false;
+      final delta = _extractStreamDelta(decoded);
+      if (delta == null) {
+        throw const LlmResponseFormatError('模型流式响应缺少 delta');
+      }
+      final text = delta.content;
+      if (text != null && text.isNotEmpty) {
+        content.write(text);
+      }
+      if (delta.finishReason != null) {
+        if (delta.finishReason != 'stop') {
+          throw const LlmResponseFormatError('模型输出未完整结束，请重试');
+        }
+        finished = true;
+        return true;
+      }
+      return false;
+    }
+
+    try {
+      // 以实际内容识别响应格式，兼容省略或误标 Content-Type 的服务。
+      // 与传输层共享响应预算，普通 JSON 的整行响应也受同一有限上限保护。
+      await for (var line in boundedLines(
+        response.stream.transform(utf8.decoder),
+        maxChars: _maxResponseBytes,
+      )) {
+        _checkActive();
+        if (isSse == null) {
+          if (line.startsWith('\uFEFF')) line = line.substring(1);
+          final start = line.trimLeft();
+          if (start.isEmpty) continue;
+          isSse = !start.startsWith('{') && !start.startsWith('[');
+        }
+        if (!isSse) {
+          json.writeln(line);
+          continue;
+        }
+        if (line.isEmpty) {
+          if (consumeEvent()) break;
+        } else if (line.startsWith('data:')) {
+          var data = line.substring(5);
+          if (data.startsWith(' ')) data = data.substring(1);
+          eventData.add(data);
+        }
+      }
+    } on TimeoutException {
+      _checkActive();
+      throw const LlmNetworkError('AI 助手响应超时，请稍后重试');
+    } on SocketException {
+      _checkActive();
+      throw const LlmNetworkError('网络不可用，请检查网络后重试');
+    } on http.ClientException {
+      _checkActive();
+      throw const LlmNetworkError('网络请求失败');
+    }
+    _checkActive();
+    if (isSse == false) return _parseChatCompletionJson(json.toString());
+    // 兼容末帧后直接 EOF 的服务；缺少任何结束信号的流不能返回部分题目。
+    if (eventData.isNotEmpty) consumeEvent();
+    if (!finished) {
+      throw const LlmResponseFormatError('模型流式响应未完成，请重试');
+    }
+    if (content.toString().trim().isEmpty) {
+      throw const LlmResponseFormatError('模型输出内容为空');
+    }
+    return ChatCompletion(content: content.toString());
   }
 
   // ============ Prompt 构造（design §3.2） ============
@@ -1166,9 +1284,17 @@ final class LlmClient {
   /// 这里 content 允许为空（模型只发起工具调用时常如此），但 content 与
   /// tool_calls 不能同时为空（视为空回复，抛格式错误）。
   ChatCompletion _parseChatCompletion(http.Response response) {
+    try {
+      return _parseChatCompletionJson(utf8.decode(response.bodyBytes));
+    } on FormatException {
+      throw const LlmResponseFormatError('模型响应不是有效 JSON');
+    }
+  }
+
+  ChatCompletion _parseChatCompletionJson(String text) {
     Object? decoded;
     try {
-      decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      decoded = jsonDecode(text);
     } on FormatException {
       throw const LlmResponseFormatError('模型响应不是有效 JSON');
     }
@@ -1218,14 +1344,29 @@ final class LlmClient {
       return null;
     }
     if (decoded is! Map<String, dynamic>) return null;
+    return _extractStreamDelta(decoded)?.content;
+  }
+
+  static ({String? content, String? finishReason})? _extractStreamDelta(
+    Map<String, dynamic> decoded,
+  ) {
     final choices = decoded['choices'];
     if (choices is! List<Object?> || choices.isEmpty) return null;
     final choice = choices.first;
     if (choice is! Map<Object?, Object?>) return null;
     final delta = choice['delta'];
-    if (delta is! Map<Object?, Object?>) return null;
+    final finishReason = choice['finish_reason'];
+    if (delta is! Map<Object?, Object?>) {
+      return delta == null && finishReason is String
+          ? (content: null, finishReason: finishReason)
+          : null;
+    }
     final content = delta['content'];
-    return content is String ? content : null;
+    if (content != null && content is! String) return null;
+    return (
+      content: content as String?,
+      finishReason: finishReason is String ? finishReason : null,
+    );
   }
 
   /// 容错解析草稿：剥 markdown code fence、截取首个 `[` 到末个 `]`，
