@@ -7,7 +7,6 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_editor_draft.dart';
-import 'package:poemath/data/models/picture_story_prompt.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/profile/widgets/picture_story_text_field.dart';
 
@@ -28,7 +27,6 @@ class _PictureStoryCandidateEditorPageState
     extends State<PictureStoryCandidateEditorPage> {
   final _form = GlobalKey<FormState>();
   final _controllers = <PictureStoryEditorField, TextEditingController>{};
-  late PictureStoryLevel _level;
   late final PictureStoryEditorDraft _baseEdit;
   bool _available = true;
   late final int _profileRevision;
@@ -54,7 +52,6 @@ class _PictureStoryCandidateEditorPageState
     _baseEdit = saved ?? widget.session.candidate.edit;
     if (!_available) _error = '草稿已变化，请返回预览页';
     final edit = _baseEdit;
-    _level = edit.level;
     _profileRevision = ProfileScope.revision;
     for (final field in PictureStoryEditorField.values) {
       _controllers[field] = TextEditingController(text: edit.fields[field]);
@@ -65,7 +62,6 @@ class _PictureStoryCandidateEditorPageState
   }
 
   PictureStoryEditorDraft _snapshot() => _baseEdit.copyWith(
-        level: _level,
         fields: {for (final e in _controllers.entries) e.key: e.value.text},
       );
 
@@ -129,13 +125,28 @@ class _PictureStoryCandidateEditorPageState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final edit = _baseEdit;
+    final canEdit = !_saving && _sameProfile && _available;
     return PopScope(
       canPop: _allowPop,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) unawaited(_leave());
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('编辑生成题目')),
+        appBar: AppBar(
+          title: const Text('编辑生成题目'),
+          actions: [
+            IconButton(
+              tooltip: _saving ? '正在保存…' : '保存修改',
+              onPressed: canEdit ? () => _leave(validate: true) : null,
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: SpacingTokens.lg,
+                      child: CircularProgressIndicator(),
+                    )
+                  : const Icon(Icons.save_outlined),
+            ),
+          ],
+        ),
         body: SafeArea(
           child: Form(
             key: _form,
@@ -150,50 +161,43 @@ class _PictureStoryCandidateEditorPageState
                 ],
                 ColoredCard(
                   color: theme.colorScheme.primary,
+                  padding: EdgeInsets.zero,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      PictureStoryImageView(image: edit.image!),
-                      const SizedBox(height: SpacingTokens.md),
-                      PictureStoryTextField(
-                        field: PictureStoryEditorField.title,
-                        controller:
-                            _controllers[PictureStoryEditorField.title]!,
-                        enabled: !_saving && _sameProfile && _available,
-                        onChanged: _changed,
-                      ),
-                      const SizedBox(height: SpacingTokens.md),
-                      DropdownButtonFormField<PictureStoryLevel>(
-                        initialValue: _level,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: '难度'),
-                        items: [
-                          for (final level in PictureStoryLevel.values)
-                            DropdownMenuItem(
-                              value: level,
-                              child: Text(level.label),
-                            ),
-                        ],
-                        onChanged: _saving || !_sameProfile || !_available
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  setState(() => _level = value);
-                                  _changed('');
-                                }
-                              },
-                      ),
-                      for (final field in PictureStoryEditorField.values.where(
-                        (f) => f != PictureStoryEditorField.title,
-                      )) ...[
-                        const SizedBox(height: SpacingTokens.md),
-                        PictureStoryTextField(
-                          field: field,
-                          controller: _controllers[field]!,
-                          enabled: !_saving && _sameProfile && _available,
-                          onChanged: _changed,
+                      PictureStoryImageView(
+                        image: edit.image!,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(SpacingTokens.radiusMedium),
                         ),
-                      ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(SpacingTokens.md),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            PictureStoryTextField(
+                              field: PictureStoryEditorField.title,
+                              controller:
+                                  _controllers[PictureStoryEditorField.title]!,
+                              enabled: canEdit,
+                              onChanged: _changed,
+                            ),
+                            for (final field
+                                in PictureStoryEditorField.values.where(
+                              (f) => f != PictureStoryEditorField.title,
+                            )) ...[
+                              const SizedBox(height: SpacingTokens.md),
+                              PictureStoryTextField(
+                                field: field,
+                                controller: _controllers[field]!,
+                                enabled: canEdit,
+                                onChanged: _changed,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -205,17 +209,6 @@ class _PictureStoryCandidateEditorPageState
                   ),
                 ],
               ],
-            ),
-          ),
-        ),
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(SpacingTokens.md),
-            child: FilledButton(
-              onPressed: _saving || !_sameProfile || !_available
-                  ? null
-                  : () => _leave(validate: true),
-              child: Text(_saving ? '正在保存…' : '保存修改'),
             ),
           ),
         ),

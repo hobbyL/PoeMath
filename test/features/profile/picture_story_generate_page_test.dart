@@ -16,7 +16,8 @@ import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_generation_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
-import 'package:poemath/core/widgets/page_animation_scope.dart';
+import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/image_generation_config.dart';
@@ -25,6 +26,7 @@ import 'package:poemath/data/models/picture_story_generation_draft.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/profile/image_generation_settings_page.dart';
 import 'package:poemath/features/profile/picture_story_candidate_editor_page.dart';
 import 'package:poemath/features/profile/picture_story_generate_page.dart';
@@ -234,6 +236,209 @@ void main() {
             .selected,
         isTrue,
       );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await drainHiveWritesForTesting(tester);
+    });
+  }
+
+  for (final (size, scale, columns) in [
+    (const Size(320, 1100), 2.0, 1),
+    (const Size(700, 1100), 1.0, 2),
+    (const Size(1200, 1100), 2.0, 3),
+  ]) {
+    testWidgets('预览在宽度 ${size.width}、字号 $scale 下自然排入 $columns 列并可勾选编辑',
+        (tester) async {
+      late List<PictureStoryGenerationCandidate> candidates;
+      final level = PictureStoryLevel.values.last;
+      await tester.runAsync(() async {
+        final image = await images.importBytes(await pictureStoryPng());
+        final draft = await service.createDraft(
+          PictureStoryGenerationOptions(
+            level: level,
+            count: 5,
+            themes: ['日常生活'],
+          ),
+        );
+        candidates = [
+          for (var index = 0; index < draft.options.count; index++)
+            PictureStoryGenerationCandidate(
+              edit: PictureStoryEditorDraft(
+                id: 'local-layout-$index',
+                profileId: draft.profileId,
+                fields: {
+                  ...PictureStoryEditorDraft.create(
+                    id: 'local-layout-$index',
+                    profileId: draft.profileId,
+                    original: pictureStoryFixture(
+                      id: 'local-layout-$index',
+                      title: '预览题目 ${index + 1}',
+                      image: image,
+                    ),
+                  ).fields,
+                  if (index == 0)
+                    PictureStoryEditorField.questions: [
+                      for (var line = 1;
+                          line <= PictureStoryPrompt.maxLines;
+                          line++)
+                        '请描述图中的第 $line 个细节',
+                    ].join('\n'),
+                },
+                level: level,
+                image: image,
+              ),
+              imagePrompt: '测试场景',
+              requestId: 'layout-request-$index',
+              stage: PictureStoryGenerationStage.ready,
+            ),
+        ];
+        await HiveBoxes.settings.put(
+          PictureStoryGenerationService.keyFor(draft.profileId),
+          draft.copyWith(candidates).encode(),
+        );
+      });
+      await mount(tester, size: size, scale: scale);
+      final cards = [
+        for (final candidate in candidates) find.byKey(ValueKey(candidate.id)),
+      ];
+      final rects = [for (final card in cards) tester.getRect(card)];
+      for (final rect in rects) {
+        expect(rect.width, closeTo(rects.first.width, 0.01));
+        expect(rect.left, greaterThanOrEqualTo(SpacingTokens.md));
+        expect(rect.right, lessThanOrEqualTo(size.width - SpacingTokens.md));
+      }
+      if (columns == 1) {
+        for (var index = 1; index < rects.length; index++) {
+          expect(rects[index].left, rects.first.left);
+          expect(
+            rects[index].top,
+            closeTo(rects[index - 1].bottom + SpacingTokens.md, 0.01),
+          );
+        }
+      } else {
+        for (var index = 1; index < columns; index++) {
+          expect(rects[index].top, closeTo(rects.first.top, 0.01));
+          expect(
+            rects[index].left,
+            closeTo(rects[index - 1].right + SpacingTokens.md, 0.01),
+          );
+        }
+        expect(rects[1].height, lessThan(rects.first.height));
+        expect(rects[columns].left, closeTo(rects[1].left, 0.01));
+        expect(
+          rects[columns].top,
+          closeTo(rects[1].bottom + SpacingTokens.md, 0.01),
+        );
+        expect(rects[columns].top, lessThan(rects.first.bottom));
+      }
+      final title = find.descendant(
+        of: cards.first,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              widget.textSpan?.toPlainText().startsWith('预览题目 1') == true,
+        ),
+      );
+      final checkbox = find.descendant(
+        of: cards.first,
+        matching: find.byType(Checkbox),
+      );
+      final checkboxRect = tester.getRect(checkbox);
+      final titleInset = tester.getRect(title).left - rects.first.left;
+      final visibleCheckboxRight = checkboxRect.center.dx + Checkbox.width / 2;
+      expect(titleInset, SpacingTokens.md);
+      expect(
+        rects.first.right - visibleCheckboxRight,
+        closeTo(titleInset, 0.01),
+      );
+      expect(
+        checkboxRect.width,
+        greaterThanOrEqualTo(SpacingTokens.minTapTarget),
+      );
+      expect(
+        checkboxRect.height,
+        greaterThanOrEqualTo(SpacingTokens.minTapTarget),
+      );
+      // 点击靠近卡片边缘的点击区域，验证留白调整没有裁掉右侧手势。
+      await tester.runAsync(
+        () => tester.tapAt(
+          Offset(rects.first.right - SpacingTokens.xs, checkboxRect.center.dy),
+        ),
+      );
+      final selectedButton = find.widgetWithText(FilledButton, '确认入库（4 道）');
+      await _until(
+        tester,
+        () =>
+            !service.readDraft('default')!.candidates.first.selected &&
+            selectedButton.evaluate().isNotEmpty &&
+            tester.widget<FilledButton>(selectedButton).onPressed != null,
+      );
+      expect(
+        service.readDraft('default')!.candidates.first.toJson(),
+        candidates.first.copyWith(selected: false).toJson(),
+      );
+      expect(find.text('确认入库（4 道）'), findsOneWidget);
+      final editButton = find.descendant(
+        of: cards.first,
+        matching: find.text('编辑内容'),
+      );
+      await tester.ensureVisible(editButton);
+      await tester.pumpAndSettle();
+      await tester.runAsync(() => tester.tap(editButton));
+      final editor = find.byType(PictureStoryCandidateEditorPage);
+      await _until(tester, () => editor.evaluate().isNotEmpty);
+      final editorCard = find.descendant(
+        of: editor,
+        matching: find.byType(ColoredCard),
+      );
+      final editorImage = find.descendant(
+        of: editor,
+        matching: find.byType(PictureStoryImageView),
+      );
+      final editorCardRect = tester.getRect(editorCard);
+      final editorImageRect = tester.getRect(editorImage);
+      expect(editorImageRect.left, closeTo(editorCardRect.left, 0.01));
+      expect(editorImageRect.top, closeTo(editorCardRect.top, 0.01));
+      expect(editorImageRect.right, closeTo(editorCardRect.right, 0.01));
+      expect(
+        find.byType(DropdownButtonFormField<PictureStoryLevel>),
+        findsNothing,
+      );
+      final saveButton = find.byTooltip('保存修改');
+      expect(
+        find.ancestor(of: saveButton, matching: find.byType(AppBar)),
+        findsOneWidget,
+      );
+      final titleField = find.byKey(const ValueKey('picture-story-title'));
+      await tester.ensureVisible(titleField);
+      await tester.pumpAndSettle();
+      await tester.enterText(titleField, '瀑布流中修改的题目');
+      await tester.runAsync(() => tester.tap(saveButton));
+      final updatedTitle = find.descendant(
+        of: cards.first,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              widget.textSpan?.toPlainText().startsWith('瀑布流中修改的题目') == true,
+        ),
+      );
+      await _until(
+        tester,
+        () => editor.evaluate().isEmpty && updatedTitle.evaluate().isNotEmpty,
+      );
+      final saved = service.readDraft('default')!;
+      expect(
+        saved.candidates.first.edit.fields[PictureStoryEditorField.title],
+        '瀑布流中修改的题目',
+      );
+      expect(saved.candidates.first.edit.level, level);
+      expect(saved.candidates.first.edit.image, candidates.first.edit.image);
+      expect(saved.candidates.first.selected, isFalse);
+      expect(
+        [for (final candidate in saved.candidates.skip(1)) candidate.toJson()],
+        [for (final candidate in candidates.skip(1)) candidate.toJson()],
+      );
+      expect(repository.catalogState().versions, isEmpty);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await drainHiveWritesForTesting(tester);
@@ -450,7 +655,7 @@ void main() {
       tester.widget<TextFormField>(titleField).controller!.text,
       '家长修改后的题目',
     );
-    await tester.runAsync(() => tester.tap(find.text('保存修改')));
+    await tester.runAsync(() => tester.tap(find.byTooltip('保存修改')));
     await _until(
       tester,
       () => find.byType(PictureStoryCandidateEditorPage).evaluate().isEmpty,

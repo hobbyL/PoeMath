@@ -10,6 +10,7 @@ import 'package:poemath/core/services/picture_story_generation_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/theme/typography_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/picture_story_generation_draft.dart';
@@ -325,48 +326,55 @@ class _PictureStoryGeneratePageState
         ],
       ),
       body: SafeArea(
-        child: AnimatedPageBody(
-          children: [
-            if (!_sameProfile) ...[
-              Text(
-                '孩子档案已切换，请返回题库后重新进入。',
-                style: TextStyle(color: theme.colorScheme.error),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
-            if (_error != null) ...[
-              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
-              if (_loadFailed)
-                TextButton(
-                  onPressed: () => _reload(),
-                  child: const Text('重试读取草稿'),
+        child: LayoutBuilder(
+          builder: (context, constraints) => AnimatedPageBody(
+            children: [
+              if (!_sameProfile) ...[
+                Text(
+                  '孩子档案已切换，请返回题库后重新进入。',
+                  style: TextStyle(color: theme.colorScheme.error),
                 ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
-            if (draft == null && !_loadFailed) _options(theme, canOperate),
-            if (draft != null) ...[
-              if (_busy)
-                LinearProgressIndicator(
-                  semanticsLabel: _generating ? '正在生成题目' : '正在入库',
-                ),
-              if (_generating)
-                Wrap(
-                  spacing: SpacingTokens.sm,
+                const SizedBox(height: SpacingTokens.md),
+              ],
+              if (_error != null) ...[
+                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                if (_loadFailed)
+                  TextButton(
+                    onPressed: () => _reload(),
+                    child: const Text('重试读取草稿'),
+                  ),
+                const SizedBox(height: SpacingTokens.md),
+              ],
+              if (draft == null && !_loadFailed) _options(theme, canOperate),
+              if (draft != null) ...[
+                if (_busy)
+                  LinearProgressIndicator(
+                    semanticsLabel: _generating ? '正在生成题目' : '正在入库',
+                  ),
+                if (_generating)
+                  Wrap(
+                    spacing: SpacingTokens.sm,
+                    children: [
+                      TextButton.icon(
+                        onPressed: _pause,
+                        icon: const Icon(Icons.pause),
+                        label: const Text('暂停生成'),
+                      ),
+                    ],
+                  ),
+                if (_busy) const SizedBox(height: SpacingTokens.md),
+                MasonryLayout(
+                  key: const ValueKey('picture-story-generation-masonry'),
+                  columnCount: ResponsiveLayout.columns(constraints.maxWidth),
+                  gap: SpacingTokens.md,
                   children: [
-                    TextButton.icon(
-                      onPressed: _pause,
-                      icon: const Icon(Icons.pause),
-                      label: const Text('暂停生成'),
-                    ),
+                    for (final (index, item) in draft.candidates.indexed)
+                      _candidate(theme, item, index, canOperate),
                   ],
                 ),
-              for (final (index, item) in draft.candidates.indexed) ...[
-                if (_busy || index > 0)
-                  const SizedBox(height: SpacingTokens.md),
-                _candidate(theme, item, index, canOperate),
               ],
             ],
-          ],
+          ),
         ),
       ),
       bottomNavigationBar: draft == null
@@ -479,6 +487,8 @@ class _PictureStoryGeneratePageState
   ) {
     final edit = item.edit;
     final published = item.stage == PictureStoryGenerationStage.published;
+    // 图形居中在完整点击区域内，标题行需补偿其内置的水平留白。
+    const checkboxInset = (kMinInteractiveDimension - Checkbox.width) / 2;
     return ColoredCard(
       key: ValueKey(item.id),
       color: theme.colorScheme.primary,
@@ -494,45 +504,60 @@ class _PictureStoryGeneratePageState
               ),
             ),
           Padding(
-            padding: const EdgeInsets.all(SpacingTokens.md),
+            padding: EdgeInsets.only(
+              left: SpacingTokens.md,
+              top: SpacingTokens.md,
+              right: item.isReady
+                  ? SpacingTokens.md - checkboxInset
+                  : SpacingTokens.md,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      text: edit.fields[PictureStoryEditorField.title]
+                                  ?.trim()
+                                  .isNotEmpty ==
+                              true
+                          ? edit.fields[PictureStoryEditorField.title]!
+                          : '第 ${index + 1} 道题',
+                      children: [
+                        TextSpan(
+                          text: ' ${item.stage.label}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.left,
+                  ),
+                ),
+                if (item.isReady)
+                  Checkbox(
+                    value: item.selected,
+                    semanticLabel: '选择第 ${index + 1} 道题',
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
+                    visualDensity: VisualDensity.standard,
+                    onChanged:
+                        enabled ? (v) => _select(item, v ?? false) : null,
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(
+              left: SpacingTokens.md,
+              right: SpacingTokens.md,
+              bottom: SpacingTokens.md,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(
-                          text: edit.fields[PictureStoryEditorField.title]
-                                      ?.trim()
-                                      .isNotEmpty ==
-                                  true
-                              ? edit.fields[PictureStoryEditorField.title]!
-                              : '第 ${index + 1} 道题',
-                          children: [
-                            TextSpan(
-                              text: ' ${item.stage.label}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.left,
-                      ),
-                    ),
-                    if (item.isReady)
-                      Checkbox(
-                        value: item.selected,
-                        semanticLabel: '选择第 ${index + 1} 道题',
-                        onChanged:
-                            enabled ? (v) => _select(item, v ?? false) : null,
-                      ),
-                  ],
-                ),
                 if (edit.fields[PictureStoryEditorField.theme]
                         ?.trim()
                         .isNotEmpty ==
