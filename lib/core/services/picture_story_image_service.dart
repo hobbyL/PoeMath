@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:poemath/core/services/cache_activity.dart';
+import 'package:poemath/core/services/cache_file_storage.dart';
 
 import 'package:poemath/data/models/picture_story_prompt.dart';
 
@@ -42,11 +43,63 @@ class PictureStoryImageService {
   static const maxUploadBytes = 512 * 1024;
   static const _maxSourcePixels = 40 * 1000 * 1000;
   static const _pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+  static final _ownedFileName =
+      RegExp(r'^[a-f0-9]{64}\.png(?:\.\d+-\d+\.pending)?$');
 
   final Future<Directory> Function() _directoryProvider;
   final PictureStoryImageNormalizer _normalizer;
   final PictureStoryImageDecoder _decoder;
   final PictureStoryImageNormalizer _uploadNormalizer;
+
+  /// 只统计本服务拥有的正式题图和未发布副本，不创建目录或解码图片。
+  Future<CacheUsage> storageUsage() async =>
+      CacheFileStorage.usage(await _storedFiles());
+
+  /// 调用方须持有题图导入屏障和仓储队列，并传入全部持久引用。
+  Future<void> removeUnreferenced(
+    Set<String> retainedIds, {
+    required void Function() authorize,
+  }) async {
+    authorize();
+    if (retainedIds.any((id) => !PictureStoryImage.isValidSha(id))) {
+      throw const FormatException('题图引用无效');
+    }
+    final files = await _storedFiles();
+    authorize();
+    await CacheFileStorage.clear(
+      files.where(
+        (file) => !retainedIds.contains(_fileName(file).substring(0, 64)),
+      ),
+      authorize: authorize,
+    );
+    authorize();
+  }
+
+  static String _fileName(FileSystemEntity file) =>
+      file.path.split(Platform.pathSeparator).last;
+
+  Future<List<File>> _storedFiles() async {
+    final base = await _directoryProvider();
+    final directory = Directory('${base.path}/picture_story/images');
+    for (final parent in [
+      base,
+      Directory('${base.path}/picture_story'),
+      directory,
+    ]) {
+      final type = await FileSystemEntity.type(parent.path, followLinks: false);
+      if (type == FileSystemEntityType.notFound) return const [];
+      if (type != FileSystemEntityType.directory) {
+        throw const FileSystemException('题图目录无法读取');
+      }
+    }
+    return directory
+        .list(followLinks: false)
+        .where(
+          (entry) => entry is File && _ownedFileName.hasMatch(_fileName(entry)),
+        )
+        .cast<File>()
+        .toList();
+  }
 
   Future<File> _file(String id) async {
     if (!PictureStoryImage.isValidSha(id)) {

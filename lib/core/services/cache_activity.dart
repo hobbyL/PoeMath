@@ -1,7 +1,13 @@
 import 'dart:async';
 
-/// 有在途读写的临时文件不能被存储管理删除。
-enum TemporaryCacheKind { updates, pickers, sharing, systemTts }
+/// 按生产者保护在途文件；题图租约还覆盖导入后保存草稿引用的窗口。
+enum TemporaryCacheKind {
+  updates,
+  pickers,
+  sharing,
+  systemTts,
+  pictureStoryImages
+}
 
 class CacheInUseException implements Exception {
   const CacheInUseException();

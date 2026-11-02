@@ -141,7 +141,7 @@ void main() {
     await seed();
     final snapshot = await service.scan();
     expect(snapshot.hasErrors, isFalse);
-    expect(snapshot.diskBytes, 1150);
+    expect(snapshot.diskBytes, 1159);
     expect(snapshot.memoryBytes, 0);
     expect(await bytes(), {
       StorageCacheKind.textbookCovers: 11,
@@ -149,6 +149,7 @@ void main() {
       StorageCacheKind.textbookAudio: 23,
       StorageCacheKind.cloudAudio: 0,
       StorageCacheKind.images: 0,
+      StorageCacheKind.pictureStoryImages: 9,
       StorageCacheKind.updates: 1024,
       StorageCacheKind.pickers: 60,
       StorageCacheKind.sharing: 9,
@@ -164,7 +165,8 @@ void main() {
     );
   });
 
-  for (final kind in StorageCacheKind.values.where((kind) => !kind.isMemory)) {
+  for (final kind in StorageCacheKind.values
+      .where((kind) => !kind.isMemory && kind.canClear)) {
     test('单独清理 ${kind.name}，保留其他缓存和正式文件', () async {
       await seed();
       final before = await bytes();
@@ -227,10 +229,10 @@ void main() {
         .remember('${support.path}/textbooks/${book.pdfSha256}.pdf', image);
     final snapshot = await service.scan();
     expect(snapshot.memoryBytes, 24);
-    expect(snapshot.diskBytes, 1150);
+    expect(snapshot.diskBytes, 1159);
     await service.clear(StorageCacheKind.images);
     expect((await service.scan()).memoryBytes, 0);
-    expect((await service.scan()).diskBytes, 1150);
+    expect((await service.scan()).diskBytes, 1159);
     expect(image.debugDisposed, isFalse);
   });
 
@@ -259,6 +261,38 @@ void main() {
       throwsA(isA<FileSystemException>()),
     );
     expect(await blocked.readAsBytes(), List.filled(5, 42));
+  });
+
+  test('题图单独统计文件数量和磁盘占用，服务边界拒绝清理', () async {
+    await seed();
+    await write(
+      support,
+      'picture_story/images/$otherId.png.123-456.pending',
+      5,
+    );
+    await write(support, 'picture_story/images/unknown.png', 17);
+    final entry = (await service.scan()).entries.singleWhere(
+          (entry) => entry.kind == StorageCacheKind.pictureStoryImages,
+        );
+    expect(entry.usage!.entries, 2);
+    expect(entry.usage!.bytes, 14);
+    expect(entry.kind.isMemory, isFalse);
+    expect(entry.kind.canClear, isFalse);
+    await expectLater(
+      service.clear(StorageCacheKind.pictureStoryImages),
+      throwsUnsupportedError,
+    );
+    expect(
+      await File('${support.path}/picture_story/images/${book.pdfSha256}.png')
+          .length(),
+      9,
+    );
+    expect(
+      await File(
+        '${support.path}/picture_story/images/$otherId.png.123-456.pending',
+      ).length(),
+      5,
+    );
   });
 
   test('不扫描或清理缓存目录中的符号链接目标', () async {
@@ -370,7 +404,8 @@ void main() {
         for (final key in HiveBoxes.settings.keys)
           key: HiveBoxes.settings.get(key),
       };
-      for (final kind in StorageCacheKind.values) {
+      for (final kind
+          in StorageCacheKind.values.where((kind) => kind.canClear)) {
         await service.clear(kind);
       }
       await HiveBoxes.close();

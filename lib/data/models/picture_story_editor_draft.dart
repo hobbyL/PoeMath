@@ -13,6 +13,7 @@ enum PictureStoryEditorField {
 
 /// 原始表单文字允许暂时不完整；发布时才使用题目的完整校验。
 class PictureStoryEditorDraft {
+  static const storageKey = 'picture_story_editor_draft_v1';
   // 完整的 20 × 400 rune 多行内容即使全为代理对也能暂存，并留出换行空间。
   static const maxRawFieldLength = 20000;
 

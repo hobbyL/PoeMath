@@ -169,6 +169,7 @@ class PictureStoryGenerationCandidate {
 }
 
 class PictureStoryGenerationDraft {
+  static const storageSuffix = '_picture_story_generation_draft_v1';
   PictureStoryGenerationDraft({
     required this.id,
     required this.profileId,

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 
 import 'package:poemath/app_bootstrap.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/picture_story_editor_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -28,6 +29,20 @@ class _FailingDraftBox extends Fake implements Box<dynamic> {
   @override
   Future<void> put(dynamic key, dynamic value) async =>
       throw HiveError('模拟暂存写入失败');
+}
+
+class _PausedImportImages extends PictureStoryImageService {
+  _PausedImportImages({required super.directoryProvider});
+  final stored = Completer<void>();
+  final proceed = Completer<void>();
+
+  @override
+  Future<PictureStoryImage> importPath(String path) async {
+    final result = await super.importPath(path);
+    stored.complete();
+    await proceed.future;
+    return result;
+  }
 }
 
 void main() {
@@ -81,6 +96,41 @@ void main() {
     );
   }
 
+  test('选图已发布但草稿引用尚未落盘时不能删除，落盘后保留新图并清理旧题图', () async {
+    final originalImage = await images.importBytes(await pictureStoryPng());
+    final repository = PictureStoryRepository(images: images, authorize: () {});
+    final prompt = await repository.savePrompt(
+      prompt: pictureStoryFixture(image: originalImage),
+      profileId: 'default',
+    );
+    final paused =
+        _PausedImportImages(directoryProvider: () async => directory);
+    final service = PictureStoryEditorService(
+      images: paused,
+      pickPath: (_) async => source.path,
+      supportsLostData: false,
+    );
+    addTearDown(service.dispose);
+    final choosing =
+        service.chooseImage(service.openDraft(), PictureStoryImageSource.file);
+    await paused.stored.future;
+    final before = repository.storageSnapshot();
+    await expectLater(
+      repository.deletePrompt(prompt: prompt, profileId: 'default'),
+      throwsA(isA<CacheInUseException>()),
+    );
+    expect(repository.storageSnapshot(), before);
+    expect(await images.imagePath(originalImage.value), isNotNull);
+    paused.proceed.complete();
+    await choosing;
+    final selectedImage = service.readDraft()!.image!;
+    await repository.deletePrompt(prompt: prompt, profileId: 'default');
+    expect(await images.imagePath(originalImage.value), isNull);
+    expect(await images.readImage(selectedImage.value), isNotEmpty);
+    expect(service.readDraft()!.image, selectedImage);
+    expect(await source.exists(), isTrue);
+  });
+
   test('外部选图前落盘完整表单，取消后原图与所有文字保持一致', () async {
     final reached = Completer<void>();
     final selected = Completer<String?>();
@@ -110,24 +160,32 @@ void main() {
 
   test('超长临时字段在打开选图前拒绝，原快照和未保存文字保留', () async {
     var calls = 0;
-    final service = editor(pickPath: (_) async {
-      calls++;
-      return source.path;
-    },);
+    final service = editor(
+      pickPath: (_) async {
+        calls++;
+        return source.path;
+      },
+    );
     final previous = filled(service);
     final snapshot = previous.encode();
     await HiveBoxes.settings.put(PictureStoryEditorService.draftKey, snapshot);
     final text =
         List.filled(PictureStoryEditorDraft.maxRawFieldLength + 1, '字').join();
     final draft = previous.copyWith(
-        fields: {...previous.fields, PictureStoryEditorField.questions: text},);
+      fields: {...previous.fields, PictureStoryEditorField.questions: text},
+    );
     await expectLater(
-        service.chooseImage(draft, PictureStoryImageSource.file),
-        throwsA(isA<FormatException>()
-            .having((error) => error.message, 'message', '编辑内容无法暂存，请精简文字后重试'),),);
+      service.chooseImage(draft, PictureStoryImageSource.file),
+      throwsA(
+        isA<FormatException>()
+            .having((error) => error.message, 'message', '编辑内容无法暂存，请精简文字后重试'),
+      ),
+    );
     expect(calls, 0);
     expect(
-        HiveBoxes.settings.get(PictureStoryEditorService.draftKey), snapshot,);
+      HiveBoxes.settings.get(PictureStoryEditorService.draftKey),
+      snapshot,
+    );
     expect(service.readDraft()!.toJson(), previous.toJson());
     expect(service.isPicking, isFalse);
     expect(draft.fields[PictureStoryEditorField.questions], text);
@@ -139,12 +197,17 @@ void main() {
     final text = List.filled(PictureStoryPrompt.maxLines, line).join('\n');
     final previous = filled(service);
     final draft = previous.copyWith(
-        fields: {...previous.fields, PictureStoryEditorField.questions: text},);
-    expect(draft.toPrompt().questions,
-        List.filled(PictureStoryPrompt.maxLines, line),);
+      fields: {...previous.fields, PictureStoryEditorField.questions: text},
+    );
+    expect(
+      draft.toPrompt().questions,
+      List.filled(PictureStoryPrompt.maxLines, line),
+    );
     await service.chooseImage(draft, PictureStoryImageSource.file);
     expect(
-        service.readDraft()!.fields[PictureStoryEditorField.questions], text,);
+      service.readDraft()!.fields[PictureStoryEditorField.questions],
+      text,
+    );
     expect(service.readDraft()!.toPrompt().toJson(), draft.toPrompt().toJson());
   });
 

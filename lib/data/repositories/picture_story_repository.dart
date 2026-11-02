@@ -4,15 +4,27 @@ import 'dart:convert';
 
 import 'package:hive/hive.dart';
 
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/picture_story_editor_draft.dart';
+import 'package:poemath/data/models/picture_story_generation_draft.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
 
 export 'package:poemath/data/models/picture_story_prompt.dart';
+
+/// 目录删除已提交；文件清理失败不能回滚成一个可能缺图的活动题目。
+class PictureStoryImageCleanupException implements Exception {
+  const PictureStoryImageCleanupException(this.cause);
+  final Object cause;
+
+  @override
+  String toString() => '题目已删除，题图清理未完成';
+}
 
 /// 旧版内置题仅用于还原练习历史，不再加入可选题库。
 class PictureStoryCatalog {
@@ -225,27 +237,88 @@ class PictureStoryRepository {
     required PictureStoryPrompt prompt,
     required String profileId,
   }) =>
-      exclusive(() async {
-        _authorize();
-        _checkProfile(profileId);
-        final state = catalogState();
-        if (state.deletedIds.contains(prompt.id)) return;
-        final current = _findPrompt(state, prompt.id);
-        if (current == null ||
-            current.version != prompt.version ||
-            !current.sameContent(prompt)) {
-          throw const FormatException('题目不存在或已更新，请重新打开题库后再删除');
-        }
-        final versions = [...state.versions];
-        final merged = PictureStoryCatalogState(
-          versions,
-          deletedIds: {...state.deletedIds, current.id},
-        );
-        await _writeSettingsWithRollback(
-          {catalogKey: jsonEncode(merged.toJson())},
-          operation: '删除',
-        );
-      });
+      CacheActivity.clear(
+        TemporaryCacheKind.pictureStoryImages,
+        () => exclusive(() async {
+          void check() {
+            _authorize();
+            _checkProfile(profileId);
+          }
+
+          check();
+          final state = catalogState();
+          if (!state.deletedIds.contains(prompt.id)) {
+            final current = _findPrompt(state, prompt.id);
+            if (current == null ||
+                current.version != prompt.version ||
+                !current.sameContent(prompt)) {
+              throw const FormatException('题目不存在或已更新，请重新打开题库后再删除');
+            }
+          }
+          final deletedIds = {...state.deletedIds, prompt.id};
+          // 包含所有孩子的已完成记录和未完成练习，不能只读取当前档案的历史。
+          final practicedVersions = {
+            for (final record in _records.values)
+              (id: record.promptId, version: record.promptVersion),
+          };
+          final merged = PictureStoryCatalogState(
+            state.versions.where(
+              (version) =>
+                  !deletedIds.contains(version.id) ||
+                  !version.image.isLocal ||
+                  practicedVersions.contains(
+                    (id: version.id, version: version.version),
+                  ),
+            ),
+            deletedIds: deletedIds,
+          );
+          final retainedImages = {
+            ...merged.imageIds,
+            ..._draftImageIds(),
+          };
+          await _writeSettingsWithRollback(
+            {catalogKey: jsonEncode(merged.toJson())},
+            operation: '删除',
+            check: check,
+          );
+          // 旧内置题没有本地题图；本地题删除和重试才触发文件回收。
+          if (!prompt.image.isLocal && state.imageIds.isEmpty) return;
+          try {
+            await _images.removeUnreferenced(
+              retainedImages,
+              authorize: check,
+            );
+          } on Object catch (error, stackTrace) {
+            Error.throwWithStackTrace(
+              PictureStoryImageCleanupException(error),
+              stackTrace,
+            );
+          }
+        }),
+      );
+
+  Set<String> _draftImageIds() {
+    final ids = <String>{};
+    void retain(PictureStoryEditorDraft draft) {
+      for (final image in [draft.image, draft.original?.image]) {
+        if (image?.isLocal == true) ids.add(image!.value);
+      }
+    }
+
+    if (_settings.containsKey(PictureStoryEditorDraft.storageKey)) {
+      final raw = _settings.get(PictureStoryEditorDraft.storageKey);
+      if (raw is! String) throw const FormatException('编辑草稿暂时无法读取，题图已保留');
+      retain(PictureStoryEditorDraft.fromJson(jsonDecode(raw)));
+    }
+    for (final key in _settings.keys.whereType<String>()) {
+      if (!key.endsWith(PictureStoryGenerationDraft.storageSuffix)) continue;
+      final draft = PictureStoryGenerationDraft.fromJson(_settings.get(key));
+      for (final candidate in draft.candidates) {
+        retain(candidate.edit);
+      }
+    }
+    return ids;
+  }
 
   /// AI 候选仅在家长确认后一次性发布；失败补偿目录及当前孩子启用选择。
   /// 固定的新题 id 允许暂存清理失败后的同内容重试，不生成重复题。
@@ -390,7 +463,8 @@ class PictureStoryRepository {
     Map<String, List<String>> enabled,
   ) async {
     await restoreStorageSnapshot({
-      if (state.versions.isNotEmpty) catalogKey: jsonEncode(state.toJson()),
+      if (state.versions.isNotEmpty || state.deletedIds.isNotEmpty)
+        catalogKey: jsonEncode(state.toJson()),
       for (final entry in enabled.entries)
         enabledKeyFor(entry.key): jsonEncode(entry.value),
     });
@@ -413,23 +487,38 @@ class PictureStoryRepository {
   Future<void> save(
     PictureStoryPracticeRecord record, {
     void Function()? check,
-  }) async {
-    check?.call();
-    if (record.profileId != ProfileScope.currentId) {
-      throw StateError('看图说话记录档案不匹配');
-    }
-    // 工作中的可变草稿不能通过 Hive 的同实例缓存提前改变已保存记录。
-    await _records.put(
-      ProfileScope.key('picture_story:${record.id}'),
-      record.copy(),
-    );
+  }) {
+    final snapshot = record.copy();
+    final profileId = ProfileScope.currentId;
+    final key = ProfileScope.key('picture_story:${snapshot.id}');
+    return exclusive(() async {
+      check?.call();
+      if (snapshot.profileId != profileId ||
+          profileId != ProfileScope.currentId) {
+        throw StateError('看图说话记录档案不匹配');
+      }
+      final state = catalogState();
+      if (state.deletedIds.contains(snapshot.promptId) &&
+          _findPrompt(
+                state,
+                snapshot.promptId,
+                version: snapshot.promptVersion,
+              ) ==
+              null) {
+        throw const FormatException('原题已经删除，无法新增这次练习');
+      }
+      // 工作中的可变草稿不能通过 Hive 的同实例缓存提前改变已保存记录。
+      await _records.put(key, snapshot);
+    });
   }
 
-  Future<void> delete(String id) async {
+  Future<void> delete(String id) {
+    final profileId = ProfileScope.currentId;
     final key = ProfileScope.key('picture_story:$id');
-    final record = _records.get(key);
-    if (record?.profileId == ProfileScope.currentId) {
-      await _records.delete(key);
-    }
+    return exclusive(() async {
+      if (profileId != ProfileScope.currentId) return;
+      final record = _records.get(key);
+      if (record?.profileId == profileId) await _records.delete(key);
+    });
   }
 }

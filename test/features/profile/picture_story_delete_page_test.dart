@@ -8,6 +8,7 @@ import 'package:hive/hive.dart';
 
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_tile.dart';
@@ -28,6 +29,7 @@ class _Repository extends PictureStoryRepository {
   Completer<void>? deleteGate;
   var deleteCalls = 0;
   bool failNextDelete = false;
+  bool failNextImageCleanup = false;
 
   @override
   Future<void> deletePrompt({
@@ -43,6 +45,10 @@ class _Repository extends PictureStoryRepository {
         throw HiveError('模拟删除写入失败');
       }
       await super.deletePrompt(prompt: prompt, profileId: profileId);
+      if (failNextImageCleanup) {
+        failNextImageCleanup = false;
+        throw PictureStoryImageCleanupException(HiveError('模拟题图清理失败'));
+      }
     });
   }
 
@@ -182,7 +188,7 @@ void main() {
     await openPrompt(tester, prompt);
     await openDelete(tester);
     expect(
-      find.text('「${prompt.title}」将从所有孩子的题库中移除。已有练习记录会保留。'),
+      find.text('「${prompt.title}」将从所有孩子的题库中移除，并清理不再使用的题图。练习历史及其题图会保留。'),
       findsOneWidget,
     );
     await tester
@@ -230,6 +236,60 @@ void main() {
     await confirmDelete(tester);
     expect(repository.findPrompt(prompt.id), isNull);
     expect(repository.deleteCalls, 2);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  testWidgets('题图清理失败仍返回题库，如实提示题目已删除', (tester) async {
+    final (router, _) = await pumpFlow(tester);
+    final prompt = prompts.first;
+    repository.failNextImageCleanup = true;
+    await openPrompt(tester, prompt);
+    await openDelete(tester);
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, '删除'));
+      await expectLater(
+        repository.lastDelete!,
+        throwsA(isA<PictureStoryImageCleanupException>()),
+      );
+    });
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.state.uri.path,
+      AppRoutes.pictureStoryManagement,
+    );
+    expect(repository.findPrompt(prompt.id), isNull);
+    expect(find.text('题目已删除，题图清理未完成'), findsOneWidget);
+    expect(find.text('题目没有删除，请重试'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
+  testWidgets('题图正在导入时取消删除并显示稍后重试，释放租约后可正常删除', (tester) async {
+    await pumpFlow(tester);
+    final prompt = prompts.first;
+    await openPrompt(tester, prompt);
+    await openDelete(tester);
+    final gate = Completer<void>();
+    final active = CacheActivity.use(
+      TemporaryCacheKind.pictureStoryImages,
+      () => gate.future,
+    );
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, '删除'));
+      await expectLater(
+        repository.lastDelete!,
+        throwsA(isA<CacheInUseException>()),
+      );
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('正在处理题图，请完成后再删除'), findsOneWidget);
+    expect(repository.findPrompt(prompt.id), isNotNull);
+    gate.complete();
+    await active;
+    await openDelete(tester);
+    await confirmDelete(tester);
+    expect(repository.findPrompt(prompt.id), isNull);
     expect(tester.takeException(), isNull);
     await unmount(tester);
   });

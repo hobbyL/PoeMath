@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -10,6 +11,8 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
+import 'package:poemath/data/repositories/picture_story_repository.dart'
+    show PictureStoryImageCleanupException;
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
@@ -38,7 +41,8 @@ class _PictureStoryDetailPageState
         builder: (dialogContext) => AlertDialog(
           scrollable: true,
           title: const Text('删除题目'),
-          content: Text('「${prompt.title}」将从所有孩子的题库中移除。已有练习记录会保留。'),
+          content:
+              Text('「${prompt.title}」将从所有孩子的题库中移除，并清理不再使用的题图。练习历史及其题图会保留。'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
@@ -57,13 +61,7 @@ class _PictureStoryDetailPageState
       if (!mounted || confirmed != true) return;
       await repository.deletePrompt(prompt: prompt, profileId: profileId);
       if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      if (context.canPop()) {
-        context.pop();
-      } else {
-        context.go(AppRoutes.pictureStoryManagement);
-      }
-      messenger.showSnackBar(const SnackBar(content: Text('题目已删除')));
+      _finishDeletion('题目已删除');
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '看图说话题目删除失败',
@@ -72,8 +70,13 @@ class _PictureStoryDetailPageState
         stackTrace: stackTrace,
       );
       if (mounted) {
+        if (error is PictureStoryImageCleanupException) {
+          _finishDeletion(error.toString());
+          return;
+        }
         final message = switch (error) {
           ParentAccessDenied() => error.toString(),
+          CacheInUseException() => '正在处理题图，请完成后再删除',
           FormatException() => error.message,
           _ => '题目没有删除，请重试',
         };
@@ -83,6 +86,16 @@ class _PictureStoryDetailPageState
     } finally {
       if (mounted) setState(() => _deleting = false);
     }
+  }
+
+  void _finishDeletion(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.pictureStoryManagement);
+    }
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

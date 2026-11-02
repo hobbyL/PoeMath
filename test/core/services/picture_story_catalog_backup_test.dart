@@ -176,6 +176,29 @@ void main() {
   test('已删除题目及历史图片在真实备份和新目录恢复后仍保留删除状态', () async {
     await populatedBackup();
     final repository = PictureStoryRepository(images: images);
+    await repository.save(
+      PictureStoryPracticeRecord(
+        id: 'local-history',
+        profileId: 'default',
+        promptId: 'local-fixture',
+        promptVersion: 1,
+        startedAt: DateTime(2026),
+        status: 'completed',
+        segmentsJson: '[]',
+      ),
+    );
+    await repository.save(
+      PictureStoryPracticeRecord(
+        id: 'legacy-history',
+        profileId: 'default',
+        promptId: 'kite-in-the-park',
+        promptVersion: 2,
+        startedAt: DateTime(2026),
+        status: 'completed',
+        segmentsJson: '[]',
+      ),
+    );
+    final discardedId = repository.findPrompt('local-fixture')!.image.value;
     for (final id in ['local-fixture', 'kite-in-the-park']) {
       await repository.deletePrompt(
         prompt: repository.findPrompt(id)!,
@@ -189,7 +212,8 @@ void main() {
     };
     final text = await backup().exportToJson();
     final node = jsonDecode(text)['pictureStoryCatalog'] as Map;
-    expect(node['schemaVersion'], 2);
+    expect(node['schemaVersion'], 3);
+    expect(await images.imagePath(discardedId), isNull);
     expect(
       (node['deletedIds'] as List).toSet(),
       {'local-fixture', 'kite-in-the-park'},
@@ -197,7 +221,7 @@ void main() {
     final preview = backup().inspectJson(text);
     expect(preview.counts['看图说话题目'], 0);
     expect(preview.counts['已删除题目'], 2);
-    expect(preview.counts['题目图片'], 2);
+    expect(preview.counts['题目图片'], 1);
     await tearDownHiveForTesting();
     await setUpHiveForTesting();
     await unlockParentForTesting();
@@ -214,7 +238,10 @@ void main() {
     for (final id in ['local-fixture', 'kite-in-the-park']) {
       expect(reopened.findPrompt(id), isNull);
       expect(reopened.findPrompt(id, version: 1), isNotNull);
-      expect(reopened.findPrompt(id, version: 2), isNotNull);
+      expect(
+        reopened.findPrompt(id, version: 2),
+        id == 'local-fixture' ? isNull : isNotNull,
+      );
       expect(reopened.isEnabled(id), isFalse);
     }
     for (final profile in ['child-a', 'child-b']) {
@@ -225,6 +252,34 @@ void main() {
     for (final entry in bytes.entries) {
       expect(await targetImages.readImage(entry.key), entry.value);
     }
+  });
+
+  test('无历史引用的本地题删除题图，只有删除标记的备份仍可恢复', () async {
+    final repository = PictureStoryRepository(images: images);
+    final image = await importImage('unpracticed', 9);
+    final prompt = await repository.savePrompt(
+      prompt: pictureStoryFixture(image: image),
+      profileId: 'default',
+    );
+    await repository.deletePrompt(prompt: prompt, profileId: 'default');
+    expect(await images.imagePath(image.value), isNull);
+    expect(repository.catalogState().versions, isEmpty);
+    final text = await backup().exportToJson();
+    final node = jsonDecode(text)['pictureStoryCatalog'] as Map;
+    expect(node['versions'], isEmpty);
+    expect(node['images'], isEmpty);
+    expect(backup().inspectJson(text).counts['题目图片'], 0);
+    await HiveBoxes.settings.delete(PictureStoryRepository.catalogKey);
+    await backup().restoreFromJson(text);
+    await HiveBoxes.close();
+    await HiveBoxes.init();
+    final reopened = PictureStoryRepository(images: images);
+    expect(reopened.catalogState().deletedIds, {prompt.id});
+    expect(reopened.listPrompts(), isEmpty);
+    await expectLater(
+      reopened.savePrompt(prompt: prompt, profileId: 'default'),
+      throwsFormatException,
+    );
   });
 
   test('旧备份保存的题目全部删除后加密恢复仍为空，缺题库段不撤销删除', () async {

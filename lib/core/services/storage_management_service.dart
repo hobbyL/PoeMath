@@ -6,6 +6,7 @@ import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/cache_file_storage.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_editor_service.dart';
+import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/services/textbook_cover_cache.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
@@ -17,6 +18,7 @@ enum StorageCacheKind {
   textbookAudio,
   cloudAudio,
   images,
+  pictureStoryImages,
   updates,
   pickers,
   sharing,
@@ -24,6 +26,7 @@ enum StorageCacheKind {
   legacySpeechModels;
 
   bool get isMemory => this == cloudAudio || this == images;
+  bool get canClear => this != pictureStoryImages;
 }
 
 class StorageCacheEntry {
@@ -50,11 +53,12 @@ class StorageCacheSnapshot {
       .fold(0, (bytes, entry) => bytes + (entry.usage?.bytes ?? 0));
 }
 
-/// 只管理实际缓存所有者；Hive、正式 PDF/题图、课程和备份快照不在清理范围。
+/// 由实际文件所有者统计占用；正式题图只读，其他持久数据不在清理范围。
 class StorageManagementService {
   StorageManagementService({
     required TextbookFileService textbooks,
     required TtsService tts,
+    PictureStoryImageService? pictureStoryImages,
     Future<Directory> Function()? supportDirectoryProvider,
     Future<Directory> Function()? temporaryDirectoryProvider,
     ImageCache? imageCache,
@@ -62,6 +66,10 @@ class StorageManagementService {
     Future<void> Function()? preparePickerCleanup,
   })  : _textbooks = textbooks,
         _tts = tts,
+        _pictureStoryImages = pictureStoryImages ??
+            PictureStoryImageService(
+              directoryProvider: supportDirectoryProvider,
+            ),
         _supportDirectory =
             supportDirectoryProvider ?? getApplicationSupportDirectory,
         _temporaryDirectory =
@@ -72,6 +80,7 @@ class StorageManagementService {
 
   final TextbookFileService _textbooks;
   final TtsService _tts;
+  final PictureStoryImageService _pictureStoryImages;
   final Future<Directory> Function() _supportDirectory;
   final Future<Directory> Function() _temporaryDirectory;
   final ImageCache _imageCache;
@@ -133,6 +142,8 @@ class StorageManagementService {
               bytes: _imageCache.currentSizeBytes,
               entries: _imageCache.currentSize,
             );
+      case StorageCacheKind.pictureStoryImages:
+        return _pictureStoryImages.storageUsage();
       case StorageCacheKind.legacySpeechModels:
         final files = await CacheFileStorage.files(
           Directory('${(await _supportDirectory()).path}/speech_models'),
@@ -164,6 +175,8 @@ class StorageManagementService {
       case StorageCacheKind.images:
         TextbookCoverCache.clearMemory();
         _imageCache.clear();
+      case StorageCacheKind.pictureStoryImages:
+        throw UnsupportedError('题图只能随题目删除，存储管理不提供清理');
       case StorageCacheKind.legacySpeechModels:
         final files = await CacheFileStorage.files(
           Directory('${(await _supportDirectory()).path}/speech_models'),

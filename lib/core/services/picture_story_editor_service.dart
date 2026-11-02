@@ -38,7 +38,7 @@ class PictureStoryEditorService extends ChangeNotifier {
             (!kIsWeb && defaultTargetPlatform == TargetPlatform.android);
 
   static final instance = PictureStoryEditorService();
-  static const draftKey = 'picture_story_editor_draft_v1';
+  static const draftKey = PictureStoryEditorDraft.storageKey;
   final Box<dynamic>? _settingsOverride;
   final PictureStoryImageService _images;
   final PictureStoryPickPath _pickPath;
@@ -147,27 +147,28 @@ class PictureStoryEditorService extends ChangeNotifier {
     String request,
     String? path, {
     String? message,
-  }) async {
-    if (!_matches(draft, request)) return;
-    PictureStoryImage? image;
-    if (path != null) image = await _images.importPath(path);
-    await PictureStoryRepository.exclusive(() async {
-      if (!_matches(draft, request)) return;
-      final current = readDraft()!;
-      await _settings.put(
-        draftKey,
-        current
-            .copyWith(
-              image: image,
-              clearPendingRequest: true,
-              message: message,
-              clearMessage: message == null,
-            )
-            .encode(),
-      );
-      notifyListeners();
-    });
-  }
+  }) =>
+      CacheActivity.use(TemporaryCacheKind.pictureStoryImages, () async {
+        if (!_matches(draft, request)) return;
+        PictureStoryImage? image;
+        if (path != null) image = await _images.importPath(path);
+        await PictureStoryRepository.exclusive(() async {
+          if (!_matches(draft, request)) return;
+          final current = readDraft()!;
+          await _settings.put(
+            draftKey,
+            current
+                .copyWith(
+                  image: image,
+                  clearPendingRequest: true,
+                  message: message,
+                  clearMessage: message == null,
+                )
+                .encode(),
+          );
+          notifyListeners();
+        });
+      });
 
   Future<void> recoverLostImage() => _recovery ??= CacheActivity.use(
         TemporaryCacheKind.pickers,

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:hive/hive.dart';
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/image_generation_client.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
@@ -65,7 +66,7 @@ class PictureStoryGenerationService {
             ((active) => ImageGenerationClient(isActive: active)),
         _authorize = authorize ?? ParentAccessService.instance.assertAllowed;
 
-  static const draftSuffix = '_picture_story_generation_draft_v1';
+  static const draftSuffix = PictureStoryGenerationDraft.storageSuffix;
   static Future<void> _operations = Future<void>.value();
   static final Map<String, _GenerationRun> _runs = {};
   final Box<dynamic>? _settingsOverride;
@@ -300,15 +301,22 @@ class PictureStoryGenerationService {
                   '单张完整场景，人物动作和物体关系清楚，不拼图、不分镜、不加文字、水印或标志。'
                   '避免暴力、危险模仿及成人内容。\n${item.imagePrompt}',
             );
-            final image = await _images.importBytes(bytes);
-            item = item.copyWith(
-              edit: item.edit.copyWith(image: image),
-              stage: PictureStoryGenerationStage.imageReady,
-            );
-            // 即使页面刚离开，已经得到的图片也只回写匹配的原草稿。
-            if (!await _update(saved, item, expectedRequest: item.requestId)) {
-              throw const ImageGenerationCancelled();
-            }
+            await CacheActivity.use(TemporaryCacheKind.pictureStoryImages,
+                () async {
+              final image = await _images.importBytes(bytes);
+              item = item.copyWith(
+                edit: item.edit.copyWith(image: image),
+                stage: PictureStoryGenerationStage.imageReady,
+              );
+              // 租约持续到引用落盘，清理不能插入图片发布与草稿保存之间。
+              if (!await _update(
+                saved,
+                item,
+                expectedRequest: item.requestId,
+              )) {
+                throw const ImageGenerationCancelled();
+              }
+            });
             changed();
           }
           check();

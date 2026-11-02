@@ -22,6 +22,56 @@ void main() {
   });
   tearDown(() => directory.delete(recursive: true));
 
+  test('题图统计不创建目录，目录损坏不会被当作零占用', () async {
+    final empty = await service.storageUsage();
+    expect(empty.entries, 0);
+    expect(empty.bytes, 0);
+    expect(await directory.list().length, 0);
+    await File('${directory.path}/picture_story').writeAsString('blocked');
+    await expectLater(
+      service.storageUsage(),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
+
+  test('只扫描自有题图，不跟随目录或文件链接，也不删除未知文件', () async {
+    final image = await service.importBytes(await pictureStoryPng());
+    final stored = File((await service.imagePath(image.value))!);
+    final images = stored.parent;
+    final unknown = await File('${images.path}/keep.txt').writeAsString('keep');
+    final nested = File('${images.path}/unknown/${'a' * 64}.png');
+    await nested.parent.create();
+    await nested.writeAsString('private');
+    final external =
+        await File('${directory.path}/private.png').writeAsString('private');
+    final link = Link('${images.path}/${'b' * 64}.png');
+    await link.create(external.path);
+    final usage = await service.storageUsage();
+    expect(usage.entries, 1);
+    expect(usage.bytes, await stored.length());
+    await service.removeUnreferenced({}, authorize: () {});
+    expect(await stored.exists(), isFalse);
+    expect(await unknown.readAsString(), 'keep');
+    expect(await nested.readAsString(), 'private');
+    expect(await external.readAsString(), 'private');
+    expect(await link.exists(), isTrue);
+    await link.delete();
+    await unknown.delete();
+    await nested.parent.delete(recursive: true);
+    await images.delete();
+    await images.parent.delete();
+    await Link('${directory.path}/picture_story').create(directory.path);
+    await expectLater(
+      service.storageUsage(),
+      throwsA(isA<FileSystemException>()),
+    );
+    await expectLater(
+      service.removeUnreferenced({}, authorize: () {}),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(await external.readAsString(), 'private');
+  });
+
   test('真实 PNG 导入、SHA 去重和新服务读取，原文件保持不变', () async {
     final bytes = await pictureStoryPng();
     final source = File('${directory.path}/source.png');

@@ -18,18 +18,22 @@ import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_editor_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
+import 'package:poemath/core/services/storage_management_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/picture_story_editor_draft.dart';
+import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/profile/picture_story_detail_page.dart';
 import 'package:poemath/features/profile/picture_story_editor_page.dart';
 import 'package:poemath/features/profile/picture_story_management_page.dart';
+import 'package:poemath/features/profile/storage_management_page.dart';
+import 'package:poemath/features/profile/storage_management_provider.dart';
 
 import '../test/helpers/hive_test_helper.dart';
 import '../test/helpers/parent_access_test_helper.dart';
@@ -62,7 +66,9 @@ class _Editor extends PictureStoryEditorService {
   Future<void>? lastDiscard;
   @override
   Future<void> chooseImage(
-          PictureStoryEditorDraft draft, PictureStoryImageSource source,) =>
+    PictureStoryEditorDraft draft,
+    PictureStoryImageSource source,
+  ) =>
       lastPick = super.chooseImage(draft, source);
   @override
   Future<void> discardDraft(PictureStoryEditorDraft draft) =>
@@ -72,17 +78,26 @@ class _Editor extends PictureStoryEditorService {
 class _Repository extends PictureStoryRepository {
   _Repository({required super.images, required super.authorize});
   Future<PictureStoryPrompt>? lastSave;
+  Future<void>? lastDelete;
   @override
-  Future<PictureStoryPrompt> savePrompt(
-          {required PictureStoryPrompt prompt,
-          required String profileId,
-          PictureStoryPrompt? original,
-          bool enableForProfile = true,}) =>
+  Future<void> deletePrompt({
+    required PictureStoryPrompt prompt,
+    required String profileId,
+  }) =>
+      lastDelete = super.deletePrompt(prompt: prompt, profileId: profileId);
+  @override
+  Future<PictureStoryPrompt> savePrompt({
+    required PictureStoryPrompt prompt,
+    required String profileId,
+    PictureStoryPrompt? original,
+    bool enableForProfile = true,
+  }) =>
       lastSave = super.savePrompt(
-          prompt: prompt,
-          profileId: profileId,
-          original: original,
-          enableForProfile: enableForProfile,);
+        prompt: prompt,
+        profileId: profileId,
+        original: original,
+        enableForProfile: enableForProfile,
+      );
 }
 
 void main() {
@@ -96,6 +111,7 @@ void main() {
   late ProviderContainer container;
   late GoRouter router;
   final captureKey = GlobalKey();
+  const storagePath = '/test-storage';
 
   setUp(() async {
     expect(
@@ -113,32 +129,47 @@ void main() {
     final fixture = File('${directory.path}/fixture.png');
     await fixture.writeAsBytes(await pictureStoryPng(width: 240, height: 160));
     editor = _Editor(
-        images: images,
-        pickPath: nativePickers ? null : (_) async => fixture.path,);
-    container = ProviderContainer(overrides: [
-      pictureStoryImageServiceProvider.overrideWithValue(images),
-      pictureStoryRepositoryProvider.overrideWithValue(repository),
-      pictureStoryEditorServiceProvider.overrideWithValue(editor),
-    ],);
+      images: images,
+      pickPath: nativePickers ? null : (_) async => fixture.path,
+    );
+    container = ProviderContainer(
+      overrides: [
+        pictureStoryImageServiceProvider.overrideWithValue(images),
+        pictureStoryRepositoryProvider.overrideWithValue(repository),
+        pictureStoryEditorServiceProvider.overrideWithValue(editor),
+      ],
+    );
     Widget protected(Widget child) =>
         ParentAccessBoundary(service: access, child: child);
-    router =
-        GoRouter(initialLocation: AppRoutes.pictureStoryManagement, routes: [
-      GoRoute(
+    router = GoRouter(
+      initialLocation: AppRoutes.pictureStoryManagement,
+      routes: [
+        GoRoute(
           path: AppRoutes.pictureStoryManagement,
-          builder: (_, state) => protected(const PictureStoryManagementPage()),),
-      GoRoute(
+          builder: (_, state) => protected(const PictureStoryManagementPage()),
+        ),
+        GoRoute(
           path: AppRoutes.pictureStoryCreate,
-          builder: (_, state) => protected(const PictureStoryEditorPage()),),
-      GoRoute(
+          builder: (_, state) => protected(const PictureStoryEditorPage()),
+        ),
+        GoRoute(
           path: AppRoutes.pictureStoryDetail,
           builder: (_, state) => protected(
-              PictureStoryDetailPage(promptId: state.pathParameters['id']!),),),
-      GoRoute(
+            PictureStoryDetailPage(promptId: state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
           path: AppRoutes.pictureStoryEdit,
           builder: (_, state) => protected(
-              PictureStoryEditorPage(promptId: state.pathParameters['id']!),),),
-    ],);
+            PictureStoryEditorPage(promptId: state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: storagePath,
+          builder: (_, state) => protected(const StorageManagementPage()),
+        ),
+      ],
+    );
   });
   tearDown(() async {
     lockParentForTesting();
@@ -151,16 +182,27 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  Future<void> openEditor(WidgetTester tester) async {
-    await tester.pumpWidget(UncontrolledProviderScope(
+  Future<void> showApp(WidgetTester tester) async {
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
         container: container,
         child: RepaintBoundary(
-            key: captureKey,
-            child: MaterialApp.router(
-                theme: AppTheme.resolve(
-                    subject: AppSubject.poem, brightness: Brightness.light,),
-                routerConfig: router,),),),);
+          key: captureKey,
+          child: MaterialApp.router(
+            theme: AppTheme.resolve(
+              subject: AppSubject.poem,
+              brightness: Brightness.light,
+            ),
+            routerConfig: router,
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
+  }
+
+  Future<void> openEditor(WidgetTester tester) async {
+    await showApp(tester);
     expect(repository.listPrompts(), isEmpty);
     expect(container.read(pictureStoryPromptCountProvider), 0);
     await tester.tap(find.byTooltip('新增题目'));
@@ -202,19 +244,23 @@ void main() {
     access.unlock();
     await tester.pumpAndSettle();
     expect(
-        tester
-            .widget<TextFormField>(
-                find.byKey(const ValueKey('picture-story-title')),)
-            .controller!
-            .text,
-        '小猫的窗前故事',);
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('picture-story-title')),
+          )
+          .controller!
+          .text,
+      '小猫的窗前故事',
+    );
     expect(
-        tester
-            .widget<TextFormField>(
-                find.byKey(const ValueKey('picture-story-questions')),)
-            .controller!
-            .text,
-        '小猫在哪里？\n小猫看到了什么？',);
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('picture-story-questions')),
+          )
+          .controller!
+          .text,
+      '小猫在哪里？\n小猫看到了什么？',
+    );
   }
 
   Future<void> saveAndVerify(WidgetTester tester) async {
@@ -230,12 +276,16 @@ void main() {
     expect(container.read(pictureStoryPromptCountProvider), 1);
     final bytes = await images.readImage(saved.image.value);
     final backup = BackupService(
-        pictureStoryImages: images, pictureStoryRepository: repository,);
+      pictureStoryImages: images,
+      pictureStoryRepository: repository,
+    );
     final json = await backup.exportToJson();
     await PictureStoryRepository.exclusive(
-        () => repository.restoreStorageSnapshot({}),);
+      () => repository.restoreStorageSnapshot({}),
+    );
     final targetImages = PictureStoryImageService(
-        directoryProvider: () async => Directory('${directory.path}/restore'),);
+      directoryProvider: () async => Directory('${directory.path}/restore'),
+    );
     await BackupService(pictureStoryImages: targetImages).restoreFromJson(json);
     await tester.pumpAndSettle();
     expect(repository.findPrompt(saved.id)!.toJson(), saved.toJson());
@@ -247,9 +297,11 @@ void main() {
       final data =
           (await screenshot.toByteData(format: ui.ImageByteFormat.png))!;
       final file = File(
-          '${directory.parent.path}/picture-story-native-${DateTime.now().microsecondsSinceEpoch}.png',);
+        '${directory.parent.path}/picture-story-native-${DateTime.now().microsecondsSinceEpoch}.png',
+      );
       await file.writeAsBytes(
-          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),);
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
       AppLogger.d('EVIDENCE=${file.path}', tag: 'PictureStoryNativeTest');
     } finally {
       screenshot.dispose();
@@ -259,34 +311,116 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('Android 新增题图、保存详情与完整离线备份恢复', (tester) async {
-    await openEditor(tester);
-    if (nativePickers) {
-      await choose(tester, '从文件选择', 'SYSTEM_FILE_PICKER');
-      await resumeEditor(tester);
-      final first = editor.readDraft()!;
-      expect(first.image!.isLocal, isTrue);
-      await choose(tester, '从相册选择', 'SYSTEM_GALLERY_CANCEL');
-      await resumeEditor(tester);
-      expect(editor.readDraft()!.image, first.image);
-      expect(editor.readDraft()!.fields, first.fields);
-      await choose(tester, '拍照', 'SYSTEM_CAMERA');
-      await resumeEditor(tester);
-      expect(editor.readDraft()!.image!.isLocal, isTrue);
-      expect(editor.readDraft()!.image, isNot(first.image));
-    } else {
-      await choose(tester, '从文件选择', 'LOCAL_IMAGE_IMPORT');
-    }
-    expect(find.text('题目图片'), findsNothing);
-    final image = find.byType(PictureStoryImageView);
-    await tester.ensureVisible(image);
-    await tester.pumpAndSettle();
-    final card = find.ancestor(of: image, matching: find.byType(ColoredCard));
-    final imageRect = tester.getRect(image);
-    final cardRect = tester.getRect(card);
-    expect(imageRect.left, closeTo(cardRect.left, 0.01));
-    expect(imageRect.top, closeTo(cardRect.top, 0.01));
-    expect(imageRect.right, closeTo(cardRect.right, 0.01));
-    await saveAndVerify(tester);
-  }, timeout: const Timeout(Duration(minutes: 17)),);
+  testWidgets(
+    'Android 新增题图、保存详情与完整离线备份恢复',
+    (tester) async {
+      await openEditor(tester);
+      if (nativePickers) {
+        await choose(tester, '从文件选择', 'SYSTEM_FILE_PICKER');
+        await resumeEditor(tester);
+        final first = editor.readDraft()!;
+        expect(first.image!.isLocal, isTrue);
+        await choose(tester, '从相册选择', 'SYSTEM_GALLERY_CANCEL');
+        await resumeEditor(tester);
+        expect(editor.readDraft()!.image, first.image);
+        expect(editor.readDraft()!.fields, first.fields);
+        await choose(tester, '拍照', 'SYSTEM_CAMERA');
+        await resumeEditor(tester);
+        expect(editor.readDraft()!.image!.isLocal, isTrue);
+        expect(editor.readDraft()!.image, isNot(first.image));
+      } else {
+        await choose(tester, '从文件选择', 'LOCAL_IMAGE_IMPORT');
+      }
+      expect(find.text('题目图片'), findsNothing);
+      final image = find.byType(PictureStoryImageView);
+      await tester.ensureVisible(image);
+      await tester.pumpAndSettle();
+      final card = find.ancestor(of: image, matching: find.byType(ColoredCard));
+      final imageRect = tester.getRect(image);
+      final cardRect = tester.getRect(card);
+      expect(imageRect.left, closeTo(cardRect.left, 0.01));
+      expect(imageRect.top, closeTo(cardRect.top, 0.01));
+      expect(imageRect.right, closeTo(cardRect.right, 0.01));
+      await saveAndVerify(tester);
+    },
+    timeout: const Timeout(Duration(minutes: 17)),
+  );
+
+  testWidgets(
+    'Android 题图独立只读统计，删除无引用图片并保留历史原图',
+    (tester) async {
+      final firstImage =
+          await images.importBytes(await pictureStoryPng(width: 5));
+      final updatedImage =
+          await images.importBytes(await pictureStoryPng(width: 6));
+      final unusedImage =
+          await images.importBytes(await pictureStoryPng(width: 7));
+      final original = await repository.savePrompt(
+        prompt:
+            pictureStoryFixture(id: 'local-native-history', image: firstImage),
+        profileId: 'default',
+      );
+      await repository.save(PictureStoryPracticeRecord(
+        id: 'native-history',
+        profileId: 'default',
+        promptId: original.id,
+        promptVersion: 1,
+        startedAt: DateTime(2026),
+        status: 'completed',
+        segmentsJson: '[]',
+        answerText: '历史中已经保存的表达',
+      ),);
+      final updated = await repository.savePrompt(
+        prompt: original.copyWith(title: '新版本题目', image: updatedImage),
+        original: original,
+        profileId: 'default',
+      );
+      final unused = await repository.savePrompt(
+        prompt:
+            pictureStoryFixture(id: 'local-native-unused', image: unusedImage),
+        profileId: 'default',
+      );
+      final historyBytes = await images.readImage(firstImage.value);
+      await showApp(tester);
+      for (final prompt in [updated, unused]) {
+        router.push(AppRoutes.pictureStoryDetailOf(prompt.id));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('删除题目'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(TextButton, '删除'));
+        await tester.pumpAndSettle();
+        await repository.lastDelete!.timeout(const Duration(seconds: 20));
+        await tester.pumpAndSettle();
+        expect(repository.findPrompt(prompt.id), isNull);
+      }
+      expect(await images.imagePath(updatedImage.value), isNull);
+      expect(await images.imagePath(unusedImage.value), isNull);
+      expect(await images.readImage(firstImage.value), historyBytes);
+      expect(repository.findPrompt(original.id, version: 1)!.toJson(),
+          original.toJson(),);
+      expect(repository.find('native-history')!.answerText, '历史中已经保存的表达');
+      final entry =
+          (await container.read(storageManagementServiceProvider).scan())
+              .entries
+              .singleWhere(
+                  (entry) => entry.kind == StorageCacheKind.pictureStoryImages,);
+      expect(entry.usage!.entries, 1);
+      expect(entry.usage!.bytes, historyBytes.length);
+      router.go(storagePath);
+      await tester.pumpAndSettle();
+      final tile = find.ancestor(
+          of: find.textContaining('看图说话题图'), matching: find.byType(AppTile),);
+      await tester.ensureVisible(tile);
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: tile, matching: find.textContaining('1个文件')),
+          findsOneWidget,);
+      expect(find.descendant(of: tile, matching: find.byType(TextButton)),
+          findsNothing,);
+      expect(tester.widget<AppTile>(tile).onTap, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
 }

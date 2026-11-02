@@ -73,7 +73,7 @@ Finder _clearOf(String label) => find.descendant(
     );
 
 Finder get _refreshButton => find.ancestor(
-      of: find.byTooltip('刷新缓存占用'),
+      of: find.byTooltip('刷新存储占用'),
       matching: find.byType(IconButton),
     );
 
@@ -121,7 +121,7 @@ void main() {
     await tester.tap(find.text('存储管理'));
     await tester.pumpAndSettle();
     expect(find.byType(StorageManagementPage), findsOneWidget);
-    expect(find.text('磁盘缓存 2.0 KB'), findsOneWidget);
+    expect(find.text('磁盘占用 2.0 KB'), findsOneWidget);
     expect(find.text('内存缓存 0 B'), findsOneWidget);
     expect(find.textContaining('教材封面'), findsOneWidget);
     expect(find.textContaining('2个文件 · 1.0 KB'), findsNWidgets(2));
@@ -145,7 +145,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.cleared, [StorageCacheKind.textbookCovers]);
     expect(service.scans, 2);
-    expect(find.text('磁盘缓存 1.0 KB'), findsOneWidget);
+    expect(find.text('磁盘占用 1.0 KB'), findsOneWidget);
     expect(find.textContaining('2个文件 · 1.0 KB'), findsOneWidget);
     expect(tester.widget<TextButton>(_clearOf('教材封面')).onPressed, isNull);
     expect(tester.widget<TextButton>(_clearOf('教材解析')).onPressed, isNotNull);
@@ -192,7 +192,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('清理未完成，请刷新后重试'), findsOneWidget);
     expect(find.textContaining('1个文件 · 512 B'), findsOneWidget);
-    expect(find.text('磁盘缓存 1.5 KB'), findsOneWidget);
+    expect(find.text('磁盘占用 1.5 KB'), findsOneWidget);
     expect(service.scans, 2);
     await tester.pump(const Duration(seconds: 5));
   });
@@ -200,17 +200,17 @@ void main() {
   testWidgets('统计失败可刷新，单项失败与零占用明确区分', (tester) async {
     service.scanError = StateError('目录无法读取');
     await show(tester);
-    expect(find.text('暂时无法读取缓存，请刷新重试。'), findsOneWidget);
+    expect(find.text('暂时无法读取存储，请刷新重试。'), findsOneWidget);
     expect(
       tester.widget<IconButton>(_refreshButton).onPressed,
       isNotNull,
     );
     service.scanError = null;
     service.usages[StorageCacheKind.textbookCovers] = null;
-    await tester.tap(find.byTooltip('刷新缓存占用'));
+    await tester.tap(find.byTooltip('刷新存储占用'));
     await tester.pumpAndSettle();
     expect(find.textContaining('统计失败，请刷新重试'), findsOneWidget);
-    expect(find.text('部分缓存暂时无法统计，以上为已统计占用。'), findsOneWidget);
+    expect(find.text('部分存储暂时无法统计，以上为已统计占用。'), findsOneWidget);
     expect(tester.widget<TextButton>(_clearOf('教材封面')).onPressed, isNull);
     expect(tester.widget<TextButton>(_clearOf('教材解析')).onPressed, isNotNull);
     expect(service.scans, 2);
@@ -234,6 +234,26 @@ void main() {
     expect(service.cleared, isEmpty);
     expect(find.text('请由家长解锁后继续'), findsOneWidget);
     await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('题图显示独立数量和占用，不提供清理按钮', (tester) async {
+    service.usages[StorageCacheKind.pictureStoryImages] =
+        const CacheUsage(bytes: 4096, entries: 3);
+    await show(tester);
+    final tile = find.ancestor(
+      of: find.textContaining('看图说话题图'),
+      matching: find.byType(AppTile),
+    );
+    await tester.ensureVisible(tile);
+    expect(find.textContaining('3个文件 · 4.0 KB'), findsOneWidget);
+    expect(
+      find.descendant(of: tile, matching: find.byType(TextButton)),
+      findsNothing,
+    );
+    expect(tester.widget<AppTile>(tile).trailing, isNull);
+    expect(tester.widget<AppTile>(tile).onTap, isNull);
+    expect(_clearOf('看图说话题图'), findsNothing);
+    expect(service.cleared, isEmpty);
   });
 
   testWidgets('卡片随宽度分列，窄屏和大字号仍能显示长分类与操作按钮', (tester) async {

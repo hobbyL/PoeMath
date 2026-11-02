@@ -334,7 +334,7 @@ void main() {
       [prompt],
       deletedIds: [prompt.id],
     ).toJson();
-    expect(deleted['schemaVersion'], 2);
+    expect(deleted['schemaVersion'], 3);
     expect(PictureStoryCatalogState.fromJson(deleted).deletedIds, {prompt.id});
     for (final invalid in <Object?>[
       null,
@@ -342,7 +342,6 @@ void main() {
       [1],
       [prompt.id, prompt.id],
       ['../outside'],
-      ['local-unknown'],
     ]) {
       expect(
         () => PictureStoryCatalogState.fromJson({
@@ -357,7 +356,11 @@ void main() {
       throwsFormatException,
     );
     expect(
-      () => PictureStoryCatalogState([prompt], deletedIds: ['local-unknown']),
+      () => PictureStoryCatalogState.fromJson({
+        ...deleted,
+        'schemaVersion': 2,
+        'deletedIds': ['local-unknown'],
+      }),
       throwsFormatException,
     );
   });
@@ -398,7 +401,7 @@ void main() {
     expect(repository.catalogState().deletedIds, {original.id});
   });
 
-  test('删除本地题保留所有历史版本、练习记录与实际题图，已有启用选择均失效', () async {
+  test('删除本地题保留历史引用版本、练习记录与实际题图，已有启用选择均失效', () async {
     final directory = await Directory.systemTemp.createTemp('picture_delete_');
     addTearDown(() => directory.delete(recursive: true));
     final images =
@@ -447,10 +450,7 @@ void main() {
       repository.findPrompt(first.id, version: 1)!.toJson(),
       first.toJson(),
     );
-    expect(
-      repository.findPrompt(first.id, version: 2)!.toJson(),
-      second.toJson(),
-    );
+    expect(repository.findPrompt(first.id, version: 2), isNull);
     expect(repository.find(record.id)!.answerText, record.answerText);
     expect(repository.find(record.id)!.promptVersion, 1);
     expect(await images.readImage(image.value), beforeBytes);
@@ -530,6 +530,32 @@ void main() {
       );
     });
   }
+
+  test('本地题目录写入失败不删除实际题图，补偿后重试可完成文件删除', () async {
+    final directory =
+        await Directory.systemTemp.createTemp('picture-delete-rollback-');
+    addTearDown(() => directory.delete(recursive: true));
+    final images =
+        PictureStoryImageService(directoryProvider: () async => directory);
+    final image = await images.importBytes(await pictureStoryPng());
+    final saved = await PictureStoryRepository(images: images).savePrompt(
+      prompt: pictureStoryFixture(image: image),
+      profileId: 'default',
+    );
+    final repository = PictureStoryRepository(
+      images: images,
+      settings: _PartialWriteBox(HiveBoxes.settings),
+    );
+    final before = repository.storageSnapshot();
+    await expectLater(
+      repository.deletePrompt(prompt: saved, profileId: 'default'),
+      throwsStateError,
+    );
+    expect(repository.storageSnapshot(), before);
+    expect(await images.readImage(image.value), isNotEmpty);
+    await repository.deletePrompt(prompt: saved, profileId: 'default');
+    expect(await images.imagePath(image.value), isNull);
+  });
 
   for (final relock in [true, false]) {
     test('排队期间${relock ? '家长锁定' : '档案切换'}不能删除题目', () async {

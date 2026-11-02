@@ -122,7 +122,7 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
         title: const Text('存储管理'),
         actions: [
           IconButton(
-            tooltip: '刷新缓存占用',
+            tooltip: '刷新存储占用',
             onPressed: _loading || _busy != null ? null : _load,
             icon: const Icon(Icons.refresh),
           ),
@@ -141,7 +141,7 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (_loading) ...[
-                    const Text('正在统计缓存…'),
+                    const Text('正在统计存储…'),
                     const SizedBox(height: SpacingTokens.sm),
                     const LinearProgressIndicator(),
                   ] else if (snapshot != null) ...[
@@ -150,7 +150,7 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
                       children: [
                         Expanded(
                           child: Text(
-                            '磁盘缓存 ${formatBytes(snapshot.diskBytes)}',
+                            '磁盘占用 ${formatBytes(snapshot.diskBytes)}',
                           ),
                         ),
                         const SizedBox(width: SpacingTokens.md),
@@ -166,7 +166,7 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
                   if (_loadFailed || snapshot?.hasErrors == true) ...[
                     const SizedBox(height: SpacingTokens.sm),
                     Text(
-                      _loadFailed ? '暂时无法读取缓存，请刷新重试。' : '部分缓存暂时无法统计，以上为已统计占用。',
+                      _loadFailed ? '暂时无法读取存储，请刷新重试。' : '部分存储暂时无法统计，以上为已统计占用。',
                       style: TextStyle(color: theme.colorScheme.error),
                     ),
                   ],
@@ -200,28 +200,31 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
                                 : '${entry.usage!.entries}${entry.kind.isMemory ? '项' : '个文件'} · ${formatBytes(entry.usage!.bytes)}',
                         titleSuffixInline: true,
                         subtitle: entry.kind.description,
-                        trailing: Tooltip(
-                          message: '清理${entry.kind.label}',
-                          child: TextButton(
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(
-                                SpacingTokens.minTapTarget,
-                                SpacingTokens.minTapTarget,
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: SpacingTokens.xs,
-                              ),
-                              alignment: AlignmentDirectional.centerEnd,
-                            ),
-                            onPressed: _loading ||
-                                    _busy != null ||
-                                    entry.usage == null ||
-                                    entry.usage!.entries == 0
-                                ? null
-                                : () => _clear(entry.kind),
-                            child: Text(_busy == entry.kind ? '清理中…' : '清理'),
-                          ),
-                        ),
+                        trailing: entry.kind.canClear
+                            ? Tooltip(
+                                message: '清理${entry.kind.label}',
+                                child: TextButton(
+                                  style: TextButton.styleFrom(
+                                    minimumSize: const Size(
+                                      SpacingTokens.minTapTarget,
+                                      SpacingTokens.minTapTarget,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: SpacingTokens.xs,
+                                    ),
+                                    alignment: AlignmentDirectional.centerEnd,
+                                  ),
+                                  onPressed: _loading ||
+                                          _busy != null ||
+                                          entry.usage == null ||
+                                          entry.usage!.entries == 0
+                                      ? null
+                                      : () => _clear(entry.kind),
+                                  child:
+                                      Text(_busy == entry.kind ? '清理中…' : '清理'),
+                                ),
+                              )
+                            : null,
                       ),
                   ],
                 );
@@ -241,6 +244,7 @@ extension _StorageCacheLabels on StorageCacheKind {
         StorageCacheKind.textbookAudio => '教材朗读',
         StorageCacheKind.cloudAudio => '云朗读',
         StorageCacheKind.images => '图片显示',
+        StorageCacheKind.pictureStoryImages => '看图说话题图',
         StorageCacheKind.updates => '更新安装包',
         StorageCacheKind.pickers => '文件与图片选择',
         StorageCacheKind.sharing => '分享与导出临时文件',
@@ -250,7 +254,8 @@ extension _StorageCacheLabels on StorageCacheKind {
 
   IconData get icon => switch (this) {
         StorageCacheKind.textbookCovers ||
-        StorageCacheKind.images =>
+        StorageCacheKind.images ||
+        StorageCacheKind.pictureStoryImages =>
           Icons.image_outlined,
         StorageCacheKind.textbookContent => Icons.menu_book_outlined,
         StorageCacheKind.textbookAudio ||
@@ -269,6 +274,7 @@ extension _StorageCacheLabels on StorageCacheKind {
         StorageCacheKind.textbookAudio => '系统或云端生成的教材音频及校验文件',
         StorageCacheKind.cloudAudio => '本次使用中复用的云端朗读音频',
         StorageCacheKind.images => '用于加快图片显示的闲置解码图片',
+        StorageCacheKind.pictureStoryImages => '删除题目时清理无引用题图，历史和草稿使用的图片会保留',
         StorageCacheKind.updates => '已下载的更新包及未完成副本',
         StorageCacheKind.pickers => '导入文件、相册选图和拍照的临时副本',
         StorageCacheKind.sharing => '分享产生的副本与导出临时文件',

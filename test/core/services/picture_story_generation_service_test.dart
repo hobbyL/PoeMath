@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/image_generation_client.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
@@ -140,6 +141,20 @@ class _BudgetImages extends PictureStoryImageService {
   Future<Uint8List> readImage(String id) async {
     reads++;
     throw StateError('预算拒绝前不应读取题图');
+  }
+}
+
+class _PausedGeneratedImages extends PictureStoryImageService {
+  _PausedGeneratedImages({required super.directoryProvider});
+  final stored = Completer<void>();
+  final proceed = Completer<void>();
+
+  @override
+  Future<PictureStoryImage> importBytes(Uint8List bytes) async {
+    final result = await super.importBytes(bytes);
+    stored.complete();
+    await proceed.future;
+    return result;
   }
 }
 
@@ -282,6 +297,33 @@ void main() {
     ProfileScope.reset();
     await tearDownHiveForTesting();
     await directory.delete(recursive: true);
+  });
+
+  test('AI 图片落盘到生成草稿保存之间阻止删除，随后删除不影响候选题图和看图出题', () async {
+    final oldImage = await images.importBytes(await pictureStoryPng());
+    final prompt = await repository.savePrompt(
+      prompt: pictureStoryFixture(image: oldImage),
+      profileId: 'default',
+    );
+    final paused =
+        _PausedGeneratedImages(directoryProvider: () async => directory);
+    service = createService(imageService: paused);
+    final generating = start(count: 1);
+    await paused.stored.future;
+    final before = repository.storageSnapshot();
+    await expectLater(
+      repository.deletePrompt(prompt: prompt, profileId: 'default'),
+      throwsA(isA<CacheInUseException>()),
+    );
+    expect(repository.storageSnapshot(), before);
+    paused.proceed.complete();
+    final draft = await generating;
+    final generatedImage = draft.candidates.single.edit.image!;
+    await repository.deletePrompt(prompt: prompt, profileId: 'default');
+    expect(await images.imagePath(oldImage.value), isNull);
+    expect(await images.readImage(generatedImage.value), isNotEmpty);
+    expect(service.readDraft('default')!.candidates.single.isReady, isTrue);
+    expect(captionCalls, 1);
   });
 
   test('SSE 规划与逐题看图出题保留完整题图、内容和生成顺序', () async {

@@ -265,14 +265,10 @@ class PictureStoryCatalogState {
     Iterable<PictureStoryPrompt> versions, {
     Iterable<String> deletedIds = const [],
   })  : versions = _checkedVersions(versions),
-        deletedIds = _checkedDeletedIds(deletedIds) {
-    final ids = this.versions.map((prompt) => prompt.id).toSet();
-    if (!ids.containsAll(this.deletedIds)) {
-      throw const FormatException('已删除题目缺少保留的原题版本');
-    }
-  }
+        deletedIds = _checkedDeletedIds(deletedIds);
 
-  static const schemaVersion = 2;
+  static const schemaVersion = 3;
+  static const retainedVersionsSchemaVersion = 2;
   static const legacySchemaVersion = 1;
   static const maxVersions = 10000;
   final List<PictureStoryPrompt> versions;
@@ -318,6 +314,7 @@ class PictureStoryCatalogState {
   factory PictureStoryCatalogState.fromJson(Object? value) {
     if (value is! Map<String, dynamic> ||
         (value['schemaVersion'] != schemaVersion &&
+            value['schemaVersion'] != retainedVersionsSchemaVersion &&
             value['schemaVersion'] != legacySchemaVersion) ||
         value['versions'] is! List) {
       throw const FormatException('看图说话题库格式或版本不支持');
@@ -332,12 +329,6 @@ class PictureStoryCatalogState {
         throw const FormatException('题库包含重复的题目版本');
       }
     }
-    for (final numbers in seen.values) {
-      if (!numbers.contains(1) ||
-          numbers.reduce((a, b) => a > b ? a : b) != numbers.length) {
-        throw const FormatException('题库的题目版本不连续');
-      }
-    }
     final rawDeletedIds = value['deletedIds'];
     if (value.containsKey('deletedIds') &&
         (rawDeletedIds is! List || rawDeletedIds.any((id) => id is! String))) {
@@ -345,14 +336,31 @@ class PictureStoryCatalogState {
     }
     if (rawDeletedIds is List &&
         rawDeletedIds.isNotEmpty &&
-        value['schemaVersion'] != schemaVersion) {
+        value['schemaVersion'] == legacySchemaVersion) {
       throw const FormatException('题库的删除标记需要新版格式');
+    }
+    final deletedIds = _checkedDeletedIds(
+      rawDeletedIds == null ? const [] : (rawDeletedIds as List).cast<String>(),
+    );
+    if (value['schemaVersion'] == retainedVersionsSchemaVersion &&
+        !seen.keys.toSet().containsAll(deletedIds)) {
+      throw const FormatException('已删除题目缺少保留的原题版本');
+    }
+    for (final entry in seen.entries) {
+      // 已删除的本地题只保留练习引用的版本；活动题和旧格式仍严格连续。
+      if (value['schemaVersion'] == schemaVersion &&
+          deletedIds.contains(entry.key)) {
+        continue;
+      }
+      final numbers = entry.value;
+      if (!numbers.contains(1) ||
+          numbers.reduce((a, b) => a > b ? a : b) != numbers.length) {
+        throw const FormatException('题库的题目版本不连续');
+      }
     }
     return PictureStoryCatalogState(
       versions,
-      deletedIds: rawDeletedIds == null
-          ? const []
-          : (rawDeletedIds as List).cast<String>(),
+      deletedIds: deletedIds,
     );
   }
 }
