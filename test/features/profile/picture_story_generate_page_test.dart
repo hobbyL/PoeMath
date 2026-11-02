@@ -264,14 +264,26 @@ void main() {
     await tester.ensureVisible(find.text('生成图文题目'));
     await tester.pumpAndSettle();
     await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
-    await _until(tester, () => service.readDraft('default')?.readyCount == 3);
+    final readyButton = find.widgetWithText(FilledButton, '确认入库（3 道）');
+    // 数据就绪不代表生成回调和页面刷新完成，等预览真正可操作。
+    await _until(
+      tester,
+      () =>
+          service.readDraft('default')?.readyCount == 3 &&
+          readyButton.evaluate().isNotEmpty &&
+          tester.widget<FilledButton>(readyButton).onPressed != null,
+    );
     expect((service as _GenerationFlow).capturedPrompt, '用儿童水彩场景引导观察和表达');
     expect(repository.catalogState().versions, isEmpty);
     final first = service.readDraft('default')!.candidates.first;
     final firstCard = find.byKey(ValueKey(first.id));
     final editButton =
         find.descendant(of: firstCard, matching: find.text('编辑内容'));
-    await tester.ensureVisible(editButton);
+    await tester.scrollUntilVisible(
+      editButton,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.runAsync(() => tester.tap(editButton));
     await _until(
