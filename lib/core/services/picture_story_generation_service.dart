@@ -297,9 +297,7 @@ class PictureStoryGenerationService {
             check();
             final bytes = await run.images!.generate(
               config: imageConfig,
-              prompt: '为小学生看图说话绘制一幅清晰、温暖的儿童插画。'
-                  '单张完整场景，人物动作和物体关系清楚，不拼图、不分镜、不加文字、水印或标志。'
-                  '避免暴力、危险模仿及成人内容。\n${item.imagePrompt}',
+              prompt: buildPictureStoryImagePrompt(item.imagePrompt),
             );
             await CacheActivity.use(TemporaryCacheKind.pictureStoryImages,
                 () async {

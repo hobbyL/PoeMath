@@ -174,6 +174,7 @@ void main() {
   int? captionStatus;
   final captionRequests = <Map<String, dynamic>>[];
   final planRequests = <Map<String, dynamic>>[];
+  final imageRequests = <Map<String, dynamic>>[];
   final requestOrder = <String>[];
 
   PictureStoryGenerationService createService({
@@ -233,7 +234,9 @@ void main() {
           imageClients++;
           return ImageGenerationClient(
             isActive: active,
-            httpClient: MockClient((_) async {
+            httpClient: MockClient((request) async {
+              imageRequests
+                  .add(jsonDecode(request.body) as Map<String, dynamic>);
               imageCalls++;
               requestOrder.add('生图 $imageCalls');
               return http.Response(
@@ -288,6 +291,7 @@ void main() {
     captionStatus = null;
     captionRequests.clear();
     planRequests.clear();
+    imageRequests.clear();
     requestOrder.clear();
     service = createService();
   });
@@ -404,6 +408,13 @@ void main() {
     expect(planning, contains('只输出严格 JSON 数组'));
     expect(planning, contains('imagePrompt'));
     expect(planning, contains('不要先编题目或答案'));
+    expect(planning, contains('一件儿童熟悉的日常小事'));
+    expect(planning, contains('画面内的可见线索'));
+    expect(imageRequests, hasLength(2));
+    for (final request in imageRequests) {
+      expect(request['prompt'], contains('小学语文课本式插图'));
+      expect(request['prompt'], contains('一幅图讲一件事'));
+    }
     for (final request in captionRequests) {
       final messages = request['messages'] as List;
       final prompt = messages.first['content'] as String;
@@ -422,6 +433,23 @@ void main() {
     expect(imageCalls, 3);
     expect(captionCalls, 3);
     expect(draft.readyCount, 3);
+    final planning =
+        (planRequests.single['messages'] as List).first['content'] as String;
+    expect(planning, contains('小学语文课本式看图说话'));
+    expect(planning, contains('正在发生的一个关键时刻'));
+    expect(planning, contains('不能仅换颜色或装饰'));
+    expect(imageRequests, hasLength(3));
+    for (var i = 0; i < imageRequests.length; i++) {
+      final prompt = imageRequests[i]['prompt'] as String;
+      expect(prompt, contains('小学语文课本式插图'));
+      expect(prompt, contains('平面手绘儿童教材插图'));
+      expect(prompt, contains('人物正在做什么、彼此怎样互动'));
+      expect(prompt, contains('不拼图、不分镜'));
+      expect(
+        prompt,
+        endsWith('具体场景：\n场景 $i：公园里的孩子观察花朵。'),
+      );
+    }
     expect(draft.candidates.map((c) => c.id).toSet().length, 3);
     expect(repository.catalogState().versions, isEmpty);
     expect(

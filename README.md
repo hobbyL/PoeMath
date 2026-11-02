@@ -349,7 +349,7 @@ cat keystore.b64 | pbcopy
 | 说一说 | 观察图片与引导问题，分段录音、回听、修改识别文字并完成练习 | `picture_story_practice_page` |
 | 表达反馈与历史 | 本地反馈或可选 AI 看图反馈，按当时的题目版本查看练习记录 | `picture_story_practice_page` / `picture_story_history_page` |
 | 题库管理 | 新增、编辑、启用选择、完整详情与删除；导航栏保存图标提交，无需难度 | `picture_story_management_page` / `picture_story_editor_page` / `picture_story_detail_page` |
-| AI 出题 | 先生成图片，再依据实际图片生成题目；1–5 道数量滑动条、SSE/JSON 兼容、宽屏瀑布流预览、逐题编辑与选择入库 | `picture_story_generate_page` / `picture_story_candidate_editor_page` |
+| AI 出题 | 按小学语文课本式单图故事要求生成图片，突出人物动作、互动与事件线索，再依据实际图片出题；1–5 道数量滑动条、SSE/JSON 兼容、宽屏瀑布流预览、逐题编辑与选择入库 | `picture_story_generate_page` / `picture_story_candidate_editor_page` |
 
 录音转写使用家长配置的腾讯云语音识别。AI 出题与 AI 反馈需要相应的生图/看图模型配置；调用失败不会自动发布题目。题库与配图可备份，表达录音、练习历史和未确认草稿目前保留在本机。
 
