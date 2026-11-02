@@ -160,7 +160,10 @@ class PictureStoryRepository {
         ? (_savedEnabledIds(ProfileScope.currentId) ?? const <String>[]).toSet()
         : null;
     final ids = state.versions.map((prompt) => prompt.id).toSet();
+    // 按首次入库的顺序倒序显示，题目的后续版本沿用原排序位置。
     return ids
+        .toList()
+        .reversed
         .where((id) => !state.deletedIds.contains(id))
         .map((id) => _findPrompt(state, id)!)
         .where((prompt) => enabledIds == null || enabledIds.contains(prompt.id))

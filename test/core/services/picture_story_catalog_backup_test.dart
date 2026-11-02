@@ -169,7 +169,7 @@ void main() {
     expect(reopened.isEnabled('kite-in-the-park'), isFalse);
     expect(
       reopened.listPrompts().map((prompt) => prompt.id),
-      ['local-fixture', 'kite-in-the-park'],
+      ['kite-in-the-park', 'local-fixture'],
     );
   });
 

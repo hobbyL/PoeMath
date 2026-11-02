@@ -95,7 +95,7 @@ Finder _switchOf(String title) => find.descendant(
     );
 
 List<Rect> _promptRects(WidgetTester tester) => [
-      for (final prompt in _prompts)
+      for (final prompt in _prompts.reversed)
         tester.getRect(find.widgetWithText(AppTile, prompt.title)),
     ];
 
@@ -152,7 +152,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('题库插图应贴住卡片左侧并铺满高度，开关居中', (tester) async {
+  testWidgets('题库最新入库的题目在前，插图贴住卡片左侧并铺满高度，开关居中', (tester) async {
     await _pumpPage(tester);
 
     _verifyPromptLayout(tester);
