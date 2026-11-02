@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'dart:async';
-import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -64,30 +62,7 @@ void main() {
   });
 
   test('复杂题图的视觉上传副本不超过 512 KiB，保持比例且不修改永久题图', () async {
-    const width = 1024;
-    const height = 768;
-    final pixels = Uint8List(width * height * 4);
-    final random = Random(42);
-    for (var i = 0; i < pixels.length; i += 4) {
-      pixels[i] = random.nextInt(256);
-      pixels[i + 1] = random.nextInt(256);
-      pixels[i + 2] = random.nextInt(256);
-      pixels[i + 3] = 255;
-    }
-    final ready = Completer<ui.Image>();
-    ui.decodeImageFromPixels(
-      pixels,
-      width,
-      height,
-      ui.PixelFormat.rgba8888,
-      ready.complete,
-    );
-    final image = await ready.future;
-    final data = (await image.toByteData(format: ui.ImageByteFormat.png))!;
-    final source = Uint8List.fromList(
-      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
-    );
-    image.dispose();
+    final source = await pictureStoryNoisePng();
     final storedImage = await service.importBytes(source);
     final stored = await service.readImage(storedImage.value);
     expect(stored.length, greaterThan(PictureStoryImageService.maxUploadBytes));

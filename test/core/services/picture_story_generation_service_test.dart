@@ -124,7 +124,9 @@ void main() {
   var planCalls = 0;
   var captionCalls = 0;
   var imageCalls = 0;
+  var imageClients = 0;
   var failCaption = 0;
+  int? captionStatus;
   final captionRequests = <Map<String, dynamic>>[];
   final planRequests = <Map<String, dynamic>>[];
 
@@ -155,6 +157,9 @@ void main() {
             }
             captionCalls++;
             captionRequests.add(body);
+            if (captionStatus != null) {
+              return http.Response('private provider response', captionStatus!);
+            }
             if (captionCalls == failCaption) {
               return _completion({'title': '不完整内容'});
             }
@@ -168,20 +173,23 @@ void main() {
             });
           }),
         ),
-        imageFactory: (active) => ImageGenerationClient(
-          isActive: active,
-          httpClient: MockClient((_) async {
-            imageCalls++;
-            return http.Response(
-              jsonEncode({
-                'data': [
-                  {'b64_json': base64Encode(png)},
-                ],
-              }),
-              200,
-            );
-          }),
-        ),
+        imageFactory: (active) {
+          imageClients++;
+          return ImageGenerationClient(
+            isActive: active,
+            httpClient: MockClient((_) async {
+              imageCalls++;
+              return http.Response(
+                jsonEncode({
+                  'data': [
+                    {'b64_json': base64Encode(png)},
+                  ],
+                }),
+                200,
+              );
+            }),
+          );
+        },
       );
 
   Future<PictureStoryGenerationDraft> start({
@@ -217,7 +225,9 @@ void main() {
     planCalls = 0;
     captionCalls = 0;
     imageCalls = 0;
+    imageClients = 0;
     failCaption = 0;
+    captionStatus = null;
     captionRequests.clear();
     planRequests.clear();
     service = createService();
@@ -300,6 +310,7 @@ void main() {
     expect(draft.readyCount, 2);
     final failed = draft.candidates[1];
     expect(failed.stage, PictureStoryGenerationStage.failed);
+    expect(failed.error, '看图出题内容不完整或格式不正确，可保留图片重试');
     expect(failed.edit.image, isNotNull);
     final completed = draft.candidates.first.edit.toPrompt();
     await service.run(
@@ -319,6 +330,123 @@ void main() {
       draft.candidates.first.edit.toPrompt().sameContent(completed),
       isTrue,
     );
+  });
+
+  test('复杂大图可以实际发送看图请求，失败后重试复用原图与草稿', () async {
+    png = await pictureStoryNoisePng();
+    failCaption = 1;
+    var draft = await start(count: 1);
+    expect(planCalls, 1);
+    expect(imageCalls, 1);
+    expect(captionCalls, 1);
+    final failed = draft.candidates.single;
+    expect(failed.stage, PictureStoryGenerationStage.failed);
+    final image = failed.edit.image!;
+    final stored = await images.readImage(image.value);
+    final requestBytes = utf8.encode(jsonEncode(captionRequests.single)).length;
+    expect(requestBytes, greaterThan(256 * 1024));
+    expect(requestBytes, lessThan(1024 * 1024));
+    await service.run(
+      draft: draft,
+      config: _llm,
+      imageConfig: _imageConfig,
+      isActive: () => true,
+      candidateId: failed.id,
+      reuseImageId: image.value,
+    );
+    draft = service.readDraft('default')!;
+    expect(draft.readyCount, 1);
+    expect(planCalls, 1);
+    expect(imageCalls, 1);
+    expect(captionCalls, 2);
+    expect(imageClients, 1);
+    final completed = draft.candidates.single;
+    expect(completed.id, failed.id);
+    expect(completed.edit.image, image);
+    expect(completed.error, isNull);
+    expect(completed.edit.toPrompt().title, '观察花朵 2');
+    expect(completed.edit.toPrompt().questions, ['你看到了什么？', '想象孩子接下来会做什么？']);
+    expect(await images.readImage(image.value), stored);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
+    expect(repository.catalogState().versions, isEmpty);
+  });
+
+  test('看图模型服务失败给出明确原因，保留原图后可以只重试出题', () async {
+    captionStatus = 400;
+    var draft = await start(count: 1);
+    final failed = draft.candidates.single;
+    expect(failed.stage, PictureStoryGenerationStage.failed);
+    expect(failed.error, '看图模型服务请求失败，请检查服务或稍后重试');
+    expect(draft.readyCount, 0);
+    captionStatus = null;
+    await service.run(
+      draft: draft,
+      config: _llm,
+      imageConfig: _imageConfig,
+      isActive: () => true,
+      candidateId: failed.id,
+      reuseImageId: failed.edit.image!.value,
+    );
+    draft = service.readDraft('default')!;
+    expect(draft.readyCount, 1);
+    expect(draft.candidates.single.edit.image, failed.edit.image);
+    expect(planCalls, 1);
+    expect(imageCalls, 1);
+    expect(captionCalls, 2);
+    expect(imageClients, 1);
+  });
+
+  test('重试出题的图片缺失或已被替换时零请求失败，不新建图片', () async {
+    final expected = await images.importBytes(await pictureStoryPng());
+    final replacement =
+        await images.importBytes(await pictureStoryPng(width: 5));
+    for (final currentImage in [null, replacement]) {
+      final draft = await service.createDraft(
+        PictureStoryGenerationOptions(
+          level: PictureStoryLevel.starter,
+          count: 1,
+          themes: ['日常生活'],
+        ),
+      );
+      final candidate = PictureStoryGenerationCandidate(
+        edit: PictureStoryEditorDraft.create(
+          id: 'local-retry-missing-image',
+          profileId: draft.profileId,
+        ).copyWith(image: currentImage),
+        imagePrompt: '已有场景',
+        requestId: 'request-before-retry',
+        stage: PictureStoryGenerationStage.failed,
+      );
+      final saved = draft.copyWith([candidate]);
+      await HiveBoxes.settings.put(
+        PictureStoryGenerationService.keyFor(draft.profileId),
+        saved.encode(),
+      );
+      await expectLater(
+        service.run(
+          draft: saved,
+          config: _llm,
+          imageConfig: _imageConfig,
+          isActive: () => true,
+          candidateId: candidate.id,
+          reuseImageId: expected.value,
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            '图片归属检查',
+            '题图已变化，请重新打开草稿后重试出题',
+          ),
+        ),
+      );
+      expect(service.readDraft(draft.profileId)!.encode(), saved.encode());
+      expect(planCalls, 0);
+      expect(captionCalls, 0);
+      expect(imageCalls, 0);
+      expect(imageClients, 0);
+      await service.discardDraft(saved);
+    }
   });
 
   test('图片已返回时家长锁定，迟到结果只保存原草稿；重新验证后续做不重画', () async {

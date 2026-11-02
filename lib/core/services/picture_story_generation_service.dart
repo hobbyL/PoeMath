@@ -36,12 +36,12 @@ class PictureStoryGenerationEditSession {
 class _GenerationRun {
   _GenerationRun(this.llm, this.images);
   final LlmClient llm;
-  final ImageGenerationClient images;
+  final ImageGenerationClient? images;
   bool cancelled = false;
   void cancel() {
     cancelled = true;
     llm.close();
-    images.close();
+    images?.close();
   }
 }
 
@@ -180,6 +180,7 @@ class PictureStoryGenerationService {
     required bool Function() isActive,
     void Function()? onChanged,
     String? candidateId,
+    String? reuseImageId,
     bool regenerateImage = false,
     String? promptOverride,
   }) async {
@@ -188,6 +189,9 @@ class PictureStoryGenerationService {
     _checkScope(profile, revision);
     if (!isActive()) throw const ImageGenerationCancelled();
     if (isRunning(profile)) throw const FormatException('上一轮生成正在停止，请稍后重试');
+    if (reuseImageId != null && (candidateId == null || regenerateImage)) {
+      throw const FormatException('重试出题必须指定已有题图');
+    }
     if (![config, ...config.fallbacks].any((c) => c.supportsVision)) {
       throw const FormatException('请为看图说话出题配置支持看图的大模型');
     }
@@ -217,7 +221,10 @@ class PictureStoryGenerationService {
               ));
     }
 
-    run = _GenerationRun(_llmFactory(active), _imageFactory(active));
+    run = _GenerationRun(
+      _llmFactory(active),
+      reuseImageId == null ? _imageFactory(active) : null,
+    );
     _runs[profile] = run;
     void check() {
       if (!active()) throw const ImageGenerationCancelled();
@@ -230,6 +237,14 @@ class PictureStoryGenerationService {
     try {
       check();
       var saved = readDraft(profile)!;
+      if (reuseImageId != null) {
+        final target = saved.candidates
+            .where((candidate) => candidate.id == candidateId)
+            .firstOrNull;
+        if (target?.edit.image?.value != reuseImageId) {
+          throw const FormatException('题图已变化，请重新打开草稿后重试出题');
+        }
+      }
       if (saved.candidates.isEmpty) {
         final items = await _plan(saved, config, run.llm, planningPrompt);
         check();
@@ -279,7 +294,7 @@ class PictureStoryGenerationService {
             await _update(saved, item, expectedRequest: item.requestId);
             changed();
             check();
-            final bytes = await run.images.generate(
+            final bytes = await run.images!.generate(
               config: imageConfig,
               prompt: '为小学生看图说话绘制一幅清晰、温暖的儿童插画。'
                   '单张完整场景，人物动作和物体关系清楚，不拼图、不分镜、不加文字、水印或标志。'
@@ -635,6 +650,12 @@ class PictureStoryGenerationService {
         PictureStoryImageException() => error.message,
         LlmAuthError() => '大模型访问失败，请检查密钥和模型权限',
         LlmNetworkError() => '看图出题请求超时或网络不可用，可保留图片重试',
+        LlmServerError() => '看图模型服务请求失败，请检查服务或稍后重试',
+        LlmResponseFormatError(retryable: false) =>
+          '看图出题内容超出上传限制，请调整图片或补充要求后重试',
+        LlmResponseFormatError() ||
+        FormatException() =>
+          '看图出题内容不完整或格式不正确，可保留图片重试',
         _ => '看图出题未完成，可重试或编辑已生成的图片',
       };
 }

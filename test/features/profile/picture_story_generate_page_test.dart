@@ -1,13 +1,17 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/image_generation_client.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
+import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_generation_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
@@ -53,6 +57,7 @@ class _GenerationFlow extends PictureStoryGenerationService {
     required bool Function() isActive,
     void Function()? onChanged,
     String? candidateId,
+    String? reuseImageId,
     bool regenerateImage = false,
     String? promptOverride,
   }) async {
@@ -234,6 +239,141 @@ void main() {
       await drainHiveWritesForTesting(tester);
     });
   }
+
+  testWidgets('点击重试出题只读取当前图片，不调用生图或处理其他候选', (tester) async {
+    late PictureStoryImage image;
+    late List<int> stored;
+    late List<int> uploaded;
+    late PictureStoryGenerationCandidate first;
+    late PictureStoryGenerationCandidate other;
+    var imageClients = 0;
+    var imageRequests = 0;
+    final captions = <Map<String, dynamic>>[];
+    await tester.runAsync(() async {
+      image = await images.importBytes(await pictureStoryNoisePng());
+      stored = await images.readImage(image.value);
+      uploaded = await images.readForVision(image.value);
+      final settings = SettingsRepository();
+      await settings.saveImageGenerationConfig(
+        provider: const ImageGenerationProviderConfig(
+          name: '测试',
+          baseUrl: 'https://image.example.com/v1',
+          model: 'image',
+        ),
+        apiKey: '',
+      );
+      await settings.saveLlmProviderConfig(
+        id: 'vision',
+        name: '看图',
+        baseUrl: 'https://llm.example.com',
+        model: 'gpt-4o-mini',
+        apiKey: '',
+      );
+      service = PictureStoryGenerationService(
+        repository: repository,
+        images: images,
+        llmFactory: (active) => LlmClient(
+          isActive: active,
+          httpClient: MockClient((request) async {
+            captions.add(jsonDecode(request.body) as Map<String, dynamic>);
+            return http.Response.bytes(
+              utf8.encode(
+                jsonEncode({
+                  'choices': [
+                    {
+                      'message': {
+                        'content': jsonEncode({
+                          'title': '复用已有图片的题目',
+                          'questions': ['图中的孩子在做什么？'],
+                        }),
+                      },
+                    },
+                  ],
+                }),
+              ),
+              200,
+            );
+          }),
+        ),
+        imageFactory: (active) {
+          imageClients++;
+          return ImageGenerationClient(
+            isActive: active,
+            httpClient: MockClient((request) async {
+              imageRequests++;
+              throw StateError('重试出题不能调用生图服务');
+            }),
+          );
+        },
+      );
+      final draft = await service.createDraft(
+        PictureStoryGenerationOptions(
+          level: PictureStoryLevel.starter,
+          count: 2,
+          themes: ['日常生活'],
+        ),
+      );
+      first = PictureStoryGenerationCandidate(
+        edit: PictureStoryEditorDraft.create(
+          id: 'local-retry-first',
+          profileId: draft.profileId,
+        ).copyWith(image: image),
+        imagePrompt: '已有图片的场景',
+        requestId: 'request-first',
+        stage: PictureStoryGenerationStage.failed,
+        error: '看图出题未完成',
+      );
+      other = PictureStoryGenerationCandidate(
+        edit: PictureStoryEditorDraft.create(
+          id: 'local-retry-other',
+          profileId: draft.profileId,
+        ),
+        imagePrompt: '尚未生成图片的其他场景',
+        requestId: 'request-other',
+      );
+      await HiveBoxes.settings.put(
+        PictureStoryGenerationService.keyFor(draft.profileId),
+        draft.copyWith([first, other]).encode(),
+      );
+    });
+    await mount(tester);
+    final retry = find.descendant(
+      of: find.byKey(ValueKey(first.id)),
+      matching: find.text('重试出题'),
+    );
+    await tester.scrollUntilVisible(
+      retry,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => tester.tap(retry));
+    final readyButton = find.widgetWithText(FilledButton, '确认入库（1 道）');
+    await _until(
+      tester,
+      () =>
+          service.readDraft('default')?.readyCount == 1 &&
+          readyButton.evaluate().isNotEmpty &&
+          tester.widget<FilledButton>(readyButton).onPressed != null,
+    );
+    expect(imageClients, 0);
+    expect(imageRequests, 0);
+    expect(captions, hasLength(1));
+    final parts =
+        ((captions.single['messages'] as List).last as Map)['content'] as List;
+    final url = ((parts.last as Map)['image_url'] as Map)['url'];
+    expect(url, 'data:image/png;base64,${base64Encode(uploaded)}');
+    final saved = service.readDraft('default')!;
+    expect(saved.candidates.first.id, first.id);
+    expect(saved.candidates.first.edit.image, image);
+    expect(saved.candidates.first.edit.toPrompt().title, '复用已有图片的题目');
+    expect(saved.candidates.last.toJson(), other.toJson());
+    expect(await tester.runAsync(() => images.readImage(image.value)), stored);
+    expect(repository.catalogState().versions, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await drainHiveWritesForTesting(tester);
+  });
 
   testWidgets('使用自定义提示词生成、编辑草稿、勾选后确认入库的真实页面链路', (tester) async {
     final png = await tester.runAsync(() => pictureStoryPng());

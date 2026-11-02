@@ -97,7 +97,11 @@ class _PictureStoryGeneratePageState
       ParentAccessService.instance.isUnlocked &&
       (ModalRoute.of(context)?.isCurrent ?? false);
 
-  Future<void> _generate({String? candidateId, bool regenerate = false}) async {
+  Future<void> _generate({
+    String? candidateId,
+    String? reuseImageId,
+    bool regenerate = false,
+  }) async {
     if (_busy || !_sameProfile) return;
     final token = ++_generation;
     setState(() {
@@ -140,6 +144,7 @@ class _PictureStoryGeneratePageState
         isActive: active,
         onChanged: _reload,
         candidateId: candidateId,
+        reuseImageId: reuseImageId,
         regenerateImage: regenerate,
         promptOverride: promptOverride,
       );
@@ -584,7 +589,10 @@ class _PictureStoryGeneratePageState
                       else
                         TextButton.icon(
                           onPressed: enabled
-                              ? () => _generate(candidateId: item.id)
+                              ? () => _generate(
+                                    candidateId: item.id,
+                                    reuseImageId: edit.image?.value,
+                                  )
                               : null,
                           icon: const Icon(Icons.refresh),
                           label: Text(

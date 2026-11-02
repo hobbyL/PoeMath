@@ -860,6 +860,7 @@ final class LlmClient {
           tools: tools,
           toolChoice: toolChoice,
           maxTokens: maxTokens,
+          requiresVision: requiresVision,
         ),
         // 工具探测并非最终回答，只有后续流完整成功才持久化。
         reportSuccess: false,
@@ -873,13 +874,18 @@ final class LlmClient {
     required List<Map<String, Object?>> tools,
     required String toolChoice,
     required int maxTokens,
+    required bool requiresVision,
   }) async {
     final base = normalizeBaseUrl(config.baseUrl);
     final body = jsonEncode(<String, Object?>{
       'model': config.model,
       'messages': <Map<String, Object?>>[
         {'role': 'system', 'content': systemPrompt},
-        for (final message in boundedChatContext(messages)) message.toJson(),
+        for (final message in boundedChatContext(
+          messages,
+          requiresVision: requiresVision,
+        ))
+          message.toJson(),
       ],
       'max_tokens': maxTokens,
       if (tools.isNotEmpty) ...<String, Object?>{
@@ -1084,8 +1090,14 @@ final class LlmClient {
   }
 
   /// Keep whole user turns, including their tool calls/results, within a finite budget.
-  static List<ChatMessage> boundedChatContext(List<ChatMessage> messages) {
-    const maxBytes = 256 * 1024;
+  /// 视觉上下文需容纳 512 KiB 图片的 Base64 数据，完整请求仍限制为 1 MiB。
+  static List<ChatMessage> boundedChatContext(
+    List<ChatMessage> messages, {
+    bool requiresVision = false,
+  }) {
+    const maxTextBytes = 256 * 1024;
+    const maxVisionBytes = 768 * 1024;
+    final maxBytes = requiresVision ? maxVisionBytes : maxTextBytes;
     const maxMessages = 100;
     if (messages.isEmpty) return const [];
     final starts = <int>[

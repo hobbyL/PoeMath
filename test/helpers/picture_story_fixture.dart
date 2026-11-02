@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -39,5 +41,37 @@ Future<Uint8List> pictureStoryPng({int width = 4, int height = 3}) async {
   } finally {
     image.dispose();
     picture.dispose();
+  }
+}
+
+/// 固定随机种子的复杂 PNG，验证真实图像压缩和视觉请求的字节预算。
+Future<Uint8List> pictureStoryNoisePng({
+  int width = 1024,
+  int height = 768,
+}) async {
+  final pixels = Uint8List(width * height * 4);
+  final random = Random(42);
+  for (var i = 0; i < pixels.length; i += 4) {
+    pixels[i] = random.nextInt(256);
+    pixels[i + 1] = random.nextInt(256);
+    pixels[i + 2] = random.nextInt(256);
+    pixels[i + 3] = 255;
+  }
+  final ready = Completer<ui.Image>();
+  ui.decodeImageFromPixels(
+    pixels,
+    width,
+    height,
+    ui.PixelFormat.rgba8888,
+    ready.complete,
+  );
+  final image = await ready.future;
+  try {
+    final data = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+    return Uint8List.fromList(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+    );
+  } finally {
+    image.dispose();
   }
 }
