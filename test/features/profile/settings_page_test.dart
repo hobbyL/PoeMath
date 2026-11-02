@@ -111,7 +111,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('学习背景'), findsOneWidget);
     expect(find.text('看图说话题库'), findsOneWidget);
-    expect(find.text('管理内置题目与启用状态'), findsOneWidget);
+    expect(find.text('管理题目与启用状态'), findsOneWidget);
     expect(find.text('练习设置'), findsOneWidget);
     expect(find.text('书籍管理'), findsOneWidget);
     expect(find.text('拼音显示'), findsNothing);

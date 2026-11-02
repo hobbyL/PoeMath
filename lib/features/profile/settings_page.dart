@@ -198,7 +198,7 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.image_outlined,
                 iconColor: theme.colorScheme.secondary,
                 title: '看图说话题库',
-                subtitle: '管理内置题目与启用状态',
+                subtitle: '管理题目与启用状态',
                 onTap: () => context.push(AppRoutes.pictureStoryManagement),
               ),
               const SizedBox(height: SpacingTokens.md),

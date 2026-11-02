@@ -14,6 +14,7 @@ import 'package:poemath/data/models/picture_story_prompt.dart';
 
 export 'package:poemath/data/models/picture_story_prompt.dart';
 
+/// 旧版内置题仅用于还原练习历史，不再加入可选题库。
 class PictureStoryCatalog {
   const PictureStoryCatalog._();
 
@@ -100,9 +101,8 @@ class PictureStoryRepository {
   }
 
   bool isEnabled(String promptId) =>
-      !catalogState().deletedIds.contains(promptId) &&
-      (_savedEnabledIds(ProfileScope.currentId) ??
-              PictureStoryCatalog.prompts.map((p) => p.id).toList())
+      findPrompt(promptId) != null &&
+      (_savedEnabledIds(ProfileScope.currentId) ?? const <String>[])
           .contains(promptId);
 
   Stream<BoxEvent> watchCatalog() => _settings.watch(key: catalogKey);
@@ -138,21 +138,16 @@ class PictureStoryRepository {
               .where((prompt) => prompt.id == id && prompt.version == version)
               .firstOrNull;
     }
-    if (local.isEmpty) return PictureStoryCatalog.find(id);
+    if (local.isEmpty) return null;
     return local.reduce((a, b) => a.version > b.version ? a : b);
   }
 
   List<PictureStoryPrompt> listPrompts({bool enabledOnly = false}) {
     final state = catalogState();
     final enabledIds = enabledOnly
-        ? (_savedEnabledIds(ProfileScope.currentId) ??
-                PictureStoryCatalog.prompts.map((prompt) => prompt.id).toList())
-            .toSet()
+        ? (_savedEnabledIds(ProfileScope.currentId) ?? const <String>[]).toSet()
         : null;
-    final ids = <String>{
-      ...PictureStoryCatalog.prompts.map((prompt) => prompt.id),
-      ...state.versions.map((prompt) => prompt.id),
-    };
+    final ids = state.versions.map((prompt) => prompt.id).toSet();
     return ids
         .where((id) => !state.deletedIds.contains(id))
         .map((id) => _findPrompt(state, id)!)
@@ -168,8 +163,7 @@ class PictureStoryRepository {
       if (findPrompt(promptId) == null) {
         throw ArgumentError.value(promptId, 'promptId', '看图说话题目不存在');
       }
-      final ids = _savedEnabledIds(profileId) ??
-          PictureStoryCatalog.prompts.map((prompt) => prompt.id).toList();
+      final ids = _savedEnabledIds(profileId) ?? <String>[];
       if (enabled) {
         if (!ids.contains(promptId)) ids.add(promptId);
       } else {
@@ -206,9 +200,6 @@ class PictureStoryRepository {
 
         final saved = candidate.copyWith(version: (current?.version ?? 0) + 1);
         final versions = [...state.versions];
-        if (current != null && !versions.any((item) => item.id == current.id)) {
-          versions.add(current.copyWith());
-        }
         versions.add(saved);
         final merged = PictureStoryCatalogState(
           versions,
@@ -221,8 +212,7 @@ class PictureStoryRepository {
           catalogKey: jsonEncode(merged.toJson()),
         };
         if (original == null && enableForProfile) {
-          final ids = _savedEnabledIds(profileId) ??
-              PictureStoryCatalog.prompts.map((item) => item.id).toList();
+          final ids = _savedEnabledIds(profileId) ?? <String>[];
           if (!ids.contains(saved.id)) ids.add(saved.id);
           values[enabledKeyFor(profileId)] = jsonEncode(ids);
         }
@@ -247,9 +237,6 @@ class PictureStoryRepository {
           throw const FormatException('题目不存在或已更新，请重新打开题库后再删除');
         }
         final versions = [...state.versions];
-        if (!versions.any((item) => item.id == current.id)) {
-          versions.add(current.copyWith());
-        }
         final merged = PictureStoryCatalogState(
           versions,
           deletedIds: {...state.deletedIds, current.id},
@@ -313,8 +300,6 @@ class PictureStoryRepository {
       );
       final ids = <String>{
         ...?_savedEnabledIds(profileId),
-        if (_savedEnabledIds(profileId) == null)
-          ...PictureStoryCatalog.prompts.map((p) => p.id),
         ...saved.map((p) => p.id),
       }.toList();
       final enabled = {...enabledByProfile(), profileId: ids};
@@ -382,7 +367,7 @@ class PictureStoryRepository {
                 _savedEnabledIds(
                       key.substring(0, key.length - enabledSuffix.length),
                     ) ??
-                    PictureStoryCatalog.prompts.map((item) => item.id).toList(),
+                    <String>[],
       };
 
   Map<String, Object?> storageSnapshot() => {

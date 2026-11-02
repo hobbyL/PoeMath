@@ -68,10 +68,10 @@ class _Repository extends PictureStoryRepository {
 }
 
 class _Editor extends PictureStoryEditorService {
-  _Editor(
-      {required PictureStoryImageService super.images,
-      super.pickPath,})
-      : super(supportsLostData: false);
+  _Editor({
+    required PictureStoryImageService super.images,
+    super.pickPath,
+  }) : super(supportsLostData: false);
   Future<void>? lastPick;
   Future<void>? lastDiscard;
   @override
@@ -113,6 +113,7 @@ void main() {
   late PictureStoryImageService images;
   late _Repository repository;
   late _Editor editor;
+  late File pickedFile;
 
   setUp(() async {
     ProfileScope.reset();
@@ -122,7 +123,9 @@ void main() {
         await Directory.systemTemp.createTemp('picture_story_editor_ui_');
     images = PictureStoryImageService(directoryProvider: () async => directory);
     repository = _Repository(images: images);
-    editor = _Editor(images: images, pickPath: (_) async => null);
+    pickedFile = File('${directory.path}/chosen.png');
+    await pickedFile.writeAsBytes(await pictureStoryPng(width: 11, height: 7));
+    editor = _Editor(images: images, pickPath: (_) async => pickedFile.path);
   });
   tearDown(() async {
     lockParentForTesting();
@@ -219,17 +222,40 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> useBuiltin(WidgetTester tester, String title) async {
-    await tapVisible(tester, find.text('使用内置插图'));
-    expect(find.text('选择内置插图'), findsOneWidget);
-    await tapVisible(tester, find.text(title));
+  Future<PictureStoryPrompt> seedPrompt(WidgetTester tester) async =>
+      (await tester.runAsync(
+        () => PictureStoryRepository(images: images).savePrompt(
+          prompt: pictureStoryFixture()
+              .copyWith(level: PictureStoryLevel.storyteller),
+          profileId: 'default',
+        ),
+      ))!;
+
+  Future<void> chooseFile(WidgetTester tester) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    final control = find.text('从文件选择');
+    await tester.ensureVisible(control);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => tester.tap(control));
+    for (var i = 0; i < 100; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+      if (!editor.isPicking && find.byType(Image).evaluate().isNotEmpty) break;
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+    expect(editor.isPicking, isFalse);
+    expect(find.byType(Image), findsOneWidget);
+    expect(editor.readDraft()!.image!.isLocal, isTrue);
+    expect(tester.takeException(), isNull);
   }
 
   Future<void> finishSave(WidgetTester tester) async {
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pump();
     await tester.runAsync(() async {
-      await tester.tap(find.text('保存题目'));
+      await tester.tap(find.byTooltip('保存题目'));
       await repository.lastSave!.timeout(const Duration(seconds: 5));
       await editor.lastDiscard!.timeout(const Duration(seconds: 5));
     });
@@ -238,10 +264,30 @@ void main() {
 
   testWidgets('真实路由新增题目：必填校验、选图、保存详情和数量即时刷新', (tester) async {
     final (router, container) = await pumpFlow(tester);
+    expect(find.byType(AppTile), findsNothing);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
     await tester.tap(find.byTooltip('新增题目'));
     await tester.pumpAndSettle();
     expect(find.byType(PictureStoryEditorPage), findsOneWidget);
-    await tester.tap(find.text('保存题目'));
+    expect(find.text('使用内置插图'), findsNothing);
+    expect(find.text('难度'), findsNothing);
+    expect(
+      find.byType(DropdownButtonFormField<PictureStoryLevel>),
+      findsNothing,
+    );
+    expect(find.text('保存题目'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byTooltip('保存题目'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold).last).bottomNavigationBar,
+      isNull,
+    );
+    await tester.tap(find.byTooltip('保存题目'));
     await tester.pumpAndSettle();
     expect(repository.saveCalls, 0);
     expect(find.text('请填写题目标题'), findsOneWidget);
@@ -249,7 +295,8 @@ void main() {
     expect(find.text('请选择题目图片'), findsOneWidget);
     await enter(tester, 'title', '窗前的小猫');
     await enter(tester, 'questions', '小猫在哪里？\n它看到了什么？');
-    await useBuiltin(tester, '公园里的风筝');
+    await chooseFile(tester);
+    final selectedImage = editor.readDraft()!.image;
     await finishSave(tester);
     expect(find.byType(PictureStoryDetailPage), findsOneWidget);
     expect(find.text('窗前的小猫'), findsOneWidget);
@@ -261,8 +308,11 @@ void main() {
     expect(saved.sceneFacts, isEmpty);
     expect(saved.goals, isEmpty);
     expect(saved.reference, isEmpty);
-    expect(saved.image, const PictureStoryImage.builtin('kite'));
-    expect(container.read(pictureStoryPromptCountProvider), 4);
+    expect(saved.image, selectedImage);
+    expect(saved.image.isLocal, isTrue);
+    expect(saved.level, PictureStoryLevel.starter);
+    expect(container.read(pictureStoryPromptCountProvider), 1);
+    expect(repository.listPrompts().map((prompt) => prompt.id), [saved.id]);
     expect(
       HiveBoxes.settings.containsKey(PictureStoryEditorService.draftKey),
       isFalse,
@@ -274,31 +324,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('新增题可关闭当前孩子启用，其他孩子默认仍只有内置题', (tester) async {
+  testWidgets('新增题可关闭当前孩子启用，其他孩子默认无启用题目', (tester) async {
     final (_, container) =
         await pumpFlow(tester, location: AppRoutes.pictureStoryCreate);
     await enter(tester, 'title', '暂时不练习的新题');
     await enter(tester, 'questions', '图里有什么？');
-    await useBuiltin(tester, '雨天送伞');
+    await chooseFile(tester);
+    final selectedImage = editor.readDraft()!.image;
     await tapVisible(tester, find.byType(Switch));
     await finishSave(tester);
     final id = repository.lastCandidate!.id;
     expect(
       repository.findPrompt(id)!.image,
-      const PictureStoryImage.builtin('umbrella'),
+      selectedImage,
     );
     expect(repository.isEnabled(id), isFalse);
-    expect(container.read(pictureStoryPromptCountProvider), 3);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
     ProfileScope.switchTo('another-child');
     expect(repository.isEnabled(id), isFalse);
-    expect(repository.listPrompts().length, 4);
-    expect(container.read(pictureStoryPromptCountProvider), 3);
+    expect(repository.listPrompts().length, 1);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('卡片内容进入详情，开关独立启用；编辑保留旧版本和启用选择', (tester) async {
+    final original = await seedPrompt(tester);
     final (router, _) = await pumpFlow(tester);
-    final title = PictureStoryCatalog.prompts.first.title;
+    final title = original.title;
     final tile =
         find.ancestor(of: find.text(title), matching: find.byType(AppTile));
     final toggle = find.descendant(of: tile, matching: find.byType(Switch));
@@ -308,7 +360,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(find.byType(PictureStoryManagementPage), findsOneWidget);
-    expect(repository.isEnabled('kite-in-the-park'), isFalse);
+    expect(repository.isEnabled(original.id), isFalse);
     await tester.tap(find.text(title));
     await tester.pumpAndSettle();
     expect(find.byType(PictureStoryDetailPage), findsOneWidget);
@@ -319,12 +371,14 @@ void main() {
     await finishSave(tester);
     expect(find.byType(PictureStoryDetailPage), findsOneWidget);
     expect(find.text('风筝飞得很高'), findsOneWidget);
-    expect(repository.findPrompt('kite-in-the-park')!.version, 2);
+    expect(repository.findPrompt(original.id)!.version, 2);
+    expect(repository.findPrompt(original.id)!.level, original.level);
+    expect(repository.findPrompt(original.id)!.image, original.image);
     expect(
-      repository.findPrompt('kite-in-the-park', version: 1)!.toJson(),
-      PictureStoryCatalog.prompts.first.toJson(),
+      repository.findPrompt(original.id, version: 1)!.toJson(),
+      original.toJson(),
     );
-    expect(repository.isEnabled('kite-in-the-park'), isFalse);
+    expect(repository.isEnabled(original.id), isFalse);
     router.pop();
     await tester.pumpAndSettle();
     expect(find.text('风筝飞得很高'), findsOneWidget);
@@ -332,7 +386,8 @@ void main() {
   });
 
   testWidgets('取消编辑先确认，继续编辑保留文字，明确放弃后不改已保存题目', (tester) async {
-    final original = PictureStoryCatalog.prompts.first;
+    final original = await seedPrompt(tester);
+    final before = repository.storageSnapshot();
     await pumpFlow(tester, location: AppRoutes.pictureStoryEditOf(original.id));
     await enter(tester, 'title', '尚未发布的修改');
     await tester.runAsync(() => tester.tap(find.byTooltip('返回')));
@@ -356,7 +411,7 @@ void main() {
     expect(find.byType(PictureStoryManagementPage), findsOneWidget);
     expect(repository.findPrompt(original.id)!.toJson(), original.toJson());
     expect(repository.saveCalls, 0);
-    expect(repository.storageSnapshot(), isEmpty);
+    expect(repository.storageSnapshot(), before);
     expect(tester.takeException(), isNull);
   });
 
@@ -364,10 +419,10 @@ void main() {
     await pumpFlow(tester, location: AppRoutes.pictureStoryCreate);
     await enter(tester, 'title', '重试后保存的小猫');
     await enter(tester, 'questions', '小猫在做什么？');
-    await useBuiltin(tester, '一起收拾玩具');
+    await chooseFile(tester);
     repository.failNextSave = true;
     await tester.runAsync(() async {
-      await tester.tap(find.text('保存题目'));
+      await tester.tap(find.byTooltip('保存题目'));
       await expectLater(repository.lastSave!, throwsA(isA<HiveError>()));
     });
     await tester.pumpAndSettle();
@@ -385,17 +440,18 @@ void main() {
     );
     await tester.runAsync(() async {
       repository.saveGate = Completer<void>();
-      await tester.tap(find.text('保存题目'));
-      await tester.tap(find.text('保存题目'));
+      await tester.tap(find.byTooltip('保存题目'));
+      await tester.tap(find.byTooltip('保存题目'));
       expect(repository.saveCalls, 2);
       repository.saveGate!.complete();
       await repository.lastSave!.timeout(const Duration(seconds: 5));
+      await editor.lastDiscard!.timeout(const Duration(seconds: 5));
     });
     await tester.pumpAndSettle();
     expect(find.byType(PictureStoryDetailPage), findsOneWidget);
     expect(repository.lastCandidate!.id, id);
     expect(repository.findPrompt(id)!.version, 1);
-    expect(repository.listPrompts().length, 4);
+    expect(repository.listPrompts().length, 1);
     expect(tester.takeException(), isNull);
   });
 
@@ -418,7 +474,7 @@ void main() {
     await tester.runAsync(() async {
       await source.writeAsBytes(await pictureStoryPng(width: 11, height: 7));
     });
-    final original = PictureStoryCatalog.prompts.first;
+    final original = await seedPrompt(tester);
     final (_, container) = await pumpFlow(
       tester,
       location: AppRoutes.pictureStoryEditOf(original.id),
@@ -485,7 +541,7 @@ void main() {
     const Size(1100, 1000),
   ]) {
     testWidgets('大字号编辑长内容可滚动且无溢出 ${size.width}', (tester) async {
-      final original = PictureStoryCatalog.prompts.first;
+      final original = await seedPrompt(tester);
       final edited = original.copyWith(
         title: List.filled(10, '风筝和小狗的故事').join(),
         questions: [List.filled(30, '小狗和孩子正在做什么？').join()],
@@ -513,7 +569,9 @@ void main() {
         edited.reference,
       );
       expect(tester.getRect(reference).width, greaterThan(0));
-      expect(find.text('保存题目'), findsOneWidget);
+      expect(find.byTooltip('保存题目'), findsOneWidget);
+      expect(find.text('难度'), findsNothing);
+      expect(find.text('使用内置插图'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -524,7 +582,7 @@ void main() {
       location: AppRoutes.pictureStoryEditOf('missing-prompt'),
     );
     expect(find.text('题目不存在，请返回题库选择其他题目。'), findsOneWidget);
-    expect(find.text('保存题目'), findsNothing);
+    expect(find.byTooltip('保存题目'), findsNothing);
     expect(repository.storageSnapshot(), isEmpty);
     expect(HiveBoxes.pictureStoryPractice.isEmpty, isTrue);
     expect(tester.takeException(), isNull);

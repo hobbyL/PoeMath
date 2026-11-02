@@ -12,6 +12,21 @@ import 'package:poemath/features/profile/picture_story_management_page.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
+import '../../helpers/picture_story_fixture.dart';
+
+final _prompts = [
+  pictureStoryFixture(id: 'local-fixture-0'),
+  pictureStoryFixture(
+    id: 'local-fixture-1',
+    title: '窗前的小鸟',
+    image: const PictureStoryImage.builtin('umbrella'),
+  ),
+  pictureStoryFixture(
+    id: 'local-fixture-2',
+    title: '一起整理房间',
+    image: const PictureStoryImage.builtin('toys'),
+  ),
+];
 
 class _TrackingPictureStoryRepository extends PictureStoryRepository {
   late Future<void> lastWrite;
@@ -27,7 +42,18 @@ Future<ProviderContainer> _pumpPage(
   Size size = const Size(420, 800),
   double textScale = 1,
   PictureStoryRepository? repository,
+  bool withPrompts = true,
 }) async {
+  if (withPrompts) {
+    await tester.runAsync(() async {
+      for (final prompt in _prompts) {
+        await PictureStoryRepository().savePrompt(
+          prompt: prompt,
+          profileId: 'default',
+        );
+      }
+    });
+  }
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -69,12 +95,12 @@ Finder _switchOf(String title) => find.descendant(
     );
 
 List<Rect> _promptRects(WidgetTester tester) => [
-      for (final prompt in PictureStoryCatalog.prompts)
+      for (final prompt in _prompts)
         tester.getRect(find.widgetWithText(AppTile, prompt.title)),
     ];
 
 void _verifyPromptLayout(WidgetTester tester) {
-  for (final prompt in PictureStoryCatalog.prompts) {
+  for (final prompt in _prompts) {
     final row = find.widgetWithText(AppTile, prompt.title);
     final illustration = find.descendant(
       of: row,
@@ -113,6 +139,17 @@ void main() {
   tearDown(() async {
     lockParentForTesting();
     await tearDownHiveForWidgetTesting();
+  });
+
+  testWidgets('初始题库为空且可新增或AI出题，不展示内置题目', (tester) async {
+    final container = await _pumpPage(tester, withPrompts: false);
+    expect(find.byType(AppTile), findsNothing);
+    expect(find.text('题库里还没有题目，点击右上角「新增题目」添加。'), findsOneWidget);
+    expect(find.byTooltip('新增题目'), findsOneWidget);
+    expect(find.byTooltip('AI 出题'), findsOneWidget);
+    expect(container.read(pictureStoryCatalogProvider), isEmpty);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('题库插图应贴住卡片左侧并铺满高度，开关居中', (tester) async {
@@ -182,8 +219,8 @@ void main() {
       size: const Size(900, 700),
       repository: repository,
     );
-    const title = '公园里的风筝';
-    const promptId = 'kite-in-the-park';
+    const title = '窗前的小猫';
+    const promptId = 'local-fixture-0';
     final control = _switchOf(title);
 
     expect(tester.widget<Switch>(control).value, isTrue);

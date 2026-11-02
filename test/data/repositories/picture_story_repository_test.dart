@@ -97,6 +97,24 @@ void main() {
     );
   }
 
+  Future<PictureStoryPrompt> seedLegacyPrompt() async {
+    final prompt = PictureStoryCatalog.prompts.first;
+    final state = PictureStoryRepository().catalogState();
+    await HiveBoxes.settings.put(
+      PictureStoryRepository.catalogKey,
+      jsonEncode(
+        PictureStoryCatalogState(
+          [
+            ...state.versions,
+            prompt,
+          ],
+          deletedIds: state.deletedIds,
+        ).toJson(),
+      ),
+    );
+    return prompt;
+  }
+
   test('目录生产与解码共用累计版本上限，10000可读、10001拒绝', () {
     expect(PictureStoryCatalogState.maxVersions, 10000);
     final entries = versions(10000);
@@ -154,7 +172,7 @@ void main() {
     await HiveBoxes.init();
     repository = PictureStoryRepository();
     expect(repository.findPrompt('local-fixture')!.version, 10000);
-    expect(repository.listPrompts().length, 4);
+    expect(repository.listPrompts().length, 1);
   });
 
   test('满容量拒绝新增，目录、两档案选择、历史版本和实际图片完整保留', () async {
@@ -207,11 +225,11 @@ void main() {
     expect(await source.exists(), isTrue);
   });
 
-  test('首次编辑内置题把补入的v1计入容量，9999拒绝、9998可发布v2', () async {
+  test('已移除内置题不能从旧表单重新发布，不补入版本或启用选择', () async {
     await seedVersions(9999);
     final settings = _PartialWriteBox(HiveBoxes.settings, failNext: false);
     final repository = PictureStoryRepository(settings: settings);
-    final original = repository.findPrompt('kite-in-the-park')!;
+    final original = PictureStoryCatalog.prompts.first;
     final before = repository.storageSnapshot();
     await expectLater(
       repository.savePrompt(
@@ -223,15 +241,11 @@ void main() {
     );
     expect(settings.writes, 0);
     expect(repository.storageSnapshot(), before);
-    expect(repository.findPrompt(original.id)!.toJson(), original.toJson());
-    await seedVersions(9998);
-    final saved = await repository.savePrompt(
-      prompt: original.copyWith(title: '内置题修改'),
-      original: original,
-      profileId: 'default',
+    expect(repository.findPrompt(original.id), isNull);
+    expect(
+      repository.listPrompts().map((prompt) => prompt.id),
+      ['local-fixture'],
     );
-    expect(saved.version, 2);
-    expect(repository.catalogState().versions.length, 10000);
     expect(
       repository.findPrompt(original.id, version: 1)!.toJson(),
       original.toJson(),
@@ -280,13 +294,30 @@ void main() {
     expect(reopened.segments, isEmpty);
   });
 
-  test('旧安装默认启用三道内置题，读取不创建共享目录', () {
+  test('新旧安装均不自动展示或启用内置题，原版仅供历史精确读取', () async {
     final repository = PictureStoryRepository();
-    expect(
-      repository.listPrompts().map((p) => p.toJson()),
-      PictureStoryCatalog.prompts.map((p) => p.toJson()),
+    expect(repository.listPrompts(), isEmpty);
+    expect(repository.listPrompts(enabledOnly: true), isEmpty);
+    await HiveBoxes.settings.put(
+      PictureStoryRepository.enabledKeyFor('default'),
+      jsonEncode(
+        PictureStoryCatalog.prompts.map((prompt) => prompt.id).toList(),
+      ),
     );
-    expect(repository.listPrompts(enabledOnly: true).length, 3);
+    expect(repository.listPrompts(enabledOnly: true), isEmpty);
+    for (final prompt in PictureStoryCatalog.prompts) {
+      expect(repository.findPrompt(prompt.id), isNull);
+      expect(repository.isEnabled(prompt.id), isFalse);
+      expect(
+        repository.findPrompt(prompt.id, version: 1)!.toJson(),
+        prompt.toJson(),
+      );
+      expect(repository.findPrompt(prompt.id, version: 2), isNull);
+      await expectLater(
+        repository.setEnabled(prompt.id, true),
+        throwsArgumentError,
+      );
+    }
     expect(
       HiveBoxes.settings.containsKey(PictureStoryRepository.catalogKey),
       isFalse,
@@ -331,14 +362,14 @@ void main() {
     );
   });
 
-  test('删除内置题移出全部档案题库，重开仍可读取原版', () async {
+  test('删除旧备份中保存的题目后各档案为空，重开仍可读取原版', () async {
     var repository = PictureStoryRepository();
-    final original = PictureStoryCatalog.prompts.first;
+    final original = await seedLegacyPrompt();
     await repository.deletePrompt(prompt: original, profileId: 'default');
     expect(repository.findPrompt(original.id), isNull);
     expect(repository.isEnabled(original.id), isFalse);
-    expect(repository.listPrompts().length, 2);
-    expect(repository.listPrompts(enabledOnly: true).length, 2);
+    expect(repository.listPrompts(), isEmpty);
+    expect(repository.listPrompts(enabledOnly: true), isEmpty);
     expect(
       repository.catalogState().versions.single.toJson(),
       original.toJson(),
@@ -351,7 +382,7 @@ void main() {
     );
     ProfileScope.switchTo('child-b');
     expect(repository.isEnabled(original.id), isFalse);
-    expect(repository.listPrompts(enabledOnly: true).length, 2);
+    expect(repository.listPrompts(enabledOnly: true), isEmpty);
     await expectLater(
       repository.setEnabled(original.id, true),
       throwsArgumentError,
@@ -461,7 +492,7 @@ void main() {
       prompt: pictureStoryFixture(id: 'local-next'),
       profileId: 'default',
     );
-    final builtin = PictureStoryCatalog.prompts.first;
+    final builtin = await seedLegacyPrompt();
     await repository.savePrompt(
       prompt: builtin.copyWith(title: '改另一题'),
       original: builtin,
@@ -471,10 +502,10 @@ void main() {
     expect(repository.catalogState().deletedIds, {first.id});
   });
 
-  for (final hasCatalog in [false, true]) {
-    test('删除部分写入失败补偿原目录和键缺失，重试可成功（原目录=$hasCatalog）', () async {
-      final original = PictureStoryCatalog.prompts.first;
-      final prompt = hasCatalog
+  for (final edited in [false, true]) {
+    test('删除部分写入失败补偿已存目录和选择键缺失，重试可成功（已编辑=$edited）', () async {
+      final original = await seedLegacyPrompt();
+      final prompt = edited
           ? await PictureStoryRepository().savePrompt(
               prompt: original.copyWith(title: '已编辑的题目'),
               original: original,
@@ -545,14 +576,14 @@ void main() {
     );
     final versionProvider =
         pictureStoryPromptVersionProvider((id: prompt.id, version: 1));
-    expect(container.read(pictureStoryPromptCountProvider), 4);
+    expect(container.read(pictureStoryPromptCountProvider), 1);
     expect(
       container.read(pictureStoryPromptByIdProvider(prompt.id)),
       isNotNull,
     );
     expect(container.read(versionProvider)!.toJson(), prompt.toJson());
     await repository.deletePrompt(prompt: prompt, profileId: 'default');
-    expect(container.read(pictureStoryPromptCountProvider), 3);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
     expect(
       container
           .read(pictureStoryCatalogProvider)
@@ -563,7 +594,7 @@ void main() {
     expect(container.read(versionProvider)!.toJson(), prompt.toJson());
   });
 
-  test('满容量删除已有题目保留全部历史，内置原版补入超限不会挤掉历史', () async {
+  test('满容量删除已有题目保留全部历史，旧内置题不重新进入目录', () async {
     await seedVersions(PictureStoryCatalogState.maxVersions);
     final repository = PictureStoryRepository();
     final prompt = repository.findPrompt('local-fixture')!;
@@ -585,7 +616,7 @@ void main() {
     expect(repository.storageSnapshot(), before);
     expect(
       repository.findPrompt(PictureStoryCatalog.prompts.first.id),
-      isNotNull,
+      isNull,
     );
     expect(repository.findPrompt(prompt.id, version: 1), isNotNull);
   });
@@ -613,7 +644,7 @@ void main() {
     expect(repository.isEnabled(saved.id), isTrue);
   });
 
-  test('新增可保持停用，编辑内置题保留原版和练习版本', () async {
+  test('新增可保持停用，编辑旧备份已保存题目保留原版和练习版本', () async {
     final repository = PictureStoryRepository();
     await repository.savePrompt(
       prompt: pictureStoryFixture(),
@@ -621,7 +652,7 @@ void main() {
       enableForProfile: false,
     );
     expect(repository.isEnabled('local-fixture'), isFalse);
-    final original = repository.findPrompt('kite-in-the-park')!;
+    final original = await seedLegacyPrompt();
     final record = PictureStoryPracticeRecord(
       id: 'completed-v1',
       profileId: ProfileScope.currentId,
@@ -665,7 +696,7 @@ void main() {
 
   test('旧表单不能覆盖新版，失败仍可继续进行下一次合法编辑', () async {
     final repository = PictureStoryRepository();
-    final v1 = repository.findPrompt('kite-in-the-park')!;
+    final v1 = await seedLegacyPrompt();
     final v2 = await repository.savePrompt(
       prompt: v1.copyWith(title: '新标题'),
       original: v1,
@@ -758,7 +789,7 @@ void main() {
   test('目录和启用 Provider 随仓储写入、版本及档案变化刷新', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
-    expect(container.read(pictureStoryPromptCountProvider), 3);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
     final saved =
         await container.read(pictureStoryRepositoryProvider).savePrompt(
               prompt: pictureStoryFixture(),
@@ -768,7 +799,7 @@ void main() {
       container.read(pictureStoryCatalogProvider).last.toJson(),
       saved.toJson(),
     );
-    expect(container.read(pictureStoryPromptCountProvider), 4);
+    expect(container.read(pictureStoryPromptCountProvider), 1);
     final updated =
         await container.read(pictureStoryRepositoryProvider).savePrompt(
               prompt: saved.copyWith(title: '新的观察题'),
@@ -780,7 +811,7 @@ void main() {
       updated.toJson(),
     );
     ProfileScope.switchTo('child-b');
-    expect(container.read(pictureStoryPromptCountProvider), 3);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
     expect(
       container.read(pictureStoryCatalogProvider).last.toJson(),
       updated.toJson(),

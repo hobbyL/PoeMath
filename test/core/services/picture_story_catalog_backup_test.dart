@@ -102,6 +102,15 @@ void main() {
       profileId: 'default',
     );
     final builtin = PictureStoryCatalog.prompts.first;
+    await HiveBoxes.settings.put(
+      PictureStoryRepository.catalogKey,
+      jsonEncode(
+        PictureStoryCatalogState([
+          ...repository.catalogState().versions,
+          builtin,
+        ]).toJson(),
+      ),
+    );
     await repository.savePrompt(
       prompt: builtin.copyWith(title: '我们一起放风筝', image: firstImage),
       original: builtin,
@@ -111,7 +120,7 @@ void main() {
     await repository.setEnabled(first.id, true);
     ProfileScope.switchTo('child-b');
     await repository.setEnabled(first.id, true);
-    await repository.setEnabled('rainy-day-umbrella', false);
+    await repository.setEnabled(builtin.id, false);
     ProfileScope.reset();
     return backup().exportToJson();
   }
@@ -157,7 +166,11 @@ void main() {
     ProfileScope.switchTo('child-a');
     expect(reopened.isEnabled('local-fixture'), isTrue);
     ProfileScope.switchTo('child-b');
-    expect(reopened.isEnabled('rainy-day-umbrella'), isFalse);
+    expect(reopened.isEnabled('kite-in-the-park'), isFalse);
+    expect(
+      reopened.listPrompts().map((prompt) => prompt.id),
+      ['local-fixture', 'kite-in-the-park'],
+    );
   });
 
   test('已删除题目及历史图片在真实备份和新目录恢复后仍保留删除状态', () async {
@@ -197,7 +210,7 @@ void main() {
     await HiveBoxes.init();
     final reopened = PictureStoryRepository(images: targetImages);
     expect(reopened.catalogState().toJson(), catalog);
-    expect(reopened.listPrompts().length, 2);
+    expect(reopened.listPrompts(), isEmpty);
     for (final id in ['local-fixture', 'kite-in-the-park']) {
       expect(reopened.findPrompt(id), isNull);
       expect(reopened.findPrompt(id, version: 1), isNotNull);
@@ -214,8 +227,14 @@ void main() {
     }
   });
 
-  test('全部内置题删除后加密恢复仍为空，缺题库段的旧备份不撤销删除', () async {
+  test('旧备份保存的题目全部删除后加密恢复仍为空，缺题库段不撤销删除', () async {
     final repository = PictureStoryRepository(images: images);
+    await HiveBoxes.settings.put(
+      PictureStoryRepository.catalogKey,
+      jsonEncode(
+        PictureStoryCatalogState(PictureStoryCatalog.prompts).toJson(),
+      ),
+    );
     for (final prompt in PictureStoryCatalog.prompts) {
       await repository.deletePrompt(prompt: prompt, profileId: 'default');
     }
@@ -327,7 +346,7 @@ void main() {
     expect(calls, 0);
   });
 
-  test('显式空题库段恢复内置默认，已保存图片与本机临时表单保留', () async {
+  test('显式空题库段恢复为空，已保存图片与本机临时表单保留', () async {
     await populatedBackup();
     final repository = PictureStoryRepository(images: images);
     final id = repository.catalogState().imageIds.first;
@@ -346,11 +365,8 @@ void main() {
       }),
     );
     expect(repository.storageSnapshot(), isEmpty);
-    expect(
-      repository.listPrompts().map((prompt) => prompt.toJson()).toList(),
-      PictureStoryCatalog.prompts.map((prompt) => prompt.toJson()).toList(),
-    );
-    expect(repository.listPrompts(enabledOnly: true).length, 3);
+    expect(repository.listPrompts(), isEmpty);
+    expect(repository.listPrompts(enabledOnly: true), isEmpty);
     expect(await images.readImage(id), beforeBytes);
     expect(
       HiveBoxes.settings.get(PictureStoryEditorService.draftKey),
@@ -540,7 +556,7 @@ void main() {
       container.read(pictureStoryImageBytesProvider(id).future),
       throwsA(isA<PictureStoryImageException>()),
     );
-    expect(container.read(pictureStoryPromptCountProvider), 3);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
     await backup().restoreFromJson(
       jsonEncode({
         'version': 1,
@@ -564,6 +580,6 @@ void main() {
       await container.read(pictureStoryImageBytesProvider(id).future),
       bytes,
     );
-    expect(container.read(pictureStoryPromptCountProvider), 4);
+    expect(container.read(pictureStoryPromptCountProvider), 1);
   });
 }

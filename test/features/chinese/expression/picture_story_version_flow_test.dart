@@ -296,6 +296,45 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('旧内置题只用于历史，题库为空且旧练习入口不创建新草稿', (tester) async {
+    final prompt = PictureStoryCatalog.prompts.first;
+    await tester.runAsync(
+      () => repository.save(
+        PictureStoryPracticeRecord(
+          id: 'legacy-builtin-history',
+          profileId: 'default',
+          promptId: prompt.id,
+          promptVersion: prompt.version,
+          startedAt: DateTime(2026),
+          status: 'completed',
+          segmentsJson: '[]',
+          answerText: '风筝飞到了天空中。',
+        ),
+      ),
+    );
+    final container = await pumpPage(tester, const PictureStoryHistoryPage());
+    expect(container.read(pictureStoryCatalogProvider), isEmpty);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
+    expect(find.text(prompt.title), findsOneWidget);
+    expect(find.text(prompt.reference), findsOneWidget);
+    expect(find.text('风筝飞到了天空中。'), findsOneWidget);
+    expect(
+      tester
+          .widget<PictureStoryImageView>(find.byType(PictureStoryImageView))
+          .image,
+      prompt.image,
+    );
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+    await pumpPage(tester, PictureStoryPracticePage(promptId: prompt.id));
+    expect(find.text('题目不存在，请返回选择其他题目。'), findsOneWidget);
+    expect(HiveBoxes.pictureStoryPractice.length, 1);
+    expect(repository.find('legacy-builtin-history')!.answerText, '风筝飞到了天空中。');
+    expect(repository.storageSnapshot(), isEmpty);
+    expect(tester.takeException(), isNull);
+    await unmount(tester);
+  });
+
   testWidgets('不存在的练习入口显示可返回提示，不能创建没有题目的草稿', (tester) async {
     await pumpPage(
       tester,
@@ -321,7 +360,7 @@ void main() {
       size: const Size(320, 1000),
       textScale: 2,
     );
-    expect(container.read(pictureStoryPromptCountProvider), 4);
+    expect(container.read(pictureStoryPromptCountProvider), 1);
     await tester.scrollUntilVisible(find.text(title), 300);
     expect(find.text(title), findsOneWidget);
     expect(tester.takeException(), isNull);

@@ -171,48 +171,6 @@ class _PictureStoryEditorPageState
     }
   }
 
-  Future<void> _chooseBuiltin() async {
-    if (_busy) return;
-    final image = await showModalBottomSheet<PictureStoryImage>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(SpacingTokens.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('选择内置插图', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: SpacingTokens.md),
-              for (final prompt in PictureStoryCatalog.prompts)
-                AppTile(
-                  flat: true,
-                  iconColor: Theme.of(context).colorScheme.primary,
-                  leading: SizedBox(
-                    width: SpacingTokens.xxl + SpacingTokens.md,
-                    child: PictureStoryImageView(
-                      image: prompt.image,
-                      preview: true,
-                    ),
-                  ),
-                  title: prompt.title,
-                  subtitle: '',
-                  onTap: () => Navigator.pop(context, prompt.image),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (!mounted || image == null) return;
-    setState(() {
-      _draft = _currentDraft().copyWith(image: image, clearMessage: true);
-      _error = null;
-    });
-  }
-
   Future<void> _save() async {
     if (_busy || _draft == null) return;
     setState(() => _submitted = true);
@@ -345,6 +303,19 @@ class _PictureStoryEditorPageState
             icon: const BackButtonIcon(),
             onPressed: _busy ? null : _requestExit,
           ),
+          actions: [
+            if (draft != null && !profileChanged)
+              IconButton(
+                tooltip: _saving ? '正在保存…' : '保存题目',
+                onPressed: _busy ? null : _save,
+                icon: _saving
+                    ? const SizedBox.square(
+                        dimension: SpacingTokens.lg,
+                        child: CircularProgressIndicator(),
+                      )
+                    : const Icon(Icons.save_outlined),
+              ),
+          ],
         ),
         body: draft == null || profileChanged
             ? PictureStoryUnavailableView(
@@ -431,17 +402,6 @@ class _PictureStoryEditorPageState
                   ),
                 ),
               ),
-        bottomNavigationBar: draft == null || profileChanged
-            ? null
-            : SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(SpacingTokens.md),
-                  child: FilledButton(
-                    onPressed: _busy ? null : _save,
-                    child: Text(_saving ? '正在保存…' : '保存题目'),
-                  ),
-                ),
-              ),
       ),
     );
   }
@@ -463,14 +423,6 @@ class _PictureStoryEditorPageState
               const SizedBox(height: SpacingTokens.sm),
               const Text('正在获取图片，返回后可继续编辑。'),
             ],
-            AppTile(
-              flat: true,
-              iconColor: theme.colorScheme.primary,
-              icon: Icons.draw_outlined,
-              title: '使用内置插图',
-              subtitle: '',
-              onTap: _busy ? null : _chooseBuiltin,
-            ),
             if (_editor.supportsGallery)
               AppTile(
                 flat: true,
@@ -521,25 +473,6 @@ class _PictureStoryEditorPageState
             Text('基本信息', style: theme.textTheme.titleMedium),
             const SizedBox(height: SpacingTokens.md),
             _field(PictureStoryEditorField.title),
-            const SizedBox(height: SpacingTokens.md),
-            DropdownButtonFormField<PictureStoryLevel>(
-              initialValue: draft.level,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: '难度'),
-              items: [
-                for (final level in PictureStoryLevel.values)
-                  DropdownMenuItem(value: level, child: Text(level.label)),
-              ],
-              onChanged: _busy
-                  ? null
-                  : (level) {
-                      if (level != null) {
-                        setState(
-                          () => _draft = _currentDraft().copyWith(level: level),
-                        );
-                      }
-                    },
-            ),
             const SizedBox(height: SpacingTokens.md),
             _field(PictureStoryEditorField.theme),
             if (draft.original == null) ...[

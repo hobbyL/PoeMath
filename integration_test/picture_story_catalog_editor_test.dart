@@ -30,6 +30,7 @@ import 'package:poemath/features/profile/picture_story_editor_page.dart';
 import 'package:poemath/features/profile/picture_story_management_page.dart';
 
 import '../test/helpers/hive_test_helper.dart';
+import '../test/helpers/parent_access_test_helper.dart';
 import '../test/helpers/picture_story_fixture.dart';
 
 class _Access extends ParentAccessService {
@@ -102,6 +103,7 @@ void main() {
     );
     ProfileScope.reset();
     await setUpHiveForTesting();
+    await unlockParentForTesting();
     directory = await Directory.systemTemp.createTemp('picture_story_native_');
     images = PictureStoryImageService(directoryProvider: () async => directory);
     access = _Access();
@@ -137,6 +139,7 @@ void main() {
     ],);
   });
   tearDown(() async {
+    lockParentForTesting();
     router.dispose();
     container.dispose();
     editor.dispose();
@@ -156,8 +159,19 @@ void main() {
                     subject: AppSubject.poem, brightness: Brightness.light,),
                 routerConfig: router,),),),);
     await tester.pumpAndSettle();
+    expect(repository.listPrompts(), isEmpty);
+    expect(container.read(pictureStoryPromptCountProvider), 0);
     await tester.tap(find.byTooltip('新增题目'));
     await tester.pumpAndSettle();
+    expect(find.text('使用内置插图'), findsNothing);
+    expect(find.text('难度'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byTooltip('保存题目'),
+      ),
+      findsOneWidget,
+    );
     for (final entry
         in {'title': '小猫的窗前故事', 'questions': '小猫在哪里？\n小猫看到了什么？'}.entries) {
       final field = find.byKey(ValueKey('picture-story-${entry.key}'));
@@ -202,7 +216,7 @@ void main() {
   }
 
   Future<void> saveAndVerify(WidgetTester tester) async {
-    await tester.tap(find.text('保存题目'));
+    await tester.tap(find.byTooltip('保存题目'));
     final saved =
         await repository.lastSave!.timeout(const Duration(seconds: 20));
     await editor.lastDiscard!.timeout(const Duration(seconds: 20));
@@ -210,6 +224,8 @@ void main() {
     expect(find.byType(PictureStoryDetailPage), findsOneWidget);
     expect(find.text(saved.title), findsOneWidget);
     expect(saved.image.isLocal, isTrue);
+    expect(repository.listPrompts().map((prompt) => prompt.id), [saved.id]);
+    expect(container.read(pictureStoryPromptCountProvider), 1);
     final bytes = await images.readImage(saved.image.value);
     final backup = BackupService(
         pictureStoryImages: images, pictureStoryRepository: repository,);

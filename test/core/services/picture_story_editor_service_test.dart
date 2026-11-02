@@ -274,7 +274,7 @@ void main() {
       await images.readImage(expected.value),
     );
     expect(PictureStoryRepository().storageSnapshot(), isEmpty);
-    expect(PictureStoryRepository().listPrompts().length, 3);
+    expect(PictureStoryRepository().listPrompts(), isEmpty);
   });
 
   test('档案切换后晚到图片仍归原表单，新档案与所有启用键保持原状', () async {

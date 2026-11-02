@@ -83,12 +83,22 @@ class _Repository extends PictureStoryRepository {
 
 void main() {
   late _Repository repository;
+  final prompts = List.generate(
+    3,
+    (index) => pictureStoryFixture(
+      id: 'local-delete-${index + 1}',
+      title: '已保存的题目 ${index + 1}',
+    ),
+  );
 
   setUp(() async {
     ProfileScope.reset();
     await setUpHiveForTesting();
     await unlockParentForTesting();
     repository = _Repository(Zone.current);
+    for (final prompt in prompts) {
+      await repository.savePrompt(prompt: prompt, profileId: 'default');
+    }
   });
   tearDown(() async {
     lockParentForTesting();
@@ -167,7 +177,7 @@ void main() {
 
   testWidgets('真实题库详情可取消删除，确认后返回题库并刷新启用数量', (tester) async {
     final (router, container) = await pumpFlow(tester);
-    final prompt = PictureStoryCatalog.prompts.first;
+    final prompt = prompts.first;
     final before = repository.storageSnapshot();
     await openPrompt(tester, prompt);
     await openDelete(tester);
@@ -204,7 +214,7 @@ void main() {
   });
 
   testWidgets('删除写入失败保留题目并提示，按钮恢复后可重试', (tester) async {
-    final prompt = PictureStoryCatalog.prompts.first;
+    final prompt = prompts.first;
     await pumpFlow(tester, location: AppRoutes.pictureStoryDetailOf(prompt.id));
     repository.failNextDelete = true;
     await openDelete(tester);
@@ -225,7 +235,7 @@ void main() {
   });
 
   testWidgets('确认期间切换孩子档案不会删除题目', (tester) async {
-    final prompt = PictureStoryCatalog.prompts.first;
+    final prompt = prompts.first;
     await pumpFlow(tester, location: AppRoutes.pictureStoryDetailOf(prompt.id));
     final before = repository.storageSnapshot();
     await openDelete(tester);
@@ -244,7 +254,7 @@ void main() {
   });
 
   testWidgets('确认期间家长重新锁定，不访问已销毁页面也不删除题目', (tester) async {
-    final prompt = PictureStoryCatalog.prompts.first;
+    final prompt = prompts.first;
     await pumpFlow(tester, location: AppRoutes.pictureStoryDetailOf(prompt.id));
     final before = repository.storageSnapshot();
     await openDelete(tester);
@@ -263,7 +273,7 @@ void main() {
   });
 
   testWidgets('重复点击只弹出一次确认，保存期间编辑与删除按钮均禁用', (tester) async {
-    final prompt = PictureStoryCatalog.prompts.first;
+    final prompt = prompts.first;
     await pumpFlow(tester, location: AppRoutes.pictureStoryDetailOf(prompt.id));
     repository.deleteGate = repository.ioZone.run(() => Completer<void>());
     try {
@@ -309,7 +319,7 @@ void main() {
 
   testWidgets('全部删除后显示可新增的空题库', (tester) async {
     final (_, container) = await pumpFlow(tester);
-    for (final prompt in PictureStoryCatalog.prompts) {
+    for (final prompt in prompts) {
       await openPrompt(tester, prompt);
       await openDelete(tester);
       await confirmDelete(tester);
