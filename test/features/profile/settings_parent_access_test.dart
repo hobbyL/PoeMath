@@ -411,12 +411,10 @@ void main() {
       () => find.byType(PictureStoryGeneratePage).evaluate().isNotEmpty,
     );
     expect(_unlockButton, findsNothing);
+    expect(find.byType(Slider), findsOneWidget);
     // 精确15分钟边界由服务测试验证；失效通知沿用同一 lock() 路径。
-    await tester.runAsync(() => tester.tap(find.text('题目数量')));
-    await _pumpUntil(tester, () => find.byType(BottomSheet).evaluate().isNotEmpty);
     await tester.runAsync(() async => access.lock());
     await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
-    expect(find.byType(BottomSheet), findsNothing);
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(
       find.byType(PictureStoryGeneratePage, skipOffstage: false),

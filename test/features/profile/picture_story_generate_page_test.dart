@@ -214,35 +214,19 @@ void main() {
     await drainHiveWritesForTesting(tester);
   });
 
-  Future<void> openCountSheet(WidgetTester tester) async {
-    await tester.ensureVisible(find.text('题目数量'));
-    await tester.pumpAndSettle();
-    await tester.runAsync(() async {
-      await tester.tap(find.text('题目数量'));
-      await tester.pump();
-    });
-    await tester.pumpAndSettle();
-    expect(find.byType(BottomSheet), findsOneWidget);
-    expect(find.text('选择题目数量'), findsOneWidget);
-  }
-
   Future<void> chooseCount(WidgetTester tester, int count) async {
-    final option = find.descendant(
-      of: find.byType(BottomSheet),
-      matching: find.widgetWithText(AppTile, '$count 道'),
-    );
-    await tester.ensureVisible(option);
+    final slider = find.byType(Slider);
+    await tester.ensureVisible(slider);
     await tester.pumpAndSettle();
-    await tester.runAsync(() async {
-      await tester.tap(option);
-      await tester.pump();
-    });
-    await _until(
-      tester,
-      () =>
-          find.byType(BottomSheet).evaluate().isEmpty &&
-          find.text('$count 道').evaluate().isNotEmpty,
+    final bounds = tester.getRect(slider);
+    final gesture = await tester.startGesture(bounds.center);
+    await gesture.moveTo(
+      Offset(bounds.left + bounds.width * (count - 1) / 4, bounds.center.dy),
     );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(slider).value, count.toDouble());
+    expect(find.text('数量（$count 题）'), findsOneWidget);
   }
 
   for (final (size, scale) in [
@@ -265,34 +249,14 @@ void main() {
         ),
         findsNothing,
       );
-      await openCountSheet(tester);
-      final selected = find.descendant(
-        of: find.byType(BottomSheet),
-        matching: find.widgetWithText(AppTile, '3 道'),
+      expect(find.text('数量（3 题）'), findsOneWidget);
+      expect(
+        tester.getSize(find.byType(Slider)).height,
+        greaterThanOrEqualTo(SpacingTokens.minTapTarget),
       );
-      expect(tester.widget<AppTile>(selected).selected, isTrue);
-      for (final element in find
-          .descendant(
-            of: find.byType(BottomSheet),
-            matching: find.byType(AppTile),
-          )
-          .evaluate()) {
-        expect(
-          tester.getSize(find.byWidget(element.widget)).height,
-          greaterThanOrEqualTo(SpacingTokens.minTapTarget),
-        );
-      }
       await chooseCount(tester, 1);
-      await openCountSheet(tester);
+      await chooseCount(tester, 2);
       await chooseCount(tester, 5);
-      await openCountSheet(tester);
-      final sheetContext = tester.element(find.byType(BottomSheet));
-      await tester.runAsync(() async {
-        Navigator.pop(sheetContext);
-        await tester.pump();
-      });
-      await _until(tester, () => find.byType(BottomSheet).evaluate().isEmpty);
-      expect(find.text('5 道'), findsOneWidget);
       await tester.ensureVisible(find.text('自然观察'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('自然观察'));
@@ -679,7 +643,6 @@ void main() {
       );
     });
     final router = await mount(tester);
-    await openCountSheet(tester);
     await chooseCount(tester, 5);
     await tester.ensureVisible(find.text('生成图文题目'));
     await tester.pumpAndSettle();

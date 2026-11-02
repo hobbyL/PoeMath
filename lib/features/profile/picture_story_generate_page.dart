@@ -306,74 +306,6 @@ class _PictureStoryGeneratePageState
     super.dispose();
   }
 
-  Future<void> _pickCount() async {
-    final count = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        final theme = Theme.of(sheetContext);
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.7,
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: SpacingTokens.md),
-                Text(
-                  '选择题目数量',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpacingTokens.md,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (var i = 1; i <= 5; i++)
-                          AppTile(
-                            flat: true,
-                            selected: i == _count,
-                            icon: i == _count
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_unchecked,
-                            iconColor: theme.colorScheme.primary,
-                            title: '$i 道',
-                            subtitle: '',
-                            trailing: const SizedBox.shrink(),
-                            allowTapWithTrailing: true,
-                            onTap: () => Navigator.pop(sheetContext, i),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    if (count == null ||
-        !mounted ||
-        !_foreground ||
-        !_sameProfile ||
-        _busy ||
-        _draft != null ||
-        !ParentAccessService.instance.isUnlocked ||
-        ModalRoute.of(context)?.isCurrent != true) {
-      return;
-    }
-    setState(() => _count = count);
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -465,14 +397,17 @@ class _PictureStoryGeneratePageState
           const SizedBox(height: SpacingTokens.sm),
           const Text('每道题一张图，每次可生成 1–5 道。先生成图片，再根据实际画面编写问题。'),
           const SizedBox(height: SpacingTokens.md),
-          AppTile(
-            flat: true,
-            icon: Icons.format_list_numbered,
-            iconColor: theme.colorScheme.primary,
-            title: '题目数量',
-            subtitle: '',
-            trailingText: '$_count 道',
-            onTap: enabled ? _pickCount : null,
+          Text('数量（$_count 题）', style: theme.textTheme.titleSmall),
+          Slider(
+            value: _count.toDouble(),
+            min: 1,
+            max: 5,
+            divisions: 4,
+            label: '$_count',
+            semanticFormatterCallback: (value) => '${value.round()} 题',
+            onChanged: enabled
+                ? (value) => setState(() => _count = value.round())
+                : null,
           ),
           const SizedBox(height: SpacingTokens.md),
           const Text('主题（可多选）'),
