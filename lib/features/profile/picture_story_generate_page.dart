@@ -8,6 +8,7 @@ import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_generation_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/typography_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
@@ -344,30 +345,24 @@ class _PictureStoryGeneratePageState
             ],
             if (draft == null && !_loadFailed) _options(theme, canOperate),
             if (draft != null) ...[
-              Text(
-                '${draft.readyCount}/${draft.options.count} 道题待确认',
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: SpacingTokens.xs),
-              const Text('请核对图片与题目内容，选择后确认入库。离开页面会暂停生成，草稿保留。'),
-              const SizedBox(height: SpacingTokens.sm),
               if (_busy)
                 LinearProgressIndicator(
                   semanticsLabel: _generating ? '正在生成题目' : '正在入库',
                 ),
-              Wrap(
-                spacing: SpacingTokens.sm,
-                children: [
-                  if (_generating)
+              if (_generating)
+                Wrap(
+                  spacing: SpacingTokens.sm,
+                  children: [
                     TextButton.icon(
                       onPressed: _pause,
                       icon: const Icon(Icons.pause),
                       label: const Text('暂停生成'),
                     ),
-                ],
-              ),
+                  ],
+                ),
               for (final (index, item) in draft.candidates.indexed) ...[
-                const SizedBox(height: SpacingTokens.md),
+                if (_busy || index > 0)
+                  const SizedBox(height: SpacingTokens.md),
                 _candidate(theme, item, index, canOperate),
               ],
             ],
@@ -505,13 +500,6 @@ class _PictureStoryGeneratePageState
               children: [
                 Row(
                   children: [
-                    if (item.isReady)
-                      Checkbox(
-                        value: item.selected,
-                        semanticLabel: '选择第 ${index + 1} 道题',
-                        onChanged:
-                            enabled ? (v) => _select(item, v ?? false) : null,
-                      ),
                     Expanded(
                       child: Text.rich(
                         TextSpan(
@@ -530,9 +518,19 @@ class _PictureStoryGeneratePageState
                             ),
                           ],
                         ),
-                        style: theme.textTheme.titleMedium,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.left,
                       ),
                     ),
+                    if (item.isReady)
+                      Checkbox(
+                        value: item.selected,
+                        semanticLabel: '选择第 ${index + 1} 道题',
+                        onChanged:
+                            enabled ? (v) => _select(item, v ?? false) : null,
+                      ),
                   ],
                 ),
                 if (edit.fields[PictureStoryEditorField.theme]
@@ -554,9 +552,18 @@ class _PictureStoryGeneratePageState
                   ])
                     if (edit.fields[field]?.trim().isNotEmpty == true) ...[
                       const SizedBox(height: SpacingTokens.md),
-                      Text(label, style: theme.textTheme.labelLarge),
+                      Text(
+                        label,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: TypographyTokens.fsSection,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       const SizedBox(height: SpacingTokens.xs),
-                      Text(edit.fields[field]!),
+                      Text(
+                        edit.fields[field]!,
+                        style: theme.textTheme.bodyMedium,
+                      ),
                     ],
                 ],
                 if (item.error != null) ...[
