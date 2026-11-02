@@ -5,6 +5,7 @@
 
 import 'dart:convert';
 
+import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 
 import 'package:crypto/crypto.dart';
@@ -40,7 +41,8 @@ class SettingsRepository {
           imageGenerationProviders,
         ),
         'imageActive': imageGenerationActiveProviderId,
-        'prompt': pictureStoryGenerationPromptOverride,
+        'imagePrompt': pictureStoryImageGenerationPromptOverride,
+        'questionPrompt': pictureStoryQuestionGenerationPromptOverride,
         'llmVersions': _llmProviderVersions,
         'llm': LlmProviderConfig.encodeList(llmProviders),
         'active': HiveBoxes.settings.get('llm_active_provider_id'),
@@ -421,6 +423,11 @@ class SettingsRepository {
       'llm_word_problem_prompt';
   static const String _keyPictureStoryGenerationPrompt =
       'llm_picture_story_prompt';
+  // 拆分项以空串表示已恢复默认，隔离旧共享偏好；不写默认提示词副本。
+  static const String _keyPictureStoryImageGenerationPrompt =
+      'llm_picture_story_image_prompt';
+  static const String _keyPictureStoryQuestionGenerationPrompt =
+      'llm_picture_story_question_prompt';
   // AI 助手悬浮球位置（设备绑定，不入备份白名单）：坐标随屏幕尺寸
   // 变化而失效，换机/旋转后由 _clampToBounds 越界回落兜底，跨设备
   // 迁移无意义（对照：assistant_enabled 是用户偏好，在白名单内）。
@@ -1160,9 +1167,24 @@ class SettingsRepository {
   String? get wordProblemGenerationPromptOverride =>
       _generationPromptOverride(_keyWordProblemGenerationPrompt);
 
-  /// 看图说话的场景规划与看图出题共用一份教学偏好。
+  /// 旧版共享教学偏好，作为尚未分别设置的两阶段提示词的兼容来源。
   String? get pictureStoryGenerationPromptOverride =>
       _generationPromptOverride(_keyPictureStoryGenerationPrompt);
+
+  /// 生图与场景规划共用图片要求；显式默认标记阻止回退到旧教学偏好。
+  String? get pictureStoryImageGenerationPromptOverride {
+    if (HiveBoxes.settings.containsKey(_keyPictureStoryImageGenerationPrompt)) {
+      return _generationPromptOverride(_keyPictureStoryImageGenerationPrompt);
+    }
+    final legacy = pictureStoryGenerationPromptOverride;
+    return legacy == null ? null : legacyPictureStoryImagePrompt(legacy);
+  }
+
+  /// 根据实际图片出题，独立于生图设置。
+  String? get pictureStoryQuestionGenerationPromptOverride =>
+      HiveBoxes.settings.containsKey(_keyPictureStoryQuestionGenerationPrompt)
+          ? _generationPromptOverride(_keyPictureStoryQuestionGenerationPrompt)
+          : pictureStoryGenerationPromptOverride;
 
   String? _generationPromptOverride(String key) {
     final raw = HiveBoxes.settings.get(key);
@@ -1181,10 +1203,40 @@ class SettingsRepository {
   Future<void> resetPictureStoryGenerationPrompt() =>
       setPictureStoryGenerationPrompt('');
 
-  Future<void> _setGenerationPrompt(String key, String value) async {
+  Future<void> setPictureStoryImageGenerationPrompt(String value) =>
+      _setGenerationPrompt(
+        _keyPictureStoryImageGenerationPrompt,
+        value,
+        keepDefaultMarker: true,
+        maxLength: kPictureStoryImagePromptMaxLength,
+      );
+
+  Future<void> resetPictureStoryImageGenerationPrompt() =>
+      setPictureStoryImageGenerationPrompt('');
+
+  Future<void> setPictureStoryQuestionGenerationPrompt(String value) =>
+      _setGenerationPrompt(
+        _keyPictureStoryQuestionGenerationPrompt,
+        value,
+        keepDefaultMarker: true,
+        maxLength: kPictureStoryQuestionPromptMaxLength,
+      );
+
+  Future<void> resetPictureStoryQuestionGenerationPrompt() =>
+      setPictureStoryQuestionGenerationPrompt('');
+
+  Future<void> _setGenerationPrompt(
+    String key,
+    String value, {
+    bool keepDefaultMarker = false,
+    int? maxLength,
+  }) async {
     ParentAccessService.instance.assertAllowed();
     final trimmed = value.trim();
-    if (trimmed.isEmpty) {
+    if (maxLength != null && trimmed.runes.length > maxLength) {
+      throw FormatException('提示词不能超过 $maxLength 字');
+    }
+    if (trimmed.isEmpty && !keepDefaultMarker) {
       await HiveBoxes.settings.delete(key);
     } else {
       await HiveBoxes.settings.put(key, trimmed);

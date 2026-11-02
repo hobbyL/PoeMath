@@ -1,8 +1,8 @@
 // test/features/profile/prompt_settings_page_test.dart
 //
 // AI 提示词设置页 widget 测试：初始展示内置默认全文、编辑保存落 Hive、
-// 清空保存 = 恢复默认、超 2000 字拒绝、恢复默认确认弹层先展示默认全文
-// 再确认、已是默认时恢复按钮禁用，两个出题场景和讲解、助手共用相同操作。
+// 清空保存 = 恢复默认、长度校验、恢复默认确认弹层先展示默认全文
+// 再确认、已是默认时恢复按钮禁用，独立生图、出题与讲解、助手共用相同操作。
 //
 // Hive 写链 tap 须在 runAsync 真实异步区执行（本仓既有结论）。
 
@@ -133,20 +133,25 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  testWidgets('未自定义时：五个场景展示内置默认全文与「内置默认」标注', (tester) async {
+  testWidgets('未自定义时：六个场景展示内置默认全文与「内置默认」标注', (tester) async {
     await _pumpPage(tester);
 
     expect(find.text('AI 生成应用题'), findsOneWidget);
-    expect(find.text('AI 生成看图说话题'), findsOneWidget);
+    expect(find.text('看图说话生图'), findsOneWidget);
+    expect(find.text('根据图片出题'), findsOneWidget);
     expect(_fieldText(tester, 'AI 生成应用题'), kWordProblemGenerationSystemPrompt);
     expect(
-      _fieldText(tester, 'AI 生成看图说话题'),
-      kPictureStoryGenerationSystemPrompt,
+      _fieldText(tester, '看图说话生图'),
+      kPictureStoryImageGenerationSystemPrompt,
+    );
+    expect(
+      _fieldText(tester, '根据图片出题'),
+      kPictureStoryQuestionGenerationSystemPrompt,
     );
     expect(find.text('诗词讲解'), findsOneWidget);
     expect(find.text('口算解析'), findsOneWidget);
     expect(find.text('AI 助手人设'), findsOneWidget);
-    expect(find.text('内置默认'), findsNWidgets(5));
+    expect(find.text('内置默认'), findsNWidgets(6));
     expect(find.text('已自定义'), findsNothing);
 
     expect(_fieldText(tester, '诗词讲解'), kPoemExplainSystemPrompt);
@@ -160,7 +165,7 @@ void main() {
     await _pumpPage(tester);
 
     expect(find.text('已自定义'), findsOneWidget);
-    expect(find.text('内置默认'), findsNWidgets(4));
+    expect(find.text('内置默认'), findsNWidgets(5));
     expect(_fieldText(tester, '诗词讲解'), '我的诗词风格');
     expect(_fieldText(tester, '口算解析'), kMathExplainSystemPrompt);
     expect(_fieldText(tester, 'AI 助手人设'), kAssistantSystemPrompt);
@@ -199,7 +204,7 @@ void main() {
     await _tapReal(tester, _sectionButton('口算解析', '保存'));
 
     expect(HiveBoxes.settings.get('llm_math_explain_prompt'), isNull);
-    expect(find.text('内置默认'), findsNWidgets(5));
+    expect(find.text('内置默认'), findsNWidgets(6));
     expect(find.text('已恢复默认'), findsOneWidget);
     expect(_fieldText(tester, '口算解析'), kMathExplainSystemPrompt);
 
@@ -251,7 +256,7 @@ void main() {
     await _tapReal(tester, find.widgetWithText(FilledButton, '恢复默认'));
 
     expect(HiveBoxes.settings.get('llm_poem_explain_prompt'), isNull);
-    expect(find.text('内置默认'), findsNWidgets(5));
+    expect(find.text('内置默认'), findsNWidgets(6));
     expect(_fieldText(tester, '诗词讲解'), kPoemExplainSystemPrompt);
 
     await tester.pump(const Duration(seconds: 5));
@@ -303,12 +308,27 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
-  for (final (title, key, defaultText) in [
-    ('AI 生成应用题', 'llm_word_problem_prompt', kWordProblemGenerationSystemPrompt),
+  for (final (title, key, defaultText, maxLength, keepsMarker) in [
     (
-      'AI 生成看图说话题',
-      'llm_picture_story_prompt',
-      kPictureStoryGenerationSystemPrompt
+      'AI 生成应用题',
+      'llm_word_problem_prompt',
+      kWordProblemGenerationSystemPrompt,
+      _maxLength,
+      false
+    ),
+    (
+      '看图说话生图',
+      'llm_picture_story_image_prompt',
+      kPictureStoryImageGenerationSystemPrompt,
+      kPictureStoryImagePromptMaxLength,
+      true
+    ),
+    (
+      '根据图片出题',
+      'llm_picture_story_question_prompt',
+      kPictureStoryQuestionGenerationSystemPrompt,
+      kPictureStoryQuestionPromptMaxLength,
+      true
     ),
   ]) {
     testWidgets('$title：保存后重新进入保留内容，取消恢复不改写，确认和清空均恢复默认', (tester) async {
@@ -329,20 +349,22 @@ void main() {
 
       await _tapReal(tester, _sectionButton(title, '恢复默认'));
       await _tapReal(tester, find.widgetWithText(FilledButton, '恢复默认'));
-      expect(HiveBoxes.settings.containsKey(key), isFalse);
+      expect(HiveBoxes.settings.containsKey(key), keepsMarker);
+      expect(HiveBoxes.settings.get(key), keepsMarker ? '' : null);
       expect(_fieldText(tester, title), defaultText);
       await tester.enterText(_sectionField(title), '再次自定义');
       await _tapReal(tester, _sectionButton(title, '保存'));
       await tester.enterText(_sectionField(title), '   ');
       await _tapReal(tester, _sectionButton(title, '保存'));
-      expect(HiveBoxes.settings.containsKey(key), isFalse);
+      expect(HiveBoxes.settings.containsKey(key), keepsMarker);
+      expect(HiveBoxes.settings.get(key), keepsMarker ? '' : null);
       expect(_fieldText(tester, title), defaultText);
       await tester.pump(const Duration(seconds: 5));
     });
 
-    testWidgets('$title：超过共同长度上限不保存', (tester) async {
+    testWidgets('$title：超过该场景长度上限不保存', (tester) async {
       await _pumpPage(tester);
-      await tester.enterText(_sectionField(title), '超' * (_maxLength + 1));
+      await tester.enterText(_sectionField(title), '超' * (maxLength + 1));
       await _tapReal(tester, _sectionButton(title, '保存'));
       expect(HiveBoxes.settings.containsKey(key), isFalse);
       expect(find.text('$title提示词超长，已取消保存'), findsOneWidget);
@@ -350,11 +372,61 @@ void main() {
     });
   }
 
-  testWidgets('五个场景在小屏大字号下均可滚动到编辑和操作按钮，无布局溢出', (tester) async {
+  testWidgets('旧教学偏好下两项分别编辑和恢复默认，重开后互不覆盖', (tester) async {
+    await tester.runAsync(() async {
+      await HiveBoxes.settings.put('llm_picture_story_prompt', '采用短句表达');
+    });
+    await _pumpPage(tester);
+    final originalImage = _fieldText(tester, '看图说话生图');
+    expect(originalImage, contains('平面手绘儿童教材插图'));
+    expect(originalImage, endsWith('采用短句表达'));
+    expect(_fieldText(tester, '根据图片出题'), '采用短句表达');
+    await tester.enterText(_sectionField('根据图片出题'), '三个观察问题');
+    await _tapReal(tester, _sectionButton('根据图片出题', '保存'));
+    expect(
+      HiveBoxes.settings.get('llm_picture_story_question_prompt'),
+      '三个观察问题',
+    );
+    expect(_fieldText(tester, '看图说话生图'), originalImage);
+    await _tapReal(tester, _sectionButton('根据图片出题', '恢复默认'));
+    await _tapReal(tester, find.widgetWithText(FilledButton, '恢复默认'));
+    expect(
+      _fieldText(tester, '根据图片出题'),
+      kPictureStoryQuestionGenerationSystemPrompt,
+    );
+    expect(_fieldText(tester, '看图说话生图'), originalImage);
+    await tester.enterText(_sectionField('看图说话生图'), '水彩人物互动');
+    await _tapReal(tester, _sectionButton('看图说话生图', '保存'));
+    expect(HiveBoxes.settings.get('llm_picture_story_image_prompt'), '水彩人物互动');
+    expect(
+      _fieldText(tester, '根据图片出题'),
+      kPictureStoryQuestionGenerationSystemPrompt,
+    );
+    await tester.enterText(_sectionField('看图说话生图'), '  ');
+    await _tapReal(tester, _sectionButton('看图说话生图', '保存'));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await _pumpPage(tester);
+    expect(
+      _fieldText(tester, '看图说话生图'),
+      kPictureStoryImageGenerationSystemPrompt,
+    );
+    expect(
+      _fieldText(tester, '根据图片出题'),
+      kPictureStoryQuestionGenerationSystemPrompt,
+    );
+    expect(HiveBoxes.settings.get('llm_picture_story_prompt'), '采用短句表达');
+    expect(HiveBoxes.settings.get('llm_picture_story_image_prompt'), '');
+    expect(HiveBoxes.settings.get('llm_picture_story_question_prompt'), '');
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('六个场景在小屏大字号下均可滚动到编辑和操作按钮，无布局溢出', (tester) async {
     await _pumpPage(tester, size: const Size(320, 900), scale: 2);
     for (final title in [
       'AI 生成应用题',
-      'AI 生成看图说话题',
+      '看图说话生图',
+      '根据图片出题',
       '诗词讲解',
       '口算解析',
       'AI 助手人设',
@@ -390,7 +462,7 @@ void main() {
 
     expect(_fieldText(tester, 'AI 助手人设'), '你是严格老师');
     expect(find.text('已自定义'), findsOneWidget);
-    expect(find.text('内置默认'), findsNWidgets(4));
+    expect(find.text('内置默认'), findsNWidgets(5));
   });
 
   testWidgets('助手人设区块：清空保存 = 恢复默认，框回 kAssistantSystemPrompt', (tester) async {
@@ -404,7 +476,7 @@ void main() {
 
     expect(HiveBoxes.settings.get('llm_assistant_prompt'), isNull);
     expect(_fieldText(tester, 'AI 助手人设'), kAssistantSystemPrompt);
-    expect(find.text('内置默认'), findsNWidgets(5));
+    expect(find.text('内置默认'), findsNWidgets(6));
 
     await tester.pump(const Duration(seconds: 5));
   });

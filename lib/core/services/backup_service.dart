@@ -11,6 +11,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/data/hive/migrations/poem_identity_migration.dart';
@@ -142,7 +143,9 @@ const Map<String, String> _settingsValueType = <String, String>{
   'llm_math_explain_prompt': 'string', // 口算解析 system prompt 覆盖
   'llm_assistant_prompt': 'string', // AI 助手 system prompt 覆盖
   'llm_word_problem_prompt': 'string', // AI 应用题素材选择提示词
-  'llm_picture_story_prompt': 'string', // AI 看图说话出题提示词
+  'llm_picture_story_prompt': 'string', // 旧版共享教学偏好
+  'llm_picture_story_image_prompt': 'string', // 看图说话生图要求
+  'llm_picture_story_question_prompt': 'string', // 根据图片出题要求
   'assistant_enabled': 'bool', // AI 助手悬浮气泡开关（默认关闭）
   // AI 助手悬浮球停留位置（body 坐标系逻辑像素）。
   //
@@ -1737,6 +1740,19 @@ class BackupService {
       if (value == null) continue; // 类型不符：跳过
       if (!SettingsConstraints.accepts(entry.key, value)) continue;
       normalized[entry.key] = value;
+    }
+
+    // 旧备份的共享偏好映射到未独立提供的两项；显式空值仍表示恢复默认。
+    // 原始载荷给出的坏类型保持跳过语义，不能用旧偏好覆盖本机有效值。
+    final legacy = normalized['llm_picture_story_prompt'];
+    if (legacy is String) {
+      if (!items.containsKey('llm_picture_story_image_prompt')) {
+        normalized['llm_picture_story_image_prompt'] =
+            legacy.trim().isEmpty ? '' : legacyPictureStoryImagePrompt(legacy);
+      }
+      if (!items.containsKey('llm_picture_story_question_prompt')) {
+        normalized['llm_picture_story_question_prompt'] = legacy.trim();
+      }
     }
 
     // LLM 一致性过滤：不落悬空 id / 坏结构（见 _filterLlmSettings）。

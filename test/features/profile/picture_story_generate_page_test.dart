@@ -50,7 +50,8 @@ class _GenerationFlow extends PictureStoryGenerationService {
           ),
         );
   final PictureStoryImage image;
-  String? capturedPrompt;
+  String? capturedImagePrompt;
+  String? capturedQuestionPrompt;
   @override
   Future<void> run({
     required PictureStoryGenerationDraft draft,
@@ -61,10 +62,12 @@ class _GenerationFlow extends PictureStoryGenerationService {
     String? candidateId,
     String? reuseImageId,
     bool regenerateImage = false,
-    String? promptOverride,
+    String? imagePromptOverride,
+    String? questionPromptOverride,
   }) async {
     if (!isActive()) throw const ImageGenerationCancelled();
-    capturedPrompt = promptOverride;
+    capturedImagePrompt = imagePromptOverride;
+    capturedQuestionPrompt = questionPromptOverride;
     final items = [
       for (var i = 0; i < draft.options.count; i++) _candidate(draft, i),
     ];
@@ -625,7 +628,8 @@ void main() {
         _GenerationFlow(image: image!, repository: repository, images: images);
     await tester.runAsync(() async {
       final settings = SettingsRepository();
-      await settings.setPictureStoryGenerationPrompt('用儿童水彩场景引导观察和表达');
+      await settings.setPictureStoryImageGenerationPrompt('用儿童水彩场景突出互动');
+      await settings.setPictureStoryQuestionGenerationPrompt('先观察细节，再用短句表达');
       await settings.saveImageGenerationConfig(
         provider: const ImageGenerationProviderConfig(
           name: '测试',
@@ -656,7 +660,8 @@ void main() {
           readyButton.evaluate().isNotEmpty &&
           tester.widget<FilledButton>(readyButton).onPressed != null,
     );
-    expect((service as _GenerationFlow).capturedPrompt, '用儿童水彩场景引导观察和表达');
+    expect((service as _GenerationFlow).capturedImagePrompt, '用儿童水彩场景突出互动');
+    expect((service as _GenerationFlow).capturedQuestionPrompt, '先观察细节，再用短句表达');
     expect(service.readDraft('default')!.options.count, 5);
     expect(repository.catalogState().versions, isEmpty);
     final first = service.readDraft('default')!.candidates.first;

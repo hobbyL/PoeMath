@@ -3,7 +3,7 @@
 // 层级：features/profile
 // 职责：AI 设置枢纽页 —— 设置→「AI 设置」的落地页。三个入口：
 //       供应商设置（厂商配置与生效切换）、使用场景设置（场景绑定厂商）、
-//       提示词设置（AI 讲解 system prompt 自定义）。
+//       提示词设置（生图、出题、讲解与助手人设自定义）。
 //       深链 AppRoutes.llmSettings 直达供应商设置（诗词/口算/出题页的
 //       「去设置」入口），不经过本页。
 
@@ -124,7 +124,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
             icon: Icons.edit_note_outlined,
             iconColor: theme.colorScheme.secondary,
             title: '提示词设置',
-            subtitle: '应用题、看图说话、讲解与助手人设的提示词',
+            subtitle: '生图、出题、讲解与助手人设的提示词',
             onTap: () => Navigator.push<void>(
               context,
               fadeSlideRoute(

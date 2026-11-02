@@ -1,15 +1,16 @@
 // lib/features/profile/prompt_settings_page.dart
 //
 // 层级：features/profile
-// 职责：AI 提示词设置页 —— 出题、诗词讲解、口算解析和助手人设的 system prompt
-//       的查看、编辑与一键恢复默认。仅 system prompt 可编辑；user prompt
-//       为程序拼装（隐私载荷最小化），不在此页面范围。
+// 职责：AI 提示词设置页 —— 生图、出题、诗词讲解、口算解析和助手人设的提示词
+//       的查看、编辑与一键恢复默认。画面和教学要求可编辑；具体场景、
+//       图片与阶段输出结构由程序拼装，不在此页面范围。
 //
 // 语义（与 SettingsRepository 对齐）：
 // - 编辑框初始展示「当前生效内容」= 覆盖值 ?? 内置默认常量；
-// - 保存：trim 后为空 → 删 key（恢复默认）；超 [kPromptMaxLength] → 拒绝；
+// - 保存：trim 后为空 → 恢复默认；超出该场景长度上限 → 拒绝；
 // - 恢复默认：先弹确认弹层只读展示内置默认全文（用户改坏后可先看看
-//   原来是什么样再决定），确认后删 key 回落编译期常量。
+//   原来是什么样再决定），确认后回落编译期常量。看图说话保留空值标记，
+//   分别恢复默认时隔离旧版共享教学偏好的回退。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,10 +25,8 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 
 /// 提示词长度上限：超出拒绝保存（防误粘贴巨量文本撑爆请求体）。
 ///
-/// 五个场景共用同一上限：
-/// 内置默认值都在 1.2k 字符以内，2000 已留足编辑余量，且仓储层无校验，
-/// UI 是唯一闸口，统一口径可避免「换个区块就能绕过」。
-const int kPromptMaxLength = 2000;
+/// 普通提示词维持 2000 字，生图项单独采用适合图片请求的上限。
+const int kPromptMaxLength = kPictureStoryQuestionPromptMaxLength;
 
 /// 可编辑的提示词场景。
 ///
@@ -39,11 +38,17 @@ enum _PromptScene {
     resetTitle: '恢复应用题出题默认',
     explanation: '调整应用题的生活情境与素材选择偏好。',
   ),
-  pictureStory(
-    title: 'AI 生成看图说话题',
-    hintText: '输入看图说话出题提示词',
-    resetTitle: '恢复看图说话出题默认',
-    explanation: '调整单图场景的规划、观察引导与参考表达。',
+  pictureStoryImage(
+    title: '看图说话生图',
+    hintText: '输入题图的画风、构图与故事场景要求',
+    resetTitle: '恢复生图提示词默认',
+    explanation: '调整题图的画风、人物动作、互动与构图，也用于规划画面。',
+  ),
+  pictureStoryQuestion(
+    title: '根据图片出题',
+    hintText: '输入根据图片出题的提示词',
+    resetTitle: '恢复看图出题提示词默认',
+    explanation: '调整观察提示、引导问题与参考表达，题目依据实际图片生成。',
   ),
   poemExplain(
     title: '诗词讲解',
@@ -77,10 +82,17 @@ enum _PromptScene {
   final String resetTitle;
   final String explanation;
 
+  int get maxLength => this == _PromptScene.pictureStoryImage
+      ? kPictureStoryImagePromptMaxLength
+      : kPromptMaxLength;
+
   /// 内置默认全文。
   String get defaultText => switch (this) {
         _PromptScene.wordProblem => kWordProblemGenerationSystemPrompt,
-        _PromptScene.pictureStory => kPictureStoryGenerationSystemPrompt,
+        _PromptScene.pictureStoryImage =>
+          kPictureStoryImageGenerationSystemPrompt,
+        _PromptScene.pictureStoryQuestion =>
+          kPictureStoryQuestionGenerationSystemPrompt,
         _PromptScene.poemExplain => kPoemExplainSystemPrompt,
         _PromptScene.mathExplain => kMathExplainSystemPrompt,
         _PromptScene.assistant => kAssistantSystemPrompt,
@@ -90,9 +102,12 @@ enum _PromptScene {
   String currentText(SettingsRepository repo) => switch (this) {
         _PromptScene.wordProblem => repo.wordProblemGenerationPromptOverride ??
             kWordProblemGenerationSystemPrompt,
-        _PromptScene.pictureStory =>
-          repo.pictureStoryGenerationPromptOverride ??
-              kPictureStoryGenerationSystemPrompt,
+        _PromptScene.pictureStoryImage =>
+          repo.pictureStoryImageGenerationPromptOverride ??
+              kPictureStoryImageGenerationSystemPrompt,
+        _PromptScene.pictureStoryQuestion =>
+          repo.pictureStoryQuestionGenerationPromptOverride ??
+              kPictureStoryQuestionGenerationSystemPrompt,
         _PromptScene.poemExplain =>
           repo.poemExplainPromptOverride ?? kPoemExplainSystemPrompt,
         _PromptScene.mathExplain =>
@@ -104,7 +119,10 @@ enum _PromptScene {
   /// 当前是否有用户覆盖（null = 内置默认态）。
   String? overrideOf(SettingsRepository repo) => switch (this) {
         _PromptScene.wordProblem => repo.wordProblemGenerationPromptOverride,
-        _PromptScene.pictureStory => repo.pictureStoryGenerationPromptOverride,
+        _PromptScene.pictureStoryImage =>
+          repo.pictureStoryImageGenerationPromptOverride,
+        _PromptScene.pictureStoryQuestion =>
+          repo.pictureStoryQuestionGenerationPromptOverride,
         _PromptScene.poemExplain => repo.poemExplainPromptOverride,
         _PromptScene.mathExplain => repo.mathExplainPromptOverride,
         _PromptScene.assistant => repo.assistantPromptOverride,
@@ -112,8 +130,10 @@ enum _PromptScene {
 
   Future<void> save(SettingsRepository repo, String value) => switch (this) {
         _PromptScene.wordProblem => repo.setWordProblemGenerationPrompt(value),
-        _PromptScene.pictureStory =>
-          repo.setPictureStoryGenerationPrompt(value),
+        _PromptScene.pictureStoryImage =>
+          repo.setPictureStoryImageGenerationPrompt(value),
+        _PromptScene.pictureStoryQuestion =>
+          repo.setPictureStoryQuestionGenerationPrompt(value),
         _PromptScene.poemExplain => repo.setPoemExplainPrompt(value),
         _PromptScene.mathExplain => repo.setMathExplainPrompt(value),
         _PromptScene.assistant => repo.setAssistantPrompt(value),
@@ -121,7 +141,10 @@ enum _PromptScene {
 
   Future<void> reset(SettingsRepository repo) => switch (this) {
         _PromptScene.wordProblem => repo.resetWordProblemGenerationPrompt(),
-        _PromptScene.pictureStory => repo.resetPictureStoryGenerationPrompt(),
+        _PromptScene.pictureStoryImage =>
+          repo.resetPictureStoryImageGenerationPrompt(),
+        _PromptScene.pictureStoryQuestion =>
+          repo.resetPictureStoryQuestionGenerationPrompt(),
         _PromptScene.poemExplain => repo.resetPoemExplainPrompt(),
         _PromptScene.mathExplain => repo.resetMathExplainPrompt(),
         _PromptScene.assistant => repo.resetAssistantPrompt(),
@@ -162,11 +185,11 @@ class _PromptSettingsPageState extends ConsumerState<PromptSettingsPage> {
     super.dispose();
   }
 
-  /// 保存单个场景的提示词；空串语义 = 恢复默认（仓储内删 key）。
+  /// 保存单个场景的提示词；空串语义 = 恢复默认。
   Future<void> _save(_PromptScene scene) async {
     final controller = _controllers[scene]!;
     final value = controller.text;
-    if (value.trim().length > kPromptMaxLength) {
+    if (value.trim().runes.length > scene.maxLength) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${scene.title}提示词超长，已取消保存'),
@@ -192,7 +215,7 @@ class _PromptSettingsPageState extends ConsumerState<PromptSettingsPage> {
     );
   }
 
-  /// 恢复默认：先弹确认弹层（只读展示内置默认全文），确认后删 key。
+  /// 恢复默认：先弹确认弹层，只读展示内置默认全文。
   Future<void> _reset(_PromptScene scene) async {
     if (_overrides[scene] == null) return;
     final confirmed = await showDialog<bool>(
@@ -259,7 +282,7 @@ class _PromptSettingsPageState extends ConsumerState<PromptSettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '调整 AI 出题、讲解的表达偏好与助手人设，'
+              '分别调整 AI 生图、出题、讲解的要求与助手人设，'
               '改得不如意可随时恢复内置默认。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,

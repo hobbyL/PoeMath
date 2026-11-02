@@ -183,7 +183,8 @@ class PictureStoryGenerationService {
     String? candidateId,
     String? reuseImageId,
     bool regenerateImage = false,
-    String? promptOverride,
+    String? imagePromptOverride,
+    String? questionPromptOverride,
   }) async {
     final profile = draft.profileId;
     final revision = ProfileScope.revision;
@@ -196,8 +197,18 @@ class PictureStoryGenerationService {
     if (![config, ...config.fallbacks].any((c) => c.supportsVision)) {
       throw const FormatException('请为看图说话出题配置支持看图的大模型');
     }
-    final planningPrompt = buildPictureStoryPlanningPrompt(promptOverride);
-    final questionPrompt = buildPictureStoryQuestionPrompt(promptOverride);
+    if (reuseImageId == null &&
+        (imagePromptOverride?.trim().runes.length ?? 0) >
+            kPictureStoryImagePromptMaxLength) {
+      throw const ImageGenerationException('生图提示词过长，请缩短后重试');
+    }
+    if ((questionPromptOverride?.trim().runes.length ?? 0) >
+        kPictureStoryQuestionPromptMaxLength) {
+      throw const FormatException('看图出题提示词过长，请缩短后重试');
+    }
+    final planningPrompt = buildPictureStoryPlanningPrompt(imagePromptOverride);
+    final questionPrompt =
+        buildPictureStoryQuestionPrompt(questionPromptOverride);
     late final _GenerationRun run;
     String? currentCandidate;
     String? currentRequest;
@@ -297,7 +308,10 @@ class PictureStoryGenerationService {
             check();
             final bytes = await run.images!.generate(
               config: imageConfig,
-              prompt: buildPictureStoryImagePrompt(item.imagePrompt),
+              prompt: buildPictureStoryImagePrompt(
+                item.imagePrompt,
+                promptOverride: imagePromptOverride,
+              ),
             );
             await CacheActivity.use(TemporaryCacheKind.pictureStoryImages,
                 () async {
@@ -413,7 +427,8 @@ class PictureStoryGenerationService {
     if (value is! Map ||
         value['imagePrompt'] is! String ||
         (value['imagePrompt'] as String).trim().isEmpty ||
-        (value['imagePrompt'] as String).runes.length > 3000) {
+        (value['imagePrompt'] as String).runes.length >
+            kPictureStorySceneDescriptionMaxLength) {
       throw const FormatException('场景规划内容无效，请重新生成');
     }
     return PictureStoryGenerationCandidate(

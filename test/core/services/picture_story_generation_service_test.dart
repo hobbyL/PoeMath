@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/cache_activity.dart';
@@ -172,6 +173,7 @@ void main() {
   var failCaption = 0;
   var incompleteSseCaptions = false;
   int? captionStatus;
+  String? plannedImagePrompt;
   final captionRequests = <Map<String, dynamic>>[];
   final planRequests = <Map<String, dynamic>>[];
   final imageRequests = <Map<String, dynamic>>[];
@@ -202,7 +204,9 @@ void main() {
               return _completion(
                 [
                   for (var i = 0; i < saved.options.count; i++)
-                    {'imagePrompt': '场景 $i：公园里的孩子观察花朵。'},
+                    {
+                      'imagePrompt': plannedImagePrompt ?? '场景 $i：公园里的孩子观察花朵。',
+                    },
                 ],
                 sse: sse,
               );
@@ -254,7 +258,8 @@ void main() {
 
   Future<PictureStoryGenerationDraft> start({
     int count = 3,
-    String? promptOverride,
+    String? imagePromptOverride,
+    String? questionPromptOverride,
   }) async {
     final draft = await service.createDraft(
       PictureStoryGenerationOptions(
@@ -268,7 +273,8 @@ void main() {
       config: _llm,
       imageConfig: _imageConfig,
       isActive: () => true,
-      promptOverride: promptOverride,
+      imagePromptOverride: imagePromptOverride,
+      questionPromptOverride: questionPromptOverride,
     );
     return service.readDraft('default')!;
   }
@@ -289,6 +295,7 @@ void main() {
     failCaption = 0;
     incompleteSseCaptions = false;
     captionStatus = null;
+    plannedImagePrompt = null;
     captionRequests.clear();
     planRequests.clear();
     imageRequests.clear();
@@ -396,35 +403,96 @@ void main() {
     expect(repository.catalogState().versions, isEmpty);
   });
 
-  test('自定义看图说话提示词同时进入场景规划和实际图片出题，保留各阶段格式约束', () async {
-    final draft = await start(count: 2, promptOverride: '  先观察画面，再用短句表达  ');
+  test('生图与看图出题自定义提示词分别进入真实 SSE 请求，保留各阶段约束', () async {
+    service = createService(sse: true);
+    final draft = await start(
+      count: 2,
+      imagePromptOverride: '  用水彩描绘孩子互助的小事  ',
+      questionPromptOverride: '  先观察画面，再用短句表达  ',
+    );
     expect(planCalls, 1);
     expect(imageCalls, 2);
     expect(captionCalls, 2);
     expect(draft.readyCount, 2);
     final planning =
         (planRequests.single['messages'] as List).first['content'] as String;
-    expect(planning, startsWith('先观察画面，再用短句表达\n\n'));
+    expect(planning, startsWith('用水彩描绘孩子互助的小事\n\n'));
+    expect(planning, isNot(contains('先观察画面，再用短句表达')));
     expect(planning, contains('只输出严格 JSON 数组'));
     expect(planning, contains('imagePrompt'));
     expect(planning, contains('不要先编题目或答案'));
-    expect(planning, contains('一件儿童熟悉的日常小事'));
-    expect(planning, contains('画面内的可见线索'));
+    expect(planning, contains('不拼图、不分镜'));
     expect(imageRequests, hasLength(2));
     for (final request in imageRequests) {
-      expect(request['prompt'], contains('小学语文课本式插图'));
-      expect(request['prompt'], contains('一幅图讲一件事'));
+      expect(request['prompt'], startsWith('用水彩描绘孩子互助的小事\n\n'));
+      expect(request['prompt'], contains('具体场景：\n场景'));
+      expect(request['prompt'], isNot(contains('先观察画面，再用短句表达')));
+      expect(request['prompt'], isNot(contains('平面手绘儿童教材插图')));
     }
     for (final request in captionRequests) {
       final messages = request['messages'] as List;
       final prompt = messages.first['content'] as String;
       expect(prompt, startsWith('先观察画面，再用短句表达\n\n'));
+      expect(prompt, isNot(contains('用水彩描绘孩子互助的小事')));
       expect(prompt, contains('只输出严格 JSON 对象'));
       expect(prompt, contains('只依据实际图片'));
       expect(prompt, contains('不要编造图中看不到'));
       expect(messages.last['content'], isA<List<Object?>>());
     }
     expect(repository.catalogState().versions, isEmpty);
+  });
+
+  test('生图提示词和规划场景均达长度上限时仍可实际请求，出题提示独立生效', () async {
+    plannedImagePrompt = '场' * kPictureStorySceneDescriptionMaxLength;
+    final draft = await start(
+      count: 1,
+      imagePromptOverride: '图' * kPictureStoryImagePromptMaxLength,
+      questionPromptOverride: '题' * kPictureStoryQuestionPromptMaxLength,
+    );
+    expect(draft.readyCount, 1);
+    expect(requestOrder, ['规划', '生图 1', '看图 1']);
+    final prompt = imageRequests.single['prompt'] as String;
+    expect(prompt.runes.length, lessThanOrEqualTo(4000));
+    expect(prompt, endsWith(plannedImagePrompt!));
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
+  });
+
+  test('生图提示词超长在规划及计费请求前拒绝，保留草稿', () async {
+    await expectLater(
+      start(imagePromptOverride: '图' * (kPictureStoryImagePromptMaxLength + 1)),
+      throwsA(isA<ImageGenerationException>()),
+    );
+    expect(requestOrder, isEmpty);
+    expect(imageClients, 0);
+    expect(service.readDraft('default')!.candidates, isEmpty);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 0);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
+  });
+
+  test('看图出题提示词超长在规划及计费请求前拒绝，保留草稿', () async {
+    await expectLater(
+      start(
+        questionPromptOverride:
+            '题' * (kPictureStoryQuestionPromptMaxLength + 1),
+      ),
+      throwsFormatException,
+    );
+    expect(requestOrder, isEmpty);
+    expect(imageClients, 0);
+    expect(service.readDraft('default')!.candidates, isEmpty);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 0);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 0);
+  });
+
+  test('规划场景超长不进入生图，保留草稿且不使用图片额度', () async {
+    plannedImagePrompt = '场' * (kPictureStorySceneDescriptionMaxLength + 1);
+    await expectLater(start(count: 1), throwsFormatException);
+    expect(requestOrder, ['规划']);
+    expect(service.readDraft('default')!.candidates, isEmpty);
+    expect(imageCalls, 0);
+    expect(captionCalls, 0);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 0);
   });
 
   test('先生成实图再看图出题，批量草稿可重读且确认前目录零变化', () async {
@@ -443,7 +511,7 @@ void main() {
       final prompt = imageRequests[i]['prompt'] as String;
       expect(prompt, contains('小学语文课本式插图'));
       expect(prompt, contains('平面手绘儿童教材插图'));
-      expect(prompt, contains('人物正在做什么、彼此怎样互动'));
+      expect(prompt, contains('正在做什么、与谁或什么物体互动'));
       expect(prompt, contains('不拼图、不分镜'));
       expect(
         prompt,
