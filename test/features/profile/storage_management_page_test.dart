@@ -234,17 +234,42 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('窄屏和两倍字号仍能显示长分类和操作按钮', (tester) async {
-    tester.view.physicalSize = const Size(320, 1000);
+  testWidgets('卡片随宽度分列，窄屏和大字号仍能显示长分类与操作按钮', (tester) async {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await show(tester, largeText: true);
-    await tester.scrollUntilVisible(find.textContaining('文件与图片选择'), 280);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('文件与图片选择'), findsOneWidget);
-    expect(_clearOf('文件与图片选择'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await tester.pump(const Duration(seconds: 2));
+    for (final (width, largeText, columns) in [
+      (320.0, false, 1),
+      (800.0, false, 2),
+      (1200.0, false, 3),
+      (320.0, true, 1),
+      (1200.0, true, 1),
+    ]) {
+      tester.view.physicalSize = Size(width, 1000);
+      await show(tester, largeText: largeText);
+      final cards = [
+        for (final label in ['教材封面', '教材解析', '教材朗读'])
+          tester.getRect(
+            find.ancestor(
+              of: _clearOf(label),
+              matching: find.byType(AppTile),
+            ),
+          ),
+      ];
+      for (var column = 1; column < columns; column++) {
+        expect(cards[column].top, cards.first.top);
+        expect(cards[column].left, greaterThan(cards[column - 1].right));
+        expect(cards[column].width, closeTo(cards.first.width, 0.1));
+      }
+      if (columns < cards.length) {
+        expect(cards[columns].top, greaterThan(cards.first.bottom));
+      }
+      await tester.scrollUntilVisible(find.textContaining('文件与图片选择'), 280);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('文件与图片选择'), findsOneWidget);
+      expect(_clearOf('文件与图片选择'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(seconds: 2));
+    }
   });
 }

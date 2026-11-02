@@ -5,6 +5,7 @@ import 'package:poemath/core/services/storage_management_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/format_bytes.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/features/profile/storage_management_provider.dart';
@@ -173,43 +174,59 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
               ),
             ),
             const SizedBox(height: SpacingTokens.md),
-            for (final entry in entries) ...[
-              AppTile(
-                icon: entry.kind.icon,
-                iconColor: theme.colorScheme.primary,
-                title: entry.kind.label,
-                titleSuffix: _loading
-                    ? '正在统计…'
-                    : entry.usage == null
-                        ? '统计失败，请刷新重试'
-                        : '${entry.usage!.entries}${entry.kind.isMemory ? '项' : '个文件'} · ${formatBytes(entry.usage!.bytes)}',
-                titleSuffixInline: true,
-                subtitle: entry.kind.description,
-                trailing: Tooltip(
-                  message: '清理${entry.kind.label}',
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(
-                        SpacingTokens.minTapTarget,
-                        SpacingTokens.minTapTarget,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpacingTokens.xs,
-                      ),
-                      alignment: AlignmentDirectional.centerEnd,
-                    ),
-                    onPressed: _loading ||
-                            _busy != null ||
-                            entry.usage == null ||
-                            entry.usage!.entries == 0
-                        ? null
-                        : () => _clear(entry.kind),
-                    child: Text(_busy == entry.kind ? '清理中…' : '清理'),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final fontSize = theme.textTheme.titleSmall?.fontSize;
+                final textScale = fontSize == null
+                    ? 1.0
+                    : MediaQuery.textScalerOf(context).scale(fontSize) /
+                        fontSize;
+                return MasonryLayout(
+                  columnCount: ResponsiveLayout.columns(
+                    constraints.maxWidth /
+                        textScale.clamp(1.0, double.infinity),
                   ),
-                ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-            ],
+                  gap: SpacingTokens.sm,
+                  children: [
+                    for (final entry in entries)
+                      AppTile(
+                        icon: entry.kind.icon,
+                        iconColor: theme.colorScheme.primary,
+                        title: entry.kind.label,
+                        titleSuffix: _loading
+                            ? '正在统计…'
+                            : entry.usage == null
+                                ? '统计失败，请刷新重试'
+                                : '${entry.usage!.entries}${entry.kind.isMemory ? '项' : '个文件'} · ${formatBytes(entry.usage!.bytes)}',
+                        titleSuffixInline: true,
+                        subtitle: entry.kind.description,
+                        trailing: Tooltip(
+                          message: '清理${entry.kind.label}',
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(
+                                SpacingTokens.minTapTarget,
+                                SpacingTokens.minTapTarget,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: SpacingTokens.xs,
+                              ),
+                              alignment: AlignmentDirectional.centerEnd,
+                            ),
+                            onPressed: _loading ||
+                                    _busy != null ||
+                                    entry.usage == null ||
+                                    entry.usage!.entries == 0
+                                ? null
+                                : () => _clear(entry.kind),
+                            child: Text(_busy == entry.kind ? '清理中…' : '清理'),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
           ],
         ),
       ),
