@@ -17,31 +17,46 @@ void assertParentAccess(BuildContext context, {ParentAccessService? service}) {
 Future<bool> ensureParentAccess(
   BuildContext context, {
   ParentAccessService? service,
+}) async =>
+    await _ensureParentAccess(context, service: service) ==
+    _ParentAccessResult.allowed;
+
+enum _ParentAccessResult { allowed, cancelled, denied }
+
+Future<_ParentAccessResult> _ensureParentAccess(
+  BuildContext context, {
+  ParentAccessService? service,
 }) async {
   final access = service ?? ParentAccessService.instance;
-  if (!_isCurrentPage(context)) return false;
+  if (!context.mounted || !_isCurrentPage(context)) {
+    return _ParentAccessResult.denied;
+  }
   final route = ModalRoute.of(context);
   final pending = _requests[access];
   if (pending != null &&
       pending.context.mounted &&
       identical(route, pending.route)) {
     final result = await pending.done.future;
-    if (!context.mounted || !_isCurrentPage(context)) return false;
-    if (result && access.isUnlocked) return true;
-    return false;
+    if (!context.mounted || !_isCurrentPage(context)) {
+      return _ParentAccessResult.denied;
+    }
+    if (result == _ParentAccessResult.allowed && !access.isUnlocked) {
+      return _ParentAccessResult.denied;
+    }
+    return result;
   }
   final request = _ParentAccessRequest(route, context);
   _requests[access] = request;
-  var allowed = false;
+  var result = _ParentAccessResult.denied;
   try {
-    allowed = await _requestParentAccess(context, access);
-    return allowed;
+    result = await _requestParentAccess(context, access);
+    return result;
   } on Object {
     if (context.mounted) _showStorageError(context);
-    return false;
+    return _ParentAccessResult.denied;
   } finally {
     if (identical(_requests[access], request)) _requests[access] = null;
-    request.done.complete(allowed);
+    request.done.complete(result);
   }
 }
 
@@ -51,7 +66,7 @@ class _ParentAccessRequest {
   _ParentAccessRequest(this.route, this.context);
   final ModalRoute<dynamic>? route;
   final BuildContext context;
-  final done = Completer<bool>();
+  final done = Completer<_ParentAccessResult>();
 }
 
 bool _isCurrentPage(BuildContext context) =>
@@ -83,13 +98,15 @@ Future<void> _openParentSetup(BuildContext context) async {
   await router.push<void>(AppRoutes.parentProtection, extra: true);
 }
 
-Future<bool> _requestParentAccess(
+Future<_ParentAccessResult> _requestParentAccess(
   BuildContext context,
   ParentAccessService access,
 ) async {
   access.observeLifecycle();
   await access.initialize();
-  if (!context.mounted || !_isCurrentPage(context)) return false;
+  if (!context.mounted || !_isCurrentPage(context)) {
+    return _ParentAccessResult.denied;
+  }
   if (access.needsResetNotice) {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       const SnackBar(content: Text('此设备没有原家长验证记录，请重新设置家长密码')),
@@ -97,20 +114,25 @@ Future<bool> _requestParentAccess(
   }
   if (!access.enabled) {
     if (access.canSetPin) await _openParentSetup(context);
-    return false;
+    return _ParentAccessResult.denied;
   }
-  if (access.isUnlocked) return true;
+  if (access.isUnlocked) return _ParentAccessResult.allowed;
   final result = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (_) => _ParentUnlockDialog(access),
   );
-  if (!context.mounted || !_isCurrentPage(context)) return false;
+  if (!context.mounted || !_isCurrentPage(context)) {
+    return _ParentAccessResult.denied;
+  }
   if (!access.enabled && access.canSetPin) {
     await _openParentSetup(context);
-    return false;
+    return _ParentAccessResult.denied;
   }
-  return result == true && access.isUnlocked;
+  if (result == true && access.isUnlocked) return _ParentAccessResult.allowed;
+  return result == false
+      ? _ParentAccessResult.cancelled
+      : _ParentAccessResult.denied;
 }
 
 class _ParentUnlockDialog extends StatefulWidget {
@@ -233,6 +255,7 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
   bool _scheduled = false;
   bool _setupAttempted = false;
   bool _storageFailed = false;
+  bool _wasUnlocked = false;
   ParentAccessService get _access =>
       widget.service ?? ParentAccessService.instance;
 
@@ -249,6 +272,7 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
   void initState() {
     super.initState();
     _boundaries.add(this);
+    _wasUnlocked = _access.isUnlocked;
     _access.observeLifecycle();
     _access.addListener(_changed);
   }
@@ -281,19 +305,27 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
       if (!_access.enabled && !widget.allowSetup) _setupAttempted = true;
     });
     try {
+      var result = _ParentAccessResult.denied;
       if (widget.allowSetup) {
         await _access.initialize();
         if (!mounted) return;
         _ready = true;
         if (_access.enabled && !_access.isUnlocked) {
-          await ensureParentAccess(context, service: _access);
+          result = await _ensureParentAccess(context, service: _access);
         }
       } else {
-        await ensureParentAccess(context, service: _access);
+        result = await _ensureParentAccess(context, service: _access);
         if (mounted) {
           _ready = true;
           _storageFailed = _access.hasStorageError;
         }
+      }
+      // 只有主动取消才退出家长区；后台关闭、离页和读取失败仍可重试。
+      if (result == _ParentAccessResult.cancelled &&
+          mounted &&
+          _isCurrentPage(context) &&
+          !_access.isUnlocked) {
+        _leave();
       }
     } on Object {
       if (mounted) {
@@ -307,6 +339,8 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
 
   void _changed() {
     if (!mounted) return;
+    final lostAccess = _wasUnlocked && !_access.isUnlocked;
+    _wasUnlocked = _access.isUnlocked;
     if (_access.enabled) {
       _setupAttempted = false;
     } else if (_requesting && !widget.allowSetup) {
@@ -321,9 +355,8 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
       }
     }
     if (_ready &&
-        !widget.allowSetup &&
-        !_access.enabled &&
-        !_setupAttempted &&
+        (lostAccess ||
+            (!widget.allowSetup && !_access.enabled && !_setupAttempted)) &&
         _isCurrentPage(context)) {
       _scheduleRequest();
     }
@@ -350,7 +383,14 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
     if (_canShowChild) return widget.child;
     final setup = !_access.enabled;
     return Scaffold(
-      appBar: AppBar(title: const Text('家长保护')),
+      appBar: AppBar(
+        title: const Text('家长保护'),
+        leading: IconButton(
+          tooltip: '返回',
+          onPressed: _leave,
+          icon: const Icon(Icons.arrow_back),
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(SpacingTokens.lg),

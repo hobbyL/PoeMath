@@ -16,6 +16,7 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/profile/ai_settings_page.dart';
 import 'package:poemath/features/profile/llm_provider_settings_page.dart';
 import 'package:poemath/features/profile/parent_protection_page.dart';
+import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/picture_story_detail_page.dart';
 import 'package:poemath/features/profile/picture_story_editor_page.dart';
 import 'package:poemath/features/profile/picture_story_management_page.dart';
@@ -331,7 +332,7 @@ void main() {
     expect(router.routerDelegate.state.uri.path, AppRoutes.llmSettings);
   });
 
-  testWidgets('错误或取消验证保持锁定，正确PIN进入且跨设置复用15分钟窗口', (tester) async {
+  testWidgets('取消验证返回我的，错误PIN保持锁定，正确PIN跨设置复用15分钟窗口', (tester) async {
     await tester.runAsync(unlockParentForTesting);
     access.lock();
     final router = createAppRouter(initialLocation: AppRoutes.settings);
@@ -346,9 +347,12 @@ void main() {
     expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
     await tester.runAsync(() => tester.tap(find.text('取消')));
     await _drainFrames(tester);
+    expect(router.routerDelegate.state.uri.path, AppRoutes.profile);
+    expect(access.isUnlocked, isFalse);
     expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
-    await tester
-        .runAsync(() => tester.tap(find.widgetWithText(FilledButton, '家长解锁')));
+    await tester.runAsync(() async {
+      unawaited(router.push<void>(AppRoutes.settings));
+    });
     await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
     await tester.enterText(
       find.widgetWithText(TextField, '6 位数字 PIN'),
@@ -386,6 +390,55 @@ void main() {
       () => find.byType(LlmProviderSettingsPage).evaluate().isNotEmpty,
     );
     expect(_unlockButton, findsNothing);
+  });
+
+  testWidgets('多层设置与AI出题授权失效后只验证一次，取消直接返回我的', (tester) async {
+    await tester.runAsync(unlockParentForTesting);
+    final router = createAppRouter(initialLocation: AppRoutes.profile);
+    await _mount(tester, router);
+    await tester.runAsync(() => tester.tap(find.byTooltip('设置')));
+    await _pumpUntil(tester, () => find.text('学习与内容').evaluate().isNotEmpty);
+    await tester.runAsync(() => tester.tap(find.text('学习与内容')));
+    await _pumpUntil(tester, () => find.text('看图说话题库').evaluate().isNotEmpty);
+    await tester.runAsync(() => tester.tap(find.text('看图说话题库')));
+    await _pumpUntil(
+      tester,
+      () => find.byType(PictureStoryManagementPage).evaluate().isNotEmpty,
+    );
+    await tester.runAsync(() => tester.tap(find.byTooltip('AI 出题')));
+    await _pumpUntil(
+      tester,
+      () => find.byType(PictureStoryGeneratePage).evaluate().isNotEmpty,
+    );
+    expect(_unlockButton, findsNothing);
+    // 精确15分钟边界由服务测试验证；失效通知沿用同一 lock() 路径。
+    await tester.runAsync(() => tester.tap(find.text('题目数量')));
+    await _pumpUntil(tester, () => find.byType(BottomSheet).evaluate().isNotEmpty);
+    await tester.runAsync(() async => access.lock());
+    await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.byType(PictureStoryGeneratePage, skipOffstage: false),
+      findsNothing,
+    );
+    await tester.runAsync(() => tester.tap(find.text('取消')));
+    await _drainFrames(tester);
+    expect(router.routerDelegate.state.uri.path, AppRoutes.profile);
+    expect(find.byType(ProfilePage), findsOneWidget);
+    expect(
+      find.byType(ParentAccessBoundary, skipOffstage: false),
+      findsNothing,
+    );
+    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
+    expect(
+      find.byType(PictureStoryManagementPage, skipOffstage: false),
+      findsNothing,
+    );
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(router.canPop(), isFalse);
+    expect(access.isUnlocked, isFalse);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('一次性恢复码只进入重设，保持原目标锁定且不会误退底层页', (tester) async {

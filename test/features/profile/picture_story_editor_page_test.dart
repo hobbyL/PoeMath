@@ -106,6 +106,19 @@ class _ParentAccess extends ParentAccessService {
     unlocked = true;
     notifyListeners();
   }
+
+  @override
+  Future<bool> authenticate(
+    String secret, {
+    bool recovery = false,
+    bool Function()? isCurrent,
+  }) async {
+    if (secret != testParentPin || recovery || isCurrent?.call() == false) {
+      return false;
+    }
+    unlock();
+    return true;
+  }
 }
 
 void main() {
@@ -524,7 +537,14 @@ void main() {
       addTearDown(subscription.close);
       await container.read(pictureStoryImageBytesProvider(id).future);
     });
-    access.unlock();
+    await tester.enterText(
+      find.widgetWithText(TextField, '6 位数字 PIN'),
+      testParentPin,
+    );
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(FilledButton, '解锁'));
+      await tester.pump();
+    });
     await tester.pumpAndSettle();
     expect(find.byType(PictureStoryEditorPage), findsOneWidget);
     expect(

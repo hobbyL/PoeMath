@@ -15,13 +15,14 @@ import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/providers/backup_protection_providers.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/features/profile/settings_page.dart';
 import 'package:poemath/features/profile/widgets/backup_import_flow.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 
 void main() {
-  testWidgets('直接访问设置路由也需家长验证，取消后不能挂载设置页', (tester) async {
+  testWidgets('直接访问设置需家长验证，取消后返回我的且不能挂载设置页', (tester) async {
     await tester.runAsync(() async {
       await setUpHiveForTesting();
       await unlockParentForTesting();
@@ -30,6 +31,10 @@ void main() {
     final router = createAppRouter(initialLocation: AppRoutes.settings);
     addTearDown(() => tester.runAsync(tearDownHiveForTesting));
     addTearDown(router.dispose);
+    addTearDown(() async {
+      await tester.runAsync(() => tester.pumpWidget(const SizedBox.shrink()));
+      ParentAccessService.instance.lock();
+    });
     await tester.runAsync(() async {
       await tester.pumpWidget(
         ProviderScope(child: MaterialApp.router(routerConfig: router)),
@@ -39,12 +44,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('家长解锁'), findsWidgets);
     expect(find.text('家长保护与云额度'), findsNothing);
-    await tester.runAsync(() => tester.tap(find.text('取消')));
+    // 返回我的会读取本地快照，导航帧也要在真实异步域中执行。
+    await tester.runAsync(() async {
+      await tester.tap(find.text('取消'));
+      await tester.pump();
+    });
     await tester.pumpAndSettle();
-    expect(find.text('请由家长解锁后继续'), findsOneWidget);
+    expect(router.routerDelegate.state.uri.path, AppRoutes.profile);
+    expect(ParentAccessService.instance.isUnlocked, isFalse);
+    expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
     expect(find.text('家长保护与云额度'), findsNothing);
-    await tester.pumpWidget(const SizedBox.shrink());
-    ParentAccessService.instance.lock();
   });
 
   testWidgets('整包解密后可选择跳过未来版本凭据并恢复学习设置', (tester) async {

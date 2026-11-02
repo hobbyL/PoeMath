@@ -227,7 +227,9 @@ void main() {
     expect(find.byType(AlertDialog), findsOneWidget);
     lockParentForTesting();
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.widgetWithText(FilledButton, '清理缓存'), findsNothing);
+    expect(find.widgetWithText(FilledButton, '解锁'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.byType(StorageManagementPage), findsNothing);
     expect(service.cleared, isEmpty);
     expect(find.text('请由家长解锁后继续'), findsOneWidget);
