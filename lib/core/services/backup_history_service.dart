@@ -29,17 +29,15 @@ class BackupSnapshot {
 /// 旧明文历史迁移只加密原始 JSON，保留其中已有字段。
 class BackupHistoryService {
   BackupHistoryService({
-    required BackupService backup,
+    required this._backup,
     Future<Directory> Function()? directoryProvider,
     DateTime Function()? clock,
-    Future<List<int>> Function()? keyProvider,
+    this._keyProvider,
     SecureCredentialStore? credentialStore,
     this.retention = 10,
-  })  : _backup = backup,
-        _directoryProvider =
+  })  : _directoryProvider =
             directoryProvider ?? getApplicationSupportDirectory,
         _clock = clock ?? DateTime.now,
-        _keyProvider = keyProvider,
         _credentialStore = credentialStore ?? SecureCredentialStore();
   final BackupService _backup;
   final Future<List<int>> Function()? _keyProvider;

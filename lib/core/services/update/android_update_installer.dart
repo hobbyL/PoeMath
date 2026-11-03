@@ -29,10 +29,9 @@ class UpdateInstallException implements Exception {
 /// - 调用系统安装器安装 APK
 class AndroidUpdateInstaller {
   AndroidUpdateInstaller({
-    MethodChannel channel = const MethodChannel('com.poemath.app/app_update'),
+    this._channel = const MethodChannel('com.poemath.app/app_update'),
     bool? isAndroid,
-  })  : _channel = channel,
-        _isAndroid = isAndroid ?? Platform.isAndroid;
+  })  : _isAndroid = isAndroid ?? Platform.isAndroid;
 
   final MethodChannel _channel;
   final bool _isAndroid;

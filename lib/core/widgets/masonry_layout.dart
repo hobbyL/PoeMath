@@ -49,9 +49,7 @@ class RenderMasonry extends RenderBox
     with
         ContainerRenderObjectMixin<RenderBox, MasonryParentData>,
         RenderBoxContainerDefaultsMixin<RenderBox, MasonryParentData> {
-  RenderMasonry({required int columnCount, required double gap})
-      : _columnCount = columnCount,
-        _gap = gap;
+  RenderMasonry({required this._columnCount, required this._gap});
 
   int _columnCount;
   double _gap;

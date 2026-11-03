@@ -18,8 +18,7 @@ import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 
 class _FakeFiles extends TextbookFileService {
-  _FakeFiles(this.usage, {void Function(String)? onAction})
-      : _onAction = onAction;
+  _FakeFiles(this.usage, {this._onAction});
 
   final void Function(String)? _onAction;
   TextbookStorageUsage usage;
@@ -89,8 +88,7 @@ class _FakeFiles extends TextbookFileService {
 }
 
 class _FakeCourses extends TextbookCourseRepository {
-  _FakeCourses(this.onClear, {void Function(String)? onAction})
-      : _onAction = onAction;
+  _FakeCourses(this.onClear, {this._onAction});
 
   final void Function() onClear;
   final void Function(String)? _onAction;
@@ -114,9 +112,8 @@ class _UnusedBox implements Box<dynamic> {
 }
 
 class _FakeRepo extends TextbookRepository {
-  _FakeRepo({void Function(String)? onAction})
-      : _onAction = onAction,
-        super(box: const _UnusedBox());
+  _FakeRepo({this._onAction})
+      : super(box: const _UnusedBox());
   final void Function(String)? _onAction;
   final deleted = <String>[];
 
@@ -128,9 +125,8 @@ class _FakeRepo extends TextbookRepository {
 }
 
 class _FakeCleanup extends TextbookProgressCleanup {
-  _FakeCleanup({void Function(String)? onAction})
-      : _onAction = onAction,
-        super(box: const _UnusedBox());
+  _FakeCleanup({this._onAction})
+      : super(box: const _UnusedBox());
   final void Function(String)? _onAction;
   final deleted = <String>[];
 

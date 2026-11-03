@@ -29,7 +29,7 @@ class TextbookDownloadCancelled extends TextbookFileException {
 }
 
 class TextbookImportToken {
-  TextbookImportToken({void Function()? authorize}) : _authorize = authorize;
+  TextbookImportToken({this._authorize});
   final void Function()? _authorize;
   bool _cancelled = false;
   final _abort = Completer<void>();
@@ -104,7 +104,7 @@ class TextbookFileService {
     NarrationAudioCache? narrationAudioCache,
     TextbookPdfValidator? validator,
     http.Client Function()? clientFactory,
-    Duration requestTimeout = const Duration(seconds: 30),
+    this._requestTimeout = const Duration(seconds: 30),
     this.maxFileSize = 250 * 1024 * 1024,
   })  : narrationCache = narrationAudioCache ??
             NarrationAudioCache(
@@ -115,8 +115,7 @@ class TextbookFileService {
         _pickerCacheDirectoryProvider =
             pickerCacheDirectoryProvider ?? _pickerCacheDirectory,
         _validator = validator ?? _validatePdf,
-        _clientFactory = clientFactory ?? http.Client.new,
-        _requestTimeout = requestTimeout;
+        _clientFactory = clientFactory ?? http.Client.new;
   final Future<Directory> Function() _directoryProvider;
   final Future<Directory?> Function() _pickerCacheDirectoryProvider;
   final TextbookPdfValidator _validator;

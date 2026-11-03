@@ -174,8 +174,8 @@ class _SpeakHandle {
     required this.sessionId,
     required this.text,
     required this.onReady,
-    required Completer<void> completer,
-  }) : _completer = completer;
+    required this._completer,
+  });
 
   final int sessionId;
   final String text;

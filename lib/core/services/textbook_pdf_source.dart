@@ -10,7 +10,7 @@ class TextbookDraftCancelled implements Exception {
 }
 
 class TextbookDraftToken {
-  TextbookDraftToken({void Function()? authorize}) : _authorize = authorize;
+  TextbookDraftToken({this._authorize});
   final void Function()? _authorize;
   bool _cancelled = false;
   bool get cancelled => _cancelled;

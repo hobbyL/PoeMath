@@ -7,10 +7,8 @@ import 'package:poemath/core/services/update/update_models.dart';
 
 /// 可注入返回值/异常并统计调用次数的 fake 客户端。
 class _FakeUpdateClient extends UpdateClient {
-  _FakeUpdateClient({AppUpdateInfo? latest, Object? error})
-      : _latest = latest,
-        _error = error,
-        super(updateUrl: 'https://example.com/latest.json');
+  _FakeUpdateClient({this._latest, this._error})
+      : super(updateUrl: 'https://example.com/latest.json');
 
   final AppUpdateInfo? _latest;
   final Object? _error;
@@ -28,11 +26,9 @@ class _FakeUpdateClient extends UpdateClient {
 /// 覆写平台支持与当前版本的 fake 安装器。
 class _FakeUpdateInstaller extends AndroidUpdateInstaller {
   _FakeUpdateInstaller({
-    required AppVersionInfo current,
-    bool supported = true,
-  })  : _current = current,
-        _supported = supported,
-        super(isAndroid: true);
+    required this._current,
+    this._supported = true,
+  })  : super(isAndroid: true);
 
   final AppVersionInfo _current;
   final bool _supported;

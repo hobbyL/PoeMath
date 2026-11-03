@@ -32,27 +32,20 @@ final class LlmClient {
   LlmClient({
     http.Client? httpClient,
     CloudUsageService? usage,
-    Duration generateTimeout = const Duration(seconds: 60),
-    Duration probeTimeout = const Duration(seconds: 15),
-    Duration explainTimeout = const Duration(seconds: 60),
+    this._generateTimeout = const Duration(seconds: 60),
+    this._probeTimeout = const Duration(seconds: 15),
+    this._explainTimeout = const Duration(seconds: 60),
     Duration chatTimeout = const Duration(seconds: 90),
-    bool Function()? isActive,
-    Future<void> Function(LlmConfig config, String model)? onModelSucceeded,
-    Future<void> Function(LlmConfig request, LlmConfig successful)?
-        onSelectionSucceeded,
+    this._isActive,
+    this._onModelSucceeded,
+    this._onSelectionSucceeded,
   })  : _usage = usage ?? CloudUsageService.instance,
-        _isActive = isActive,
-        _onModelSucceeded = onModelSucceeded,
-        _onSelectionSucceeded = onSelectionSucceeded,
         _httpClient = BoundedHttpClient(
           httpClient ?? http.Client(),
           timeout: chatTimeout,
           maxResponseBytes: _maxResponseBytes,
         ),
         _ownsHttpClient = httpClient == null,
-        _generateTimeout = generateTimeout,
-        _probeTimeout = probeTimeout,
-        _explainTimeout = explainTimeout,
         _chatTimeout = chatTimeout;
 
   final BoundedHttpClient _httpClient;

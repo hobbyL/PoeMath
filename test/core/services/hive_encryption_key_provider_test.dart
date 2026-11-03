@@ -20,9 +20,8 @@ final class _InertSecureStorage implements FlutterSecureStorage {
 
 /// 内存安全存储，可按 key 注入读取失败。
 final class _MemoryStore extends SecureCredentialStore {
-  _MemoryStore({Set<String> throwOnRead = const {}})
-      : _throwOnRead = throwOnRead,
-        super(storage: const _InertSecureStorage());
+  _MemoryStore({this._throwOnRead = const {}})
+      : super(storage: const _InertSecureStorage());
 
   final Set<String> _throwOnRead;
   Object? readError;

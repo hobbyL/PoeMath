@@ -28,8 +28,7 @@ class HiveKeyUnavailable implements Exception {
 /// **只负责「取到一把密钥」，不负责判断这把密钥能不能解开现有 box** ——
 /// 那是 `HiveEncryptionKeyResolver` 的职责（它需要看迁移状态）。
 class HiveEncryptionKeyProvider {
-  HiveEncryptionKeyProvider({required SecureCredentialStore store})
-      : _store = store;
+  HiveEncryptionKeyProvider({required this._store});
 
   final SecureCredentialStore _store;
 

@@ -24,12 +24,11 @@ class ImageGenerationClient {
   ImageGenerationClient({
     http.Client? httpClient,
     CloudUsageService? usage,
-    bool Function()? isActive,
+    this._isActive,
     Duration timeout = const Duration(seconds: 180),
   })  : _inner = httpClient ?? http.Client(),
         _ownsClient = httpClient == null,
-        _usage = usage ?? CloudUsageService.instance,
-        _isActive = isActive {
+        _usage = usage ?? CloudUsageService.instance {
     _http = BoundedHttpClient(
       _inner,
       timeout: timeout,

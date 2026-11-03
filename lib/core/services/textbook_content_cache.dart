@@ -13,8 +13,8 @@ import 'package:poemath/data/models/textbook_page_text.dart';
 class TextbookContentCache {
   TextbookContentCache({
     required this.book,
-    required Future<Directory> Function() directoryProvider,
-  }) : _directoryProvider = directoryProvider {
+    required this._directoryProvider,
+  }) {
     if (!Textbook.isValidId(book.pdfSha256)) {
       throw ArgumentError.value(book.pdfSha256, 'pdfSha256');
     }

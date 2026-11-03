@@ -18,14 +18,13 @@ typedef UpdateAvailableCallback =
 /// 自动更新检测控制器。
 class UpdateCheckController {
   UpdateCheckController({
-    required bool updateCheckConfigured,
+    required this._updateCheckConfigured,
     required this.client,
     required this.installer,
     required this.onAvailable,
     this.recheckInterval = const Duration(hours: 1),
     DateTime Function()? now,
-  })  : _updateCheckConfigured = updateCheckConfigured,
-        _now = now ?? DateTime.now;
+  })  : _now = now ?? DateTime.now;
 
   final bool _updateCheckConfigured;
   final UpdateClient client;

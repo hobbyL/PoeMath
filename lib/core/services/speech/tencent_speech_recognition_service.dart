@@ -32,12 +32,10 @@ abstract interface class SpeechRecognitionService {
 final class TencentSpeechRecognitionService
     implements SpeechRecognitionService {
   TencentSpeechRecognitionService({
-    required SpeechAudioRecorder recorder,
-    required TencentAsrClient tencentClient,
-    required SettingsRepository settingsRepository,
-  })  : _recorder = recorder,
-        _tencentClient = tencentClient,
-        _settingsRepository = settingsRepository;
+    required this._recorder,
+    required this._tencentClient,
+    required this._settingsRepository,
+  });
 
   final SpeechAudioRecorder _recorder;
   final TencentAsrClient _tencentClient;

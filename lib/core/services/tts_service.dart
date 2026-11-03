@@ -90,15 +90,11 @@ class TtsService {
   TtsService(
     this._settings, {
     FlutterTts? flutterTts,
-    WorkerTtsClient? cloudClient,
-    CloudAudioPlayer? cloudPlayer,
-    SystemTtsFileSynthesizer? fileSynthesizer,
-    NarrationPlayer Function()? narrationPlayerFactory,
-  })  : _tts = flutterTts ?? FlutterTts(),
-        _cloudClient = cloudClient,
-        _cloudPlayer = cloudPlayer,
-        _fileSynthesizer = fileSynthesizer,
-        _narrationPlayerFactory = narrationPlayerFactory;
+    this._cloudClient,
+    this._cloudPlayer,
+    this._fileSynthesizer,
+    this._narrationPlayerFactory,
+  })  : _tts = flutterTts ?? FlutterTts();
 
   /// 当前是否正在朗读。
   bool get isSpeaking => _isSpeaking;

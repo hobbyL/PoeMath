@@ -31,14 +31,11 @@ final class PreferredSpeechRecognitionService
         StreamingSpeechRecognitionService,
         RetainedAudioSpeechRecognitionService {
   PreferredSpeechRecognitionService({
-    required SpeechAudioRecorder recorder,
-    required TencentAsrClient sentenceClient,
-    required TencentRealtimeAsrClient realtimeClient,
-    required SettingsRepository settingsRepository,
-  })  : _recorder = recorder,
-        _sentenceClient = sentenceClient,
-        _realtimeClient = realtimeClient,
-        _settingsRepository = settingsRepository;
+    required this._recorder,
+    required this._sentenceClient,
+    required this._realtimeClient,
+    required this._settingsRepository,
+  });
 
   final SpeechAudioRecorder _recorder;
   final TencentAsrClient _sentenceClient;

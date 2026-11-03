@@ -35,11 +35,10 @@ class NotificationService {
 
   @visibleForTesting
   NotificationService.forTesting({
-    required FlutterLocalNotificationsPlugin plugin,
-    required LocalTimeZoneIdentifierResolver localTimeZoneIdentifierResolver,
+    required this._plugin,
+    required this._localTimeZoneIdentifierResolver,
     this.onNotificationTap,
-  })  : _plugin = plugin,
-        _localTimeZoneIdentifierResolver = localTimeZoneIdentifierResolver;
+  });
 
   static final NotificationService instance = NotificationService._();
 

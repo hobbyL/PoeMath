@@ -56,17 +56,15 @@ class StorageCacheSnapshot {
 /// 由实际文件所有者统计占用；正式题图只读，其他持久数据不在清理范围。
 class StorageManagementService {
   StorageManagementService({
-    required TextbookFileService textbooks,
-    required TtsService tts,
+    required this._textbooks,
+    required this._tts,
     PictureStoryImageService? pictureStoryImages,
     Future<Directory> Function()? supportDirectoryProvider,
     Future<Directory> Function()? temporaryDirectoryProvider,
     ImageCache? imageCache,
     void Function()? authorize,
     Future<void> Function()? preparePickerCleanup,
-  })  : _textbooks = textbooks,
-        _tts = tts,
-        _pictureStoryImages = pictureStoryImages ??
+  })  : _pictureStoryImages = pictureStoryImages ??
             PictureStoryImageService(
               directoryProvider: supportDirectoryProvider,
             ),

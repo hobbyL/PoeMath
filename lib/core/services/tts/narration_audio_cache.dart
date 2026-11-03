@@ -18,8 +18,8 @@ class NarrationAudio {
     this.bytes,
     required this.format,
     this.identity,
-    void Function()? release,
-  }) : _release = release;
+    this._release,
+  });
   final String? path;
   final Uint8List? bytes;
   final String format;

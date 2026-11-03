@@ -32,13 +32,12 @@ final class TencentRealtimeAsrClient {
   TencentRealtimeAsrClient({
     DateTime Function()? clock,
     Random? random,
-    Duration timeout = const Duration(seconds: 12),
+    this._timeout = const Duration(seconds: 12),
     CloudUsageService? usage,
     TencentAppIdClient? appIdClient,
     Future<WebSocket> Function(Uri)? connectSocket,
   })  : _clock = clock ?? DateTime.now,
         _random = random ?? Random.secure(),
-        _timeout = timeout,
         _usage = usage ?? CloudUsageService.instance,
         _appIdClient = appIdClient ?? TencentAppIdClient(),
         _ownsAppIdClient = appIdClient == null,
@@ -316,16 +315,12 @@ final class TencentRealtimeAsrClient {
 
 final class TencentRealtimeAsrSession {
   TencentRealtimeAsrSession._({
-    required WebSocket socket,
-    required StreamSubscription<Object?> subscription,
-    required Completer<void> finished,
-    required String Function() getFinalText,
-    required TencentRealtimeAsrException? Function() getFailure,
-  })  : _socket = socket,
-        _subscription = subscription,
-        _finished = finished,
-        _getFinalText = getFinalText,
-        _getFailure = getFailure;
+    required this._socket,
+    required this._subscription,
+    required this._finished,
+    required this._getFinalText,
+    required this._getFailure,
+  });
 
   final WebSocket _socket;
   final StreamSubscription<Object?> _subscription;

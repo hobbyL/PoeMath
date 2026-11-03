@@ -197,11 +197,10 @@ class BackupService {
   BackupService({
     SecureCredentialStore? secureStore,
     PictureStoryImageService? pictureStoryImages,
-    PictureStoryRepository? pictureStoryRepository,
+    this._pictureStoryRepository,
   })  : _secureStore = secureStore ?? SecureCredentialStore(),
         _pictureStoryImages =
-            pictureStoryImages ?? PictureStoryImageService.instance,
-        _pictureStoryRepository = pictureStoryRepository;
+            pictureStoryImages ?? PictureStoryImageService.instance;
 
   final SecureCredentialStore _secureStore;
   final PictureStoryImageService _pictureStoryImages;

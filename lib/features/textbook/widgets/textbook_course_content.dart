@@ -515,17 +515,13 @@ class TextbookCourseText extends StatelessWidget {
   const TextbookCourseText._({
     super.key,
     required this.node,
-    required _CourseTextMetrics metrics,
-    bool wrap = false,
-    TextbookReadingLayout readingLayout = const TextbookReadingLayout(),
-    _CourseReadingFlow? flow,
+    required _CourseTextMetrics this._metrics,
+    this._wrap = false,
+    this._flow,
     this.showPinyin = true,
     this.activeRanges = const [],
     this.activeStartKey,
-  })  : _metrics = metrics,
-        _flow = flow,
-        _readingLayout = readingLayout,
-        _wrap = wrap;
+  }) : _readingLayout = const TextbookReadingLayout();
 
   final TextbookCourseParagraph node;
   final bool showPinyin;

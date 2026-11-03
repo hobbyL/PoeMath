@@ -25,7 +25,7 @@ final class WorkerTtsClient {
     http.Client? httpClient,
     CloudUsageService? usage,
     Duration synthesizeTimeout = const Duration(seconds: 30),
-    Duration probeTimeout = const Duration(seconds: 10),
+    this._probeTimeout = const Duration(seconds: 10),
   })  : _usage = usage ?? CloudUsageService.instance,
         _httpClient = BoundedHttpClient(
           httpClient ?? http.Client(),
@@ -33,8 +33,7 @@ final class WorkerTtsClient {
           maxResponseBytes: 8 * 1024 * 1024,
         ),
         _ownsHttpClient = httpClient == null,
-        _synthesizeTimeout = synthesizeTimeout,
-        _probeTimeout = probeTimeout;
+        _synthesizeTimeout = synthesizeTimeout;
 
   final BoundedHttpClient _httpClient;
   final CloudUsageService _usage;

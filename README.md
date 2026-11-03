@@ -172,15 +172,19 @@ lib/
 
 ### 前置条件
 
-- [Flutter](https://flutter.dev) 3.44.6（当前验证与 CI 基线，推荐使用 [FVM](https://fvm.app) 管理）
-- Dart 3.12.2
+- [Flutter](https://flutter.dev) 3.47.8（当前验证与 CI 基线，推荐使用 [FVM](https://fvm.app) 管理）
+- Dart 3.13.7
 - Android 最低版本：Android 7.0（API 24）
 
 Android 最低版本以 `android/app/build.gradle` 的 `minSdk` 为准；图标生成配置
-`flutter_launcher_icons.yaml` 与开发文档必须同步。当前基线对齐 Flutter 3.44.6
+`flutter_launcher_icons.yaml` 与开发文档必须同步。当前基线对齐 Flutter 3.47.8
 及文件选择器的间接依赖 `flutter_plugin_android_lifecycle 2.0.35`，不支持 Android 5/6。
 调整前需评估旧设备影响，调整后运行 `python3 tools/check_android_compatibility.py`；
 测试和发版 CI 均执行此检查。本地 `AGENTS.md`、模拟器指南存在时也会参与检查。
+
+Flutter 3.47.8 / Dart 3.13.7 包含 Android TLS 证书校验安全修复；必须使用该
+SDK 重新构建 APK，更新配置文件无法修补已安装的旧应用。
+依据：[Dart SDK 官方安全公告](https://github.com/dart-lang/sdk/security/advisories/GHSA-frr6-h895-5pxp)。
 
 ### 快速开始
 
