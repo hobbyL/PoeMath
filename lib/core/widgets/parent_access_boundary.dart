@@ -103,6 +103,8 @@ Future<_ParentAccessResult> _requestParentAccess(
   ParentAccessService access,
 ) async {
   access.observeLifecycle();
+  // 当前会话已经验证过 PIN，跨页复用这次授权；有效期与后台锁定仍由服务检查。
+  if (access.isUnlocked) return _ParentAccessResult.allowed;
   await access.initialize();
   if (!context.mounted || !_isCurrentPage(context)) {
     return _ParentAccessResult.denied;
@@ -272,8 +274,10 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
   void initState() {
     super.initState();
     _boundaries.add(this);
-    _wasUnlocked = _access.isUnlocked;
     _access.observeLifecycle();
+    _wasUnlocked = _access.isUnlocked;
+    // 已验证的会话可在首帧显示子页，不重新进入安全存储读取和解锁占位页。
+    _ready = _wasUnlocked;
     _access.addListener(_changed);
   }
 

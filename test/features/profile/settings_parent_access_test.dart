@@ -34,11 +34,13 @@ import '../../helpers/parent_access_test_helper.dart';
 
 class _HeldStore extends SecureCredentialStore {
   String? record;
+  int reads = 0;
   Completer<void>? nextRead;
   Completer<void>? readEntered;
 
   @override
   Future<String?> readParentProtection() async {
+    reads++;
     final pending = nextRead;
     nextRead = null;
     readEntered?.complete();
@@ -439,6 +441,150 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final navigatorPush in [false, true]) {
+    testWidgets(
+        '${navigatorPush ? 'Navigator' : 'GoRouter'}子页复用有效授权，首帧不显示保护页且不重复读取安全存储',
+        (tester) async {
+      final store = _HeldStore();
+      final controlled = ParentAccessService(store: store);
+      addTearDown(controlled.dispose);
+      await tester.runAsync(() async {
+        await controlled.configure(testParentPin);
+        controlled.lock();
+        expect(await controlled.authenticate(testParentPin), isTrue);
+      });
+      var authorizedActions = 0;
+      Widget childPage() => ParentAccessBoundary(
+            service: controlled,
+            child: Builder(
+              builder: (context) => Scaffold(
+                appBar: AppBar(title: const Text('真实子页面')),
+                body: FilledButton(
+                  onPressed: () async {
+                    if (await ensureParentAccess(
+                      context,
+                      service: controlled,
+                    )) {
+                      authorizedActions++;
+                    }
+                  },
+                  child: const Text('管理操作'),
+                ),
+              ),
+            ),
+          );
+
+      final router = GoRouter(
+        initialLocation: AppRoutes.settings,
+        routes: [
+          GoRoute(
+            path: AppRoutes.settings,
+            builder: (_, state) => ParentAccessBoundary(
+              service: controlled,
+              child: Builder(
+                builder: (context) => Scaffold(
+                  appBar: AppBar(title: const Text('已解锁的设置')),
+                  body: FilledButton(
+                    onPressed: () {
+                      if (navigatorPush) {
+                        unawaited(
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => childPage(),
+                            ),
+                          ),
+                        );
+                      } else {
+                        unawaited(context.push<void>(AppRoutes.llmSettings));
+                      }
+                    },
+                    child: const Text('进入子页'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.llmSettings,
+            builder: (_, state) => childPage(),
+          ),
+        ],
+      );
+      await _mount(tester, router);
+      final readsBeforeNavigation = store.reads;
+      final release = Completer<void>();
+      store.nextRead = release;
+      addTearDown(() {
+        if (!release.isCompleted) release.complete();
+      });
+
+      await tester.runAsync(() => tester.tap(find.text('进入子页')));
+      await tester.runAsync(() => tester.pump());
+      expect(
+        find.byType(ParentAccessBoundary, skipOffstage: false),
+        findsNWidgets(2),
+      );
+      expect(find.text('真实子页面', skipOffstage: false), findsOneWidget);
+      expect(find.text('家长保护', skipOffstage: false), findsNothing);
+      expect(store.reads, readsBeforeNavigation);
+
+      // 安全存储即使两秒后仍未响应，也不应阻塞仍有效的授权。
+      await tester.runAsync(() => tester.pump(const Duration(seconds: 2)));
+      await tester.runAsync(() => tester.tap(find.text('管理操作')));
+      await _drainFrames(tester);
+      expect(find.text('真实子页面'), findsOneWidget);
+      expect(authorizedActions, 1);
+      expect(store.reads, readsBeforeNavigation);
+      expect(find.text('家长保护', skipOffstage: false), findsNothing);
+      expect(controlled.isUnlocked, isTrue);
+    });
+  }
+
+  testWidgets('授权精确到期后新页面重新验证，读取期间不挂载管理内容', (tester) async {
+    final store = _HeldStore();
+    var now = DateTime(2026, 11, 3, 10);
+    final controlled = ParentAccessService(store: store, clock: () => now);
+    addTearDown(controlled.dispose);
+    await tester.runAsync(() => controlled.configure(testParentPin));
+    expect(controlled.isUnlocked, isTrue);
+    now = now.add(ParentAccessService.unlockDuration);
+    expect(controlled.isUnlocked, isFalse);
+
+    final release = Completer<void>();
+    final entered = Completer<void>();
+    store.nextRead = release;
+    store.readEntered = entered;
+    addTearDown(() {
+      if (!release.isCompleted) release.complete();
+    });
+    final router = GoRouter(
+      initialLocation: AppRoutes.llmSettings,
+      routes: [
+        GoRoute(
+          path: AppRoutes.llmSettings,
+          builder: (_, state) => ParentAccessBoundary(
+            service: controlled,
+            child: const Scaffold(body: Text('已过期授权不能查看的管理内容')),
+          ),
+        ),
+      ],
+    );
+    await _mount(tester, router);
+    expect(entered.isCompleted, isTrue);
+    expect(
+      find.text('已过期授权不能查看的管理内容', skipOffstage: false),
+      findsNothing,
+    );
+    await tester.runAsync(() async => release.complete());
+    await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
+    expect(controlled.isUnlocked, isFalse);
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.text('已过期授权不能查看的管理内容', skipOffstage: false),
+      findsNothing,
+    );
+  });
+
   testWidgets('一次性恢复码只进入重设，保持原目标锁定且不会误退底层页', (tester) async {
     final recovery = await tester.runAsync(unlockParentForTesting);
     access.lock();
@@ -669,6 +815,8 @@ void main() {
     testWidgets('安全记录损坏时${configured ? '已设置' : '首次设置'}入口保持锁定，可重试缺失记录',
         (tester) async {
       if (configured) await tester.runAsync(unlockParentForTesting);
+      // 损坏记录模拟新一轮验证；已验证且未过期的会话在跨页时复用。
+      access.lock();
       FlutterSecureStorage.setMockInitialValues({'parent_protection': '{}'});
       final router = createAppRouter(initialLocation: AppRoutes.settings);
       await _mount(tester, router);
