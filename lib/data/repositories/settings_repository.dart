@@ -1771,7 +1771,7 @@ class SettingsRepository {
   ///
   /// **顺序必须是「先写安全存储成功，再清 Hive」**：任一条写失败就保留该条
   /// 原值（明文留在 Hive 里仍可被读取，比直接丢失凭据安全），并只记日志、
-  /// 不中断整批迁移。写失败时不落盘，因此 `changed` 为 false 时 Hive 不变。
+  /// 不中断整批迁移。每条独立提交，空凭据配置无需写入。
   Future<void> migratePlaintextWebDavCredentials() =>
       CredentialConfigurationAccess.exclusive(
         _migratePlaintextWebDavCredentials,
@@ -1782,42 +1782,49 @@ class SettingsRepository {
     final result = WebDavConfig.decodeListDetailed(raw);
     if (result.configs.isEmpty) return;
 
-    var changed = false;
-    final cleaned = <WebDavConfig>[];
     for (final config in result.configs) {
       if (config.username.isEmpty && config.password.isEmpty) {
-        cleaned.add(config);
         continue;
       }
       try {
-        await _credentialStore.saveWebDavCredentials(
-          configId: config.id,
-          username: config.username,
-          password: config.password,
-        );
-        // 安全存储写入成功后，才在 Hive 副本中置空凭据。
-        cleaned.add(
-          WebDavConfig(
-            id: config.id,
-            name: config.name,
-            url: config.url,
-            username: '',
-            password: '',
-            remotePath: config.remotePath,
-          ),
-        );
-        changed = true;
-      } on Object catch (error) {
+        await _migrateWebDavConfig(config);
+      } on Object {
         AppLogger.e(
           'WebDAV 凭据迁移失败，保留 Hive 原值',
           tag: 'Startup',
-          error: error,
         );
-        cleaned.add(config);
       }
     }
-    if (changed) await _saveConfigsToHive(cleaned);
   }
+
+  Future<void> _migrateWebDavConfig(WebDavConfig config) =>
+      _changeCredentialConfiguration(
+        kind: 'webdav',
+        id: config.id,
+        requireParent: false,
+        settingsKeys: [_keyWebDavConfigs],
+        work: (undo, authorize) async {
+          await _changeWebDavCredentials(
+            config.id,
+            (username: config.username, password: config.password),
+            undo,
+            authorize,
+          );
+          await _saveConfigsToHive(
+            webDavConfigs.map((c) {
+              if (c.id != config.id) return c;
+              return WebDavConfig(
+                id: c.id,
+                name: c.name,
+                url: c.url,
+                username: '',
+                password: '',
+                remotePath: c.remotePath,
+              );
+            }).toList(),
+          );
+        },
+      );
 
   /// 加载完整的 WebDAV 配置（含凭据）。
   ///
@@ -1850,33 +1857,7 @@ class SettingsRepository {
 
     // 安全存储无数据，检查 Hive 中是否有旧明文凭据（迁移）
     if (config.username.isNotEmpty && config.password.isNotEmpty) {
-      await _changeCredentialConfiguration(
-        kind: 'webdav',
-        id: config.id,
-        requireParent: false,
-        settingsKeys: [_keyWebDavConfigs],
-        work: (undo, authorize) async {
-          await _changeWebDavCredentials(
-            config.id,
-            (username: config.username, password: config.password),
-            undo,
-            authorize,
-          );
-          // 清除 Hive 中的明文凭据
-          await _saveConfigsToHive(
-            webDavConfigs.map((c) {
-              return WebDavConfig(
-                id: c.id,
-                name: c.name,
-                url: c.url,
-                username: '',
-                password: '',
-                remotePath: c.remotePath,
-              );
-            }).toList(),
-          );
-        },
-      );
+      await _migrateWebDavConfig(config);
       return config; // 原始 config 已含凭据
     }
 

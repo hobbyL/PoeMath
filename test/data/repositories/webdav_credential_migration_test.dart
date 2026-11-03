@@ -9,6 +9,8 @@
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
+import 'package:poemath/core/constants/hive_keys.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/webdav_config.dart';
@@ -36,7 +38,7 @@ final class FakeCredentialStore extends SecureCredentialStore {
       : super(storage: const _InertSecureStorage());
 
   /// 为 true 时 `saveWebDavCredentials` 抛错，模拟安全存储不可用。
-  final bool failWrites;
+  bool failWrites;
 
   /// configId → (username, password)，只保留最后一次写入。
   final Map<String, ({String username, String password})> saved = {};
@@ -117,6 +119,38 @@ void main() {
   }
 
   group('migratePlaintextWebDavCredentials', () {
+    test('启动失败后单账号补迁移保留其他账号，重开存储仍可迁移', () async {
+      useStore(failWrites: true);
+      await _seedRawConfigs([
+        _plaintextConfig(id: 'a', username: 'user-a', password: 'secret-a'),
+        _plaintextConfig(id: 'b', username: 'user-b', password: 'secret-b'),
+      ]);
+      await repo.migratePlaintextWebDavCredentials();
+      expect(store.saved, isEmpty);
+      store.failWrites = false;
+      final a =
+          await repo.loadWebDavConfigWithCredentials(repo.webDavConfigs.first);
+      expect(a.password, 'secret-a');
+      expect(store.saved.keys, ['a']);
+      expect(repo.webDavConfigs.last.password, 'secret-b');
+      expect(repo.webDavConfigs.first.password, isEmpty);
+
+      await HiveBoxes.settings.close();
+      HiveBoxes.settings = await Hive.openBox<dynamic>(
+        HiveKeys.settingsBox,
+        crashRecovery: false,
+      );
+      final restarted = SettingsRepository(credentialStore: store);
+      await restarted.migratePlaintextWebDavCredentials();
+      final b = await restarted
+          .loadWebDavConfigWithCredentials(restarted.webDavConfigs.last);
+      expect(b.username, 'user-b');
+      expect(b.password, 'secret-b');
+      expect(store.saved.keys, ['a', 'b']);
+      expect(_rawHiveJson(), isNot(contains('secret-a')));
+      expect(_rawHiveJson(), isNot(contains('secret-b')));
+    });
+
     test('Hive 明文凭据 → 迁入安全存储且 Hive 置空', () async {
       useStore();
       await _seedRawConfigs([_plaintextConfig()]);
@@ -276,10 +310,7 @@ void main() {
 }
 
 /// 第一次写入成功、后续抛错 —— 用于验证逐条独立处理。
-final class _FailOnSecondStore extends SecureCredentialStore {
-  _FailOnSecondStore() : super(storage: const _InertSecureStorage());
-
-  final Map<String, ({String username, String password})> saved = {};
+final class _FailOnSecondStore extends FakeCredentialStore {
   var _calls = 0;
 
   @override
