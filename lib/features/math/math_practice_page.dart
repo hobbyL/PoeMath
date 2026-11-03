@@ -121,7 +121,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         // 仍走原弹窗/直接恢复语义。
         final draftIsVertical =
             (draft['request'] as Map<String, dynamic>?)?['mode'] ==
-                ProblemMode.vertical.name;
+            ProblemMode.vertical.name;
         final intentIsVertical = intent?.mode == ProblemMode.vertical;
         final sameScheme =
             intent == null || draftIsVertical == intentIsVertical;
@@ -129,8 +129,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         final resume = !sameScheme
             ? false // 意图不同：丢草稿走新练习（下方 remove）。
             : widget.resume
-                ? true
-                : await choosePracticeResume(context, '口算');
+            ? true
+            : await choosePracticeResume(context, '口算');
         if (!mounted) return;
         if (resume == null) {
           if (context.canPop()) {
@@ -157,9 +157,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       );
       if (!mounted) return;
       if (_ready) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('练习已恢复，进度或结算暂未保存，请重试')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('练习已恢复，进度或结算暂未保存，请重试')));
       } else {
         setState(() => _generationError = '上次练习暂时无法恢复，请返回首页放弃草稿后重试');
       }
@@ -168,14 +167,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   Future<void> _restoreDraft(Map<String, dynamic> draft) async {
     final problems = (draft['problems'] as List<dynamic>)
-        .map(
-          (p) => MathProblem.fromJson(p as Map<String, dynamic>),
-        )
+        .map((p) => MathProblem.fromJson(p as Map<String, dynamic>))
         .toList();
     final records = (draft['records'] as List<dynamic>)
-        .map(
-          (r) => ProblemRecord.fromJson(r as Map<String, dynamic>),
-        )
+        .map((r) => ProblemRecord.fromJson(r as Map<String, dynamic>))
         .toList();
     final index = draft['index'] as int;
     if (problems.isEmpty ||
@@ -185,8 +180,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         records.length > index + 1) {
       throw const FormatException('草稿答题位置无效');
     }
-    _request =
-        MathPracticeRequest.fromJson(draft['request'] as Map<String, dynamic>);
+    _request = MathPracticeRequest.fromJson(
+      draft['request'] as Map<String, dynamic>,
+    );
     _sessionBatchSize = _request!.count;
     _sessionProblems = problems;
     _draftIndex = index;
@@ -213,15 +209,18 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           legacyInput.length <= fields.length) {
         final digits = legacyInput.padLeft(fields.length, '0');
         for (var i = 0; i < fields.length; i++) {
-          _verticalAttempt =
-              _verticalAttempt.withField(fields[i].$1, digits[i]);
+          _verticalAttempt = _verticalAttempt.withField(
+            fields[i].$1,
+            digits[i],
+          );
         }
         _answerController.clear();
       }
     }
     // 旧草稿可能停留在已移除的进退位栏，恢复到可填写的结果数位。
     final savedField = draft['verticalField'] as String?;
-    _verticalField = VerticalAttempt.supports(problems[index]) &&
+    _verticalField =
+        VerticalAttempt.supports(problems[index]) &&
             VerticalAttempt.fieldsFor(problems[index])
                 .any((entry) => entry.$1 == savedField)
         ? savedField!
@@ -229,8 +228,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     ref.read(mathProblemsProvider.notifier).state = problems;
     ref.read(mathCurrentIndexProvider.notifier).state = index;
     ref.read(mathAnsweredCountProvider.notifier).state = records.length;
-    ref.read(mathCorrectCountProvider.notifier).state =
-        records.where((r) => r.isCorrect).length;
+    ref.read(mathCorrectCountProvider.notifier).state = records
+        .where((r) => r.isCorrect)
+        .length;
     if (records.length > index) {
       final record = records[index];
       _judgement = _judgeRecordedAnswer(problems[index], record);
@@ -334,13 +334,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     );
     final request = _request ??=
         ref.read(nextMathPracticeRequestProvider.notifier).consume() ??
-            MathPracticeRequest(
-              grade: ref.read(mathGradeProvider),
-              semester: ref.read(mathSemesterProvider),
-              count: batchSize,
-              mode: ref.read(mathPracticeModeProvider),
-              difficulty: defaultDifficulty,
-            );
+        MathPracticeRequest(
+          grade: ref.read(mathGradeProvider),
+          semester: ref.read(mathSemesterProvider),
+          count: batchSize,
+          mode: ref.read(mathPracticeModeProvider),
+          difficulty: defaultDifficulty,
+        );
     final grade = request.grade;
     final semester = request.semester;
     final difficulty = request.difficulty;
@@ -359,9 +359,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       }
       practiceMode = null;
       ref.read(mathPracticeModeProvider.notifier).state = null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('所选模式不适用于当前年级或难度，已切换为综合练习')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('所选模式不适用于当前年级或难度，已切换为综合练习')));
     }
 
     List<MathProblem> problems;
@@ -440,9 +440,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       isComplete: false,
       semester: _request!.semester,
       difficulty: _request!.difficulty.name,
-      problemsJson: jsonEncode(
-        _problemRecords.map((r) => r.toJson()).toList(),
-      ),
+      problemsJson: jsonEncode(_problemRecords.map((r) => r.toJson()).toList()),
     );
     if (_completedAt == null) await _drafts.guard(() => sessions.save(session));
 
@@ -471,8 +469,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
             skillId: problem.skillId,
             semester: problem.semester,
             problemJson: jsonEncode(problem.toJson()),
-            attemptJson:
-                record.attempt == null ? null : jsonEncode(record.attempt),
+            attemptJson: record.attempt == null
+                ? null
+                : jsonEncode(record.attempt),
             activityId: 'math_mistake_attempt:$_sessionId:$i',
           ),
         );
@@ -633,9 +632,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       await _saveDraft();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('答题进度或结算保存失败，请重试')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('答题进度或结算保存失败，请重试')));
       }
     } finally {
       _submitting = false;
@@ -684,9 +682,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       finishedAt: completedAt,
       semester: _request!.semester,
       difficulty: _request!.difficulty.name,
-      problemsJson: jsonEncode(
-        _problemRecords.map((r) => r.toJson()).toList(),
-      ),
+      problemsJson: jsonEncode(_problemRecords.map((r) => r.toJson()).toList()),
     );
 
     final repo = ref.read(mathSessionRepoProvider);
@@ -712,10 +708,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final levelBeforeReward = statsRepo.get().level;
     if (stars > 0) {
       await _drafts.guard(
-        () => statsRepo.addStars(
-          stars,
-          activityId: activityId,
-        ),
+        () => statsRepo.addStars(stars, activityId: activityId),
       );
     }
     await _drafts.guard(
@@ -752,7 +745,11 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
     // 成就自动检查
     if (!mounted) return;
-    final newlyUnlocked = await checkAchievements(ref, latestSession: session);
+    final newlyUnlocked = await checkAchievements(
+      ref,
+      latestSession: session,
+      mutation: _drafts,
+    );
     if (!mounted) return;
 
     // 刷新首页统计 providers
@@ -884,26 +881,27 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                     // 题目文本（竖式模式特殊展示）
                     KeyedSubtree(
                       key: ValueKey('q_$currentIndex'),
-                      child: (problem.mode == ProblemMode.vertical
-                              ? VerticalCalcWidget(
-                                  problem: problem,
-                                  showAnswer: _judgement != null,
-                                ) as Widget
-                              : MathText(
-                                  problem.problemText,
-                                  style: TypographyTokens.mathProblemStyle(
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ))
-                          .animatePage(context)
-                          .fadeIn(duration: 350.ms)
-                          .slideX(
-                            begin: 0.12,
-                            end: 0,
-                            duration: 350.ms,
-                            curve: Curves.easeOutCubic,
-                          ),
+                      child:
+                          (problem.mode == ProblemMode.vertical
+                                  ? VerticalCalcWidget(
+                                      problem: problem,
+                                      showAnswer: _judgement != null,
+                                    ) as Widget
+                                  : MathText(
+                                      problem.problemText,
+                                      style: TypographyTokens.mathProblemStyle(
+                                        color: theme.colorScheme.onSurface,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ))
+                              .animatePage(context)
+                              .fadeIn(duration: 350.ms)
+                              .slideX(
+                                begin: 0.12,
+                                end: 0,
+                                duration: 350.ms,
+                                curve: Curves.easeOutCubic,
+                              ),
                     ),
                     const SizedBox(height: SpacingTokens.xl),
 
@@ -934,11 +932,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                 );
                 final progress = LinearProgressIndicator(
                   value: (currentIndex + 1) / problems.length,
-                  backgroundColor:
-                      theme.colorScheme.primary.withValues(alpha: 0.1),
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.1,
+                  ),
                   color: theme.colorScheme.primary,
-                  borderRadius:
-                      BorderRadius.circular(SpacingTokens.radiusSmall),
+                  borderRadius: BorderRadius.circular(
+                    SpacingTokens.radiusSmall,
+                  ),
                 );
                 return Column(
                   children: [
@@ -948,8 +948,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                       child: LayoutBuilder(
                         builder: (context, area) => SingleChildScrollView(
                           child: ConstrainedBox(
-                            constraints:
-                                BoxConstraints(minHeight: area.maxHeight),
+                            constraints: BoxConstraints(
+                              minHeight: area.maxHeight,
+                            ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -1120,12 +1121,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     if (problem == null || judgement == null) return const SizedBox.shrink();
     final isWide = MediaQuery.sizeOf(context).width >= 420;
     void open() => showMathAiExplainSheet(
-          context,
-          problemText: problem.problemText,
-          correctAnswer: problem.answerText,
-          userAnswer: judgement.isCorrect ? null : _userAnswerOfCurrent(),
-          diagnosisCategory: judgement.diagnosis?.category,
-        );
+      context,
+      problemText: problem.problemText,
+      correctAnswer: problem.answerText,
+      userAnswer: judgement.isCorrect ? null : _userAnswerOfCurrent(),
+      diagnosisCategory: judgement.diagnosis?.category,
+    );
     return isWide
         ? TextButton.icon(
             onPressed: open,
@@ -1161,24 +1162,30 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           horizontal: SpacingTokens.md,
           vertical: SpacingTokens.sm,
         ),
-        child: SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _submitting || _isFinishing ? null : _nextProblem,
-            icon: const Icon(Icons.arrow_forward_rounded),
-            label: Text(
-              ref.read(mathCurrentIndexProvider) + 1 >=
-                      ref.read(mathProblemsProvider).length
-                  ? '查看成绩'
-                  : '下一题',
-            ),
-          ),
-        ).animatePage(context).fadeIn(duration: 250.ms).slideY(
-              begin: 0.2,
-              end: 0,
-              duration: 250.ms,
-              curve: Curves.easeOutCubic,
-            ),
+        child:
+            SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _submitting || _isFinishing
+                        ? null
+                        : _nextProblem,
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: Text(
+                      ref.read(mathCurrentIndexProvider) + 1 >=
+                              ref.read(mathProblemsProvider).length
+                          ? '查看成绩'
+                          : '下一题',
+                    ),
+                  ),
+                )
+                .animatePage(context)
+                .fadeIn(duration: 250.ms)
+                .slideY(
+                  begin: 0.2,
+                  end: 0,
+                  duration: 250.ms,
+                  curve: Curves.easeOutCubic,
+                ),
       );
     }
 
@@ -1201,8 +1208,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         setState(() {
           if (process) {
             if (RegExp(r'^\d$').hasMatch(digit)) {
-              _verticalAttempt =
-                  _verticalAttempt.withField(_verticalField, digit);
+              _verticalAttempt = _verticalAttempt.withField(
+                _verticalField,
+                digit,
+              );
               _queueDraftSave();
             }
             return;
@@ -1228,7 +1237,8 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         });
       },
       onSubmit: _submitAnswer,
-      submitEnabled: !_submitting &&
+      submitEnabled:
+          !_submitting &&
           (process
               ? _verticalAttempt.complete(problem)
               : _answerController.text.isNotEmpty),
@@ -1279,8 +1289,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                     fontSize: TypographyTokens.fsTitle,
                     fontWeight: FontWeight.bold,
                     color: _answerController.text.isEmpty
-                        ? theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.5)
+                        ? theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.5,
+                          )
                         : theme.colorScheme.onSurface,
                   ),
                 ),
@@ -1290,8 +1301,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                     child: Text(
                       '例如：3…2',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                     ),
                   ),
@@ -1301,10 +1313,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         if (problem?.mode == ProblemMode.vertical && !process)
           Padding(
             padding: const EdgeInsets.only(top: SpacingTokens.xs),
-            child: Text(
-              '请使用下方键盘填写完整结果。',
-              style: theme.textTheme.bodySmall,
-            ),
+            child: Text('请使用下方键盘填写完整结果。', style: theme.textTheme.bodySmall),
           ),
       ],
     );
@@ -1323,13 +1332,11 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
               child: OutlinedButton(
                 onPressed: () => _submitCompareAnswer(symbol),
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                    color: theme.colorScheme.primary,
-                    width: 2,
-                  ),
+                  side: BorderSide(color: theme.colorScheme.primary, width: 2),
                   shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(SpacingTokens.radiusMedium),
+                    borderRadius: BorderRadius.circular(
+                      SpacingTokens.radiusMedium,
+                    ),
                   ),
                 ),
                 child: Text(

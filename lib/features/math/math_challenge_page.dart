@@ -24,6 +24,7 @@ import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
@@ -68,6 +69,7 @@ class MathChallengePage extends ConsumerStatefulWidget {
 
 class _MathChallengePageState extends ConsumerState<MathChallengePage>
     with TickerProviderStateMixin, WidgetsBindingObserver {
+  final _learningWrites = PracticeDraftRepository();
   static const _initialSeconds = 60;
   static const _bonusSeconds = 3; // 答对加 3 秒（仅续命模式）
   static const _comboThreshold = 5; // 连续 5 题触发 combo 奖励
@@ -184,7 +186,8 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     final grade = ref.read(mathGradeProvider);
     final semester = ref.read(mathSemesterProvider);
     final difficulty = DifficultyLevel.values.byName(settings.mathDifficulty);
-    final vertical = _verticalScheme &&
+    final vertical =
+        _verticalScheme &&
         MathEngine.supportedModes(
           grade: grade,
           semester: semester,
@@ -207,9 +210,8 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
         error: error,
         stackTrace: stack,
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前方案暂时无法出题，请调整选择后重试')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('当前方案暂时无法出题，请调整选择后重试')));
       return;
     }
     setState(() {
@@ -409,7 +411,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     });
 
     try {
-      await _saveRecord(elapsed: elapsed, stars: stars);
+      await _learningWrites.guard(
+        () => _saveRecord(elapsed: elapsed, stars: stars),
+      );
       if (!mounted) return;
       // 挑战页只落 ChallengeRecord，但「单次全对 / 困难全对」类成就的判定
       // 口径来自 MathSession（见 AchievementChecker._sessionPerfect）。这里把
@@ -418,6 +422,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       final newlyUnlocked = await checkAchievements(
         ref,
         latestSession: _asAchievementSession(elapsed: elapsed, stars: stars),
+        mutation: _learningWrites,
       );
 
       if (!mounted) return;
@@ -446,8 +451,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
         await showCelebration(
           context,
           type: CelebrationType.achievement,
-          subtitle:
-              newlyUnlocked.map((achievement) => achievement.title).join('、'),
+          subtitle: newlyUnlocked
+              .map((achievement) => achievement.title)
+              .join('、'),
         );
       }
     } catch (error, stackTrace) {
@@ -469,10 +475,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   }
 
   /// 保存挑战记录及其关联统计。
-  Future<void> _saveRecord({
-    required int elapsed,
-    required int stars,
-  }) async {
+  Future<void> _saveRecord({required int elapsed, required int stars}) async {
     final request = _challengeRequest!;
     final grade = request.grade;
     final semester = request.semester;
@@ -588,8 +591,8 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
             child: _finished
                 ? _buildResult(theme)
                 : _started
-                    ? _buildChallenge(theme)
-                    : _buildStart(theme),
+                ? _buildChallenge(theme)
+                : _buildStart(theme),
           ),
         ),
       ),
@@ -806,8 +809,10 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
         if (_answerPending) return;
         setState(() {
           if (process) {
-            _verticalAttempt =
-                _verticalAttempt.withField(_verticalField, digit);
+            _verticalAttempt = _verticalAttempt.withField(
+              _verticalField,
+              digit,
+            );
           } else if (NumberKeypad.canAppend(_controller.text, digit)) {
             _controller.text += digit;
           }
@@ -819,13 +824,16 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
           if (process) {
             _verticalAttempt = _verticalAttempt.withField(_verticalField, '');
           } else if (_controller.text.isNotEmpty) {
-            _controller.text =
-                _controller.text.substring(0, _controller.text.length - 1);
+            _controller.text = _controller.text.substring(
+              0,
+              _controller.text.length - 1,
+            );
           }
         });
       },
       onSubmit: _submitAnswer,
-      submitEnabled: !_answerPending &&
+      submitEnabled:
+          !_answerPending &&
           (process
               ? _verticalAttempt.complete(problem)
               : _controller.text.isNotEmpty),
@@ -840,8 +848,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
       initialSeconds: _initialSeconds,
       extending: _challengeMode == 'extending',
     );
-    final timeColor =
-        timeRatio > 0.3 ? theme.colorScheme.primary : theme.colorScheme.error;
+    final timeColor = timeRatio > 0.3
+        ? theme.colorScheme.primary
+        : theme.colorScheme.error;
     final problem = _currentProblem!;
     final process = VerticalAttempt.supports(problem);
 
@@ -891,10 +900,10 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                   builder: (context, child) {
                     final dx = _shakeController.isAnimating
                         ? 10 *
-                            (1 - _shakeController.value) *
-                            (_shakeController.value * 4 * 3.14159)
-                                .remainder(3.14159)
-                                .abs()
+                              (1 - _shakeController.value) *
+                              (_shakeController.value * 4 * 3.14159)
+                                  .remainder(3.14159)
+                                  .abs()
                         : 0.0;
                     return Transform.translate(
                       offset: Offset(dx, 0),
@@ -1002,8 +1011,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
   }
 
   Widget _buildResult(ThemeData theme) {
-    final accuracy =
-        _totalAnswered > 0 ? (_correctCount / _totalAnswered * 100).round() : 0;
+    final accuracy = _totalAnswered > 0
+        ? (_correctCount / _totalAnswered * 100).round()
+        : 0;
 
     return Center(
       child: AnimatedPageBody(
@@ -1145,8 +1155,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed:
-                      _isSaving ? null : () => Navigator.of(context).pop(),
+                  onPressed: _isSaving
+                      ? null
+                      : () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.arrow_back),
                   label: const Text('返回'),
                   style: OutlinedButton.styleFrom(
@@ -1160,9 +1171,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                   onPressed: _isSaving ? null : _restartChallenge,
                   icon: const Icon(Icons.replay_rounded),
                   label: const Text('再来一次'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
                 ),
               ),
             ],

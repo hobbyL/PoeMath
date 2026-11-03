@@ -19,6 +19,8 @@ import 'package:poemath/features/poem/poem_detail_page.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
+import '../../helpers/hive_test_helper.dart';
+
 class _MockTtsService extends Mock implements TtsService {}
 
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
@@ -67,6 +69,9 @@ Future<void> _pumpDetailPage(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(setUpHiveForTesting);
+  tearDown(tearDownHiveForTesting);
+
   testWidgets('详情页窄屏：长句缩到字号下限后换行，字号不低于下限', (tester) async {
     tester.view.physicalSize = const Size(320, 800);
     tester.view.devicePixelRatio = 1.0;
@@ -128,7 +133,10 @@ void main() {
 
     // 当前句是 Wrap（逐字填空），整行被 AutoFitLine 包住保证单行缩小。
     expect(
-      find.descendant(of: find.byType(AutoFitLine), matching: find.byType(Wrap)),
+      find.descendant(
+        of: find.byType(AutoFitLine),
+        matching: find.byType(Wrap),
+      ),
       findsOneWidget,
     );
 

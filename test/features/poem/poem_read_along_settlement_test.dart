@@ -13,6 +13,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../helpers/recording_sound_service.dart';
+import '../../helpers/hive_test_helper.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -173,7 +175,8 @@ void main() {
   late _MockTtsService tts;
   late _MockSettingsRepository settings;
 
-  setUp(() {
+  setUp(() async {
+    await setUpHiveForTesting();
     sound = RecordingSoundService();
     tts = _MockTtsService();
     settings = _MockSettingsRepository();
@@ -183,6 +186,8 @@ void main() {
     when(() => settings.loadSpeechRecognitionSettings())
         .thenAnswer((_) async => _verifiedSettings);
   });
+
+  tearDown(tearDownHiveForTesting);
 
   Future<void> pumpPage(
     WidgetTester tester, {
@@ -200,8 +205,9 @@ void main() {
           poemByIdProvider(_poemId).overrideWith((ref) => _poem),
           userStatsRepoProvider.overrideWith((ref) => statsRepo),
           checkInRepoProvider.overrideWith((ref) => checkInRepo),
-          learningActivityRepositoryProvider
-              .overrideWith((ref) => activityRepo),
+          learningActivityRepositoryProvider.overrideWith(
+            (ref) => activityRepo,
+          ),
         ],
         child: MaterialApp(
           home: MediaQuery(

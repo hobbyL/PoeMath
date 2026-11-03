@@ -18,6 +18,8 @@ import 'package:poemath/features/poem/poem_read_along_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/read_along_voice_status_button.dart';
 
+import '../../helpers/hive_test_helper.dart';
+
 class _MockTtsService extends Mock implements TtsService {}
 
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
@@ -61,8 +63,9 @@ final class _FakeSpeechRecognitionService implements SpeechRecognitionService {
       _isRecording = false;
       throw stopError!;
     }
-    final result = await (stopCompleter?.future ??
-        Future.value(const SpeechRecognitionResult(text: '床前明月光')));
+    final result =
+        await (stopCompleter?.future ??
+            Future.value(const SpeechRecognitionResult(text: '床前明月光')));
     _isRecording = false;
     return result;
   }
@@ -103,7 +106,8 @@ void main() {
   late _MockTtsService tts;
   late _MockSettingsRepository settings;
 
-  setUp(() {
+  setUp(() async {
+    await setUpHiveForTesting();
     tts = _MockTtsService();
     settings = _MockSettingsRepository();
     when(() => tts.stop()).thenAnswer((_) async {});
@@ -113,17 +117,12 @@ void main() {
     when(() => settings.loadSpeechRecognitionSettings())
         .thenAnswer((_) async => _verifiedSettings);
   });
+  tearDown(tearDownHiveForTesting);
 
   testWidgets('跟读页首帧应直接显示诗句内容', (tester) async {
     final speech = _FakeSpeechRecognitionService();
 
-    await _pumpPage(
-      tester,
-      speech,
-      tts,
-      settings,
-      settleAnimations: false,
-    );
+    await _pumpPage(tester, speech, tts, settings, settleAnimations: false);
     await tester.pump();
 
     expect(find.text('床前明月光，'), findsOneWidget);
@@ -188,9 +187,7 @@ void main() {
 
   testWidgets('录音状态显示秒数与聆听提示，点击后进入识别状态并展示结果', (tester) async {
     final recognition = Completer<SpeechRecognitionResult>();
-    final speech = _FakeSpeechRecognitionService(
-      stopCompleter: recognition,
-    );
+    final speech = _FakeSpeechRecognitionService(stopCompleter: recognition);
 
     await _pumpPage(tester, speech, tts, settings);
     await tester.pump();
@@ -213,9 +210,7 @@ void main() {
     expect(find.byKey(const ValueKey('read-along-voice-dots')), findsOneWidget);
     expect(speech.stopCalls, 1);
 
-    recognition.complete(
-      const SpeechRecognitionResult(text: '床前明月光'),
-    );
+    recognition.complete(const SpeechRecognitionResult(text: '床前明月光'));
     await tester.pump();
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -300,9 +295,7 @@ void main() {
 
   testWidgets('录音达到十五秒后自动进入识别状态', (tester) async {
     final recognition = Completer<SpeechRecognitionResult>();
-    final speech = _FakeSpeechRecognitionService(
-      stopCompleter: recognition,
-    );
+    final speech = _FakeSpeechRecognitionService(stopCompleter: recognition);
 
     await _pumpPage(tester, speech, tts, settings);
     await tester.tap(find.text('读一读'));
@@ -314,9 +307,7 @@ void main() {
     expect(speech.stopCalls, 1);
     expect(find.text('识别中'), findsOneWidget);
 
-    recognition.complete(
-      const SpeechRecognitionResult(text: '床前明月光'),
-    );
+    recognition.complete(const SpeechRecognitionResult(text: '床前明月光'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpWidget(const SizedBox.shrink());

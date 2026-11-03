@@ -25,6 +25,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -117,6 +118,7 @@ class PoemDictationPage extends ConsumerStatefulWidget {
 }
 
 class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
+  final _learningWrites = PracticeDraftRepository();
   // ── 诗句数据 ──
   List<String> _lines = [];
   final List<bool> _lineResults = [];
@@ -284,9 +286,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
     ]..shuffle();
 
     final want = tiles.length >= 12 ? 0 : 12 - tiles.length;
-    tiles.addAll(
-      distractPool.take(want).map((ch) => _CandidateTile(ch)),
-    );
+    tiles.addAll(distractPool.take(want).map((ch) => _CandidateTile(ch)));
 
     tiles.shuffle();
     return tiles;
@@ -461,30 +461,32 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
     final activities = ref.read(learningActivityRepositoryProvider);
     final checkIn = ref.read(checkInRepoProvider);
     try {
-      if (!_progressRecorded) {
-        await progress.recordStudy(widget.poemId);
-        _progressRecorded = true;
-      }
-      await stats.updatePoemStats(learned: progress.learnedCount);
-      await activities.record(
-        id: activityId,
-        activityType: LearningActivityType.poemDictation,
-        totalItems: total,
-        successfulItems: successful,
-        poemId: widget.poemId,
-        starsEarned: stars,
-        durationSeconds: duration,
-        completedAt: completedAt,
-        detailsJson: detailsJson,
-      );
-      if (stars > 0) await stats.addStars(stars, activityId: activityId);
-      await checkIn.updateForDate(
-        completedAt,
-        activityId: activityId,
-        addPoems: 1,
-        addStars: stars,
-        addDuration: duration,
-      );
+      await _learningWrites.guard(() async {
+        if (!_progressRecorded) {
+          await progress.recordStudy(widget.poemId);
+          _progressRecorded = true;
+        }
+        await stats.updatePoemStats(learned: progress.learnedCount);
+        await activities.record(
+          id: activityId,
+          activityType: LearningActivityType.poemDictation,
+          totalItems: total,
+          successfulItems: successful,
+          poemId: widget.poemId,
+          starsEarned: stars,
+          durationSeconds: duration,
+          completedAt: completedAt,
+          detailsJson: detailsJson,
+        );
+        if (stars > 0) await stats.addStars(stars, activityId: activityId);
+        await checkIn.updateForDate(
+          completedAt,
+          activityId: activityId,
+          addPoems: 1,
+          addStars: stars,
+          addDuration: duration,
+        );
+      });
       _settled = true;
       if (mounted) unawaited(ref.read(soundServiceProvider).playCompletion());
     } on Object catch (error, stack) {
@@ -602,17 +604,16 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
                           _handwriteStrokeData = null;
                         });
                         if (next) {
-                          final target =
-                              _targetCharsOf(_lines[_currentLineIndex]);
+                          final target = _targetCharsOf(
+                            _lines[_currentLineIndex],
+                          );
                           if (target.isNotEmpty) {
                             unawaited(_loadHandwriteStrokeData(target.first));
                           }
                         }
                       },
                 showSelectedIcon: false,
-                style: const ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                ),
+                style: const ButtonStyle(visualDensity: VisualDensity.compact),
               ),
             ),
           ),
@@ -628,9 +629,7 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
                     color: theme.colorScheme.surface,
                     backgroundOpacity: 0.6,
                     padding: EdgeInsets.zero,
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
+                    child: const Center(child: CircularProgressIndicator()),
                   ),
                 ),
             ],
@@ -702,13 +701,9 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
               child: _handwriteLoading
                   ? const Center(child: CircularProgressIndicator())
                   : SingleChildScrollView(
-                      padding: const EdgeInsets.only(
-                        top: SpacingTokens.sm,
-                      ),
+                      padding: const EdgeInsets.only(top: SpacingTokens.sm),
                       child: PoemSentenceWritingSheet(
-                        targetChars: _targetCharsOf(
-                          _lines[_currentLineIndex],
-                        ),
+                        targetChars: _targetCharsOf(_lines[_currentLineIndex]),
                         confirmedChars: _handwritten,
                         currentStrokeData: _handwriteStrokeData,
                         onCharConfirmed: _onHandwriteCharConfirmed,
@@ -767,18 +762,15 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
           return Container(
             width: 40,
             height: 48,
-            margin: const EdgeInsets.symmetric(
-              horizontal: 2,
-              vertical: 4,
-            ),
+            margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
             alignment: Alignment.center,
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
                   color: _judging
                       ? (isCorrect
-                          ? theme.semantic.success
-                          : theme.colorScheme.error)
+                            ? theme.semantic.success
+                            : theme.colorScheme.error)
                       : theme.colorScheme.primary,
                   width: 2,
                 ),
@@ -789,8 +781,8 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
               style: theme.textTheme.headlineSmall?.copyWith(
                 color: _judging
                     ? (isCorrect
-                        ? theme.semantic.success
-                        : theme.colorScheme.error)
+                          ? theme.semantic.success
+                          : theme.colorScheme.error)
                     : theme.colorScheme.onSurface,
                 fontWeight: FontWeight.bold,
                 fontFamilyFallback: TypographyTokens.serifFallback,
@@ -813,39 +805,44 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
         final tile = entry.value;
 
         return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _onCandidateTap(tile),
-            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-            child: AnimatedContainer(
-              duration: 200.ms,
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: tile.used
-                    ? theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5)
-                    : theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _onCandidateTap(tile),
                 borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-                border: Border.all(
-                  color: tile.used
-                      ? theme.colorScheme.onSurface.withValues(alpha: 0.08)
-                      : theme.colorScheme.primary.withValues(alpha: 0.2),
+                child: AnimatedContainer(
+                  duration: 200.ms,
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: tile.used
+                        ? theme.colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.5,
+                          )
+                        : theme.colorScheme.primaryContainer.withValues(
+                            alpha: 0.5,
+                          ),
+                    borderRadius: BorderRadius.circular(
+                      SpacingTokens.radiusMedium,
+                    ),
+                    border: Border.all(
+                      color: tile.used
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.08)
+                          : theme.colorScheme.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    tile.char,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: tile.used
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.25)
+                          : null,
+                    ),
+                  ),
                 ),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                tile.char,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: tile.used
-                      ? theme.colorScheme.onSurface.withValues(alpha: 0.25)
-                      : null,
-                ),
-              ),
-            ),
-          ),
-        )
+            )
             .animate()
             .scale(
               begin: const Offset(0, 0),
@@ -871,80 +868,89 @@ class _PoemDictationPageState extends ConsumerState<PoemDictationPage> {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(SpacingTokens.lg),
-        child: ColoredCard(
-          color: passed ? theme.semantic.success : theme.semantic.caution,
-          width: double.infinity,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                passed ? Icons.emoji_events_rounded : Icons.refresh_rounded,
-                size: 56,
-                color: passed ? theme.semantic.success : theme.semantic.caution,
-              ),
-              const SizedBox(height: SpacingTokens.md),
-              Text(
-                passed ? '听写完成！' : '再听一遍，会更好！',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color:
-                      passed ? theme.semantic.success : theme.semantic.caution,
-                ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              Text(
-                '总得分 ${(score * 100).round()}%'
-                '（${_lineResults.where((r) => r).length}/${_lineResults.length} 句）',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-              if (_targeted) const Text('错句专项完成，仅记录练习；全诗掌握和复习轮次保持原值，不发累计星星。'),
-              for (final snapshot in _snapshots)
-                Padding(
-                  padding: const EdgeInsets.only(top: SpacingTokens.sm),
-                  child: PoemAnswerDifference(
-                    expected: snapshot.expected,
-                    answer: snapshot.answer,
+        child:
+            ColoredCard(
+                  color: passed
+                      ? theme.semantic.success
+                      : theme.semantic.caution,
+                  width: double.infinity,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        passed
+                            ? Icons.emoji_events_rounded
+                            : Icons.refresh_rounded,
+                        size: 56,
+                        color: passed
+                            ? theme.semantic.success
+                            : theme.semantic.caution,
+                      ),
+                      const SizedBox(height: SpacingTokens.md),
+                      Text(
+                        passed ? '听写完成！' : '再听一遍，会更好！',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: passed
+                              ? theme.semantic.success
+                              : theme.semantic.caution,
+                        ),
+                      ),
+                      const SizedBox(height: SpacingTokens.sm),
+                      Text(
+                        '总得分 ${(score * 100).round()}%'
+                        '（${_lineResults.where((r) => r).length}/${_lineResults.length} 句）',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: SpacingTokens.md),
+                      if (_targeted)
+                        const Text('错句专项完成，仅记录练习；全诗掌握和复习轮次保持原值，不发累计星星。'),
+                      for (final snapshot in _snapshots)
+                        Padding(
+                          padding: const EdgeInsets.only(top: SpacingTokens.sm),
+                          child: PoemAnswerDifference(
+                            expected: snapshot.expected,
+                            answer: snapshot.answer,
+                          ),
+                        ),
+                      const SizedBox(height: SpacingTokens.lg),
+                      if (_settlementError != null) ...[
+                        Text(
+                          _settlementError!,
+                          style: TextStyle(color: theme.colorScheme.error),
+                        ),
+                        TextButton(
+                          onPressed: _settling ? null : _onAllLinesComplete,
+                          child: const Text('重试保存'),
+                        ),
+                      ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _settled ? _exitWithResult : null,
+                              icon: const Icon(Icons.arrow_back),
+                              label: const Text('完成'),
+                            ),
+                          ),
+                          const SizedBox(width: SpacingTokens.md),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _settled ? _restart : null,
+                              icon: const Icon(Icons.replay),
+                              label: const Text('再来一次'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-              const SizedBox(height: SpacingTokens.lg),
-              if (_settlementError != null) ...[
-                Text(
-                  _settlementError!,
-                  style: TextStyle(color: theme.colorScheme.error),
-                ),
-                TextButton(
-                  onPressed: _settling ? null : _onAllLinesComplete,
-                  child: const Text('重试保存'),
-                ),
-              ],
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _settled ? _exitWithResult : null,
-                      icon: const Icon(Icons.arrow_back),
-                      label: const Text('完成'),
-                    ),
-                  ),
-                  const SizedBox(width: SpacingTokens.md),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _settled ? _restart : null,
-                      icon: const Icon(Icons.replay),
-                      label: const Text('再来一次'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        )
-            .animatePage(context)
-            .fadeIn(duration: 400.ms)
-            .slideY(begin: 0.1, end: 0, duration: 400.ms),
+                )
+                .animatePage(context)
+                .fadeIn(duration: 400.ms)
+                .slideY(begin: 0.1, end: 0, duration: 400.ms),
       ),
     );
   }

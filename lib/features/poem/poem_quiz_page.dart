@@ -18,6 +18,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
@@ -30,11 +31,7 @@ import 'package:poemath/features/poem/quiz/quiz_engine.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
 
 class PoemQuizPage extends ConsumerStatefulWidget {
-  const PoemQuizPage({
-    super.key,
-    required this.poemId,
-    required this.quizType,
-  });
+  const PoemQuizPage({super.key, required this.poemId, required this.quizType});
 
   final String poemId;
   final QuizType quizType;
@@ -44,6 +41,7 @@ class PoemQuizPage extends ConsumerStatefulWidget {
 }
 
 class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
+  final _learningWrites = PracticeDraftRepository();
   QuizSession? _session;
   bool _answered = false;
   final _fillController = TextEditingController();
@@ -144,9 +142,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
     if (questions.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('该诗词无法生成测试题目')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('该诗词无法生成测试题目')));
         Navigator.pop(context);
       }
       return;
@@ -222,7 +219,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
               expected: session.questions[i].correctAnswer,
               answer: session.userAnswers[i] ?? '',
               wholeLine: false,
-              passed: normalizePoemAnswer(session.userAnswers[i] ?? '') ==
+              passed:
+                  normalizePoemAnswer(session.userAnswers[i] ?? '') ==
                   normalizePoemAnswer(session.questions[i].correctAnswer),
             ),
       ],
@@ -241,61 +239,63 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final checkInRepo = ref.read(checkInRepoProvider);
     final reviewRepo = ref.read(reviewRepoProvider);
     try {
-      if (!_progressRecorded) {
-        _recordedProgress = await progressRepo.recordStudy(widget.poemId);
-        _progressRecorded = true;
-      }
-      final progress = _recordedProgress!.copyWith();
-
-      // 更新全局统计
-      final learnedCount = progressRepo.learnedCount;
-      await statsRepo.updatePoemStats(learned: learnedCount);
-      await activityRepo.record(
-        id: activityId,
-        activityType: LearningActivityType.poemQuiz,
-        totalItems: session.questions.length,
-        successfulItems: session.correctCount,
-        poemId: widget.poemId,
-        starsEarned: stars,
-        durationSeconds: duration,
-        completedAt: completedAt,
-        detailsJson: detailsJson,
-      );
-      if (stars > 0) {
-        await statsRepo.addStars(stars, activityId: activityId);
-      }
-      await checkInRepo.updateForDate(
-        completedAt,
-        activityId: activityId,
-        addPoems: 1,
-        addStars: stars,
-        addDuration: duration,
-      );
-      // 通过时更新掌握等级、状态和复习计划
-      if (session.isPassed) {
-        var needSave = false;
-
-        if (progress.masteryLevel < 5) {
-          progress.masteryLevel = 5; // 测试通过 = 等级 5
-          needSave = true;
+      await _learningWrites.guard(() async {
+        if (!_progressRecorded) {
+          _recordedProgress = await progressRepo.recordStudy(widget.poemId);
+          _progressRecorded = true;
         }
+        final progress = _recordedProgress!.copyWith();
 
-        // 测试通过 → 进入复习阶段
-        if (progress.status == LearningStatus.learning) {
-          progress.status = LearningStatus.reviewing;
-          needSave = true;
+        // 更新全局统计
+        final learnedCount = progressRepo.learnedCount;
+        await statsRepo.updatePoemStats(learned: learnedCount);
+        await activityRepo.record(
+          id: activityId,
+          activityType: LearningActivityType.poemQuiz,
+          totalItems: session.questions.length,
+          successfulItems: session.correctCount,
+          poemId: widget.poemId,
+          starsEarned: stars,
+          durationSeconds: duration,
+          completedAt: completedAt,
+          detailsJson: detailsJson,
+        );
+        if (stars > 0) {
+          await statsRepo.addStars(stars, activityId: activityId);
         }
+        await checkInRepo.updateForDate(
+          completedAt,
+          activityId: activityId,
+          addPoems: 1,
+          addStars: stars,
+          addDuration: duration,
+        );
+        // 通过时更新掌握等级、状态和复习计划
+        if (session.isPassed) {
+          var needSave = false;
 
-        if (needSave) {
-          await progressRepo.save(progress);
-        }
+          if (progress.masteryLevel < 5) {
+            progress.masteryLevel = 5; // 测试通过 = 等级 5
+            needSave = true;
+          }
 
-        // 首次通过 → 创建艾宾浩斯复习计划
-        final existing = reviewRepo.get(widget.poemId);
-        if (existing == null) {
-          await reviewRepo.createSchedule(widget.poemId);
+          // 测试通过 → 进入复习阶段
+          if (progress.status == LearningStatus.learning) {
+            progress.status = LearningStatus.reviewing;
+            needSave = true;
+          }
+
+          if (needSave) {
+            await progressRepo.save(progress);
+          }
+
+          // 首次通过 → 创建艾宾浩斯复习计划
+          final existing = reviewRepo.get(widget.poemId);
+          if (existing == null) {
+            await reviewRepo.createSchedule(widget.poemId);
+          }
         }
-      }
+      });
 
       _settled = true;
       if (!mounted) return;
@@ -334,7 +334,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
   Future<List<Achievement>> _checkAchievementsSafely() async {
     try {
-      return await checkAchievements(ref);
+      return await checkAchievements(ref, mutation: _learningWrites);
     } on Object catch (error, stack) {
       AppLogger.e('成就检查失败', tag: 'PoemQuiz', error: error, stackTrace: stack);
       return const [];
@@ -385,9 +385,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
         if (!didPop && session.isFinished) _exitWithResult();
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('${widget.quizType.label} · ${poem.title}'),
-        ),
+        appBar: AppBar(title: Text('${widget.quizType.label} · ${poem.title}')),
         body: Stack(
           children: [
             session.isFinished
@@ -509,11 +507,11 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                 onPressed: _isFinishing
                     ? null
                     : session.currentIndex < session.questions.length - 1
-                        ? _nextQuestion
-                        : () async {
-                            session.advance();
-                            await _finishQuiz();
-                          },
+                    ? _nextQuestion
+                    : () async {
+                        session.advance();
+                        await _finishQuiz();
+                      },
                 icon: Icon(
                   session.currentIndex < session.questions.length - 1
                       ? Icons.arrow_forward
@@ -548,9 +546,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
             decoration: InputDecoration(
               hintText: '请输入答案…',
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(
-                  SpacingTokens.radiusMedium,
-                ),
+                borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: SpacingTokens.md,
@@ -562,10 +558,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
         ),
         if (!_answered) ...[
           const SizedBox(width: SpacingTokens.sm),
-          FilledButton(
-            onPressed: _submitFillAnswer,
-            child: const Text('提交'),
-          ),
+          FilledButton(onPressed: _submitFillAnswer, child: const Text('提交')),
         ],
       ],
     );
@@ -584,7 +577,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
         Color? borderColor;
         Color? textColor;
         final isCorrectOption = option == q.correctAnswer;
-        final isUserWrong = _answered &&
+        final isUserWrong =
+            _answered &&
             !isCorrectOption &&
             option == _session!.userAnswers[_session!.currentIndex];
 
@@ -781,85 +775,90 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
           // 统计卡片（滑入）
           ColoredCard(
-            color: theme.colorScheme.primary,
-            child: Column(
-              children: [
-                Text(
-                  poem?.title ?? '',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                color: theme.colorScheme.primary,
+                child: Column(
                   children: [
-                    _buildStatItem(
-                      context,
-                      '${session.correctCount}/${session.questions.length}',
-                      '正确',
-                    ),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.2),
-                    ),
-                    _buildStatItem(
-                      context,
-                      '${(session.accuracy * 100).toStringAsFixed(0)}%',
-                      '正确率',
-                    ),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.2),
-                    ),
-                    _buildStatItem(context, timeText, '用时'),
-                  ],
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.star_rounded,
-                      size: 18,
-                      color: theme.colorScheme.secondary,
-                    ),
-                    const SizedBox(width: SpacingTokens.xs),
                     Text(
-                      _starsEarned > 0 ? '获得 $_starsEarned 颗星星' : '本次未获得星星',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      poem?.title ?? '',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
-                ),
-                if (session.isPassed) ...[
-                  const SizedBox(height: SpacingTokens.md),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.schedule,
-                        size: 16,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: SpacingTokens.xs),
-                      Text(
-                        '已加入艾宾浩斯复习计划',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.primary,
+                    const SizedBox(height: SpacingTokens.md),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildStatItem(
+                          context,
+                          '${session.correctCount}/${session.questions.length}',
+                          '正确',
                         ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.2,
+                          ),
+                        ),
+                        _buildStatItem(
+                          context,
+                          '${(session.accuracy * 100).toStringAsFixed(0)}%',
+                          '正确率',
+                        ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.2,
+                          ),
+                        ),
+                        _buildStatItem(context, timeText, '用时'),
+                      ],
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.star_rounded,
+                          size: 18,
+                          color: theme.colorScheme.secondary,
+                        ),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Text(
+                          _starsEarned > 0 ? '获得 $_starsEarned 颗星星' : '本次未获得星星',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (session.isPassed) ...[
+                      const SizedBox(height: SpacingTokens.md),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.schedule,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: SpacingTokens.xs),
+                          Text(
+                            '已加入艾宾浩斯复习计划',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
-              ],
-            ),
-          ).animatePage(context).fadeIn(delay: 600.ms, duration: 400.ms).slideY(
+                  ],
+                ),
+              )
+              .animatePage(context)
+              .fadeIn(delay: 600.ms, duration: 400.ms)
+              .slideY(
                 begin: 0.15,
                 end: 0,
                 delay: 600.ms,
@@ -883,11 +882,11 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
           TextButton.icon(
             onPressed: _settled
                 ? () => Navigator.of(context).push<void>(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            PoemPracticeHistoryPage(poemId: widget.poemId),
-                      ),
-                    )
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          PoemPracticeHistoryPage(poemId: widget.poemId),
+                    ),
+                  )
                 : null,
             icon: const Icon(Icons.history),
             label: const Text('回看作答与错句'),

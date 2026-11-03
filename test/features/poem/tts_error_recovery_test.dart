@@ -13,6 +13,8 @@ import 'package:poemath/features/poem/poem_detail_page.dart';
 import 'package:poemath/features/poem/poem_read_along_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
+import '../../helpers/hive_test_helper.dart';
+
 class _MockTtsService extends Mock implements TtsService {}
 
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
@@ -41,7 +43,8 @@ void main() {
   late _MockTtsService tts;
   late _MockSpeechRecognitionService speech;
 
-  setUp(() {
+  setUp(() async {
+    await setUpHiveForTesting();
     tts = _MockTtsService();
     speech = _MockSpeechRecognitionService();
     when(() => tts.stop()).thenAnswer((_) async {});
@@ -50,6 +53,8 @@ void main() {
     when(() => speech.initialize()).thenAnswer((_) async {});
     when(() => speech.cancel()).thenAnswer((_) async {});
   });
+
+  tearDown(tearDownHiveForTesting);
 
   testWidgets('诗词详情朗读失败后恢复朗读按钮并提示', (tester) async {
     final settings = _MockSettingsRepository();
@@ -70,9 +75,7 @@ void main() {
           isFavoriteProvider(_poemId).overrideWith((ref) => false),
           poemProgressProvider(_poemId).overrideWith((ref) => null),
         ],
-        child: const MaterialApp(
-          home: PoemDetailPage(poemId: _poemId),
-        ),
+        child: const MaterialApp(home: PoemDetailPage(poemId: _poemId)),
       ),
     );
     await tester.pump();
@@ -163,9 +166,8 @@ void main() {
   });
 
   testWidgets('开始跟读前停止范读失败时保持空闲并提示', (tester) async {
-    when(() => tts.stop()).thenAnswer(
-      (_) async => throw const TtsException('停止失败'),
-    );
+    when(() => tts.stop())
+        .thenAnswer((_) async => throw const TtsException('停止失败'));
     final settings = _MockSettingsRepository();
     when(() => settings.loadSpeechRecognitionSettings())
         .thenAnswer((_) async => _verifiedSettings);

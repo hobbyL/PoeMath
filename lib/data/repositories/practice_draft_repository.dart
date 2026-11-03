@@ -8,8 +8,8 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 /// 本机草稿不随备份迁移，恢复学习数据成功后清除，避免重放旧结算。
 class PracticeDraftRepository {
   PracticeDraftRepository()
-      : _epoch =
-            HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int;
+    : _epoch =
+          HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int;
 
   final int _epoch;
   static bool _restoring = false;
@@ -29,6 +29,8 @@ class PracticeDraftRepository {
     }
   }
 
+  /// 一次完整结算的跨 box 写入也必须登记，恢复会先排空这些写入。
+  /// 页面在建立时捕获本实例，恢复后不能重新取实例继续提交旧结果。
   Future<T> guard<T>(Future<T> Function() action) async {
     assertCurrent();
     final done = Completer<void>();
@@ -51,7 +53,8 @@ class PracticeDraftRepository {
     try {
       await Future.wait(_active.toList());
       await Future.wait(
-          _writes.values.map((work) => work.catchError((Object _) {})),);
+        _writes.values.map((work) => work.catchError((Object _) {})),
+      );
       return await runZoned(restore, zoneValues: {_restoreZone: true});
     } finally {
       _restoring = false;
@@ -116,7 +119,9 @@ class PracticeDraftRepository {
       if (previous != null) {
         try {
           await previous;
-        } catch (_) {/* 后续检查点允许重试。 */}
+        } catch (_) {
+          /* 后续检查点允许重试。 */
+        }
       }
       await action();
     }();
@@ -129,9 +134,10 @@ class PracticeDraftRepository {
   static Future<void> clearAll({bool advanceEpoch = true}) async {
     if (advanceEpoch) {
       await HiveBoxes.meta.put(
-          'practice_draft_epoch',
-          (HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int) +
-              1,);
+        'practice_draft_epoch',
+        (HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int) +
+            1,
+      );
     }
     // 包括其他档案的草稿；备份会整体替换所有档案数据。
     final keys = HiveBoxes.meta.keys
@@ -144,16 +150,22 @@ class PracticeDraftRepository {
       try {
         await _enqueue(key, () => HiveBoxes.meta.delete(key));
       } on Object catch (error, stackTrace) {
-        AppLogger.e('恢复后草稿缓存清理失败，旧草稿已失效',
-            tag: 'PracticeDraft', error: error, stackTrace: stackTrace,);
+        AppLogger.e(
+          '恢复后草稿缓存清理失败，旧草稿已失效',
+          tag: 'PracticeDraft',
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     }
   }
 
   Stream<void> changes() => HiveBoxes.meta
       .watch()
-      .where((event) =>
-          event.key == 'practice_draft_epoch' ||
-          event.key.toString().contains('_$_prefix'),)
+      .where(
+        (event) =>
+            event.key == 'practice_draft_epoch' ||
+            event.key.toString().contains('_$_prefix'),
+      )
       .map((_) {});
 }

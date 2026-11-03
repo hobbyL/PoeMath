@@ -1,14 +1,54 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/data/repositories/llm_problem_repository.dart';
+
 import '../../helpers/hive_test_helper.dart';
 
 void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
+  test('恢复先排空完整写入链，期间拒绝新结算，恢复后拒绝旧页面', () async {
+    final old = PracticeDraftRepository();
+    final entered = Completer<void>();
+    final proceed = Completer<void>();
+    final writing = expectLater(
+      old.guard(() async {
+        await HiveBoxes.settings.put('pending_completion', 'progress');
+        entered.complete();
+        await proceed.future;
+        await HiveBoxes.settings.put('pending_completion', 'finished');
+      }),
+      throwsStateError,
+    );
+    await entered.future;
+    var restoreEntered = false;
+    final restoring = PracticeDraftRepository.whileRestoring(() async {
+      restoreEntered = true;
+      expect(HiveBoxes.settings.get('pending_completion'), 'finished');
+      await HiveBoxes.meta.put('practice_draft_epoch', 1);
+      await HiveBoxes.settings.delete('pending_completion');
+    });
+    try {
+      await Future<void>.delayed(Duration.zero);
+      expect(restoreEntered, isFalse);
+      await expectLater(
+        PracticeDraftRepository().guard(() async => 1),
+        throwsStateError,
+      );
+    } finally {
+      proceed.complete();
+    }
+    await writing;
+    await restoring;
+    expect(HiveBoxes.settings.get('pending_completion'), isNull);
+    await expectLater(old.guard(() async => 1), throwsStateError);
+    expect(await PracticeDraftRepository().guard(() async => 1), 1);
+  });
   test('排队前固定快照，重开保留输入，旧题组不能删除新草稿', () async {
     final repo = PracticeDraftRepository();
     final snapshot = <String, dynamic>{
@@ -37,7 +77,9 @@ void main() {
     final current = PracticeDraftRepository();
     await current.save('math', {'sessionId': 'after'});
     await expectLater(
-        old.save('math', {'sessionId': 'stale'}), throwsStateError,);
+      old.save('math', {'sessionId': 'stale'}),
+      throwsStateError,
+    );
     await expectLater(old.remove('math'), throwsStateError);
     await expectLater(old.guard(() async => 1), throwsStateError);
     expect(current.get('math')!['sessionId'], 'after');
@@ -47,26 +89,33 @@ void main() {
     final problems = LlmProblemRepository();
     await problems.addAll([
       LlmProblem(
-          id: 'p',
-          profileId: 'default',
-          questionText: '12减4',
-          unit: '个',
-          operands: [12, 4],
-          operators: ['-'],
-          answer: 8,
-          explanation: '相减',
-          batchId: 'batch',
-          createdAt: DateTime(2026, 10),
-          grade: 2,
-          semester: '上',
-          topic: 'subtraction',
-          difficulty: 2,),
+        id: 'p',
+        profileId: 'default',
+        questionText: '12减4',
+        unit: '个',
+        operands: [12, 4],
+        operators: ['-'],
+        answer: 8,
+        explanation: '相减',
+        batchId: 'batch',
+        createdAt: DateTime(2026, 10),
+        grade: 2,
+        semester: '上',
+        topic: 'subtraction',
+        difficulty: 2,
+      ),
     ]);
     Future<void> checkpoint() async {
       await UserStatsRepository().recordMathAttempt(
-          isCorrect: true, bestStreak: 1, activityId: 'word_attempt:session:0',);
-      await problems.recordAttempt('p',
-          correct: true, activityId: 'word_library_attempt:session:0',);
+        isCorrect: true,
+        bestStreak: 1,
+        activityId: 'word_attempt:session:0',
+      );
+      await problems.recordAttempt(
+        'p',
+        correct: true,
+        activityId: 'word_library_attempt:session:0',
+      );
     }
 
     await checkpoint();

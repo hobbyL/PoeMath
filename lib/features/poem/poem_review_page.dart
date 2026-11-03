@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/models/poem_progress.dart';
@@ -43,8 +45,9 @@ class PoemReviewPage extends ConsumerWidget {
                   Icon(
                     Icons.event_available,
                     size: 64,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.3),
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.3,
+                    ),
                   ),
                   const SizedBox(height: SpacingTokens.md),
                   Text(
@@ -80,15 +83,10 @@ class PoemReviewPage extends ConsumerWidget {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: () => _startBatchReview(
-                          context,
-                          ref,
-                          dueToday,
-                        ),
+                        onPressed: () =>
+                            _startBatchReview(context, ref, dueToday),
                         icon: const Icon(Icons.play_circle_outline),
-                        label: Text(
-                          '一键复习今日全部（${dueToday.length} 首）',
-                        ),
+                        label: Text('一键复习今日全部（${dueToday.length} 首）'),
                       ),
                     ),
                     const SizedBox(height: SpacingTokens.lg),
@@ -97,70 +95,54 @@ class PoemReviewPage extends ConsumerWidget {
                   // 今日待复习
                   if (dueToday.isNotEmpty) ...[
                     _buildSectionTitle(
-                      context,
-                      '今日待复习',
-                      '${dueToday.length} 首',
-                      theme.colorScheme.primary,
-                    ).animatePage(context).fadeIn(duration: 300.ms).slideX(
-                          begin: -0.1,
-                          end: 0,
-                          duration: 300.ms,
-                        ),
+                          context,
+                          '今日待复习',
+                          '${dueToday.length} 首',
+                          theme.colorScheme.primary,
+                        )
+                        .animatePage(context)
+                        .fadeIn(duration: 300.ms)
+                        .slideX(begin: -0.1, end: 0, duration: 300.ms),
                     const SizedBox(height: SpacingTokens.sm),
                     ...dueToday.asMap().entries.map(
-                          (e) => _buildReviewItem(
-                            context,
-                            ref,
-                            e.value,
-                            isDue: true,
-                          )
+                      (e) =>
+                          _buildReviewItem(context, ref, e.value, isDue: true)
                               .animatePage(context)
-                              .fadeIn(
-                                delay: (80 * e.key).ms,
-                                duration: 300.ms,
-                              )
+                              .fadeIn(delay: (80 * e.key).ms, duration: 300.ms)
                               .slideX(
                                 begin: 0.1,
                                 end: 0,
                                 delay: (80 * e.key).ms,
                                 duration: 300.ms,
                               ),
-                        ),
+                    ),
                     const SizedBox(height: SpacingTokens.lg),
                   ],
 
                   // 未来复习
                   if (upcoming.isNotEmpty) ...[
                     _buildSectionTitle(
-                      context,
-                      '即将复习',
-                      '${upcoming.length} 首',
-                      theme.colorScheme.secondary,
-                    ).animatePage(context).fadeIn(duration: 300.ms).slideX(
-                          begin: -0.1,
-                          end: 0,
-                          duration: 300.ms,
-                        ),
+                          context,
+                          '即将复习',
+                          '${upcoming.length} 首',
+                          theme.colorScheme.secondary,
+                        )
+                        .animatePage(context)
+                        .fadeIn(duration: 300.ms)
+                        .slideX(begin: -0.1, end: 0, duration: 300.ms),
                     const SizedBox(height: SpacingTokens.sm),
                     ...upcoming.asMap().entries.map(
-                          (e) => _buildReviewItem(
-                            context,
-                            ref,
-                            e.value,
-                            isDue: false,
-                          )
+                      (e) =>
+                          _buildReviewItem(context, ref, e.value, isDue: false)
                               .animatePage(context)
-                              .fadeIn(
-                                delay: (80 * e.key).ms,
-                                duration: 300.ms,
-                              )
+                              .fadeIn(delay: (80 * e.key).ms, duration: 300.ms)
                               .slideX(
                                 begin: 0.1,
                                 end: 0,
                                 delay: (80 * e.key).ms,
                                 duration: 300.ms,
                               ),
-                        ),
+                    ),
                   ],
                 ],
               ),
@@ -174,11 +156,7 @@ class PoemReviewPage extends ConsumerWidget {
       color: theme.colorScheme.primary,
       child: Row(
         children: [
-          Icon(
-            Icons.psychology,
-            size: 32,
-            color: theme.colorScheme.primary,
-          ),
+          Icon(Icons.psychology, size: 32, color: theme.colorScheme.primary),
           const SizedBox(width: SpacingTokens.md),
           Expanded(
             child: Column(
@@ -258,8 +236,8 @@ class PoemReviewPage extends ConsumerWidget {
     final roundLabel = '第 ${schedule.currentRound + 1} 轮';
     final intervalLabel =
         schedule.currentRound < ReviewSchedule.intervals.length
-            ? '${ReviewSchedule.intervals[schedule.currentRound]} 天'
-            : '已完成';
+        ? '${ReviewSchedule.intervals[schedule.currentRound]} 天'
+        : '已完成';
 
     // 距离下次复习天数
     final now = DateTime.now();
@@ -284,8 +262,9 @@ class PoemReviewPage extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
       child: AppTile(
         icon: isDue ? Icons.notifications_active : Icons.schedule,
-        iconColor:
-            isDue ? theme.colorScheme.primary : theme.colorScheme.secondary,
+        iconColor: isDue
+            ? theme.colorScheme.primary
+            : theme.colorScheme.secondary,
         title: poem.title,
         subtitle: '$roundLabel · 间隔 $intervalLabel · $timeLabel',
         trailing: isDue
@@ -331,9 +310,8 @@ class PoemReviewPage extends ConsumerWidget {
                 const SizedBox(height: SpacingTokens.md),
                 Text(
                   '选择复习方式',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(ctx).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 ListTile(
@@ -413,10 +391,7 @@ class PoemReviewPage extends ConsumerWidget {
           ? '今日复习已全部完成！'
           : '已完成 $completedCount/${schedules.length} 首，剩余复习未记录';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 2),
-        ),
+        SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
       );
     }
   }
@@ -431,7 +406,10 @@ class PoemReviewPage extends ConsumerWidget {
   ) async {
     final reviewActivityId =
         'review:${schedule.poemId}:${DateTime.now().microsecondsSinceEpoch}';
+    final learningWrites = PracticeDraftRepository();
     final result = await context.push<PoemPracticeResult>(route);
+
+    if (!context.mounted) return false;
 
     // 侧信道纪律：读取即清空，只消费属于本次练习的分数。
     final score = ref.read(lastPracticeScoreProvider);
@@ -439,106 +417,128 @@ class PoemReviewPage extends ConsumerWidget {
 
     if (!context.mounted) return false;
 
-    final isQuizOutcome = result == PoemPracticeResult.quizPassed ||
-        result == PoemPracticeResult.quizFailed;
-    if (isQuizOutcome) {
-      final reviewRepo = ref.read(reviewRepoProvider);
-      if (result == PoemPracticeResult.quizFailed) {
-        // 未达及格线：有得分才落库（仓储内部不推进、明天重测）；
-        // 无得分不写任何状态。返回 false 中断批量循环（现状语义不变）。
-        if (score != null) {
+    try {
+      return await learningWrites.guard(() async {
+        final isQuizOutcome =
+            result == PoemPracticeResult.quizPassed ||
+            result == PoemPracticeResult.quizFailed;
+        if (isQuizOutcome) {
+          final reviewRepo = ref.read(reviewRepoProvider);
+          if (result == PoemPracticeResult.quizFailed) {
+            // 未达及格线：有得分才落库（仓储内部不推进、明天重测）；
+            // 无得分不写任何状态。返回 false 中断批量循环（现状语义不变）。
+            if (score != null) {
+              await reviewRepo.completeReview(
+                schedule.poemId,
+                score: score,
+                activityId: reviewActivityId,
+              );
+            }
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('本次测试未达 80%，明天再来一轮'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+            ref.invalidate(reviewRepoProvider);
+            ref.invalidate(dueReviewCountProvider);
+            return false;
+          }
+          // 测试通过：带得分自适应推进（>=0.8 推进轮次）。
           await reviewRepo.completeReview(
             schedule.poemId,
             score: score,
             activityId: reviewActivityId,
           );
+        } else if (result?.completesReview != true) {
+          return false;
         }
+
+        // 明确完成后推进复习计划
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('本次测试未达 80%，明天再来一轮'),
-              duration: Duration(seconds: 2),
-            ),
+          final reviewRepo = ref.read(reviewRepoProvider);
+          if (!isQuizOutcome) {
+            // 背诵完成：无得分路径，走原有推进。
+            await reviewRepo.completeReview(
+              schedule.poemId,
+              activityId: reviewActivityId,
+            );
+          }
+
+          // 如果复习全部完成，将状态更新为「已掌握」
+          final nextSchedule = reviewRepo.get(schedule.poemId);
+          if (nextSchedule != null && nextSchedule.isCompleted) {
+            final progressRepo = ref.read(poemProgressRepoProvider);
+            final progress = progressRepo.get(schedule.poemId);
+            if (progress != null &&
+                progress.status != LearningStatus.mastered) {
+              await progressRepo.save(
+                progress.copyWith(status: LearningStatus.mastered),
+              );
+
+              // 同步更新 UserStats 的已掌握数
+              final statsRepo = ref.read(userStatsRepoProvider);
+              final masteredCount = progressRepo.masteredCount;
+              await statsRepo.updatePoemStats(mastered: masteredCount);
+            }
+          }
+
+          // 刷新 providers
+          ref.invalidate(reviewRepoProvider);
+          ref.invalidate(dueReviewCountProvider);
+          ref.invalidate(poemProgressProvider(schedule.poemId));
+          ref.invalidate(userStatsProvider);
+
+          // 成就自动检查
+          final newlyUnlocked = await checkAchievements(
+            ref,
+            mutation: learningWrites,
           );
+          ref.invalidate(unlockedAchievementsCountProvider);
+
+          if (context.mounted && newlyUnlocked.isNotEmpty) {
+            final names = newlyUnlocked.map((a) => a.title).join('、');
+            showCelebration(
+              context,
+              type: CelebrationType.achievement,
+              subtitle: names,
+            );
+          }
+
+          if (context.mounted) {
+            final message = nextSchedule != null && nextSchedule.isCompleted
+                ? '恭喜！该诗词复习全部完成！'
+                : (isQuizOutcome && score != null && score < 1.0
+                      ? '对了 ${(score * 100).toStringAsFixed(0)}%，差一点点满分！下次复习在 '
+                            '${nextSchedule != null ? _formatNextDate(nextSchedule) : ''}'
+                      : '复习已记录 ✓ 下次复习在 '
+                            '${nextSchedule != null ? _formatNextDate(nextSchedule) : ''}');
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
         }
-        ref.invalidate(reviewRepoProvider);
-        ref.invalidate(dueReviewCountProvider);
-        return false;
-      }
-      // 测试通过：带得分自适应推进（>=0.8 推进轮次）。
-      await reviewRepo.completeReview(
-        schedule.poemId,
-        score: score,
-        activityId: reviewActivityId,
+        return true;
+      });
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '复习结算失败',
+        tag: 'PoemReview',
+        error: error,
+        stackTrace: stackTrace,
       );
-    } else if (result?.completesReview != true) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('复习记录保存失败，请重新进入复习计划')));
+      }
       return false;
     }
-
-    // 明确完成后推进复习计划
-    if (context.mounted) {
-      final reviewRepo = ref.read(reviewRepoProvider);
-      if (!isQuizOutcome) {
-        // 背诵完成：无得分路径，走原有推进。
-        await reviewRepo.completeReview(
-          schedule.poemId,
-          activityId: reviewActivityId,
-        );
-      }
-
-      // 如果复习全部完成，将状态更新为「已掌握」
-      final nextSchedule = reviewRepo.get(schedule.poemId);
-      if (nextSchedule != null && nextSchedule.isCompleted) {
-        final progressRepo = ref.read(poemProgressRepoProvider);
-        final progress = progressRepo.get(schedule.poemId);
-        if (progress != null && progress.status != LearningStatus.mastered) {
-          await progressRepo
-              .save(progress.copyWith(status: LearningStatus.mastered));
-
-          // 同步更新 UserStats 的已掌握数
-          final statsRepo = ref.read(userStatsRepoProvider);
-          final masteredCount = progressRepo.masteredCount;
-          await statsRepo.updatePoemStats(mastered: masteredCount);
-        }
-      }
-
-      // 刷新 providers
-      ref.invalidate(reviewRepoProvider);
-      ref.invalidate(dueReviewCountProvider);
-      ref.invalidate(poemProgressProvider(schedule.poemId));
-      ref.invalidate(userStatsProvider);
-
-      // 成就自动检查
-      final newlyUnlocked = await checkAchievements(ref);
-      ref.invalidate(unlockedAchievementsCountProvider);
-
-      if (context.mounted && newlyUnlocked.isNotEmpty) {
-        final names = newlyUnlocked.map((a) => a.title).join('、');
-        showCelebration(
-          context,
-          type: CelebrationType.achievement,
-          subtitle: names,
-        );
-      }
-
-      if (context.mounted) {
-        final message = nextSchedule != null && nextSchedule.isCompleted
-            ? '恭喜！该诗词复习全部完成！'
-            : (isQuizOutcome && score != null && score < 1.0
-                ? '对了 ${(score * 100).toStringAsFixed(0)}%，差一点点满分！下次复习在 '
-                    '${nextSchedule != null ? _formatNextDate(nextSchedule) : ''}'
-                : '复习已记录 ✓ 下次复习在 '
-                    '${nextSchedule != null ? _formatNextDate(nextSchedule) : ''}');
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    }
-    return true;
   }
 
   String _formatNextDate(ReviewSchedule schedule) {

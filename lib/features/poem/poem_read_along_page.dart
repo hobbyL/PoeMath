@@ -21,6 +21,7 @@ import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -65,6 +66,7 @@ class PoemReadAlongPage extends ConsumerStatefulWidget {
 }
 
 class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
+  final _learningWrites = PracticeDraftRepository();
   static const _maxRecordingDurationSeconds = 15;
 
   late final SpeechRecognitionService _speech;
@@ -108,7 +110,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   void initState() {
     super.initState();
     _activityId = _newActivityId();
-    _speech = widget.speechRecognitionService ??
+    _speech =
+        widget.speechRecognitionService ??
         ref.read(speechRecognitionServiceProvider);
     _tts = ref.read(ttsServiceProvider);
     unawaited(_initSpeech());
@@ -163,13 +166,13 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     unawaited(_speech.cancel());
     unawaited(
       _tts.stop().onError(
-            (error, stackTrace) => AppLogger.e(
-              '退出跟读页时停止范读失败',
-              tag: 'PoemReadAlong',
-              error: error,
-              stackTrace: stackTrace,
-            ),
-          ),
+        (error, stackTrace) => AppLogger.e(
+          '退出跟读页时停止范读失败',
+          tag: 'PoemReadAlong',
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      ),
     );
     super.dispose();
   }
@@ -237,9 +240,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('停止范读失败，请稍后重试')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('停止范读失败，请稍后重试')));
       }
     } finally {
       if (mounted) {
@@ -283,9 +284,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       if (mounted) {
         setState(() => _phase = _ReadAlongPhase.idle);
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('无法开始跟读，请稍后重试')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('无法开始跟读，请稍后重试')));
       }
       return;
     }
@@ -329,9 +328,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       if (mounted) {
         setState(() => _phase = _ReadAlongPhase.idle);
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('无法开始跟读，请检查麦克风权限')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('无法开始跟读，请检查麦克风权限')));
       }
     }
   }
@@ -499,9 +496,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
       if (mounted) {
         setState(() => _phase = _ReadAlongPhase.idle);
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('语音识别失败，请重新朗读')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('语音识别失败，请重新朗读')));
       }
     }
   }
@@ -525,7 +520,10 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   /// 去除中英文标点和空格。
   String _removePunctuation(String text) {
     return text.replaceAll(
-      RegExp('[，。！？、；：""' '（）《》\\s,.!?;:\'"()\\[\\]{}]'),
+      RegExp(
+        '[，。！？、；：""'
+        '（）《》\\s,.!?;:\'"()\\[\\]{}]',
+      ),
       '',
     );
   }
@@ -649,26 +647,28 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     // unhandled error。故只记日志 + 让 `_settlementStarted` 复位，
     // 用户下次进入仍可重新结算（activityId 未落库，重试幂等）。
     try {
-      await activityRepo.record(
-        id: activityId,
-        activityType: LearningActivityType.readAlong,
-        totalItems: total,
-        successfulItems: qualified,
-        poemId: poemId,
-        starsEarned: stars,
-        durationSeconds: duration,
-        completedAt: completedAt,
-      );
-      if (stars > 0) {
-        await statsRepo.addStars(stars, activityId: activityId);
-      }
-      await checkInRepo.updateForDate(
-        completedAt,
-        activityId: activityId,
-        addPoems: 1,
-        addStars: stars,
-        addDuration: duration,
-      );
+      await _learningWrites.guard(() async {
+        await activityRepo.record(
+          id: activityId,
+          activityType: LearningActivityType.readAlong,
+          totalItems: total,
+          successfulItems: qualified,
+          poemId: poemId,
+          starsEarned: stars,
+          durationSeconds: duration,
+          completedAt: completedAt,
+        );
+        if (stars > 0) {
+          await statsRepo.addStars(stars, activityId: activityId);
+        }
+        await checkInRepo.updateForDate(
+          completedAt,
+          activityId: activityId,
+          addPoems: 1,
+          addStars: stars,
+          addDuration: duration,
+        );
+      });
       _settled = true;
     } on Object catch (error, stackTrace) {
       AppLogger.e(
@@ -784,29 +784,29 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   }
 
   Widget _buildScoreExplanation(ThemeData theme) => ColoredCard(
-        color: theme.colorScheme.tertiary,
-        child: const Text(
-          '参考分按识别文字与原文的顺序匹配比例计算，忽略标点和空格；多读的字不一定扣分。它不评价音准、声调或发音。语音识别可能出错，请核对识别文字和差异，可重录或请家长核对。',
-        ),
-      );
+    color: theme.colorScheme.tertiary,
+    child: const Text(
+      '参考分按识别文字与原文的顺序匹配比例计算，忽略标点和空格；多读的字不一定扣分。它不评价音准、声调或发音。语音识别可能出错，请核对识别文字和差异，可重录或请家长核对。',
+    ),
+  );
 
   Future<void> _showParentCheck() => showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('家长核对'),
-          content: const SingleChildScrollView(
-            child: Text(
-              '请对照原文和系统识别文字，结合孩子实际朗读确认是否读对。识别错误不等于读错；本页不评音准或声调。核对后可返回重录，本参考分不替代家长判断。',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('已核对'),
-            ),
-          ],
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('家长核对'),
+      content: const SingleChildScrollView(
+        child: Text(
+          '请对照原文和系统识别文字，结合孩子实际朗读确认是否读对。识别错误不等于读错；本页不评音准或声调。核对后可返回重录，本参考分不替代家长判断。',
         ),
-      );
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('已核对'),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildPracticeView(ThemeData theme) {
     return AnimatedPageBody(
@@ -837,7 +837,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     final progress = _lines.isEmpty
         ? 0.0
         : (_currentLine + (_phase == _ReadAlongPhase.scored ? 1 : 0)) /
-            _lines.length;
+              _lines.length;
 
     return Column(
       children: [
@@ -981,23 +981,23 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         const Text('内容匹配参考分'),
         // 分数显示
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _scoreIconData(score),
-              size: 32,
-              color: _scoreColor(score, theme),
-            ),
-            const SizedBox(width: SpacingTokens.sm),
-            Text(
-              '$percent%',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: _scoreColor(score, theme),
-              ),
-            ),
-          ],
-        )
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _scoreIconData(score),
+                  size: 32,
+                  color: _scoreColor(score, theme),
+                ),
+                const SizedBox(width: SpacingTokens.sm),
+                Text(
+                  '$percent%',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: _scoreColor(score, theme),
+                  ),
+                ),
+              ],
+            )
             .animatePage(context)
             .scale(
               begin: const Offset(0.5, 0.5),
@@ -1030,10 +1030,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                   ),
                 ),
                 const SizedBox(height: SpacingTokens.xs),
-                Text(
-                  _recognizedTexts.last,
-                  style: theme.textTheme.bodyMedium,
-                ),
+                Text(_recognizedTexts.last, style: theme.textTheme.bodyMedium),
               ],
             ),
           ),
@@ -1058,8 +1055,9 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         mediaQuery.disableAnimations || mediaQuery.accessibleNavigation;
 
     return AnimatedSwitcher(
-      duration:
-          reduceMotion ? Duration.zero : const Duration(milliseconds: 220),
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (child, animation) {
@@ -1123,8 +1121,9 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                         backgroundColor: Theme.of(context)
                             .colorScheme
                             .surfaceContainerHighest,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onSurfaceVariant,
+                        foregroundColor: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
                       ),
                 icon: const Icon(Icons.mic),
                 label: Text(_tencentConfigured ? '读一读' : '读一读（需配置）'),
@@ -1183,9 +1182,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                       ? Icons.arrow_forward
                       : Icons.check,
                 ),
-                label: Text(
-                  _currentLine < _lines.length - 1 ? '下一句' : '查看结果',
-                ),
+                label: Text(_currentLine < _lines.length - 1 ? '下一句' : '查看结果'),
               ),
             ),
           ],
@@ -1202,10 +1199,10 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     final stars = overall >= 0.9
         ? 3
         : overall >= 0.7
-            ? 2
-            : overall >= 0.5
-                ? 1
-                : 0;
+        ? 2
+        : overall >= 0.5
+        ? 1
+        : 0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -1215,24 +1212,25 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
           // 星星
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(3, (i) {
-              final filled = i < stars;
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.xs,
-                ),
-                child: Icon(
-                  filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                  size: 48,
-                  color: filled
-                      ? theme.semantic.caution
-                      : theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.3),
-                ),
-              );
-            }),
-          )
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(3, (i) {
+                  final filled = i < stars;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.xs,
+                    ),
+                    child: Icon(
+                      filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                      size: 48,
+                      color: filled
+                          ? theme.semantic.caution
+                          : theme.colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.3,
+                            ),
+                    ),
+                  );
+                }),
+              )
               .animatePage(context)
               .scale(
                 begin: const Offset(0.3, 0.3),
@@ -1284,9 +1282,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                   final score = i < _scores.length ? _scores[i] : 0.0;
                   final pct = (score * 100).round();
                   return Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: SpacingTokens.sm,
-                    ),
+                    padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

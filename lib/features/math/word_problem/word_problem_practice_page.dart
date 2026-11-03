@@ -99,8 +99,9 @@ class _WordProblemPracticePageState
     try {
       final draft = _drafts.get('word');
       if (draft != null) {
-        final resume =
-            widget.resume ? true : await choosePracticeResume(context, '应用题');
+        final resume = widget.resume
+            ? true
+            : await choosePracticeResume(context, '应用题');
         if (!mounted) return;
         if (resume == null) {
           if (context.canPop()) {
@@ -112,9 +113,7 @@ class _WordProblemPracticePageState
         }
         if (resume) {
           _problems = (draft['problems'] as List<dynamic>)
-              .map(
-                (p) => LlmProblem.fromSnapshot(p as Map<String, dynamic>),
-              )
+              .map((p) => LlmProblem.fromSnapshot(p as Map<String, dynamic>))
               .toList();
           _problemRecords.addAll(
             (draft['records'] as List<dynamic>).map(
@@ -131,8 +130,9 @@ class _WordProblemPracticePageState
           }
           _sessionId = draft['sessionId'] as String;
           _startTime = DateTime.parse(draft['startedAt'] as String);
-          _completedAt =
-              DateTime.tryParse(draft['completedAt'] as String? ?? '');
+          _completedAt = DateTime.tryParse(
+            draft['completedAt'] as String? ?? '',
+          );
           _correctCount = _problemRecords.where((r) => r.isCorrect).length;
           _isCorrect = _problemRecords.length > _currentIndex
               ? _problemRecords[_currentIndex].isCorrect
@@ -170,9 +170,8 @@ class _WordProblemPracticePageState
       if (!mounted) return;
       if (_ready) {
         // 快照解析完成后的落盘失败可在当前题重试，不能挡住结算按钮。
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('练习已恢复，进度或结算暂未保存，请重试')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('练习已恢复，进度或结算暂未保存，请重试')));
       } else {
         setState(() => _resumeError = '上次应用题暂时无法恢复，请返回首页放弃草稿后重试');
       }
@@ -275,9 +274,7 @@ class _WordProblemPracticePageState
       isComplete: false,
       semester: first.semester,
       difficulty: _difficultyLabel(first.difficulty),
-      problemsJson: jsonEncode(
-        _problemRecords.map((r) => r.toJson()).toList(),
-      ),
+      problemsJson: jsonEncode(_problemRecords.map((r) => r.toJson()).toList()),
     );
     if (_completedAt == null) await _drafts.guard(() => sessions.save(session));
 
@@ -308,8 +305,9 @@ class _WordProblemPracticePageState
             problemType: 'llm_word_problem',
             grade: problem.grade,
             semester: problem.semester,
-            solutionStepsJson:
-                problem.explanation.isEmpty ? null : problem.explanation,
+            solutionStepsJson: problem.explanation.isEmpty
+                ? null
+                : problem.explanation,
             activityId: 'word_mistake_attempt:$_sessionId:$i',
           ),
         );
@@ -405,9 +403,8 @@ class _WordProblemPracticePageState
       await _saveDraft();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('答题进度或结算保存失败，请重试')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('答题进度或结算保存失败，请重试')));
       }
     } finally {
       _submitting = false;
@@ -454,9 +451,7 @@ class _WordProblemPracticePageState
       finishedAt: completedAt,
       semester: first.semester,
       difficulty: _difficultyLabel(first.difficulty),
-      problemsJson: jsonEncode(
-        _problemRecords.map((r) => r.toJson()).toList(),
-      ),
+      problemsJson: jsonEncode(_problemRecords.map((r) => r.toJson()).toList()),
     );
 
     final repo = ref.read(mathSessionRepoProvider);
@@ -481,8 +476,9 @@ class _WordProblemPracticePageState
     // 做题数已在 _persistProgress() 中逐题更新，只需添加星星。
     final levelBeforeReward = statsRepo.get().level;
     if (stars > 0) {
-      await _drafts
-          .guard(() => statsRepo.addStars(stars, activityId: activityId));
+      await _drafts.guard(
+        () => statsRepo.addStars(stars, activityId: activityId),
+      );
     }
     await _drafts.guard(
       () => checkInRepo.updateForDate(
@@ -514,7 +510,11 @@ class _WordProblemPracticePageState
     }
 
     if (!mounted) return;
-    final newlyUnlocked = await checkAchievements(ref, latestSession: session);
+    final newlyUnlocked = await checkAchievements(
+      ref,
+      latestSession: session,
+      mutation: _drafts,
+    );
     if (!mounted) return;
 
     ref.invalidate(userStatsProvider);
@@ -574,8 +574,9 @@ class _WordProblemPracticePageState
 
   /// 从当前档案题库换一组：保持练习背景，优先未做题，排除刚完成的题。
   Future<void> _retrySession() async {
-    final contexts =
-        _problems.map((p) => (p.grade, p.semester, p.topic)).toSet();
+    final contexts = _problems
+        .map((p) => (p.grade, p.semester, p.topic))
+        .toSet();
     final completedIds = _problems.map((p) => p.id).toSet();
     final completedTexts = _problems.map((p) => p.questionText.trim()).toSet();
     final candidates = ref
@@ -593,9 +594,9 @@ class _WordProblemPracticePageState
       ...candidates.where((p) => p.done),
     ].take(_problems.length).toList();
     if (nextProblems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('同类题目已练完，可以在题库选择其他题目或生成新题')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('同类题目已练完，可以在题库选择其他题目或生成新题')));
       _returnToLibrary();
       return;
     }
@@ -663,8 +664,9 @@ class _WordProblemPracticePageState
               children: [
                 LinearProgressIndicator(
                   value: (_currentIndex + 1) / total,
-                  backgroundColor:
-                      theme.colorScheme.primary.withValues(alpha: 0.1),
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.1,
+                  ),
                   color: theme.colorScheme.primary,
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -683,22 +685,25 @@ class _WordProblemPracticePageState
                               // 应用题题面（长文本自适应）
                               KeyedSubtree(
                                 key: ValueKey('q_$_currentIndex'),
-                                child: Text(
-                                  problem.questionText,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    height: 1.6,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                )
-                                    .animatePage(context)
-                                    .fadeIn(duration: 350.ms)
-                                    .slideX(
-                                      begin: 0.12,
-                                      end: 0,
-                                      duration: 350.ms,
-                                      curve: Curves.easeOutCubic,
-                                    ),
+                                child:
+                                    Text(
+                                          problem.questionText,
+                                          textAlign: TextAlign.center,
+                                          style: theme.textTheme.titleMedium
+                                              ?.copyWith(
+                                                height: 1.6,
+                                                color:
+                                                    theme.colorScheme.onSurface,
+                                              ),
+                                        )
+                                        .animatePage(context)
+                                        .fadeIn(duration: 350.ms)
+                                        .slideX(
+                                          begin: 0.12,
+                                          end: 0,
+                                          duration: 350.ms,
+                                          curve: Curves.easeOutCubic,
+                                        ),
                               ),
                               const SizedBox(height: SpacingTokens.xl),
 
@@ -795,9 +800,7 @@ class _WordProblemPracticePageState
                 icon: Icon(
                   _showExplanation ? Icons.expand_less : Icons.expand_more,
                 ),
-                label: Text(
-                  _showExplanation ? '收起讲解' : '查看讲解',
-                ),
+                label: Text(_showExplanation ? '收起讲解' : '查看讲解'),
               ),
               if (_showExplanation)
                 Align(
@@ -821,15 +824,18 @@ class _WordProblemPracticePageState
 
     if (_isCorrect != null) {
       return SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: _submitting || _isFinishing ? null : _nextProblem,
-          icon: const Icon(Icons.arrow_forward_rounded),
-          label: Text(
-            _currentIndex + 1 >= _problems.length ? '查看成绩' : '下一题',
-          ),
-        ),
-      ).animatePage(context).fadeIn(duration: 250.ms).slideY(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _submitting || _isFinishing ? null : _nextProblem,
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: Text(
+                _currentIndex + 1 >= _problems.length ? '查看成绩' : '下一题',
+              ),
+            ),
+          )
+          .animatePage(context)
+          .fadeIn(duration: 250.ms)
+          .slideY(
             begin: 0.2,
             end: 0,
             duration: 250.ms,
@@ -871,8 +877,9 @@ class _WordProblemPracticePageState
                       fontSize: TypographyTokens.fsTitle,
                       fontWeight: FontWeight.bold,
                       color: _answerController.text.isEmpty
-                          ? theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.5)
+                          ? theme.colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            )
                           : theme.colorScheme.onSurface,
                     ),
                   ),
@@ -908,7 +915,8 @@ class _WordProblemPracticePageState
             });
           },
           onSubmit: _submitAnswer,
-          submitEnabled: _answerController.text.isNotEmpty &&
+          submitEnabled:
+              _answerController.text.isNotEmpty &&
               !_submitting &&
               !_isFinishing,
         ),
