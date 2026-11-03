@@ -28,12 +28,27 @@ class _Store extends SecureCredentialStore {
   Completer<void>? llmEntered;
   Completer<void>? llmProceed;
   bool failLlmWrite = false;
+  final llmKeys = <String, String>{};
+
+  @override
+  Future<String?> readLlmApiKeyFor(String id) async => llmKeys[id];
+
+  @override
+  Future<void> deleteLlmApiKeyFor(String id) async {
+    llmKeys.remove(id);
+  }
 
   @override
   Future<void> saveLlmApiKeyFor(String id, String apiKey) async {
-    llmEntered?.complete();
+    if (llmEntered != null && !llmEntered!.isCompleted) {
+      llmEntered!.complete();
+    }
     await llmProceed?.future;
-    if (failLlmWrite) throw StateError('synthetic LLM write failure');
+    if (failLlmWrite) {
+      failLlmWrite = false;
+      throw StateError('synthetic LLM write failure');
+    }
+    llmKeys[id] = apiKey;
   }
 
   @override

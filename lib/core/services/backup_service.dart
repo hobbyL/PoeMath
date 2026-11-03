@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/cache_activity.dart';
+import 'package:poemath/core/services/credential_configuration_access.dart';
 import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/data/hive/migrations/poem_identity_migration.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -288,10 +289,12 @@ class BackupService {
     bool includeCredentials = true,
   }) =>
       PictureStoryRepository.exclusive(
-        () => _exportToJson(
-          passphrase: passphrase,
-          encryptPayload: encryptPayload,
-          includeCredentials: includeCredentials,
+        () => CredentialConfigurationAccess.exclusive(
+          () => _exportToJson(
+            passphrase: passphrase,
+            encryptPayload: encryptPayload,
+            includeCredentials: includeCredentials,
+          ),
         ),
       );
 
@@ -436,7 +439,8 @@ class BackupService {
       for (final config in LlmProviderConfig.decodeList(
         HiveBoxes.settings.get('llm_providers') as String?,
       )) {
-        final key = await _secureStore.readLlmApiKeyFor(config.id);
+        final key = await SettingsRepository(credentialStore: _secureStore)
+            .readLlmApiKeyFor(config.id);
         if (key != null && key.isNotEmpty) providerKeys[config.id] = key;
       }
       if (providerKeys.isNotEmpty) {
@@ -671,7 +675,9 @@ class BackupService {
     ParentAccessService.instance.assertAllowed();
     return PracticeDraftRepository.whileRestoring(
       () => PictureStoryRepository.exclusive(
-        () => _restoreFromJson(jsonString, passphrase: passphrase),
+        () => CredentialConfigurationAccess.exclusive(
+          () => _restoreFromJson(jsonString, passphrase: passphrase),
+        ),
       ),
     );
   }
@@ -1054,7 +1060,8 @@ class BackupService {
     final activeId =
         HiveBoxes.settings.get('llm_active_provider_id') as String?;
     if (activeId == null || activeId.isEmpty) return null;
-    return _secureStore.readLlmApiKeyFor(activeId);
+    return SettingsRepository(credentialStore: _secureStore)
+        .readLlmApiKeyFor(activeId);
   }
 
   /// 执行实际的数据恢复，返回记录总数。

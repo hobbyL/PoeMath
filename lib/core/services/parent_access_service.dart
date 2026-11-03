@@ -82,6 +82,16 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
     if (!isUnlocked) throw const ParentAccessDenied();
   }
 
+  /// 异步敏感操作只能使用开始时的授权，锁定后重新解锁也不能续用。
+  void Function() captureAuthorization() {
+    assertAllowed();
+    final generation = _lockGeneration;
+    return () {
+      if (generation != _lockGeneration) throw const ParentAccessDenied();
+      assertAllowed();
+    };
+  }
+
   void _assertCanSetPin() {
     if (!canSetPin) throw const ParentAccessDenied();
   }

@@ -7,6 +7,7 @@ import 'dart:convert';
 
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
+import 'package:poemath/core/services/credential_configuration_access.dart';
 
 import 'package:crypto/crypto.dart';
 
@@ -350,6 +351,133 @@ class SettingsRepository {
 
   static void _markLlmProviderWrite(String id) {
     _llmProviderVersions[id] = (_llmProviderVersions[id] ?? 0) + 1;
+  }
+
+  static String _credentialPendingKey(String kind, String id) =>
+      'credential_configuration_pending_${kind}_$id';
+
+  void _assertCredentialConsistent(String kind, String id) {
+    if (HiveBoxes.meta.get(_credentialPendingKey(kind, id)) == true) {
+      throw const FormatException('配置保存未完成，请家长重新填写凭据并保存');
+    }
+  }
+
+  /// 安全存储没有跨 Hive 事务：先落盘中断标记，再写凭据和配置。
+  /// 补偿不完整时保留标记，重启后仍拒绝使用可能错配的凭据。
+  Future<void> _changeCredentialConfiguration({
+    required String kind,
+    required String id,
+    required List<String> settingsKeys,
+    required Future<void> Function(
+      List<Future<void> Function()> undo,
+      void Function() authorize,
+    ) work,
+    bool requireParent = true,
+    bool replacesCredentials = true,
+  }) {
+    final authorize = requireParent
+        ? ParentAccessService.instance.captureAuthorization()
+        : () {};
+    return CredentialConfigurationAccess.exclusive(() async {
+      authorize();
+      final marker = _credentialPendingKey(kind, id);
+      final wasBlocked = HiveBoxes.meta.get(marker) == true;
+      if (wasBlocked && !replacesCredentials) {
+        _assertCredentialConsistent(kind, id);
+      }
+      final previous = {
+        for (final key in settingsKeys)
+          key: (
+            exists: HiveBoxes.settings.containsKey(key),
+            value: HiveBoxes.settings.get(key),
+          ),
+      };
+      final undo = <Future<void> Function()>[];
+      await HiveBoxes.meta.put(marker, true);
+      try {
+        authorize();
+        await work(undo, authorize);
+        authorize();
+        await HiveBoxes.meta.delete(marker);
+      } on Object {
+        var rollbackFailed = false;
+        for (final restore in undo.reversed) {
+          try {
+            await restore();
+          } on Object {
+            rollbackFailed = true;
+          }
+        }
+        for (final entry in previous.entries) {
+          try {
+            final old = entry.value;
+            if (old.exists) {
+              if (!HiveBoxes.settings.containsKey(entry.key) ||
+                  HiveBoxes.settings.get(entry.key) != old.value) {
+                await HiveBoxes.settings.put(entry.key, old.value);
+              }
+            } else if (HiveBoxes.settings.containsKey(entry.key)) {
+              await HiveBoxes.settings.delete(entry.key);
+            }
+          } on Object {
+            rollbackFailed = true;
+          }
+        }
+        if (!rollbackFailed && !wasBlocked) {
+          try {
+            await HiveBoxes.meta.delete(marker);
+          } on Object {
+            rollbackFailed = true;
+          }
+        }
+        if (rollbackFailed) {
+          throw const FormatException('配置保存与回滚失败，请重新填写凭据并保存');
+        }
+        rethrow;
+      }
+    });
+  }
+
+  Future<void> _changeLlmKey(
+    String id,
+    String? key,
+    List<Future<void> Function()> undo,
+    void Function() authorize,
+  ) async {
+    final previous = await _credentialStore.readLlmApiKeyFor(id);
+    authorize();
+    undo.add(
+      () => previous == null
+          ? _credentialStore.deleteLlmApiKeyFor(id)
+          : _credentialStore.saveLlmApiKeyFor(id, previous),
+    );
+    if (key == null) {
+      await _credentialStore.deleteLlmApiKeyFor(id);
+    } else {
+      await _credentialStore.saveLlmApiKeyFor(id, key);
+    }
+    authorize();
+  }
+
+  Future<void> _changeWebDavCredentials(
+    String id,
+    ({String username, String password})? credentials,
+    List<Future<void> Function()> undo,
+    void Function() authorize,
+  ) async {
+    final previous = await _credentialStore.readWebDavCredentials(id);
+    authorize();
+    Future<void> write(({String username, String password})? value) =>
+        value == null
+            ? _credentialStore.deleteWebDavCredentials(id)
+            : _credentialStore.saveWebDavCredentials(
+                configId: id,
+                username: value.username,
+                password: value.password,
+              );
+    undo.add(() => write(previous));
+    await write(credentials);
+    authorize();
   }
 
   int _boundedInt(String key, int fallback) {
@@ -775,6 +903,12 @@ class SettingsRepository {
   /// 返回 null 的条件与 [readLlmConfig] 一致（无可用配置/字段为空）。
   Future<LlmConfig?> readLlmConfigForScenario(LlmScenario scenario) async {
     await migrateLegacyLlmConfigIfNeeded();
+    return CredentialConfigurationAccess.exclusive(
+      () => _readLlmConfigForScenario(scenario),
+    );
+  }
+
+  Future<LlmConfig?> _readLlmConfigForScenario(LlmScenario scenario) async {
     final scenarioId = providerIdForScenario(scenario);
     final targetId = scenarioId ?? llmActiveProviderId;
     if (targetId == null) return null;
@@ -884,6 +1018,7 @@ class SettingsRepository {
     required LlmScenario scenario,
     String? modelOverride,
   }) async {
+    _assertCredentialConsistent('llm', id);
     final providers = llmProviders;
     if (!providers.any((p) => p.id == id)) return null;
     final target = providers.firstWhere((p) => p.id == id);
@@ -949,8 +1084,7 @@ class SettingsRepository {
       return false;
     }
     for (final config in {request, candidate}) {
-      final key =
-          await _credentialStore.readLlmApiKeyFor(config.selection!.providerId);
+      final key = await readLlmApiKeyFor(config.selection!.providerId);
       if (!isActive() || (key ?? '') != config.apiKey) return false;
     }
     // 最后一个 await 后重新读全部配置；检查到写入之间没有异步窗口。
@@ -1023,42 +1157,51 @@ class SettingsRepository {
     _pendingLlmSaves.add(operation);
     try {
       final key = apiKey.trim();
-      if (key.isNotEmpty) {
-        await _credentialStore.saveLlmApiKeyFor(id, key);
-      }
-
-      final list = llmProviders;
-      final config = LlmProviderConfig(
+      await _changeCredentialConfiguration(
+        kind: 'llm',
         id: id,
-        name: name.trim(),
-        baseUrl: normalized.toString(),
-        model: model.trim(),
-        models: LlmProviderConfig.normalizeModels(models, model.trim()),
+        settingsKeys: [_keyLlmProviders, _keyLlmActiveProviderId],
+        replacesCredentials: key.isNotEmpty,
+        work: (undo, authorize) async {
+          if (key.isNotEmpty) {
+            await _changeLlmKey(id, key, undo, authorize);
+          }
+
+          final list = llmProviders;
+          final config = LlmProviderConfig(
+            id: id,
+            name: name.trim(),
+            baseUrl: normalized.toString(),
+            model: model.trim(),
+            models: LlmProviderConfig.normalizeModels(models, model.trim()),
+          );
+          final index = list.indexWhere((c) => c.id == id);
+          if (index >= 0) {
+            list[index] = config;
+          } else {
+            list.add(config);
+          }
+          await HiveBoxes.settings.put(
+            _keyLlmProviders,
+            LlmProviderConfig.encodeList(list),
+          );
+          authorize();
+          // 追加且无有效 active 时自动设为生效。
+          //
+          // 读「原始存储值」而非 llmActiveProviderId getter：getter 自带
+          // 回落写回的自愈副作用（列表非空时永不返回 null），用它判断会让
+          // 本分支语义隐性且条件不可达。
+          if (index < 0) {
+            final storedActive =
+                HiveBoxes.settings.get(_keyLlmActiveProviderId) as String?;
+            final hasValidActive =
+                storedActive != null && list.any((c) => c.id == storedActive);
+            if (!hasValidActive) {
+              await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
+            }
+          }
+        },
       );
-      final index = list.indexWhere((c) => c.id == id);
-      if (index >= 0) {
-        list[index] = config;
-      } else {
-        list.add(config);
-      }
-      await HiveBoxes.settings.put(
-        _keyLlmProviders,
-        LlmProviderConfig.encodeList(list),
-      );
-      // 追加且无有效 active 时自动设为生效。
-      //
-      // 读「原始存储值」而非 llmActiveProviderId getter：getter 自带
-      // 回落写回的自愈副作用（列表非空时永不返回 null），用它判断会让
-      // 本分支语义隐性且条件不可达。
-      if (index < 0) {
-        final storedActive =
-            HiveBoxes.settings.get(_keyLlmActiveProviderId) as String?;
-        final hasValidActive =
-            storedActive != null && list.any((c) => c.id == storedActive);
-        if (!hasValidActive) {
-          await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
-        }
-      }
     } finally {
       _pendingLlmSaves.remove(operation);
     }
@@ -1071,38 +1214,57 @@ class SettingsRepository {
   Future<void> deleteLlmProviderConfig(String id) async {
     ParentAccessService.instance.assertAllowed();
     _markLlmProviderWrite(id);
-    await _credentialStore.deleteLlmApiKeyFor(id);
-    // 先按原始存储值清理场景绑定（列表写回后无法再判断悬空归属）。
-    for (final scenario in LlmScenario.values) {
-      if (HiveBoxes.settings.get(scenario.settingsKey) == id) {
-        await HiveBoxes.settings.delete(scenario.settingsKey);
-        // 绑定被删，该场景选中的 model 一并清掉（属于被删配置）。
-        await HiveBoxes.settings.delete(scenario.modelKey);
-      }
-    }
-    final list = llmProviders..removeWhere((c) => c.id == id);
-    await HiveBoxes.settings.put(
-      _keyLlmProviders,
-      LlmProviderConfig.encodeList(list),
-    );
-    if (list.isEmpty) {
-      await HiveBoxes.settings.delete(_keyLlmActiveProviderId);
-      return;
-    }
-    final activeId = llmActiveProviderId;
-    if (activeId == null ||
-        activeId == id ||
-        !list.any((c) => c.id == activeId)) {
-      await HiveBoxes.settings.put(
+    await _changeCredentialConfiguration(
+      kind: 'llm',
+      id: id,
+      settingsKeys: [
+        _keyLlmProviders,
         _keyLlmActiveProviderId,
-        list.first.id,
-      );
-    }
+        for (final scenario in LlmScenario.values) ...[
+          scenario.settingsKey,
+          scenario.modelKey,
+        ],
+      ],
+      work: (undo, authorize) async {
+        await _changeLlmKey(id, null, undo, authorize);
+        // 先按原始存储值清理场景绑定（列表写回后无法再判断悬空归属）。
+        for (final scenario in LlmScenario.values) {
+          if (HiveBoxes.settings.get(scenario.settingsKey) == id) {
+            await HiveBoxes.settings.delete(scenario.settingsKey);
+            // 绑定被删，该场景选中的 model 一并清掉（属于被删配置）。
+            await HiveBoxes.settings.delete(scenario.modelKey);
+            authorize();
+          }
+        }
+        final list = llmProviders..removeWhere((c) => c.id == id);
+        await HiveBoxes.settings.put(
+          _keyLlmProviders,
+          LlmProviderConfig.encodeList(list),
+        );
+        authorize();
+        if (list.isEmpty) {
+          await HiveBoxes.settings.delete(_keyLlmActiveProviderId);
+          return;
+        }
+        final activeId = llmActiveProviderId;
+        if (activeId == null ||
+            activeId == id ||
+            !list.any((c) => c.id == activeId)) {
+          await HiveBoxes.settings.put(
+            _keyLlmActiveProviderId,
+            list.first.id,
+          );
+        }
+      },
+    );
   }
 
   /// 读取指定配置的已存 Key（页面回退判断用）。
   Future<String?> readLlmApiKeyFor(String id) {
-    return _credentialStore.readLlmApiKeyFor(id);
+    return CredentialConfigurationAccess.exclusive(() {
+      _assertCredentialConsistent('llm', id);
+      return _credentialStore.readLlmApiKeyFor(id);
+    });
   }
 
   /// 清除指定配置已保存的 API Key（如从有鉴权服务切到无鉴权服务）；
@@ -1110,7 +1272,12 @@ class SettingsRepository {
   Future<void> clearLlmApiKey(String id) {
     ParentAccessService.instance.assertAllowed();
     _markLlmProviderWrite(id);
-    return _credentialStore.deleteLlmApiKeyFor(id);
+    return _changeCredentialConfiguration(
+      kind: 'llm',
+      id: id,
+      settingsKeys: const [],
+      work: (undo, authorize) => _changeLlmKey(id, null, undo, authorize),
+    );
   }
 
   /// 旧单配置（llm_base_url/llm_model/llm_provider_name + llm_api_key）
@@ -1127,8 +1294,9 @@ class SettingsRepository {
   Future<void> migrateLegacyLlmConfigIfNeeded() {
     final inFlight = _legacyMigrationInFlight;
     if (inFlight != null) return inFlight;
-    return _legacyMigrationInFlight = _doMigrateLegacyLlmConfig()
-        .whenComplete(() => _legacyMigrationInFlight = null);
+    return _legacyMigrationInFlight = CredentialConfigurationAccess.exclusive(
+      _doMigrateLegacyLlmConfig,
+    ).whenComplete(() => _legacyMigrationInFlight = null);
   }
 
   Future<void> _doMigrateLegacyLlmConfig() async {
@@ -1138,27 +1306,47 @@ class SettingsRepository {
     if (providers.isNotEmpty || legacyBase.trim().isEmpty) return;
 
     final id = LlmProviderConfig.generateId();
-    // 旧 Key 复制到新键位；旧单 Key（无 Key 服务）允许为空。
-    final legacyKey = await _credentialStore.readLlmApiKey();
-    if (legacyKey != null && legacyKey.isNotEmpty) {
-      await _credentialStore.saveLlmApiKeyFor(id, legacyKey);
-      await _credentialStore.deleteLlmApiKey();
-    }
-    final config = LlmProviderConfig(
+    await _changeCredentialConfiguration(
+      kind: 'llm',
       id: id,
-      name: HiveBoxes.settings.get(_keyLlmProviderName, defaultValue: '')
-          as String,
-      baseUrl: legacyBase.trim(),
-      model: HiveBoxes.settings.get(_keyLlmModel, defaultValue: '') as String,
+      requireParent: false,
+      settingsKeys: [
+        _keyLlmProviders,
+        _keyLlmActiveProviderId,
+        _keyLlmBaseUrl,
+        _keyLlmModel,
+        _keyLlmProviderName,
+      ],
+      work: (undo, authorize) async {
+        // 旧 Key 复制到新键位；旧单 Key（无 Key 服务）允许为空。
+        final legacyKey = await _credentialStore.readLlmApiKey();
+        if (legacyKey != null && legacyKey.isNotEmpty) {
+          await _changeLlmKey(id, legacyKey, undo, authorize);
+        }
+        final config = LlmProviderConfig(
+          id: id,
+          name: HiveBoxes.settings.get(_keyLlmProviderName, defaultValue: '')
+              as String,
+          baseUrl: legacyBase.trim(),
+          model:
+              HiveBoxes.settings.get(_keyLlmModel, defaultValue: '') as String,
+        );
+        await HiveBoxes.settings.put(
+          _keyLlmProviders,
+          LlmProviderConfig.encodeList([config]),
+        );
+        await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
+        await HiveBoxes.settings.delete(_keyLlmBaseUrl);
+        await HiveBoxes.settings.delete(_keyLlmModel);
+        await HiveBoxes.settings.delete(_keyLlmProviderName);
+      },
     );
-    await HiveBoxes.settings.put(
-      _keyLlmProviders,
-      LlmProviderConfig.encodeList([config]),
-    );
-    await HiveBoxes.settings.put(_keyLlmActiveProviderId, id);
-    await HiveBoxes.settings.delete(_keyLlmBaseUrl);
-    await HiveBoxes.settings.delete(_keyLlmModel);
-    await HiveBoxes.settings.delete(_keyLlmProviderName);
+    // 新配置完整落盘后才删除旧 Key；失败时保留副本供下次清理。
+    try {
+      await _credentialStore.deleteLlmApiKey();
+    } on Object {
+      AppLogger.e('旧 LLM 密钥清理失败', tag: 'LLM');
+    }
   }
 
   // ============ AI 提示词（可编辑，覆盖 ?? 内置默认） ============
@@ -1584,7 +1772,12 @@ class SettingsRepository {
   /// **顺序必须是「先写安全存储成功，再清 Hive」**：任一条写失败就保留该条
   /// 原值（明文留在 Hive 里仍可被读取，比直接丢失凭据安全），并只记日志、
   /// 不中断整批迁移。写失败时不落盘，因此 `changed` 为 false 时 Hive 不变。
-  Future<void> migratePlaintextWebDavCredentials() async {
+  Future<void> migratePlaintextWebDavCredentials() =>
+      CredentialConfigurationAccess.exclusive(
+        _migratePlaintextWebDavCredentials,
+      );
+
+  Future<void> _migratePlaintextWebDavCredentials() async {
     final raw = HiveBoxes.settings.get(_keyWebDavConfigs) as String?;
     final result = WebDavConfig.decodeListDetailed(raw);
     if (result.configs.isEmpty) return;
@@ -1631,7 +1824,17 @@ class SettingsRepository {
   /// 若安全存储中无凭据，尝试从 Hive 迁移旧明文凭据。
   Future<WebDavConfig> loadWebDavConfigWithCredentials(
     WebDavConfig config,
+  ) =>
+      CredentialConfigurationAccess.exclusive(
+        () => _loadWebDavConfigWithCredentials(config),
+      );
+
+  Future<WebDavConfig> _loadWebDavConfigWithCredentials(
+    WebDavConfig requested,
   ) async {
+    _assertCredentialConsistent('webdav', requested.id);
+    final config = webDavConfigs.where((c) => c.id == requested.id).firstOrNull;
+    if (config == null) throw const FormatException('网盘配置已删除，请重新选择');
     // 先尝试从安全存储读取
     final creds = await _credentialStore.readWebDavCredentials(config.id);
     if (creds != null) {
@@ -1647,23 +1850,32 @@ class SettingsRepository {
 
     // 安全存储无数据，检查 Hive 中是否有旧明文凭据（迁移）
     if (config.username.isNotEmpty && config.password.isNotEmpty) {
-      await _credentialStore.saveWebDavCredentials(
-        configId: config.id,
-        username: config.username,
-        password: config.password,
-      );
-      // 清除 Hive 中的明文凭据
-      await _saveConfigsToHive(
-        webDavConfigs.map((c) {
-          return WebDavConfig(
-            id: c.id,
-            name: c.name,
-            url: c.url,
-            username: '',
-            password: '',
-            remotePath: c.remotePath,
+      await _changeCredentialConfiguration(
+        kind: 'webdav',
+        id: config.id,
+        requireParent: false,
+        settingsKeys: [_keyWebDavConfigs],
+        work: (undo, authorize) async {
+          await _changeWebDavCredentials(
+            config.id,
+            (username: config.username, password: config.password),
+            undo,
+            authorize,
           );
-        }).toList(),
+          // 清除 Hive 中的明文凭据
+          await _saveConfigsToHive(
+            webDavConfigs.map((c) {
+              return WebDavConfig(
+                id: c.id,
+                name: c.name,
+                url: c.url,
+                username: '',
+                password: '',
+                remotePath: c.remotePath,
+              );
+            }).toList(),
+          );
+        },
       );
       return config; // 原始 config 已含凭据
     }
@@ -1676,43 +1888,58 @@ class SettingsRepository {
   /// 凭据存入安全存储，非敏感信息存入 Hive。
   Future<void> saveWebDavConfig(WebDavConfig config) async {
     ParentAccessService.instance.assertAllowed();
-    // 凭据 → 安全存储
-    await _credentialStore.saveWebDavCredentials(
-      configId: config.id,
-      username: config.username,
-      password: config.password,
-    );
-
-    // 非敏感信息 → Hive（凭据字段**刻意**置空）。
-    //
-    // 凭据不落盘是本模块的设计不变量：Hive 中的配置形状永远不含凭据，读取
-    // 时由 loadWebDavConfigWithCredentials 从安全存储重新注入。不要「优化」
-    // 成把 config 原样写入（例如复用同一个对象、或补上 username/password），
-    // 那会让明文密码永久留在未加密的 settings box 里。
-    final stripped = WebDavConfig(
+    await _changeCredentialConfiguration(
+      kind: 'webdav',
       id: config.id,
-      name: config.name,
-      url: config.url,
-      username: '',
-      password: '',
-      remotePath: config.remotePath,
+      settingsKeys: [_keyWebDavConfigs],
+      work: (undo, authorize) async {
+        // 凭据 → 安全存储
+        await _changeWebDavCredentials(
+          config.id,
+          (username: config.username, password: config.password),
+          undo,
+          authorize,
+        );
+
+        // 非敏感信息 → Hive（凭据字段**刻意**置空）。
+        //
+        // 凭据不落盘是本模块的设计不变量：Hive 中的配置形状永远不含凭据，读取
+        // 时由 loadWebDavConfigWithCredentials 从安全存储重新注入。不要「优化」
+        // 成把 config 原样写入（例如复用同一个对象、或补上 username/password），
+        // 那会让明文密码永久留在未加密的 settings box 里。
+        final stripped = WebDavConfig(
+          id: config.id,
+          name: config.name,
+          url: config.url,
+          username: '',
+          password: '',
+          remotePath: config.remotePath,
+        );
+        final list = _mutableConfigs();
+        final index = list.indexWhere((c) => c.id == config.id);
+        if (index >= 0) {
+          list[index] = stripped;
+        } else {
+          list.add(stripped);
+        }
+        await _saveConfigsToHive(list);
+      },
     );
-    final list = _mutableConfigs();
-    final index = list.indexWhere((c) => c.id == config.id);
-    if (index >= 0) {
-      list[index] = stripped;
-    } else {
-      list.add(stripped);
-    }
-    await _saveConfigsToHive(list);
   }
 
   /// 删除一条 WebDAV 配置。
   Future<void> deleteWebDavConfig(String id) async {
     ParentAccessService.instance.assertAllowed();
-    await _credentialStore.deleteWebDavCredentials(id);
-    final list = _mutableConfigs()..removeWhere((c) => c.id == id);
-    await _saveConfigsToHive(list);
+    await _changeCredentialConfiguration(
+      kind: 'webdav',
+      id: id,
+      settingsKeys: [_keyWebDavConfigs],
+      work: (undo, authorize) async {
+        await _changeWebDavCredentials(id, null, undo, authorize);
+        final list = _mutableConfigs()..removeWhere((c) => c.id == id);
+        await _saveConfigsToHive(list);
+      },
+    );
   }
 
   Future<void> _saveConfigsToHive(List<WebDavConfig> configs) async {
