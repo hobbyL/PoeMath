@@ -710,6 +710,7 @@ class BackupService {
             _decodeProviderKeys(plainCredentials[key]!);
           }
         }
+        _validateLegacyLlmCredentialAssociation(data, plainCredentials);
       }
     }
 
@@ -993,19 +994,43 @@ class BackupService {
     return value.cast<String, String>();
   }
 
-  /// 在本机 llm_providers 中按 hint（host|model）匹配配置；
-  /// 找不到返回 null（恢复时丢弃该 key）。同 host+model 多条取第一条
-  /// （同址同模型的 key 可互换，无实害）。
-  String? _matchLlmProviderByHint(String hint) {
-    final providers = LlmProviderConfig.decodeList(
-      HiveBoxes.settings.get('llm_providers') as String?,
-    );
-    for (final config in providers) {
-      if (_llmKeyHintOf(config.baseUrl, config.model) == hint) {
-        return config.id;
-      }
+  void _validateLegacyLlmCredentialAssociation(
+    Map<String, dynamic> data,
+    Map<String, String> credentials,
+  ) {
+    if (credentials.containsKey(kCredKeyLlmProviderKeys) ||
+        (credentials[kCredKeyLlmApiKey]?.isEmpty ?? true)) {
+      return;
     }
-    return null;
+    final hint = credentials[kCredKeyLlmApiKeyHint];
+    if (hint == null || hint.isEmpty) return;
+    final settings = data['settings'] as Map<String, dynamic>?;
+    final incoming =
+        settings == null ? null : _acceptedSettings(settings)['llm_providers'];
+    _matchLlmProviderByHint(
+      hint,
+      providers: LlmProviderConfig.decodeList(
+        incoming as String? ??
+            HiveBoxes.settings.get('llm_providers') as String?,
+      ),
+    );
+  }
+
+  /// 旧 hint 不含端口和账号信息，只接受唯一候选；不能猜测密钥归属。
+  String? _matchLlmProviderByHint(
+    String hint, {
+    List<LlmProviderConfig>? providers,
+  }) {
+    final candidates = (providers ??
+            LlmProviderConfig.decodeList(
+              HiveBoxes.settings.get('llm_providers') as String?,
+            ))
+        .where((config) => _llmKeyHintOf(config.baseUrl, config.model) == hint)
+        .toList();
+    if (candidates.length > 1) {
+      throw const FormatException('旧备份无法确定 AI 密钥对应的配置，请跳过凭据恢复并重新填写密钥');
+    }
+    return candidates.firstOrNull?.id;
   }
 
   /// 当前生效 LLM 配置的 key 归属提示（host|model）；无生效配置返回
@@ -1735,9 +1760,7 @@ class BackupService {
     return items.length;
   }
 
-  Future<void> _restoreSettings(Map<String, dynamic> items) async {
-    final box = HiveBoxes.settings;
-
+  Map<String, Object> _acceptedSettings(Map<String, dynamic> items) {
     // 先规范化全部白名单内的值（类型不符跳过该 key，不毁整个恢复）。
     final normalized = <String, Object>{};
     for (final entry in items.entries) {
@@ -1764,7 +1787,12 @@ class BackupService {
 
     // LLM 一致性过滤：不落悬空 id / 坏结构（见 _filterLlmSettings）。
     // 非 LLM key 原样透传。
-    final accepted = _filterLlmSettings(normalized);
+    return _filterLlmSettings(normalized);
+  }
+
+  Future<void> _restoreSettings(Map<String, dynamic> items) async {
+    final box = HiveBoxes.settings;
+    final accepted = _acceptedSettings(items);
 
     // 只删「最终会被写入」的 key，而非遍历 items.keys 或全白名单：
     // - 遍历全白名单 → 旧备份会抹掉本机新纳入的 LLM 配置；

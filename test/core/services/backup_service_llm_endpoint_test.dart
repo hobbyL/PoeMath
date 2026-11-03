@@ -8,11 +8,13 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
+import 'package:poemath/data/models/user_stats.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
@@ -47,8 +49,7 @@ final class _MemoryCredentialStore extends SecureCredentialStore {
   }
 
   @override
-  Future<String?> readLlmApiKeyFor(String configId) async =>
-      llmKeys[configId];
+  Future<String?> readLlmApiKeyFor(String configId) async => llmKeys[configId];
 
   @override
   Future<void> deleteLlmApiKeyFor(String configId) async {
@@ -97,6 +98,86 @@ void main() {
   });
 
   group('detectLlmEndpointChanges', () {
+    for (final incomingProviders in [false, true]) {
+      test('旧 hint 的多端口候选在任何数据写入前拒绝（备份含配置：$incomingProviders）', () async {
+        final candidates = [
+          _provider(
+            id: 'wrong-port',
+            baseUrl: 'https://shared.example:9443/v1',
+          ),
+          _provider(
+            id: 'right-port',
+            baseUrl: 'https://shared.example:8443/v1',
+          ),
+        ];
+        await _seedLocalProviders(
+          incomingProviders
+              ? [_provider(id: 'local', baseUrl: 'https://local.example/v1')]
+              : candidates,
+        );
+        credentialStore.llmKeys.addAll(
+          {'wrong-port': 'existing-wrong', 'right-port': 'existing-right'},
+        );
+        await HiveBoxes.userStats
+            .put('default', UserStats(profileId: 'default', totalStars: 9));
+        final oldProviders = HiveBoxes.settings.get('llm_providers');
+        final credentials = await encryptCredentials(
+          {
+            kCredKeyLlmApiKey: 'synthetic-key-for-8443',
+            kCredKeyLlmApiKeyHint: 'shared.example|m1',
+          },
+          'synthetic-passphrase',
+        );
+        final payload = jsonEncode({
+          'version': 1,
+          'userStats': <Object>[],
+          if (incomingProviders)
+            'settings': {'llm_providers': _providersJson(candidates)},
+          'credentials': credentials,
+        });
+        await expectLater(
+          backupService.restoreFromJson(
+            payload,
+            passphrase: 'synthetic-passphrase',
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              contains('无法确定'),
+            ),
+          ),
+        );
+        expect(
+          credentialStore.llmKeys,
+          {'wrong-port': 'existing-wrong', 'right-port': 'existing-right'},
+        );
+        expect(HiveBoxes.userStats.get('default')!.totalStars, 9);
+        expect(HiveBoxes.settings.get('llm_providers'), oldProviders);
+        expect(HiveBoxes.meta.get('practice_draft_epoch'), isNull);
+      });
+    }
+
+    test('现代 ID 映射可区分同域名不同端口，不受旧 hint 限制', () async {
+      await _seedLocalProviders([
+        _provider(id: 'a', baseUrl: 'https://shared.example:9443/v1'),
+        _provider(id: 'b', baseUrl: 'https://shared.example:8443/v1'),
+      ]);
+      final credentials = await encryptCredentials(
+        {
+          kCredKeyLlmProviderKeys: jsonEncode({'a': 'key-a', 'b': 'key-b'}),
+          kCredKeyLlmApiKey: 'key-b',
+          kCredKeyLlmApiKeyHint: 'shared.example|m1',
+        },
+        'synthetic-passphrase',
+      );
+      await backupService.restoreFromJson(
+        jsonEncode({'version': 1, 'credentials': credentials}),
+        passphrase: 'synthetic-passphrase',
+      );
+      expect(credentialStore.llmKeys, {'a': 'key-a', 'b': 'key-b'});
+    });
+
     test('AC4 地址无变更 → 返回空 set（isEmpty 为 true）', () async {
       await _seedLocalProviders([
         _provider(id: 'p1', baseUrl: 'https://api.example.com'),
@@ -238,8 +319,7 @@ void main() {
       expect(changes.added, contains('attacker.example.net'));
     });
 
-    test('回归：仅 legacy llm_base_url，本机已有 providers → 仍检出（升格风险）',
-        () async {
+    test('回归：仅 legacy llm_base_url，本机已有 providers → 仍检出（升格风险）', () async {
       await _seedLocalProviders([
         _provider(id: 'p1', baseUrl: 'https://api.openai.com/v1'),
       ]);
@@ -256,8 +336,7 @@ void main() {
     });
 
     test('回归：本机 legacy 与备份 legacy 不同 → 检出为 changed', () async {
-      await HiveBoxes.settings
-          .put('llm_base_url', 'https://api.openai.com/v1');
+      await HiveBoxes.settings.put('llm_base_url', 'https://api.openai.com/v1');
 
       final changes = BackupService.detectLlmEndpointChanges(
         _backup(<String, dynamic>{
@@ -270,8 +349,7 @@ void main() {
       expect(changes.changed.single.to, 'attacker.example.net');
     });
 
-    test('回归：同 host 换端口 → 视为端点变更（不同端口可能是不同服务）',
-        () async {
+    test('回归：同 host 换端口 → 视为端点变更（不同端口可能是不同服务）', () async {
       await _seedLocalProviders([
         _provider(id: 'p1', baseUrl: 'https://gw.example.com/v1'),
       ]);
@@ -305,8 +383,7 @@ void main() {
       expect(changes!.isEmpty, isTrue);
     });
 
-    test('回归：providers 坏结构 + legacy evil → 仍按 legacy 检出（不静默放行）',
-        () {
+    test('回归：providers 坏结构 + legacy evil → 仍按 legacy 检出（不静默放行）', () {
       // 厂商列表不可解析时 legacy 才是唯一端点来源，若此时返回 null
       // 攻击者即可用「坏 providers + 好 legacy」组合绕过闸门。
       final changes = BackupService.detectLlmEndpointChanges(
@@ -353,8 +430,7 @@ void main() {
       expect(changes!.isEmpty, isTrue, reason: 'providers 是权威端点来源');
     });
 
-    test('AC4 备份厂商列表坏结构 → null；合法空列表 → 不弹框（informational removed）',
-        () async {
+    test('AC4 备份厂商列表坏结构 → null；合法空列表 → 不弹框（informational removed）', () async {
       await _seedLocalProviders([
         _provider(id: 'p1', baseUrl: 'https://api.example.com'),
       ]);
@@ -563,8 +639,7 @@ void main() {
   });
 
   group('防漂移：白名单覆盖 LlmScenario 全量 key', () {
-    test('LlmScenario 的 settingsKey 与 modelKey 均已登记且类型为 string',
-        () async {
+    test('LlmScenario 的 settingsKey 与 modelKey 均已登记且类型为 string', () async {
       // 通过实际恢复验证：给出全部场景绑定，全部应落盘。
       final providers = [
         _provider(id: 'px', baseUrl: 'https://x.example.com'),
@@ -617,9 +692,8 @@ void main() {
       }
 
       final json = await backupService.exportToJson();
-      final settings =
-          (jsonDecode(json) as Map<String, dynamic>)['settings']
-              as Map<String, dynamic>;
+      final settings = (jsonDecode(json) as Map<String, dynamic>)['settings']
+          as Map<String, dynamic>;
 
       // 导出的确有 LLM 配置（AC1）。
       expect(settings.containsKey('llm_providers'), isTrue);
@@ -629,8 +703,7 @@ void main() {
       await unlockParentForTesting();
       await backupService.restoreFromJson(json);
 
-      final restored =
-          LlmProviderConfig.decodeList(
+      final restored = LlmProviderConfig.decodeList(
         HiveBoxes.settings.get('llm_providers') as String?,
       );
       expect(restored.map((c) => c.id), containsAll(<String>['p1', 'p2']));
