@@ -61,7 +61,7 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  test('未设置时管理锁定，首次PIN仅存盐化摘要且解锁精确15分钟', () async {
+  test('未设置时管理锁定，首次PIN仅存盐化摘要且解锁精确5分钟', () async {
     expect(access.enabled, isFalse);
     expect(access.isUnlocked, isFalse);
     expect(access.canSetPin, isTrue);
@@ -83,10 +83,10 @@ void main() {
     expect(access.isUnlocked, isTrue);
     expect(access.assertAllowed, returnsNormally);
     now = unlockedAt.add(
-      const Duration(minutes: 15) - const Duration(microseconds: 1),
+      const Duration(minutes: 5) - const Duration(microseconds: 1),
     );
     expect(access.isUnlocked, isTrue);
-    now = unlockedAt.add(const Duration(minutes: 15));
+    now = unlockedAt.add(const Duration(minutes: 5));
     expect(access.isUnlocked, isFalse);
     expect(access.canSetPin, isFalse);
     expect(access.assertAllowed, throwsA(isA<ParentAccessDenied>()));

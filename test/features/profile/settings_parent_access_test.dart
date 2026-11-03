@@ -334,7 +334,7 @@ void main() {
     expect(router.routerDelegate.state.uri.path, AppRoutes.llmSettings);
   });
 
-  testWidgets('取消验证返回我的，错误PIN保持锁定，正确PIN跨设置复用15分钟窗口', (tester) async {
+  testWidgets('取消验证返回我的，错误PIN保持锁定，正确PIN跨设置复用5分钟窗口', (tester) async {
     await tester.runAsync(unlockParentForTesting);
     access.lock();
     final router = createAppRouter(initialLocation: AppRoutes.settings);
@@ -414,7 +414,7 @@ void main() {
     );
     expect(_unlockButton, findsNothing);
     expect(find.byType(Slider), findsOneWidget);
-    // 精确15分钟边界由服务测试验证；失效通知沿用同一 lock() 路径。
+    // 精确5分钟边界由服务测试验证；失效通知沿用同一 lock() 路径。
     await tester.runAsync(() async => access.lock());
     await _pumpUntil(tester, () => _unlockButton.evaluate().isNotEmpty);
     expect(find.byType(AlertDialog), findsOneWidget);

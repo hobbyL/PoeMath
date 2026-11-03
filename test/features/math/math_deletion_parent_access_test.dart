@@ -304,7 +304,7 @@ void main() {
     }
   }
 
-  testWidgets('错误 PIN 保留题目，正确 PIN 后确认；15 分钟内批次删除复用验证', (tester) async {
+  testWidgets('错误 PIN 保留题目，正确 PIN 后确认；5 分钟内批次删除复用验证', (tester) async {
     await tester.runAsync(unlockParentForTesting);
     access.lock();
     await mount(tester, _Deletion.problem);

@@ -24,7 +24,7 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
   })  : _store = store ?? SecureCredentialStore(),
         _clock = clock ?? DateTime.now;
   static final instance = ParentAccessService();
-  static const unlockDuration = Duration(minutes: 15);
+  static const unlockDuration = Duration(minutes: 5);
   final SecureCredentialStore _store;
   final DateTime Function() _clock;
   DateTime? _until;
