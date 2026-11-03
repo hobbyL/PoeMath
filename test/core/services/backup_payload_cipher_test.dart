@@ -10,6 +10,7 @@ import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 
@@ -67,10 +68,9 @@ void main() {
 
   test('整包解密后跳过未来版本凭据仍可恢复学习数据', () async {
     const passphrase = '合成测试口令';
-    final credentials = await encryptCredentials(
-      {'future_vendor_key': 'synthetic-key'},
-      passphrase,
-    );
+    final credentials = await encryptCredentials({
+      'future_vendor_key': 'synthetic-key',
+    }, passphrase);
     final encrypted = await encryptBackupPayload(
       jsonEncode({
         'version': 1,
@@ -134,8 +134,9 @@ void main() {
   });
 
   test('恶意 KDF 和超大文件在解析或派生前拒绝', () async {
-    final node = jsonDecode(await encryptBackupPayload(plain, deviceKey: key))
-        as Map<String, dynamic>;
+    final node = jsonDecode(
+      await encryptBackupPayload(plain, deviceKey: key),
+    ) as Map<String, dynamic>;
     node['kdf'] = {
       'algorithm': 'pbkdf2-sha256',
       'iterations': 999999999,
@@ -198,5 +199,49 @@ void main() {
     expect(await file.readAsString(), encrypted);
     store.raw = base64Encode(keyBytes);
     expect(await history.read('1_manual_deadbeef.json'), plain);
+  });
+
+  test('首次生成设备密钥前先隔离全部坏历史，与文件日期顺序无关', () async {
+    final dir = await Directory('${root.path}/backup_history').create();
+    final valid = File('${dir.path}/2_manual_deadbeef.json');
+    await valid.writeAsString(plain);
+    const corrupt = '{"version":';
+    final bad = File('${dir.path}/1_manual_deadbeef.json');
+    await bad.writeAsString(corrupt);
+    final store = _Store();
+    final history = BackupHistoryService(
+      backup: BackupService(),
+      directoryProvider: () async => root,
+      credentialStore: store,
+    );
+    await history.setDailyEnabled(true);
+    await history.maybeCreateDaily();
+    expect(store.writes, 1);
+    expect(await history.read('2_manual_deadbeef.json'), plain);
+    expect((await history.overview()).unreadableCount, 1);
+    expect(
+      await File('${dir.path}/unreadable/1_manual_deadbeef.json')
+          .readAsString(),
+      corrupt,
+    );
+    expect(HiveBoxes.meta.get('last_daily_snapshot'), isNotNull);
+  });
+
+  test('迁移的密钥 FormatException 不能被隔离为坏历史或继续每日写入', () async {
+    final dir = await Directory('${root.path}/backup_history').create();
+    final file = File('${dir.path}/1_manual_deadbeef.json');
+    await file.writeAsString(plain);
+    final store = _Store()..raw = 'corrupt!';
+    final history = BackupHistoryService(
+      backup: BackupService(),
+      directoryProvider: () async => root,
+      credentialStore: store,
+    );
+    await history.setDailyEnabled(true);
+    await expectLater(history.maybeCreateDaily(), throwsFormatException);
+    expect(store.writes, 0);
+    expect(await file.readAsString(), plain);
+    expect((await history.overview()).unreadableCount, 0);
+    expect(HiveBoxes.meta.get('last_daily_snapshot'), isNull);
   });
 }

@@ -52,8 +52,9 @@ void main() {
     final entries = await history.list();
     expect(entries, hasLength(3));
     expect(entries.first.createdAt, now);
-    final payload = jsonDecode(await history.read(entries.first.id))
-        as Map<String, dynamic>;
+    final payload = jsonDecode(
+      await history.read(entries.first.id),
+    ) as Map<String, dynamic>;
     expect(payload.containsKey('credentials'), isFalse);
     // parent_protection_enabled 现随备份迁移（换机后孩子仍受保护），
     // 因此快照里会出现。快照本身不含凭据这一点不变。
@@ -62,6 +63,37 @@ void main() {
       isTrue,
     );
     await expectLater(history.read('../escape.json'), throwsFormatException);
+  });
+
+  test('损坏旧历史隔离留存，不阻断跨日快照且不被保留数量清理', () async {
+    final historyDirectory = await Directory('${directory.path}/backup_history')
+        .create();
+    const id = '1_daily_deadbeef.json';
+    final bad = File('${historyDirectory.path}/$id');
+    const original = '{"version":';
+    await bad.writeAsString(original);
+    await history.setDailyEnabled(true);
+    for (var day = 0; day < 4; day++) {
+      await history.maybeCreateDaily();
+      now = now.add(const Duration(days: 1));
+    }
+    final entries = await history.list();
+    expect(entries, hasLength(3));
+    expect(entries.every((entry) => entry.reason == 'daily'), isTrue);
+    expect(HiveBoxes.meta.get('last_daily_snapshot'), '2026-10-19');
+    expect(await bad.exists(), isFalse);
+    expect(
+      await File('${historyDirectory.path}/unreadable/$id').readAsString(),
+      original,
+    );
+    final restarted = BackupHistoryService(
+      backup: backup,
+      directoryProvider: () async => directory,
+      keyProvider: () async => List<int>.filled(32, 7),
+    );
+    final overview = await restarted.overview();
+    expect(overview.unreadableCount, 1);
+    expect(overview.snapshots, hasLength(3));
   });
 
   test('预览纯读，协调恢复先保护旧数据且刷新镜像；历史可再恢复', () async {
@@ -93,8 +125,9 @@ void main() {
     expect(refreshes, 1);
     final protected = (await history.list()).single;
     expect(protected.reason, 'before_restore');
-    await coordinator
-        .restore(backup.inspectJson(await history.read(protected.id)));
+    await coordinator.restore(
+      backup.inspectJson(await history.read(protected.id)),
+    );
     expect(HiveBoxes.settings.get('theme_mode'), 'dark');
   });
 
@@ -187,8 +220,9 @@ void main() {
     });
     final activeResult = expectLater(active, throwsStateError);
     await entered.future;
-    final restore = backup
-        .restoreFromJson('{"version":1,"settings":{"theme_mode":"light"}}');
+    final restore = backup.restoreFromJson(
+      '{"version":1,"settings":{"theme_mode":"light"}}',
+    );
     await Future<void>.delayed(Duration.zero);
     expect(() => drafts.assertCurrent(), throwsStateError);
     release.complete();

@@ -1,8 +1,10 @@
 import 'dart:convert';
+
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/backup_payload_cipher.dart';
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -19,11 +21,16 @@ class BackupSnapshot {
   final DateTime createdAt;
   final String reason;
   String get label => switch (reason) {
-        'before_restore' => '恢复前保护',
-        'daily' => '每日快照',
-        _ => '手动快照',
-      };
+    'before_restore' => '恢复前保护',
+    'daily' => '每日快照',
+    _ => '手动快照',
+  };
 }
+
+typedef BackupHistoryOverview = ({
+  List<BackupSnapshot> snapshots,
+  int unreadableCount,
+});
 
 /// 新建本地回退文件不含 credentials，不与外部备份或云同步时间线混用。
 /// 旧明文历史迁移只加密原始 JSON，保留其中已有字段。
@@ -35,10 +42,9 @@ class BackupHistoryService {
     this._keyProvider,
     SecureCredentialStore? credentialStore,
     this.retention = 10,
-  })  : _directoryProvider =
-            directoryProvider ?? getApplicationSupportDirectory,
-        _clock = clock ?? DateTime.now,
-        _credentialStore = credentialStore ?? SecureCredentialStore();
+  }) : _directoryProvider = directoryProvider ?? getApplicationSupportDirectory,
+       _clock = clock ?? DateTime.now,
+       _credentialStore = credentialStore ?? SecureCredentialStore();
   final BackupService _backup;
   final Future<List<int>> Function()? _keyProvider;
   final SecureCredentialStore _credentialStore;
@@ -46,8 +52,9 @@ class BackupHistoryService {
   final DateTime Function() _clock;
   final int retention;
   static Future<void> _tail = Future<void>.value();
-  static final _validId =
-      RegExp(r'^\d+_(manual|daily|before_restore)_[a-f0-9]{8}\.json$');
+  static final _validId = RegExp(
+    r'^\d+_(manual|daily|before_restore)_[a-f0-9]{8}\.json$',
+  );
 
   bool get dailyEnabled =>
       HiveBoxes.settings.get('daily_snapshot_enabled', defaultValue: false) ==
@@ -56,8 +63,8 @@ class BackupHistoryService {
       HiveBoxes.settings.get('external_backup_reminder', defaultValue: true) ==
       true;
   DateTime? get lastExternalBackup => DateTime.tryParse(
-        HiveBoxes.meta.get('last_external_backup') as String? ?? '',
-      );
+    HiveBoxes.meta.get('last_external_backup') as String? ?? '',
+  );
   bool get externalBackupDue =>
       reminderEnabled &&
       (lastExternalBackup == null ||
@@ -117,6 +124,32 @@ class BackupHistoryService {
     return result;
   }
 
+  Future<BackupHistoryOverview> overview() => _exclusive(() async {
+    final snapshots = await list();
+    final directory = await _directory();
+    final unreadable = Directory('${directory.path}/unreadable');
+    var count = 0;
+    if (await unreadable.exists()) {
+      await for (final entry in unreadable.list()) {
+        if (entry is File) count++;
+      }
+    }
+    return (snapshots: snapshots, unreadableCount: count);
+  });
+
+  Future<void> _preserveUnreadable(File file) async {
+    final directory = await _directory();
+    final unreadable = await Directory('${directory.path}/unreadable').create();
+    final name = file.uri.pathSegments.last;
+    var target = File('${unreadable.path}/$name');
+    while (await target.exists()) {
+      final suffix = Random.secure().nextInt(0x100000000).toRadixString(16);
+      target = File('${unreadable.path}/$name.$suffix');
+    }
+    // Rename preserves the original bytes; retention only sees active snapshots.
+    await file.rename(target.path);
+  }
+
   Future<SecretKey> _key() async {
     if (_keyProvider != null) {
       final bytes = await _keyProvider();
@@ -124,7 +157,8 @@ class BackupHistoryService {
       return SecretKey(bytes);
     }
     const options = IOSOptions(
-        accessibility: KeychainAccessibility.first_unlock_this_device,);
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    );
     const name = 'backup_history_key';
     // Read errors are deliberately propagated; never replace a temporarily inaccessible key.
     final raw = await _credentialStore.readRawSecret(name, iOptions: options);
@@ -136,13 +170,17 @@ class BackupHistoryService {
     final directory = await _directory();
     for (final entry in await list()) {
       if (isEncryptedBackup(
-          await readBackupFile(File('${directory.path}/${entry.id}')),)) {
+        await readBackupFile(File('${directory.path}/${entry.id}')),
+      )) {
         throw StateError('本机快照密钥不可用，原始文件已保留');
       }
     }
     final bytes = SecretKeyData.random(length: 32).bytes;
-    await _credentialStore.writeRawSecret(name, base64Encode(bytes),
-        iOptions: options,);
+    await _credentialStore.writeRawSecret(
+      name,
+      base64Encode(bytes),
+      iOptions: options,
+    );
     return SecretKey(bytes);
   }
 
@@ -158,27 +196,43 @@ class BackupHistoryService {
   }
 
   Future<String> read(String id) => _exclusive(() async {
-        if (!_validId.hasMatch(id)) throw const FormatException('快照标识无效');
-        final directory = await _directory();
-        final file = File('${directory.path}/$id');
-        final json = await readBackupFile(file);
-        final key = await _key();
-        if (isEncryptedBackup(json)) {
-          return decryptBackupPayload(json, deviceKey: key);
-        }
-        _backup.inspectJson(json);
-        await _writeProtected(file, json, key);
-        return json;
-      });
+    if (!_validId.hasMatch(id)) throw const FormatException('快照标识无效');
+    final directory = await _directory();
+    final file = File('${directory.path}/$id');
+    final json = await readBackupFile(file);
+    final key = await _key();
+    if (isEncryptedBackup(json)) {
+      return decryptBackupPayload(json, deviceKey: key);
+    }
+    _backup.inspectJson(json);
+    await _writeProtected(file, json, key);
+    return json;
+  });
 
   Future<void> _migrateLegacy() async {
     final directory = await _directory();
-    SecretKey? key;
+    final plaintextFiles = <File>[];
     for (final entry in await list()) {
       final file = File('${directory.path}/${entry.id}');
+      late final String json;
+      try {
+        json = await readBackupFile(file);
+        if (isEncryptedBackup(json)) continue;
+        _backup.inspectJson(json);
+      } on FormatException {
+        await _preserveUnreadable(file);
+        continue;
+      }
+      plaintextFiles.add(file);
+    }
+    // Classify every file first: key creation also scans the remaining history.
+    // An older corrupt file must not block migration of a newer valid snapshot.
+    SecretKey? key;
+    for (final file in plaintextFiles) {
       final json = await readBackupFile(file);
-      if (isEncryptedBackup(json)) continue;
       _backup.inspectJson(json);
+      // Key access and encryption stay outside the format-error boundary.
+      // A temporarily unavailable key must never be treated as a bad file.
       key ??= await _key();
       await _writeProtected(file, json, key);
     }
@@ -194,8 +248,10 @@ class BackupHistoryService {
     }
     final json = await _backup.exportToJson();
     final created = _clock();
-    final suffix =
-        Random.secure().nextInt(0x100000000).toRadixString(16).padLeft(8, '0');
+    final suffix = Random.secure()
+        .nextInt(0x100000000)
+        .toRadixString(16)
+        .padLeft(8, '0');
     final id = '${created.microsecondsSinceEpoch}_${reason}_$suffix.json';
     final directory = await _directory();
     await _writeProtected(File('${directory.path}/$id'), json, await _key());

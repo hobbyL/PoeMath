@@ -45,13 +45,13 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
   /// 备份加密口令是否已设置；`null` 表示尚未从安全存储加载完成。
   bool? _hasPassphrase;
   bool _busy = false;
-  Future<List<BackupSnapshot>>? _history;
+  Future<BackupHistoryOverview>? _history;
 
   @override
   void initState() {
     super.initState();
     _loadPassphraseState();
-    _history = ref.read(backupHistoryProvider).list();
+    _history = ref.read(backupHistoryProvider).overview();
   }
 
   Future<void> _loadPassphraseState() async {
@@ -344,7 +344,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       source: source,
     );
     if (!mounted) return;
-    setState(() => _history = ref.read(backupHistoryProvider).list());
+    setState(() => _history = ref.read(backupHistoryProvider).overview());
     if (result != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -390,7 +390,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _history = history.list();
+          _history = history.overview();
         });
       }
     }
@@ -428,7 +428,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
                       if (mounted) {
                         setState(() {
                           _busy = false;
-                          _history = history.list();
+                          _history = history.overview();
                         });
                       }
                     }
@@ -470,19 +470,26 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
           ),
         ),
         const SizedBox(height: SpacingTokens.sm),
-        FutureBuilder<List<BackupSnapshot>>(
+        FutureBuilder<BackupHistoryOverview>(
           future: _history,
           builder: (context, snapshot) {
             if (snapshot.hasError) return const Text('本地历史暂时无法读取，可稍后重试');
-            final entries = snapshot.data ?? [];
-            if (entries.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(SpacingTokens.md),
-                child: Text('暂无保护快照'),
-              );
-            }
+            final entries = snapshot.data?.snapshots ?? [];
+            final unreadable = snapshot.data?.unreadableCount ?? 0;
             return Column(
               children: [
+                if (unreadable > 0) ...[
+                  ColoredCard(
+                    color: theme.colorScheme.error,
+                    child: Text('有 $unreadable 份历史备份无法读取，原始文件已保留。其他备份可正常使用。'),
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                ],
+                if (entries.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(SpacingTokens.md),
+                    child: Text('暂无保护快照'),
+                  ),
                 for (final entry in entries) ...[
                   AppTile(
                     icon: Icons.restore,
