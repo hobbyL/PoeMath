@@ -186,6 +186,12 @@ Flutter 3.47.8 / Dart 3.13.7 包含 Android TLS 证书校验安全修复；必�
 SDK 重新构建 APK，更新配置文件无法修补已安装的旧应用。
 依据：[Dart SDK 官方安全公告](https://github.com/dart-lang/sdk/security/advisories/GHSA-frr6-h895-5pxp)。
 
+PDF 阅读依赖固定为 `pdfrx 2.11.0`，原生 PDFium 使用 `chromium/8125`，
+包含 CVE-2026-110155 修复。安装依赖后运行
+`python3 tools/check_pdfium_security.py`，检查锁文件及实际解析的原生构建输入；
+测试、Android 构建与模拟器 CI 都执行此检查。
+依据：[Chrome 官方安全公告](https://chromereleases.googleblog.com/2026/10/stable-channel-update-for-desktop_01668083673.html)。
+
 ### 快速开始
 
 ```bash

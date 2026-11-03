@@ -39,6 +39,7 @@ jobs:
       - name: Check project and release contracts
         run: |
           python3 tools/check_project_contracts.py
+          python3 tools/check_pdfium_security.py
           python3 -m unittest discover -s tools -p '*_test.py'
           python3 tools/release_notes_test.py
 
