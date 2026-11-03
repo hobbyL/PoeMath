@@ -4,7 +4,7 @@ import 'dart:async';
 class CredentialConfigurationAccess {
   CredentialConfigurationAccess._();
 
-  static Future<void> _tail = Future<void>.value();
+  static Future<void>? _tail;
   static final Object _zoneKey = Object();
   static Object? _owner;
 
@@ -12,16 +12,24 @@ class CredentialConfigurationAccess {
     if (_owner != null && identical(Zone.current[_zoneKey], _owner)) {
       return operation();
     }
-    final result = _tail.then((_) async {
-      final owner = Object();
-      _owner = owner;
+    final previous = _tail;
+    final done = Completer<void>();
+    _tail = done.future;
+    return (() async {
       try {
-        return await runZoned(operation, zoneValues: {_zoneKey: owner});
+        if (previous != null) await previous;
+        final owner = Object();
+        _owner = owner;
+        try {
+          return await runZoned(operation, zoneValues: {_zoneKey: owner});
+        } finally {
+          _owner = null;
+        }
       } finally {
-        _owner = null;
+        // An idle queue must not keep a completed future from a retired Zone.
+        if (identical(_tail, done.future)) _tail = null;
+        done.complete();
       }
-    });
-    _tail = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
-    return result;
+    })();
   }
 }
