@@ -1260,7 +1260,7 @@ final class LlmClient {
     if (choices is! List<Object?> || choices.isEmpty) {
       final error = decoded['error'];
       if (error is Map<String, dynamic> && error['message'] is String) {
-        throw LlmResponseFormatError('模型返回错误：${error['message']}');
+        throw const LlmResponseFormatError('模型服务返回错误，请稍后重试或请家长检查配置');
       }
       throw const LlmResponseFormatError('模型响应缺少 choices');
     }
@@ -1305,7 +1305,7 @@ final class LlmClient {
     if (choices is! List<Object?> || choices.isEmpty) {
       final error = decoded['error'];
       if (error is Map<String, dynamic> && error['message'] is String) {
-        throw LlmResponseFormatError('模型返回错误：${error['message']}');
+        throw const LlmResponseFormatError('模型服务返回错误，请稍后重试或请家长检查配置');
       }
       throw const LlmResponseFormatError('模型响应缺少 choices');
     }

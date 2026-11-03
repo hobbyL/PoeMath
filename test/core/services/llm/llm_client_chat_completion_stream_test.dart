@@ -76,6 +76,47 @@ http.StreamedResponse _response(
 }
 
 void main() {
+  for (final mode in ['complete', 'streamed complete', 'explain']) {
+    test('HTTP 200 JSON error in $mode never exposes upstream secrets',
+        () async {
+      final client = LlmClient(
+        httpClient: MockClient((request) async {
+          expect(request.headers['Authorization'], 'Bearer ${_config.apiKey}');
+          return http.Response(
+            jsonEncode({
+              'error': {'message': '${_config.apiKey} provider-private-detail'},
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      addTearDown(client.close);
+      final Future<Object> response = mode == 'explain'
+          ? client.explain(
+              config: _config,
+              systemPrompt: '测试',
+              userPrompt: '测试',
+            )
+          : client.chatComplete(
+              config: _config,
+              systemPrompt: '测试',
+              messages: _messages,
+              stream: mode == 'streamed complete',
+            );
+      await expectLater(
+        response,
+        throwsA(
+          isA<LlmResponseFormatError>().having(
+            (error) => error.message,
+            'message',
+            '模型服务返回错误，请稍后重试或请家长检查配置',
+          ),
+        ),
+      );
+    });
+  }
+
   test('汇总 SSE 后返回完整 JSON；中文跨字节、多行事件、空帧和统计帧均兼容', () async {
     late Map<String, dynamic> requestBody;
     late Map<String, String> headers;

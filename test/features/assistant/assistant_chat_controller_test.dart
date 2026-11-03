@@ -515,6 +515,28 @@ void main() {
     expect(requests, 0);
   });
 
+  test('家长锁定时 HTTP 200 原始错误不向孩子显示 API Key', () async {
+    await seedProviders();
+    lockParentForTesting();
+    final container = containerWith(
+      MockClient((request) async {
+        expect(request.headers['Authorization'], 'Bearer key-p1');
+        return http.Response(
+          jsonEncode({
+            'error': {'message': 'key-p1 provider-private-detail'},
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    await container.read(assistantChatControllerProvider.notifier).send('你好');
+    final state = container.read(assistantChatControllerProvider);
+    expect(state.isError, isTrue);
+    expect(state.message, '模型服务返回错误，请稍后重试或请家长检查配置');
+    expect(state.messages.single.content, '你好');
+  });
+
   test('服务端 5xx：error 态且文案不含 API Key；user 气泡保留', () async {
     await seedProviders();
     final container = containerWith(
