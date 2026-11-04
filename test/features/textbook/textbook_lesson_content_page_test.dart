@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
@@ -31,6 +32,16 @@ class _Files extends TextbookFileService {
 }
 
 class _Books implements TextbookRepository {
+  final recent = <String, String>{};
+  @override
+  Textbook? recentBook(String profileId) => find(recent[profileId] ?? '');
+  @override
+  Future<void> markOpened(String profileId, String id) async {
+    recent[profileId] = id;
+  }
+  @override
+  Stream<BoxEvent> watchReading(String profileId) => const Stream.empty();
+
   final saved = <int>[];
   @override
   Future<void> savePage(String profileId, Textbook book, int page) async =>

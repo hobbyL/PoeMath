@@ -44,6 +44,9 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
   Timer? _saveTimer;
   bool _dirty = false;
   bool _saveFailed = false;
+  bool _recentSaved = false;
+  bool _recentSaving = false;
+  bool _recentSaveFailed = false;
   TextbookGoToPage? _goToPage;
   TextbookTocLoader? _toc;
 
@@ -89,6 +92,26 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
         stackTrace: stackTrace,
       );
       if (mounted) setState(() => _saveFailed = true);
+    }
+  }
+
+  Future<void> _markOpened() async {
+    final book = _book;
+    if (book == null || _recentSaved || _recentSaving) return;
+    _recentSaving = true;
+    try {
+      await _repo.markOpened(_profileId, book.pdfSha256);
+      if (mounted) {
+        setState(() {
+          _recentSaved = true;
+          _recentSaveFailed = false;
+        });
+      }
+    } on Object catch (error) {
+      AppLogger.e('最近阅读保存失败', tag: 'Textbook', error: error);
+      if (mounted) setState(() => _recentSaveFailed = true);
+    } finally {
+      _recentSaving = false;
     }
   }
 
@@ -239,6 +262,7 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
             onReady: (goTo) {
               if (mounted && revision == _viewerRevision) {
                 setState(() => _goToPage = goTo);
+                unawaited(_markOpened());
               }
             },
             onTocReady: (toc) {
@@ -273,6 +297,11 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (_recentSaveFailed)
+                TextButton(
+                  onPressed: _markOpened,
+                  child: const Text('续读入口保存失败，点击重试'),
+                ),
               if (_saveFailed)
                 Row(
                   children: [

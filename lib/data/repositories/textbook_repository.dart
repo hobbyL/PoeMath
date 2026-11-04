@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:hive/hive.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -10,7 +11,36 @@ class TextbookRepository {
   final Box<dynamic> _box;
   static const bookKeyPrefix = 'textbook_book_v1:';
   static const readingKeyPrefix = 'textbook_reading_v1:';
+  static const recentKeyPrefix = 'textbook_recent_v1:';
   Future<void> _writes = Future<void>.value();
+
+  String _recentKey(String profileId) =>
+      '$recentKeyPrefix${Uri.encodeComponent(profileId)}';
+
+  Textbook? recentBook(String profileId) {
+    final id = _box.get(_recentKey(profileId));
+    if (id == null) return null;
+    if (id is! String || !Textbook.isValidId(id)) {
+      throw const FormatException('最近阅读记录无法读取');
+    }
+    return find(id);
+  }
+
+  Future<void> markOpened(String profileId, String id) => _enqueue(() async {
+    if (find(id) == null) return;
+    await _box.put(_recentKey(profileId), id);
+  });
+
+  Stream<BoxEvent> watchReading(String profileId) =>
+      _box.watch().where((event) {
+        final key = event.key;
+        return key is String &&
+            (key == _recentKey(profileId) ||
+                key.startsWith(
+                  '$readingKeyPrefix${Uri.encodeComponent(profileId)}:',
+                ) ||
+                key.startsWith(bookKeyPrefix));
+      });
 
   List<Textbook> list() {
     final books = <Textbook>[];
@@ -27,8 +57,9 @@ class TextbookRepository {
     final raw = _box.get('$bookKeyPrefix$id');
     if (raw == null) return null;
     try {
-      final book =
-          Textbook.fromJson(jsonDecode(raw as String) as Map<String, dynamic>);
+      final book = Textbook.fromJson(
+        jsonDecode(raw as String) as Map<String, dynamic>,
+      );
       return book.pdfSha256 == id ? book : null;
     } on Object catch (error) {
       AppLogger.e('教材登记信息无法读取', tag: 'Textbook', error: error);
@@ -94,13 +125,16 @@ class TextbookRepository {
   /// 重复删除幂等；键不存在时无操作。书名/课程/学习进度的清理由调用方
   /// 编排（见缓存管理 sheet 的「删除本书」）。
   Future<void> delete(String id) => _enqueue(() async {
-        await _box.delete('$bookKeyPrefix$id');
-        for (final key in _box.keys.whereType<String>().toList()) {
-          if (key.startsWith(readingKeyPrefix) && key.endsWith(':$id')) {
-            await _box.delete(key);
-          }
-        }
-      });
+    await _box.delete('$bookKeyPrefix$id');
+    for (final key in _box.keys.whereType<String>().toList()) {
+      if (key.startsWith(readingKeyPrefix) && key.endsWith(':$id')) {
+        await _box.delete(key);
+      }
+      if (key.startsWith(recentKeyPrefix) && _box.get(key) == id) {
+        await _box.delete(key);
+      }
+    }
+  });
 
   Future<void> _enqueue(Future<void> Function() operation) {
     final result = _writes.then((_) => operation());

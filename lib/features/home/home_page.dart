@@ -23,6 +23,7 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
 import 'package:poemath/features/home/today_plan_section.dart';
+import 'package:poemath/features/home/textbook_resume_section.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
@@ -61,6 +62,7 @@ class HomePage extends ConsumerWidget {
             _buildDailyGoal(context, ref),
             const SizedBox(height: SpacingTokens.lg),
             const PracticeResumeSection(),
+            const TextbookResumeSection(),
             const TodayPlanSection(),
 
             // 累计概览放在今日行动之后。

@@ -44,6 +44,9 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   late final String _profileId;
   int _saveRevision = 0;
   bool _saveFailed = false;
+  bool _recentSaved = false;
+  bool _recentSaving = false;
+  bool _recentSaveFailed = false;
   bool _previewVisible = true;
   bool _turning = false;
   int _previewPage = 1;
@@ -68,6 +71,9 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     _previewRevision++;
     _saveRevision++;
     _saveFailed = false;
+    _recentSaved = false;
+    _recentSaving = false;
+    _recentSaveFailed = false;
     _previewVisible = true;
     _turning = false;
     _goToPage = null;
@@ -93,6 +99,28 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       if (mounted && revision == _saveRevision) {
         setState(() => _saveFailed = true);
       }
+    }
+  }
+
+  Future<void> _markOpened(Textbook book) async {
+    if (widget.manage || _recentSaved || _recentSaving) return;
+    _recentSaving = true;
+    final id = book.pdfSha256;
+    try {
+      await _repo.markOpened(_profileId, id);
+      if (mounted && widget.bookId == id) {
+        setState(() {
+          _recentSaved = true;
+          _recentSaveFailed = false;
+        });
+      }
+    } on Object catch (error) {
+      AppLogger.e('最近阅读保存失败', tag: 'Textbook', error: error);
+      if (mounted && widget.bookId == id) {
+        setState(() => _recentSaveFailed = true);
+      }
+    } finally {
+      if (mounted && widget.bookId == id) _recentSaving = false;
     }
   }
 
@@ -299,6 +327,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       onReady: (goToPage) {
         if (mounted && _previewVisible && revision == _previewRevision) {
           setState(() => _goToPage = goToPage);
+          unawaited(_markOpened(book));
         }
       },
       onSearchReady: (search) {
@@ -464,6 +493,11 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_recentSaveFailed)
+                TextButton(
+                  onPressed: () => _markOpened(book),
+                  child: const Text('续读入口保存失败，点击重试'),
+                ),
               if (_saveFailed)
                 Row(
                   children: [

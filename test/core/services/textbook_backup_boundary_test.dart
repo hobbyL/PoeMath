@@ -29,6 +29,7 @@ void main() {
     });
     await repo.addIfAbsent(book);
     await repo.savePage('child', book, 2);
+    await repo.markOpened('child', book.pdfSha256);
     await repo.setMatch('child', book.pdfSha256, TextbookMatch.matches);
     await TextbookDownloadRepository().markPending(book.pdfSha256);
     final backup = BackupService();
@@ -39,6 +40,7 @@ void main() {
     expect(exported.contains(book.pdfSha256), isFalse);
     await backup.restoreFromJson(exported);
     expect(repo.find(book.pdfSha256)!.toJson(), book.toJson());
+    expect(repo.recentBook('child')!.pdfSha256, book.pdfSha256);
     expect(repo.reading('child', book.pdfSha256).toJson(), {
       'page': 2,
       'match': 'matches',

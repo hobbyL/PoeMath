@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
@@ -45,6 +46,16 @@ class _DownloadIntents extends TextbookDownloadRepository {
 }
 
 class _MemoryRepository implements TextbookRepository {
+  final recent = <String, String>{};
+  @override
+  Textbook? recentBook(String profileId) => find(recent[profileId] ?? '');
+  @override
+  Future<void> markOpened(String profileId, String id) async {
+    recent[profileId] = id;
+  }
+  @override
+  Stream<BoxEvent> watchReading(String profileId) => const Stream.empty();
+
   final books = <String, Textbook>{};
   final readings = <String, TextbookReading>{};
   final saved = <({String profile, int page})>[];
@@ -705,6 +716,26 @@ void main() {
       'match': 'matches',
     });
   });
+
+  for (final manage in [false, true]) {
+    testWidgets('PDF 就绪才记录最近阅读，管理预览不记录（管理：$manage）', (tester) async {
+      repo.books[book.pdfSha256] = book;
+      TextbookViewerOptions? options;
+      await pump(tester, TextbookDetailPage(
+        bookId: book.pdfSha256,
+        manage: manage,
+        previewBuilder: (_, value) {
+          options = value;
+          return const SizedBox.expand();
+        },
+      ));
+      expect(repo.recentBook('default'), isNull);
+      options!.onReady((_) async {});
+      await tester.pumpAndSettle();
+      expect(repo.recentBook('default')?.pdfSha256, manage ? null : book.pdfSha256);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   testWidgets('详情卡片纵向居中，底部固定带箭头按钮；翻页保存续读位置', (tester) async {
     repo.books[book.pdfSha256] = book;

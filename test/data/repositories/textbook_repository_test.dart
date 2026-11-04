@@ -28,6 +28,7 @@ void main() {
     final book = textbookFixture();
     await repo.addIfAbsent(book);
     await repo.savePage('child', book, 2);
+    await repo.markOpened('child', book.pdfSha256);
     await repo.setMatch('child', book.pdfSha256, TextbookMatch.matches);
     await repo.addIfAbsent(textbookFixture(title: '后来文件名'));
     await box.close();
@@ -35,6 +36,7 @@ void main() {
     repo = TextbookRepository(box: box);
     expect(repo.find(book.pdfSha256)!.toJson(), book.toJson());
     expect(repo.list().length, 1);
+    expect(repo.recentBook('child')!.pdfSha256, book.pdfSha256);
     expect(repo.reading('child', book.pdfSha256).toJson(),
         {'page': 2, 'match': 'matches'},);
   });
@@ -100,10 +102,16 @@ void main() {
     await repo.savePage('parent', book, 5);
     await repo.savePage('child', other, 3);
     await repo.setMatch('child', book.pdfSha256, TextbookMatch.matches);
+    await repo.markOpened('child', book.pdfSha256);
+    await repo.markOpened('parent', book.pdfSha256);
+    await repo.markOpened('other:child', other.pdfSha256);
 
     await repo.delete(book.pdfSha256);
 
     expect(repo.find(book.pdfSha256), isNull);
+    expect(repo.recentBook('child'), isNull);
+    expect(repo.recentBook('parent'), isNull);
+    expect(repo.recentBook('other:child')!.pdfSha256, other.pdfSha256);
     expect(repo.reading('child', book.pdfSha256).page, 1);
     expect(repo.reading('parent', book.pdfSha256).page, 1);
     expect(repo.reading('child', book.pdfSha256).match, TextbookMatch.unchecked);
@@ -123,5 +131,29 @@ void main() {
           ),
       isEmpty,
     );
+  });
+
+  test('最近阅读只由打开事件更新，旧页码写入不抢占最近课本', () async {
+    final book = textbookFixture();
+    final other = textbookFixture(id: List.filled(64, 'b').join());
+    await repo.addIfAbsent(book);
+    await repo.addIfAbsent(other);
+    expect(repo.recentBook('child'), isNull);
+    await repo.markOpened('child', book.pdfSha256);
+    await repo.markOpened('child', other.pdfSha256);
+    await repo.savePage('child', book, 2);
+    expect(repo.recentBook('child')!.pdfSha256, other.pdfSha256);
+    expect(repo.recentBook('parent'), isNull);
+    await repo.delete(other.pdfSha256);
+    await repo.markOpened('child', other.pdfSha256);
+    expect(repo.recentBook('child'), isNull);
+    expect(box.containsKey('${TextbookRepository.recentKeyPrefix}child'), isFalse);
+  });
+
+  test('损坏的最近标识报告失败，不自动改写原值', () async {
+    const key = '${TextbookRepository.recentKeyPrefix}child';
+    await box.put(key, 42);
+    expect(() => repo.recentBook('child'), throwsFormatException);
+    expect(box.get(key), 42);
   });
 }
