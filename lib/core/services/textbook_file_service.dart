@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -32,9 +33,12 @@ class TextbookImportToken {
   TextbookImportToken({this._authorize});
   final void Function()? _authorize;
   bool _cancelled = false;
+  bool _preservePartialOnCancel = false;
   final _abort = Completer<void>();
   Future<void> get abortTrigger => _abort.future;
-  void cancel() {
+  void cancel({bool preservePartial = false}) {
+    if (_cancelled) return;
+    _preservePartialOnCancel = preservePartial;
     _cancelled = true;
     if (!_abort.isCompleted) _abort.complete();
   }
@@ -106,16 +110,16 @@ class TextbookFileService {
     http.Client Function()? clientFactory,
     this._requestTimeout = const Duration(seconds: 30),
     this.maxFileSize = 250 * 1024 * 1024,
-  })  : narrationCache = narrationAudioCache ??
-            NarrationAudioCache(
-              directoryProvider: directoryProvider ?? getTemporaryDirectory,
-            ),
-        _directoryProvider =
-            directoryProvider ?? getApplicationSupportDirectory,
-        _pickerCacheDirectoryProvider =
-            pickerCacheDirectoryProvider ?? _pickerCacheDirectory,
-        _validator = validator ?? _validatePdf,
-        _clientFactory = clientFactory ?? http.Client.new;
+  }) : narrationCache =
+           narrationAudioCache ??
+           NarrationAudioCache(
+             directoryProvider: directoryProvider ?? getTemporaryDirectory,
+           ),
+       _directoryProvider = directoryProvider ?? getApplicationSupportDirectory,
+       _pickerCacheDirectoryProvider =
+           pickerCacheDirectoryProvider ?? _pickerCacheDirectory,
+       _validator = validator ?? _validatePdf,
+       _clientFactory = clientFactory ?? http.Client.new;
   final Future<Directory> Function() _directoryProvider;
   final Future<Directory?> Function() _pickerCacheDirectoryProvider;
   final TextbookPdfValidator _validator;
@@ -198,8 +202,10 @@ class TextbookFileService {
         () => _importPdf(sourcePath, token, onProgress),
       ),
     );
-    _operations =
-        result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _operations = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
     return result;
   }
 
@@ -231,29 +237,45 @@ class TextbookFileService {
   }) {
     final result = _operations.then((_) async {
       try {
-        return await _downloadPdfFromUrl(
-          entry,
-          entry.downloadUrl,
-          token,
-          onProgress,
-        );
+        try {
+          return await _downloadPdfFromUrl(
+            entry,
+            entry.downloadUrl,
+            token,
+            onProgress,
+          );
+        } on TextbookDownloadCancelled {
+          rethrow;
+        } on TextbookFileException {
+          final fallback = entry.fallbackDownloadUrl;
+          if (fallback == null) rethrow;
+          return await _downloadPdfFromUrl(
+            entry,
+            fallback,
+            token,
+            onProgress,
+            fallback: true,
+          );
+        }
       } on TextbookDownloadCancelled {
+        if (!token._preservePartialOnCancel) {
+          await _discardDownload(entry.book.pdfSha256);
+        }
         rethrow;
-      } on TextbookFileException {
-        final fallback = entry.fallbackDownloadUrl;
-        if (fallback == null) rethrow;
-        return _downloadPdfFromUrl(
-          entry,
-          fallback,
-          token,
-          onProgress,
-          fallback: true,
-        );
       }
     });
-    _operations =
-        result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _operations = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
     return result;
+  }
+
+  Future<void> _discardDownload(String id) async {
+    if (!Textbook.isValidId(id)) return;
+    final base = await _directoryProvider();
+    final partial = File('${base.path}/textbooks/$id.download.pending');
+    if (await partial.exists()) await partial.delete();
   }
 
   Future<ImportedTextbookFile> _downloadPdfFromUrl(
@@ -273,25 +295,62 @@ class TextbookFileService {
       if (entry.book.fileSize < 5 || entry.book.fileSize > maxFileSize) {
         throw const TextbookFileException('PDF 超过大小上限');
       }
-      onProgress?.call(0, entry.book.fileSize);
+      final base = await _directoryProvider();
+      final partial = File(
+        '${base.path}/textbooks/${entry.book.pdfSha256}.download.pending',
+      );
+      var offset = await partial.exists() ? await partial.length() : 0;
+      if (offset > entry.book.fileSize) {
+        await partial.delete();
+        offset = 0;
+      }
+      token.check();
+      onProgress?.call(offset, entry.book.fileSize);
+      // 退出可能发生在文件已收齐、尚未校验/登记时，无需再次联网。
+      if (offset == entry.book.fileSize) {
+        return await _storePdf(
+          stream: const Stream.empty(),
+          expectedSize: entry.book.fileSize,
+          expectedSha: entry.book.pdfSha256,
+          expectedPages: entry.book.pageCount,
+          token: token,
+          onProgress: onProgress,
+          downloadPartial: partial,
+          resumeOffset: offset,
+        );
+      }
       client = _clientFactory();
       final request = http.AbortableRequest(
         'GET',
         url,
         abortTrigger: Future.any([token.abortTrigger, abort.future]),
       )..followRedirects = false;
+      request.headers['Accept-Encoding'] = 'identity';
+      if (offset > 0) request.headers['Range'] = 'bytes=$offset-';
       if (fallback) {
         request.headers['Accept'] = 'application/vnd.github.raw+json';
       }
       final response = await client.send(request).timeout(_requestTimeout);
       token.check();
-      if (response.statusCode != 200) {
-        throw TextbookFileException(
-          '教材来源暂时无法下载（${response.statusCode}），请稍后重试',
-        );
+      if (response.statusCode != 200 && response.statusCode != 206) {
+        throw TextbookFileException('教材来源暂时无法下载（${response.statusCode}），请稍后重试');
+      }
+      if (response.statusCode == 206) {
+        final range = RegExp(r'^bytes (\d+)-(\d+)/(\d+)$')
+            .firstMatch(response.headers['content-range'] ?? '');
+        if (range == null ||
+            int.parse(range[1]!) != offset ||
+            int.parse(range[2]!) != entry.book.fileSize - 1 ||
+            int.parse(range[3]!) != entry.book.fileSize) {
+          throw const TextbookFileException('教材续传位置与目录不一致，请稍后重试');
+        }
+      } else {
+        // 来源不支持 Range 时，从完整响应重新写入，绝不能追加成重复内容。
+        if (offset > 0) onProgress?.call(0, entry.book.fileSize);
+        offset = 0;
       }
       if (response.contentLength != null &&
-          response.contentLength != entry.book.fileSize) {
+          response.contentLength != entry.book.fileSize - offset) {
         throw const TextbookFileException('教材文件大小与目录不一致，请稍后重试');
       }
       return await _storePdf(
@@ -301,6 +360,8 @@ class TextbookFileService {
         expectedPages: entry.book.pageCount,
         token: token,
         onProgress: onProgress,
+        downloadPartial: partial,
+        resumeOffset: offset,
       );
     } on TextbookImportCancelled {
       throw const TextbookDownloadCancelled();
@@ -330,28 +391,45 @@ class TextbookFileService {
     String? expectedSha,
     int? expectedPages,
     TextbookImportProgress? onProgress,
+    File? downloadPartial,
+    int resumeOffset = 0,
   }) async {
     File? pending;
     RandomAccessFile? output;
+    var invalidPartial = false;
     try {
       token.check();
       if (expectedSize < 5 || expectedSize > maxFileSize) {
         throw const TextbookFileException('请选择有效 PDF，文件不能超过 250 MB');
       }
       final directory = await _directory();
-      pending = File(
-        '${directory.path}/${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}.pending',
+      pending =
+          downloadPartial ??
+          File(
+            '${directory.path}/${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}.pending',
+          );
+      output = await pending.open(
+        mode: resumeOffset > 0 ? FileMode.writeOnlyAppend : FileMode.writeOnly,
       );
-      output = await pending.open(mode: FileMode.writeOnly);
-      var copied = 0;
+      var copied = resumeOffset;
       final header = <int>[];
+      if (resumeOffset > 0) {
+        await for (final bytes in pending.openRead(0, min(5, resumeOffset))) {
+          header.addAll(bytes);
+        }
+      }
       await for (final bytes in stream) {
         token.check();
         copied += bytes.length;
         if (copied > maxFileSize || copied > expectedSize) {
+          invalidPartial = true;
           throw const TextbookFileException('PDF 超过大小上限');
         }
         if (header.length < 5) header.addAll(bytes.take(5 - header.length));
+        if (header.length == 5 && String.fromCharCodes(header) != '%PDF-') {
+          invalidPartial = true;
+          throw const TextbookFileException('文件不是完整的 PDF，请重新选择');
+        }
         await output.writeFrom(bytes);
         onProgress?.call(copied, expectedSize);
       }
@@ -359,19 +437,32 @@ class TextbookFileService {
       await output.close();
       output = null;
       token.check();
-      if (copied != expectedSize || String.fromCharCodes(header) != '%PDF-') {
+      if (copied != expectedSize) {
+        throw const TextbookFileException('文件不是完整的 PDF，请重新选择');
+      }
+      if (String.fromCharCodes(header) != '%PDF-') {
+        invalidPartial = true;
         throw const TextbookFileException('文件不是完整的 PDF，请重新选择');
       }
       final digest = (await sha256.bind(pending.openRead()).first).toString();
       token.check();
       if (expectedSha != null && digest != expectedSha) {
+        invalidPartial = true;
         throw const TextbookFileException('教材文件校验失败，请重新下载');
       }
-      final pages = await _validator(pending.path);
+      final int pages;
+      try {
+        pages = await _validator(pending.path);
+      } on Object {
+        invalidPartial = true;
+        rethrow;
+      }
       if (pages < 1 || pages > 5000) {
+        invalidPartial = true;
         throw const TextbookFileException('PDF 页数无效或超过 5000 页');
       }
       if (expectedPages != null && pages != expectedPages) {
+        invalidPartial = true;
         throw const TextbookFileException('教材页数与目录不一致，请重新下载');
       }
       token.check();
@@ -389,7 +480,16 @@ class TextbookFileService {
       rethrow;
     } finally {
       await output?.close();
-      if (pending != null && await pending.exists()) await pending.delete();
+      if (pending != null && await pending.exists()) {
+        final length = await pending.length();
+        final retain =
+            downloadPartial != null &&
+            !invalidPartial &&
+            (!token._cancelled || token._preservePartialOnCancel) &&
+            length > 0 &&
+            length <= expectedSize;
+        if (!retain) await pending.delete();
+      }
     }
   }
 
@@ -440,8 +540,8 @@ class TextbookFileService {
   }
 
   Future<List<File>> _cacheFiles() async => CacheFileStorage.files(
-        Directory('${(await _directoryProvider()).path}/textbooks/cache'),
-      );
+    Directory('${(await _directoryProvider()).path}/textbooks/cache'),
+  );
 
   /// 应用范围的派生缓存清单；包含未登记书目的遗留缓存，不读取原书。
   Future<({CacheUsage covers, CacheUsage content})> cacheUsage() async {
@@ -465,8 +565,9 @@ class TextbookFileService {
         if (File(path).parent.path == base) path,
     };
     final orphanFiles = <File>[];
-    for (final file
-        in files.where((file) => TextbookCoverCache.isCoverFile(file.path))) {
+    for (final file in files.where(
+      (file) => TextbookCoverCache.isCoverFile(file.path),
+    )) {
       final relative = file.path.substring('$base/cache/'.length);
       final id = relative.split(Platform.pathSeparator).first;
       if (Textbook.isValidId(id)) {
@@ -495,8 +596,10 @@ class TextbookFileService {
     ]);
     final files = await _cacheFiles();
     final orphanFiles = files.where((file) {
-      final id =
-          file.path.substring(base.length).split(Platform.pathSeparator).first;
+      final id = file.path
+          .substring(base.length)
+          .split(Platform.pathSeparator)
+          .first;
       return !caches.containsKey(id) &&
           !TextbookCoverCache.isCoverFile(file.path);
     });
@@ -539,8 +642,10 @@ class TextbookFileService {
       }
       if (await file.exists()) await file.delete();
     });
-    _operations =
-        result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _operations = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
     return result;
   }
 }

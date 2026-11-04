@@ -24,6 +24,7 @@ import 'package:poemath/core/services/update/update_models.dart';
 import 'package:poemath/features/assistant/assistant_enabled_provider.dart';
 import 'package:poemath/features/assistant/widgets/draggable_assistant_bubble.dart';
 import 'package:poemath/features/shell/update_dialog.dart';
+import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 
 /// controller 构造工厂：MainShell 传入自己的 onAvailable 包装后构造，
 /// 保证注入路径与生产路径同构（抑制分支等 MainShell 链路可被测试覆盖）。
@@ -71,6 +72,7 @@ class _MainShellState extends ConsumerState<MainShell>
     );
     _wireNotificationTap();
     unawaited(_maybeSnapshot());
+    unawaited(_restoreTextbookDownloads());
   }
 
   @override
@@ -92,6 +94,26 @@ class _MainShellState extends ConsumerState<MainShell>
     if (state == AppLifecycleState.resumed) {
       unawaited(_updateController?.maybeCheck());
       unawaited(_maybeSnapshot());
+      unawaited(_restoreTextbookDownloads());
+    }
+  }
+
+  Future<void> _restoreTextbookDownloads() async {
+    try {
+      if (ref.read(textbookDownloadRepositoryProvider).pendingIds().isEmpty) {
+        return;
+      }
+      final downloads = ref.read(textbookDownloadsProvider.notifier);
+      final catalog = await ref.read(textbookCatalogProvider.future);
+      if (!mounted) return;
+      await downloads.restorePending(catalog);
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '教材下载恢复失败，下次返回应用时重试',
+        tag: 'Textbook',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -196,8 +218,8 @@ class _MainShellState extends ConsumerState<MainShell>
   }
 
   Future<void> _consumeNotificationLaunchPayload() async {
-    final payload =
-        await NotificationService.instance.consumePendingLaunchPayload();
+    final payload = await NotificationService.instance
+        .consumePendingLaunchPayload();
     if (payload == null || !mounted) return;
     _onNotificationTap(payload);
   }

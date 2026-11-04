@@ -8,19 +8,35 @@ import 'package:poemath/core/services/update/android_update_installer.dart';
 import 'package:poemath/core/services/update/update_check_controller.dart';
 import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/core/services/update/update_models.dart';
+import 'package:poemath/core/services/textbook_file_service.dart';
+import 'package:poemath/data/models/textbook_catalog.dart';
+import 'package:poemath/data/repositories/textbook_download_repository.dart';
+import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/features/shell/main_shell.dart';
+import 'package:poemath/features/textbook/providers/textbook_download_controller.dart';
+import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/textbook_fixture.dart';
+
+class _SpyDownloads extends TextbookDownloadController {
+  _SpyDownloads() : super(TextbookFileService(), TextbookRepository(), (_) {});
+  final restoredIds = <List<String>>[];
+  @override
+  Future<void> restorePending(List<TextbookCatalogEntry> catalog) async {
+    restoredIds.add([for (final entry in catalog) entry.book.pdfSha256]);
+  }
+}
 
 /// 记录 maybeCheck 调用次数的 spy 控制器（基类依赖从不执行）。
 class _SpyUpdateController extends UpdateCheckController {
   _SpyUpdateController()
-      : super(
-          updateCheckConfigured: true,
-          client: _NoopUpdateClient(),
-          installer: AndroidUpdateInstaller(isAndroid: false),
-          onAvailable: (update, current) {},
-        );
+    : super(
+        updateCheckConfigured: true,
+        client: _NoopUpdateClient(),
+        installer: AndroidUpdateInstaller(isAndroid: false),
+        onAvailable: (update, current) {},
+      );
 
   int checkCount = 0;
 
@@ -64,10 +80,10 @@ class _OldVersionInstaller extends AndroidUpdateInstaller {
 
   @override
   Future<AppVersionInfo> getCurrentVersion() async => const AppVersionInfo(
-        packageName: 'com.poemath.app',
-        versionName: '1.0.0',
-        versionCode: 100,
-      );
+    packageName: 'com.poemath.app',
+    versionName: '1.0.0',
+    versionCode: 100,
+  );
 }
 
 GoRouter _router(UpdateCheckControllerFactory factory) {
@@ -87,9 +103,16 @@ GoRouter _router(UpdateCheckControllerFactory factory) {
 
 // MainShell 是 ConsumerStatefulWidget，dialog push 会触发其
 // didChangeDependencies 重查容器——测试树须与生产同构地提供 ProviderScope。
-Future<void> _pumpShell(WidgetTester tester, GoRouter router) {
+Future<void> _pumpShell(
+  WidgetTester tester,
+  GoRouter router, {
+  List<Override> overrides = const [],
+}) {
   return tester.pumpWidget(
-    ProviderScope(child: MaterialApp.router(routerConfig: router)),
+    ProviderScope(
+      overrides: overrides,
+      child: MaterialApp.router(routerConfig: router),
+    ),
   );
 }
 
@@ -102,6 +125,52 @@ void main() {
 
   tearDown(() async {
     await tearDownHiveForTesting();
+  });
+
+  testWidgets('有未完成任务时，主界面冷启动和返回前台均触发下载恢复', (tester) async {
+    final book = textbookFixture();
+    await tester.runAsync(
+      () => TextbookDownloadRepository().markPending(book.pdfSha256),
+    );
+    final entry = TextbookCatalogEntry(
+      book: book,
+      downloadUrl: Uri.parse('https://example.com/sample.pdf'),
+      sourceRepository: 'test/books',
+      sourceCommit: 'a' * 40,
+      sourcePath: 'sample.pdf',
+      editionLabel: '合成测试',
+      evidencePdfPages: const [1],
+    );
+    final downloads = _SpyDownloads();
+    final router = _router((_) => _SpyUpdateController());
+    addTearDown(router.dispose);
+    await _pumpShell(
+      tester,
+      router,
+      overrides: [
+        textbookDownloadsProvider.overrideWith((ref) => downloads),
+        textbookCatalogProvider.overrideWith((ref) async => [entry]),
+      ],
+    );
+    await tester.pump();
+    expect(downloads.restoredIds, [
+      [book.pdfSha256],
+    ]);
+    expect(find.text('tab-child'), findsOneWidget);
+
+    final binding = TestWidgetsFlutterBinding.instance;
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(downloads.restoredIds, [
+      [book.pdfSha256],
+      [book.pdfSha256],
+    ]);
+    await drainHiveWritesForTesting(tester);
   });
 
   testWidgets('冷启动首帧后恰触发一次自动检测', (tester) async {

@@ -17,6 +17,7 @@ import 'package:poemath/data/models/textbook_catalog.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_toc_dialog.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
+import 'package:poemath/data/repositories/textbook_download_repository.dart';
 import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_detail_page.dart';
@@ -32,6 +33,16 @@ import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
 import '../../helpers/textbook_fixture.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
+
+class _DownloadIntents extends TextbookDownloadRepository {
+  final ids = <String>{};
+  @override
+  Set<String> pendingIds() => {...ids};
+  @override
+  Future<void> markPending(String id) async => ids.add(id);
+  @override
+  Future<void> remove(String id) async => ids.remove(id);
+}
 
 class _MemoryRepository implements TextbookRepository {
   final books = <String, Textbook>{};
@@ -229,6 +240,9 @@ void main() {
       ProviderScope(
         overrides: [
           textbookRepositoryProvider.overrideWithValue(repo),
+          textbookDownloadRepositoryProvider.overrideWithValue(
+            _DownloadIntents(),
+          ),
           textbookFileServiceProvider.overrideWithValue(files),
           textbookCatalogProvider.overrideWith((ref) async => catalog),
           textbookPreviewBuilderProvider.overrideWithValue(

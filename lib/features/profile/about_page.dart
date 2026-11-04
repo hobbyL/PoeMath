@@ -80,10 +80,10 @@ class _AboutPageState extends State<AboutPage> {
                   child: Column(
                     children: [
                       Icon(
-                        Icons.auto_stories_rounded,
-                        size: 72,
-                        color: theme.colorScheme.primary,
-                      )
+                            Icons.auto_stories_rounded,
+                            size: 72,
+                            color: theme.colorScheme.primary,
+                          )
                           .animatePage(context)
                           .scaleXY(
                             begin: 0.8,
@@ -104,16 +104,18 @@ class _AboutPageState extends State<AboutPage> {
                       Text(
                         AppConstants.slogan,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                       const SizedBox(height: SpacingTokens.xs),
                       Text(
                         version,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.4),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.4,
+                          ),
                         ),
                       ),
                     ],
@@ -138,8 +140,9 @@ class _AboutPageState extends State<AboutPage> {
                           '让孩子在轻松愉快的氛围中学习成长。',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             height: 1.6,
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.8),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
                           ),
                         ),
                       ],
@@ -298,9 +301,8 @@ class _AboutPageState extends State<AboutPage> {
                 Text(
                   '导出诊断日志',
                   textAlign: TextAlign.center,
-                  style: Theme.of(sheet).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(sheet).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.md),
                 AppTile(
@@ -348,8 +350,9 @@ class _AboutPageState extends State<AboutPage> {
           try {
             await file.writeAsString(text);
             if (!mounted) return;
-            await SharePlus.instance
-                .share(ShareParams(files: [XFile(file.path)]));
+            await SharePlus.instance.share(
+              ShareParams(files: [XFile(file.path)]),
+            );
           } finally {
             if (await file.exists()) await file.delete();
           }
@@ -439,8 +442,9 @@ class _AboutPageState extends State<AboutPage> {
                             text,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               height: 1.7,
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.85),
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.85,
+                              ),
                             ),
                           ),
                         );
@@ -473,14 +477,8 @@ class _AboutPageState extends State<AboutPage> {
         continue;
       }
       s = s.replaceFirst(RegExp(r'^#{1,6}\s*'), '');
-      s = s.replaceAllMapped(
-        RegExp(r'\*\*(.+?)\*\*'),
-        (m) => m.group(1) ?? '',
-      );
-      s = s.replaceAllMapped(
-        RegExp(r'`([^`]+)`'),
-        (m) => m.group(1) ?? '',
-      );
+      s = s.replaceAllMapped(RegExp(r'\*\*(.+?)\*\*'), (m) => m.group(1) ?? '');
+      s = s.replaceAllMapped(RegExp(r'`([^`]+)`'), (m) => m.group(1) ?? '');
       s = s.replaceFirst(RegExp(r'^>\s?'), '');
       // 表格分隔线省略
       if (RegExp(r'^\|[\s:-]+\|$').hasMatch(s.replaceAll(' ', ''))) {
@@ -502,7 +500,7 @@ class _AboutPageState extends State<AboutPage> {
 学习记录主要保存本机，Hive 内容加密；本地历史快照以独立设备密钥整体加密。
 看图说话支持家长从相册、文件或拍照选图。题图和练习录音保存在应用私有目录，未额外加密；题库及保留版本、题图和各孩子的启用选择进入JSON/WebDAV备份，临时表单、练习历史和录音留在本机。旧备份缺少题库段时保留本机题库。为助手配置支持图片的AI模型后，完成练习时会发送完整题图、表达文字和练习目标到所配置服务，可能按自动切换规则发送至其他已配置服务商。
 看图说话AI出题由家长主动使用：先向所配置的大模型发送场景规划要求，再向独立生图服务发送场景描述，随后将实际题图和要求发送给看图模型生成题目。候选图文先保存本机草稿，核对并确认后才入库；中断可保留原图重试。规划与看图请求使用AI额度，生图使用独立图片额度，失败、测试和重试也计数。密钥存于设备安全存储，设置备份口令后可加密迁移；未确认草稿和本机已用额度不进入JSON/WebDAV备份。
-主动下载或导入的教材 PDF 保存在应用私有目录且未额外加密，不上传；教材下载直接请求 GitHub 公开文件，来源服务器会收到 IP 地址和文件路径，不发送档案、阅读位置或教材文字。教材登记与阅读位置保存在本机，不进入当前 JSON/WebDAV 备份。本书搜索和自动目录识别在本机处理，关键词不持久保存；目录树和逐页文字按PDF哈希在应用私有目录持久缓存，退出或重启后复用，未额外加密且不上传、不进入当前JSON/WebDAV备份，删除原书时一并清理。书籍管理移除 PDF 后保留阅读位置，同版重下或重导可续读。
+主动下载或导入的教材 PDF 保存在应用私有目录且未额外加密，不上传；教材下载直接请求 GitHub 公开文件，来源服务器会收到 IP 地址和文件路径，不发送档案、阅读位置或教材文字。未完成任务与已接收部分保留在本机，重新打开应用或返回前台自动继续；来源支持时断点续传，否则重新下载。主动取消后不再自动恢复，进程退出期间不传输；任务和部分文件不进JSON/WebDAV备份。教材登记与阅读位置保存在本机，不进入当前 JSON/WebDAV 备份。本书搜索和自动目录识别在本机处理，关键词不持久保存；目录树和逐页文字按PDF哈希在应用私有目录持久缓存，退出或重启后复用，未额外加密且不上传、不进入当前JSON/WebDAV备份，删除原书时一并清理。书籍管理移除 PDF 后保留阅读位置，同版重下或重导可续读。
 首次进入教材内容审核时，从本机书库PDF的文字和字符位置逐课整理待审草稿，不调用AI或OCR，可暂停续跑和手工补齐。字符位置缓存随原书删除清理；课程草稿、待处理候选、生成进度及审核人称呼、核对说明和审核结果保存在应用私有目录，未额外加密，不上传、不进入当前JSON/WebDAV备份；移除原书PDF后保留人工整理成果。在书籍管理选择「删除本书」则连同课程数据与全部档案的认一认/写一写学习记录一并清除，不可恢复。
 外部备份：设置口令后整体加密；未设口令为明文 JSON，不含安全凭据。WebDAV 仅连接您配置的服务器。
 配置更新源的版本在启动及恢复前台自动检查版本信息，至少间隔一小时；下载与安装需您主动确认。
