@@ -783,31 +783,92 @@ void main() {
     expect(streamCall, 1); // 未重跑
   });
 
-  test('resendFrom：清除点在重发点之后时被收紧到重发点（contextBaseIndex 不越界）', () async {
-    await seedProviders();
-    final container = containerWith(
-      MockClient((request) async {
-        if (!_isStream(request.body)) return _completionResponse();
-        return _sseResponse('答');
-      }),
-    );
-    final notifier = container.read(assistantChatControllerProvider.notifier);
+  for (final (operation, index) in const [
+    ('resendFrom(0)', 0),
+    ('resendFrom(2)', 2),
+    ('regenerate', 2),
+  ]) {
+    test('$operation：清除上下文后，两次请求仍携带目标问题', () async {
+      await seedProviders();
+      final requests = <Map<String, dynamic>>[];
+      final container = containerWith(
+        MockClient((request) async {
+          requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+          return _isStream(request.body)
+              ? _sseResponse('答')
+              : _completionResponse();
+        }),
+      );
+      final notifier = container.read(assistantChatControllerProvider.notifier);
 
-    await notifier.send('第一问');
-    await notifier.send('第二问');
-    notifier.clearContext(); // base = 4（末尾）
-    expect(container.read(assistantChatControllerProvider).contextBaseIndex, 4);
+      await notifier.send('第一问');
+      await notifier.send('第二问');
+      expect(notifier.clearContext(), isTrue);
+      requests.clear();
 
-    await notifier.resendFrom(0); // 消息截到 1 条 → base 须收紧到 ≤1
-    final state = container.read(assistantChatControllerProvider);
-    // 弱断言回归：原先是 lessThanOrEqualTo(state.messages.length)（=2），
-    // 比本行注释声称的「≤1」还松 —— base=2 也能通过，而那意味着上下文
-    // 起点落在新回答之后，刚重发出来的这轮对话会被整段排除出请求历史。
-    // 实现是 `clamp(0, index + 1)`（assistant_chat_controller.dart:106），
-    // resendFrom(0) 的精确结果就是 1，直接锁死。
-    expect(state.contextBaseIndex, 1);
-    expect(state.messages, hasLength(2)); // 第一问 + 新答
-  });
+      if (operation == 'regenerate') {
+        await notifier.regenerate();
+      } else {
+        await notifier.resendFrom(index);
+      }
+
+      expect(requests, hasLength(2));
+      for (final request in requests) {
+        final messages = request['messages'] as List<dynamic>;
+        expect(messages.first['role'], 'system');
+        expect(messages.skip(1).toList(), [
+          {'role': 'user', 'content': index == 0 ? '第一问' : '第二问'},
+        ]);
+      }
+      final state = container.read(assistantChatControllerProvider);
+      expect(state.isReady, isTrue);
+      expect(state.contextBaseIndex, index);
+      expect(
+        state.messages.map((message) => message.content).toList(),
+        index == 0 ? ['第一问', '答'] : ['第一问', '答', '第二问', '答'],
+      );
+    });
+  }
+
+  for (final regenerate in [false, true]) {
+    test('${regenerate ? 'regenerate' : 'resendFrom'}：保留清除点之后的有效上下文', () async {
+      await seedProviders();
+      final requests = <Map<String, dynamic>>[];
+      final container = containerWith(
+        MockClient((request) async {
+          requests.add(jsonDecode(request.body) as Map<String, dynamic>);
+          return _isStream(request.body)
+              ? _sseResponse('答')
+              : _completionResponse();
+        }),
+      );
+      final notifier = container.read(assistantChatControllerProvider.notifier);
+
+      await notifier.send('旧问题');
+      expect(notifier.clearContext(), isTrue);
+      await notifier.send('清除后的第一问');
+      await notifier.send('清除后的第二问');
+      requests.clear();
+
+      if (regenerate) {
+        await notifier.regenerate();
+      } else {
+        await notifier.resendFrom(4);
+      }
+
+      expect(requests, hasLength(2));
+      for (final request in requests) {
+        final messages = request['messages'] as List<dynamic>;
+        expect(messages.first['role'], 'system');
+        expect(messages.skip(1).toList(), [
+          {'role': 'user', 'content': '清除后的第一问'},
+          {'role': 'assistant', 'content': '答'},
+          {'role': 'user', 'content': '清除后的第二问'},
+        ]);
+      }
+      expect(container.read(assistantChatControllerProvider).contextBaseIndex, 2);
+    });
+  }
 
   test('页面销毁在 streaming：discardPending 收敛状态（固化增量），不卡 busy', () async {
     await seedProviders();

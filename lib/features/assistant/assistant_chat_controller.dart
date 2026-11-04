@@ -91,7 +91,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     state = AssistantChatState(
       status: AssistantChatStatus.loading,
       messages: messages.sublist(0, lastUserIndex + 1),
-      contextBaseIndex: state.contextBaseIndex.clamp(0, lastUserIndex + 1),
+      contextBaseIndex: state.contextBaseIndex.clamp(0, lastUserIndex),
     );
     await _complete(token);
   }
@@ -111,7 +111,7 @@ class AssistantChatController extends Notifier<AssistantChatState> {
     state = AssistantChatState(
       status: AssistantChatStatus.loading,
       messages: messages.sublist(0, index + 1),
-      contextBaseIndex: state.contextBaseIndex.clamp(0, index + 1),
+      contextBaseIndex: state.contextBaseIndex.clamp(0, index),
     );
     await _complete(token);
   }
