@@ -65,7 +65,18 @@ class _PictureStoryGeneratePageState
 
   void _reload({bool notify = true}) {
     try {
-      _draft = _service.readDraft(_profile);
+      final draft = _service.readDraft(_profile);
+      _draft = draft;
+      if (draft != null && draft.candidates.isEmpty) {
+        final options = draft.options;
+        _count = options.count;
+        _themes
+          ..clear()
+          ..addAll(options.themes);
+        if (_requirements.text != options.requirements) {
+          _requirements.text = options.requirements;
+        }
+      }
       _loadFailed = false;
     } on Object {
       _loadFailed = true;
@@ -128,8 +139,9 @@ class _PictureStoryGeneratePageState
       final images = await settings.readImageGenerationConfig();
       if (!active()) return;
       if (images == null) throw const FormatException('请先配置图片生成服务');
-      final llm =
-          await settings.readLlmConfigForScenario(LlmScenario.pictureStory);
+      final llm = await settings.readLlmConfigForScenario(
+        LlmScenario.pictureStory,
+      );
       if (!active()) return;
       if (llm == null) throw const FormatException('请先配置用于看图出题的大模型');
       _draft ??= await _service.createDraft(
@@ -159,8 +171,8 @@ class _PictureStoryGeneratePageState
           () => _error = error is FormatException
               ? error.message
               : error is ParentAccessDenied
-                  ? error.toString()
-                  : '生成未完成，已生成内容会保留，请稍后重试',
+              ? error.toString()
+              : '生成未完成，已生成内容会保留，请稍后重试',
         );
       }
     } finally {
@@ -258,8 +270,8 @@ class _PictureStoryGeneratePageState
           () => _error = error is FormatException
               ? error.message
               : error is PictureStoryPublicationCleanupException
-                  ? error.toString()
-                  : '题目暂未入库，草稿仍保留，请重试',
+              ? error.toString()
+              : '题目暂未入库，草稿仍保留，请重试',
         );
       }
     } finally {
@@ -314,6 +326,7 @@ class _PictureStoryGeneratePageState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final draft = _draft;
+    final hasCandidates = draft?.candidates.isNotEmpty ?? false;
     final canOperate = !_busy && _sameProfile && !_loadFailed;
     final selectedCount = draft?.selectedPrompts.length ?? 0;
     return Scaffold(
@@ -348,7 +361,6 @@ class _PictureStoryGeneratePageState
                   ),
                 const SizedBox(height: SpacingTokens.md),
               ],
-              if (draft == null && !_loadFailed) _options(theme, canOperate),
               if (draft != null) ...[
                 if (_busy)
                   LinearProgressIndicator(
@@ -366,6 +378,9 @@ class _PictureStoryGeneratePageState
                     ],
                   ),
                 if (_busy) const SizedBox(height: SpacingTokens.md),
+              ],
+              if (!hasCandidates && !_loadFailed) _options(theme, canOperate),
+              if (draft != null && hasCandidates)
                 MasonryLayout(
                   key: const ValueKey('picture-story-generation-masonry'),
                   columnCount: ResponsiveLayout.columns(constraints.maxWidth),
@@ -375,12 +390,11 @@ class _PictureStoryGeneratePageState
                       _candidate(theme, item, index, canOperate),
                   ],
                 ),
-              ],
             ],
           ),
         ),
       ),
-      bottomNavigationBar: draft == null
+      bottomNavigationBar: !hasCandidates
           ? null
           : SafeArea(
               child: Padding(
@@ -394,70 +408,89 @@ class _PictureStoryGeneratePageState
     );
   }
 
-  Widget _options(ThemeData theme, bool enabled) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('生成内容', style: theme.textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.sm),
-          const Text('每道题一张图，每次可生成 1–5 道。先生成图片，再根据实际画面编写问题。'),
-          const SizedBox(height: SpacingTokens.md),
-          Text('数量（$_count 题）', style: theme.textTheme.titleSmall),
-          Slider(
-            value: _count.toDouble(),
-            min: 1,
-            max: 5,
-            divisions: 4,
-            label: '$_count',
-            semanticFormatterCallback: (value) => '${value.round()} 题',
-            onChanged: enabled
-                ? (value) => setState(() => _count = value.round())
-                : null,
-          ),
-          const SizedBox(height: SpacingTokens.md),
-          const Text('主题（可多选）'),
-          const SizedBox(height: SpacingTokens.xs),
-          Wrap(
-            spacing: SpacingTokens.xs,
-            runSpacing: SpacingTokens.xs,
-            children: [
-              for (final theme in PictureStoryGenerationOptions.availableThemes)
-                FilterChip(
-                  label: Text(theme),
-                  selected: _themes.contains(theme),
-                  onSelected: enabled
-                      ? (v) {
-                          setState(() {
-                            if (v) {
-                              _themes.add(theme);
-                            } else {
-                              _themes.remove(theme);
-                            }
-                          });
-                        }
-                      : null,
-                ),
-            ],
-          ),
-          const SizedBox(height: SpacingTokens.md),
-          TextField(
-            controller: _requirements,
-            enabled: enabled,
-            minLines: 2,
-            maxLines: 4,
-            maxLength: 1000,
-            decoration: const InputDecoration(
-              labelText: '补充要求（选填）',
-              hintText: '例如：雨天互相帮助，画面里有小动物',
+  Widget _options(ThemeData theme, bool enabled) {
+    final hasPendingPlan = _draft != null;
+    final canEdit = enabled && !hasPendingPlan;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (hasPendingPlan && !_busy) ...[
+          Text(
+            '上次生成未完成，出题要求已保留。可重试生成，或先放弃草稿再修改要求。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: SpacingTokens.md),
-          FilledButton.icon(
-            onPressed: enabled ? () => _generate() : null,
-            icon: const Icon(Icons.auto_awesome_outlined),
-            label: Text(_busy ? '正在规划场景…' : '生成图文题目'),
-          ),
         ],
-      );
+        Text('生成内容', style: theme.textTheme.titleMedium),
+        const SizedBox(height: SpacingTokens.sm),
+        const Text('每道题一张图，每次可生成 1–5 道。先生成图片，再根据实际画面编写问题。'),
+        const SizedBox(height: SpacingTokens.md),
+        Text('数量（$_count 题）', style: theme.textTheme.titleSmall),
+        Slider(
+          value: _count.toDouble(),
+          min: 1,
+          max: 5,
+          divisions: 4,
+          label: '$_count',
+          semanticFormatterCallback: (value) => '${value.round()} 题',
+          onChanged: canEdit
+              ? (value) => setState(() => _count = value.round())
+              : null,
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        const Text('主题（可多选）'),
+        const SizedBox(height: SpacingTokens.xs),
+        Wrap(
+          spacing: SpacingTokens.xs,
+          runSpacing: SpacingTokens.xs,
+          children: [
+            for (final theme in PictureStoryGenerationOptions.availableThemes)
+              FilterChip(
+                label: Text(theme),
+                selected: _themes.contains(theme),
+                onSelected: canEdit
+                    ? (v) {
+                        setState(() {
+                          if (v) {
+                            _themes.add(theme);
+                          } else {
+                            _themes.remove(theme);
+                          }
+                        });
+                      }
+                    : null,
+              ),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        TextField(
+          controller: _requirements,
+          enabled: canEdit,
+          minLines: 2,
+          maxLines: 4,
+          maxLength: 1000,
+          decoration: const InputDecoration(
+            labelText: '补充要求（选填）',
+            hintText: '例如：雨天互相帮助，画面里有小动物',
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        FilledButton.icon(
+          onPressed: enabled ? () => _generate() : null,
+          icon: const Icon(Icons.auto_awesome_outlined),
+          label: Text(
+            _busy
+                ? '正在规划场景…'
+                : hasPendingPlan
+                ? '重试生成图文题目'
+                : '生成图文题目',
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _candidate(
     ThemeData theme,
@@ -496,7 +529,8 @@ class _PictureStoryGeneratePageState
                 Expanded(
                   child: Text.rich(
                     TextSpan(
-                      text: edit.fields[PictureStoryEditorField.title]
+                      text:
+                          edit.fields[PictureStoryEditorField.title]
                                   ?.trim()
                                   .isNotEmpty ==
                               true
@@ -523,8 +557,9 @@ class _PictureStoryGeneratePageState
                     semanticLabel: '选择第 ${index + 1} 道题',
                     materialTapTargetSize: MaterialTapTargetSize.padded,
                     visualDensity: VisualDensity.standard,
-                    onChanged:
-                        enabled ? (v) => _select(item, v ?? false) : null,
+                    onChanged: enabled
+                        ? (v) => _select(item, v ?? false)
+                        : null,
                   ),
               ],
             ),
@@ -602,14 +637,12 @@ class _PictureStoryGeneratePageState
                         TextButton.icon(
                           onPressed: enabled
                               ? () => _generate(
-                                    candidateId: item.id,
-                                    reuseImageId: edit.image?.value,
-                                  )
+                                  candidateId: item.id,
+                                  reuseImageId: edit.image?.value,
+                                )
                               : null,
                           icon: const Icon(Icons.refresh),
-                          label: Text(
-                            edit.image == null ? '生成图片' : '重试出题',
-                          ),
+                          label: Text(edit.image == null ? '生成图片' : '重试出题'),
                         ),
                     ],
                   ),
