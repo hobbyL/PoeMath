@@ -63,6 +63,16 @@ class _MissingFiles extends TextbookFileService {
   Future<void> discardPickerCopy(String sourcePath) async {}
 }
 
+class _ObservedDeleteRepository extends TextbookRepository {
+  final deleted = Completer<void>();
+
+  @override
+  Future<void> delete(String id) async {
+    await super.delete(id);
+    deleted.complete();
+  }
+}
+
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
   final access = ParentAccessService.instance;
@@ -209,6 +219,8 @@ void main() {
   }
 
   testWidgets('家长正常授权删除按实际仓储清除书目和学习记录', (tester) async {
+    final observedRepo = _ObservedDeleteRepository();
+    repo = observedRepo;
     await mount(
       tester,
       MaterialApp(home: Scaffold(body: TextbookCacheSheet(book: book))),
@@ -222,14 +234,17 @@ void main() {
       matching: find.widgetWithText(FilledButton, '删除本书'),
     );
     await tester.runAsync(() => tester.tap(confirm));
+    // 书目消失只是中间状态；交替推进真实 IO 和虚拟时钟，等完整删除结束。
     for (var attempt = 0;
-        attempt < 50 && repo.find(book.pdfSha256) != null;
+        attempt < 100 && !observedRepo.deleted.isCompleted;
         attempt++) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 20)),
       );
       await tester.pump();
     }
+    expect(observedRepo.deleted.isCompleted, isTrue, reason: '书目和阅读位置应已完整删除');
+    await tester.pumpAndSettle();
     expect(repo.find(book.pdfSha256), isNull);
     expect(HiveBoxes.settings.containsKey(progressKey), isFalse);
     expect(repo.reading('default', book.pdfSha256).page, 1);
