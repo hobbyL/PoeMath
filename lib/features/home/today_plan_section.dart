@@ -63,7 +63,7 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                 children: [
                   Expanded(
                     child: Text(
-                      '今日任务 ${plan.completedCount}/${plan.tasks.length}',
+                      '今日练习清单 ${plan.completedCount}/${plan.tasks.length}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),

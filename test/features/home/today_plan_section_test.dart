@@ -128,7 +128,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('今日任务 0/1'), findsOneWidget);
+      expect(find.text('今日练习清单 0/1'), findsOneWidget);
       expect(find.textContaining('年级'), findsNothing);
       expect(find.textContaining('每天首次生成后固定'), findsNothing);
       final taskCard = find.ancestor(
@@ -196,7 +196,7 @@ void main() {
         config.order,
         [TodayTaskKind.review, TodayTaskKind.newPoem, TodayTaskKind.mistake],
       );
-      expect(find.text('今日任务 0/1'), findsOneWidget);
+      expect(find.text('今日练习清单 0/1'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

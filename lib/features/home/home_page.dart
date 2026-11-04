@@ -58,13 +58,14 @@ class HomePage extends ConsumerWidget {
             _buildStreakCard(context, streak, isCheckedIn, stats, ref),
             const SizedBox(height: SpacingTokens.md),
 
-            // 学习概览
-            _buildStatsOverview(context, stats, learnedPoems),
+            _buildDailyGoal(context, ref),
             const SizedBox(height: SpacingTokens.lg),
-
-            // 快捷入口
             const PracticeResumeSection(),
             const TodayPlanSection(),
+
+            // 累计概览放在今日行动之后。
+            _buildStatsOverview(context, stats, learnedPoems),
+            const SizedBox(height: SpacingTokens.lg),
             Text(
               '快捷入口',
               style: theme.textTheme.titleMedium?.copyWith(
@@ -94,15 +95,6 @@ class HomePage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.lg),
             ],
 
-            // 今日目标
-            Text(
-              '今日目标',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            _buildDailyGoal(context, dueReviews, ref),
             // 底部留白：为底部导航栏预留空间
             const SizedBox(height: 100),
           ],
@@ -136,16 +128,19 @@ class HomePage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: SpacingTokens.sm,
+                  runSpacing: SpacingTokens.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color:
-                            theme.colorScheme.onPrimary.withValues(alpha: 0.9),
+                        color: theme.colorScheme.onPrimary.withValues(
+                          alpha: 0.9,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: SpacingTokens.sm),
                     // 等级徽章（原 AppBar 右上角）。
                     //
                     // 配色刻意用 onPrimary 半透明底 + 白字，而不是沿用原来
@@ -173,8 +168,9 @@ class HomePage extends ConsumerWidget {
                       child: Text(
                         '天连续',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onPrimary
-                              .withValues(alpha: 0.8),
+                          color: theme.colorScheme.onPrimary.withValues(
+                            alpha: 0.8,
+                          ),
                         ),
                       ),
                     ),
@@ -211,9 +207,7 @@ class HomePage extends ConsumerWidget {
                     ScaffoldMessenger.of(context).clearSnackBars();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(
-                          '每日目标未完成：${missing.join("、")}',
-                        ),
+                        content: Text('每日目标未完成：${missing.join("、")}'),
                         duration: const Duration(seconds: 3),
                       ),
                     );
@@ -247,9 +241,7 @@ class HomePage extends ConsumerWidget {
                   messenger
                     ..clearSnackBars()
                     ..showSnackBar(
-                      const SnackBar(
-                        content: Text('打卡失败，请检查设备存储空间后重试'),
-                      ),
+                      const SnackBar(content: Text('打卡失败，请检查设备存储空间后重试')),
                     );
                   return;
                 }
@@ -288,8 +280,9 @@ class HomePage extends ConsumerWidget {
                     unawaited(
                       checkInDone.then((_) async {
                         if (!context.mounted) return;
-                        final names =
-                            newlyUnlocked.map((a) => a.title).join('、');
+                        final names = newlyUnlocked
+                            .map((a) => a.title)
+                            .join('、');
                         await showCelebration(
                           context,
                           type: CelebrationType.achievement,
@@ -303,8 +296,9 @@ class HomePage extends ConsumerWidget {
               style: FilledButton.styleFrom(
                 // 主色渐变卡片上的按钮：用 onPrimary 而非白色硬编码，
                 // 换主题时自动跟随（与下方 `onPrimary` 图标同源）。
-                backgroundColor:
-                    theme.colorScheme.onPrimary.withValues(alpha: 0.2),
+                backgroundColor: theme.colorScheme.onPrimary.withValues(
+                  alpha: 0.2,
+                ),
                 foregroundColor: theme.colorScheme.onPrimary,
               ),
               child: const Text('打卡'),
@@ -569,117 +563,58 @@ class HomePage extends ConsumerWidget {
               ],
             ),
           ),
-          Icon(
-            Icons.chevron_right,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+          Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
         ],
       ),
     );
   }
 
-  Widget _buildDailyGoal(
-    BuildContext context,
-    int dueReviews,
-    WidgetRef ref,
-  ) {
+  Widget _buildDailyGoal(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final poemGoal = ref.watch(dailyPoemGoalProvider);
     final mathGoal = ref.watch(dailyMathGoalProvider);
     final todayPoems = ref.watch(todayPoemCountProvider);
     final todayMath = ref.watch(todayMathCountProvider);
+    final poemDone = todayPoems >= poemGoal;
+    final mathDone = todayMath >= mathGoal;
 
     return ColoredCard(
       color: theme.colorScheme.primary,
       width: double.infinity,
-      backgroundOpacity: 0.06,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildGoalItem(
-            context,
-            '背诵 $poemGoal 首诗词',
-            Icons.menu_book_outlined,
-            current: todayPoems,
-            target: poemGoal,
+          Text('打卡目标 · 诗词与口算', style: theme.textTheme.titleMedium),
+          const SizedBox(height: SpacingTokens.sm),
+          AppTile(
+            flat: true,
+            icon: poemDone
+                ? Icons.check_circle_outline
+                : Icons.menu_book_outlined,
+            iconColor: theme.colorScheme.primary,
+            title: '诗词 $todayPoems/$poemGoal 首',
+            subtitle: poemDone
+                ? '目标已完成'
+                : '还差 ${poemGoal - todayPoems} 首 · 去学诗词',
+            onTap: poemDone ? null : () => context.go(AppRoutes.poemTab),
+            trailing: poemDone ? const SizedBox.shrink() : null,
           ),
-          _buildGoalItem(
-            context,
-            '完成 $mathGoal 题口算',
-            Icons.calculate_outlined,
-            current: todayMath,
-            target: mathGoal,
+          AppTile(
+            flat: true,
+            icon: mathDone
+                ? Icons.check_circle_outline
+                : Icons.calculate_outlined,
+            iconColor: theme.colorScheme.secondary,
+            title: '口算 $todayMath/$mathGoal 题',
+            subtitle: mathDone
+                ? '目标已完成'
+                : '还差 ${mathGoal - todayMath} 题 · 去练口算',
+            onTap: mathDone ? null : () => context.go(AppRoutes.mathTab),
+            trailing: mathDone ? const SizedBox.shrink() : null,
           ),
-          if (dueReviews > 0)
-            _buildGoalItem(
-              context,
-              '复习 $dueReviews 首待复习诗词',
-              Icons.replay_rounded,
-              onTap: () => context.push(AppRoutes.poemReview),
-            ),
         ],
       ),
     );
-  }
-
-  Widget _buildGoalItem(
-    BuildContext context,
-    String text,
-    IconData icon, {
-    VoidCallback? onTap,
-    int? current,
-    int? target,
-  }) {
-    final theme = Theme.of(context);
-    final done = current != null && target != null && current >= target;
-    final content = Padding(
-      padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-      child: Row(
-        children: [
-          Icon(
-            done ? Icons.check_circle : icon,
-            size: 16,
-            color: done
-                ? theme.semantic.success
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: SpacingTokens.sm),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                decoration: done ? TextDecoration.lineThrough : null,
-                color: done ? theme.colorScheme.onSurfaceVariant : null,
-              ),
-            ),
-          ),
-          if (current != null && target != null)
-            Text(
-              '$current/$target',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color:
-                    done ? theme.semantic.success : theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          if (onTap != null)
-            Icon(
-              Icons.chevron_right,
-              size: 16,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-        ],
-      ),
-    );
-
-    if (onTap != null) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-        child: content,
-      );
-    }
-    return content;
   }
 }
 
