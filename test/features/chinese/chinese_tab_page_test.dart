@@ -16,6 +16,7 @@ import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/features/chinese/chinese_tab_page.dart';
+import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/poem/poem_favorites_page.dart';
 import 'package:poemath/features/poem/poem_learning_path_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
@@ -225,6 +226,14 @@ void main() {
     await tester.pumpAndSettle();
     app.router.go(AppRoutes.home);
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('背诗词'),
+      250,
+      scrollable: find.descendant(
+        of: find.byType(HomePage),
+        matching: find.byType(Scrollable),
+      ),
+    );
     await tester.tap(find.text('背诗词'));
     await tester.pumpAndSettle();
     _expectPoemSection(tester);

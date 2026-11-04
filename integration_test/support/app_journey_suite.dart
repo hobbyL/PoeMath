@@ -22,8 +22,10 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/formula.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/features/chinese/chinese_tab_page.dart';
+import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/math_mistake_page.dart';
+import 'package:poemath/features/math/math_session_detail_page.dart';
 import 'package:poemath/features/profile/backup_restore_page.dart';
 import 'package:poemath/features/profile/parent_protection_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
@@ -62,6 +64,7 @@ void defineAppJourneyTests({
     await _startApp(tester, directoryProvider: directoryProvider);
 
     expect(find.byType(MainShell), findsOneWidget);
+    await _showHomeAction(tester, '背诗词');
     expect(find.text('背诗词'), findsOneWidget);
 
     await _tapTab(tester, '语文');
@@ -129,14 +132,23 @@ void defineAppJourneyTests({
           tester.widget<FilledButton>(resultsButton).onPressed != null,
     );
     await _tap(tester, resultsButton);
-    await _pumpUntil(tester, find.text('查看错题'));
+    await _pumpUntil(tester, find.text('看本轮错题（1）'));
     expect(HiveBoxes.mathMistakes.values, isNotEmpty);
-    await _tap(tester, find.text('查看错题'));
+    await _tap(tester, find.text('看本轮错题（1）'));
+    await _pumpUntil(tester, find.byType(MathSessionDetailPage));
+    final detail = tester.widget<MathSessionDetailPage>(
+      find.byType(MathSessionDetailPage),
+    );
+    expect(detail.session.id, HiveBoxes.mathSessions.values.single.id);
+    expect(detail.initiallyMistakesOnly, isTrue);
+    expect(detail.session.problemRecords.single.isCorrect, isFalse);
+    await _tap(tester, find.text('全部错题'));
     await _pumpUntil(tester, find.byType(MathMistakePage));
   });
 
   testWidgets('公式详情可以收藏并持久化', (tester) async {
     await _startApp(tester, directoryProvider: directoryProvider);
+    await _showHomeAction(tester, '查公式');
     await _tap(tester, find.text('查公式'));
     await _pumpUntil(tester, find.text('公式知识库'));
 
@@ -345,7 +357,20 @@ Future<void> _startApp(
     ),
   );
   await _pumpUntil(tester, find.byType(MainShell));
-  await _pumpUntil(tester, find.text('背诗词'));
+  await _pumpUntil(tester, find.text('打卡目标 · 诗词与口算'));
+}
+
+Future<void> _showHomeAction(WidgetTester tester, String label) async {
+  await tester.runAsync(
+    () => tester.scrollUntilVisible(
+      find.text(label),
+      250,
+      scrollable: find.descendant(
+        of: find.byType(HomePage),
+        matching: find.byType(Scrollable),
+      ),
+    ),
+  );
 }
 
 Future<void> _tapTab(WidgetTester tester, String label) async {

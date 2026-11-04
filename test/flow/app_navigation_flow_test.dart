@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/app.dart';
+import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 
 import '../helpers/hive_test_helper.dart';
@@ -76,7 +77,7 @@ void main() {
     await drainHiveWritesForTesting(tester);
   });
 
-  testWidgets('首页显示快捷入口和今日目标', (tester) async {
+  testWidgets('首页先显示打卡目标，滚动后显示快捷入口', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: App()));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 200));
@@ -84,17 +85,22 @@ void main() {
     // 消耗 MainShell IndexedStack 中所有 tab 的 flutter_animate 入场动画
     await tester.pump(const Duration(seconds: 3));
 
-    // 快捷入口
+    expect(find.text('打卡目标 · 诗词与口算'), findsOneWidget);
+    expect(find.text('打卡'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('背诗词'),
+      250,
+      scrollable: find.descendant(
+        of: find.byType(HomePage),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    // 快捷入口保留在今日行动之后。
     expect(find.text('背诗词'), findsOneWidget);
     expect(find.text('做口算'), findsOneWidget);
     expect(find.text('查公式'), findsOneWidget);
     expect(find.text('错题本'), findsOneWidget);
-
-    // 今日目标
-    expect(find.text('今日目标'), findsOneWidget);
-
-    // 打卡区域
-    expect(find.text('打卡'), findsOneWidget);
 
     // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。
     await drainHiveWritesForTesting(tester);
