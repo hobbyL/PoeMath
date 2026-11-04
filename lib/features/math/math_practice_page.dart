@@ -786,13 +786,17 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         correctCount: correctCount,
         durationSeconds: duration,
         starsEarned: stars,
+        reviewLabel: '看本轮错题（${problems.length - correctCount}）',
       ),
     );
 
     if (!mounted) return;
 
     if (action == 'review') {
-      context.pushReplacement(AppRoutes.mathMistake);
+      context.pushReplacement(
+        '${AppRoutes.mathSessionDetail}?mistakesOnly=1',
+        extra: session,
+      );
     } else if (action == 'retry') {
       _retrySession();
     } else {

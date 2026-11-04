@@ -419,7 +419,11 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           }
           return fadeSlideTransitionPage(
             state: state,
-            child: MathSessionDetailPage(session: session),
+            child: MathSessionDetailPage(
+              session: session,
+              initiallyMistakesOnly:
+                  state.uri.queryParameters['mistakesOnly'] == '1',
+            ),
           );
         },
       ),

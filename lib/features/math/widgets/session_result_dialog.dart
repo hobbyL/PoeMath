@@ -13,15 +13,16 @@ class SessionResultDialog extends StatelessWidget {
     required this.correctCount,
     required this.durationSeconds,
     required this.starsEarned,
+    this.reviewLabel = '查看错题',
   });
 
   final int totalProblems;
   final int correctCount;
   final int durationSeconds;
   final int starsEarned;
+  final String reviewLabel;
 
-  double get accuracy =>
-      totalProblems > 0 ? correctCount / totalProblems : 0.0;
+  double get accuracy => totalProblems > 0 ? correctCount / totalProblems : 0.0;
 
   String get _durationText {
     final minutes = durationSeconds ~/ 60;
@@ -94,7 +95,9 @@ class SessionResultDialog extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(3, (i) {
               return Icon(
-                i < starsEarned ? Icons.star_rounded : Icons.star_outline_rounded,
+                i < starsEarned
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
                 size: 40,
                 color: i < starsEarned
                     ? theme.semantic.caution
@@ -124,7 +127,7 @@ class SessionResultDialog extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(context).pop('review'),
-                    child: const Text('查看错题'),
+                    child: Text(reviewLabel),
                   ),
                 ),
                 const SizedBox(width: SpacingTokens.sm),

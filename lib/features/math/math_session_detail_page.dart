@@ -13,18 +13,47 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 
-class MathSessionDetailPage extends ConsumerWidget {
-  const MathSessionDetailPage({super.key, required this.session});
+class MathSessionDetailPage extends ConsumerStatefulWidget {
+  const MathSessionDetailPage({
+    super.key,
+    required this.session,
+    this.initiallyMistakesOnly = false,
+  });
 
   final MathSession session;
+  final bool initiallyMistakesOnly;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MathSessionDetailPage> createState() =>
+      _MathSessionDetailPageState();
+}
+
+class _MathSessionDetailPageState extends ConsumerState<MathSessionDetailPage> {
+  late bool _mistakesOnly = widget.initiallyMistakesOnly;
+
+  @override
+  void didUpdateWidget(covariant MathSessionDetailPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session.id != widget.session.id ||
+        oldWidget.initiallyMistakesOnly != widget.initiallyMistakesOnly) {
+      _mistakesOnly = widget.initiallyMistakesOnly;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = widget.session;
     final theme = Theme.of(context);
     final records = session.problemRecords;
+    // 筛选后仍使用原题下标，保持题号和错题 ID 一致。
+    final visibleRecords = records.indexed
+        .where((entry) => !_mistakesOnly || !entry.$2.isCorrect)
+        .toList();
+    final mistakeCount = records.where((record) => !record.isCorrect).length;
     final accuracy = session.accuracy;
     final accuracyPct = (accuracy * 100).toStringAsFixed(0);
 
@@ -69,8 +98,10 @@ class MathSessionDetailPage extends ConsumerWidget {
                           padding: const EdgeInsets.all(SpacingTokens.md),
                           child: ColoredCard(
                             color: theme.colorScheme.primary,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceAround,
+                              spacing: SpacingTokens.md,
+                              runSpacing: SpacingTokens.sm,
                               children: [
                                 _SummaryItem(
                                   label: '正确率',
@@ -106,6 +137,34 @@ class MathSessionDetailPage extends ConsumerWidget {
                         .slideY(begin: 0.1, end: 0, duration: 400.ms),
               ),
 
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  child: Wrap(
+                    spacing: SpacingTokens.sm,
+                    runSpacing: SpacingTokens.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('全部作答'),
+                        selected: !_mistakesOnly,
+                        onSelected: (_) =>
+                            setState(() => _mistakesOnly = false),
+                      ),
+                      ChoiceChip(
+                        label: Text('本轮错题（$mistakeCount）'),
+                        selected: _mistakesOnly,
+                        onSelected: (_) => setState(() => _mistakesOnly = true),
+                      ),
+                      TextButton(
+                        onPressed: () => context.push(AppRoutes.mathMistake),
+                        child: const Text('全部错题'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               // 题目列表
               if (records.isEmpty)
                 const SliverFillRemaining(
@@ -116,13 +175,22 @@ class MathSessionDetailPage extends ConsumerWidget {
                     description: '本次练习的成绩统计仍可在上方查看。',
                   ),
                 )
+              else if (visibleRecords.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: AppEmptyState(
+                    icon: Icons.check_circle_outline,
+                    title: '本轮没有错题',
+                    description: '可以切换到全部作答查看练习记录。',
+                  ),
+                )
               else
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: SpacingTokens.md,
                   ),
                   sliver: SliverList.builder(
-                    itemCount: (records.length + columns - 1) ~/ columns,
+                    itemCount: (visibleRecords.length + columns - 1) ~/ columns,
                     itemBuilder: (context, rowIndex) {
                       final start = rowIndex * columns;
                       final rowWidgets = <Widget>[];
@@ -133,13 +201,13 @@ class MathSessionDetailPage extends ConsumerWidget {
                           );
                         }
                         final idx = start + col;
-                        if (idx < records.length) {
-                          final record = records[idx];
+                        if (idx < visibleRecords.length) {
+                          final (originalIndex, record) = visibleRecords[idx];
                           rowWidgets.add(
                             Expanded(
                               child:
                                   _ProblemRow(
-                                        index: idx,
+                                        index: originalIndex,
                                         record: record,
                                         sessionId: session.id,
                                       )
@@ -236,13 +304,17 @@ class _ProblemRow extends ConsumerWidget {
     final theme = Theme.of(context);
     final isCorrect = record.isCorrect;
 
-    // 错题查找对应的 MathMistake ID
+    // 当前错题按题面聚合；旧历史仍可能使用 session/index 标识。
     String? mistakeId;
     if (!isCorrect) {
       final repo = ref.watch(mathMistakeRepoProvider);
-      final id = '${sessionId}_$index';
-      final mistake = repo.getById(id);
-      if (mistake != null) mistakeId = id;
+      final legacyId = '${sessionId}_$index';
+      final id = MathMistakeRepository.problemKey(
+        problemText: record.problemText,
+        correctAnswer: record.answerText,
+      );
+      final mistake = repo.getById(id) ?? repo.getById(legacyId);
+      mistakeId = mistake?.id;
     }
 
     final canNavigate = mistakeId != null;
