@@ -30,10 +30,7 @@ import 'package:poemath/features/profile/widgets/backup_passphrase_dialog.dart';
 import 'package:poemath/features/profile/widgets/credential_export_failed_dialog.dart';
 
 class BackupRestorePage extends ConsumerStatefulWidget {
-  const BackupRestorePage({
-    super.key,
-    this.notificationService,
-  });
+  const BackupRestorePage({super.key, this.notificationService});
 
   final NotificationService? notificationService;
 
@@ -55,8 +52,9 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
   }
 
   Future<void> _loadPassphraseState() async {
-    final passphrase =
-        await ref.read(secureCredentialStoreProvider).readBackupPassphrase();
+    final passphrase = await ref
+        .read(secureCredentialStoreProvider)
+        .readBackupPassphrase();
     if (mounted) {
       setState(() => _hasPassphrase = passphrase != null);
     }
@@ -83,9 +81,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
       if (!mounted) return;
       setState(() => _hasPassphrase = passphrase != null);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.isEmpty ? '备份加密口令已清除' : '备份加密口令已保存 ✓'),
-        ),
+        SnackBar(content: Text(result.isEmpty ? '备份加密口令已清除' : '备份加密口令已保存 ✓')),
       );
     } on Object catch (error) {
       if (mounted) {
@@ -198,9 +194,8 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
                 Text(
                   '导出备份',
                   textAlign: TextAlign.center,
-                  style: Theme.of(sheet).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(sheet).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.md),
                 AppTile(
@@ -252,8 +247,9 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
             await file.writeAsString(json);
             if (!context.mounted) return;
             ParentAccessService.instance.assertAllowed();
-            final result = await SharePlus.instance
-                .share(ShareParams(files: [XFile(file.path)]));
+            final result = await SharePlus.instance.share(
+              ShareParams(files: [XFile(file.path)]),
+            );
             if (result.status == ShareResultStatus.success) {
               await history.markExternalBackup();
             }
@@ -420,9 +416,9 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
                       await history.create();
                     } on Object catch (error) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('快照失败：$error')),
-                        );
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text('快照失败：$error')));
                       }
                     } finally {
                       if (mounted) {
@@ -486,17 +482,21 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
                   const SizedBox(height: SpacingTokens.sm),
                 ],
                 if (entries.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(SpacingTokens.md),
-                    child: Text('暂无保护快照'),
+                  const AppEmptyState(
+                    icon: Icons.restore,
+                    title: '暂无保护快照',
+                    description: '恢复备份前会自动保护当前数据，可在这里找回。',
                   ),
                 for (final entry in entries) ...[
                   AppTile(
                     icon: Icons.restore,
                     iconColor: theme.colorScheme.primary,
                     title: entry.label,
-                    subtitle:
-                        entry.createdAt.toLocal().toString().split('.').first,
+                    subtitle: entry.createdAt
+                        .toLocal()
+                        .toString()
+                        .split('.')
+                        .first,
                     onTap: _busy ? null : () => _restoreSnapshot(entry),
                   ),
                   if (entry != entries.last)

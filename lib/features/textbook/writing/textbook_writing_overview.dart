@@ -48,10 +48,10 @@ class _WritingOverviewState extends ConsumerState<TextbookWritingOverview> {
   static const int _maximumColumns = 4;
 
   static String _badgeLabel(WritingBadge badge) => switch (badge) {
-        WritingBadge.none => '未练',
-        WritingBadge.traced => '已描红',
-        WritingBadge.written => '已自写',
-      };
+    WritingBadge.none => '未练',
+    WritingBadge.traced => '已描红',
+    WritingBadge.written => '已自写',
+  };
 
   static Color _badgeColor(ThemeData theme, WritingBadge badge) =>
       switch (badge) {
@@ -209,7 +209,6 @@ class _WritingOverviewState extends ConsumerState<TextbookWritingOverview> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final pack = ref.watch(textbookCourseProvider(widget.bookId)).valueOrNull;
     final strokes = ref.watch(writingStrokeDataProvider).valueOrNull;
     final progress = ref.watch(textbookWritingProgressProvider(widget.bookId));
@@ -221,16 +220,11 @@ class _WritingOverviewState extends ConsumerState<TextbookWritingOverview> {
             hasStrokeData: strokes?.hasStrokeDataSync ?? _noStrokeData,
           );
     if (targets.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: SpacingTokens.md),
-        child: Text(
-          '本课暂无会写字。',
-          key: const ValueKey('writing-empty'),
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
+      return const AppEmptyState(
+        key: ValueKey('writing-empty'),
+        icon: Icons.edit_outlined,
+        title: '本课暂无会写字。',
+        description: '请家长核对本课的书写内容。',
       );
     }
     final records = progress.valueOrNull?.records;
@@ -238,9 +232,10 @@ class _WritingOverviewState extends ConsumerState<TextbookWritingOverview> {
       builder: (context, constraints) {
         final gap = SpacingTokens.sm;
         final available = constraints.maxWidth;
-        final columns = ((available + gap) / (_cardWidth + gap))
-            .floor()
-            .clamp(_minimumColumns, _maximumColumns);
+        final columns = ((available + gap) / (_cardWidth + gap)).floor().clamp(
+          _minimumColumns,
+          _maximumColumns,
+        );
         return MasonryLayout(
           key: const ValueKey('writing-masonry'),
           columnCount: columns,

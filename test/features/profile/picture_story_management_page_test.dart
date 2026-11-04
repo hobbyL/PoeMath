@@ -76,9 +76,8 @@ Future<ProviderContainer> _pumpPage(
           brightness: Brightness.light,
         ),
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(textScale),
-          ),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
           child: child!,
         ),
         home: const PictureStoryManagementPage(),
@@ -90,14 +89,14 @@ Future<ProviderContainer> _pumpPage(
 }
 
 Finder _switchOf(String title) => find.descendant(
-      of: find.widgetWithText(AppTile, title),
-      matching: find.byType(Switch),
-    );
+  of: find.widgetWithText(AppTile, title),
+  matching: find.byType(Switch),
+);
 
 List<Rect> _promptRects(WidgetTester tester) => [
-      for (final prompt in _prompts.reversed)
-        tester.getRect(find.widgetWithText(AppTile, prompt.title)),
-    ];
+  for (final prompt in _prompts.reversed)
+    tester.getRect(find.widgetWithText(AppTile, prompt.title)),
+];
 
 void _verifyPromptLayout(WidgetTester tester) {
   for (final prompt in _prompts) {
@@ -144,7 +143,8 @@ void main() {
   testWidgets('初始题库为空且可新增或AI出题，不展示内置题目', (tester) async {
     final container = await _pumpPage(tester, withPrompts: false);
     expect(find.byType(AppTile), findsNothing);
-    expect(find.text('题库里还没有题目，点击右上角「新增题目」添加。'), findsOneWidget);
+    expect(find.text('题库还是空的'), findsOneWidget);
+    expect(find.text('添加图片或让 AI 出题，家长确认后即可练习'), findsOneWidget);
     expect(find.byTooltip('新增题目'), findsOneWidget);
     expect(find.byTooltip('AI 出题'), findsOneWidget);
     expect(container.read(pictureStoryCatalogProvider), isEmpty);
@@ -192,11 +192,7 @@ void main() {
 
   for (final textScale in [1.0, 2.0]) {
     testWidgets('宽屏题库应展示三列，同排等高且字号 $textScale 下不溢出', (tester) async {
-      await _pumpPage(
-        tester,
-        size: const Size(900, 700),
-        textScale: textScale,
-      );
+      await _pumpPage(tester, size: const Size(900, 700), textScale: textScale);
 
       _verifyPromptLayout(tester);
       final rects = _promptRects(tester);

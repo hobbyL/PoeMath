@@ -50,8 +50,9 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
 
   Future<void> _load() async {
     try {
-      final usage =
-          await ref.read(textbookFileServiceProvider).storageUsage(widget.book);
+      final usage = await ref
+          .read(textbookFileServiceProvider)
+          .storageUsage(widget.book);
       if (!mounted) return;
       setState(() {
         _usage = usage;
@@ -78,9 +79,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
       context: context,
       builder: (dialog) => AlertDialog(
         title: Text('$verb$label？'),
-        content: Text(
-          warning ?? '清理后再次用到会重新生成，不影响原书、课程内容与学习进度。',
-        ),
+        content: Text(warning ?? '清理后再次用到会重新生成，不影响原书、课程内容与学习进度。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog, false),
@@ -193,9 +192,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
       ref.invalidate(textbookCourseDocumentProvider(id));
     } on Object {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('删除失败，已删除的部分不会恢复，请稍后重试')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('删除失败，已删除的部分不会恢复，请稍后重试')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -238,8 +236,9 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                     child: Icon(
                       Icons.delete_outline,
                       size: SpacingTokens.md,
-                      color:
-                          _busy ? theme.disabledColor : theme.colorScheme.error,
+                      color: _busy
+                          ? theme.disabledColor
+                          : theme.colorScheme.error,
                     ),
                   ),
                 ),
@@ -305,7 +304,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   child: Row(
                     children: [
                       Text(
-                        usage.hasDerived ? '可清理缓存' : '暂无缓存',
+                        usage.hasDerived ? '可清理缓存' : '缓存合计',
                         style: theme.textTheme.bodyMedium,
                       ),
                       const Spacer(),
@@ -319,17 +318,14 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                     ],
                   ),
                 ),
-                if (!usage.hasDerived) ...[
-                  const SizedBox(height: SpacingTokens.sm),
-                  Text(
-                    '目录提取、封面和朗读音频会在使用时自动生成。',
-                    key: const ValueKey('cache-empty'),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                if (!usage.hasDerived)
+                  const AppEmptyState(
+                    key: ValueKey('cache-empty'),
+                    icon: Icons.cleaning_services_outlined,
+                    title: '暂无缓存',
+                    description: '目录提取、封面和朗读音频会在使用时自动生成。',
+                    padding: EdgeInsets.all(SpacingTokens.md),
                   ),
-                ],
                 const SizedBox(height: SpacingTokens.sm),
                 _row(
                   key: const ValueKey('cache-row-pdf'),
@@ -363,7 +359,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   title: '目录与提取内容',
                   subtitle: usage.contentFiles > 0
                       ? '${usage.contentFiles} 个文件 · '
-                          '${formatBytes(usage.contentBytes)} · 可重新生成'
+                            '${formatBytes(usage.contentBytes)} · 可重新生成'
                       : '未生成',
                   onDelete: () => _clear(
                     '目录与提取内容',
@@ -380,7 +376,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   title: '朗读音频（句子/字/词）',
                   subtitle: usage.audioFiles > 0
                       ? '${usage.audioFiles} 段 · '
-                          '${formatBytes(usage.audioBytes)} · 可重新生成'
+                            '${formatBytes(usage.audioBytes)} · 可重新生成'
                       : '未生成',
                   onDelete: () => _clear(
                     '朗读音频',
@@ -398,7 +394,7 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                   title: '课程内容',
                   subtitle: usage.courseBytes > 0
                       ? '${formatBytes(usage.courseBytes)} · '
-                          '读一读/认一认/写一写内容，删除后需重新生成'
+                            '读一读/认一认/写一写内容，删除后需重新生成'
                       : '未生成',
                   onDelete: () => _clear(
                     '课程内容',
@@ -413,7 +409,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                         textbookCourseDocumentProvider(widget.book.pdfSha256),
                       );
                     },
-                    warning: '读一读、认一认、写一写的内容来自课程数据，删除后不会自动'
+                    warning:
+                        '读一读、认一认、写一写的内容来自课程数据，删除后不会自动'
                         '恢复，需要重新生成或重新导入课程 JSON。原书、缓存与学习进度'
                         '不受影响。',
                     danger: true,
@@ -428,11 +425,11 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                         onPressed: _busy || !usage.hasDerived
                             ? null
                             : () => _clear(
-                                  '全部缓存',
-                                  () => ref
-                                      .read(textbookFileServiceProvider)
-                                      .clearDerived(widget.book),
-                                ),
+                                '全部缓存',
+                                () => ref
+                                    .read(textbookFileServiceProvider)
+                                    .clearDerived(widget.book),
+                              ),
                         icon: const Icon(Icons.delete_sweep_outlined),
                         label: const Text('清理全部缓存'),
                       ),
@@ -441,13 +438,14 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                     Builder(
                       builder: (context) {
                         final id = widget.book.pdfSha256;
-                        final generationBusy = ref
+                        final generationBusy =
+                            ref
                                 .watch(textbookGenerationProvider)[id]
                                 ?.running ??
                             false;
                         final downloading =
                             ref.watch(textbookDownloadsProvider)[id]?.active ??
-                                false;
+                            false;
                         final blocked = generationBusy || downloading;
                         final button = OutlinedButton.icon(
                           key: const ValueKey('cache-delete-book'),
@@ -461,8 +459,9 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                         );
                         if (!blocked) return button;
                         return Tooltip(
-                          message:
-                              generationBusy ? '课程整理进行中，请稍后再试' : '下载进行中，请稍后再试',
+                          message: generationBusy
+                              ? '课程整理进行中，请稍后再试'
+                              : '下载进行中，请稍后再试',
                           child: button,
                         );
                       },

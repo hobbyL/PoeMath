@@ -41,14 +41,14 @@ List<_PinyinHint> _pinyinHints(TextbookDraftCandidate candidate) {
 
 /// 旧草稿里可能仍存着拼音字体的 ASCII 编码；编辑页展示前统一解码。
 List<String> _decodedPinyinHints(TextbookDraftCandidate candidate) => [
-      for (final hint in _pinyinHints(candidate))
-        '${hint.character}: ${hint.decoded ?? '字体编码待核对'}',
-    ];
+  for (final hint in _pinyinHints(candidate))
+    '${hint.character}: ${hint.decoded ?? '字体编码待核对'}',
+];
 
 List<String> _pendingPinyinHints(TextbookDraftCandidate candidate) => [
-      for (final hint in _pinyinHints(candidate))
-        if (!hint.valid) '${hint.character}: ${hint.decoded ?? '字体编码待核对'}',
-    ];
+  for (final hint in _pinyinHints(candidate))
+    if (!hint.valid) '${hint.character}: ${hint.decoded ?? '字体编码待核对'}',
+];
 
 class TextbookDraftDetailsPage extends ConsumerStatefulWidget {
   const TextbookDraftDetailsPage({
@@ -107,7 +107,9 @@ class _TextbookDraftDetailsState
     }
     setState(() => _saving = true);
     try {
-      await ref.read(textbookCourseRepositoryProvider).resolveDifference(
+      await ref
+          .read(textbookCourseRepositoryProvider)
+          .resolveDifference(
             widget.book,
             widget.lessonId,
             accept: accept,
@@ -162,10 +164,7 @@ class _TextbookDraftDetailsState
                     for (final l in doc.pack.lessons)
                       DropdownMenuItem(
                         value: l.id,
-                        child: Text(
-                          l.title,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        child: Text(l.title, overflow: TextOverflow.ellipsis),
                       ),
                   ],
                   onChanged: (v) => update(() => lessonId = v!),
@@ -177,10 +176,7 @@ class _TextbookDraftDetailsState
                   decoration: const InputDecoration(labelText: '内容类别'),
                   items: [
                     for (final e in textbookCourseCategoryLabels.entries)
-                      DropdownMenuItem(
-                        value: e.key,
-                        child: Text(e.value),
-                      ),
+                      DropdownMenuItem(value: e.key, child: Text(e.value)),
                   ],
                   onChanged: (v) => update(() => category = v!),
                 ),
@@ -208,7 +204,8 @@ class _TextbookDraftDetailsState
         lessonId,
         category,
         id: id,
-        text: category == 'recognitionCharacters' ||
+        text:
+            category == 'recognitionCharacters' ||
                 category == 'writingCharacters'
             ? '新'
             : '待填写',
@@ -238,7 +235,9 @@ class _TextbookDraftDetailsState
     TextbookDraftCandidate candidate,
   ) async {
     try {
-      await ref.read(textbookCourseRepositoryProvider).updateGeneration(
+      await ref
+          .read(textbookCourseRepositoryProvider)
+          .updateGeneration(
             widget.book,
             doc.generation!.runId,
             (g) => g.copyWith(
@@ -402,15 +401,13 @@ class _TextbookDraftDetailsState
   }
 
   Future<void> _page(int page) => Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => TextbookCourseSourcePage(
-            book: widget.book,
-            sources: [
-              TextbookSourcePage(page, null, 'text_extracted'),
-            ],
-          ),
-        ),
-      );
+    MaterialPageRoute(
+      builder: (_) => TextbookCourseSourcePage(
+        book: widget.book,
+        sources: [TextbookSourcePage(page, null, 'text_extracted')],
+      ),
+    ),
+  );
 
   Future<void> _retry() async {
     if (_saving) return;
@@ -419,8 +416,9 @@ class _TextbookDraftDetailsState
     try {
       final catalog = await ref.read(textbookCatalogProvider.future);
       if (!mounted) return;
-      final path =
-          await ref.read(textbookPathProvider(widget.book.pdfSha256).future);
+      final path = await ref.read(
+        textbookPathProvider(widget.book.pdfSha256).future,
+      );
       final entry = catalog
           .where((e) => e.book.pdfSha256 == widget.book.pdfSha256)
           .firstOrNull;
@@ -447,8 +445,9 @@ class _TextbookDraftDetailsState
 
   @override
   Widget build(BuildContext context) {
-    final data =
-        ref.watch(textbookCourseDocumentProvider(widget.book.pdfSha256));
+    final data = ref.watch(
+      textbookCourseDocumentProvider(widget.book.pdfSha256),
+    );
     final theme = Theme.of(context);
     final contentStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -469,15 +468,16 @@ class _TextbookDraftDetailsState
       body: data.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => Center(
-          child: TextButton(
-            onPressed: _reload,
-            child: const Text('读取失败，重试'),
-          ),
+          child: TextButton(onPressed: _reload, child: const Text('读取失败，重试')),
         ),
         data: (doc) {
           final generation = doc?.generation;
           if (doc == null || generation == null) {
-            return const Center(child: Text('这份草稿由人工导入，可在课目页直接添加、编辑内容。'));
+            return const AppEmptyState(
+              icon: Icons.edit_note_outlined,
+              title: '这份草稿由人工导入',
+              description: '可在课目页直接添加、编辑内容。',
+            );
           }
           final plan = generation.plans
               .where((p) => p.id == widget.lessonId)
@@ -572,9 +572,10 @@ class _TextbookDraftDetailsState
                 style: theme.textTheme.titleMedium,
               ),
               if (candidateList.isEmpty)
-                Text(
-                  '没有未分类候选。各类内容是否完整，仍需对照原书核对。',
-                  style: contentStyle,
+                const AppEmptyState(
+                  icon: Icons.fact_check_outlined,
+                  title: '没有未分类候选',
+                  description: '各类内容是否完整，仍需对照原书核对。',
                 ),
               for (final candidate in candidateList)
                 Padding(
@@ -695,16 +696,10 @@ class _DifferenceSummary extends StatelessWidget {
                 ),
               if (category.removed.isNotEmpty &&
                   _listDifferenceCategories.contains(category.category))
-                Text(
-                  '仅当前版本：${category.removed.join('、')}',
-                  style: style,
-                ),
+                Text('仅当前版本：${category.removed.join('、')}', style: style),
               if (category.added.isNotEmpty &&
                   _listDifferenceCategories.contains(category.category))
-                Text(
-                  '仅生成版本：${category.added.join('、')}',
-                  style: style,
-                ),
+                Text('仅生成版本：${category.added.join('、')}', style: style),
             ],
             if (difference.hasPinyinDifference)
               Text(

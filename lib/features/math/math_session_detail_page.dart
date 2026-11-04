@@ -64,58 +64,56 @@ class MathSessionDetailPage extends ConsumerWidget {
 
               // 概要卡片
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(SpacingTokens.md),
-                  child: ColoredCard(
-                    color: theme.colorScheme.primary,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _SummaryItem(
-                          label: '正确率',
-                          value: '$accuracyPct%',
-                          color: accuracy >= 0.9
-                              ? theme.semantic.success
-                              : accuracy >= 0.7
-                                  ? theme.semantic.caution
-                                  : theme.colorScheme.error,
-                        ),
-                        _SummaryItem(
-                          label: '题数',
-                          value:
-                              '${session.correctCount}/${session.totalProblems}',
-                          color: theme.colorScheme.primary,
-                        ),
-                        _SummaryItem(
-                          label: '用时',
-                          value: durStr,
-                          color: theme.colorScheme.secondary,
-                        ),
-                        _SummaryItem(
-                          label: '时间',
-                          value: timeStr,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                    .animatePage(context)
-                    .fadeIn(duration: 400.ms)
-                    .slideY(begin: 0.1, end: 0, duration: 400.ms),
+                child:
+                    Padding(
+                          padding: const EdgeInsets.all(SpacingTokens.md),
+                          child: ColoredCard(
+                            color: theme.colorScheme.primary,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _SummaryItem(
+                                  label: '正确率',
+                                  value: '$accuracyPct%',
+                                  color: accuracy >= 0.9
+                                      ? theme.semantic.success
+                                      : accuracy >= 0.7
+                                      ? theme.semantic.caution
+                                      : theme.colorScheme.error,
+                                ),
+                                _SummaryItem(
+                                  label: '题数',
+                                  value:
+                                      '${session.correctCount}/${session.totalProblems}',
+                                  color: theme.colorScheme.primary,
+                                ),
+                                _SummaryItem(
+                                  label: '用时',
+                                  value: durStr,
+                                  color: theme.colorScheme.secondary,
+                                ),
+                                _SummaryItem(
+                                  label: '时间',
+                                  value: timeStr,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .animatePage(context)
+                        .fadeIn(duration: 400.ms)
+                        .slideY(begin: 0.1, end: 0, duration: 400.ms),
               ),
 
               // 题目列表
               if (records.isEmpty)
-                SliverFillRemaining(
+                const SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(
-                    child: Text(
-                      '该练习无题目详情记录',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+                  child: AppEmptyState(
+                    icon: Icons.history_outlined,
+                    title: '该练习无题目详情记录',
+                    description: '本次练习的成绩统计仍可在上方查看。',
                   ),
                 )
               else
@@ -139,22 +137,23 @@ class MathSessionDetailPage extends ConsumerWidget {
                           final record = records[idx];
                           rowWidgets.add(
                             Expanded(
-                              child: _ProblemRow(
-                                index: idx,
-                                record: record,
-                                sessionId: session.id,
-                              )
-                                  .animatePage(context)
-                                  .fadeIn(
-                                    delay: (80 * idx).ms,
-                                    duration: 300.ms,
-                                  )
-                                  .slideX(
-                                    begin: 0.1,
-                                    end: 0,
-                                    delay: (80 * idx).ms,
-                                    duration: 300.ms,
-                                  ),
+                              child:
+                                  _ProblemRow(
+                                        index: idx,
+                                        record: record,
+                                        sessionId: session.id,
+                                      )
+                                      .animatePage(context)
+                                      .fadeIn(
+                                        delay: (80 * idx).ms,
+                                        duration: 300.ms,
+                                      )
+                                      .slideX(
+                                        begin: 0.1,
+                                        end: 0,
+                                        delay: (80 * idx).ms,
+                                        duration: 300.ms,
+                                      ),
                             ),
                           );
                         } else {
@@ -249,15 +248,13 @@ class _ProblemRow extends ConsumerWidget {
     final canNavigate = mistakeId != null;
 
     // 参考 _SessionCard 配色：用 primary/tertiary 做主视觉
-    final statusColor =
-        isCorrect ? theme.colorScheme.tertiary : theme.colorScheme.primary;
+    final statusColor = isCorrect
+        ? theme.colorScheme.tertiary
+        : theme.colorScheme.primary;
 
     return GestureDetector(
       onTap: canNavigate
-          ? () => context.push(
-                AppRoutes.mathMistakeDetail,
-                extra: mistakeId,
-              )
+          ? () => context.push(AppRoutes.mathMistakeDetail, extra: mistakeId)
           : null,
       child: ColoredCard(
         color: theme.colorScheme.primary,

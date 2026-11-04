@@ -40,18 +40,20 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
         .length;
     final mastered = required
         .where(
-            (poem) => progress.get(poem.id)?.status == LearningStatus.mastered,)
+          (poem) => progress.get(poem.id)?.status == LearningStatus.mastered,
+        )
         .length;
     final requiredIds = required.map((poem) => poem.id).toSet();
-    final extended = poems
-        .where(
-          (poem) =>
-              !requiredIds.contains(poem.id) &&
-              poem.effectiveGrades.contains(grade) &&
-              (poem.semester == null || poem.semester == semester),
-        )
-        .toList()
-      ..sort(compareCurriculumPoems);
+    final extended =
+        poems
+            .where(
+              (poem) =>
+                  !requiredIds.contains(poem.id) &&
+                  poem.effectiveGrades.contains(grade) &&
+                  (poem.semester == null || poem.semester == semester),
+            )
+            .toList()
+          ..sort(compareCurriculumPoems);
     final units = <String, List<Poem>>{};
     for (final poem in required) {
       units
@@ -81,7 +83,8 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
                   Text('本册必背 $learned/${required.length} 首已学 · $mastered 首已掌握'),
                   const SizedBox(height: SpacingTokens.sm),
                   LinearProgressIndicator(
-                      value: required.isEmpty ? 0 : learned / required.length,),
+                    value: required.isEmpty ? 0 : learned / required.length,
+                  ),
                   const SizedBox(height: SpacingTokens.sm),
                   const Text('按教材标注位置学习，无需先解锁低年级。浏览其他册次不改变学习背景。'),
                 ],
@@ -90,7 +93,12 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
             const SizedBox(height: SpacingTokens.md),
             Text('本册必背', style: theme.textTheme.titleLarge),
             const SizedBox(height: SpacingTokens.sm),
-            if (required.isEmpty) const Text('当前内容库未标注这一册的必背内容，可先阅读下方拓展诗词。'),
+            if (required.isEmpty)
+              const AppEmptyState(
+                icon: Icons.menu_book_outlined,
+                title: '本册暂无必背内容',
+                description: '当前内容库未标注这一册的必背内容，可先阅读下方拓展诗词。',
+              ),
             for (final unit in units.entries) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: SpacingTokens.sm),
@@ -102,8 +110,10 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
               ],
             ],
             const SizedBox(height: SpacingTokens.md),
-            Text('拓展阅读 · ${extended.length} 首',
-                style: theme.textTheme.titleLarge,),
+            Text(
+              '拓展阅读 · ${extended.length} 首',
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: SpacingTokens.sm),
             const Text('拓展阅读不计入本册必背进度；未标册次的诗词按内容难度归入适读年级。'),
             const SizedBox(height: SpacingTokens.sm),
@@ -160,8 +170,7 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
                       ChoiceChip(
                         label: Text('$value 年级'),
                         selected: grade == value,
-                        onSelected: (_) =>
-                            setSheetState(() => grade = value),
+                        onSelected: (_) => setSheetState(() => grade = value),
                       ),
                   ],
                 ),
@@ -203,8 +212,10 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
 
   Widget _poemTile(Poem poem, {required bool required}) {
     final theme = Theme.of(context);
-    final status =
-        ref.read(poemProgressRepositoryProvider).get(poem.id)?.status;
+    final status = ref
+        .read(poemProgressRepositoryProvider)
+        .get(poem.id)
+        ?.status;
     final label = switch (status) {
       LearningStatus.mastered => '已掌握',
       LearningStatus.learning || LearningStatus.reviewing => '已学习',
@@ -214,8 +225,9 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
       icon: status == LearningStatus.mastered
           ? Icons.verified_outlined
           : Icons.menu_book_outlined,
-      iconColor:
-          required ? theme.colorScheme.primary : theme.colorScheme.secondary,
+      iconColor: required
+          ? theme.colorScheme.primary
+          : theme.colorScheme.secondary,
       title: poem.title,
       subtitle: '${poem.author} · ${required ? '本册必背' : '拓展'} · $label',
       onTap: () async {

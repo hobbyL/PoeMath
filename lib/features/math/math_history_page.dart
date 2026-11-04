@@ -22,7 +22,6 @@ class MathHistoryPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.watch(mathSessionRepoProvider);
     final sessions = repo.getAll();
-    final theme = Theme.of(context);
 
     return Scaffold(
       body: LayoutBuilder(
@@ -30,42 +29,19 @@ class MathHistoryPage extends ConsumerWidget {
           final columns = ResponsiveLayout.columns(constraints.maxWidth);
 
           return sessions.isEmpty
-              ? CustomScrollView(
+              ? const CustomScrollView(
                   slivers: [
-                    const SliverAppBar(
+                    SliverAppBar(
                       floating: true,
                       snap: true,
                       title: Text('练习记录'),
                     ),
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.history_outlined,
-                              size: 64,
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.3),
-                            ),
-                            const SizedBox(height: SpacingTokens.md),
-                            Text(
-                              '暂无练习记录',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: SpacingTokens.xs),
-                            Text(
-                              '完成一次口算练习后即可查看记录',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.6),
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: AppEmptyState(
+                        icon: Icons.history_outlined,
+                        title: '暂无练习记录',
+                        description: '完成一次口算练习后即可查看记录',
                       ),
                     ),
                   ],
@@ -98,24 +74,27 @@ class MathHistoryPage extends ConsumerWidget {
                               final session = sessions[idx];
                               rowWidgets.add(
                                 Expanded(
-                                  child: GestureDetector(
-                                    onTap: () => context.push(
-                                      AppRoutes.mathSessionDetail,
-                                      extra: session,
-                                    ),
-                                    child: _SessionCard(session: session),
-                                  )
-                                      .animatePage(context)
-                                      .fadeIn(
-                                        delay: (80 * idx).ms,
-                                        duration: 300.ms,
-                                      )
-                                      .slideX(
-                                        begin: 0.1,
-                                        end: 0,
-                                        delay: (80 * idx).ms,
-                                        duration: 300.ms,
-                                      ),
+                                  child:
+                                      GestureDetector(
+                                            onTap: () => context.push(
+                                              AppRoutes.mathSessionDetail,
+                                              extra: session,
+                                            ),
+                                            child: _SessionCard(
+                                              session: session,
+                                            ),
+                                          )
+                                          .animatePage(context)
+                                          .fadeIn(
+                                            delay: (80 * idx).ms,
+                                            duration: 300.ms,
+                                          )
+                                          .slideX(
+                                            begin: 0.1,
+                                            end: 0,
+                                            delay: (80 * idx).ms,
+                                            duration: 300.ms,
+                                          ),
                                 ),
                               );
                             } else {
@@ -159,8 +138,8 @@ class _SessionCard extends StatelessWidget {
     final accuracyColor = accuracy >= 0.9
         ? theme.semantic.success
         : accuracy >= 0.7
-            ? theme.semantic.caution
-            : theme.colorScheme.error;
+        ? theme.semantic.caution
+        : theme.colorScheme.error;
 
     // 星星
     final stars = session.starsEarned;
@@ -282,8 +261,9 @@ class _SessionCard extends StatelessWidget {
                       size: 20,
                       color: i < stars
                           ? theme.semantic.caution
-                          : theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.3),
+                          : theme.colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.3,
+                            ),
                     );
                   }),
                 ),

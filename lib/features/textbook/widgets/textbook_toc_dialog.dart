@@ -30,29 +30,28 @@ Future<int?> showTextbookToc({
   required BuildContext context,
   required TextbookTocLoader load,
   int? currentPage,
-}) =>
-    showGeneralDialog<int>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-      transitionDuration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : Durations.medium2,
-      pageBuilder: (_, __, ___) => Align(
-        alignment: Alignment.centerLeft,
-        child: TextbookTocDrawer(load: load, currentPage: currentPage),
+}) => showGeneralDialog<int>(
+  context: context,
+  barrierDismissible: true,
+  barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+  transitionDuration: MediaQuery.disableAnimationsOf(context)
+      ? Duration.zero
+      : Durations.medium2,
+  pageBuilder: (_, __, ___) => Align(
+    alignment: Alignment.centerLeft,
+    child: TextbookTocDrawer(load: load, currentPage: currentPage),
+  ),
+  transitionBuilder: (_, animation, __, child) => SlideTransition(
+    position: Tween(begin: const Offset(-1, 0), end: Offset.zero).animate(
+      CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
       ),
-      transitionBuilder: (_, animation, __, child) => SlideTransition(
-        position: Tween(begin: const Offset(-1, 0), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          ),
-        ),
-        child: child,
-      ),
-    );
+    ),
+    child: child,
+  ),
+);
 
 class TextbookTocDrawer extends StatefulWidget {
   const TextbookTocDrawer({super.key, required this.load, this.currentPage});
@@ -114,36 +113,40 @@ class _TextbookTocDrawerState extends State<TextbookTocDrawer> {
     }
 
     try {
-      _subscription = widget.load(refresh).listen(
-        (progress) {
-          if (!mounted || generation != _generation) return;
-          final result = progress.result ?? _result;
-          final selectCurrentPage =
-              _loading && progress.phase == TextbookTocPhase.ready;
-          final selectedIndex = selectCurrentPage && result != null
-              ? _entryIndexForPage(result.entries, widget.currentPage)
-              : null;
-          setState(() {
-            _progress = progress;
-            if (result != null) _result = result;
-            if (selectCurrentPage) {
-              _selectedIndex = selectedIndex;
+      _subscription = widget
+          .load(refresh)
+          .listen(
+            (progress) {
+              if (!mounted || generation != _generation) return;
+              final result = progress.result ?? _result;
+              final selectCurrentPage =
+                  _loading && progress.phase == TextbookTocPhase.ready;
+              final selectedIndex = selectCurrentPage && result != null
+                  ? _entryIndexForPage(result.entries, widget.currentPage)
+                  : null;
+              setState(() {
+                _progress = progress;
+                if (result != null) _result = result;
+                if (selectCurrentPage) {
+                  _selectedIndex = selectedIndex;
+                  if (selectedIndex != null) {
+                    _expandAncestors(result!.entries, selectedIndex);
+                  }
+                }
+                _loading = progress.phase != TextbookTocPhase.ready;
+              });
               if (selectedIndex != null) {
-                _expandAncestors(result!.entries, selectedIndex);
+                unawaited(_scrollToEntry(selectedIndex));
               }
-            }
-            _loading = progress.phase != TextbookTocPhase.ready;
-          });
-          if (selectedIndex != null) unawaited(_scrollToEntry(selectedIndex));
-        },
-        onDone: () {
-          if (mounted && generation == _generation && _result == null) {
-            failed();
-          }
-        },
-        onError: (Object error, StackTrace stack) => failed(),
-        cancelOnError: true,
-      );
+            },
+            onDone: () {
+              if (mounted && generation == _generation && _result == null) {
+                failed();
+              }
+            },
+            onError: (Object error, StackTrace stack) => failed(),
+            cancelOnError: true,
+          );
     } on Object {
       failed();
     }
@@ -199,16 +202,14 @@ class _TextbookTocDrawerState extends State<TextbookTocDrawer> {
           : 0.0;
       final samples = <(int, double, double)>[];
       for (final (listPosition, entryIndex) in _visibleEntryIndices.indexed) {
-        final renderObject =
-            _entryKeys[entryIndex]?.currentContext?.findRenderObject();
+        final renderObject = _entryKeys[entryIndex]?.currentContext
+            ?.findRenderObject();
         if (renderObject is RenderBox && renderObject.hasSize) {
-          samples.add(
-            (
-              listPosition,
-              renderObject.localToGlobal(Offset.zero).dy,
-              renderObject.size.height,
-            ),
-          );
+          samples.add((
+            listPosition,
+            renderObject.localToGlobal(Offset.zero).dy,
+            renderObject.size.height,
+          ));
         }
       }
       double desiredOffset;
@@ -217,22 +218,26 @@ class _TextbookTocDrawerState extends State<TextbookTocDrawer> {
         desiredOffset = position.maxScrollExtent * fraction;
       } else {
         final nearest = samples.reduce(
-          (prior, sample) => (sample.$1 - targetPosition).abs() <
+          (prior, sample) =>
+              (sample.$1 - targetPosition).abs() <
                   (prior.$1 - targetPosition).abs()
               ? sample
               : prior,
         );
         final averageHeight =
             samples.map((sample) => sample.$3).reduce((a, b) => a + b) /
-                samples.length;
-        final estimatedTargetTop = position.pixels +
+            samples.length;
+        final estimatedTargetTop =
+            position.pixels +
             nearest.$2 -
             viewportTop +
             (targetPosition - nearest.$1) * averageHeight;
-        desiredOffset = estimatedTargetTop -
+        desiredOffset =
+            estimatedTargetTop -
             (position.viewportDimension - averageHeight) / 2;
         if ((desiredOffset - position.pixels).abs() < 1) {
-          desiredOffset += (targetPosition - nearest.$1).sign *
+          desiredOffset +=
+              (targetPosition - nearest.$1).sign *
               position.viewportDimension *
               0.75;
         }
@@ -265,21 +270,21 @@ class _TextbookTocDrawerState extends State<TextbookTocDrawer> {
     final status = _failed
         ? '目录识别未完成，请重试'
         : _loading
-            ? progress == null
-                ? '正在读取目录…'
-                : '${progress.phase == TextbookTocPhase.resolving ? '正在校准页码' : '正在查找目录'} ${progress.scanned} / ${progress.total} 页'
-            : entries.isEmpty
-                ? result?.hasText == false
-                    ? '这本书暂无可识别的文字目录'
-                    : '未识别到可用目录'
-                : entries.indexed.any(
-                    (item) =>
-                        item.$2.page == null &&
-                        !item.$2.isGroup &&
-                        !hasChildren(item.$1),
-                  )
-                    ? '部分条目暂未定位页码'
-                    : null;
+        ? progress == null
+              ? '正在读取目录…'
+              : '${progress.phase == TextbookTocPhase.resolving ? '正在校准页码' : '正在查找目录'} ${progress.scanned} / ${progress.total} 页'
+        : entries.isEmpty
+        ? result?.hasText == false
+              ? '这本书暂无可识别的文字目录'
+              : '未识别到可用目录'
+        : entries.indexed.any(
+            (item) =>
+                item.$2.page == null &&
+                !item.$2.isGroup &&
+                !hasChildren(item.$1),
+          )
+        ? '部分条目暂未定位页码'
+        : null;
     return Drawer(
       width: math.min(
         ResponsiveLayout.mediumBreakpoint * 2 / 3,
@@ -307,7 +312,16 @@ class _TextbookTocDrawerState extends State<TextbookTocDrawer> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (status != null) Text(status),
+                        if (status != null)
+                          if (!_failed && !_loading && entries.isEmpty)
+                            AppEmptyState(
+                              icon: Icons.toc_outlined,
+                              title: status,
+                              description: '可返回原书直接翻页阅读。',
+                              padding: const EdgeInsets.all(SpacingTokens.md),
+                            )
+                          else
+                            Text(status),
                         if (_loading) ...[
                           const SizedBox(height: SpacingTokens.sm),
                           LinearProgressIndicator(
@@ -356,7 +370,8 @@ class _TextbookTocDrawerState extends State<TextbookTocDrawer> {
                       key: key,
                       child: Padding(
                         padding: EdgeInsetsDirectional.only(
-                          start: SpacingTokens.md *
+                          start:
+                              SpacingTokens.md *
                               entry.level.clamp(0, 3) /
                               math.max(
                                 1,
@@ -369,14 +384,15 @@ class _TextbookTocDrawerState extends State<TextbookTocDrawer> {
                           selected: index == _selectedIndex,
                           iconColor: theme.colorScheme.primary,
                           title: title,
-                          titleSuffix:
-                              entry.page == null ? null : '第 ${entry.page} 页',
+                          titleSuffix: entry.page == null
+                              ? null
+                              : '第 ${entry.page} 页',
                           subtitle:
                               entry.page != null || branch || entry.isGroup
-                                  ? ''
-                                  : entry.printedPage != null
-                                      ? '书内第 ${entry.printedPage} 页 · 暂未定位页码'
-                                      : '暂无跳转页码',
+                              ? ''
+                              : entry.printedPage != null
+                              ? '书内第 ${entry.printedPage} 页 · 暂未定位页码'
+                              : '暂无跳转页码',
                           subtitleMaxLines: 2,
                           trailingInTitle: true,
                           trailingIcon: branch && !collapsed
@@ -391,8 +407,8 @@ class _TextbookTocDrawerState extends State<TextbookTocDrawer> {
                               : null,
                           onTap: entry.page == null
                               ? branch
-                                  ? toggle
-                                  : null
+                                    ? toggle
+                                    : null
                               : () => Navigator.pop(context, entry.page),
                         ),
                       ),

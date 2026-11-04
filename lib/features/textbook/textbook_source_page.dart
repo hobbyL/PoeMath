@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -46,72 +47,73 @@ class _TextbookSourcePageState extends ConsumerState<TextbookCourseSourcePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('对照原书')),
-        body: ref.watch(textbookPathProvider(widget.book.pdfSha256)).when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => Center(
-                child: TextButton(
-                  onPressed: () => ref
-                      .invalidate(textbookPathProvider(widget.book.pdfSha256)),
-                  child: const Text('文件检查失败，点击重试'),
-                ),
-              ),
-              data: (path) {
-                if (path == null) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(SpacingTokens.lg),
-                      child: Text('本地原书已移除，请重新下载或导入后对照。审核草稿已保留。'),
-                    ),
-                  );
-                }
-                final revision = _revision;
-                final options = TextbookViewerOptions(
-                  path: path,
-                  initialPage: _page,
-                  onPageChanged: (page) {
-                    if (mounted && revision == _revision) {
-                      setState(() => _page = page);
-                    }
-                  },
-                  onReady: (goTo) {
-                    if (mounted && revision == _revision) {
-                      setState(() => _goTo = goTo);
-                    }
-                  },
-                  onRetry: () => setState(() {
-                    _goTo = null;
-                    _revision++;
-                  }),
-                );
-                return KeyedSubtree(
-                  key: ValueKey(_revision),
-                  child: widget.viewerBuilder?.call(context, options) ??
-                      TextbookPdfView(options: options),
-                );
-              },
-            ),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(SpacingTokens.sm),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  Text('第 $_page / ${widget.book.pageCount} 页'),
-                  const SizedBox(width: SpacingTokens.md),
-                  for (final page
-                      in widget.sources.map((source) => source.pdfPage).toSet())
-                    TextButton(
-                      onPressed:
-                          _goTo == null || _busy ? null : () => _jump(page),
-                      child: Text('来源第 $page 页'),
-                    ),
-                ],
-              ),
+    appBar: AppBar(title: const Text('对照原书')),
+    body: ref
+        .watch(textbookPathProvider(widget.book.pdfSha256))
+        .when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, __) => Center(
+            child: TextButton(
+              onPressed: () =>
+                  ref.invalidate(textbookPathProvider(widget.book.pdfSha256)),
+              child: const Text('文件检查失败，点击重试'),
             ),
           ),
+          data: (path) {
+            if (path == null) {
+              return const AppEmptyState(
+                icon: Icons.menu_book_outlined,
+                title: '本地原书已移除',
+                description: '请重新下载或导入后对照。审核草稿已保留。',
+              );
+            }
+            final revision = _revision;
+            final options = TextbookViewerOptions(
+              path: path,
+              initialPage: _page,
+              onPageChanged: (page) {
+                if (mounted && revision == _revision) {
+                  setState(() => _page = page);
+                }
+              },
+              onReady: (goTo) {
+                if (mounted && revision == _revision) {
+                  setState(() => _goTo = goTo);
+                }
+              },
+              onRetry: () => setState(() {
+                _goTo = null;
+                _revision++;
+              }),
+            );
+            return KeyedSubtree(
+              key: ValueKey(_revision),
+              child:
+                  widget.viewerBuilder?.call(context, options) ??
+                  TextbookPdfView(options: options),
+            );
+          },
         ),
-      );
+    bottomNavigationBar: SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.all(SpacingTokens.sm),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              Text('第 $_page / ${widget.book.pageCount} 页'),
+              const SizedBox(width: SpacingTokens.md),
+              for (final page
+                  in widget.sources.map((source) => source.pdfPage).toSet())
+                TextButton(
+                  onPressed: _goTo == null || _busy ? null : () => _jump(page),
+                  child: Text('来源第 $page 页'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }

@@ -108,12 +108,11 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
       0,
       (sum, s) => sum + s.durationMinutes,
     );
-    final avgAccuracy =
-        totalMath > 0 ? (totalCorrect / totalMath * 100).round() : 0;
+    final avgAccuracy = totalMath > 0
+        ? (totalCorrect / totalMath * 100).round()
+        : 0;
     final activeDays = stats
-        .where(
-          (s) => s.poemCount > 0 || s.mathTotal > 0,
-        )
+        .where((s) => s.poemCount > 0 || s.mathTotal > 0)
         .length;
 
     return ColoredCard(
@@ -258,9 +257,8 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
               const SizedBox(height: SpacingTokens.md),
               Text(
                 '选择时间范围',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(ctx).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: SpacingTokens.sm),
               RadioGroup<int>(
@@ -313,7 +311,8 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
                 const Spacer(),
                 ...legend.entries.indexed.map((entry) {
                   final (i, e) = entry;
-                  final color = e.value ??
+                  final color =
+                      e.value ??
                       (i == 0
                           ? theme.colorScheme.primary
                           : theme.colorScheme.secondary);
@@ -355,7 +354,8 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
 
   /// 根据天数计算图表内容宽度，每组柱占固定宽度。
   double _chartWidth(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width -
+    final screenWidth =
+        MediaQuery.sizeOf(context).width -
         SpacingTokens.md * 2 -
         SpacingTokens.md * 2;
     final minWidth = _days * 36.0; // 每天至少 36px
@@ -384,8 +384,8 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
   /// 做题数 + 学诗数（分组柱状图）。
   Widget _buildPracticeChart(ThemeData theme, List<DailyStat> stats) {
     final maxY = stats.fold<double>(0, (prev, s) {
-      final m =
-          (s.mathTotal > s.poemCount ? s.mathTotal : s.poemCount).toDouble();
+      final m = (s.mathTotal > s.poemCount ? s.mathTotal : s.poemCount)
+          .toDouble();
       return m > prev ? m : prev;
     });
 
@@ -433,13 +433,11 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
     }
 
     if (spots.isEmpty) {
-      return Center(
-        child: Text(
-          '暂无数据',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
+      return const AppEmptyState(
+        icon: Icons.show_chart,
+        title: '暂无数据',
+        description: '完成口算练习后可查看正确率趋势。',
+        padding: EdgeInsets.all(SpacingTokens.md),
       );
     }
 

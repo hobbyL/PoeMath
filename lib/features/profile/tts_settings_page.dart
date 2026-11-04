@@ -86,8 +86,9 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     _speed = settingsRepo.ttsSpeed;
     _cloudEnabled = settingsRepo.ttsCloudEnabled;
     _cloudVoice = settingsRepo.ttsCloudVoice;
-    _baseUrlController =
-        TextEditingController(text: settingsRepo.ttsCloudBaseUrl);
+    _baseUrlController = TextEditingController(
+      text: settingsRepo.ttsCloudBaseUrl,
+    );
     _apiKeyController = TextEditingController();
     _loadVoices();
     _loadVerification();
@@ -180,9 +181,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('音色设置失败，请稍后重试')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('音色设置失败，请稍后重试')));
       }
       return;
     }
@@ -325,10 +324,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       );
       await _tts.verifyCloud(config);
       if (!mounted) return;
-      await settingsRepo.saveWorkerTtsConfig(
-        baseUrl: baseUrl,
-        apiKey: apiKey,
-      );
+      await settingsRepo.saveWorkerTtsConfig(baseUrl: baseUrl, apiKey: apiKey);
       await settingsRepo.markWorkerTtsVerified();
       if (mounted) {
         setState(() {
@@ -408,9 +404,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('配置删除失败，请稍后重试')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('配置删除失败，请稍后重试')));
       }
     }
   }
@@ -444,9 +438,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('试听失败，请检查网络后重试')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('试听失败，请检查网络后重试')));
       }
     } finally {
       if (mounted) setState(() => _cloudBusy = false);
@@ -465,13 +457,13 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     // 离开页面停止试听
     unawaited(
       _tts.stop().onError(
-            (error, stackTrace) => AppLogger.e(
-              '退出音频设置页时停止试听失败',
-              tag: 'TtsSettings',
-              error: error,
-              stackTrace: stackTrace,
-            ),
-          ),
+        (error, stackTrace) => AppLogger.e(
+          '退出音频设置页时停止试听失败',
+          tag: 'TtsSettings',
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      ),
     );
     _baseUrlController.dispose();
     _apiKeyController.dispose();
@@ -494,7 +486,8 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
   static String _voiceDisplayName(String name, String locale, int index) {
     // 如果 name 是有意义的（不是纯 locale code），直接用
     final lower = name.toLowerCase().replaceAll(RegExp(r'[-_]'), '');
-    final isLocaleCode = lower == 'zh' ||
+    final isLocaleCode =
+        lower == 'zh' ||
         lower == 'zhcn' ||
         lower == 'zhtw' ||
         lower == 'zhhk' ||
@@ -526,10 +519,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.speed,
-                        color: theme.colorScheme.primary,
-                      ),
+                      Icon(Icons.speed, color: theme.colorScheme.primary),
                       const SizedBox(width: SpacingTokens.sm),
                       Text(
                         '语速调节',
@@ -658,23 +648,17 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
               ),
 
               if (_voices!.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(SpacingTokens.xl),
-                  child: Center(
-                    child: Text(
-                      '未找到中文语音\n请在系统设置中下载中文语音包',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
+                const AppEmptyState(
+                  icon: Icons.record_voice_over_outlined,
+                  title: '未找到中文语音',
+                  description: '请在系统设置中下载中文语音包',
                 )
               else
                 ..._voices!.asMap().entries.map((entry) {
                   final index = entry.key;
                   final voice = entry.value;
-                  final isSelected = _selectedVoice != null &&
+                  final isSelected =
+                      _selectedVoice != null &&
                       _selectedVoice!['name'] == voice['name'] &&
                       _selectedVoice!['locale'] == voice['locale'];
                   final name = voice['name'] ?? '';
@@ -699,7 +683,8 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
   Widget _buildCloudCard(ThemeData theme) {
     final showForm = !_workerVerified || _editingConfig;
     final canEnable = _workerVerified && !_cloudBusy;
-    final host = Uri.tryParse(_baseUrlController.text.trim())?.host ??
+    final host =
+        Uri.tryParse(_baseUrlController.text.trim())?.host ??
         kDefaultWorkerBaseUrl;
 
     return ColoredCard(
@@ -904,8 +889,9 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
       child: AppTile(
         icon: isSelected ? Icons.check_circle : Icons.graphic_eq,
-        iconColor:
-            isSelected ? theme.colorScheme.primary : theme.colorScheme.outline,
+        iconColor: isSelected
+            ? theme.colorScheme.primary
+            : theme.colorScheme.outline,
         title: voice.localName,
         subtitle: subtitle,
         // AppTile 在 trailing 非空时忽略 onTap，交互由试听按钮承担。
@@ -939,8 +925,9 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
       child: AppTile(
         icon: isSelected ? Icons.check_circle : icon,
-        iconColor:
-            isSelected ? theme.colorScheme.primary : theme.colorScheme.outline,
+        iconColor: isSelected
+            ? theme.colorScheme.primary
+            : theme.colorScheme.outline,
         title: title,
         subtitle: subtitle,
         trailing: IconButton(

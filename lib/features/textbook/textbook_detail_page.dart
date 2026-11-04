@@ -96,15 +96,13 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     }
   }
 
-  Future<void> _read() => _openRoute(
-        AppRoutes.textbookReadOf(widget.bookId),
-        extra: _previewPage,
-      );
+  Future<void> _read() =>
+      _openRoute(AppRoutes.textbookReadOf(widget.bookId), extra: _previewPage);
 
   Future<void> _review() => _openRoute(
-        AppRoutes.textbookReviewOf(widget.bookId),
-        suspendPreview: false,
-      );
+    AppRoutes.textbookReviewOf(widget.bookId),
+    suspendPreview: false,
+  );
 
   Future<void> _showContent(TextbookContentSection section, List<int> pages) =>
       _openRoute(
@@ -159,10 +157,8 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   Future<void> _jumpToPage(Textbook book) async {
     final page = await showDialog<int>(
       context: context,
-      builder: (_) => TextbookPageDialog(
-        page: _previewPage,
-        pageCount: book.pageCount,
-      ),
+      builder: (_) =>
+          TextbookPageDialog(page: _previewPage, pageCount: book.pageCount),
     );
     if (page != null && mounted) await _turnPage(page, book.pageCount);
   }
@@ -172,20 +168,18 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     if (search == null) return;
     final page = await showDialog<int>(
       context: context,
-      builder: (_) => TextbookSearchDialog(
-        pageCount: book.pageCount,
-        search: search,
-      ),
+      builder: (_) =>
+          TextbookSearchDialog(pageCount: book.pageCount, search: search),
     );
     if (page != null && mounted) await _turnPage(page, book.pageCount);
   }
 
   void _retryPreview() => setState(() {
-        _goToPage = null;
-        _search = null;
-        _toc = null;
-        _previewRevision++;
-      });
+    _goToPage = null;
+    _search = null;
+    _toc = null;
+    _previewRevision++;
+  });
 
   Future<void> _showToc(Textbook book) async {
     final toc = _toc;
@@ -216,17 +210,17 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
           constraints.maxWidth - MediaQuery.paddingOf(context).horizontal,
         );
         Widget tocButton({ButtonStyle? style}) => IconButton(
-              tooltip: '目录',
-              style: style,
-              onPressed: onToc,
-              icon: const Icon(Icons.toc_rounded),
-            );
+          tooltip: '目录',
+          style: style,
+          onPressed: onToc,
+          icon: const Icon(Icons.toc_rounded),
+        );
         Widget reviewButton({ButtonStyle? style}) => IconButton(
-              tooltip: '内容审核',
-              style: style,
-              onPressed: onReview,
-              icon: const Icon(Icons.fact_check_outlined),
-            );
+          tooltip: '内容审核',
+          style: style,
+          onPressed: onReview,
+          icon: const Icon(Icons.fact_check_outlined),
+        );
         return Scaffold(
           bottomNavigationBar: bottomNavigationBar,
           appBar: layout.doublePage
@@ -248,9 +242,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                         )
                       : const BackButton(),
                   title: const Text('教材详情'),
-                  actions: [
-                    if (onReview != null) reviewButton(),
-                  ],
+                  actions: [if (onReview != null) reviewButton()],
                 ),
           body: SafeArea(
             child: Stack(
@@ -330,174 +322,172 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     );
     return KeyedSubtree(
       key: ValueKey('$path:$revision'),
-      child: widget.previewBuilder?.call(context, options) ??
+      child:
+          widget.previewBuilder?.call(context, options) ??
           ref.watch(textbookPreviewBuilderProvider)(context, options),
     );
   }
 
-  Widget _pageControls(
-    Textbook book, {
-    required bool available,
-  }) =>
-      SafeArea(
-        top: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final layout = TextbookPageLayout.forWidth(constraints.maxWidth);
-            final previous = layout.previous(_previewPage, book.pageCount);
-            final next = layout.next(_previewPage, book.pageCount);
-            final pages = layout.pages(
-              layout.spreadIndex(_previewPage),
-              book.pageCount,
-            );
-            final pageLabel = pages.length == 2
-                ? '${pages.first}–${pages.last} / ${book.pageCount}'
-                : '$_previewPage / ${book.pageCount}';
-            final canNavigate =
-                available && !_turning && _previewVisible && _goToPage != null;
-            final padding = const EdgeInsets.symmetric(
-              horizontal: SpacingTokens.xs,
-              vertical: SpacingTokens.sm,
-            );
-            final previousButton = TextButton.icon(
-              onPressed: canNavigate && previous != null
-                  ? () => _turnPage(previous, book.pageCount)
-                  : null,
-              style: TextButton.styleFrom(padding: padding),
-              icon: const Icon(Icons.chevron_left),
-              label: const Text('上一页', textAlign: TextAlign.center),
-            );
-            final pageButton = Tooltip(
-              message: '输入页码跳转',
-              child: TextButton(
-                key: const ValueKey('textbook-detail-page-number'),
-                onPressed: canNavigate ? () => _jumpToPage(book) : null,
-                style: TextButton.styleFrom(padding: padding),
-                child: Text(pageLabel, textAlign: TextAlign.center),
-              ),
-            );
-            final searchButton = SizedBox(
-              width: SpacingTokens.minTapTarget,
-              child: IconButton(
-                tooltip: '搜索本书',
-                onPressed: canNavigate && _search != null
-                    ? () => _searchBook(book)
-                    : null,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: SpacingTokens.minTapTarget,
-                  minHeight: SpacingTokens.minTapTarget,
+  Widget _pageControls(Textbook book, {required bool available}) => SafeArea(
+    top: false,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final layout = TextbookPageLayout.forWidth(constraints.maxWidth);
+        final previous = layout.previous(_previewPage, book.pageCount);
+        final next = layout.next(_previewPage, book.pageCount);
+        final pages = layout.pages(
+          layout.spreadIndex(_previewPage),
+          book.pageCount,
+        );
+        final pageLabel = pages.length == 2
+            ? '${pages.first}–${pages.last} / ${book.pageCount}'
+            : '$_previewPage / ${book.pageCount}';
+        final canNavigate =
+            available && !_turning && _previewVisible && _goToPage != null;
+        final padding = const EdgeInsets.symmetric(
+          horizontal: SpacingTokens.xs,
+          vertical: SpacingTokens.sm,
+        );
+        final previousButton = TextButton.icon(
+          onPressed: canNavigate && previous != null
+              ? () => _turnPage(previous, book.pageCount)
+              : null,
+          style: TextButton.styleFrom(padding: padding),
+          icon: const Icon(Icons.chevron_left),
+          label: const Text('上一页', textAlign: TextAlign.center),
+        );
+        final pageButton = Tooltip(
+          message: '输入页码跳转',
+          child: TextButton(
+            key: const ValueKey('textbook-detail-page-number'),
+            onPressed: canNavigate ? () => _jumpToPage(book) : null,
+            style: TextButton.styleFrom(padding: padding),
+            child: Text(pageLabel, textAlign: TextAlign.center),
+          ),
+        );
+        final searchButton = SizedBox(
+          width: SpacingTokens.minTapTarget,
+          child: IconButton(
+            tooltip: '搜索本书',
+            onPressed: canNavigate && _search != null
+                ? () => _searchBook(book)
+                : null,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: SpacingTokens.minTapTarget,
+              minHeight: SpacingTokens.minTapTarget,
+            ),
+            icon: const Icon(Icons.search),
+          ),
+        );
+        final nextButton = TextButton.icon(
+          onPressed: canNavigate && next != null
+              ? () => _turnPage(next, book.pageCount)
+              : null,
+          style: TextButton.styleFrom(padding: padding),
+          iconAlignment: IconAlignment.end,
+          icon: const Icon(Icons.chevron_right),
+          label: const Text('下一页', textAlign: TextAlign.center),
+        );
+        final onRead = available && !_turning && _previewVisible ? _read : null;
+        final readButton = layout.doublePage
+            ? FilledButton.icon(
+                key: const ValueKey('textbook-detail-read'),
+                onPressed: onRead,
+                style: FilledButton.styleFrom(padding: padding),
+                icon: const Icon(Icons.menu_book_outlined),
+                label: const Text('原书阅读', textAlign: TextAlign.center),
+              )
+            : SizedBox(
+                width: SpacingTokens.minTapTarget,
+                child: IconButton(
+                  key: const ValueKey('textbook-detail-read'),
+                  tooltip: '原书阅读',
+                  onPressed: onRead,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: SpacingTokens.minTapTarget,
+                    minHeight: SpacingTokens.minTapTarget,
+                  ),
+                  icon: const Icon(Icons.menu_book_outlined),
                 ),
-                icon: const Icon(Icons.search),
-              ),
-            );
-            final nextButton = TextButton.icon(
-              onPressed: canNavigate && next != null
-                  ? () => _turnPage(next, book.pageCount)
-                  : null,
-              style: TextButton.styleFrom(padding: padding),
-              iconAlignment: IconAlignment.end,
-              icon: const Icon(Icons.chevron_right),
-              label: const Text('下一页', textAlign: TextAlign.center),
-            );
-            final onRead =
-                available && !_turning && _previewVisible ? _read : null;
-            final readButton = layout.doublePage
-                ? FilledButton.icon(
-                    key: const ValueKey('textbook-detail-read'),
-                    onPressed: onRead,
-                    style: FilledButton.styleFrom(padding: padding),
-                    icon: const Icon(Icons.menu_book_outlined),
-                    label: const Text('原书阅读', textAlign: TextAlign.center),
-                  )
-                : SizedBox(
-                    width: SpacingTokens.minTapTarget,
-                    child: IconButton(
-                      key: const ValueKey('textbook-detail-read'),
-                      tooltip: '原书阅读',
-                      onPressed: onRead,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: SpacingTokens.minTapTarget,
-                        minHeight: SpacingTokens.minTapTarget,
-                      ),
-                      icon: const Icon(Icons.menu_book_outlined),
-                    ),
-                  );
-            final glyph = TextPainter(
-              text: TextSpan(
-                text: '页',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              textDirection: Directionality.of(context),
-              textScaler: MediaQuery.textScalerOf(context),
-            )..layout();
-            final minCell = glyph.width +
-                (IconTheme.of(context).size ?? SpacingTokens.lg) +
-                SpacingTokens.sm +
-                SpacingTokens.xs * 2;
-            glyph.dispose();
-            final controlsWidth = constraints.maxWidth - SpacingTokens.md * 2;
-            final wrapRead = controlsWidth <
-                minCell * (layout.doublePage ? 4 : 3) +
-                    SpacingTokens.minTapTarget * (layout.doublePage ? 1 : 2) +
-                    SpacingTokens.xs * 4;
-            final controls = IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: previousButton),
-                  const SizedBox(width: SpacingTokens.xs),
-                  Expanded(child: pageButton),
-                  const SizedBox(width: SpacingTokens.xs),
-                  searchButton,
-                  const SizedBox(width: SpacingTokens.xs),
-                  Expanded(child: nextButton),
-                  if (!wrapRead) ...[
-                    const SizedBox(width: SpacingTokens.xs),
-                    if (layout.doublePage)
-                      Expanded(child: readButton)
-                    else
-                      readButton,
-                  ],
-                ],
-              ),
-            );
-            return Padding(
-              padding: const EdgeInsets.only(
-                left: SpacingTokens.md,
-                top: SpacingTokens.md,
-                right: SpacingTokens.md,
-              ),
-              child: Column(
-                key: const ValueKey('textbook-detail-controls'),
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_saveFailed)
-                    Row(
-                      children: [
-                        const Expanded(child: Text('阅读位置保存失败')),
-                        TextButton(
-                          onPressed: () => _savePreviewPage(book, _previewPage),
-                          child: const Text('重试保存'),
-                        ),
-                      ],
-                    ),
-                  controls,
-                  if (wrapRead) ...[
-                    const SizedBox(height: SpacingTokens.xs),
-                    Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: readButton,
+              );
+        final glyph = TextPainter(
+          text: TextSpan(
+            text: '页',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        final minCell =
+            glyph.width +
+            (IconTheme.of(context).size ?? SpacingTokens.lg) +
+            SpacingTokens.sm +
+            SpacingTokens.xs * 2;
+        glyph.dispose();
+        final controlsWidth = constraints.maxWidth - SpacingTokens.md * 2;
+        final wrapRead =
+            controlsWidth <
+            minCell * (layout.doublePage ? 4 : 3) +
+                SpacingTokens.minTapTarget * (layout.doublePage ? 1 : 2) +
+                SpacingTokens.xs * 4;
+        final controls = IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: previousButton),
+              const SizedBox(width: SpacingTokens.xs),
+              Expanded(child: pageButton),
+              const SizedBox(width: SpacingTokens.xs),
+              searchButton,
+              const SizedBox(width: SpacingTokens.xs),
+              Expanded(child: nextButton),
+              if (!wrapRead) ...[
+                const SizedBox(width: SpacingTokens.xs),
+                if (layout.doublePage)
+                  Expanded(child: readButton)
+                else
+                  readButton,
+              ],
+            ],
+          ),
+        );
+        return Padding(
+          padding: const EdgeInsets.only(
+            left: SpacingTokens.md,
+            top: SpacingTokens.md,
+            right: SpacingTokens.md,
+          ),
+          child: Column(
+            key: const ValueKey('textbook-detail-controls'),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_saveFailed)
+                Row(
+                  children: [
+                    const Expanded(child: Text('阅读位置保存失败')),
+                    TextButton(
+                      onPressed: () => _savePreviewPage(book, _previewPage),
+                      child: const Text('重试保存'),
                     ),
                   ],
-                ],
-              ),
-            );
-          },
-        ),
-      );
+                ),
+              controls,
+              if (wrapRead) ...[
+                const SizedBox(height: SpacingTokens.xs),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: readButton,
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    ),
+  );
 
   Widget _contentActions(
     List<int> pages,
@@ -542,8 +532,9 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
             children: [
               for (final section in sections)
                 TextButton(
-                  onPressed:
-                      enabled ? () => _showContent(section, pages) : null,
+                  onPressed: enabled
+                      ? () => _showContent(section, pages)
+                      : null,
                   style: TextButton.styleFrom(
                     minimumSize: const Size(
                       SpacingTokens.minTapTarget,
@@ -577,7 +568,11 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       return _detailScaffold(
         body: catalog.isLoading
             ? const Center(child: CircularProgressIndicator())
-            : const Center(child: Text('找不到这本教材，请返回书架重新选择。')),
+            : const AppEmptyState(
+                icon: Icons.menu_book_outlined,
+                title: '找不到这本教材',
+                description: '请返回书架重新选择。',
+              ),
       );
     }
     _previewPage = _previewPage.clamp(1, book.pageCount);
@@ -590,7 +585,8 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       bottomNavigationBar: _pageControls(book, available: available),
       showToc: available,
       onReview: widget.manage && !_turning && _previewVisible ? _review : null,
-      onToc: available &&
+      onToc:
+          available &&
               !_turning &&
               _previewVisible &&
               _goToPage != null &&
@@ -654,28 +650,28 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                                     ),
                                     child: available
                                         ? _previewVisible
-                                            ? _preview(
-                                                path.requireValue!,
-                                                book,
-                                                layout,
-                                              )
-                                            : const SizedBox.shrink()
+                                              ? _preview(
+                                                  path.requireValue!,
+                                                  book,
+                                                  layout,
+                                                )
+                                              : const SizedBox.shrink()
                                         : entry?.coverAsset != null
-                                            ? Image.asset(
-                                                entry!.coverAsset!,
-                                                fit: BoxFit.contain,
-                                                errorBuilder: (_, __, ___) =>
-                                                    TextbookCoverPlaceholder(
+                                        ? Image.asset(
+                                            entry!.coverAsset!,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, __, ___) =>
+                                                TextbookCoverPlaceholder(
                                                   title: book.title,
                                                   status: '下载后可翻页查看',
                                                 ),
-                                              )
-                                            : TextbookCoverPlaceholder(
-                                                title: book.title,
-                                                status: path.isLoading
-                                                    ? '正在检查本地文件'
-                                                    : '本地 PDF 暂不可用',
-                                              ),
+                                          )
+                                        : TextbookCoverPlaceholder(
+                                            title: book.title,
+                                            status: path.isLoading
+                                                ? '正在检查本地文件'
+                                                : '本地 PDF 暂不可用',
+                                          ),
                                   ),
                                 ),
                               ),
@@ -702,8 +698,10 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                               onPressed: downloading
                                   ? null
                                   : () => ref
-                                      .read(textbookDownloadsProvider.notifier)
-                                      .download(entry),
+                                        .read(
+                                          textbookDownloadsProvider.notifier,
+                                        )
+                                        .download(entry),
                               icon: const Icon(Icons.download_outlined),
                               label: Text(download != null ? '重新下载教材' : '下载教材'),
                             ),

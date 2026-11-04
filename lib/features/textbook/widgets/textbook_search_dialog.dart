@@ -63,30 +63,32 @@ class _TextbookSearchDialogState extends State<TextbookSearchDialog> {
       _failed = false;
     });
     try {
-      _subscription = widget.search(query).listen(
-        (result) {
-          if (!mounted || generation != _generation) return;
-          setState(() {
-            _searched = result.page;
-            if (result.hasText) _textPages++;
-            if (result.matchCount > 0) _results.add(result);
-          });
-        },
-        onDone: () {
-          if (mounted && generation == _generation) {
-            setState(() => _searching = false);
-          }
-        },
-        onError: (Object error, StackTrace stackTrace) {
-          if (mounted && generation == _generation) {
-            setState(() {
-              _searching = false;
-              _failed = true;
-            });
-          }
-        },
-        cancelOnError: true,
-      );
+      _subscription = widget
+          .search(query)
+          .listen(
+            (result) {
+              if (!mounted || generation != _generation) return;
+              setState(() {
+                _searched = result.page;
+                if (result.hasText) _textPages++;
+                if (result.matchCount > 0) _results.add(result);
+              });
+            },
+            onDone: () {
+              if (mounted && generation == _generation) {
+                setState(() => _searching = false);
+              }
+            },
+            onError: (Object error, StackTrace stackTrace) {
+              if (mounted && generation == _generation) {
+                setState(() {
+                  _searching = false;
+                  _failed = true;
+                });
+              }
+            },
+            cancelOnError: true,
+          );
     } on Object {
       setState(() {
         _searching = false;
@@ -108,14 +110,14 @@ class _TextbookSearchDialogState extends State<TextbookSearchDialog> {
     final status = _failed
         ? '搜索未完成，请重试'
         : _searching
-            ? '正在搜索 $_searched / ${widget.pageCount} 页'
-            : !_started
-                ? null
-                : _textPages == 0
-                    ? '这本书暂无可搜索的文字'
-                    : _results.isEmpty
-                        ? '未找到相关内容'
-                        : null;
+        ? '正在搜索 $_searched / ${widget.pageCount} 页'
+        : !_started
+        ? null
+        : _textPages == 0
+        ? '这本书暂无可搜索的文字'
+        : _results.isEmpty
+        ? '未找到相关内容'
+        : null;
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(
@@ -138,8 +140,9 @@ class _TextbookSearchDialogState extends State<TextbookSearchDialog> {
                       onChanged: _changed,
                       onSubmitted: (_) => _submit(),
                       decoration: InputDecoration(
-                        labelText:
-                            _started ? '搜索关键词 ${_results.length} 条' : '搜索关键词',
+                        labelText: _started
+                            ? '搜索关键词 ${_results.length} 条'
+                            : '搜索关键词',
                         hintText: '课文名、词语或句子',
                         suffixIcon: IconButton(
                           tooltip: '开始搜索',
@@ -150,7 +153,17 @@ class _TextbookSearchDialogState extends State<TextbookSearchDialog> {
                     ),
                     if (status != null) ...[
                       const SizedBox(height: SpacingTokens.md),
-                      Text(status, style: theme.textTheme.bodyMedium),
+                      if (!_failed && !_searching && _results.isEmpty)
+                        AppEmptyState(
+                          icon: Icons.search_off_outlined,
+                          title: status,
+                          description: _textPages == 0
+                              ? '可返回原书直接阅读。'
+                              : '试试其他关键词。',
+                          padding: const EdgeInsets.all(SpacingTokens.md),
+                        )
+                      else
+                        Text(status, style: theme.textTheme.bodyMedium),
                     ],
                     if (_searching) ...[
                       const SizedBox(height: SpacingTokens.sm),

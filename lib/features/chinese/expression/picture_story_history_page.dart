@@ -57,7 +57,11 @@ class _PictureStoryHistoryPageState
     return Scaffold(
       appBar: AppBar(title: const Text('看图说话记录')),
       body: records.isEmpty
-          ? Center(child: Text('还没有完成的练习', style: theme.textTheme.titleMedium))
+          ? const AppEmptyState(
+              icon: Icons.history_outlined,
+              title: '还没有完成的练习',
+              description: '完成一次看图说话练习后，可在这里回看表达与录音。',
+            )
           : ListView.builder(
               padding: const EdgeInsets.all(SpacingTokens.md),
               itemCount: records.length,
@@ -66,9 +70,10 @@ class _PictureStoryHistoryPageState
                 PictureStoryPrompt? prompt;
                 try {
                   prompt = ref.watch(
-                    pictureStoryPromptVersionProvider(
-                      (id: record.promptId, version: record.promptVersion),
-                    ),
+                    pictureStoryPromptVersionProvider((
+                      id: record.promptId,
+                      version: record.promptVersion,
+                    )),
                   );
                 } on Object {
                   // 历史缺失时明确提示，不用新版题目代替原版本。

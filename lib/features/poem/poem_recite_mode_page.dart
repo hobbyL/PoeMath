@@ -25,7 +25,11 @@ class PoemReciteModePage extends ConsumerWidget {
     if (poem == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('选择模式')),
-        body: const Center(child: Text('诗词未找到')),
+        body: const AppEmptyState(
+          icon: Icons.menu_book_outlined,
+          title: '诗词未找到',
+          description: '请返回诗词列表重新选择。',
+        ),
       );
     }
 
@@ -103,9 +107,7 @@ class PoemReciteModePage extends ConsumerWidget {
               title: '填空测试',
               subtitle: '补全诗句中缺失的文字',
               onTap: () {
-                context.push(
-                  '${AppRoutes.poemQuizOf(poemId)}?type=fill',
-                );
+                context.push('${AppRoutes.poemQuizOf(poemId)}?type=fill');
               },
             ),
             const SizedBox(height: SpacingTokens.sm),
@@ -116,9 +118,7 @@ class PoemReciteModePage extends ConsumerWidget {
               title: '选择题',
               subtitle: '根据上句选择正确的下句、选作者、选朝代',
               onTap: () {
-                context.push(
-                  '${AppRoutes.poemQuizOf(poemId)}?type=choice',
-                );
+                context.push('${AppRoutes.poemQuizOf(poemId)}?type=choice');
               },
             ),
             const SizedBox(height: SpacingTokens.sm),
@@ -168,7 +168,8 @@ class PoemReciteModePage extends ConsumerWidget {
                   children: [
                     Text(
                       poem.content,
-                      style: theme.extension<PoemThemeExt>()?.poemContent ??
+                      style:
+                          theme.extension<PoemThemeExt>()?.poemContent ??
                           theme.textTheme.bodyMedium?.copyWith(
                             height: 2,
                             letterSpacing: 1.5,

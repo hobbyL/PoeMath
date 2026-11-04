@@ -28,10 +28,7 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
     if (mounted) setState(() {});
   }
 
-  Widget _bookCard(
-    TextbookCatalogEntry entry,
-    TextStyle textStyle,
-  ) {
+  Widget _bookCard(TextbookCatalogEntry entry, TextStyle textStyle) {
     final book = entry.book;
     final theme = Theme.of(context);
     final path = ref.watch(textbookPathProvider(book.pdfSha256));
@@ -40,21 +37,22 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
     final reading = ref
         .watch(textbookRepositoryProvider)
         .reading(ProfileScope.currentId, book.pdfSha256);
-    final status = download?.label ??
+    final status =
+        download?.label ??
         (installed
             ? '已下载 · 第 ${reading.page.clamp(1, book.pageCount)} 页'
             : path.isLoading
-                ? '检查本地文件中'
-                : '未下载 · ${(book.fileSize / (1024 * 1024)).toStringAsFixed(1)} MB');
+            ? '检查本地文件中'
+            : '未下载 · ${(book.fileSize / (1024 * 1024)).toStringAsFixed(1)} MB');
     final active = download?.active == true;
     final failed = download?.status == TextbookDownloadStatus.failed;
     final action = active
         ? '取消下载${book.volumeLabel}'
         : installed
-            ? '阅读${book.volumeLabel}'
-            : failed
-                ? '重试下载${book.volumeLabel}'
-                : '下载${book.volumeLabel}';
+        ? '阅读${book.volumeLabel}'
+        : failed
+        ? '重试下载${book.volumeLabel}'
+        : '下载${book.volumeLabel}';
     return ColoredCard(
       key: ValueKey('textbook-download-card-${book.pdfSha256}'),
       color: theme.colorScheme.primary,
@@ -151,8 +149,9 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
                       bottom: SpacingTokens.sm,
                       child: IconButton(
                         style: IconButton.styleFrom(
-                          fixedSize:
-                              const Size.square(SpacingTokens.minTapTarget),
+                          fixedSize: const Size.square(
+                            SpacingTokens.minTapTarget,
+                          ),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           visualDensity: VisualDensity.standard,
                           padding: EdgeInsets.zero,
@@ -163,15 +162,16 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
                           active
                               ? Icons.close
                               : installed
-                                  ? Icons.auto_stories_outlined
-                                  : failed
-                                      ? Icons.refresh
-                                      : Icons.download_outlined,
+                              ? Icons.auto_stories_outlined
+                              : failed
+                              ? Icons.refresh
+                              : Icons.download_outlined,
                           size: SpacingTokens.lg,
                         ),
                         onPressed: () {
-                          final controller =
-                              ref.read(textbookDownloadsProvider.notifier);
+                          final controller = ref.read(
+                            textbookDownloadsProvider.notifier,
+                          );
                           if (active) {
                             controller.cancel(book.pdfSha256);
                           } else if (installed) {
@@ -196,8 +196,7 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final catalog = ref.watch(textbookCatalogProvider);
-    final textStyle = DefaultTextStyle.of(context)
-        .style
+    final textStyle = DefaultTextStyle.of(context).style
         .merge(theme.textTheme.bodySmall)
         .copyWith(height: 1.5);
     return Scaffold(
@@ -209,7 +208,11 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
               data: (entries) => entries.isEmpty
                   ? const SliverFillRemaining(
                       hasScrollBody: false,
-                      child: Center(child: Text('暂无可下载书籍')),
+                      child: AppEmptyState(
+                        icon: Icons.download_outlined,
+                        title: '暂无可下载书籍',
+                        description: '可先在书籍管理中导入本地 PDF。',
+                      ),
                     )
                   : TextbookCoverGrid(
                       itemCount: entries.length,
@@ -217,9 +220,8 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
                       itemBuilder: (_, index) =>
                           _bookCard(entries[index], textStyle),
                     ),
-              loading: () => const SliverToBoxAdapter(
-                child: LinearProgressIndicator(),
-              ),
+              loading: () =>
+                  const SliverToBoxAdapter(child: LinearProgressIndicator()),
               error: (_, __) => SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(

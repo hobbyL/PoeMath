@@ -38,33 +38,10 @@ class PoemReviewPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('复习计划')),
       body: dueToday.isEmpty && upcoming.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.event_available,
-                    size: 64,
-                    color: theme.colorScheme.onSurfaceVariant.withValues(
-                      alpha: 0.3,
-                    ),
-                  ),
-                  const SizedBox(height: SpacingTokens.md),
-                  Text(
-                    '暂无复习计划',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: SpacingTokens.xs),
-                  Text(
-                    '完成诗词测试后会自动创建复习计划',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+          ? const AppEmptyState(
+              icon: Icons.event_available,
+              title: '暂无复习计划',
+              description: '完成诗词测试后会自动创建复习计划',
             )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(SpacingTokens.md),

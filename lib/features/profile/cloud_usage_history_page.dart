@@ -69,22 +69,12 @@ class CloudUsageHistoryPage extends StatelessWidget {
           padding: const EdgeInsets.all(SpacingTokens.md),
           children: [
             if (!hasAny)
-              ColoredCard(
-                color: theme.colorScheme.primary,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('暂无用量记录', style: theme.textTheme.titleMedium),
-                    const SizedBox(height: SpacingTokens.xs),
-                    Text(
-                      '最近 $days 天没有发送过云端请求。使用 AI、图片生成、语音识别或云朗读后，'
-                      '这里会按天记录次数。',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+              AppEmptyState(
+                icon: Icons.bar_chart_outlined,
+                title: '暂无用量记录',
+                description:
+                    '最近 $days 天没有发送过云端请求。'
+                    '使用 AI、图片生成、语音识别或云朗读后，这里会按天记录次数。',
               )
             else
               for (final kind in CloudUsageKind.values) ...[

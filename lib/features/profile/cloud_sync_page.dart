@@ -24,10 +24,7 @@ import 'package:poemath/features/profile/widgets/credential_export_failed_dialog
 import 'package:poemath/features/profile/widgets/sync_conflict_dialog.dart';
 
 class CloudSyncPage extends ConsumerStatefulWidget {
-  const CloudSyncPage({
-    super.key,
-    this.notificationService,
-  });
+  const CloudSyncPage({super.key, this.notificationService});
 
   final NotificationService? notificationService;
 
@@ -56,8 +53,9 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
   Future<void> _editConfig(WebDavConfig config) async {
     // 从安全存储加载凭据，以便编辑页预填充
     final settingsRepo = ref.read(settingsRepositoryProvider);
-    final fullConfig =
-        await settingsRepo.loadWebDavConfigWithCredentials(config);
+    final fullConfig = await settingsRepo.loadWebDavConfigWithCredentials(
+      config,
+    );
 
     if (!mounted) return;
     final result = await Navigator.push<bool>(
@@ -122,8 +120,9 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
 
     try {
       if (!await ensureParentAccess(context) || !mounted) return;
-      final fullConfig =
-          await settingsRepo.loadWebDavConfigWithCredentials(config);
+      final fullConfig = await settingsRepo.loadWebDavConfigWithCredentials(
+        config,
+      );
       final passphrase = await credentialStore.readBackupPassphrase();
       var degraded = false;
       String json;
@@ -136,8 +135,9 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
         if (!mounted) return;
         final proceed = await showCredentialExportFailedDialog(context);
         if (proceed != true) {
-          scaffold
-              .showSnackBar(const SnackBar(content: Text('已取消上传（未修改云端备份）')));
+          scaffold.showSnackBar(
+            const SnackBar(content: Text('已取消上传（未修改云端备份）')),
+          );
           return;
         }
         json = await backup.exportToJson(
@@ -156,9 +156,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       if (conflict == SyncConflictDecision.cancelled) {
         if (!mounted) return;
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('已取消上传（云端备份未变更）')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('已取消上传（云端备份未变更）')));
         return;
       }
 
@@ -179,17 +177,15 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
             degraded
                 ? '上传成功 ✓（不含密钥）'
                 : passphrase == null
-                    ? '上传成功 ✓（未设置备份加密口令，本次备份不含凭据）'
-                    : '上传成功 ✓',
+                ? '上传成功 ✓（未设置备份加密口令，本次备份不含凭据）'
+                : '上传成功 ✓',
           ),
         ),
       );
     } on WebDavException catch (e) {
       if (!mounted) return;
       scaffold.clearSnackBars();
-      scaffold.showSnackBar(
-        SnackBar(content: Text('上传失败: ${e.message}')),
-      );
+      scaffold.showSnackBar(SnackBar(content: Text('上传失败: ${e.message}')));
     } on Object catch (e) {
       if (!mounted) return;
       // `on Object` 兜在具体类型之后：`settingsRepo.setLastSyncedAt` 写
@@ -197,9 +193,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
       // 有 `finally` 复位 `_uploading` 不会卡死，但漏捕会让上传按钮点了
       // 既无成功也无失败反馈（异常直抛框架）。
       scaffold.clearSnackBars();
-      scaffold.showSnackBar(
-        SnackBar(content: Text('上传失败: $e')),
-      );
+      scaffold.showSnackBar(SnackBar(content: Text('上传失败: $e')));
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -287,16 +281,19 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
           child: SizedBox(
             height: MediaQuery.sizeOf(sheet).height * .6,
             child: versions.isEmpty
-                ? const Center(child: Text('暂无历史版本，请先上传一次新备份'))
+                ? const AppEmptyState(
+                    icon: Icons.history_outlined,
+                    title: '暂无历史版本',
+                    description: '请先上传一次新备份',
+                  )
                 : ListView(
                     padding: const EdgeInsets.all(SpacingTokens.md),
                     children: [
                       Text(
                         '选择云端历史版本',
                         textAlign: TextAlign.center,
-                        style: Theme.of(sheet).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                        style: Theme.of(sheet).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: SpacingTokens.md),
                       for (final version in versions)
@@ -370,10 +367,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     try {
       remoteJson = await webdav.download(fullConfig);
     } on Object catch (error) {
-      AppLogger.w(
-        '上传前冲突检测跳过：云端备份不可读（$error）',
-        tag: 'CloudSync',
-      );
+      AppLogger.w('上传前冲突检测跳过：云端备份不可读（$error）', tag: 'CloudSync');
       return SyncConflictDecision.proceed;
     }
 
@@ -473,7 +467,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
               ),
             Expanded(
               child: configs.isEmpty
-                  ? _buildEmptyState(theme)
+                  ? _buildEmptyState()
                   : Column(
                       children: [
                         // 配置列表
@@ -488,77 +482,83 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                               final selected = _selectedId == config.id;
 
                               return ColoredCard(
-                                color: selected
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.outline,
-                                backgroundOpacity: selected ? 0.12 : 0.04,
-                                onTap: () =>
-                                    setState(() => _selectedId = config.id),
-                                child: Row(
-                                  children: [
-                                    // 选中标记
-                                    Icon(
-                                      selected
-                                          ? Icons.radio_button_checked
-                                          : Icons.radio_button_unchecked,
-                                      color: selected
-                                          ? theme.colorScheme.primary
-                                          : theme.colorScheme.onSurfaceVariant,
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: SpacingTokens.md),
-                                    // 配置信息
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            config.name,
-                                            style: theme.textTheme.titleSmall
-                                                ?.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                            height: SpacingTokens.xs,
-                                          ),
-                                          Text(
-                                            config.url,
-                                            style: theme.textTheme.bodySmall
-                                                ?.copyWith(
-                                              color: theme
-                                                  .colorScheme.onSurfaceVariant,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    // 操作按钮
-                                    PopupMenuButton<String>(
-                                      onSelected: (action) {
-                                        if (action == 'edit') {
-                                          _editConfig(config);
-                                        } else if (action == 'delete') {
-                                          _deleteConfig(config);
-                                        }
-                                      },
-                                      itemBuilder: (_) => [
-                                        const PopupMenuItem(
-                                          value: 'edit',
-                                          child: Text('编辑'),
+                                    color: selected
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.outline,
+                                    backgroundOpacity: selected ? 0.12 : 0.04,
+                                    onTap: () =>
+                                        setState(() => _selectedId = config.id),
+                                    child: Row(
+                                      children: [
+                                        // 选中标记
+                                        Icon(
+                                          selected
+                                              ? Icons.radio_button_checked
+                                              : Icons.radio_button_unchecked,
+                                          color: selected
+                                              ? theme.colorScheme.primary
+                                              : theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
+                                          size: 22,
                                         ),
-                                        const PopupMenuItem(
-                                          value: 'delete',
-                                          child: Text('删除'),
+                                        const SizedBox(width: SpacingTokens.md),
+                                        // 配置信息
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                config.name,
+                                                style: theme
+                                                    .textTheme
+                                                    .titleSmall
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                              ),
+                                              const SizedBox(
+                                                height: SpacingTokens.xs,
+                                              ),
+                                              Text(
+                                                config.url,
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: theme
+                                                          .colorScheme
+                                                          .onSurfaceVariant,
+                                                    ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        // 操作按钮
+                                        PopupMenuButton<String>(
+                                          onSelected: (action) {
+                                            if (action == 'edit') {
+                                              _editConfig(config);
+                                            } else if (action == 'delete') {
+                                              _deleteConfig(config);
+                                            }
+                                          },
+                                          itemBuilder: (_) => [
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Text('编辑'),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'delete',
+                                              child: Text('删除'),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
-                                  ],
-                                ),
-                              )
+                                  )
                                   .animatePage(context)
                                   .fadeIn(
                                     delay: (80 * index).ms,
@@ -596,9 +596,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                                         : const Icon(
                                             Icons.cloud_upload_outlined,
                                           ),
-                                    label: Text(
-                                      _uploading ? '上传中…' : '上传到云端',
-                                    ),
+                                    label: Text(_uploading ? '上传中…' : '上传到云端'),
                                   ),
                                 ),
                                 const SizedBox(width: SpacingTokens.md),
@@ -627,43 +625,18 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(SpacingTokens.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.cloud_off_outlined,
-              size: 64,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            Text(
-              '暂无同步方式',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              '点击右上角 + 添加 WebDAV 配置',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.lg),
-            FilledButton.icon(
-              onPressed: _addConfig,
-              icon: const Icon(Icons.add),
-              label: const Text('添加配置'),
-            ),
-          ],
-        ),
+  Widget _buildEmptyState() => AppEmptyState(
+    icon: Icons.cloud_off_outlined,
+    title: '暂无同步方式',
+    description: '点击右上角 + 添加 WebDAV 配置',
+    actions: [
+      FilledButton.icon(
+        onPressed: _addConfig,
+        icon: const Icon(Icons.add),
+        label: const Text('添加配置'),
       ),
-    );
-  }
+    ],
+  );
 }
 
 class _SmallSpinner extends StatelessWidget {

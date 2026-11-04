@@ -48,7 +48,6 @@ class _WordProblemLibraryPageState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isWide = MediaQuery.sizeOf(context).width >= 420;
     final stats = ref.watch(llmLibraryStatsProvider);
     final all = ref.watch(llmProblemListProvider);
@@ -62,10 +61,12 @@ class _WordProblemLibraryPageState
     final batchOrder = <String>[];
     final batches = <String, List<LlmProblem>>{};
     for (final problem in filtered) {
-      batches.putIfAbsent(problem.batchId, () {
-        batchOrder.add(problem.batchId);
-        return <LlmProblem>[];
-      }).add(problem);
+      batches
+          .putIfAbsent(problem.batchId, () {
+            batchOrder.add(problem.batchId);
+            return <LlmProblem>[];
+          })
+          .add(problem);
     }
 
     return Scaffold(
@@ -123,13 +124,10 @@ class _WordProblemLibraryPageState
                 // 批次分组列表
                 Expanded(
                   child: filtered.isEmpty
-                      ? Center(
-                          child: Text(
-                            '当前筛选无题目',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
+                      ? const AppEmptyState(
+                          icon: Icons.filter_alt_outlined,
+                          title: '当前筛选无题目',
+                          description: '试试其他题型或完成状态。',
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.all(SpacingTokens.md),
@@ -161,9 +159,7 @@ class _WordProblemLibraryPageState
                             ? null
                             : () => _startPractice(filtered),
                         icon: const Icon(Icons.play_arrow_rounded),
-                        label: Text(
-                          '开始练习 · ${filtered.length} 题',
-                        ),
+                        label: Text('开始练习 · ${filtered.length} 题'),
                       ),
                     ),
                     const SizedBox(width: SpacingTokens.sm),
@@ -216,9 +212,8 @@ class _WordProblemLibraryPageState
                           FilterChip(
                             label: Text(topic.label),
                             selected: _topicFilter == topic,
-                            onSelected: (s) => apply(
-                              () => _topicFilter = s ? topic : null,
-                            ),
+                            onSelected: (s) =>
+                                apply(() => _topicFilter = s ? topic : null),
                           ),
                       ],
                     ),
@@ -231,16 +226,14 @@ class _WordProblemLibraryPageState
                         FilterChip(
                           label: const Text('未做'),
                           selected: _doneFilter == false,
-                          onSelected: (s) => apply(
-                            () => _doneFilter = s ? false : null,
-                          ),
+                          onSelected: (s) =>
+                              apply(() => _doneFilter = s ? false : null),
                         ),
                         FilterChip(
                           label: const Text('已做'),
                           selected: _doneFilter == true,
-                          onSelected: (s) => apply(
-                            () => _doneFilter = s ? true : null,
-                          ),
+                          onSelected: (s) =>
+                              apply(() => _doneFilter = s ? true : null),
                         ),
                       ],
                     ),
@@ -251,9 +244,9 @@ class _WordProblemLibraryPageState
                           onPressed: _topicFilter == null && _doneFilter == null
                               ? null
                               : () => apply(() {
-                                    _topicFilter = null;
-                                    _doneFilter = null;
-                                  }),
+                                  _topicFilter = null;
+                                  _doneFilter = null;
+                                }),
                           child: const Text('重置'),
                         ),
                         const Spacer(),
@@ -273,39 +266,18 @@ class _WordProblemLibraryPageState
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(SpacingTokens.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.auto_awesome_outlined,
-              size: 48,
-              color: theme.colorScheme.primary.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            Text('题库还是空的', style: theme.textTheme.titleMedium),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              '去生成一批应用题，家长确认后即可练习',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.lg),
-            FilledButton.icon(
-              onPressed: () => context.push(AppRoutes.wordProblemGenerate),
-              icon: const Icon(Icons.auto_awesome_outlined),
-              label: const Text('去生成'),
-            ),
-          ],
-        ),
+  Widget _buildEmptyState(BuildContext context) => AppEmptyState(
+    icon: Icons.auto_awesome_outlined,
+    title: '题库还是空的',
+    description: '去生成一批应用题，家长确认后即可练习',
+    actions: [
+      FilledButton.icon(
+        onPressed: () => context.push(AppRoutes.wordProblemGenerate),
+        icon: const Icon(Icons.auto_awesome_outlined),
+        label: const Text('去生成'),
       ),
-    );
-  }
+    ],
+  );
 
   Widget _buildBatchSection(
     BuildContext context,
@@ -328,9 +300,7 @@ class _WordProblemLibraryPageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: SpacingTokens.xs,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.xs),
             child: Row(
               children: [
                 Expanded(
@@ -345,8 +315,9 @@ class _WordProblemLibraryPageState
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded, size: 20),
                   tooltip: '删除该批次',
-                  onPressed:
-                      _deleting ? null : () => _deleteBatch(context, batchId),
+                  onPressed: _deleting
+                      ? null
+                      : () => _deleteBatch(context, batchId),
                 ),
               ],
             ),
@@ -428,7 +399,8 @@ class _WordProblemLibraryPageState
 
   void _startPractice(List<LlmProblem> problems) {
     // 未做的题排在前面（已做的押后），整体仍保持创建时间倒序稳定性。
-    final sorted = [...problems]..sort((a, b) {
+    final sorted = [...problems]
+      ..sort((a, b) {
         if (a.done != b.done) return a.done ? 1 : -1;
         return 0;
       });
@@ -445,13 +417,12 @@ class _WordProblemLibraryPageState
     );
   }
 
-  Future<void> _deleteBatch(
-    BuildContext context,
-    String batchId,
-  ) {
+  Future<void> _deleteBatch(BuildContext context, String batchId) {
     final repo = ref.read(llmProblemRepositoryProvider);
-    final count =
-        repo.getAll().where((problem) => problem.batchId == batchId).length;
+    final count = repo
+        .getAll()
+        .where((problem) => problem.batchId == batchId)
+        .length;
     return _deleteWithParentVerification(
       context,
       title: '删除该批次',
@@ -503,8 +474,9 @@ class _WordProblemLibraryPageState
             FilledButton(
               style: confirmLabel == '清空'
                   ? FilledButton.styleFrom(
-                      backgroundColor:
-                          Theme.of(dialogContext).colorScheme.error,
+                      backgroundColor: Theme.of(dialogContext)
+                          .colorScheme
+                          .error,
                     )
                   : null,
               onPressed: () => Navigator.pop(dialogContext, true),

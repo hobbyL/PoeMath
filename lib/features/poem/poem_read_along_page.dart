@@ -737,7 +737,11 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     if (poem == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('跟读练习')),
-        body: const Center(child: Text('诗词未找到')),
+        body: const AppEmptyState(
+          icon: Icons.menu_book_outlined,
+          title: '诗词未找到',
+          description: '请返回诗词列表重新选择。',
+        ),
       );
     }
 

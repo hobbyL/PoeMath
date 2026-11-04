@@ -73,15 +73,13 @@ class _Repository extends PictureStoryRepository {
     final result = Completer<T>();
     // 仓储队列运行在真实 IO 域；成功或失败回送调用者，跨 error zone 不丢失异常。
     unawaited(
-      ioZone.run(
-        () async {
-          try {
-            result.complete(await operation());
-          } on Object catch (error, stackTrace) {
-            result.completeError(error, stackTrace);
-          }
-        },
-      ),
+      ioZone.run(() async {
+        try {
+          result.complete(await operation());
+        } on Object catch (error, stackTrace) {
+          result.completeError(error, stackTrace);
+        }
+      }),
     );
     return result.future;
   }
@@ -123,9 +121,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final container = ProviderContainer(
-      overrides: [
-        pictureStoryRepositoryProvider.overrideWithValue(repository),
-      ],
+      overrides: [pictureStoryRepositoryProvider.overrideWithValue(repository)],
     );
     final router = createAppRouter(initialLocation: location);
     addTearDown(container.dispose);
@@ -140,9 +136,8 @@ void main() {
           ),
           routerConfig: router,
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.linear(textScale),
-            ),
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
         ),
@@ -191,8 +186,9 @@ void main() {
       find.text('「${prompt.title}」将从所有孩子的题库中移除，并清理不再使用的题图。练习历史及其题图会保留。'),
       findsOneWidget,
     );
-    await tester
-        .runAsync(() => tester.tap(find.widgetWithText(TextButton, '取消')));
+    await tester.runAsync(
+      () => tester.tap(find.widgetWithText(TextButton, '取消')),
+    );
     await tester.pumpAndSettle();
     expect(repository.deleteCalls, 0);
     expect(repository.storageSnapshot(), before);
@@ -321,8 +317,9 @@ void main() {
     lockParentForTesting();
     await tester.pumpAndSettle();
     if (find.widgetWithText(TextButton, '删除').evaluate().isNotEmpty) {
-      await tester
-          .runAsync(() => tester.tap(find.widgetWithText(TextButton, '删除')));
+      await tester.runAsync(
+        () => tester.tap(find.widgetWithText(TextButton, '删除')),
+      );
       await tester.pumpAndSettle();
     }
     expect(repository.deleteCalls, 0);
@@ -384,7 +381,7 @@ void main() {
       await openDelete(tester);
       await confirmDelete(tester);
     }
-    expect(find.text('题库里还没有题目，点击右上角「新增题目」添加。'), findsOneWidget);
+    expect(find.text('题库还是空的'), findsOneWidget);
     expect(find.byTooltip('新增题目'), findsOneWidget);
     expect(find.byType(AppTile), findsNothing);
     expect(container.read(pictureStoryPromptCountProvider), 0);
@@ -413,8 +410,9 @@ void main() {
     expect(find.widgetWithText(TextButton, '删除'), findsOneWidget);
     expect(find.widgetWithText(TextButton, '取消'), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tester
-        .runAsync(() => tester.tap(find.widgetWithText(TextButton, '取消')));
+    await tester.runAsync(
+      () => tester.tap(find.widgetWithText(TextButton, '取消')),
+    );
     await tester.pumpAndSettle();
     expect(repository.deleteCalls, 0);
     expect(tester.takeException(), isNull);

@@ -32,8 +32,9 @@ class MathMistakePage extends ConsumerWidget {
     final theme = Theme.of(context);
 
     final resolvedCount = allMistakes.where((m) => m.isResolved).length;
-    final consolidatingCount =
-        allMistakes.where((m) => m.isConsolidating).length;
+    final consolidatingCount = allMistakes
+        .where((m) => m.isConsolidating)
+        .length;
     final unmasteredCount = allMistakes.where((m) => m.isUnmastered).length;
 
     // 收集所有错题中出现的年级，用于筛选 chips
@@ -56,27 +57,12 @@ class MathMistakePage extends ConsumerWidget {
                       snap: true,
                       title: Text('错题本（${allMistakes.length}）'),
                     ),
-                    SliverFillRemaining(
+                    const SliverFillRemaining(
                       hasScrollBody: false,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.check_circle_outline,
-                              size: 64,
-                              color:
-                                  theme.semantic.success.withValues(alpha: 0.5),
-                            ),
-                            const SizedBox(height: SpacingTokens.md),
-                            Text(
-                              '暂无错题，继续保持！',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: AppEmptyState(
+                        icon: Icons.check_circle_outline,
+                        title: '暂无错题，继续保持！',
+                        description: '练习中需要复习的错题会保存在这里。',
                       ),
                     ),
                   ],
@@ -98,37 +84,39 @@ class MathMistakePage extends ConsumerWidget {
                           SpacingTokens.md,
                           0,
                         ),
-                        child: ColoredCard(
-                          color: theme.colorScheme.primary,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _StatBadge(
-                                label: '总错题',
-                                value: '${allMistakes.length}',
-                                color: theme.colorScheme.primary,
-                              ),
-                              _StatBadge(
-                                label: '未掌握',
-                                value: '$unmasteredCount',
-                                color: theme.colorScheme.error,
-                              ),
-                              _StatBadge(
-                                label: '待巩固',
-                                value: '$consolidatingCount',
-                                color: theme.semantic.caution,
-                              ),
-                              _StatBadge(
-                                label: '已掌握',
-                                value: '$resolvedCount',
-                                color: theme.semantic.success,
-                              ),
-                            ],
-                          ),
-                        )
-                            .animatePage(context)
-                            .fadeIn(duration: 400.ms)
-                            .slideY(begin: 0.1, end: 0, duration: 400.ms),
+                        child:
+                            ColoredCard(
+                                  color: theme.colorScheme.primary,
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceAround,
+                                    children: [
+                                      _StatBadge(
+                                        label: '总错题',
+                                        value: '${allMistakes.length}',
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                      _StatBadge(
+                                        label: '未掌握',
+                                        value: '$unmasteredCount',
+                                        color: theme.colorScheme.error,
+                                      ),
+                                      _StatBadge(
+                                        label: '待巩固',
+                                        value: '$consolidatingCount',
+                                        color: theme.semantic.caution,
+                                      ),
+                                      _StatBadge(
+                                        label: '已掌握',
+                                        value: '$resolvedCount',
+                                        color: theme.semantic.success,
+                                      ),
+                                    ],
+                                  ),
+                                )
+                                .animatePage(context)
+                                .fadeIn(duration: 400.ms)
+                                .slideY(begin: 0.1, end: 0, duration: 400.ms),
                       ),
                     ),
 
@@ -152,12 +140,13 @@ class MathMistakePage extends ConsumerWidget {
                                   children: [
                                     Text(
                                       '年级',
-                                      style:
-                                          theme.textTheme.labelMedium?.copyWith(
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                      style: theme.textTheme.labelMedium
+                                          ?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                     ),
                                     const SizedBox(width: SpacingTokens.sm),
                                     FilterChip(
@@ -165,11 +154,12 @@ class MathMistakePage extends ConsumerWidget {
                                       selected: gradeFilter == null,
                                       onSelected: (_) {
                                         ref
-                                            .read(
-                                              mistakeGradeFilterProvider
-                                                  .notifier,
-                                            )
-                                            .state = null;
+                                                .read(
+                                                  mistakeGradeFilterProvider
+                                                      .notifier,
+                                                )
+                                                .state =
+                                            null;
                                       },
                                     ),
                                     for (final g in sortedGrades) ...[
@@ -179,12 +169,13 @@ class MathMistakePage extends ConsumerWidget {
                                         selected: gradeFilter == g,
                                         onSelected: (_) {
                                           ref
-                                                  .read(
-                                                    mistakeGradeFilterProvider
-                                                        .notifier,
-                                                  )
-                                                  .state =
-                                              gradeFilter == g ? null : g;
+                                              .read(
+                                                mistakeGradeFilterProvider
+                                                    .notifier,
+                                              )
+                                              .state = gradeFilter == g
+                                              ? null
+                                              : g;
                                         },
                                       ),
                                     ],
@@ -201,11 +192,13 @@ class MathMistakePage extends ConsumerWidget {
                                 children: [
                                   Text(
                                     '状态',
-                                    style:
-                                        theme.textTheme.labelMedium?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: theme.textTheme.labelMedium
+                                        ?.copyWith(
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                   ),
                                   const SizedBox(width: SpacingTokens.sm),
                                   ChoiceChip(
@@ -213,11 +206,12 @@ class MathMistakePage extends ConsumerWidget {
                                     selected: statusFilter == null,
                                     onSelected: (_) {
                                       ref
-                                          .read(
-                                            mistakeStatusFilterProvider
-                                                .notifier,
-                                          )
-                                          .state = null;
+                                              .read(
+                                                mistakeStatusFilterProvider
+                                                    .notifier,
+                                              )
+                                              .state =
+                                          null;
                                     },
                                   ),
                                   for (final filter
@@ -228,14 +222,13 @@ class MathMistakePage extends ConsumerWidget {
                                       selected: statusFilter == filter,
                                       onSelected: (_) {
                                         ref
-                                                .read(
-                                                  mistakeStatusFilterProvider
-                                                      .notifier,
-                                                )
-                                                .state =
-                                            statusFilter == filter
-                                                ? null
-                                                : filter;
+                                            .read(
+                                              mistakeStatusFilterProvider
+                                                  .notifier,
+                                            )
+                                            .state = statusFilter == filter
+                                            ? null
+                                            : filter;
                                       },
                                     ),
                                   ],
@@ -264,9 +257,7 @@ class MathMistakePage extends ConsumerWidget {
                               repracticeQueue,
                             ),
                             icon: const Icon(Icons.replay_rounded),
-                            label: Text(
-                              '开始重练（${repracticeQueue.length} 题）',
-                            ),
+                            label: Text('开始重练（${repracticeQueue.length} 题）'),
                             style: FilledButton.styleFrom(
                               minimumSize: const Size(double.infinity, 48),
                             ),
@@ -276,27 +267,12 @@ class MathMistakePage extends ConsumerWidget {
 
                     // 筛选结果为空提示
                     if (filteredMistakes.isEmpty && allMistakes.isNotEmpty)
-                      SliverFillRemaining(
+                      const SliverFillRemaining(
                         hasScrollBody: false,
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.filter_alt_outlined,
-                                size: 48,
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.4),
-                              ),
-                              const SizedBox(height: SpacingTokens.sm),
-                              Text(
-                                '当前筛选条件下无错题',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
+                        child: AppEmptyState(
+                          icon: Icons.filter_alt_outlined,
+                          title: '当前筛选条件下无错题',
+                          description: '试试其他年级或掌握状态。',
                         ),
                       ),
 
@@ -307,7 +283,8 @@ class MathMistakePage extends ConsumerWidget {
                           vertical: SpacingTokens.sm,
                         ),
                         sliver: SliverList.builder(
-                          itemCount: (filteredMistakes.length + columns - 1) ~/
+                          itemCount:
+                              (filteredMistakes.length + columns - 1) ~/
                               columns,
                           itemBuilder: (context, rowIndex) {
                             final start = rowIndex * columns;
@@ -323,29 +300,33 @@ class MathMistakePage extends ConsumerWidget {
                                 final mistake = filteredMistakes[idx];
                                 rowWidgets.add(
                                   Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => context.push(
-                                        AppRoutes.mathMistakeDetail,
-                                        extra: mistake.id,
-                                      ),
-                                      child: _MistakeCard(mistake: mistake),
-                                    )
-                                        .animatePage(context)
-                                        .fadeIn(
-                                          delay: (80 * idx).ms,
-                                          duration: 300.ms,
-                                        )
-                                        .slideX(
-                                          begin: 0.1,
-                                          end: 0,
-                                          delay: (80 * idx).ms,
-                                          duration: 300.ms,
-                                        ),
+                                    child:
+                                        GestureDetector(
+                                              onTap: () => context.push(
+                                                AppRoutes.mathMistakeDetail,
+                                                extra: mistake.id,
+                                              ),
+                                              child: _MistakeCard(
+                                                mistake: mistake,
+                                              ),
+                                            )
+                                            .animatePage(context)
+                                            .fadeIn(
+                                              delay: (80 * idx).ms,
+                                              duration: 300.ms,
+                                            )
+                                            .slideX(
+                                              begin: 0.1,
+                                              end: 0,
+                                              delay: (80 * idx).ms,
+                                              duration: 300.ms,
+                                            ),
                                   ),
                                 );
                               } else {
-                                rowWidgets
-                                    .add(const Expanded(child: SizedBox()));
+                                rowWidgets.add(
+                                  const Expanded(child: SizedBox()),
+                                );
                               }
                             }
                             return Padding(
@@ -467,8 +448,8 @@ class _MistakeCard extends StatelessWidget {
     final statusColor = mistake.isResolved
         ? theme.semantic.success
         : mistake.isConsolidating
-            ? theme.semantic.caution
-            : theme.colorScheme.error;
+        ? theme.semantic.caution
+        : theme.colorScheme.error;
 
     return ColoredCard(
       color: theme.colorScheme.primary,
@@ -493,8 +474,9 @@ class _MistakeCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                      borderRadius:
-                          BorderRadius.circular(SpacingTokens.radiusSmall),
+                      borderRadius: BorderRadius.circular(
+                        SpacingTokens.radiusSmall,
+                      ),
                     ),
                     child: Text(
                       '今日可练',
@@ -511,10 +493,12 @@ class _MistakeCard extends StatelessWidget {
                       vertical: SpacingTokens.xs,
                     ),
                     decoration: BoxDecoration(
-                      color:
-                          theme.colorScheme.secondary.withValues(alpha: 0.12),
-                      borderRadius:
-                          BorderRadius.circular(SpacingTokens.radiusSmall),
+                      color: theme.colorScheme.secondary.withValues(
+                        alpha: 0.12,
+                      ),
+                      borderRadius: BorderRadius.circular(
+                        SpacingTokens.radiusSmall,
+                      ),
                     ),
                     child: Text(
                       // 标签单一来源：math_engine kErrorCauseLabels；
@@ -604,8 +588,9 @@ class _MistakeCard extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
-                  borderRadius:
-                      BorderRadius.circular(SpacingTokens.radiusSmall),
+                  borderRadius: BorderRadius.circular(
+                    SpacingTokens.radiusSmall,
+                  ),
                 ),
                 child: Text(
                   statusLabel,

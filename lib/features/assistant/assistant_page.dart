@@ -21,7 +21,7 @@ import 'package:poemath/core/services/tts/markdown_speech_text.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
-import 'package:poemath/core/widgets/colored_card.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/assistant/assistant_chat_controller.dart';
 import 'package:poemath/features/assistant/assistant_chat_state.dart';
@@ -90,13 +90,13 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     // 令牌，在途朗读的晚到回调天然失配。
     unawaited(
       _tts.stop().onError(
-            (error, stackTrace) => AppLogger.e(
-              '退出 AI 助手时停止朗读失败',
-              tag: 'Assistant',
-              error: error,
-              stackTrace: stackTrace,
-            ),
-          ),
+        (error, stackTrace) => AppLogger.e(
+          '退出 AI 助手时停止朗读失败',
+          tag: 'Assistant',
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      ),
     );
     _scrollController.dispose();
     super.dispose();
@@ -118,13 +118,10 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     final theme = Theme.of(context);
     final chatState = ref.watch(assistantChatControllerProvider);
     // 消息 / 流式变化后滚到底部。
-    ref.listen<AssistantChatState>(
-      assistantChatControllerProvider,
-      (_, next) {
-        _syncSpeakingMessage(next.messages);
-        _scrollToBottomSoon();
-      },
-    );
+    ref.listen<AssistantChatState>(assistantChatControllerProvider, (_, next) {
+      _syncSpeakingMessage(next.messages);
+      _scrollToBottomSoon();
+    });
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -137,7 +134,8 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         title: const AssistantProviderSwitcher(),
         actions: <Widget>[
           IconButton(
-            onPressed: (chatState.messages.isNotEmpty &&
+            onPressed:
+                (chatState.messages.isNotEmpty &&
                     chatState.contextBaseIndex < chatState.messages.length &&
                     !chatState.isBusy)
                 ? () {
@@ -172,7 +170,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
 
   Widget _buildBody(ThemeData theme, AssistantChatState chatState) {
     if (chatState.isUnconfigured) {
-      return _buildUnconfigured(theme);
+      return _buildUnconfigured();
     }
     return Column(
       children: <Widget>[
@@ -192,11 +190,12 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   Widget _buildMessageList(ThemeData theme, AssistantChatState chatState) {
     final messages = chatState.messages;
     final base = chatState.contextBaseIndex;
-    final hasPending = chatState.isLoading ||
+    final hasPending =
+        chatState.isLoading ||
         chatState.isStreaming ||
         (chatState.isError && chatState.streamingText.trim().isNotEmpty);
     if (messages.isEmpty && !hasPending && !chatState.isError) {
-      return _buildEmptyState(theme);
+      return _buildEmptyState();
     }
     // 清除点正好在末尾、且无在途气泡时，补一条末尾分割线项。
     final showTrailingDivider =
@@ -266,7 +265,8 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         detail: m.content,
       );
     }
-    final isLastAssistant = index == messages.length - 1 &&
+    final isLastAssistant =
+        index == messages.length - 1 &&
         m.role == ChatRole.assistant &&
         !chatState.isBusy;
     return ChatMessageBubble(
@@ -353,9 +353,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('停止朗读失败，请稍后重试')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('停止朗读失败，请稍后重试')));
       }
       return false;
     }
@@ -371,9 +369,8 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   Future<void> _startSpeaking(ChatMessage message) async {
     final speakable = markdownToSpeechText(message.content).trim();
     if (speakable.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('这条回答没有可朗读的文本内容')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('这条回答没有可朗读的文本内容')));
       return;
     }
     final scaffold = ScaffoldMessenger.of(context);
@@ -453,36 +450,11 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(SpacingTokens.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              Icons.smart_toy_outlined,
-              size: 48,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            Text(
-              '你好，我是 AI 学习助手',
-              style: theme.textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            Text(
-              '可以问我数学题、古诗词，或任何学习上的问题～',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildEmptyState() => const AppEmptyState(
+    icon: Icons.smart_toy_outlined,
+    title: '你好，我是 AI 学习助手',
+    description: '可以问我数学题、古诗词，或任何学习上的问题～',
+  );
 
   Widget _buildErrorBanner(ThemeData theme, String message) {
     return Padding(
@@ -497,15 +469,9 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
         width: double.infinity,
         child: Row(
           children: <Widget>[
-            Icon(
-              Icons.error_outline,
-              color: theme.colorScheme.error,
-              size: 20,
-            ),
+            Icon(Icons.error_outline, color: theme.colorScheme.error, size: 20),
             const SizedBox(width: SpacingTokens.sm),
-            Expanded(
-              child: Text(message, style: theme.textTheme.bodySmall),
-            ),
+            Expanded(child: Text(message, style: theme.textTheme.bodySmall)),
             TextButton(
               onPressed: () =>
                   ref.read(assistantSessionProvider.notifier).regenerate(),
@@ -517,51 +483,20 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     );
   }
 
-  Widget _buildUnconfigured(ThemeData theme) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(SpacingTokens.md),
-        child: ColoredCard(
-          color: theme.colorScheme.tertiary,
-          width: double.infinity,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Icon(
-                    Icons.smart_toy_outlined,
-                    color: theme.colorScheme.tertiary,
-                  ),
-                  const SizedBox(width: SpacingTokens.sm),
-                  Expanded(
-                    child: Text(
-                      '尚未配置 AI 服务',
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              Text(
-                'AI 助手需要家长先配置一个 OpenAI 兼容的大模型服务'
-                '（地址、模型与 API Key）。配置后即可开始对话。',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-              FilledButton.tonalIcon(
-                onPressed: () => context.push(AppRoutes.llmSettings),
-                icon: const Icon(Icons.settings_outlined),
-                label: const Text('去配置'),
-              ),
-            ],
-          ),
-        ),
+  Widget _buildUnconfigured() => AppEmptyState(
+    icon: Icons.smart_toy_outlined,
+    title: '尚未配置 AI 服务',
+    description:
+        'AI 助手需要家长先配置一个 OpenAI 兼容的大模型服务'
+        '（地址、模型与 API Key）。配置后即可开始对话。',
+    actions: [
+      FilledButton.icon(
+        onPressed: () => context.push(AppRoutes.llmSettings),
+        icon: const Icon(Icons.settings_outlined),
+        label: const Text('去配置'),
       ),
-    );
-  }
+    ],
+  );
 }
 
 /// 挂起（loading）气泡：助手正在思考。

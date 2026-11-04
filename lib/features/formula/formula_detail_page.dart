@@ -71,13 +71,13 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
     // [_onTapRelatedFormula] 负责（10-08 修复）。
     unawaited(
       _tts.stop().onError(
-            (error, stackTrace) => AppLogger.e(
-              '退出公式详情页时停止朗读失败',
-              tag: 'FormulaDetail',
-              error: error,
-              stackTrace: stackTrace,
-            ),
-          ),
+        (error, stackTrace) => AppLogger.e(
+          '退出公式详情页时停止朗读失败',
+          tag: 'FormulaDetail',
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      ),
     );
     super.dispose();
   }
@@ -149,9 +149,7 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
     }
     if (!mounted) return;
     Navigator.of(context).push(
-      fadeSlideRoute<void>(
-        builder: (_) => FormulaDetailPage(formulaId: id),
-      ),
+      fadeSlideRoute<void>(builder: (_) => FormulaDetailPage(formulaId: id)),
     );
   }
 
@@ -172,9 +170,7 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('停止朗读失败，请稍后重试')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('停止朗读失败，请稍后重试')));
       }
       return false;
     }
@@ -260,7 +256,11 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
     if (formula == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('公式详情')),
-        body: const Center(child: Text('公式未找到')),
+        body: const AppEmptyState(
+          icon: Icons.functions_outlined,
+          title: '公式未找到',
+          description: '请返回公式知识库重新选择。',
+        ),
       );
     }
 
@@ -321,15 +321,14 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
                       child: formula.formulaLatex.isNotEmpty
                           ? Math.tex(
                               formula.formulaLatex,
-                              textStyle:
-                                  theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
-                              ),
+                              textStyle: theme.textTheme.headlineSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.primary,
+                                  ),
                               onErrorFallback: (_) => Text(
                                 formula.formulaText,
-                                style:
-                                    theme.textTheme.headlineSmall?.copyWith(
+                                style: theme.textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: theme.colorScheme.primary,
                                   letterSpacing: 1.5,
@@ -371,8 +370,9 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
                   child: Column(
                     children: formula.params.map((param) {
                       return Padding(
-                        padding:
-                            const EdgeInsets.only(bottom: SpacingTokens.xs),
+                        padding: const EdgeInsets.only(
+                          bottom: SpacingTokens.xs,
+                        ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [

@@ -53,8 +53,8 @@ class _LlmProviderSettingsPageState
                 event.key == ImageGenerationProviderConfig.settingsKey,
           )
           .listen((_) {
-        if (mounted) setState(() {});
-      });
+            if (mounted) setState(() {});
+          });
     }
     // 迁移走异步：initState 内不得 await（FakeAsync 下 Hive 写链会挂起，
     // 且 setState-in-initState 会触发框架断言）。
@@ -91,15 +91,13 @@ class _LlmProviderSettingsPageState
     } on ArgumentError catch (e) {
       // 竞态：列表在读取后被外部改写。刷新列表即可。
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('配置不存在：${e.message ?? e}')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('配置不存在：${e.message ?? e}')));
       }
     } on Object {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('配置切换失败，请重试')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('配置切换失败，请重试')));
       }
     }
     if (mounted) setState(() {});
@@ -126,11 +124,11 @@ class _LlmProviderSettingsPageState
         content: Text(
           widget.imageGeneration
               ? result == LlmProviderEditResult.saved
-                  ? '生图服务配置已保存'
-                  : '生图服务配置已删除'
+                    ? '生图服务配置已保存'
+                    : '生图服务配置已删除'
               : result == LlmProviderEditResult.saved
-                  ? 'LLM 服务配置已保存'
-                  : 'LLM 服务配置已删除',
+              ? 'LLM 服务配置已保存'
+              : 'LLM 服务配置已删除',
         ),
       ),
     );
@@ -155,9 +153,7 @@ class _LlmProviderSettingsPageState
         : settingsRepo.llmActiveProviderId;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.imageGeneration ? '图片生成设置' : '供应商设置'),
-      ),
+      appBar: AppBar(title: Text(widget.imageGeneration ? '图片生成设置' : '供应商设置')),
       body: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),
         children: [
@@ -177,10 +173,10 @@ class _LlmProviderSettingsPageState
                   child: Text(
                     widget.imageGeneration
                         ? '配置一个或多个生图服务，供看图说话生成配图。'
-                            '点选列表中的配置使其生效，API Key 仅保存在设备安全存储。'
+                              '点选列表中的配置使其生效，API Key 仅保存在设备安全存储。'
                         : '配置一个或多个 OpenAI 兼容服务（如 DeepSeek、通义千问），'
-                            '供 AI 出题与讲解使用。点选列表中的配置使其生效；'
-                            '不发送任何个人信息，API Key 仅保存在设备安全存储。',
+                              '供 AI 出题与讲解使用。点选列表中的配置使其生效；'
+                              '不发送任何个人信息，API Key 仅保存在设备安全存储。',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -200,20 +196,14 @@ class _LlmProviderSettingsPageState
           ),
           const SizedBox(height: SpacingTokens.sm),
           if (providers.isEmpty)
-            ColoredCard(
-              color: theme.colorScheme.secondary,
-              width: double.infinity,
-              child: Text(
-                widget.imageGeneration
-                    ? '还没有生图配置。点击下方「新增配置」填写供应商信息，'
-                        '也可以保存多个厂商配置，在列表中点选切换生效。'
-                    : '还没有 LLM 配置。点击下方「新增配置」填写供应商信息，'
-                        '即可添加第一个配置；也可以保存多个厂商配置，在列表中'
-                        '点选切换生效。',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
+            AppEmptyState(
+              icon: widget.imageGeneration
+                  ? Icons.image_outlined
+                  : Icons.smart_toy_outlined,
+              title: widget.imageGeneration ? '还没有生图配置' : '还没有 LLM 配置',
+              description:
+                  '点击下方「新增配置」填写供应商信息。'
+                  '可保存多个厂商配置，在列表中点选切换生效。',
             )
           else
             ColoredCard(

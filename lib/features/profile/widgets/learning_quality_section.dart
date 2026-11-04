@@ -44,11 +44,13 @@ class _LearningQualitySectionState
               Text('学习质量', style: theme.textTheme.titleMedium),
               const SizedBox(height: SpacingTokens.sm),
               Text(
-                  '新学 ${report.newPoems} 首 · 练习 ${report.poemPracticeCount} 次 · 完成复习 ${report.completedReviews} 次',),
+                '新学 ${report.newPoems} 首 · 练习 ${report.poemPracticeCount} 次 · 完成复习 ${report.completedReviews} 次',
+              ),
               Text('新增掌握 ${report.newlyMasteredPoems} 首'),
               const SizedBox(height: SpacingTokens.xs),
               const Text(
-                  '新学按首次学习的诗词计数；练习含背诵、测试、默写及跟读，可与新学、复习重叠。复习仅计有记录的完成事件，旧历史未知。',),
+                '新学按首次学习的诗词计数；练习含背诵、测试、默写及跟读，可与新学、复习重叠。复习仅计有记录的完成事件，旧历史未知。',
+              ),
               if (report.poemHistoryUnknown) ...[
                 const SizedBox(height: SpacingTokens.xs),
                 const Text('部分诗词历史只有最后学习时间，无法还原每次练习。'),
@@ -65,14 +67,20 @@ class _LearningQualitySectionState
               const Text('测试按题、默写与跟读按句分别统计，不合并为诗词总正确率；背诵不同提示级别仅计完成次数。'),
               const SizedBox(height: SpacingTokens.sm),
               Text(
-                  '数学知识点已分类 ${report.classifiedMathTotal}/$total 题 · 历史或挑战未分类 ${report.unknownMathTotal} 题',),
+                '数学知识点已分类 ${report.classifiedMathTotal}/$total 题 · 历史或挑战未分类 ${report.unknownMathTotal} 题',
+              ),
               const SizedBox(height: SpacingTokens.xs),
               const Text('正确率来自逐题作答；不从错题数推算。变化对比前一个同长度周期。'),
             ],
           ),
         ),
         const SizedBox(height: SpacingTokens.sm),
-        if (report.skills.isEmpty) const Text('还没有可分类的知识点作答，完成练习后可查看。'),
+        if (report.skills.isEmpty)
+          const AppEmptyState(
+            icon: Icons.analytics_outlined,
+            title: '还没有可分类的知识点作答',
+            description: '完成练习后可查看。',
+          ),
         for (final quality in report.skills) ...[
           AppTile(
             icon: Icons.analytics_outlined,
@@ -151,7 +159,9 @@ class _LearningQualitySectionState
         skillId: quality.skill.id,
         random: Random(0),
       );
-      ref.read(nextMathPracticeRequestProvider.notifier).setNext(
+      ref
+          .read(nextMathPracticeRequestProvider.notifier)
+          .setNext(
             MathPracticeRequest(
               grade: quality.grade,
               semester: quality.semester!,
@@ -162,8 +172,12 @@ class _LearningQualitySectionState
           );
       await context.push<void>(AppRoutes.mathPractice);
     } on Object catch (error, stack) {
-      AppLogger.e('质量报告专项打开失败',
-          tag: 'LearningQuality', error: error, stackTrace: stack,);
+      AppLogger.e(
+        '质量报告专项打开失败',
+        tag: 'LearningQuality',
+        error: error,
+        stackTrace: stack,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('这一册或难度暂不支持该专项，请从练习页选择其他内容')),

@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -141,7 +142,9 @@ class _TextbookLessonContentPageState
       } else {
         await session?.cancel();
       }
-    } on Object {/* 导航退出仍完成，播放器 dispose 与会话身份负责兜底。 */}
+    } on Object {
+      /* 导航退出仍完成，播放器 dispose 与会话身份负责兜底。 */
+    }
   }
 
   void _start(List<TextbookCourseLesson> lessons) {
@@ -224,14 +227,16 @@ class _TextbookLessonContentPageState
         await Scrollable.ensureVisible(
           word,
           alignment: 0.25,
-          duration:
-              reduceMotion ? Duration.zero : const Duration(milliseconds: 200),
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 200),
         );
         return;
       }
       if (!_scroll.hasClients) return;
-      final target =
-          _lessons.indexWhere((lesson) => lesson.id == segment.lessonId);
+      final target = _lessons.indexWhere(
+        (lesson) => lesson.id == segment.lessonId,
+      );
       final mountedIndices = [
         for (final (index, lesson) in _lessons.indexed)
           if (_lessonKeys[lesson.id]?.currentContext != null) index,
@@ -251,8 +256,9 @@ class _TextbookLessonContentPageState
     TextbookCourseLesson lesson,
     TextbookRecitationRange range,
   ) {
-    final paragraph = lesson.paragraphs
-        .firstWhere((paragraph) => paragraph.id == range.paragraphId);
+    final paragraph = lesson.paragraphs.firstWhere(
+      (paragraph) => paragraph.id == range.paragraphId,
+    );
     return String.fromCharCodes(
       paragraph.text.runes.toList().sublist(range.start, range.end),
     );
@@ -314,64 +320,67 @@ class _TextbookLessonContentPageState
           Text(
             lesson.title,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: SpacingTokens.md),
         ],
         if (readingLoading)
           const Center(child: CircularProgressIndicator())
         else if (targets.isEmpty)
-          Text(
-            _emptyLabel(lesson, section),
-            style: theme.textTheme.titleSmall,
+          AppEmptyState(
+            icon: Icons.menu_book_outlined,
+            title: _emptyLabel(lesson, section),
           )
         else
           switch (section) {
             TextbookContentSection.reading => TextbookCourseParagraphsContent(
-                paragraphs: lesson.paragraphs,
-                showPinyin: _showPinyin,
-                preserveLineBreaks: lesson.kind == 'poetry',
-                readingLayouts: ref
-                        .watch(
-                          textbookReadingLayoutProvider(
-                            (bookId: bookId, lessonId: lesson.id),
-                          ),
-                        )
-                        .valueOrNull ??
-                    const {},
-                activeRanges: _segment?.lessonId == lesson.id
-                    ? _segment!.spans
-                    : const [],
-                activeStartKey:
-                    _segment?.lessonId == lesson.id ? _wordKey : null,
-              ),
+              paragraphs: lesson.paragraphs,
+              showPinyin: _showPinyin,
+              preserveLineBreaks: lesson.kind == 'poetry',
+              readingLayouts:
+                  ref
+                      .watch(
+                        textbookReadingLayoutProvider((
+                          bookId: bookId,
+                          lessonId: lesson.id,
+                        )),
+                      )
+                      .valueOrNull ??
+                  const {},
+              activeRanges: _segment?.lessonId == lesson.id
+                  ? _segment!.spans
+                  : const [],
+              activeStartKey: _segment?.lessonId == lesson.id ? _wordKey : null,
+            ),
             TextbookContentSection.recognition => TextbookRecognitionOverview(
-                bookId: bookId,
-                lesson: lesson,
-                routeObserver: widget.routeObserver,
-                onRecognize: (targetId) =>
-                    unawaited(_openRecognition(lesson.id, targetId)),
-              ),
+              bookId: bookId,
+              lesson: lesson,
+              routeObserver: widget.routeObserver,
+              onRecognize: (targetId) =>
+                  unawaited(_openRecognition(lesson.id, targetId)),
+            ),
             TextbookContentSection.recitation => _recitations(context, lesson),
             TextbookContentSection.writing => TextbookWritingOverview(
-                bookId: bookId,
-                lesson: lesson,
-                onPractice: (targetId) =>
-                    unawaited(_openWriting(lesson.id, targetId)),
-              ),
+              bookId: bookId,
+              lesson: lesson,
+              onPractice: (targetId) =>
+                  unawaited(_openWriting(lesson.id, targetId)),
+            ),
             TextbookContentSection.exercise => TextbookExerciseOverview(
-                bookId: bookId,
-                lesson: lesson,
-                exercises: targets.cast<TextbookCourseExercise>(),
-              ),
+              bookId: bookId,
+              lesson: lesson,
+              exercises: targets.cast<TextbookCourseExercise>(),
+            ),
           },
       ],
     );
     return KeyedSubtree(
       key: _lessonKeys.putIfAbsent(lesson.id, GlobalKey.new),
       // 字卡与练习题自带卡片，不再增加整课的背景和内边距。
-      child: section == TextbookContentSection.recognition ||
+      child:
+          section == TextbookContentSection.recognition ||
               section == TextbookContentSection.writing ||
               section == TextbookContentSection.exercise
           ? KeyedSubtree(
@@ -406,9 +415,8 @@ class _TextbookLessonContentPageState
         configured = settings.hasCredentials;
       } on Object {
         if (mounted && canNavigate()) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('无法读取语音识别配置，请重试')),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('无法读取语音识别配置，请重试')));
         }
         return;
       }
@@ -515,20 +523,22 @@ class _TextbookLessonContentPageState
         : textbookLessonsForPages(pack, pages);
     final readingLessons = selected == TextbookContentSection.reading
         ? matchingLessons
-            .where((lesson) => lesson.paragraphs.isNotEmpty)
-            .toList()
+              .where((lesson) => lesson.paragraphs.isNotEmpty)
+              .toList()
         : const <TextbookCourseLesson>[];
     // 有课文可读时聚焦正文；全部无正文时仍保留真实的未整理/无要求提示。
-    final selectedLessons =
-        readingLessons.isNotEmpty ? readingLessons : matchingLessons;
+    final selectedLessons = readingLessons.isNotEmpty
+        ? readingLessons
+        : matchingLessons;
     final reading = {
       if (selected == TextbookContentSection.reading)
         for (final lesson in selectedLessons)
           if (lesson.paragraphs.isNotEmpty)
             lesson.id: ref.watch(
-              textbookReadingContentProvider(
-                (bookId: bookId, lessonId: lesson.id),
-              ),
+              textbookReadingContentProvider((
+                bookId: bookId,
+                lessonId: lesson.id,
+              )),
             ),
     };
     final readingReady = reading.values.every((value) => !value.isLoading);
@@ -545,8 +555,8 @@ class _TextbookLessonContentPageState
     final title = selected == null
         ? '课文内容'
         : lessons.length == 1
-            ? '${selected.label}·${lessons.single.title}'
-            : selected.label;
+        ? '${selected.label}·${lessons.single.title}'
+        : selected.label;
     return Scaffold(
       bottomNavigationBar: _session == null
           ? null
@@ -565,17 +575,14 @@ class _TextbookLessonContentPageState
                       const SizedBox(width: SpacingTokens.sm),
                     ],
                     Expanded(
-                      child: Text(
-                        switch (_state?.status) {
-                          NarrationStatus.preparing => '正在准备朗读…',
-                          NarrationStatus.buffering => '正在准备下一段…',
-                          NarrationStatus.paused => '已暂停',
-                          NarrationStatus.failed =>
-                            _state?.message ?? '朗读遇到问题，请重试',
-                          _ => '正在朗读',
-                        },
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      child: Text(switch (_state?.status) {
+                        NarrationStatus.preparing => '正在准备朗读…',
+                        NarrationStatus.buffering => '正在准备下一段…',
+                        NarrationStatus.paused => '已暂停',
+                        NarrationStatus.failed =>
+                          _state?.message ?? '朗读遇到问题，请重试',
+                        _ => '正在朗读',
+                      }, style: Theme.of(context).textTheme.bodySmall),
                     ),
                   ],
                 ),
@@ -615,19 +622,19 @@ class _TextbookLessonContentPageState
               tooltip: _session == null
                   ? '朗读课文'
                   : _state?.status == NarrationStatus.paused
-                      ? '继续朗读'
-                      : _state?.status == NarrationStatus.failed
-                          ? '重试朗读'
-                          : '暂停朗读',
+                  ? '继续朗读'
+                  : _state?.status == NarrationStatus.failed
+                  ? '重试朗读'
+                  : '暂停朗读',
               onPressed: readingReady ? _control : null,
               icon: Icon(
                 _session == null
                     ? Icons.volume_up_outlined
                     : _state?.status == NarrationStatus.paused
-                        ? Icons.play_arrow_rounded
-                        : _state?.status == NarrationStatus.failed
-                            ? Icons.refresh_rounded
-                            : Icons.pause_rounded,
+                    ? Icons.play_arrow_rounded
+                    : _state?.status == NarrationStatus.failed
+                    ? Icons.refresh_rounded
+                    : Icons.pause_rounded,
               ),
             ),
           ],
@@ -635,7 +642,11 @@ class _TextbookLessonContentPageState
       ),
       body: SafeArea(
         child: selected == null
-            ? const Center(child: Text('找不到这类课文内容。'))
+            ? const AppEmptyState(
+                icon: Icons.menu_book_outlined,
+                title: '找不到这类课文内容。',
+                description: '请返回课本重新选择。',
+              )
             : course.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (_, __) => Center(
@@ -653,11 +664,10 @@ class _TextbookLessonContentPageState
                 ),
                 data: (pack) {
                   if (lessons.isEmpty) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(SpacingTokens.md),
-                        child: Text('当前页暂无对应课目，请翻到课文页后再查看。'),
-                      ),
+                    return const AppEmptyState(
+                      icon: Icons.menu_book_outlined,
+                      title: '当前页暂无对应课目',
+                      description: '请翻到课文页后再查看。',
                     );
                   }
                   return ListView.separated(

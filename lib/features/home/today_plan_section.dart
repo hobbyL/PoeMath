@@ -42,7 +42,9 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
       onPressed: _configuring ? null : _configure,
       child: const Text('调整计划'),
     );
-    return ref.watch(todayPlanProvider).when(
+    return ref
+        .watch(todayPlanProvider)
+        .when(
           loading: () => const Padding(
             padding: EdgeInsets.all(SpacingTokens.md),
             child: Text('正在准备今日任务…'),
@@ -72,9 +74,10 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
               ),
               const SizedBox(height: SpacingTokens.sm),
               if (plan.tasks.isEmpty)
-                ColoredCard(
-                  color: theme.colorScheme.primary,
-                  child: const Text('今天没有待安排的任务，可按自己的节奏学习。'),
+                const AppEmptyState(
+                  icon: Icons.event_note_outlined,
+                  title: '今天没有待安排的任务',
+                  description: '可按自己的节奏学习。',
                 ),
               for (final (index, task) in plan.tasks.indexed) ...[
                 AppTile(
@@ -89,20 +92,20 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                   subtitle: task.completed
                       ? '今日已完成'
                       : _available(task)
-                          ? '开始这一项'
-                          : '内容已移除，今天不补发',
+                      ? '开始这一项'
+                      : '内容已移除，今天不补发',
                   onTap: task.completed || _opening || !_available(task)
                       ? null
                       : () => _open(task),
                   trailing: task.completed || !_available(task)
                       ? index == 0
-                          ? adjustPlan
-                          : const SizedBox.shrink()
+                            ? adjustPlan
+                            : const SizedBox.shrink()
                       : null,
                   trailingAction:
                       index == 0 && !task.completed && _available(task)
-                          ? adjustPlan
-                          : null,
+                      ? adjustPlan
+                      : null,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
               ],
@@ -113,21 +116,20 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
   }
 
   IconData _icon(TodayTaskKind kind) => switch (kind) {
-        TodayTaskKind.review => Icons.history_edu,
-        TodayTaskKind.mistake => Icons.calculate_outlined,
-        TodayTaskKind.newPoem => Icons.menu_book_outlined,
-      };
+    TodayTaskKind.review => Icons.history_edu,
+    TodayTaskKind.mistake => Icons.calculate_outlined,
+    TodayTaskKind.newPoem => Icons.menu_book_outlined,
+  };
 
   bool _available(TodayPlanTask task) => switch (task.kind) {
-        TodayTaskKind.mistake =>
-          ref.read(mathMistakeRepositoryProvider).getById(task.targetId) !=
-              null,
-        TodayTaskKind.newPoem =>
-          ref.read(poemRepositoryProvider).getById(task.targetId) != null,
-        TodayTaskKind.review =>
-          ref.read(poemRepositoryProvider).getById(task.targetId) != null &&
-              ref.read(reviewRepositoryProvider).get(task.targetId) != null,
-      };
+    TodayTaskKind.mistake =>
+      ref.read(mathMistakeRepositoryProvider).getById(task.targetId) != null,
+    TodayTaskKind.newPoem =>
+      ref.read(poemRepositoryProvider).getById(task.targetId) != null,
+    TodayTaskKind.review =>
+      ref.read(poemRepositoryProvider).getById(task.targetId) != null &&
+          ref.read(reviewRepositoryProvider).get(task.targetId) != null,
+  };
 
   Future<void> _open(TodayPlanTask task) async {
     if (_opening) return;
@@ -137,15 +139,17 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
     try {
       switch (task.kind) {
         case TodayTaskKind.newPoem:
-          await context
-              .push<PoemPracticeResult>(AppRoutes.poemReciteOf(task.targetId));
+          await context.push<PoemPracticeResult>(
+            AppRoutes.poemReciteOf(task.targetId),
+          );
         case TodayTaskKind.review:
           final reviews = ref.read(reviewRepositoryProvider);
           final progress = ref.read(poemProgressRepositoryProvider);
           final stats = ref.read(userStatsRepositoryProvider);
           ref.read(lastPracticeScoreProvider.notifier).state = null;
-          final result = await context
-              .push<PoemPracticeResult>(AppRoutes.poemQuizOf(task.targetId));
+          final result = await context.push<PoemPracticeResult>(
+            AppRoutes.poemQuizOf(task.targetId),
+          );
           if (!mounted) return;
           final score = ref.read(lastPracticeScoreProvider);
           ref.read(lastPracticeScoreProvider.notifier).state = null;
@@ -162,8 +166,9 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
               final current = progress.get(task.targetId);
               if (current != null &&
                   current.status != LearningStatus.mastered) {
-                await progress
-                    .save(current.copyWith(status: LearningStatus.mastered));
+                await progress.save(
+                  current.copyWith(status: LearningStatus.mastered),
+                );
               }
               await stats.updatePoemStats(mastered: progress.masteredCount);
             }
@@ -178,8 +183,9 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
               showCelebration(
                 context,
                 type: CelebrationType.achievement,
-                subtitle:
-                    unlocked.map((achievement) => achievement.title).join('、'),
+                subtitle: unlocked
+                    .map((achievement) => achievement.title)
+                    .join('、'),
               );
             }
             if (score < 0.8) {
@@ -230,11 +236,11 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
 
       /// 组装当前 sheet 内状态为配置对象。
       TodayPlanConfig snapshot() => TodayPlanConfig(
-            reviewCount: counts[TodayTaskKind.review]!,
-            mistakeCount: counts[TodayTaskKind.mistake]!,
-            newPoemCount: counts[TodayTaskKind.newPoem]!,
-            order: List.of(order),
-          );
+        reviewCount: counts[TodayTaskKind.review]!,
+        mistakeCount: counts[TodayTaskKind.mistake]!,
+        newPoemCount: counts[TodayTaskKind.newPoem]!,
+        order: List.of(order),
+      );
 
       /// 落盘并提示。失败不回滚 UI —— 用户刚做的调整保留在 sheet 里，
       /// 只是明确告知没存上（原实现靠「保存计划」按钮，失败路径同一套）。
@@ -249,9 +255,8 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
             stackTrace: stack,
           );
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('计划保存失败，请重试')),
-            );
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('计划保存失败，请重试')));
           }
         }
       }
@@ -302,9 +307,9 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                                   tooltip: '减少${kind.label}',
                                   onPressed: counts[kind]! > 0
                                       ? () => setSheetState(
-                                            () => counts[kind] =
-                                                counts[kind]! - 1,
-                                          )
+                                          () =>
+                                              counts[kind] = counts[kind]! - 1,
+                                        )
                                       : null,
                                   icon: const Icon(Icons.remove),
                                 ),
@@ -313,9 +318,9 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                                   tooltip: '增加${kind.label}',
                                   onPressed: counts[kind]! < 5
                                       ? () => setSheetState(
-                                            () => counts[kind] =
-                                                counts[kind]! + 1,
-                                          )
+                                          () =>
+                                              counts[kind] = counts[kind]! + 1,
+                                        )
                                       : null,
                                   icon: const Icon(Icons.add),
                                 ),
@@ -328,18 +333,18 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                               TextButton(
                                 onPressed: index > 0
                                     ? () => setSheetState(() {
-                                          order[index] = order[index - 1];
-                                          order[index - 1] = kind;
-                                        })
+                                        order[index] = order[index - 1];
+                                        order[index - 1] = kind;
+                                      })
                                     : null,
                                 child: const Text('上移'),
                               ),
                               TextButton(
                                 onPressed: index < order.length - 1
                                     ? () => setSheetState(() {
-                                          order[index] = order[index + 1];
-                                          order[index + 1] = kind;
-                                        })
+                                        order[index] = order[index + 1];
+                                        order[index + 1] = kind;
+                                      })
                                     : null,
                                 child: const Text('下移'),
                               ),

@@ -115,13 +115,13 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     // 退出页面时停止朗读
     unawaited(
       _tts.stop().onError(
-            (error, stackTrace) => AppLogger.e(
-              '退出诗词详情页时停止朗读失败',
-              tag: 'PoemDetail',
-              error: error,
-              stackTrace: stackTrace,
-            ),
-          ),
+        (error, stackTrace) => AppLogger.e(
+          '退出诗词详情页时停止朗读失败',
+          tag: 'PoemDetail',
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      ),
     );
     super.dispose();
   }
@@ -214,9 +214,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('停止朗读失败，请稍后重试')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('停止朗读失败，请稍后重试')));
       }
       // 失败保留播放态：音频确实还在播，页面不得显示空闲（缺陷 1）。
       return false;
@@ -324,7 +322,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   }
 
   Future<void> _sharePoem(Poem poem) async {
-    final text = '《${poem.title}》\n'
+    final text =
+        '《${poem.title}》\n'
         '${poem.author}·${poem.dynasty}\n'
         '\n'
         '${poem.content}\n'
@@ -343,7 +342,11 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     if (poem == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('诗词详情')),
-        body: const Center(child: Text('诗词未找到')),
+        body: const AppEmptyState(
+          icon: Icons.menu_book_outlined,
+          title: '诗词未找到',
+          description: '请返回诗词列表重新选择。',
+        ),
       );
     }
 
@@ -351,8 +354,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     final authorBio = poemAuthorBios[poem.author];
 
     // 注释播放文本：按「词：释义」逐条拼接。
-    final annotationsText =
-        poem.annotations.map((ann) => '${ann.word}：${ann.meaning}').join('。');
+    final annotationsText = poem.annotations
+        .map((ann) => '${ann.word}：${ann.meaning}')
+        .join('。');
     // 名句播放文本：按行拼接。
     final famousLinesText = poem.famousLines.join('。');
 
@@ -383,12 +387,11 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                 // 正文（整块可点击朗读，逐行显示，朗读时当前行高亮）
                 _buildSection(
                   context,
-                  onTap: () => _onTapSection(
-                    (section: _sectionContent, playText: poem.content),
-                  ),
-                  child: Center(
-                    child: _buildContentLines(poem, theme),
-                  ),
+                  onTap: () => _onTapSection((
+                    section: _sectionContent,
+                    playText: poem.content,
+                  )),
+                  child: Center(child: _buildContentLines(poem, theme)),
                 ),
 
                 // 拼音：与其余折叠区同构（默认收起、点击展开、展开后可
@@ -532,8 +535,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                     if (schedule == null || !schedule.isCompleted) {
                       return const SizedBox.shrink();
                     }
-                    final history =
-                        PoemReviewHistory.decode(schedule.historyJson);
+                    final history = PoemReviewHistory.decode(
+                      schedule.historyJson,
+                    );
                     return AppTile(
                       icon: Icons.restart_alt,
                       iconColor: theme.colorScheme.tertiary,
@@ -559,9 +563,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                           );
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('开启失败，请重试；历史记录已保留'),
-                              ),
+                              const SnackBar(content: Text('开启失败，请重试；历史记录已保留')),
                             );
                           }
                         }
@@ -624,7 +626,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               // 按钮行单独在外，照常接收点击。
               child: IgnorePointer(
                 child: Container(
-                  height: MediaQuery.paddingOf(context).top +
+                  height:
+                      MediaQuery.paddingOf(context).top +
                       SpacingTokens.xl +
                       SpacingTokens.lg,
                   decoration: BoxDecoration(
@@ -729,9 +732,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () {
-                    context.push(
-                      AppRoutes.poemReciteModeOf(widget.poemId),
-                    );
+                    context.push(AppRoutes.poemReciteModeOf(widget.poemId));
                   },
                   icon: const Icon(Icons.school_outlined),
                   label: const Text('学习'),
@@ -741,9 +742,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    context.push(
-                      AppRoutes.poemReadAlongOf(widget.poemId),
-                    );
+                    context.push(AppRoutes.poemReadAlongOf(widget.poemId));
                   },
                   icon: const Icon(Icons.mic),
                   label: const Text('跟读'),
@@ -768,11 +767,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   Widget _buildContentLines(Poem poem, ThemeData theme) {
     final lines = _splitLines(poem.content);
     final poemExt = theme.extension<PoemThemeExt>();
-    final baseStyle = poemExt?.poemContent ??
-        theme.textTheme.bodyLarge?.copyWith(
-          height: 2,
-          letterSpacing: 1.5,
-        ) ??
+    final baseStyle =
+        poemExt?.poemContent ??
+        theme.textTheme.bodyLarge?.copyWith(height: 2, letterSpacing: 1.5) ??
         TypographyTokens.poemContentStyle();
 
     // 全诗统一字号：以最长行为基准缩放，各行字号一致。
@@ -835,7 +832,8 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     _PlayTarget? playTarget,
   }) {
     final theme = Theme.of(context);
-    final playing = playTarget != null &&
+    final playing =
+        playTarget != null &&
         _isSpeaking &&
         _activeSection == playTarget.section;
     return ColoredCard(
@@ -847,19 +845,13 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         // 去除 ExpansionTile 默认的分割线和边框
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(
-            horizontal: SpacingTokens.md,
-          ),
+          tilePadding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
           childrenPadding: const EdgeInsets.only(
             left: SpacingTokens.md,
             right: SpacingTokens.md,
             bottom: SpacingTokens.md,
           ),
-          leading: Icon(
-            icon,
-            size: 20,
-            color: theme.colorScheme.primary,
-          ),
+          leading: Icon(icon, size: 20, color: theme.colorScheme.primary),
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -901,10 +893,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
   Widget _buildPlayableChild(_PlayTarget target, Widget child) {
     return InkWell(
       onTap: () => _onTapSection(target),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: child,
-      ),
+      child: Align(alignment: Alignment.centerLeft, child: child),
     );
   }
 
@@ -926,10 +915,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                 ),
               ),
               Expanded(
-                child: Text(
-                  ann.meaning,
-                  style: theme.textTheme.bodyMedium,
-                ),
+                child: Text(ann.meaning, style: theme.textTheme.bodyMedium),
               ),
             ],
           ),
@@ -994,27 +980,23 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     // 标题右侧状态操作 tag：生成/重新生成/去设置均收敛到此，正文不再放按钮。
     final actionTag = switch (state.status) {
       PoemExplainStatus.idle => AiActionTag(
-          label: '生成讲解',
-          onTap: () => _explainNotifier.generate(poem),
-        ),
-      PoemExplainStatus.loading ||
-      PoemExplainStatus.streaming =>
-        const AiActionTag(
-          label: '生成中…',
-          busy: true,
-        ),
+        label: '生成讲解',
+        onTap: () => _explainNotifier.generate(poem),
+      ),
+      PoemExplainStatus.loading || PoemExplainStatus.streaming =>
+        const AiActionTag(label: '生成中…', busy: true),
       PoemExplainStatus.ready => AiActionTag(
-          label: '重新生成',
-          onTap: () => _explainNotifier.generate(poem),
-        ),
+        label: '重新生成',
+        onTap: () => _explainNotifier.generate(poem),
+      ),
       PoemExplainStatus.error => AiActionTag(
-          label: '重新生成',
-          onTap: () => _explainNotifier.generate(poem),
-        ),
+        label: '重新生成',
+        onTap: () => _explainNotifier.generate(poem),
+      ),
       PoemExplainStatus.unconfigured => AiActionTag(
-          label: '去设置',
-          onTap: () => context.push(AppRoutes.llmSettings),
-        ),
+        label: '去设置',
+        onTap: () => context.push(AppRoutes.llmSettings),
+      ),
     };
 
     return ColoredCard(
@@ -1057,25 +1039,15 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     );
   }
 
-  List<Widget> _buildAiExplainBody(
-    ThemeData theme,
-    PoemExplainState state,
-  ) {
+  List<Widget> _buildAiExplainBody(ThemeData theme, PoemExplainState state) {
     final hintStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
     switch (state.status) {
       case PoemExplainStatus.idle:
-        return [
-          Text(
-            '点右上角「生成讲解」，让 AI 用小朋友能听懂的话讲讲这首诗。',
-            style: hintStyle,
-          ),
-        ];
+        return [Text('点右上角「生成讲解」，让 AI 用小朋友能听懂的话讲讲这首诗。', style: hintStyle)];
       case PoemExplainStatus.loading:
-        return [
-          Text('AI 正在准备讲解，请稍候…', style: hintStyle),
-        ];
+        return [Text('AI 正在准备讲解，请稍候…', style: hintStyle)];
       case PoemExplainStatus.streaming:
         // 流式接收中：实时渲染已到达段落，不含朗读入口（半截文本不朗读）。
         return [
@@ -1092,9 +1064,10 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         return [
           // 内容区可点击播放：复用折叠区的 _onTapSection 竞态/会话逻辑。
           InkWell(
-            onTap: () => _onTapSection(
-              (section: _sectionAiExplain, playText: state.fullText),
-            ),
+            onTap: () => _onTapSection((
+              section: _sectionAiExplain,
+              playText: state.fullText,
+            )),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1128,10 +1101,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         ];
       case PoemExplainStatus.unconfigured:
         return [
-          Text(
-            state.message ?? '还没有配置 AI 服务，配置后即可使用 AI 讲解。',
-            style: hintStyle,
-          ),
+          Text(state.message ?? '还没有配置 AI 服务，配置后即可使用 AI 讲解。', style: hintStyle),
         ];
     }
   }
@@ -1142,16 +1112,9 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
       context,
       child: Row(
         children: [
-          Icon(
-            Icons.history,
-            size: 18,
-            color: theme.colorScheme.primary,
-          ),
+          Icon(Icons.history, size: 18, color: theme.colorScheme.primary),
           const SizedBox(width: SpacingTokens.sm),
-          Text(
-            '已学习 $studyCount 次',
-            style: theme.textTheme.bodyMedium,
-          ),
+          Text('已学习 $studyCount 次', style: theme.textTheme.bodyMedium),
         ],
       ),
     );

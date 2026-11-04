@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
@@ -55,8 +57,8 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
       _page = widget.firstPage
           ? 1
           : (widget.initialPage ??
-                  _repo.reading(_profileId, widget.bookId).page)
-              .clamp(1, _book!.pageCount);
+                    _repo.reading(_profileId, widget.bookId).page)
+                .clamp(1, _book!.pageCount);
     }
     _initialPage = _page;
     WidgetsBinding.instance.addObserver(this);
@@ -95,8 +97,10 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
     setState(() => _page = page.clamp(1, _book!.pageCount));
     _dirty = true;
     _saveTimer?.cancel();
-    _saveTimer =
-        Timer(const Duration(milliseconds: 350), () => unawaited(_save()));
+    _saveTimer = Timer(
+      const Duration(milliseconds: 350),
+      () => unawaited(_save()),
+    );
   }
 
   Future<void> _jump() async {
@@ -132,11 +136,11 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
   }
 
   void _retry() => setState(() {
-        _initialPage = _page;
-        _viewerRevision++;
-        _goToPage = null;
-        _toc = null;
-      });
+    _initialPage = _page;
+    _viewerRevision++;
+    _goToPage = null;
+    _toc = null;
+  });
 
   @override
   void dispose() {
@@ -152,15 +156,22 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
     if (book == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('原书阅读')),
-        body: const Center(child: Text('找不到这本教材，请回书架重新选择。')),
+        body: const AppEmptyState(
+          icon: Icons.menu_book_outlined,
+          title: '找不到这本教材',
+          description: '请回书架重新选择。',
+        ),
       );
     }
-    final layout =
-        TextbookPageLayout.forWidth(MediaQuery.sizeOf(context).width);
+    final layout = TextbookPageLayout.forWidth(
+      MediaQuery.sizeOf(context).width,
+    );
     final previous = layout.previous(_page, book.pageCount);
     final next = layout.next(_page, book.pageCount);
-    final visiblePages =
-        layout.pages(layout.spreadIndex(_page), book.pageCount);
+    final visiblePages = layout.pages(
+      layout.spreadIndex(_page),
+      book.pageCount,
+    );
     final pageLabel = visiblePages.length == 2
         ? 'PDF 第 ${visiblePages.first}–${visiblePages.last} / ${book.pageCount} 页'
         : 'PDF 第 $_page / ${book.pageCount} 页';
@@ -181,7 +192,8 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
               child: Center(
                 child: IconButton(
                   tooltip: '目录',
-                  onPressed: pathState.valueOrNull != null &&
+                  onPressed:
+                      pathState.valueOrNull != null &&
                           _goToPage != null &&
                           _toc != null
                       ? _showToc
@@ -204,31 +216,24 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
         ),
         data: (path) {
           if (path == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(SpacingTokens.lg),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      '本地 PDF 已移除或丢失，请重新下载或导入。',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: SpacingTokens.sm),
-                    TextButton(
-                      onPressed: () => context
-                          .push(AppRoutes.textbookDetailOf(book.pdfSha256)),
-                      child: const Text('查看教材详情'),
-                    ),
-                  ],
+            return AppEmptyState(
+              icon: Icons.menu_book_outlined,
+              title: '本地 PDF 已移除或丢失',
+              description: '请重新下载或导入。',
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      context.push(AppRoutes.textbookDetailOf(book.pdfSha256)),
+                  child: const Text('查看教材详情'),
                 ),
-              ),
+              ],
             );
           }
           final options = TextbookViewerOptions(
             path: path,
-            contentCache:
-                ref.read(textbookFileServiceProvider).contentCache(book),
+            contentCache: ref
+                .read(textbookFileServiceProvider)
+                .contentCache(book),
             initialPage: _initialPage,
             onPageChanged: _pageChanged,
             onReady: (goTo) {
@@ -252,7 +257,8 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
           );
           return KeyedSubtree(
             key: ValueKey(_viewerRevision),
-            child: widget.viewerBuilder?.call(context, options) ??
+            child:
+                widget.viewerBuilder?.call(context, options) ??
                 TextbookPdfView(options: options),
           );
         },

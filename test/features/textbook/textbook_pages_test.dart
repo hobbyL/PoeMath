@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui' as ui;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +28,7 @@ import 'package:poemath/features/textbook/widgets/textbook_pdf_preview.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_cover.dart';
 import 'package:poemath/features/textbook/widgets/textbook_search_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
+
 import '../../helpers/textbook_fixture.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
@@ -67,8 +69,10 @@ class _MemoryRepository implements TextbookRepository {
     TextbookMatch match,
   ) async {
     if (failMatch) throw StateError('storage unavailable');
-    readings['$profileId:$id'] =
-        TextbookReading(page: reading(profileId, id).page, match: match);
+    readings['$profileId:$id'] = TextbookReading(
+      page: reading(profileId, id).page,
+      match: match,
+    );
   }
 
   @override
@@ -146,8 +150,9 @@ class _ViewerState extends State<_Viewer> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => widget.options
-          .onReady((page) async => widget.options.onPageChanged(page)),
+      (_) => widget.options.onReady(
+        (page) async => widget.options.onPageChanged(page),
+      ),
     );
   }
 
@@ -176,8 +181,9 @@ class _LifecycleViewerState extends State<_LifecycleViewer> {
     super.initState();
     widget.onCreate();
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => widget.options
-          .onReady((page) async => widget.options.onPageChanged(page)),
+      (_) => widget.options.onReady(
+        (page) async => widget.options.onPageChanged(page),
+      ),
     );
   }
 
@@ -235,10 +241,10 @@ void main() {
         child: MaterialApp(
           builder: large
               ? (context, child) => MediaQuery(
-                    data: MediaQuery.of(context)
-                        .copyWith(textScaler: const TextScaler.linear(2)),
-                    child: child!,
-                  )
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: const TextScaler.linear(2)),
+                  child: child!,
+                )
               : null,
           home: page,
         ),
@@ -249,8 +255,9 @@ void main() {
 
   final catalogEntry = TextbookCatalogEntry(
     book: book,
-    downloadUrl:
-        Uri.parse('https://raw.githubusercontent.com/test/books/sample.pdf'),
+    downloadUrl: Uri.parse(
+      'https://raw.githubusercontent.com/test/books/sample.pdf',
+    ),
     sourceRepository: 'test/books',
     sourceCommit: List.filled(40, 'a').join(),
     sourcePath: 'sample.pdf',
@@ -299,9 +306,7 @@ void main() {
     expect(action.size, const Size.square(44));
     expect(actionIcon.top, greaterThanOrEqualTo(edition.bottom + 4));
     final card = tester.getRect(
-      find.byKey(
-        ValueKey('textbook-download-card-${book.pdfSha256}'),
-      ),
+      find.byKey(ValueKey('textbook-download-card-${book.pdfSha256}')),
     );
     expect(card.bottom - action.bottom, closeTo(8, 0.01));
     expect(card.bottom - actionIcon.bottom, closeTo(8, 0.01));
@@ -321,8 +326,8 @@ void main() {
       catalog: entries,
     );
     Finder card(int index) => find.byKey(
-          ValueKey('textbook-download-card-${entries[index].book.pdfSha256}'),
-        );
+      ValueKey('textbook-download-card-${entries[index].book.pdfSha256}'),
+    );
     final first = tester.getRect(card(0));
     final second = tester.getRect(card(1));
     final third = tester.getRect(card(2));
@@ -335,16 +340,10 @@ void main() {
     );
     expect((cover.image as AssetImage).assetName, entries.first.coverAsset);
     final edition = tester.getRect(
-      find.descendant(
-        of: card(0),
-        matching: find.text('2022课标修订'),
-      ),
+      find.descendant(of: card(0), matching: find.text('2022课标修订')),
     );
     final status = tester.getRect(
-      find.descendant(
-        of: card(0),
-        matching: find.textContaining('未下载 ·'),
-      ),
+      find.descendant(of: card(0), matching: find.textContaining('未下载 ·')),
     );
     final download = tester.getRect(find.byTooltip('下载一年级上册'));
     expect(first.bottom - download.bottom, closeTo(8, 0.01));
@@ -379,9 +378,7 @@ void main() {
       size: const Size(720, 800),
     );
     final card = tester.getRect(
-      find.byKey(
-        ValueKey('textbook-download-card-${book.pdfSha256}'),
-      ),
+      find.byKey(ValueKey('textbook-download-card-${book.pdfSha256}')),
     );
     final button = tester.getRect(find.byTooltip('下载${book.volumeLabel}'));
     final cover = tester.getRect(find.byType(AspectRatio));
@@ -403,8 +400,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('已取消下载'), findsOneWidget);
     expect(repo.list(), isEmpty);
-    files.downloadAction =
-        (_) async => throw const TextbookFileException('网络中断');
+    files.downloadAction = (_) async =>
+        throw const TextbookFileException('网络中断');
     await tester.tap(find.byTooltip('下载${book.volumeLabel}'));
     await tester.pumpAndSettle();
     expect(find.text('网络中断'), findsOneWidget);
@@ -444,8 +441,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('已取消下载'), findsOneWidget);
     expect(repo.list(), isEmpty);
-    files.downloadAction =
-        (_) async => throw const TextbookFileException('网络中断');
+    files.downloadAction = (_) async =>
+        throw const TextbookFileException('网络中断');
     await tester.tap(find.text('重新下载教材'));
     await tester.pumpAndSettle();
     expect(find.text('网络中断'), findsOneWidget);
@@ -489,11 +486,8 @@ void main() {
     await pump(
       tester,
       TextbookManagementPage(
-        pickPdf: () async => PlatformFile(
-          name: 'sample.pdf',
-          size: 25,
-          path: '/sample.pdf',
-        ),
+        pickPdf: () async =>
+            PlatformFile(name: 'sample.pdf', size: 25, path: '/sample.pdf'),
       ),
     );
     await tester.tap(find.byTooltip('导入'));
@@ -578,8 +572,9 @@ void main() {
         picture.dispose();
       }
     });
-    final router =
-        createAppRouter(initialLocation: AppRoutes.textbookManagement);
+    final router = createAppRouter(
+      initialLocation: AppRoutes.textbookManagement,
+    );
     addTearDown(router.dispose);
     await tester.pumpWidget(
       ProviderScope(
@@ -610,10 +605,7 @@ void main() {
     expect(third.width, first.width);
     for (final item in books) {
       final image = tester.widget<RawImage>(
-        find.descendant(
-          of: card(item),
-          matching: find.byType(RawImage),
-        ),
+        find.descendant(of: card(item), matching: find.byType(RawImage)),
       );
       expect(image.image, same(covers[files.paths[item.pdfSha256]]));
       expect(image.fit, BoxFit.contain);
@@ -649,8 +641,10 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final local =
-        textbookFixture(id: List.filled(64, 'b').join(), title: '自有PDF');
+    final local = textbookFixture(
+      id: List.filled(64, 'b').join(),
+      title: '自有PDF',
+    );
     repo.books.addAll({book.pdfSha256: book, local.pdfSha256: local});
     files.installed = false;
     await pump(
@@ -692,10 +686,10 @@ void main() {
     expect(files.removes, 0);
     // 书目、核对状态与阅读位置不受影响。
     expect(repo.find(book.pdfSha256), book);
-    expect(
-      repo.reading('default', book.pdfSha256).toJson(),
-      {'page': 2, 'match': 'matches'},
-    );
+    expect(repo.reading('default', book.pdfSha256).toJson(), {
+      'page': 2,
+      'match': 'matches',
+    });
   });
 
   testWidgets('详情卡片纵向居中，底部固定带箭头按钮；翻页保存续读位置', (tester) async {
@@ -756,9 +750,7 @@ void main() {
     final reviewRect = tester.getRect(find.byType(BackButton));
     expect(reviewRect.right, lessThan(360));
     expect(reviewRect.center.dy, kToolbarHeight / 2);
-    for (final buttonRect in [
-      reviewRect,
-    ]) {
+    for (final buttonRect in [reviewRect]) {
       expect(buttonRect.overlaps(cardRect), isFalse);
       expect(
         cardRect.top - buttonRect.bottom,
@@ -771,8 +763,9 @@ void main() {
     expect(controlsRect.top, greaterThanOrEqualTo(cardRect.bottom));
     expect(controlsRect.bottom, 800 - 24);
     expect(controlsRect.center.dx, cardRect.center.dx);
-    final footer =
-        tester.widget<Scaffold>(find.byType(Scaffold)).bottomNavigationBar!;
+    final footer = tester
+        .widget<Scaffold>(find.byType(Scaffold))
+        .bottomNavigationBar!;
     const footerLabels = ['上一页', '1 / 3', '下一页'];
     for (final label in footerLabels) {
       expect(
@@ -803,8 +796,9 @@ void main() {
     expect(readRect.height, greaterThanOrEqualTo(SpacingTokens.minTapTarget));
     expect(readRect.center.dy, tester.getCenter(find.text('下一页')).dy);
     expect(readRect.left, greaterThan(tester.getRect(find.text('下一页')).right));
-    final pageNumber =
-        find.byKey(const ValueKey('textbook-detail-page-number'));
+    final pageNumber = find.byKey(
+      const ValueKey('textbook-detail-page-number'),
+    );
     expect(tester.widget<TextButton>(pageNumber).onPressed, isNull);
     expect(
       tester.getRect(find.byIcon(Icons.chevron_left)).right,
@@ -824,9 +818,7 @@ void main() {
     expect(options!.initialPage, 1);
     expect(
       tester
-          .widget<TextButton>(
-            find.widgetWithText(TextButton, '上一页'),
-          )
+          .widget<TextButton>(find.widgetWithText(TextButton, '上一页'))
           .onPressed,
       isNull,
     );
@@ -845,9 +837,7 @@ void main() {
     expect(find.text('3 / 3'), findsOneWidget);
     expect(
       tester
-          .widget<TextButton>(
-            find.widgetWithText(TextButton, '下一页'),
-          )
+          .widget<TextButton>(find.widgetWithText(TextButton, '下一页'))
           .onPressed,
       isNull,
     );
@@ -972,20 +962,20 @@ void main() {
     await repo.setMatch('default', bookA.pdfSha256, TextbookMatch.matches);
     TextbookViewerOptions? options;
     TextbookDetailPage detail(Textbook selected) => TextbookDetailPage(
-          bookId: selected.pdfSha256,
-          previewBuilder: (_, value) {
-            options = value;
-            return const SizedBox.expand();
-          },
-        );
+      bookId: selected.pdfSha256,
+      previewBuilder: (_, value) {
+        options = value;
+        return const SizedBox.expand();
+      },
+    );
     await pump(tester, detail(bookA));
     expect(options!.initialPage, 1);
     options!.onPageChanged(10);
     await tester.pumpAndSettle();
-    expect(
-      repo.reading('default', bookA.pdfSha256).toJson(),
-      {'page': 10, 'match': 'matches'},
-    );
+    expect(repo.reading('default', bookA.pdfSha256).toJson(), {
+      'page': 10,
+      'match': 'matches',
+    });
     final oldA = options!;
     await pump(tester, detail(bookB));
     expect(options!.initialPage, 1);
@@ -1097,9 +1087,8 @@ void main() {
         ),
         GoRoute(
           path: AppRoutes.textbookReview,
-          builder: (_, __) => Scaffold(
-            appBar: AppBar(title: const Text('合成内容审核')),
-          ),
+          builder: (_, __) =>
+              Scaffold(appBar: AppBar(title: const Text('合成内容审核'))),
         ),
       ],
     );
@@ -1141,8 +1130,12 @@ void main() {
       large: true,
     );
     tester.view.physicalSize = const Size(800, 280);
-    tester.view.padding =
-        const FakeViewPadding(top: 24, bottom: 20, left: 24, right: 36);
+    tester.view.padding = const FakeViewPadding(
+      top: 24,
+      bottom: 20,
+      left: 24,
+      right: 36,
+    );
     addTearDown(tester.view.resetPadding);
     await tester.pumpAndSettle();
     final back = find.byType(BackButton);
@@ -1185,8 +1178,9 @@ void main() {
     for (final label in ['上一页', '1 / 3', '下一页', '原书阅读']) {
       final button = find.ancestor(
         of: find.text(label),
-        matching:
-            find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is ButtonStyleButton,
+        ),
       );
       final buttonRect = tester.getRect(button);
       final labelRect = tester.getRect(find.text(label));
@@ -1284,9 +1278,7 @@ void main() {
     expect(find.byType(AppBar), findsOneWidget);
     expect(
       tester
-          .getCenter(
-            find.byKey(const ValueKey('textbook-detail-preview-card')),
-          )
+          .getCenter(find.byKey(const ValueKey('textbook-detail-preview-card')))
           .dy,
       closeTo(
         tester
@@ -1329,14 +1321,16 @@ void main() {
       options!.onPageChanged(page);
     });
     await tester.pumpAndSettle();
-    final pageNumber =
-        find.byKey(const ValueKey('textbook-detail-page-number'));
+    final pageNumber = find.byKey(
+      const ValueKey('textbook-detail-page-number'),
+    );
     expect(find.text('2 / 127'), findsOneWidget);
     for (final label in ['上一页', '2 / 127', '下一页']) {
       final button = find.ancestor(
         of: find.text(label),
-        matching:
-            find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is ButtonStyleButton,
+        ),
       );
       final buttonRect = tester.getRect(button);
       final textRect = tester.getRect(find.text(label));
@@ -1411,8 +1405,9 @@ void main() {
       ),
       size: const Size(1000, 700),
     );
-    final pageNumber =
-        find.byKey(const ValueKey('textbook-detail-page-number'));
+    final pageNumber = find.byKey(
+      const ValueKey('textbook-detail-page-number'),
+    );
     await tester.tap(pageNumber);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), '3');
@@ -1485,8 +1480,9 @@ void main() {
       );
     });
     await tester.pumpAndSettle();
-    final pageNumber =
-        find.byKey(const ValueKey('textbook-detail-page-number'));
+    final pageNumber = find.byKey(
+      const ValueKey('textbook-detail-page-number'),
+    );
     final searchRect = tester.getRect(searchButton);
     expect(searchRect.left, greaterThan(tester.getRect(pageNumber).right));
     expect(searchRect.right, lessThan(tester.getRect(find.text('下一页')).left));
@@ -1563,19 +1559,19 @@ void main() {
     );
     expect(tester.widget<IconButton>(toc).onPressed, isNull);
     Stream<TextbookTocProgress> load(bool refresh) => Stream.value(
-          const TextbookTocProgress(
-            phase: TextbookTocPhase.ready,
-            scanned: 3,
-            total: 3,
-            result: TextbookTocResult(
-              source: TextbookTocSource.bookmarks,
-              entries: [
-                TextbookTocEntry(title: '第二页章节', page: 2),
-                TextbookTocEntry(title: '第三页章节', page: 3),
-              ],
-            ),
-          ),
-        );
+      const TextbookTocProgress(
+        phase: TextbookTocPhase.ready,
+        scanned: 3,
+        total: 3,
+        result: TextbookTocResult(
+          source: TextbookTocSource.bookmarks,
+          entries: [
+            TextbookTocEntry(title: '第二页章节', page: 2),
+            TextbookTocEntry(title: '第三页章节', page: 3),
+          ],
+        ),
+      ),
+    );
     options!.onReady((page) async {
       jumps.add(page);
       options!.onPageChanged(page);
@@ -1658,19 +1654,19 @@ void main() {
     );
     options!.onReady((page) async => options!.onPageChanged(page));
     Stream<TextbookTocProgress> load(bool refresh) => Stream.value(
-          const TextbookTocProgress(
-            phase: TextbookTocPhase.ready,
-            scanned: 3,
-            total: 3,
-            result: TextbookTocResult(
-              source: TextbookTocSource.bookmarks,
-              entries: [
-                TextbookTocEntry(title: '第二页章节', page: 2),
-                TextbookTocEntry(title: '第三页章节', page: 3),
-              ],
-            ),
-          ),
-        );
+      const TextbookTocProgress(
+        phase: TextbookTocPhase.ready,
+        scanned: 3,
+        total: 3,
+        result: TextbookTocResult(
+          source: TextbookTocSource.bookmarks,
+          entries: [
+            TextbookTocEntry(title: '第二页章节', page: 2),
+            TextbookTocEntry(title: '第三页章节', page: 3),
+          ],
+        ),
+      ),
+    );
     options!.onTocReady!(load);
     await tester.pumpAndSettle();
     final toc = find.byWidgetPredicate(
@@ -1835,13 +1831,15 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     files.installed = false;
     await pump(tester, TextbookReaderPage(bookId: book.pdfSha256));
-    expect(find.text('本地 PDF 已移除或丢失，请重新下载或导入。'), findsOneWidget);
+    expect(find.text('本地 PDF 已移除或丢失'), findsOneWidget);
+    expect(find.text('请重新下载或导入。'), findsOneWidget);
     expect(find.byType(_Viewer), findsNothing);
   });
 
   testWidgets('教材路由可直接打开，无效深链不崩溃', (tester) async {
-    final router =
-        createAppRouter(initialLocation: AppRoutes.textbookDetailOf('missing'));
+    final router = createAppRouter(
+      initialLocation: AppRoutes.textbookDetailOf('missing'),
+    );
     addTearDown(router.dispose);
     await tester.pumpWidget(
       ProviderScope(
@@ -1853,10 +1851,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('找不到这本教材，请返回书架重新选择。'), findsOneWidget);
+    expect(find.text('找不到这本教材'), findsOneWidget);
+    expect(find.text('请返回书架重新选择。'), findsOneWidget);
     router.go(AppRoutes.textbookReadOf('missing'));
     await tester.pumpAndSettle();
-    expect(find.text('找不到这本教材，请回书架重新选择。'), findsOneWidget);
+    expect(find.text('找不到这本教材'), findsOneWidget);
+    expect(find.text('请回书架重新选择。'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

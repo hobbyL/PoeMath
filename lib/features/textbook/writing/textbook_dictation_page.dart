@@ -30,9 +30,8 @@ class _DictationAnswer {
   bool? correct;
 
   List<List<Offset>> strokesAt(double side) => [
-        for (final stroke in strokes)
-          [for (final point in stroke) point * side],
-      ];
+    for (final stroke in strokes) [for (final point in stroke) point * side],
+  ];
 }
 
 /// 本课随机听写：纸笔/屏幕共用题序与音频，完成整轮才展示答案。
@@ -381,7 +380,8 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
       );
     }
     return PopScope<void>(
-      canPop: _allowPop ||
+      canPop:
+          _allowPop ||
           _stage == _DictationStage.setup ||
           _invalidMessage != null,
       onPopInvokedWithResult: (didPop, _) {
@@ -397,20 +397,20 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
   }
 
   Widget _notice(String text, {VoidCallback? retry}) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(SpacingTokens.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(text, textAlign: TextAlign.center),
-              if (retry != null) ...[
-                const SizedBox(height: SpacingTokens.md),
-                FilledButton(onPressed: retry, child: const Text('重试')),
-              ],
-            ],
-          ),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(SpacingTokens.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(text, textAlign: TextAlign.center),
+          if (retry != null) ...[
+            const SizedBox(height: SpacingTokens.md),
+            FilledButton(onPressed: retry, child: const Text('重试')),
+          ],
+        ],
+      ),
+    ),
+  );
 
   List<Widget> _setup(TextbookCourseLesson lesson, double width) {
     final theme = Theme.of(context);
@@ -467,8 +467,9 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
             for (final interval in [0, 10, 15, 20, 30])
               ChoiceChip(
                 label: Text(interval == 0 ? '手动下一题' : '间隔 $interval 秒'),
-                labelStyle: theme.textTheme.labelLarge
-                    ?.copyWith(color: theme.colorScheme.onSurface),
+                labelStyle: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
                 checkmarkColor: _accent,
                 selected: _interval == interval,
                 onSelected: (_) => setState(() => _interval = interval),
@@ -489,7 +490,12 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
         icon: const Icon(Icons.hearing_outlined),
         label: const Text('开始听写'),
       ),
-      if (targets.isEmpty) const Text('本课暂无会写字。'),
+      if (targets.isEmpty)
+        const AppEmptyState(
+          icon: Icons.hearing_outlined,
+          title: '本课暂无会写字。',
+          description: '请家长核对本课的书写内容。',
+        ),
     ];
   }
 
@@ -577,9 +583,11 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
               onPressed: _paused || _answer.strokes.isEmpty
                   ? null
                   : () => setState(() {
-                        _answer.strokes = _answer.strokes
-                            .sublist(0, _answer.strokes.length - 1);
-                      }),
+                      _answer.strokes = _answer.strokes.sublist(
+                        0,
+                        _answer.strokes.length - 1,
+                      );
+                    }),
               child: const Text('撤销一笔'),
             ),
             TextButton(
@@ -612,8 +620,8 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
           _index + 1 == _answers.length
               ? '完成听写，统一核对'
               : handwriting
-                  ? '写好了，下一题'
-                  : '下一题',
+              ? '写好了，下一题'
+              : '下一题',
         ),
       ),
       if (handwriting)
@@ -740,8 +748,9 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
               ChoiceChip(
                 key: ValueKey('dictation-correct-$index'),
                 label: const Text('写对了'),
-                labelStyle: theme.textTheme.labelLarge
-                    ?.copyWith(color: theme.colorScheme.onSurface),
+                labelStyle: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
                 checkmarkColor: _accent,
                 selected: answer.correct == true,
                 onSelected: (_) => setState(() => answer.correct = true),
@@ -749,8 +758,9 @@ class _TextbookDictationPageState extends ConsumerState<TextbookDictationPage>
               ChoiceChip(
                 key: ValueKey('dictation-wrong-$index'),
                 label: const Text('还要练'),
-                labelStyle: theme.textTheme.labelLarge
-                    ?.copyWith(color: theme.colorScheme.onSurface),
+                labelStyle: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
                 checkmarkColor: _accent,
                 selected: answer.correct == false,
                 onSelected: (_) => setState(() => answer.correct = false),

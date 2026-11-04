@@ -40,8 +40,8 @@ class _WordProblemGeneratePageState
   String? _errorMessage;
 
   DifficultyLevel get _difficulty => DifficultyLevel.values.byName(
-        ref.read(settingsRepositoryProvider).mathDifficulty,
-      );
+    ref.read(settingsRepositoryProvider).mathDifficulty,
+  );
 
   /// 保留新学期仍教授的已选知识点；全部不可用时回退到首个可用项。
   /// 加法/减法在全部预设中恒存在，可用列表不会为空。
@@ -148,106 +148,79 @@ class _WordProblemGeneratePageState
       body: configAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(child: Text('配置读取失败')),
-        data: (config) => ListView(
-          padding: const EdgeInsets.all(SpacingTokens.md),
-          children: [
-            if (config == null) ...[
-              // 未配置引导态
-              ColoredCard(
-                color: theme.colorScheme.tertiary,
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.smart_toy_outlined,
-                          color: theme.colorScheme.tertiary,
-                        ),
-                        const SizedBox(width: SpacingTokens.sm),
-                        Text(
-                          '尚未配置 AI 出题服务',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+        data: (config) => config == null
+            ? AppEmptyState(
+                icon: Icons.smart_toy_outlined,
+                title: '尚未配置 AI 出题服务',
+                description:
+                    'AI 为应用题选择生活情境，题目与讲解在本地生成。需家长先配置一个 '
+                    'OpenAI 兼容的大模型服务（地址、模型与 API Key），'
+                    '生成后请核对题意、算式和讲解，再确认入库。',
+                actions: [
+                  FilledButton.icon(
+                    onPressed: () => context.push(AppRoutes.llmSettings),
+                    icon: const Icon(Icons.settings_outlined),
+                    label: const Text('去配置'),
+                  ),
+                ],
+              )
+            : ListView(
+                padding: const EdgeInsets.all(SpacingTokens.md),
+                children: [
+                  // 生成表单
+                  _buildGradeSelector(theme),
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildSemesterSelector(theme),
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildTopicSelector(theme),
+                  const SizedBox(height: SpacingTokens.md),
+                  _buildCountSelector(theme),
+                  const SizedBox(height: SpacingTokens.lg),
+
+                  if (_errorMessage != null) ...[
+                    ColoredCard(
+                      color: theme.colorScheme.error,
+                      width: double.infinity,
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline_rounded,
+                            color: theme.colorScheme.error,
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: SpacingTokens.sm),
-                    Text(
-                      'AI 为应用题选择生活情境，题目与讲解在本地生成。需家长先配置一个 '
-                      'OpenAI 兼容的大模型服务（地址、模型与 API Key），'
-                      '生成后请核对题意、算式和讲解，再确认入库。',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                          const SizedBox(width: SpacingTokens.sm),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: SpacingTokens.md),
-                    FilledButton.tonalIcon(
-                      onPressed: () => context.push(AppRoutes.llmSettings),
-                      icon: const Icon(Icons.settings_outlined),
-                      label: const Text('去配置'),
-                    ),
                   ],
-                ),
-              ),
-            ] else ...[
-              // 生成表单
-              _buildGradeSelector(theme),
-              const SizedBox(height: SpacingTokens.md),
-              _buildSemesterSelector(theme),
-              const SizedBox(height: SpacingTokens.md),
-              _buildTopicSelector(theme),
-              const SizedBox(height: SpacingTokens.md),
-              _buildCountSelector(theme),
-              const SizedBox(height: SpacingTokens.lg),
 
-              if (_errorMessage != null) ...[
-                ColoredCard(
-                  color: theme.colorScheme.error,
-                  width: double.infinity,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.error_outline_rounded,
-                        color: theme.colorScheme.error,
-                      ),
-                      const SizedBox(width: SpacingTokens.sm),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ),
-                    ],
+                  FilledButton.icon(
+                    onPressed: _generating ? null : _generate,
+                    icon: _generating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.auto_awesome_outlined),
+                    label: Text(_generating ? '生成中…' : '生成 $_count 题'),
                   ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
-
-              FilledButton.icon(
-                onPressed: _generating ? null : _generate,
-                icon: _generating
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.auto_awesome_outlined),
-                label: Text(_generating ? '生成中…' : '生成 $_count 题'),
+                  const SizedBox(height: SpacingTokens.sm),
+                  Text(
+                    '生成后进入家长预览，确认通过的题目才会入库。',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: SpacingTokens.sm),
-              Text(
-                '生成后进入家长预览，确认通过的题目才会入库。',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }

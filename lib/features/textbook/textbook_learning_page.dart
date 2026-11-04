@@ -38,15 +38,16 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsRepositoryProvider);
-    final volume = '${Textbook.gradeLabels[settings.selectedGrade]}'
+    final volume =
+        '${Textbook.gradeLabels[settings.selectedGrade]}'
         '${settings.selectedSemester}册';
     final books = ref.watch(currentTextbooksProvider);
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: widget.navigationTitle != null,
-        title: widget.navigationTitle ??
+        title:
+            widget.navigationTitle ??
             Text(
               '课本(${books.length})',
               maxLines: 1,
@@ -63,25 +64,10 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
             if (books.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(SpacingTokens.lg),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.menu_book_outlined,
-                        size: SpacingTokens.xxl,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(height: SpacingTokens.md),
-                      Text('暂无$volume课本', style: theme.textTheme.titleMedium),
-                      const SizedBox(height: SpacingTokens.sm),
-                      const Text(
-                        '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
+                child: AppEmptyState(
+                  icon: Icons.menu_book_outlined,
+                  title: '暂无$volume课本',
+                  description: '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
                 ),
               )
             else
@@ -118,19 +104,12 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
           borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
           child: path.when(
             data: (path) => path == null
-                ? TextbookCoverPlaceholder(
-                    title: title,
-                    status: '请家长补齐课本文件',
-                  )
+                ? TextbookCoverPlaceholder(title: title, status: '请家长补齐课本文件')
                 : TextbookPdfCover(path: path, title: title),
-            loading: () => TextbookCoverPlaceholder(
-              title: title,
-              status: '正在加载',
-            ),
-            error: (error, stackTrace) => TextbookCoverPlaceholder(
-              title: title,
-              status: '暂时无法读取',
-            ),
+            loading: () =>
+                TextbookCoverPlaceholder(title: title, status: '正在加载'),
+            error: (error, stackTrace) =>
+                TextbookCoverPlaceholder(title: title, status: '暂时无法读取'),
           ),
         ),
       ),

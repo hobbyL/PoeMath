@@ -47,9 +47,7 @@ class _PoemPracticeHistoryPageState
                   '待复练 ${wrong.length} 句',
                   style: theme.textTheme.titleMedium,
                 ),
-                const Text(
-                  '错句来自实际作答或使用提示的记录。完整听写该句正确后移出待复练；旧记录无明细时不推断。',
-                ),
+                const Text('错句来自实际作答或使用提示的记录。完整听写该句正确后移出待复练；旧记录无明细时不推断。'),
                 if (wrong.isNotEmpty) ...[
                   const SizedBox(height: SpacingTokens.sm),
                   FilledButton.icon(
@@ -58,8 +56,9 @@ class _PoemPracticeHistoryPageState
                         MaterialPageRoute(
                           builder: (_) => PoemDictationPage(
                             poemId: widget.poemId,
-                            targetLineIndices:
-                                wrong.map((line) => line.lineIndex).toList(),
+                            targetLineIndices: wrong
+                                .map((line) => line.lineIndex)
+                                .toList(),
                           ),
                         ),
                       );
@@ -74,14 +73,20 @@ class _PoemPracticeHistoryPageState
             ),
           ),
           const SizedBox(height: SpacingTokens.md),
-          if (activities.isEmpty) const Text('还没有练习结果，完成一次背诵、测验或听写后可在这里回看。'),
+          if (activities.isEmpty)
+            const AppEmptyState(
+              icon: Icons.history_outlined,
+              title: '还没有练习结果',
+              description: '完成一次背诵、测验或听写后可在这里回看。',
+            ),
           for (final activity in activities) ...[
             ColoredCard(
               color: theme.colorScheme.secondary,
               child: Builder(
                 builder: (context) {
-                  final details =
-                      PoemPracticeDetails.decode(activity.detailsJson);
+                  final details = PoemPracticeDetails.decode(
+                    activity.detailsJson,
+                  );
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

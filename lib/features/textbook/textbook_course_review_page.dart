@@ -69,8 +69,9 @@ class _TextbookCourseReviewPageState
       assertParentAccess(context);
       final catalog = await ref.read(textbookCatalogProvider.future);
       if (!mounted) return;
-      final entry =
-          catalog.where((e) => e.book.pdfSha256 == book.pdfSha256).firstOrNull;
+      final entry = catalog
+          .where((e) => e.book.pdfSha256 == book.pdfSha256)
+          .firstOrNull;
       final path = await ref.read(textbookPathProvider(book.pdfSha256).future);
       if (!mounted) return;
       if (entry == null || path == null) {
@@ -101,11 +102,8 @@ class _TextbookCourseReviewPageState
         stackTrace: stackTrace,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('原书或书目读取失败，请重试整理'),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('原书或书目读取失败，请重试整理')));
       }
     } finally {
       _starting = false;
@@ -157,10 +155,8 @@ class _TextbookCourseReviewPageState
                 children: [
                   Text(
                     '更多',
-                    style:
-                        Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                    style: Theme.of(sheetContext).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: SpacingTokens.sm),
                   if (pack != null)
@@ -211,8 +207,9 @@ class _TextbookCourseReviewPageState
     if (!mounted || _importing) return;
     switch (action) {
       case 'edition':
-        final pack =
-            ref.read(textbookCourseProvider(book.pdfSha256)).valueOrNull;
+        final pack = ref
+            .read(textbookCourseProvider(book.pdfSha256))
+            .valueOrNull;
         if (pack != null) {
           await _open(book, pack, nodeId: pack.edition.id);
         }
@@ -226,9 +223,9 @@ class _TextbookCourseReviewPageState
   }
 
   Future<void> _import(Textbook book) => CacheActivity.use(
-        TemporaryCacheKind.pickers,
-        () => _importFromPicker(book),
-      );
+    TemporaryCacheKind.pickers,
+    () => _importFromPicker(book),
+  );
 
   Future<void> _importFromPicker(Textbook book) async {
     if (_importing) return;
@@ -344,11 +341,8 @@ class _TextbookCourseReviewPageState
       }
     } on Object {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('课程读取失败，请重试打开'),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('课程读取失败，请重试打开')));
       }
     }
   }
@@ -374,113 +368,92 @@ class _TextbookCourseReviewPageState
           ],
         ),
         body: book == null
-            ? const Center(child: Text('找不到教材，请返回书籍管理重新选择。'))
+            ? const AppEmptyState(
+                icon: Icons.menu_book_outlined,
+                title: '找不到教材',
+                description: '请返回书籍管理重新选择。',
+              )
             : _importing
-                ? const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: SpacingTokens.md),
-                        Text('正在导入课程草稿…'),
-                      ],
-                    ),
-                  )
-                : ref.watch(textbookCourseProvider(widget.bookId)).when(
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (_, __) => Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(SpacingTokens.lg),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('课程草稿读取失败。可重试，或重新导入有效草稿。'),
-                              TextButton(
-                                onPressed: () => ref.invalidate(
-                                  textbookCourseProvider(
-                                    widget.bookId,
-                                  ),
-                                ),
-                                child: const Text('重试读取'),
+            ? const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: SpacingTokens.md),
+                    Text('正在导入课程草稿…'),
+                  ],
+                ),
+              )
+            : ref
+                  .watch(textbookCourseProvider(widget.bookId))
+                  .when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (_, __) => Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(SpacingTokens.lg),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('课程草稿读取失败。可重试，或重新导入有效草稿。'),
+                            TextButton(
+                              onPressed: () => ref.invalidate(
+                                textbookCourseProvider(widget.bookId),
                               ),
-                              TextButton(
-                                onPressed: () => _import(book),
-                                child: const Text('重新导入'),
-                              ),
-                            ],
-                          ),
+                              child: const Text('重试读取'),
+                            ),
+                            TextButton(
+                              onPressed: () => _import(book),
+                              child: const Text('重新导入'),
+                            ),
+                          ],
                         ),
                       ),
-                      data: (pack) {
-                        final path =
-                            ref.watch(textbookPathProvider(widget.bookId));
-                        final entries = ref.watch(textbookCatalogProvider);
-                        if (pack == null &&
-                            !_attempted &&
-                            path.hasValue &&
-                            entries.hasValue) {
-                          _attempted = true;
-                          if (path.valueOrNull != null &&
-                              entries.valueOrNull!.any(
-                                (e) => e.book.pdfSha256 == widget.bookId,
-                              )) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (mounted) _generate(book);
-                            });
-                          }
-                        }
-                        return pack == null
-                            ? SingleChildScrollView(
-                                child: Center(
-                                  child: Padding(
-                                    padding:
-                                        const EdgeInsets.all(SpacingTokens.lg),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.fact_check_outlined,
-                                          size: SpacingTokens.minTapTarget,
-                                        ),
-                                        const SizedBox(
-                                          height: SpacingTokens.md,
-                                        ),
-                                        const Text('从原书整理课程草稿'),
-                                        const SizedBox(
-                                          height: SpacingTokens.sm,
-                                        ),
-                                        Text(
-                                          path.isLoading || entries.isLoading
-                                              ? '正在检查本机原书与书目…'
-                                              : path.hasError ||
-                                                      entries.hasError
-                                                  ? '原书或书目读取失败，可从右上角重试整理。'
-                                                  : path.valueOrNull == null
-                                                      ? '请先下载或导入原书 PDF。之后首次进入会在本机逐课整理，内容仍需审核。'
-                                                      : !entries.valueOrNull!
-                                                              .any(
-                                                          (e) =>
-                                                              e.book
-                                                                  .pdfSha256 ==
-                                                              widget.bookId,
-                                                        )
-                                                          ? '此 PDF 尚无可核验的书目来源，暂不支持自动整理。可阅读原书，或从右上角导入课程草稿。'
-                                                          : '在本机逐课整理；完成的课目会逐课显示。无法可靠归类的内容会保留待整理。',
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const SizedBox(
-                                          height: SpacingTokens.lg,
-                                        ),
-                                        _generationStatus(book),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : _content(book, pack);
-                      },
                     ),
+                    data: (pack) {
+                      final path = ref.watch(
+                        textbookPathProvider(widget.bookId),
+                      );
+                      final entries = ref.watch(textbookCatalogProvider);
+                      if (pack == null &&
+                          !_attempted &&
+                          path.hasValue &&
+                          entries.hasValue) {
+                        _attempted = true;
+                        if (path.valueOrNull != null &&
+                            entries.valueOrNull!.any(
+                              (e) => e.book.pdfSha256 == widget.bookId,
+                            )) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) _generate(book);
+                          });
+                        }
+                      }
+                      return pack == null
+                          ? AppEmptyState(
+                              icon: Icons.fact_check_outlined,
+                              title: '从原书整理课程草稿',
+                              description: path.isLoading || entries.isLoading
+                                  ? '正在检查本机原书与书目…'
+                                  : path.hasError || entries.hasError
+                                  ? '原书或书目读取失败，可从右上角重试整理。'
+                                  : path.valueOrNull == null
+                                  ? '请先下载或导入原书 PDF。之后首次进入会在本机逐课整理，内容仍需审核。'
+                                  : !entries.valueOrNull!.any(
+                                      (e) => e.book.pdfSha256 == widget.bookId,
+                                    )
+                                  ? '此 PDF 尚无可核验的书目来源，暂不支持自动整理。可阅读原书，或从右上角导入课程草稿。'
+                                  : '在本机逐课整理；完成的课目会逐课显示。无法可靠归类的内容会保留待整理。',
+                              actions: [
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: _generationStatus(book),
+                                ),
+                              ],
+                            )
+                          : _content(book, pack);
+                    },
+                  ),
       ),
     );
   }
@@ -520,17 +493,16 @@ class _TextbookCourseReviewPageState
                   ),
                   iconAlignment: IconAlignment.end,
                   icon: const Icon(Icons.chevron_right),
-                  label: Text(
-                    '单元审核 · ${textbookCourseReviewLabel(unit)}',
-                  ),
+                  label: Text('单元审核 · ${textbookCourseReviewLabel(unit)}'),
                 ),
               ],
             ),
             for (final id in unit.lessonIds)
               Builder(
                 builder: (context) {
-                  final lesson =
-                      pack.lessons.firstWhere((lesson) => lesson.id == id);
+                  final lesson = pack.lessons.firstWhere(
+                    (lesson) => lesson.id == id,
+                  );
                   return AppTile(
                     key: ValueKey('course-lesson-$id'),
                     flat: true,
@@ -581,9 +553,7 @@ class _TextbookCourseReviewPageState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              progress?.message ?? '已保存 $done/$total 课，可继续整理',
-            ),
+            Text(progress?.message ?? '已保存 $done/$total 课，可继续整理'),
             if (running) ...[
               const SizedBox(height: SpacingTokens.sm),
               LinearProgressIndicator(value: total > 0 ? done / total : null),
@@ -591,8 +561,8 @@ class _TextbookCourseReviewPageState
             TextButton(
               onPressed: running
                   ? () => ref
-                      .read(textbookGenerationProvider.notifier)
-                      .pause(book.pdfSha256)
+                        .read(textbookGenerationProvider.notifier)
+                        .pause(book.pdfSha256)
                   : () => _generate(book),
               child: Text(running ? '暂停整理' : '继续整理'),
             ),
@@ -633,8 +603,9 @@ class _TextbookCourseLessonPageState
       });
     }
     try {
-      final pack =
-          await ref.read(textbookCourseRepositoryProvider).load(widget.book);
+      final pack = await ref
+          .read(textbookCourseRepositoryProvider)
+          .load(widget.book);
       if (pack == null ||
           !pack.lessons.any((lesson) => lesson.id == widget.lessonId)) {
         throw const FormatException('课程草稿已变化，请返回重新选择');
@@ -643,8 +614,9 @@ class _TextbookCourseLessonPageState
     } on Object catch (error) {
       if (mounted) {
         setState(
-          () => _error =
-              error is FormatException ? error.message : '更新后的课程读取失败，请重试',
+          () => _error = error is FormatException
+              ? error.message
+              : '更新后的课程读取失败，请重试',
         );
       }
     } finally {
@@ -703,7 +675,8 @@ class _TextbookCourseLessonPageState
         widget.lessonId,
         category,
         id: id,
-        text: category == 'recognitionCharacters' ||
+        text:
+            category == 'recognitionCharacters' ||
                 category == 'writingCharacters'
             ? '新'
             : '待填写',
@@ -770,138 +743,135 @@ class _TextbookCourseLessonPageState
       body: _reloading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_error!),
-                      TextButton(onPressed: _reload, child: const Text('重试读取')),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_error!),
+                  TextButton(onPressed: _reload, child: const Text('重试读取')),
+                ],
+              ),
+            )
+          : SafeArea(
+              top: false,
+              bottom: false,
+              child: ListView(
+                key: PageStorageKey(
+                  'course-lesson-${widget.book.pdfSha256}-${lesson.id}',
+                ),
+                padding: const EdgeInsets.all(SpacingTokens.md),
+                children: [
+                  AppTile(
+                    flat: true,
+                    flatTrailingEdgeAligned: true,
+                    icon: Icons.auto_stories_outlined,
+                    iconColor: theme.colorScheme.primary,
+                    title: '原书范围与待整理内容',
+                    subtitle: '核对标题起点、局部注音、未分类内容及生成差异',
+                    onTap: _draftDetails,
                   ),
-                )
-              : SafeArea(
-                  top: false,
-                  bottom: false,
-                  child: ListView(
-                    key: PageStorageKey(
-                      'course-lesson-${widget.book.pdfSha256}-${lesson.id}',
+                  for (final entry in groups.entries) ...[
+                    const Divider(height: SpacingTokens.xl),
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          entry.key == 'paragraphs'
+                              ? textbookCourseCategoryLabels[entry.key]!
+                              : '${textbookCourseCategoryLabels[entry.key]} · ${entry.value.length}',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        TextButton.icon(
+                          onPressed: () => _add(entry.key),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsetsDirectional.only(
+                              top: SpacingTokens.sm,
+                              end: SpacingTokens.sm,
+                              bottom: SpacingTokens.sm,
+                            ),
+                            minimumSize: const Size(
+                              SpacingTokens.minTapTarget,
+                              SpacingTokens.minTapTarget,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            alignment: AlignmentDirectional.centerEnd,
+                          ),
+                          icon: const Icon(Icons.add),
+                          label: const Text('添加'),
+                        ),
+                      ],
                     ),
-                    padding: const EdgeInsets.all(SpacingTokens.md),
-                    children: [
+                    const SizedBox(height: SpacingTokens.xs),
+                    if (lesson.coverage[entry.key] != TextbookCoverage.pending)
+                      Text(
+                        textbookCourseCoverageLabels[lesson.coverage[entry
+                            .key]]!,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    if (entry.value.isEmpty)
+                      AppEmptyState(
+                        icon: Icons.menu_book_outlined,
+                        title:
+                            lesson.coverage[entry.key] ==
+                                TextbookCoverage.notApplicable
+                            ? '已核对：原书无此要求'
+                            : '尚未整理此类内容',
+                        description:
+                            lesson.coverage[entry.key] ==
+                                TextbookCoverage.notApplicable
+                            ? null
+                            : '可对照原书添加。',
+                        padding: const EdgeInsets.all(SpacingTokens.md),
+                      ),
+                    if (entry.value.isNotEmpty &&
+                        (entry.key == 'paragraphs' ||
+                            entry.value.first is TextbookCourseVocabulary))
                       AppTile(
+                        key: ValueKey('course-target-${entry.key}'),
                         flat: true,
                         flatTrailingEdgeAligned: true,
-                        icon: Icons.auto_stories_outlined,
                         iconColor: theme.colorScheme.primary,
-                        title: '原书范围与待整理内容',
-                        subtitle: '核对标题起点、局部注音、未分类内容及生成差异',
-                        onTap: _draftDetails,
-                      ),
-                      for (final entry in groups.entries) ...[
-                        const Divider(height: SpacingTokens.xl),
-                        Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              entry.key == 'paragraphs'
-                                  ? textbookCourseCategoryLabels[entry.key]!
-                                  : '${textbookCourseCategoryLabels[entry.key]} · ${entry.value.length}',
-                              style: theme.textTheme.titleMedium,
-                            ),
-                            TextButton.icon(
-                              onPressed: () => _add(entry.key),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsetsDirectional.only(
-                                  top: SpacingTokens.sm,
-                                  end: SpacingTokens.sm,
-                                  bottom: SpacingTokens.sm,
-                                ),
-                                minimumSize: const Size(
-                                  SpacingTokens.minTapTarget,
-                                  SpacingTokens.minTapTarget,
-                                ),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                alignment: AlignmentDirectional.centerEnd,
+                        title: '',
+                        subtitle: entry.value
+                            .cast<TextbookCourseParagraph>()
+                            .map(
+                              (paragraph) =>
+                                  textbookContinuousText(paragraph.text),
+                            )
+                            .join(' ')
+                            .trim(),
+                        subtitleMaxLines: 2,
+                        trailingText: textbookCourseReviewLabelFor(entry.value),
+                        onTap: entry.key == 'paragraphs'
+                            ? _openParagraphs
+                            : () => _openNode(
+                                entry.value.first.id,
+                                vocabularyCategory: entry.key,
                               ),
-                              icon: const Icon(Icons.add),
-                              label: const Text('添加'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: SpacingTokens.xs),
-                        if (lesson.coverage[entry.key] !=
-                            TextbookCoverage.pending)
-                          Text(
-                            textbookCourseCoverageLabels[
-                                lesson.coverage[entry.key]]!,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        if (entry.value.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: SpacingTokens.md,
-                              horizontal: SpacingTokens.sm,
-                            ),
-                            child: Text(
-                              lesson.coverage[entry.key] ==
-                                      TextbookCoverage.notApplicable
-                                  ? '已核对：原书无此要求'
-                                  : '尚未整理此类内容，可对照原书添加。',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        if (entry.value.isNotEmpty &&
-                            (entry.key == 'paragraphs' ||
-                                entry.value.first is TextbookCourseVocabulary))
-                          AppTile(
-                            key: ValueKey('course-target-${entry.key}'),
-                            flat: true,
-                            flatTrailingEdgeAligned: true,
-                            iconColor: theme.colorScheme.primary,
-                            title: '',
-                            subtitle: entry.value
-                                .cast<TextbookCourseParagraph>()
-                                .map(
-                                  (paragraph) =>
-                                      textbookContinuousText(paragraph.text),
-                                )
-                                .join(' ')
-                                .trim(),
-                            subtitleMaxLines: 2,
-                            trailingText: textbookCourseReviewLabelFor(
-                              entry.value,
-                            ),
-                            onTap: entry.key == 'paragraphs'
-                                ? _openParagraphs
-                                : () => _openNode(
-                                      entry.value.first.id,
-                                      vocabularyCategory: entry.key,
-                                    ),
-                          )
-                        else
-                          for (final node in entry.value)
-                            AppTile(
-                              key: ValueKey('course-target-${node.id}'),
-                              flat: true,
-                              flatTrailingEdgeAligned: true,
-                              iconColor: theme.colorScheme.primary,
-                              title: '',
-                              subtitle: (node is TextbookCourseExercise
+                      )
+                    else
+                      for (final node in entry.value)
+                        AppTile(
+                          key: ValueKey('course-target-${node.id}'),
+                          flat: true,
+                          flatTrailingEdgeAligned: true,
+                          iconColor: theme.colorScheme.primary,
+                          title: '',
+                          subtitle:
+                              (node is TextbookCourseExercise
                                       ? node.prompt
                                       : textbookCourseNodeTitle(node))
                                   .replaceAll(RegExp(r'\s+'), ' ')
                                   .trim(),
-                              subtitleMaxLines: 2,
-                              trailingText: textbookCourseReviewLabel(node),
-                              onTap: () => _openNode(node.id),
-                            ),
-                      ],
-                    ],
-                  ),
-                ),
+                          subtitleMaxLines: 2,
+                          trailingText: textbookCourseReviewLabel(node),
+                          onTap: () => _openNode(node.id),
+                        ),
+                  ],
+                ],
+              ),
+            ),
     );
   }
 }
@@ -946,9 +916,8 @@ class _TextbookCoveragePageState extends ConsumerState<_TextbookCoveragePage> {
               children: [
                 Text(
                   textbookCourseCategoryLabels[category]!,
-                  style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(sheetContext).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 for (final entry in textbookCourseCoverageLabels.entries)
@@ -983,9 +952,14 @@ class _TextbookCoveragePageState extends ConsumerState<_TextbookCoveragePage> {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      final pack =
-          updateTextbookCourseCoverage(widget.pack, widget.lesson.id, _values);
-      await ref.read(textbookCourseRepositoryProvider).save(
+      final pack = updateTextbookCourseCoverage(
+        widget.pack,
+        widget.lesson.id,
+        _values,
+      );
+      await ref
+          .read(textbookCourseRepositoryProvider)
+          .save(
             widget.book,
             pack,
             previous: widget.pack,
@@ -996,8 +970,9 @@ class _TextbookCoveragePageState extends ConsumerState<_TextbookCoveragePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text(error is FormatException ? error.message : '保存失败，请重试'),
+            content: Text(
+              error is FormatException ? error.message : '保存失败，请重试',
+            ),
           ),
         );
       }

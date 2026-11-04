@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:poemath/core/services/tts/narration_session.dart';
 import 'package:poemath/core/services/tts/narration_audio_identity.dart';
@@ -121,7 +122,7 @@ class _PracticeState
   void _writeSession(
     String suffix,
     RecognitionProgress Function(RecognitionProgress, List<RecognitionTarget>)
-        reduce, {
+    reduce, {
     VoidCallback? success,
   }) {
     final p = progress!, s = p.session!, repo = repository!, fp = fingerprint;
@@ -218,8 +219,9 @@ class _PracticeState
       if (current && generation == _oralGeneration) {
         setState(() {
           _starting = false;
-          _oralMessage =
-              e is SpeechRecognitionException ? e.message : '无法开始录音，请重试';
+          _oralMessage = e is SpeechRecognitionException
+              ? e.message
+              : '无法开始录音，请重试';
         });
       }
     }
@@ -355,16 +357,22 @@ class _PracticeState
     if (widget.targetId != null &&
         (!ready.any((target) => target.id == widget.targetId) ||
             s == null ||
-            s.questions
-                .any((question) => question.targetId != widget.targetId))) {
+            s.questions.any(
+              (question) => question.targetId != widget.targetId,
+            ))) {
       return frame('认字', []);
     }
     if (ready.isEmpty) {
       return frame('认字', [
-        const Text('本课还没有可练习的生字。'),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('返回本课'),
+        AppEmptyState(
+          icon: Icons.spellcheck_outlined,
+          title: '本课还没有可练习的生字。',
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('返回本课'),
+            ),
+          ],
         ),
       ]);
     }
@@ -412,9 +420,10 @@ class _PracticeState
       RecognitionQuestionKind.study => '先自己试着认一认',
       RecognitionQuestionKind.read => '这个字你认识吗？自己读出来',
       RecognitionQuestionKind.listen => '听一听，选出这个字',
-      RecognitionQuestionKind.context => '听一听，在词句里找到这个字'
+      RecognitionQuestionKind.context => '听一听，在词句里找到这个字',
     };
-    final isChoice = q.kind == RecognitionQuestionKind.listen ||
+    final isChoice =
+        q.kind == RecognitionQuestionKind.listen ||
         q.kind == RecognitionQuestionKind.context;
     final audioControls = Column(
       mainAxisSize: MainAxisSize.min,
@@ -438,8 +447,9 @@ class _PracticeState
               )
             : audioButton(
                 isChoice && !feedback ? cue?.text ?? t.text : t.text,
-                requiredIdentity:
-                    isChoice && !feedback ? approval?.identity : null,
+                requiredIdentity: isChoice && !feedback
+                    ? approval?.identity
+                    : null,
                 label: isChoice && !feedback ? '听题目' : '听示范',
                 iconOnly: true,
                 enabled: !_oralWorking,
@@ -459,25 +469,26 @@ class _PracticeState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(
-                width: SpacingTokens.xxl + SpacingTokens.sm,
-              ),
+              const SizedBox(width: SpacingTokens.xxl + SpacingTokens.sm),
               Flexible(
                 child: ColoredCard(
                   key: const ValueKey('recognition-practice-character-card'),
                   color: Theme.of(context).colorScheme.primary,
-                  width: SpacingTokens.xxl * 3 +
+                  width:
+                      SpacingTokens.xxl * 3 +
                       SpacingTokens.md +
                       (MediaQuery.textScalerOf(context)
                                   .scale(SpacingTokens.xxl) -
                               SpacingTokens.xxl)
                           .clamp(0, SpacingTokens.xxl * 2),
-                  constraints:
-                      const BoxConstraints(minHeight: SpacingTokens.xxl * 3),
+                  constraints: const BoxConstraints(
+                    minHeight: SpacingTokens.xxl * 3,
+                  ),
                   padding: const EdgeInsets.all(SpacingTokens.sm),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: SpacingTokens.md),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: SpacingTokens.md,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -516,8 +527,8 @@ class _PracticeState
               onPressed: busy || _starting || _evaluating
                   ? null
                   : () => unawaited(
-                        _recording ? _finishRecording() : _startRecording(),
-                      ),
+                      _recording ? _finishRecording() : _startRecording(),
+                    ),
               icon: Icon(
                 _recording ? Icons.stop_circle_outlined : Icons.mic_none,
               ),
@@ -525,10 +536,10 @@ class _PracticeState
                 _starting
                     ? '正在准备麦克风…'
                     : _evaluating
-                        ? '正在听你认读…'
-                        : _recording
-                            ? '读完了，听听结果'
-                            : '读一读',
+                    ? '正在听你认读…'
+                    : _recording
+                    ? '读完了，听听结果'
+                    : '读一读',
               ),
             ),
             if (_recording) const Text('正在录音，10 秒后自动结束并识别。'),
@@ -548,16 +559,17 @@ class _PracticeState
             children: [
               for (final id in q.options)
                 OutlinedButton(
-                  onPressed: busy ||
+                  onPressed:
+                      busy ||
                           !heard ||
                           heardText != cue?.text ||
                           approval == null
                       ? null
                       : () => _answer(
-                            id == t.id
-                                ? RecognitionEvidence.correct
-                                : RecognitionEvidence.incorrect,
-                          ),
+                          id == t.id
+                              ? RecognitionEvidence.correct
+                              : RecognitionEvidence.incorrect,
+                        ),
                   child: Padding(
                     padding: const EdgeInsets.all(SpacingTokens.md),
                     child: Text(
@@ -582,16 +594,17 @@ class _PracticeState
                 for (var i = 0; i < runes.length; i++)
                   if (recognitionIsHan(runes[i]))
                     OutlinedButton(
-                      onPressed: busy ||
+                      onPressed:
+                          busy ||
                               !heard ||
                               heardText != cue?.text ||
                               approval == null
                           ? null
                           : () => _answer(
-                                q.positions.contains(i)
-                                    ? RecognitionEvidence.correct
-                                    : RecognitionEvidence.incorrect,
-                              ),
+                              q.positions.contains(i)
+                                  ? RecognitionEvidence.correct
+                                  : RecognitionEvidence.incorrect,
+                            ),
                       child: Text(
                         String.fromCharCode(runes[i]),
                         style: Theme.of(context).textTheme.headlineMedium,
@@ -639,10 +652,10 @@ class _PracticeState
                     String.fromCharCode(runes[i]),
                     key: ValueKey('recognition-context-$i'),
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          backgroundColor: q.positions.contains(i)
-                              ? Theme.of(context).colorScheme.primaryContainer
-                              : null,
-                        ),
+                      backgroundColor: q.positions.contains(i)
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : null,
+                    ),
                   ),
               ],
             ),
@@ -650,20 +663,18 @@ class _PracticeState
         );
       }
       children.add(
-        Text(
-          switch (s.feedback!) {
-            RecognitionEvidence.correct => s.hinted ? '借助提示找到了，下次再试试' : '找对了！',
-            RecognitionEvidence.incorrect => '一起再看看这个字，稍后再练',
-            RecognitionEvidence.selfCorrect => '已经对照读过了，之后再检查认读',
-            RecognitionEvidence.selfAgain => '没关系，下次再练一练',
-            RecognitionEvidence.oralCorrect =>
-              s.hinted || q.repeat || !s.recognitionFirst
-                  ? '跟着提示读出来了，隔天再独立试试'
-                  : '这次自己认出来了！过几天再来认一认',
-            RecognitionEvidence.oralAgain => '一起听听这个字，稍后再试试',
-            _ => '先练一练，慢慢记住'
-          },
-        ),
+        Text(switch (s.feedback!) {
+          RecognitionEvidence.correct => s.hinted ? '借助提示找到了，下次再试试' : '找对了！',
+          RecognitionEvidence.incorrect => '一起再看看这个字，稍后再练',
+          RecognitionEvidence.selfCorrect => '已经对照读过了，之后再检查认读',
+          RecognitionEvidence.selfAgain => '没关系，下次再练一练',
+          RecognitionEvidence.oralCorrect =>
+            s.hinted || q.repeat || !s.recognitionFirst
+                ? '跟着提示读出来了，隔天再独立试试'
+                : '这次自己认出来了！过几天再来认一认',
+          RecognitionEvidence.oralAgain => '一起听听这个字，稍后再试试',
+          _ => '先练一练，慢慢记住',
+        }),
       );
       children.add(
         FilledButton(

@@ -55,17 +55,14 @@ class _LlmScenarioSettingsPageState
     required String? model,
   }) async {
     try {
-      await ref.read(settingsRepositoryProvider).setScenarioSelection(
-            scenario,
-            providerId: providerId,
-            model: model,
-          );
+      await ref
+          .read(settingsRepositoryProvider)
+          .setScenarioSelection(scenario, providerId: providerId, model: model);
     } on ArgumentError catch (e) {
       // 竞态：列表在读取后被外部改写。刷新列表即可。
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('配置不存在：${e.message ?? e}')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('配置不存在：${e.message ?? e}')));
       }
     }
     if (mounted) setState(() {});
@@ -112,12 +109,13 @@ class _LlmScenarioSettingsPageState
                                   _followDefaultValue
                               ? Icons.radio_button_checked
                               : Icons.radio_button_unchecked,
-                          color: (currentId ?? _followDefaultValue) ==
+                          color:
+                              (currentId ?? _followDefaultValue) ==
                                   _followDefaultValue
                               ? Theme.of(sheetContext).colorScheme.primary
                               : Theme.of(sheetContext)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                                    .colorScheme
+                                    .onSurfaceVariant,
                         ),
                         title: const Text('跟随默认'),
                         onTap: () => Navigator.pop(
@@ -134,8 +132,8 @@ class _LlmScenarioSettingsPageState
                             color: config.id == currentId
                                 ? Theme.of(sheetContext).colorScheme.primary
                                 : Theme.of(sheetContext)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+                                      .colorScheme
+                                      .onSurfaceVariant,
                           ),
                           title: Text(providerDisplayName(index, config)),
                           subtitle: Text(providerHostSummary(config.baseUrl)),
@@ -164,8 +162,8 @@ class _LlmScenarioSettingsPageState
     final models = cfg.models.isNotEmpty
         ? cfg.models
         : (cfg.model.trim().isEmpty
-            ? const <String>[]
-            : <String>[cfg.model.trim()]);
+              ? const <String>[]
+              : <String>[cfg.model.trim()]);
     String? model;
     if (models.length <= 1) {
       model = models.isEmpty ? null : models.first;
@@ -209,8 +207,9 @@ class _LlmScenarioSettingsPageState
                   padding: const EdgeInsets.all(SpacingTokens.md),
                   child: Text(
                     '选择模型',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(color: theme.colorScheme.onSurface),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                    ),
                   ),
                 ),
                 Flexible(
@@ -255,8 +254,8 @@ class _LlmScenarioSettingsPageState
         final cfg = providers[index];
         final model =
             (scenarioModel != null && cfg.models.contains(scenarioModel))
-                ? scenarioModel
-                : cfg.model;
+            ? scenarioModel
+            : cfg.model;
         final name = providerDisplayName(index, cfg);
         return model.trim().isEmpty ? name : '$name · ${model.trim()}';
       }
@@ -305,16 +304,10 @@ class _LlmScenarioSettingsPageState
           ),
           const SizedBox(height: SpacingTokens.lg),
           if (providers.isEmpty)
-            ColoredCard(
-              color: theme.colorScheme.secondary,
-              width: double.infinity,
-              child: Text(
-                '还没有可用的厂商配置。请先到「供应商设置」添加配置，再回到'
-                '这里为各场景指定使用的厂商。',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
+            const AppEmptyState(
+              icon: Icons.alt_route_outlined,
+              title: '还没有可用的厂商配置',
+              description: '请先到「供应商设置」添加配置，再回到这里为各场景指定使用的厂商。',
             )
           else ...[
             for (final scenario in LlmScenario.values) ...[

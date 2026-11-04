@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
@@ -29,10 +30,9 @@ class _Repository extends PictureStoryRepository {
   Future<void> save(
     PictureStoryPracticeRecord record, {
     void Function()? check,
-  }) =>
-      lastRecordSave = ioZone.run<Future<void>>(
-        () => super.save(record, check: check),
-      );
+  }) => lastRecordSave = ioZone.run<Future<void>>(
+    () => super.save(record, check: check),
+  );
 }
 
 void main() {
@@ -52,17 +52,20 @@ void main() {
     mockChannel('xyz.luan/audioplayers.global/events');
     channels.add('xyz.luan/audioplayers');
     messenger.setMockMethodCallHandler(
-        const MethodChannel('xyz.luan/audioplayers'), (call) async {
-      if (call.method == 'create') {
-        final id =
-            (call.arguments as Map<dynamic, dynamic>)['playerId'] as String;
-        mockChannel('xyz.luan/audioplayers/events/$id');
-      }
-      if (call.method == 'getCurrentPosition' || call.method == 'getDuration') {
-        return 0;
-      }
-      return null;
-    });
+      const MethodChannel('xyz.luan/audioplayers'),
+      (call) async {
+        if (call.method == 'create') {
+          final id =
+              (call.arguments as Map<dynamic, dynamic>)['playerId'] as String;
+          mockChannel('xyz.luan/audioplayers/events/$id');
+        }
+        if (call.method == 'getCurrentPosition' ||
+            call.method == 'getDuration') {
+          return 0;
+        }
+        return null;
+      },
+    );
   });
   tearDownAll(() {
     for (final channel in channels) {
@@ -92,9 +95,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final container = ProviderContainer(
-      overrides: [
-        pictureStoryRepositoryProvider.overrideWithValue(repository),
-      ],
+      overrides: [pictureStoryRepositoryProvider.overrideWithValue(repository)],
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(
@@ -200,8 +201,9 @@ void main() {
     expect(find.text('第二版题目'), findsNothing);
     expect(find.text('新版参考内容'), findsNothing);
     expect(find.text('小猫坐在窗前。'), findsOneWidget);
-    final image = tester
-        .widget<PictureStoryImageView>(find.byType(PictureStoryImageView));
+    final image = tester.widget<PictureStoryImageView>(
+      find.byType(PictureStoryImageView),
+    );
     expect(image.image, first.image);
     expect(image.preview, isFalse);
     expect(tester.takeException(), isNull);
@@ -345,6 +347,41 @@ void main() {
     expect(tester.takeException(), isNull);
     await unmount(tester);
   });
+
+  for (final hasDisabledPrompt in [false, true]) {
+    testWidgets('表达无可练习题目时统一引导家长，窄屏大字可读（停用题：$hasDisabledPrompt）', (
+      tester,
+    ) async {
+      if (hasDisabledPrompt) {
+        await tester.runAsync(() async {
+          await repository.savePrompt(
+            prompt: pictureStoryFixture(),
+            profileId: 'default',
+          );
+          await repository.setEnabled('local-fixture', false);
+        });
+      }
+      final container = await pumpPage(
+        tester,
+        const PictureStoryPage(),
+        size: const Size(320, 360),
+        textScale: 2,
+      );
+
+      expect(container.read(pictureStoryPromptCountProvider), 0);
+      expect(find.byType(AppEmptyState), findsOneWidget);
+      expect(find.text('暂时没有可练习的题目'), findsOneWidget);
+      final guidance = find.text('请家长在设置中添加或启用看图说话题目。');
+      await tester.ensureVisible(guidance);
+      await tester.pumpAndSettle();
+      expect(guidance.hitTestable(), findsOneWidget);
+      expect(find.byType(ColoredCard), findsNothing);
+      expect(find.byTooltip('练习记录'), findsOneWidget);
+      expect(HiveBoxes.pictureStoryPractice.isEmpty, isTrue);
+      expect(tester.takeException(), isNull);
+      await unmount(tester);
+    });
+  }
 
   testWidgets('孩子题库在窄屏大字号下自然展开，新增题立即可见', (tester) async {
     final title = List.filled(10, '窗前的小猫和小鸟').join();

@@ -29,42 +29,19 @@ class ChallengeHistoryPage extends ConsumerWidget {
           final columns = ResponsiveLayout.columns(constraints.maxWidth);
 
           return records.isEmpty
-              ? CustomScrollView(
+              ? const CustomScrollView(
                   slivers: [
-                    const SliverAppBar(
+                    SliverAppBar(
                       floating: true,
                       snap: true,
                       title: Text('挑战记录'),
                     ),
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.emoji_events_outlined,
-                              size: 64,
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.3),
-                            ),
-                            const SizedBox(height: SpacingTokens.md),
-                            Text(
-                              '暂无挑战记录',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: SpacingTokens.xs),
-                            Text(
-                              '完成一次限时挑战后即可查看记录',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.6),
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: AppEmptyState(
+                        icon: Icons.emoji_events_outlined,
+                        title: '暂无挑战记录',
+                        description: '完成一次限时挑战后即可查看记录',
                       ),
                     ),
                   ],
@@ -145,10 +122,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildBestScores(
-    ThemeData theme,
-    ChallengeRecordRepository repo,
-  ) {
+  Widget _buildBestScores(ThemeData theme, ChallengeRecordRepository repo) {
     return Column(
       children: [
         for (final scheme in ['normal', 'vertical'])
@@ -255,8 +229,8 @@ class _RecordCard extends StatelessWidget {
     final accuracyColor = accuracy >= 0.9
         ? theme.semantic.success
         : accuracy >= 0.7
-            ? theme.semantic.caution
-            : theme.colorScheme.error;
+        ? theme.semantic.caution
+        : theme.colorScheme.error;
 
     // 模式颜色
     final modeColor = record.mode == 'fixed'

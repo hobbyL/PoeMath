@@ -42,8 +42,9 @@ class _PictureStoryManagementPageState
         stackTrace: stackTrace,
       );
       if (mounted) {
-        final message =
-            error is ParentAccessDenied ? error.toString() : '启用设置没有保存，请重试';
+        final message = error is ParentAccessDenied
+            ? error.toString()
+            : '启用设置没有保存，请重试';
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(message)));
       }
@@ -61,8 +62,10 @@ class _PictureStoryManagementPageState
     final Set<String> enabledIds;
     try {
       prompts = ref.watch(pictureStoryCatalogProvider);
-      enabledIds =
-          ref.watch(pictureStoryPromptProvider).map((p) => p.id).toSet();
+      enabledIds = ref
+          .watch(pictureStoryPromptProvider)
+          .map((p) => p.id)
+          .toSet();
     } on Object {
       return Scaffold(
         appBar: AppBar(title: const Text('看图说话题库')),
@@ -125,40 +128,64 @@ class _PictureStoryManagementPageState
         ],
       ),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final columns = ResponsiveLayout.columns(constraints.maxWidth);
-            return ListView(
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              children: [
-                if (tiles.isEmpty)
-                  ColoredCard(
-                    color: theme.colorScheme.primary,
-                    child: const Text('题库里还没有题目，点击右上角「新增题目」添加。'),
+        child: tiles.isEmpty
+            ? AppEmptyState(
+                icon: Icons.image_outlined,
+                title: '题库还是空的',
+                description: '添加图片或让 AI 出题，家长确认后即可练习',
+                actions: [
+                  FilledButton.icon(
+                    onPressed: () =>
+                        context.push(AppRoutes.pictureStoryGenerate),
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                    label: const Text('AI 出题'),
                   ),
-                for (var start = 0; start < tiles.length; start += columns) ...[
-                  if (start > 0) const SizedBox(height: SpacingTokens.sm),
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (var column = 0; column < columns; column++) ...[
-                          if (column > 0)
-                            const SizedBox(width: SpacingTokens.sm),
-                          Expanded(
-                            child: start + column < tiles.length
-                                ? tiles[start + column]
-                                : const SizedBox.shrink(),
-                          ),
-                        ],
-                      ],
-                    ),
+                  OutlinedButton.icon(
+                    onPressed: () => context.push(AppRoutes.pictureStoryCreate),
+                    icon: const Icon(Icons.add),
+                    label: const Text('新增题目'),
                   ),
                 ],
-              ],
-            );
-          },
-        ),
+              )
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = ResponsiveLayout.columns(
+                    constraints.maxWidth,
+                  );
+                  return ListView(
+                    padding: const EdgeInsets.all(SpacingTokens.md),
+                    children: [
+                      for (
+                        var start = 0;
+                        start < tiles.length;
+                        start += columns
+                      ) ...[
+                        if (start > 0) const SizedBox(height: SpacingTokens.sm),
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (
+                                var column = 0;
+                                column < columns;
+                                column++
+                              ) ...[
+                                if (column > 0)
+                                  const SizedBox(width: SpacingTokens.sm),
+                                Expanded(
+                                  child: start + column < tiles.length
+                                      ? tiles[start + column]
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                },
+              ),
       ),
     );
   }

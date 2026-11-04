@@ -35,10 +35,8 @@ class _TextbookManagementPageState
     super.dispose();
   }
 
-  Future<void> _import() => CacheActivity.use(
-        TemporaryCacheKind.pickers,
-        _importFromPicker,
-      );
+  Future<void> _import() =>
+      CacheActivity.use(TemporaryCacheKind.pickers, _importFromPicker);
 
   Future<void> _importFromPicker() async {
     if (_busy) return;
@@ -53,9 +51,7 @@ class _TextbookManagementPageState
               type: FileType.custom,
               allowedExtensions: ['pdf'],
               withData: false,
-            ))
-              ?.files
-              .firstOrNull;
+            ))?.files.firstOrNull;
       pickedPath = file?.path;
       if (!mounted || file == null) return;
       assertParentAccess(context);
@@ -83,7 +79,9 @@ class _TextbookManagementPageState
       );
       if (!mounted) return;
       assertParentAccess(context);
-      await ref.read(textbookRepositoryProvider).addIfAbsent(
+      await ref
+          .read(textbookRepositoryProvider)
+          .addIfAbsent(
             Textbook(
               pdfSha256: imported.sha256,
               title: details.title,
@@ -212,22 +210,12 @@ class _TextbookManagementPageState
                 ),
               ),
             if (books.isEmpty)
-              SliverFillRemaining(
+              const SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.menu_book_outlined,
-                        size: SpacingTokens.xxl,
-                      ),
-                      const SizedBox(height: SpacingTokens.md),
-                      Text('暂无书籍', style: theme.textTheme.titleLarge),
-                      const SizedBox(height: SpacingTokens.sm),
-                      const Text('点击右上角导入或下载'),
-                    ],
-                  ),
+                child: AppEmptyState(
+                  icon: Icons.menu_book_outlined,
+                  title: '暂无书籍',
+                  description: '点击右上角导入或下载',
                 ),
               )
             else
@@ -261,10 +249,7 @@ class _TextbookManagementPageState
                                           ? '可重新下载'
                                           : '需重新导入',
                                     )
-                                  : TextbookPdfCover(
-                                      path: path,
-                                      title: title,
-                                    ),
+                                  : TextbookPdfCover(path: path, title: title),
                               loading: () => TextbookCoverPlaceholder(
                                 title: title,
                                 status: '正在检查本地文件',
@@ -291,8 +276,9 @@ class _TextbookManagementPageState
                             backgroundColor: theme.colorScheme.surface
                                 .withValues(alpha: 0.9),
                             foregroundColor: theme.colorScheme.onSurface,
-                            fixedSize:
-                                const Size.square(SpacingTokens.minTapTarget),
+                            fixedSize: const Size.square(
+                              SpacingTokens.minTapTarget,
+                            ),
                             padding: EdgeInsets.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),

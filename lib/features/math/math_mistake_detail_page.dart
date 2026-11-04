@@ -43,7 +43,11 @@ class MathMistakeDetailPage extends ConsumerWidget {
     if (mistake == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('错题详情')),
-        body: const Center(child: Text('该错题已被删除')),
+        body: const AppEmptyState(
+          icon: Icons.check_circle_outline,
+          title: '该错题已被删除',
+          description: '请返回错题本查看其他题目。',
+        ),
       );
     }
 
@@ -52,12 +56,12 @@ class MathMistakeDetailPage extends ConsumerWidget {
     final isWide = MediaQuery.sizeOf(context).width >= 420;
     // AI 解析入口（移至 AppBar 右上角）：只做讲解展示，不参与判分与错题状态。
     void openAiExplain() => showMathAiExplainSheet(
-          context,
-          problemText: mistake.problemText,
-          correctAnswer: mistake.correctAnswer,
-          userAnswer: mistake.userAnswer,
-          diagnosisCategory: mistake.errorType,
-        );
+      context,
+      problemText: mistake.problemText,
+      correctAnswer: mistake.correctAnswer,
+      userAnswer: mistake.userAnswer,
+      diagnosisCategory: mistake.errorType,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -85,108 +89,111 @@ class MathMistakeDetailPage extends ConsumerWidget {
           children: [
             // 题目卡片
             ColoredCard(
-              color: theme.colorScheme.primary,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 题目文本
-                  MathText(
-                    mistake.problemText,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: SpacingTokens.md),
-
-                  // 答案对比行
-                  Row(
+                  color: theme.colorScheme.primary,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _AnswerChip(
-                        label: '你的答案',
-                        value: mistake.userAnswer,
-                        color: theme.colorScheme.error,
-                        icon: Icons.cancel_rounded,
+                      // 题目文本
+                      MathText(
+                        mistake.problemText,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(width: SpacingTokens.lg),
-                      _AnswerChip(
-                        label: '正确答案',
-                        value: mistake.correctAnswer,
-                        color: theme.semantic.success,
-                        icon: Icons.check_circle_rounded,
+                      const SizedBox(height: SpacingTokens.md),
+
+                      // 答案对比行
+                      Row(
+                        children: [
+                          _AnswerChip(
+                            label: '你的答案',
+                            value: mistake.userAnswer,
+                            color: theme.colorScheme.error,
+                            icon: Icons.cancel_rounded,
+                          ),
+                          const SizedBox(width: SpacingTokens.lg),
+                          _AnswerChip(
+                            label: '正确答案',
+                            value: mistake.correctAnswer,
+                            color: theme.semantic.success,
+                            icon: Icons.check_circle_rounded,
+                          ),
+                        ],
+                      ),
+
+                      if (problem != null &&
+                          VerticalAttempt.supports(problem)) ...[
+                        const SizedBox(height: SpacingTokens.sm),
+                        const Text('重练时只需填写结果各数位，进位或借位无需填写。'),
+                        if (attempt != null)
+                          Text(
+                            [
+                              for (final (field, title)
+                                  in VerticalAttempt.fieldsFor(problem))
+                                '$title：${attempt.field(field)}',
+                              if (attempt.regroup.isNotEmpty)
+                                '历史${problem.operators.single == Operator.add ? '个位进位' : '十位借位'}：${attempt.regroup}',
+                            ].join(' · '),
+                          ),
+                      ],
+
+                      // 已掌握标记
+                      if (mistake.isResolved) ...[
+                        const SizedBox(height: SpacingTokens.md),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: SpacingTokens.sm,
+                            vertical: SpacingTokens.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.semantic.success.withValues(
+                              alpha: 0.12,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              SpacingTokens.radiusSmall,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                size: 16,
+                                color: theme.semantic.success,
+                              ),
+                              const SizedBox(width: SpacingTokens.xs),
+                              Text(
+                                '已掌握',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.semantic.success,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (mistake.retryCount > 0) ...[
+                                const SizedBox(width: SpacingTokens.sm),
+                                Text(
+                                  '重练 ${mistake.retryCount} 次',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      // 常驻统计行：累计答错次数（与「重练 N 次」语义并存）
+                      const SizedBox(height: SpacingTokens.sm),
+                      Text(
+                        '累计答错 ${mistake.wrongCount} 次',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
-
-                  if (problem != null && VerticalAttempt.supports(problem)) ...[
-                    const SizedBox(height: SpacingTokens.sm),
-                    const Text('重练时只需填写结果各数位，进位或借位无需填写。'),
-                    if (attempt != null)
-                      Text(
-                        [
-                          for (final (field, title)
-                              in VerticalAttempt.fieldsFor(problem))
-                            '$title：${attempt.field(field)}',
-                          if (attempt.regroup.isNotEmpty)
-                            '历史${problem.operators.single == Operator.add ? '个位进位' : '十位借位'}：${attempt.regroup}',
-                        ].join(' · '),
-                      ),
-                  ],
-
-                  // 已掌握标记
-                  if (mistake.isResolved) ...[
-                    const SizedBox(height: SpacingTokens.md),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpacingTokens.sm,
-                        vertical: SpacingTokens.xs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: theme.semantic.success.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(
-                          SpacingTokens.radiusSmall,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            size: 16,
-                            color: theme.semantic.success,
-                          ),
-                          const SizedBox(width: SpacingTokens.xs),
-                          Text(
-                            '已掌握',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.semantic.success,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (mistake.retryCount > 0) ...[
-                            const SizedBox(width: SpacingTokens.sm),
-                            Text(
-                              '重练 ${mistake.retryCount} 次',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  // 常驻统计行：累计答错次数（与「重练 N 次」语义并存）
-                  const SizedBox(height: SpacingTokens.sm),
-                  Text(
-                    '累计答错 ${mistake.wrongCount} 次',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            )
+                )
                 .animatePage(context)
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: 0.1, end: 0, duration: 400.ms),
@@ -196,27 +203,27 @@ class MathMistakeDetailPage extends ConsumerWidget {
             // 错因标签
             if (mistake.errorType != null) ...[
               ColoredCard(
-                color: theme.colorScheme.error,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 18,
-                      color: theme.colorScheme.error,
+                    color: theme.colorScheme.error,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 18,
+                          color: theme.colorScheme.error,
+                        ),
+                        const SizedBox(width: SpacingTokens.sm),
+                        Text(
+                          // 标签单一来源：math_engine kErrorCauseLabels；
+                          // 未收录键回退显示英文原键（守卫内 errorType 非空）。
+                          '错因：${errorCauseLabel(mistake.errorType)}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: SpacingTokens.sm),
-                    Text(
-                      // 标签单一来源：math_engine kErrorCauseLabels；
-                      // 未收录键回退显示英文原键（守卫内 errorType 非空）。
-                      '错因：${errorCauseLabel(mistake.errorType)}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              )
+                  )
                   .animatePage(context)
                   .fadeIn(delay: 100.ms, duration: 300.ms)
                   .slideX(begin: 0.1, end: 0, delay: 100.ms, duration: 300.ms),
@@ -227,17 +234,12 @@ class MathMistakeDetailPage extends ConsumerWidget {
             if (mistake.solutionStepsJson != null &&
                 mistake.solutionStepsJson!.isNotEmpty)
               ColoredCard(
-                color: theme.colorScheme.secondary,
-                child: _buildSteps(context, mistake.solutionStepsJson!),
-              )
+                    color: theme.colorScheme.secondary,
+                    child: _buildSteps(context, mistake.solutionStepsJson!),
+                  )
                   .animatePage(context)
                   .fadeIn(delay: 200.ms, duration: 300.ms)
-                  .slideX(
-                    begin: 0.1,
-                    end: 0,
-                    delay: 200.ms,
-                    duration: 300.ms,
-                  ),
+                  .slideX(begin: 0.1, end: 0, delay: 200.ms, duration: 300.ms),
 
             const SizedBox(height: SpacingTokens.lg),
 
@@ -276,15 +278,9 @@ class MathMistakeDetailPage extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '• ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
                 Expanded(
-                  child: Text(
-                    description,
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  child: Text(description, style: theme.textTheme.bodyMedium),
                 ),
               ],
             ),
@@ -491,10 +487,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     final button = TextButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 14, color: color),
-      label: Text(
-        label,
-        style: TextStyle(fontSize: 11, color: color),
-      ),
+      label: Text(label, style: TextStyle(fontSize: 11, color: color)),
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(
           horizontal: SpacingTokens.xs,
@@ -505,8 +498,9 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       ),
     );
     return Expanded(
-      child:
-          tooltip == null ? button : Tooltip(message: tooltip, child: button),
+      child: tooltip == null
+          ? button
+          : Tooltip(message: tooltip, child: button),
     );
   }
 
@@ -585,12 +579,14 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     final skill = MathSkill.fromId(mistake.skillId);
     final semester = mistake.semester;
     if (skill == null || semester == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('这道旧错题缺少知识点或学期记录，请使用原题回练')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('这道旧错题缺少知识点或学期记录，请使用原题回练')));
       return;
     }
-    ref.read(nextMathPracticeRequestProvider.notifier).setNext(
+    ref
+        .read(nextMathPracticeRequestProvider.notifier)
+        .setNext(
           MathPracticeRequest(
             grade: mistake.grade,
             semester: semester,

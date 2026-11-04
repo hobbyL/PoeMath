@@ -63,13 +63,10 @@ class ConversationDrawer extends ConsumerWidget {
             const Divider(height: 1),
             Expanded(
               child: conversations.isEmpty
-                  ? Center(
-                      child: Text(
-                        '暂无对话',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                  ? const AppEmptyState(
+                      icon: Icons.chat_bubble_outline,
+                      title: '暂无对话',
+                      description: '点击右上角新建对话，开始交流学习问题。',
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.all(SpacingTokens.sm),
@@ -108,9 +105,7 @@ class ConversationDrawer extends ConsumerWidget {
           ref.read(assistantSessionProvider.notifier).switchTo(c.id);
         },
         child: AppTile(
-          icon: isCurrent
-              ? Icons.chat_bubble
-              : Icons.chat_bubble_outline,
+          icon: isCurrent ? Icons.chat_bubble : Icons.chat_bubble_outline,
           iconColor: isCurrent
               ? theme.colorScheme.primary
               : theme.colorScheme.secondary,

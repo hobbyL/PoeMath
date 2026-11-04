@@ -42,29 +42,28 @@ class MathTabPage extends ConsumerWidget {
   /// `color` 回调已无消费方（网格布局下多色反而杂乱）。
   ({String title, String subtitle, IconData icon}) _appearance(
     MathEntryKind kind,
-  ) =>
-      switch (kind) {
-        MathEntryKind.arithmetic => (
-            title: '口算练习',
-            subtitle: '综合练习，可选题型',
-            icon: Icons.calculate_outlined,
-          ),
-        MathEntryKind.vertical => (
-            title: '竖式计算',
-            subtitle: '按列计算，练竖式写法',
-            icon: Icons.view_stream_outlined,
-          ),
-        MathEntryKind.wordProblem => (
-            title: '应用题',
-            subtitle: '读懂题意，列式解决',
-            icon: Icons.auto_awesome_outlined,
-          ),
-        MathEntryKind.challenge => (
-            title: '挑战模式',
-            subtitle: '限时作答，看能对多少',
-            icon: Icons.timer_rounded,
-          ),
-      };
+  ) => switch (kind) {
+    MathEntryKind.arithmetic => (
+      title: '口算练习',
+      subtitle: '综合练习，可选题型',
+      icon: Icons.calculate_outlined,
+    ),
+    MathEntryKind.vertical => (
+      title: '竖式计算',
+      subtitle: '按列计算，练竖式写法',
+      icon: Icons.view_stream_outlined,
+    ),
+    MathEntryKind.wordProblem => (
+      title: '应用题',
+      subtitle: '读懂题意，列式解决',
+      icon: Icons.auto_awesome_outlined,
+    ),
+    MathEntryKind.challenge => (
+      title: '挑战模式',
+      subtitle: '限时作答，看能对多少',
+      icon: Icons.timer_rounded,
+    ),
+  };
 
   /// 进入「口算练习」：直接用当前册次与设置中的偏好发起，不再弹方案
   /// 选择框。
@@ -87,13 +86,16 @@ class MathTabPage extends ConsumerWidget {
       difficulty: difficulty,
     );
     final preferred = ref.read(mathPracticeModeProvider);
-    ref.read(nextMathPracticeRequestProvider.notifier).setNext(
+    ref
+        .read(nextMathPracticeRequestProvider.notifier)
+        .setNext(
           MathPracticeRequest(
             grade: grade,
             semester: semester,
             count: settings.mathBatchSize,
             difficulty: difficulty,
-            mode: preferred != ProblemMode.vertical &&
+            mode:
+                preferred != ProblemMode.vertical &&
                     supported.contains(preferred)
                 ? preferred
                 : null,
@@ -135,7 +137,9 @@ class MathTabPage extends ConsumerWidget {
           .showSnackBar(SnackBar(content: Text(reason)));
       return;
     }
-    ref.read(nextMathPracticeRequestProvider.notifier).setNext(
+    ref
+        .read(nextMathPracticeRequestProvider.notifier)
+        .setNext(
           MathPracticeRequest(
             grade: grade,
             semester: semester,
@@ -258,11 +262,17 @@ class MathTabPage extends ConsumerWidget {
                 if (visible.isEmpty)
                   // 学习背景里把四类全关时会走到这里；仓储层已拦空集合，
                   // 此处是异常数据（如手工改 Hive）的兜底展示。
-                  const Text('尚未开启任何练习类型，请在设置 → 学习背景中至少选择一类。')
+                  const AppEmptyState(
+                    icon: Icons.calculate_outlined,
+                    title: '尚未开启任何练习类型',
+                    description: '请在设置 → 学习背景中至少选择一类。',
+                  )
                 else
-                  for (var row = 0;
-                      row < (visible.length / columns).ceil();
-                      row++) ...[
+                  for (
+                    var row = 0;
+                    row < (visible.length / columns).ceil();
+                    row++
+                  ) ...[
                     if (row > 0) const SizedBox(height: SpacingTokens.sm),
                     IntrinsicHeight(
                       child: Row(

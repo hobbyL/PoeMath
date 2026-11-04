@@ -54,11 +54,8 @@ class StudyHubPage extends ConsumerWidget {
                     tooltip: favoritesOnly ? '显示全部公式' : '仅显示已收藏',
                   ),
                   TextButton.icon(
-                    onPressed: () => _showCategoryPicker(
-                      context,
-                      ref,
-                      selectedCategory,
-                    ),
+                    onPressed: () =>
+                        _showCategoryPicker(context, ref, selectedCategory),
                     icon: const Icon(Icons.filter_list, size: 18),
                     label: Text(filterLabel),
                   ),
@@ -95,28 +92,15 @@ class StudyHubPage extends ConsumerWidget {
               ),
               if (formulas.isEmpty)
                 SliverFillRemaining(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          favoritesOnly
-                              ? Icons.star_outline_rounded
-                              : Icons.functions_rounded,
-                          size: 64,
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: SpacingTokens.md),
-                        Text(
-                          favoritesOnly ? '还没有收藏的公式\n点击公式右上角星标即可收藏' : '暂无公式',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
+                  hasScrollBody: false,
+                  child: AppEmptyState(
+                    icon: favoritesOnly
+                        ? Icons.star_outline_rounded
+                        : Icons.functions_rounded,
+                    title: favoritesOnly ? '还没有收藏的公式' : '暂无公式',
+                    description: favoritesOnly
+                        ? '点击公式右上角星标即可收藏，也可调整搜索和分类。'
+                        : '试试其他关键词或调整分类。',
                   ),
                 )
               else
@@ -132,90 +116,86 @@ class StudyHubPage extends ConsumerWidget {
                       mainAxisSpacing: SpacingTokens.sm,
                       mainAxisExtent: 80,
                     ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final formula = formulas[index];
-                        final isFav = ref.watch(
-                          isFormulaFavoriteProvider(formula.id),
-                        );
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final formula = formulas[index];
+                      final isFav = ref.watch(
+                        isFormulaFavoriteProvider(formula.id),
+                      );
 
-                        return InkWell(
-                          onTap: () {
-                            context.push(
-                              AppRoutes.formulaDetailOf(formula.id),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(
-                            SpacingTokens.radiusMedium,
-                          ),
-                          child: ColoredCard(
-                            color: theme.colorScheme.primary,
-                            backgroundOpacity: 0.06,
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: theme.colorScheme.primary
-                                      .withValues(alpha: 0.15),
-                                  child: Icon(
-                                    Icons.functions,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(width: SpacingTokens.md),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        formula.name,
-                                        style: theme.textTheme.titleSmall
-                                            ?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        formula.formulaText,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style:
-                                            theme.textTheme.bodySmall?.copyWith(
-                                          color: theme
-                                              .colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  isFav
-                                      ? Icons.bookmark
-                                      : Icons.bookmark_border,
-                                  color: isFav
-                                      ? theme.colorScheme.secondary
-                                      : theme.colorScheme.onSurfaceVariant,
-                                  size: 20,
-                                ),
-                              ],
+                      return InkWell(
+                            onTap: () {
+                              context.push(
+                                AppRoutes.formulaDetailOf(formula.id),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(
+                              SpacingTokens.radiusMedium,
                             ),
-                          ),
-                        )
-                            .animatePage(context)
-                            .fadeIn(
-                              delay: (80 * index).ms,
-                              duration: 300.ms,
-                            )
-                            .slideX(
-                              begin: 0.1,
-                              end: 0,
-                              delay: (80 * index).ms,
-                              duration: 300.ms,
-                            );
-                      },
-                      childCount: formulas.length,
-                    ),
+                            child: ColoredCard(
+                              color: theme.colorScheme.primary,
+                              backgroundOpacity: 0.06,
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: theme.colorScheme.primary
+                                        .withValues(alpha: 0.15),
+                                    child: Icon(
+                                      Icons.functions,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: SpacingTokens.md),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          formula.name,
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          formula.formulaText,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    isFav
+                                        ? Icons.bookmark
+                                        : Icons.bookmark_border,
+                                    color: isFav
+                                        ? theme.colorScheme.secondary
+                                        : theme.colorScheme.onSurfaceVariant,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .animatePage(context)
+                          .fadeIn(delay: (80 * index).ms, duration: 300.ms)
+                          .slideX(
+                            begin: 0.1,
+                            end: 0,
+                            delay: (80 * index).ms,
+                            duration: 300.ms,
+                          );
+                    }, childCount: formulas.length),
                   ),
                 ),
             ],
@@ -246,9 +226,8 @@ class StudyHubPage extends ConsumerWidget {
                 const SizedBox(height: SpacingTokens.md),
                 Text(
                   '选择分类',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(ctx).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 Flexible(

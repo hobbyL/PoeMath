@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
-import 'package:poemath/core/widgets/page_animation_scope.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/poem_card.dart';
@@ -25,7 +25,6 @@ class PoemFavoritesPage extends ConsumerWidget {
     final poemRepo = ref.watch(poemRepoProvider);
     final progressRepo = ref.watch(poemProgressRepoProvider);
     final favorites = favRepo.getAll();
-    final theme = Theme.of(context);
 
     return Scaffold(
       body: LayoutBuilder(
@@ -39,34 +38,12 @@ class PoemFavoritesPage extends ConsumerWidget {
                 title: Text('我的收藏（${favorites.length}）'),
               ),
               if (favorites.isEmpty)
-                SliverFillRemaining(
+                const SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.favorite_border,
-                          size: 64,
-                          color:
-                              theme.colorScheme.primary.withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: SpacingTokens.md),
-                        Text(
-                          '还没有收藏的诗词',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: SpacingTokens.xs),
-                        Text(
-                          '在诗词详情页点击收藏按钮即可收藏',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: AppEmptyState(
+                    icon: Icons.favorite_border,
+                    title: '还没有收藏的诗词',
+                    description: '在诗词详情页点击收藏按钮即可收藏',
                   ),
                 )
               else
@@ -82,38 +59,32 @@ class PoemFavoritesPage extends ConsumerWidget {
                       crossAxisSpacing: SpacingTokens.sm,
                       mainAxisExtent: 120,
                     ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final fav = favorites[index];
-                        final poem = poemRepo.getById(fav.poemId);
-                        if (poem == null) return const SizedBox.shrink();
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final fav = favorites[index];
+                      final poem = poemRepo.getById(fav.poemId);
+                      if (poem == null) return const SizedBox.shrink();
 
-                        final progress = progressRepo.get(poem.id);
-                        final status =
-                            progress?.status ?? LearningStatus.notStarted;
-                        final isFav = true; // 在收藏列表里一定是收藏的
+                      final progress = progressRepo.get(poem.id);
+                      final status =
+                          progress?.status ?? LearningStatus.notStarted;
+                      final isFav = true; // 在收藏列表里一定是收藏的
 
-                        return PoemCard(
-                          poem: poem,
-                          isFavorite: isFav,
-                          learningStatus: status,
-                          onTap: () =>
-                              context.push(AppRoutes.poemDetailOf(poem.id)),
-                        )
-                            .animatePage(context)
-                            .fadeIn(
-                              delay: (60 * index).ms,
-                              duration: 300.ms,
-                            )
-                            .slideY(
-                              begin: 0.05,
-                              end: 0,
-                              delay: (60 * index).ms,
-                              duration: 300.ms,
-                            );
-                      },
-                      childCount: favorites.length,
-                    ),
+                      return PoemCard(
+                            poem: poem,
+                            isFavorite: isFav,
+                            learningStatus: status,
+                            onTap: () =>
+                                context.push(AppRoutes.poemDetailOf(poem.id)),
+                          )
+                          .animatePage(context)
+                          .fadeIn(delay: (60 * index).ms, duration: 300.ms)
+                          .slideY(
+                            begin: 0.05,
+                            end: 0,
+                            delay: (60 * index).ms,
+                            duration: 300.ms,
+                          );
+                    }, childCount: favorites.length),
                   ),
                 ),
             ],

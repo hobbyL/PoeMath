@@ -113,8 +113,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          textbookReadingLayoutProvider
-              .overrideWith((_, __) async => readingLayouts),
+          textbookReadingLayoutProvider.overrideWith(
+            (_, __) async => readingLayouts,
+          ),
           textbookCourseProvider(book.pdfSha256).overrideWith(
             (_) async => TextbookCoursePack.fromJson(raw ?? courseFixture()),
           ),
@@ -161,8 +162,10 @@ void main() {
       for (final category in TextbookCoursePack.categories)
         category: <Object?>[],
     });
-    (((raw['units'] as List).single as Map)['lessonIds'] as List)
-        .insert(0, 'lesson-empty');
+    (((raw['units'] as List).single as Map)['lessonIds'] as List).insert(
+      0,
+      'lesson-empty',
+    );
     return raw;
   }
 
@@ -224,8 +227,9 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     for (final poetry in [false, true]) {
-      testWidgets('读一读接通诗行和空行分节，切换拼音保留结构（诗歌=$poetry，字号=$scale）',
-          (tester) async {
+      testWidgets('读一读接通诗行和空行分节，切换拼音保留结构（诗歌=$poetry，字号=$scale）', (
+        tester,
+      ) async {
         final raw = courseFixture();
         final lesson = (raw['lessons'] as List).single as Map;
         lesson['kind'] = poetry ? 'poetry' : 'text';
@@ -360,8 +364,9 @@ void main() {
           expect(find.text('hē'), findsOneWidget);
           final note = tester.widget<Text>(
             find.descendant(
-              of: find
-                  .byKey(const ValueKey('recognition-note-recognition-001')),
+              of: find.byKey(
+                const ValueKey('recognition-note-recognition-001'),
+              ),
               matching: find.byType(Text),
             ),
           );
@@ -388,8 +393,9 @@ void main() {
               of: find.byKey(
                 const ValueKey('recognition-practice-recognition-001'),
               ),
-              matching: find
-                  .byKey(const ValueKey('recognition-card-recognition-001')),
+              matching: find.byKey(
+                const ValueKey('recognition-card-recognition-001'),
+              ),
             ),
             findsOneWidget,
           );
@@ -461,7 +467,8 @@ void main() {
 
   testWidgets('封面没有课目，窄屏和横屏大字的内容完整显示且可滚动', (tester) async {
     await pump(tester, TextbookContentSection.reading, pages: const [1]);
-    expect(find.text('当前页暂无对应课目，请翻到课文页后再查看。'), findsOneWidget);
+    expect(find.text('当前页暂无对应课目'), findsOneWidget);
+    expect(find.text('请翻到课文页后再查看。'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     for (final size in [const Size(320, 640), const Size(800, 280)]) {
       for (final section in TextbookContentSection.values) {
@@ -470,8 +477,9 @@ void main() {
           find.widgetWithText(AppBar, '${section.label}·星月测试'),
           findsOneWidget,
         );
-        final card = tester
-            .getRect(find.byKey(const ValueKey('textbook-content-lesson-001')));
+        final card = tester.getRect(
+          find.byKey(const ValueKey('textbook-content-lesson-001')),
+        );
         expect(card.left, 16);
         expect(card.right, size.width - 16);
         expect(tester.takeException(), isNull);
@@ -555,9 +563,8 @@ void main() {
           child: MaterialApp.router(
             routerConfig: router,
             builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: TextScaler.linear(scale),
-              ),
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
               child: child!,
             ),
           ),
@@ -575,10 +582,9 @@ void main() {
       final overview = tester.widget<TextbookExerciseOverview>(
         find.byType(TextbookExerciseOverview),
       );
-      expect(
-        overview.exercises.map((exercise) => exercise.id),
-        ['exercise-001'],
-      );
+      expect(overview.exercises.map((exercise) => exercise.id), [
+        'exercise-001',
+      ]);
       expect(find.text('完成'), findsOneWidget);
       expect(find.byType(ColoredCard), findsOneWidget);
       expect(
@@ -590,9 +596,7 @@ void main() {
       );
       expect(
         tester
-            .widget<TextButton>(
-              find.widgetWithText(TextButton, '完成'),
-            )
+            .widget<TextButton>(find.widgetWithText(TextButton, '完成'))
             .onPressed,
         isNotNull,
       );

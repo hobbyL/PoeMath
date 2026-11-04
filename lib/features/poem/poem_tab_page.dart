@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
-import 'package:poemath/core/widgets/page_animation_scope.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/poem_card.dart';
@@ -92,8 +92,8 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
 
   /// 应用搜索（同步本地状态到 provider 并关闭面板）。
   void _applySearch() {
-    ref.read(poemSearchQueryProvider.notifier).state =
-        _searchController.text.trim();
+    ref.read(poemSearchQueryProvider.notifier).state = _searchController.text
+        .trim();
     ref.read(selectedGradeProvider.notifier).state = _localGrade;
     ref.read(selectedSemesterProvider.notifier).state = _localSemester;
     ref.read(selectedStatusFilterProvider.notifier).state = _localStatus;
@@ -130,7 +130,6 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   @override
   Widget build(BuildContext context) {
     final poems = ref.watch(filteredPoemsProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
       body: LayoutBuilder(
@@ -145,10 +144,12 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                 floating: true,
                 snap: true,
                 centerTitle: widget.navigationTitle != null ? true : null,
-                titleSpacing:
-                    widget.navigationTitle != null ? SpacingTokens.sm : null,
-                leadingWidth:
-                    widget.navigationTitle != null ? SpacingTokens.xxl : null,
+                titleSpacing: widget.navigationTitle != null
+                    ? SpacingTokens.sm
+                    : null,
+                leadingWidth: widget.navigationTitle != null
+                    ? SpacingTokens.xxl
+                    : null,
                 toolbarHeight: widget.navigationToolbarHeight ?? kToolbarHeight,
                 automaticallyImplyLeading: false,
                 leading: IconButton(
@@ -167,9 +168,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                     onPressed: _panelOpen ? _closePanel : _openPanel,
                     icon: Badge(
                       isLabelVisible: _hasActiveFilters && !_panelOpen,
-                      child: Icon(
-                        _panelOpen ? Icons.search_off : Icons.search,
-                      ),
+                      child: Icon(_panelOpen ? Icons.search_off : Icons.search),
                     ),
                     tooltip: '搜索筛选',
                   ),
@@ -190,26 +189,12 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
 
               // ============ 诗词列表 ============
               if (poems.isEmpty)
-                SliverFillRemaining(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.menu_book_rounded,
-                          size: 64,
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: SpacingTokens.md),
-                        Text(
-                          '暂无诗词',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: AppEmptyState(
+                    icon: Icons.menu_book_outlined,
+                    title: '暂无诗词',
+                    description: '试试其他关键词或调整筛选条件。',
                   ),
                 )
               else
@@ -225,36 +210,27 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                       mainAxisSpacing: SpacingTokens.sm,
                       mainAxisExtent: 140,
                     ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final poem = poems[index];
-                        final isFav = ref.watch(isFavoriteProvider(poem.id));
-                        final progress =
-                            ref.watch(poemProgressProvider(poem.id));
-                        return PoemCard(
-                          poem: poem,
-                          isFavorite: isFav,
-                          learningStatus: progress?.status,
-                          onTap: () {
-                            context.push(
-                              AppRoutes.poemDetailOf(poem.id),
-                            );
-                          },
-                        )
-                            .animatePage(context)
-                            .fadeIn(
-                              delay: (80 * index).ms,
-                              duration: 300.ms,
-                            )
-                            .slideX(
-                              begin: 0.1,
-                              end: 0,
-                              delay: (80 * index).ms,
-                              duration: 300.ms,
-                            );
-                      },
-                      childCount: poems.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final poem = poems[index];
+                      final isFav = ref.watch(isFavoriteProvider(poem.id));
+                      final progress = ref.watch(poemProgressProvider(poem.id));
+                      return PoemCard(
+                            poem: poem,
+                            isFavorite: isFav,
+                            learningStatus: progress?.status,
+                            onTap: () {
+                              context.push(AppRoutes.poemDetailOf(poem.id));
+                            },
+                          )
+                          .animatePage(context)
+                          .fadeIn(delay: (80 * index).ms, duration: 300.ms)
+                          .slideX(
+                            begin: 0.1,
+                            end: 0,
+                            delay: (80 * index).ms,
+                            duration: 300.ms,
+                          );
+                    }, childCount: poems.length),
                   ),
                 ),
             ],
@@ -273,8 +249,9 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
 
     // 根据选中年级联动计算可选作者/朝代
     final repo = ref.read(poemRepoProvider);
-    final gradePoems =
-        _localGrade != null ? repo.byGrade(_localGrade!) : repo.getAll();
+    final gradePoems = _localGrade != null
+        ? repo.byGrade(_localGrade!)
+        : repo.getAll();
     final authors = gradePoems.map((p) => p.author).toSet().toList()..sort();
     final dynasties = gradePoems.map((p) => p.dynasty).toSet().toList()..sort();
 
@@ -424,15 +401,9 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                 children: [
                   // 清空按钮（有任何本地筛选时显示）
                   if (_hasLocalFilters)
-                    TextButton(
-                      onPressed: _clearAll,
-                      child: const Text('清空'),
-                    ),
+                    TextButton(onPressed: _clearAll, child: const Text('清空')),
                   const Spacer(),
-                  TextButton(
-                    onPressed: _closePanel,
-                    child: const Text('取消'),
-                  ),
+                  TextButton(onPressed: _closePanel, child: const Text('取消')),
                   const SizedBox(width: SpacingTokens.sm),
                   FilledButton.icon(
                     onPressed: _applySearch,
@@ -462,8 +433,9 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
   void _invalidateLinkedFilters() {
     if (_localAuthor == null && _localDynasty == null) return;
     final repo = ref.read(poemRepoProvider);
-    final poems =
-        _localGrade != null ? repo.byGrade(_localGrade!) : repo.getAll();
+    final poems = _localGrade != null
+        ? repo.byGrade(_localGrade!)
+        : repo.getAll();
     if (_localAuthor != null && !poems.any((p) => p.author == _localAuthor)) {
       _localAuthor = null;
     }
@@ -544,9 +516,8 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                 const SizedBox(height: SpacingTokens.md),
                 Text(
                   '筛选学习状态',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(ctx).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 Flexible(
@@ -595,9 +566,8 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                 const SizedBox(height: SpacingTokens.md),
                 Text(
                   '选择年级',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(ctx).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 Flexible(
@@ -655,9 +625,8 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                 const SizedBox(height: SpacingTokens.md),
                 Text(
                   '选择类型',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(ctx).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 Flexible(
@@ -713,9 +682,8 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                 const SizedBox(height: SpacingTokens.md),
                 Text(
                   title,
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(ctx).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 Flexible(
