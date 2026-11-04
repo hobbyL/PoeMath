@@ -77,18 +77,16 @@ bool _isCurrentPage(BuildContext context) =>
 
 void _showStorageError(BuildContext context) {
   if (!_isCurrentPage(context)) return;
-  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-    const SnackBar(content: Text('安全存储暂时无法读取，家长区保持锁定，请稍后重试')),
-  );
+  ScaffoldMessenger.maybeOf(context)
+      ?.showSnackBar(const SnackBar(content: Text('安全存储暂时无法读取，家长区保持锁定，请稍后重试')));
 }
 
 Future<void> _openParentSetup(BuildContext context) async {
   if (!_isCurrentPage(context)) return;
   final router = GoRouter.maybeOf(context);
   if (router == null) {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(content: Text('设置与管理需要家长密码，请先前往家长设置')),
-    );
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(const SnackBar(content: Text('设置与管理需要家长密码，请先前往家长设置')));
     return;
   }
   if (router.routerDelegate.currentConfiguration.lastOrNull?.matchedLocation ==
@@ -110,9 +108,8 @@ Future<_ParentAccessResult> _requestParentAccess(
     return _ParentAccessResult.denied;
   }
   if (access.needsResetNotice) {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(content: Text('此设备没有原家长验证记录，请重新设置家长密码')),
-    );
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(const SnackBar(content: Text('此设备没有原家长验证记录，请重新设置家长密码')));
   }
   if (!access.enabled) {
     if (access.canSetPin) await _openParentSetup(context);
@@ -183,54 +180,51 @@ class _ParentUnlockDialogState extends State<_ParentUnlockDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: Text(_recovery ? '使用一次性恢复码' : '家长解锁'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _recovery
-                    ? '恢复成功后需重新设置家长密码，此恢复码随即失效。'
-                    : '解锁有效 ${ParentAccessService.unlockDuration.inMinutes} 分钟，切到后台会立即锁定。',
-              ),
-              const SizedBox(height: SpacingTokens.md),
-              TextField(
-                controller: _input,
-                autofocus: true,
-                enabled: !_busy,
-                obscureText: !_recovery,
-                keyboardType:
-                    _recovery ? TextInputType.text : TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: _recovery ? '恢复码' : '6 位数字 PIN',
-                  errorText: _error,
-                ),
-                onSubmitted: (_) => _unlock(),
-              ),
-              TextButton(
-                onPressed: _busy
-                    ? null
-                    : () => setState(() {
-                          _recovery = !_recovery;
-                          _input.clear();
-                          _error = null;
-                        }),
-                child: Text(_recovery ? '使用 PIN' : '忘记 PIN，使用恢复码'),
-              ),
-            ],
+    title: Text(_recovery ? '使用一次性恢复码' : '家长解锁'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_recovery) ...[
+            const Text('恢复成功后需重新设置家长密码，此恢复码随即失效。'),
+            const SizedBox(height: SpacingTokens.md),
+          ],
+          TextField(
+            controller: _input,
+            autofocus: true,
+            enabled: !_busy,
+            obscureText: !_recovery,
+            keyboardType: _recovery ? TextInputType.text : TextInputType.number,
+            decoration: InputDecoration(
+              labelText: _recovery ? '恢复码' : '6 位数字 PIN',
+              errorText: _error,
+            ),
+            onSubmitted: (_) => _unlock(),
           ),
-        ),
-        actions: [
           TextButton(
-            onPressed: _busy ? null : () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: _busy ? null : _unlock,
-            child: Text(_busy ? '验证中…' : '解锁'),
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _recovery = !_recovery;
+                    _input.clear();
+                    _error = null;
+                  }),
+            child: Text(_recovery ? '使用 PIN' : '忘记 PIN，使用恢复码'),
           ),
         ],
-      );
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _busy ? null : () => Navigator.pop(context, false),
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        onPressed: _busy ? null : _unlock,
+        child: Text(_busy ? '验证中…' : '解锁'),
+      ),
+    ],
+  );
 }
 
 /// 同时用于 GoRouter 和 Navigator 页面，短时授权失效时移除可编辑页面。
@@ -407,8 +401,8 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
                 _storageFailed
                     ? '家长设置暂时无法读取，请稍后重试'
                     : setup
-                        ? '设置与管理需要家长密码，请先设置'
-                        : '请由家长解锁后继续',
+                    ? '设置与管理需要家长密码，请先设置'
+                    : '请由家长解锁后继续',
               ),
               const SizedBox(height: SpacingTokens.md),
               FilledButton(
@@ -417,14 +411,11 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
                   _storageFailed
                       ? '重试'
                       : setup
-                          ? '设置家长密码'
-                          : '家长解锁',
+                      ? '设置家长密码'
+                      : '家长解锁',
                 ),
               ),
-              TextButton(
-                onPressed: _leave,
-                child: const Text('返回个人页'),
-              ),
+              TextButton(onPressed: _leave, child: const Text('返回个人页')),
             ],
           ),
         ),
