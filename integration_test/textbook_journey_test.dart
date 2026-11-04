@@ -257,6 +257,7 @@ void main() {
       );
       expect(find.text('2 / 3'), findsOneWidget);
       expect(repo.reading('default', book.pdfSha256).page, 2);
+      expect(repo.recentBook('default'), isNull);
       await tester.tap(find.byKey(const ValueKey('textbook-detail-read')));
       await _until(
         tester,
@@ -270,6 +271,10 @@ void main() {
       expect(
         tester.widget<PdfViewer>(find.byType(PdfViewer)).initialPageNumber,
         2,
+      );
+      await _until(
+        tester,
+        () => repo.recentBook('default')?.pdfSha256 == book.pdfSha256,
       );
       await _until(
         tester,
@@ -322,6 +327,7 @@ void main() {
       );
       expect(await service.installedPath(book), isNull);
       expect(repo.reading('default', book.pdfSha256).page, 2);
+      expect(repo.recentBook('default')?.pdfSha256, book.pdfSha256);
       final reimported = await service.importPdf(
         sourcePath: source.path,
         token: TextbookImportToken(),
