@@ -26,6 +26,7 @@ class LearningQualitySection extends ConsumerStatefulWidget {
 class _LearningQualitySectionState
     extends ConsumerState<LearningQualitySection> {
   bool _opening = false;
+  bool _showDetails = false;
 
   @override
   Widget build(BuildContext context) {
@@ -47,34 +48,33 @@ class _LearningQualitySectionState
                 '新学 ${report.newPoems} 首 · 练习 ${report.poemPracticeCount} 次 · 完成复习 ${report.completedReviews} 次',
               ),
               Text('新增掌握 ${report.newlyMasteredPoems} 首'),
-              const SizedBox(height: SpacingTokens.xs),
-              const Text(
-                '新学按首次学习的诗词计数；练习含背诵、测试、默写及跟读，可与新学、复习重叠。复习仅计有记录的完成事件，旧历史未知。',
-              ),
-              if (report.poemHistoryUnknown) ...[
-                const SizedBox(height: SpacingTokens.xs),
-                const Text('部分诗词历史只有最后学习时间，无法还原每次练习。'),
-              ],
-              if (report.masteryHistoryUnknown) ...[
-                const SizedBox(height: SpacingTokens.xs),
-                const Text('部分已掌握诗词没有首次掌握日期，不计入本期新增。'),
-              ],
-              for (final mode in report.poemModes) ...[
-                const SizedBox(height: SpacingTokens.xs),
-                Text(_poemModeLabel(mode)),
-              ],
-              const SizedBox(height: SpacingTokens.xs),
-              const Text('测试按题、默写与跟读按句分别统计，不合并为诗词总正确率；背诵不同提示级别仅计完成次数。'),
+              if (report.poemHistoryUnknown || report.masteryHistoryUnknown)
+                const Text('部分历史记录不完整，详见统计说明。'),
               const SizedBox(height: SpacingTokens.sm),
               Text(
                 '数学知识点已分类 ${report.classifiedMathTotal}/$total 题 · 历史或挑战未分类 ${report.unknownMathTotal} 题',
               ),
               const SizedBox(height: SpacingTokens.xs),
-              const Text('正确率来自逐题作答；不从错题数推算。变化对比前一个同长度周期。'),
             ],
           ),
         ),
         const SizedBox(height: SpacingTokens.sm),
+        if (report.recommendations.isNotEmpty) ...[
+          Text('接下来练什么', style: theme.textTheme.titleMedium),
+          const SizedBox(height: SpacingTokens.sm),
+          for (final quality in report.recommendations) ...[
+            AppTile(
+              icon: Icons.play_circle_outline,
+              iconColor: theme.colorScheme.primary,
+              title: '${quality.skill.label} · 再练 5 题',
+              subtitle: quality.isSmallSample
+                  ? '样本不足，补充练习后再判断掌握情况'
+                  : '本期正确率低于 80%，试试同知识点专项',
+              onTap: _opening ? null : () => _practice(quality),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
+        ],
         if (report.skills.isEmpty)
           const AppEmptyState(
             icon: Icons.analytics_outlined,
@@ -93,21 +93,45 @@ class _LearningQualitySectionState
           ),
           const SizedBox(height: SpacingTokens.sm),
         ],
-        if (report.recommendations.isNotEmpty) ...[
-          Text('接下来练什么', style: theme.textTheme.titleMedium),
+        AppTile(
+          icon: Icons.info_outline,
+          iconColor: theme.colorScheme.primary,
+          title: '统计说明与诗词明细',
+          subtitle: _showDetails ? '点击收起' : '查看统计口径、诗词练习和历史记录说明',
+          trailingIcon: _showDetails ? Icons.expand_less : Icons.expand_more,
+          onTap: () => setState(() => _showDetails = !_showDetails),
+        ),
+        if (_showDetails) ...[
           const SizedBox(height: SpacingTokens.sm),
-          for (final quality in report.recommendations) ...[
-            AppTile(
-              icon: Icons.play_circle_outline,
-              iconColor: theme.colorScheme.primary,
-              title: '${quality.skill.label} · 再练 5 题',
-              subtitle: quality.isSmallSample
-                  ? '样本不足，补充练习后再判断掌握情况'
-                  : '本期正确率低于 80%，试试同知识点专项',
-              onTap: _opening ? null : () => _practice(quality),
+          ColoredCard(
+            color: theme.colorScheme.primary,
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: SpacingTokens.xs),
+                const Text(
+                  '新学按首次学习的诗词计数；练习含背诵、测试、默写及跟读，可与新学、复习重叠。复习仅计有记录的完成事件，旧历史未知。',
+                ),
+                if (report.poemHistoryUnknown) ...[
+                  const SizedBox(height: SpacingTokens.xs),
+                  const Text('部分诗词历史只有最后学习时间，无法还原每次练习。'),
+                ],
+                if (report.masteryHistoryUnknown) ...[
+                  const SizedBox(height: SpacingTokens.xs),
+                  const Text('部分已掌握诗词没有首次掌握日期，不计入本期新增。'),
+                ],
+                for (final mode in report.poemModes) ...[
+                  const SizedBox(height: SpacingTokens.xs),
+                  Text(_poemModeLabel(mode)),
+                ],
+                const SizedBox(height: SpacingTokens.xs),
+                const Text('测试按题、默写与跟读按句分别统计，不合并为诗词总正确率；背诵不同提示级别仅计完成次数。'),
+                const SizedBox(height: SpacingTokens.sm),
+                const Text('正确率来自逐题作答；不从错题数推算。变化对比前一个同长度周期。'),
+              ],
             ),
-            const SizedBox(height: SpacingTokens.sm),
-          ],
+          ),
         ],
       ],
     );

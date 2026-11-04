@@ -104,6 +104,16 @@ void main() {
               child: child!,),
         ),),);
     await tester.pumpAndSettle();
+    expect(find.textContaining('测试 8/10 题正确'), findsNothing);
+    expect(find.text('样本不足，补充练习后再判断掌握情况'), findsOneWidget);
+    expect(find.text('部分历史记录不完整，详见统计说明。'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('进位加法 · 再练 5 题')).dy,
+      lessThan(tester.getTopLeft(find.textContaining('2/5 题正确')).dy),
+    );
+    await tester.ensureVisible(find.text('统计说明与诗词明细'));
+    await tester.tap(find.text('统计说明与诗词明细'));
+    await tester.pumpAndSettle();
     expect(find.textContaining('2/5 题正确'), findsOneWidget);
     expect(find.textContaining('历史或挑战未分类 8 题'), findsOneWidget);
     expect(find.textContaining('小样本（少于 5 题）'), findsOneWidget);
