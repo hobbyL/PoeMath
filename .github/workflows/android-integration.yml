@@ -24,6 +24,18 @@ jobs:
       - run: flutter pub get
       - name: Check native PDFium security inputs
         run: python3 tools/check_pdfium_security.py
+      - name: Check disk space before Android emulator setup
+        run: |
+          set -euo pipefail
+          poemath_avd_home="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
+          mkdir -p "$poemath_avd_home"
+          df -h "$poemath_avd_home"
+          poemath_available_kb=$(df -Pk "$poemath_avd_home" | awk 'NR == 2 {print $4}')
+          # Reserve 2 GiB for test data and 3 GiB for SDK/build headroom.
+          if [ "$poemath_available_kb" -lt 5242880 ]; then
+            echo "::error::Android emulator setup needs at least 5 GiB free; available: ${poemath_available_kb} KiB."
+            exit 1
+          fi
       - name: Enable KVM for Android emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -35,5 +47,9 @@ jobs:
           api-level: 24
           arch: x86_64
           target: google_apis
+          # The hosted runner had 6106 MB free; the default userdata needed 7373 MB.
+          # Keep disposable test data bounded independently of emulator defaults.
+          disk-size: 2048M
+          pre-emulator-launch-script: df -h "$ANDROID_AVD_HOME"
           disable-animations: true
           script: flutter test integration_test/app_journeys_test.dart -d emulator-5554 --dart-define=POEMATH_INTEGRATION_TEST=true --no-uninstall
