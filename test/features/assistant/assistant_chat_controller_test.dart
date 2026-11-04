@@ -65,10 +65,10 @@ String _sseData(String content) {
 
 /// 把整段回答包装成「单片 + [DONE]」的 OpenAI 兼容 SSE 响应。
 http.Response _sseResponse(String content) => http.Response.bytes(
-      utf8.encode('${_sseData(content)}data: [DONE]\n\n'),
-      200,
-      headers: const {'content-type': 'text/event-stream; charset=utf-8'},
-    );
+  utf8.encode('${_sseData(content)}data: [DONE]\n\n'),
+  200,
+  headers: const {'content-type': 'text/event-stream; charset=utf-8'},
+);
 
 /// 判定请求体是否为流式（chatStream 发 stream:true；chatComplete 不发）。
 /// 控制器现为两跳：先非流式 chatComplete 判定工具，再流式 chatStream 收尾，
@@ -87,36 +87,34 @@ Map<String, Object?> _toolCallWire(
   String id,
   String name, [
   String args = '{}',
-]) =>
-    <String, Object?>{
-      'id': id,
-      'type': 'function',
-      'function': <String, Object?>{'name': name, 'arguments': args},
-    };
+]) => <String, Object?>{
+  'id': id,
+  'type': 'function',
+  'function': <String, Object?>{'name': name, 'arguments': args},
+};
 
 /// 非流式 chatComplete JSON 响应：无 tool_calls（content 占位，判定为纯聊天）
 /// 或携带 tool_calls（content 置空，驱动工具循环）。
 http.Response _completionResponse({
   String? content = '占位',
   List<Map<String, Object?>> toolCalls = const [],
-}) =>
-    http.Response.bytes(
-      utf8.encode(
-        jsonEncode(<String, Object?>{
-          'choices': <Object?>[
-            <String, Object?>{
-              'message': <String, Object?>{
-                'role': 'assistant',
-                'content': toolCalls.isEmpty ? content : null,
-                if (toolCalls.isNotEmpty) 'tool_calls': toolCalls,
-              },
-            },
-          ],
-        }),
-      ),
-      200,
-      headers: const {'content-type': 'application/json; charset=utf-8'},
-    );
+}) => http.Response.bytes(
+  utf8.encode(
+    jsonEncode(<String, Object?>{
+      'choices': <Object?>[
+        <String, Object?>{
+          'message': <String, Object?>{
+            'role': 'assistant',
+            'content': toolCalls.isEmpty ? content : null,
+            if (toolCalls.isNotEmpty) 'tool_calls': toolCalls,
+          },
+        },
+      ],
+    }),
+  ),
+  200,
+  headers: const {'content-type': 'application/json; charset=utf-8'},
+);
 
 /// [_completionResponse] 的 StreamedResponse 版本（MockClient.streaming 用）：
 /// chatComplete 走 post 读满有限流，不会卡在手工喂片的 StreamController 上。
@@ -194,12 +192,14 @@ void main() {
         if (model == 'A' || (model == 'B' && stream)) {
           return http.Response('', 503);
         }
-        final hasTool = (body['messages'] as List)
-            .any((message) => message['role'] == 'tool');
+        final hasTool = (body['messages'] as List).any(
+          (message) => message['role'] == 'tool',
+        );
         if (hasTool) {
           expect(
-            (body['messages'] as List)
-                .where((message) => message['role'] == 'tool'),
+            (body['messages'] as List).where(
+              (message) => message['role'] == 'tool',
+            ),
             hasLength(1),
           );
           return stream ? _sseResponse('完整回答') : _completionResponse();
@@ -259,8 +259,9 @@ void main() {
           request.headers['authorization'],
           'Bearer ${request.url.host == 'p1.example' ? 'p1-key' : 'p2-key'}',
         );
-        final toolMessages = (body['messages'] as List)
-            .where((message) => message['role'] == 'tool');
+        final toolMessages = (body['messages'] as List).where(
+          (message) => message['role'] == 'tool',
+        );
         if (request.url.host == 'p2.example') {
           expect(toolMessages, hasLength(1));
           return _sseResponse('跨供应商回答');
@@ -320,13 +321,10 @@ void main() {
         final body = jsonDecode(wire) as Map;
         requests.add(body['model'] as String);
         if (!_isStream(wire)) return _completionStreamed();
-        return http.StreamedResponse(
-          () async* {
-            yield utf8.encode(_sseData('已经生成'));
-            throw http.ClientException('断开');
-          }(),
-          200,
-        );
+        return http.StreamedResponse(() async* {
+          yield utf8.encode(_sseData('已经生成'));
+          throw http.ClientException('断开');
+        }(), 200);
       }),
     );
     await container.read(assistantChatControllerProvider.notifier).send('提问');
@@ -375,47 +373,49 @@ void main() {
     });
   }
 
-  test('send 成功：追加 user+assistant；契约 system 首条 / stream / 1024 / 发往 p1',
-      () async {
-    await seedProviders();
-    late http.Request captured;
-    final container = containerWith(
-      MockClient((request) async {
-        // chatComplete（非流式）先判定无工具；最终回答走 chatStream。
-        if (!_isStream(request.body)) return _completionResponse();
-        captured = request;
-        return _sseResponse('你好呀，小朋友！');
-      }),
-    );
+  test(
+    'send 成功：追加 user+assistant；契约 system 首条 / stream / 1024 / 发往 p1',
+    () async {
+      await seedProviders();
+      late http.Request captured;
+      final container = containerWith(
+        MockClient((request) async {
+          // chatComplete（非流式）先判定无工具；最终回答走 chatStream。
+          if (!_isStream(request.body)) return _completionResponse();
+          captured = request;
+          return _sseResponse('你好呀，小朋友！');
+        }),
+      );
 
-    await container.read(assistantChatControllerProvider.notifier).send('你好');
+      await container.read(assistantChatControllerProvider.notifier).send('你好');
 
-    final state = container.read(assistantChatControllerProvider);
-    expect(state.isReady, isTrue);
-    expect(state.messages, hasLength(2));
-    expect(state.messages[0].role, ChatRole.user);
-    expect(state.messages[0].content, '你好');
-    expect(state.messages[1].role, ChatRole.assistant);
-    expect(state.messages[1].content, '你好呀，小朋友！');
-    expect(state.streamingText, isEmpty);
+      final state = container.read(assistantChatControllerProvider);
+      expect(state.isReady, isTrue);
+      expect(state.messages, hasLength(2));
+      expect(state.messages[0].role, ChatRole.user);
+      expect(state.messages[0].content, '你好');
+      expect(state.messages[1].role, ChatRole.assistant);
+      expect(state.messages[1].content, '你好呀，小朋友！');
+      expect(state.streamingText, isEmpty);
 
-    expect(
-      captured.url.toString(),
-      'https://api.deepseek.com/v1/chat/completions',
-    );
-    expect(captured.headers['authorization'], 'Bearer key-p1');
-    final body = jsonDecode(captured.body) as Map<String, dynamic>;
-    expect(body['stream'], true);
-    expect(body['model'], 'deepseek-chat');
-    expect(body['max_tokens'], kAssistantMaxTokens);
-    final messages = body['messages'] as List<dynamic>;
-    expect(messages[0]['role'], 'system');
-    expect(messages[0]['content'], kAssistantSystemPrompt);
-    expect(messages[1]['role'], 'user');
-    expect(messages[1]['content'], '你好');
-    // key 绝不进请求体。
-    expect(captured.body, isNot(contains('key-p1')));
-  });
+      expect(
+        captured.url.toString(),
+        'https://api.deepseek.com/v1/chat/completions',
+      );
+      expect(captured.headers['authorization'], 'Bearer key-p1');
+      final body = jsonDecode(captured.body) as Map<String, dynamic>;
+      expect(body['stream'], true);
+      expect(body['model'], 'deepseek-chat');
+      expect(body['max_tokens'], kAssistantMaxTokens);
+      final messages = body['messages'] as List<dynamic>;
+      expect(messages[0]['role'], 'system');
+      expect(messages[0]['content'], kAssistantSystemPrompt);
+      expect(messages[1]['role'], 'user');
+      expect(messages[1]['content'], '你好');
+      // key 绝不进请求体。
+      expect(captured.body, isNot(contains('key-p1')));
+    },
+  );
 
   test('多轮续问：请求体携带历史轮次（system + user + assistant + user）', () async {
     await seedProviders();
@@ -434,8 +434,9 @@ void main() {
     await notifier.send('第一问');
     await notifier.send('第二问');
 
-    final messages = (jsonDecode(captured.body)
-        as Map<String, dynamic>)['messages'] as List<dynamic>;
+    final messages =
+        (jsonDecode(captured.body) as Map<String, dynamic>)['messages']
+            as List<dynamic>;
     expect(messages, hasLength(4));
     expect(messages[0]['role'], 'system');
     expect(messages[1]['content'], '第一问');
@@ -464,8 +465,9 @@ void main() {
     await notifier.send('第二问');
 
     // 第二轮请求体只含 system + 第二问，旧记录（第一问/第一答）不入上下文。
-    final messages = (jsonDecode(captured.body)
-        as Map<String, dynamic>)['messages'] as List<dynamic>;
+    final messages =
+        (jsonDecode(captured.body) as Map<String, dynamic>)['messages']
+            as List<dynamic>;
     expect(messages, hasLength(2));
     expect(messages[0]['role'], 'system');
     expect(messages[1]['content'], '第二问');
@@ -567,8 +569,9 @@ void main() {
 
     await container.read(assistantChatControllerProvider.notifier).send('你好');
 
-    final messages = (jsonDecode(captured.body)
-        as Map<String, dynamic>)['messages'] as List<dynamic>;
+    final messages =
+        (jsonDecode(captured.body) as Map<String, dynamic>)['messages']
+            as List<dynamic>;
     expect(messages[0]['content'], '我的自定义助手人设');
   });
 
@@ -598,10 +601,7 @@ void main() {
     final state = container.read(assistantChatControllerProvider);
     expect(state.isReady, isTrue);
     // 旧 assistant 被替换，user 不重复。
-    expect(
-      state.messages.map((m) => m.content).toList(),
-      ['出一道题', '第二次回答'],
-    );
+    expect(state.messages.map((m) => m.content).toList(), ['出一道题', '第二次回答']);
     expect(streamCall, 2);
   });
 
@@ -621,14 +621,8 @@ void main() {
     final done = notifier.send('在吗');
     sse.add(utf8.encode(_sseData('在的')));
     await Future<void>.delayed(const Duration(milliseconds: 20));
-    expect(
-      container.read(assistantChatControllerProvider).isStreaming,
-      isTrue,
-    );
-    expect(
-      container.read(assistantChatControllerProvider).streamingText,
-      '在的',
-    );
+    expect(container.read(assistantChatControllerProvider).isStreaming, isTrue);
+    expect(container.read(assistantChatControllerProvider).streamingText, '在的');
 
     notifier.stop();
     final afterStop = container.read(assistantChatControllerProvider);
@@ -663,10 +657,7 @@ void main() {
     final done = notifier.send('旧会话问题');
     sse.add(utf8.encode(_sseData('旧回答片段')));
     await Future<void>.delayed(const Duration(milliseconds: 20));
-    expect(
-      container.read(assistantChatControllerProvider).isStreaming,
-      isTrue,
-    );
+    expect(container.read(assistantChatControllerProvider).isStreaming, isTrue);
 
     notifier.startNewConversation();
     expect(container.read(assistantChatControllerProvider).isIdle, isTrue);
@@ -759,13 +750,11 @@ void main() {
 
     final state = container.read(assistantChatControllerProvider);
     expect(state.isReady, isTrue);
-    expect(
-      state.messages.map((m) => m.content).toList(),
-      ['第一问', '第3答'],
-    );
+    expect(state.messages.map((m) => m.content).toList(), ['第一问', '第3答']);
     // 请求上下文只剩 system + 第一问。
-    final messages = (jsonDecode(captured.body)
-        as Map<String, dynamic>)['messages'] as List<dynamic>;
+    final messages =
+        (jsonDecode(captured.body) as Map<String, dynamic>)['messages']
+            as List<dynamic>;
     expect(messages, hasLength(2));
     expect(messages[0]['role'], 'system');
     expect(messages[1]['content'], '第一问');
@@ -832,18 +821,33 @@ void main() {
     );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
+    final streamed = Completer<void>();
+    final discarded = Completer<void>();
+    final subscription = container.listen(assistantChatControllerProvider, (
+      _,
+      next,
+    ) {
+      if (next.isStreaming &&
+          next.streamingText == '在的' &&
+          !streamed.isCompleted) {
+        streamed.complete();
+      }
+      if (streamed.isCompleted && next.isReady && !discarded.isCompleted) {
+        discarded.complete();
+      }
+    });
+    addTearDown(subscription.close);
+
     final done = notifier.send('在吗');
     sse.add(utf8.encode(_sseData('在的')));
-    await Future<void>.delayed(const Duration(milliseconds: 20));
-    expect(
-      container.read(assistantChatControllerProvider).isStreaming,
-      isTrue,
-    );
+    // 等真实状态，避免全量并发时 Hive/配置读取超过固定的 20ms。
+    await streamed.future.timeout(const Duration(seconds: 10));
+    expect(container.read(assistantChatControllerProvider).isStreaming, isTrue);
 
     // 页面退出：废弃在途流。若不收敛，重进页面（ensureOpen 对仍在的
     // 会话不重置聊天状态）后 isBusy 永远为 true，清除上下文按钮恒灰。
     notifier.discardPending();
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await discarded.future.timeout(const Duration(seconds: 10));
 
     final state = container.read(assistantChatControllerProvider);
     expect(state.isBusy, isFalse);

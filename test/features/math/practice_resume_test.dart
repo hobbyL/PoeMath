@@ -15,6 +15,7 @@ import 'package:poemath/math_engine/math_engine_api.dart';
 import 'package:poemath/math_engine/models/vertical_attempt.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
+
 import '../../helpers/hive_test_helper.dart';
 
 class _FailFinalSessionOnce extends MathSessionRepository {
@@ -49,29 +50,29 @@ MathProblem _addition({ProblemMode mode = ProblemMode.findResult}) =>
     );
 
 Map<String, dynamic> _checkpoint(MathProblem problem) => {
-      'sessionId': 'pending-math-final',
-      'startedAt': DateTime(2026, 10, 16, 10).toIso8601String(),
-      'completedAt': DateTime(2026, 10, 16, 10, 1).toIso8601String(),
-      'elapsedMilliseconds': 60000,
-      'index': 0,
-      'input': '37',
-      'request': const MathPracticeRequest(
-        grade: 2,
-        semester: '上',
-        count: 1,
-        difficulty: DifficultyLevel.medium,
-      ).toJson(),
-      'problems': [problem.toJson()],
-      'records': [
-        ProblemRecord(
-          problemText: problem.problemText,
-          answerText: '37',
-          userAnswer: '37',
-          isCorrect: true,
-          problem: problem.toJson(),
-        ).toJson(),
-      ],
-    };
+  'sessionId': 'pending-math-final',
+  'startedAt': DateTime(2026, 10, 16, 10).toIso8601String(),
+  'completedAt': DateTime(2026, 10, 16, 10, 1).toIso8601String(),
+  'elapsedMilliseconds': 60000,
+  'index': 0,
+  'input': '37',
+  'request': const MathPracticeRequest(
+    grade: 2,
+    semester: '上',
+    count: 1,
+    difficulty: DifficultyLevel.medium,
+  ).toJson(),
+  'problems': [problem.toJson()],
+  'records': [
+    ProblemRecord(
+      problemText: problem.problemText,
+      answerText: '37',
+      userAnswer: '37',
+      isCorrect: true,
+      problem: problem.toJson(),
+    ).toJson(),
+  ],
+};
 
 void main() {
   // 意图分流（从口算/竖式卡片进入时，草稿是另一种方案的处理）。
@@ -300,10 +301,14 @@ void main() {
     expect(HiveBoxes.userStats.get('default_stats')!.mathTotalProblems, 1);
     await tester.runAsync(() async {
       await tester.tap(find.text('查看成绩'));
-      await Future<void>.delayed(const Duration(milliseconds: 300));
     });
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
+    // 结算先等待真实 I/O，再等待庆祝弹窗的虚拟计时；两种时钟都需推进。
+    for (var i = 0; i < 100 && sound.completions == 0; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     final saved = HiveBoxes.mathSessions.values.single;
     expect(sound.completions, 1, reason: '重试成功只播放一次完成音');
     expect(saved.durationSeconds, 60);
@@ -402,10 +407,10 @@ void main() {
       });
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
-      expect(
-        container.read(mathProblemsProvider).map((p) => p.toJson()),
-        [first.toJson(), second.toJson()],
-      );
+      expect(container.read(mathProblemsProvider).map((p) => p.toJson()), [
+        first.toJson(),
+        second.toJson(),
+      ]);
       expect(container.read(mathCurrentIndexProvider), 1);
       expect(container.read(mathAnsweredCountProvider), 1);
       expect(find.text('3'), findsWidgets);
@@ -426,7 +431,7 @@ void main() {
       27,
       Operator.multiply,
       '2565',
-      ['thousands', 'hundreds', 'tens', 'ones']
+      ['thousands', 'hundreds', 'tens', 'ones'],
     ),
   ]) {
     testWidgets('竖式$a${op.symbol}$b显示所有结果数位，只填结果即可提交', (tester) async {
@@ -505,8 +510,9 @@ void main() {
   }
 
   for (final legacy in [true, false]) {
-    testWidgets('恢复乘法${legacy ? '旧完整答案' : '新高位作答'}草稿，数位内容可见且可直接提交',
-        (tester) async {
+    testWidgets('恢复乘法${legacy ? '旧完整答案' : '新高位作答'}草稿，数位内容可见且可直接提交', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(400, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -521,8 +527,11 @@ void main() {
       );
       final attempt = legacy
           ? const VerticalAttempt()
-          : const VerticalAttempt(ones: '5', tens: '6', hundreds: '5')
-              .withField('thousands', '2');
+          : const VerticalAttempt(
+              ones: '5',
+              tens: '6',
+              hundreds: '5',
+            ).withField('thousands', '2');
       await tester.runAsync(() async {
         await HiveBoxes.settings.put('sound_enabled', false);
         await HiveBoxes.settings.put('haptic_enabled', false);
@@ -575,10 +584,9 @@ void main() {
       final record = HiveBoxes.mathSessions.values.single.problemRecords.single;
       expect(record.userAnswer, '2565');
       expect(record.isCorrect, isTrue);
-      expect(
-        VerticalAttempt.fromJson(record.attempt!).higherDigits,
-        {'thousands': '2'},
-      );
+      expect(VerticalAttempt.fromJson(record.attempt!).higherDigits, {
+        'thousands': '2',
+      });
       await tester.runAsync(() async {
         await tester.pumpWidget(const SizedBox.shrink());
         await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -596,8 +604,11 @@ void main() {
       grade: 2,
       semester: '上',
     );
-    final attempt =
-        const VerticalAttempt(ones: '3', tens: '8', regroup: '0').toJson();
+    final attempt = const VerticalAttempt(
+      ones: '3',
+      tens: '8',
+      regroup: '0',
+    ).toJson();
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('sound_enabled', false);
       await HiveBoxes.settings.put('haptic_enabled', false);
@@ -665,18 +676,21 @@ void main() {
     clock.start(elapsedMilliseconds: 5000);
     clock.didChangeAppLifecycleState(AppLifecycleState.paused);
     final paused = clock.elapsedMilliseconds;
-    await tester
-        .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
     expect(clock.elapsedMilliseconds, paused);
     clock.didChangeAppLifecycleState(AppLifecycleState.resumed);
-    await tester
-        .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
     expect(clock.elapsedMilliseconds, greaterThan(paused));
     clock.finish();
     final finished = clock.elapsedMilliseconds;
     clock.didChangeAppLifecycleState(AppLifecycleState.resumed);
-    await tester
-        .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
     expect(clock.elapsedMilliseconds, finished);
   });
   for (final tens in ['7', '8']) {
