@@ -1,9 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:poemath/core/services/llm/llm_explain_providers.dart';
+import 'package:poemath/core/services/llm/llm_config.dart';
+import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/speech/preferred_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
@@ -11,6 +17,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_audio_service.dart';
 import 'package:poemath/features/chinese/expression/picture_story_practice_page.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
@@ -18,6 +25,16 @@ import 'package:poemath/features/chinese/expression/providers/picture_story_prov
 import '../../../helpers/hive_test_helper.dart';
 import '../../../helpers/parent_access_test_helper.dart';
 import '../../../helpers/picture_story_fixture.dart';
+
+class _VisionSettings extends SettingsRepository {
+  @override
+  Future<LlmConfig?> readLlmConfigForScenario(LlmScenario scenario) async =>
+      const LlmConfig(
+        baseUrl: 'https://llm.example.com',
+        apiKey: '',
+        model: 'gpt-4o-mini',
+      );
+}
 
 class _Speech
     implements
@@ -123,6 +140,8 @@ class _Repository extends PictureStoryRepository {
   final Zone ioZone;
   Completer<void>? nextSave;
   bool failHeldSave = false;
+  int completedSaves = 0;
+  bool failAiSave = false;
   final held = <Completer<void>>[];
   final writes = <Future<void>>[];
   @override
@@ -132,6 +151,7 @@ class _Repository extends PictureStoryRepository {
   }) {
     final completion = Completer<void>();
     final snapshot = record.copy();
+    if (snapshot.status == 'completed') completedSaves++;
     final pending = nextSave;
     nextSave = null;
     final fail = pending != null && failHeldSave;
@@ -140,6 +160,9 @@ class _Repository extends PictureStoryRepository {
       try {
         await pending?.future;
         if (fail) throw StateError('synthetic delayed write failure');
+        if (failAiSave && snapshot.feedbackJson.contains('"vision"')) {
+          throw StateError('synthetic AI feedback write failure');
+        }
         await super.save(snapshot, check: check);
         completion.complete();
       } on Object catch (error, stack) {
@@ -231,8 +254,7 @@ void main() {
     promptId = (await repository.savePrompt(
       prompt: pictureStoryFixture(),
       profileId: 'default',
-    ))
-        .id;
+    )).id;
     lockParentForTesting();
     audio = _Audio();
     speeches = [];
@@ -243,7 +265,7 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  Future<void> mount(WidgetTester tester) async {
+  Future<void> mount(WidgetTester tester, {http.Client? client}) async {
     tester.view.physicalSize = const Size(800, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -266,7 +288,9 @@ void main() {
         for (final saving in repository.writes) {
           try {
             await saving;
-          } on Object {/* The page handles write failures. */}
+          } on Object {
+            /* The page handles write failures. */
+          }
         }
       });
       await tester.pump();
@@ -275,6 +299,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          if (client != null)
+            llmExplainHttpClientProvider.overrideWithValue(client),
+          if (client != null)
+            settingsRepositoryProvider.overrideWithValue(_VisionSettings()),
           pictureStoryRepositoryProvider.overrideWithValue(repository),
           pictureStoryAudioServiceProvider.overrideWithValue(audio),
           speechRecognitionServiceFactoryProvider.overrideWithValue(() {
@@ -441,8 +469,9 @@ void main() {
     await tap(tester, '说好了');
     await tap(tester, '说一说');
     pending.complete();
-    await tester
-        .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
     await tester.pump();
     expect(speeches.last.active, isTrue);
     expect(find.widgetWithText(FilledButton, '说好了'), findsOneWidget);
@@ -478,4 +507,129 @@ void main() {
     expect(speeches.last.active, isTrue);
     expect(find.widgetWithText(FilledButton, '说好了'), findsOneWidget);
   });
+
+  Future<void> recordSegment(WidgetTester tester, {http.Client? client}) async {
+    await mount(tester, client: client);
+    await tap(tester, '说一说');
+    await tap(tester, '说好了');
+    await waitUntil(
+      tester,
+      () =>
+          HiveBoxes.pictureStoryPractice.values.single.segments.length == 1 &&
+          tester
+                  .widget<FilledButton>(
+                    find.widgetWithText(FilledButton, '说一说'),
+                  )
+                  .onPressed !=
+              null,
+    );
+  }
+
+  testWidgets('完成后留在已保存的反馈，重复点击只完成一次，缺录音保留文字', (tester) async {
+    await recordSegment(tester);
+    final complete = tester
+        .widget<IconButton>(
+          find.widgetWithIcon(IconButton, Icons.check_outlined),
+        )
+        .onPressed!;
+    complete();
+    complete();
+    await tester.pump();
+    await waitUntil(tester, () => find.text('练习已完成').evaluate().isNotEmpty);
+    final saved = HiveBoxes.pictureStoryPractice.values.single;
+    final feedback = jsonDecode(saved.feedbackJson) as Map<String, dynamic>;
+    expect(saved.status, 'completed');
+    expect(repository.completedSaves, 1);
+    expect(
+      find.text((feedback['highlights'] as List).first as String),
+      findsOneWidget,
+    );
+    expect(find.text(feedback['suggestion'] as String), findsOneWidget);
+    expect(find.text('孩子的表达'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    await tester.tap(find.text('孩子的表达'));
+    await waitUntil(
+      tester,
+      () => find.text('录音文件已清理，文字记录仍然保留').evaluate().isNotEmpty,
+    );
+    await background(tester);
+    await foreground(tester);
+    expect(find.text('练习已完成'), findsOneWidget);
+    expect(repository.completedSaves, 1);
+  });
+
+  testWidgets('完成保存失败保留草稿及重试，成功后才显示结果', (tester) async {
+    await recordSegment(tester);
+    final pending = Completer<void>();
+    repository.nextSave = pending;
+    repository.failHeldSave = true;
+    await tester.tap(find.byTooltip('完成练习').first);
+    await tester.pump();
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    pending.complete();
+    await waitUntil(
+      tester,
+      () => find.text('练习暂时没有保存，请检查设备空间后重试').evaluate().isNotEmpty,
+    );
+    expect(HiveBoxes.pictureStoryPractice.values.single.status, 'draft');
+    expect(find.text('练习已完成'), findsNothing);
+    await tester.tap(find.byTooltip('完成练习').first);
+    await waitUntil(tester, () => find.text('练习已完成').evaluate().isNotEmpty);
+    expect(HiveBoxes.pictureStoryPractice.values.single.status, 'completed');
+  });
+
+  testWidgets('完成写入前退后台取消旧结果，回来可重新完成', (tester) async {
+    await recordSegment(tester);
+    final pending = Completer<void>();
+    repository.nextSave = pending;
+    await tester.tap(find.byTooltip('完成练习').first);
+    await tester.pump();
+    await background(tester);
+    pending.complete();
+    await tester.runAsync(() => repository.writes.last);
+    await foreground(tester);
+    expect(HiveBoxes.pictureStoryPractice.values.single.status, 'draft');
+    expect(find.text('练习已完成'), findsNothing);
+    await tester.tap(find.byTooltip('完成练习').first);
+    await waitUntil(tester, () => find.text('练习已完成').evaluate().isNotEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final failSave in [false, true]) {
+    testWidgets('完成结果仅展示成功保存的反馈（AI保存失败：$failSave）', (tester) async {
+      repository.failAiSave = failSave;
+      var requests = 0;
+      final client = MockClient((request) async {
+        requests++;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {'role': 'assistant', 'content': '你说清了地点。再补充一个动作。'},
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      await recordSegment(tester, client: client);
+      await tester.runAsync(() => tester.tap(find.byTooltip('完成练习').first));
+      await waitUntil(tester, () => find.text('练习已完成').evaluate().isNotEmpty);
+      final saved = HiveBoxes.pictureStoryPractice.values.single;
+      expect(requests, 1);
+      expect(
+        find.text('你说清了地点。再补充一个动作。'),
+        failSave ? findsNothing : findsOneWidget,
+      );
+      expect(
+        (jsonDecode(saved.feedbackJson) as Map)['source'],
+        failSave ? 'local' : 'vision',
+      );
+      if (failSave) {
+        expect(find.text('练习已保存，AI 反馈未能保存，先看看本地反馈。'), findsOneWidget);
+        expect(find.text('你愿意把看到的内容说出来了。'), findsOneWidget);
+      }
+    });
+  }
 }

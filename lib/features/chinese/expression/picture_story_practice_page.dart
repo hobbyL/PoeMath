@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 
 import 'package:poemath/core/services/speech/preferred_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
@@ -30,6 +31,7 @@ import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_audio_service.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_feedback.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
 
 class PictureStoryPracticePage extends ConsumerStatefulWidget {
@@ -54,6 +56,8 @@ class _PictureStoryPracticePageState
   StreamSubscription<String>? _transcriptSubscription;
   SpeechRecognitionService? _speech;
   PictureStoryPracticeRecord? _record;
+  PictureStoryPracticeRecord? _savedRecord;
+  bool get _completed => _savedRecord?.status == 'completed';
   List<PictureStorySegment> _segments = [];
   String _liveText = '';
   String? _message;
@@ -153,7 +157,7 @@ class _PictureStoryPracticePageState
       _invalidateRecording();
       unawaited(_player.stop());
       // Persist only the segments already accepted while the page was active.
-      unawaited(_saveDraft());
+      if (!_finishing && !_completed) unawaited(_saveDraft());
       if (mounted) {
         setState(() {
           _starting = false;
@@ -172,7 +176,12 @@ class _PictureStoryPracticePageState
   }
 
   Future<void> _startRecording() async {
-    if (!_foreground || _starting || _recording || _processing || _finishing) {
+    if (!_foreground ||
+        _starting ||
+        _recording ||
+        _processing ||
+        _finishing ||
+        _completed) {
       return;
     }
     final generation = ++_generation;
@@ -345,7 +354,7 @@ class _PictureStoryPracticePageState
   }
 
   Future<void> _deleteSegment(PictureStorySegment segment) async {
-    if (_record == null) return;
+    if (_record == null || _finishing || _completed) return;
     final removedIndex = _segments.indexOf(segment);
     setState(() {
       _segments = [
@@ -370,6 +379,7 @@ class _PictureStoryPracticePageState
     if (!_foreground ||
         _starting ||
         _finishing ||
+        _completed ||
         _record == null ||
         _segments.isEmpty ||
         _recording ||
@@ -377,53 +387,64 @@ class _PictureStoryPracticePageState
       return;
     }
     final generation = _generation;
-    setState(() => _finishing = true);
-    final before = _record!.copy();
+    setState(() {
+      _finishing = true;
+      _message = null;
+    });
+    final completed = _record!.copy();
     try {
-      _record!.setSegments(_segments);
-      _record!.status = 'completed';
-      _record!.completedAt = DateTime.now();
-      _record!.usedHints = _usedHints;
-      _record!.feedbackJson = jsonEncode(<String, Object>{
+      completed.setSegments(_segments);
+      completed.status = 'completed';
+      completed.completedAt = DateTime.now();
+      completed.usedHints = _usedHints;
+      completed.feedbackJson = jsonEncode(<String, Object>{
         'source': 'local',
         'highlights': [
           '你愿意把看到的内容说出来了。',
           if (_segments.length > 1) '你用了多段话补充细节。',
         ],
-        'suggestion': _record!.answerText.trim().isEmpty
+        'suggestion': completed.answerText.trim().isEmpty
             ? '可以先填写听到的文字，再请家长一起回听。'
             : '再补充一个动作或人物的心情，故事会更生动。',
       });
-      if (!await _saveDraft(generation: generation)) {
-        if (!_current(generation)) return;
-        _record = before;
+      if (!await _saveDraft(generation: generation, snapshot: completed)) {
         return;
       }
       if (!_current(generation)) return;
+      _record = completed;
       final aiFeedback = await _generateAiFeedback(
         prompt: _prompt!,
         generation: generation,
       );
       if (!_current(generation)) return;
       if (aiFeedback != null) {
-        _record!.feedbackJson = jsonEncode(<String, Object>{
+        final withAi = completed.copy();
+        withAi.feedbackJson = jsonEncode(<String, Object>{
           'source': 'vision',
           'text': aiFeedback,
         });
-        await _saveDraft(generation: generation);
+        final saved = await _saveDraft(
+          generation: generation,
+          snapshot: withAi,
+        );
+        if (_current(generation)) {
+          if (saved) {
+            _record = withAi;
+          } else {
+            _message = '练习已保存，AI 反馈未能保存，先看看本地反馈。';
+          }
+        }
       }
-      if (!_current(generation)) return;
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('本次练习已保存')));
-      context.pop();
     } finally {
       if (_current(generation)) setState(() => _finishing = false);
     }
   }
 
-  Future<bool> _saveDraft({int? generation}) async {
-    final record = _record?.copy();
+  Future<bool> _saveDraft({
+    int? generation,
+    PictureStoryPracticeRecord? snapshot,
+  }) async {
+    final record = (snapshot ?? _record)?.copy();
     if (record == null) return false;
     final revision = ++_draftRevision;
     void check() {
@@ -434,6 +455,10 @@ class _PictureStoryPracticePageState
 
     try {
       await _repository.save(record, check: check);
+      if (revision == _draftRevision) {
+        _savedRecord = record;
+        if (mounted && _foreground) setState(() {});
+      }
       return true;
     } on _PictureStoryRecordingCancelled {
       return false;
@@ -499,8 +524,9 @@ class _PictureStoryPracticePageState
     if (image == null || !_current(generation)) return null;
     final settings = ref.read(settingsRepositoryProvider);
     try {
-      final config =
-          await settings.readLlmConfigForScenario(LlmScenario.assistant);
+      final config = await settings.readLlmConfigForScenario(
+        LlmScenario.assistant,
+      );
       if (config == null || !config.supportsVision || !_current(generation)) {
         return null;
       }
@@ -519,8 +545,7 @@ class _PictureStoryPracticePageState
       try {
         final completion = await client.chatComplete(
           config: config,
-          systemPrompt:
-              '你是小学语文口语表达老师。请根据图片和孩子的表达，给出简短、具体、鼓励性的中文反馈。先说一个做得好的地方，再给一个可执行的改进建议。只输出两句话，不要编造图片中看不到的细节。',
+          systemPrompt: '你是小学语文口语表达老师。请根据图片和孩子的表达，给出简短、具体、鼓励性的中文反馈。先说一个做得好的地方，再给一个可执行的改进建议。只输出两句话，不要编造图片中看不到的细节。',
           messages: [
             ChatMessage(
               role: ChatRole.user,
@@ -592,12 +617,15 @@ class _PictureStoryPracticePageState
         ),
       );
     }
+    if (_completed && !_finishing) {
+      return _buildResult(theme, prompt, _savedRecord!);
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(prompt.title),
         actions: [
           IconButton(
-            onPressed: _complete,
+            onPressed: _finishing ? null : _complete,
             icon: const Icon(Icons.check_outlined),
             tooltip: '完成练习',
           ),
@@ -634,6 +662,63 @@ class _PictureStoryPracticePageState
       ),
     );
   }
+
+  Widget _buildResult(
+    ThemeData theme,
+    PictureStoryPrompt prompt,
+    PictureStoryPracticeRecord record,
+  ) => Scaffold(
+    appBar: AppBar(title: const Text('本次表达')),
+    body: SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        children: [
+          ColoredCard(
+            color: theme.colorScheme.primary,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('练习已完成', style: theme.textTheme.titleLarge),
+                Text(prompt.title, style: theme.textTheme.titleMedium),
+                PictureStoryFeedback(feedbackJson: record.feedbackJson),
+                if (_message != null) ...[
+                  const SizedBox(height: SpacingTokens.sm),
+                  Text(_message!),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.md),
+          Text('回听我的表达', style: theme.textTheme.titleMedium),
+          const SizedBox(height: SpacingTokens.sm),
+          for (final segment in record.segments)
+            AppTile(
+              icon: _playingId == segment.id
+                  ? Icons.stop_circle_outlined
+                  : Icons.play_circle_outline,
+              iconColor: theme.colorScheme.primary,
+              title:
+                  '第 ${segment.position + 1} 段 · ${segment.durationSeconds} 秒',
+              subtitle: segment.answerText.isEmpty
+                  ? '未填写文字'
+                  : segment.answerText,
+              onTap: () => _play(segment),
+            ),
+          const SizedBox(height: SpacingTokens.md),
+          FilledButton(
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go(AppRoutes.chineseSectionOf('expression'));
+              }
+            },
+            child: const Text('完成'),
+          ),
+        ],
+      ),
+    ),
+  );
 
   List<Widget> _buildContent(ThemeData theme, PictureStoryPrompt prompt) {
     final titleStyle = theme.textTheme.titleMedium?.copyWith(
@@ -691,25 +776,16 @@ class _PictureStoryPracticePageState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '先观察，再说一说',
-                    style: titleStyle,
-                  ),
+                  Text('先观察，再说一说', style: titleStyle),
                   const SizedBox(height: SpacingTokens.sm),
                   for (final question in prompt.questions)
                     Padding(
                       padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-                      child: Text(
-                        '· $question',
-                        style: bodyStyle,
-                      ),
+                      child: Text('· $question', style: bodyStyle),
                     ),
                   if (_showHints) ...[
                     const SizedBox(height: SpacingTokens.sm),
-                    Text(
-                      prompt.sceneFacts.join('\n'),
-                      style: bodyStyle,
-                    ),
+                    Text(prompt.sceneFacts.join('\n'), style: bodyStyle),
                   ],
                 ],
               ),
@@ -722,33 +798,25 @@ class _PictureStoryPracticePageState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '我的表达',
-              style: titleStyle,
-            ),
+            Text('我的表达', style: titleStyle),
             const SizedBox(height: SpacingTokens.sm),
             if (_segments.isEmpty && !_recording && !_processing)
-              Text(
-                '录完一段后，识别文字会自动填在这里。你可以修改文字。',
-                style: bodyStyle,
-              ),
+              Text('录完一段后，识别文字会自动填在这里。你可以修改文字。', style: bodyStyle),
             for (final segment in _segments)
               _segmentTile(theme, segment, bodyStyle),
             if (_recording)
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: SpacingTokens.sm,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: SpacingTokens.sm),
                 child: Text(
                   _liveText.isEmpty
                       ? '正在听你说… $_elapsedSeconds/60 秒'
                       : _liveText,
-                  style: bodyStyle?.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
+                  style: bodyStyle?.copyWith(color: theme.colorScheme.primary),
                 ),
               ),
-            if (_starting || _processing) const LinearProgressIndicator(),
+            if (_starting || _processing || _finishing)
+              const LinearProgressIndicator(),
+            if (_finishing) const Text('正在整理本次反馈…'),
             if (_message != null) ...[
               const SizedBox(height: SpacingTokens.sm),
               Text(
@@ -763,8 +831,8 @@ class _PictureStoryPracticePageState
                   child: FilledButton.icon(
                     onPressed:
                         !_foreground || _starting || _processing || _finishing
-                            ? null
-                            : (_recording ? _finishSegment : _startRecording),
+                        ? null
+                        : (_recording ? _finishSegment : _startRecording),
                     icon: Icon(
                       _recording ? Icons.stop : Icons.mic_none_outlined,
                     ),
@@ -776,7 +844,7 @@ class _PictureStoryPracticePageState
                 if (_segments.isNotEmpty) ...[
                   const SizedBox(width: SpacingTokens.sm),
                   IconButton(
-                    onPressed: _complete,
+                    onPressed: _finishing ? null : _complete,
                     icon: const Icon(Icons.done_all_outlined),
                     tooltip: '完成练习',
                   ),
@@ -818,7 +886,9 @@ class _PictureStoryPracticePageState
                 ),
               ),
               IconButton(
-                onPressed: _processing ? null : () => _deleteSegment(segment),
+                onPressed: _processing || _finishing
+                    ? null
+                    : () => _deleteSegment(segment),
                 icon: const Icon(Icons.delete_outline),
                 tooltip: '删除这段',
               ),
@@ -826,13 +896,15 @@ class _PictureStoryPracticePageState
           ),
           TextField(
             controller: controller,
+            readOnly: _finishing,
             style: bodyStyle,
             minLines: 1,
             maxLines: 4,
             decoration: const InputDecoration(labelText: '识别文字（可修改）'),
             onChanged: (value) {
-              final index =
-                  _segments.indexWhere((item) => item.id == segment.id);
+              final index = _segments.indexWhere(
+                (item) => item.id == segment.id,
+              );
               if (index < 0) return;
               _segments[index] = _segments[index].copyWith(editedText: value);
               _record?.setSegments(_segments);
