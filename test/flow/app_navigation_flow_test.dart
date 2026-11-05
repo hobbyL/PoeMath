@@ -7,7 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/app.dart';
+import 'package:poemath/features/chinese/chinese_tab_page.dart';
 import 'package:poemath/features/home/home_page.dart';
+import 'package:poemath/features/math/math_tab_page.dart';
+import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/shell/main_shell.dart';
 
 import '../helpers/hive_test_helper.dart';
@@ -59,8 +62,17 @@ void main() {
       '我的': 3,
       '首页': 0,
     };
+    const pages = [HomePage, ChineseTabPage, MathTabPage, ProfilePage];
     for (final entry in expectedIndex.entries) {
       await tester.tap(_bottomBarItem(entry.key));
+      await tester.pump();
+      await tester.pump();
+      final pageContext = tester.element(find.byType(pages[entry.value]));
+      expect(
+        ModalRoute.of(pageContext)!.animation!.value,
+        1,
+        reason: '切换底部栏目后应立即可见，不等待整页淡入转场',
+      );
       await tester.pumpAndSettle();
       expect(
         _selectedTab(tester),

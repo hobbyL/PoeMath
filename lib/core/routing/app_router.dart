@@ -106,10 +106,15 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
       ),
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
+        // 同级主栏目直接切换，避免每次点击叠加两张全屏页面的淡入淡出。
+        // 推入详情页仍使用下面的 Material 页面转场。
         routes: <RouteBase>[
           GoRoute(
             path: AppRoutes.home,
-            builder: (context, state) => const HomePage(),
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              key: state.pageKey,
+              child: const HomePage(),
+            ),
           ),
           GoRoute(
             path: AppRoutes.poemTab,
@@ -117,18 +122,28 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           ),
           GoRoute(
             path: AppRoutes.chineseTab,
-            builder: (context, state) => ChineseTabPage(
-              section:
-                  ChineseSection.fromId(state.uri.queryParameters['section']),
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              key: state.pageKey,
+              child: ChineseTabPage(
+                section: ChineseSection.fromId(
+                  state.uri.queryParameters['section'],
+                ),
+              ),
             ),
           ),
           GoRoute(
             path: AppRoutes.mathTab,
-            builder: (context, state) => const MathTabPage(),
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              key: state.pageKey,
+              child: const MathTabPage(),
+            ),
           ),
           GoRoute(
             path: AppRoutes.profile,
-            builder: (context, state) => const ProfilePage(),
+            pageBuilder: (context, state) => NoTransitionPage<void>(
+              key: state.pageKey,
+              child: const ProfilePage(),
+            ),
           ),
         ],
       ),
