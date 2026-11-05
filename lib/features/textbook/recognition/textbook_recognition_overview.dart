@@ -351,6 +351,8 @@ class _OverviewState extends ConsumerState<TextbookRecognitionOverview>
                       key: ValueKey('recognition-practice-${target.id}'),
                       onPressed: () => widget.onRecognize!(target.id),
                       style: TextButton.styleFrom(
+                        overlayColor: Colors.transparent,
+                        splashFactory: NoSplash.splashFactory,
                         minimumSize: const Size(
                           SpacingTokens.minTapTarget,
                           SpacingTokens.minTapTarget,

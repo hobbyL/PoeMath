@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/features/poem/poem_answer_difference.dart';
+import 'package:poemath/core/services/speech/preferred_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/services/sound_service.dart';
@@ -74,6 +75,9 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   bool _tencentConfigured = false;
   Timer? _recordingTimer;
   Future<void>? _speechInitialization;
+  StreamSubscription<String>? _transcriptSubscription;
+  String _liveText = '';
+  bool _usedSentenceFallback = false;
 
   /// 诗句列表（按换行拆分）。
   List<String> _lines = [];
@@ -112,7 +116,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     _activityId = _newActivityId();
     _speech =
         widget.speechRecognitionService ??
-        ref.read(speechRecognitionServiceProvider);
+        ref.read(speechRecognitionServiceFactoryProvider)();
     _tts = ref.read(ttsServiceProvider);
     unawaited(_initSpeech());
   }
@@ -163,7 +167,12 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   @override
   void dispose() {
     _recordingTimer?.cancel();
-    unawaited(_speech.cancel());
+    _stopTranscriptUpdates();
+    unawaited(
+      widget.speechRecognitionService == null
+          ? _speech.dispose()
+          : _speech.cancel(),
+    );
     unawaited(
       _tts.stop().onError(
         (error, stackTrace) => AppLogger.e(
@@ -251,6 +260,12 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
   // ============ 语音识别录制 ============
 
+  void _stopTranscriptUpdates() {
+    final subscription = _transcriptSubscription;
+    _transcriptSubscription = null;
+    unawaited(subscription?.cancel());
+  }
+
   Future<void> _startRecording() async {
     if (!mounted ||
         (_phase != _ReadAlongPhase.idle && _phase != _ReadAlongPhase.scored)) {
@@ -266,6 +281,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     setState(() {
       _phase = _ReadAlongPhase.preparing;
       _recordingElapsedSeconds = 0;
+      _liveText = '';
+      _usedSentenceFallback = false;
     });
 
     if (!mounted || _phase != _ReadAlongPhase.preparing) return;
@@ -292,6 +309,21 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     if (!mounted || _phase != _ReadAlongPhase.preparing) return;
 
     try {
+      _stopTranscriptUpdates();
+      final speech = _speech;
+      if (speech is StreamingSpeechRecognitionService) {
+        _transcriptSubscription = (speech as StreamingSpeechRecognitionService)
+            .transcriptStream
+            .listen((text) {
+              if (!mounted ||
+                  (_phase != _ReadAlongPhase.preparing &&
+                      _phase != _ReadAlongPhase.recording &&
+                      _phase != _ReadAlongPhase.processing)) {
+                return;
+              }
+              setState(() => _liveText = text);
+            });
+      }
       await _speech.start();
       if (!mounted) {
         await _speech.cancel();
@@ -301,7 +333,12 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         await _speech.cancel();
         return;
       }
-      setState(() => _phase = _ReadAlongPhase.recording);
+      setState(() {
+        _phase = _ReadAlongPhase.recording;
+        _usedSentenceFallback =
+            speech is StreamingSpeechRecognitionService &&
+            (speech as StreamingSpeechRecognitionService).usedFallback;
+      });
       _startRecordingTimer();
     } on SpeechPermissionDeniedException {
       if (mounted) setState(() => _phase = _ReadAlongPhase.idle);
@@ -329,6 +366,10 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         setState(() => _phase = _ReadAlongPhase.idle);
         scaffold.clearSnackBars();
         scaffold.showSnackBar(const SnackBar(content: Text('无法开始跟读，请检查麦克风权限')));
+      }
+    } finally {
+      if (!mounted || _phase != _ReadAlongPhase.recording) {
+        _stopTranscriptUpdates();
       }
     }
   }
@@ -441,6 +482,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     setState(() {
       _recognizedTexts.add(recognized);
       _scores.add(score);
+      _usedSentenceFallback = result.usedFallback;
       _phase = _ReadAlongPhase.scored;
     });
 
@@ -498,6 +540,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         scaffold.clearSnackBars();
         scaffold.showSnackBar(const SnackBar(content: Text('语音识别失败，请重新朗读')));
       }
+    } finally {
+      _stopTranscriptUpdates();
     }
   }
 
@@ -949,29 +993,42 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   }
 
   Widget _buildRecognitionResult(ThemeData theme) {
-    if (_phase == _ReadAlongPhase.recording) {
+    if (_phase == _ReadAlongPhase.recording ||
+        _phase == _ReadAlongPhase.processing) {
       return Column(
         children: [
           Text(
-            '正在聆听… $_recordingElapsedSeconds/$_maxRecordingDurationSeconds 秒',
+            _phase == _ReadAlongPhase.recording
+                ? '正在聆听… $_recordingElapsedSeconds/$_maxRecordingDurationSeconds 秒'
+                : '正在识别…',
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
-        ],
-      );
-    }
-
-    if (_phase == _ReadAlongPhase.processing) {
-      return Column(
-        children: [
-          Text(
-            '正在识别…',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          if (_usedSentenceFallback) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            const Text('实时识别额度已用完，将在录音结束后识别。'),
+          ],
+          if (_liveText.isNotEmpty) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            ColoredCard(
+              color: theme.colorScheme.primary,
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('正在识别的文字', style: theme.textTheme.labelSmall),
+                  const SizedBox(height: SpacingTokens.xs),
+                  Text(
+                    _liveText,
+                    key: const ValueKey('read-along-live-transcript'),
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       );
     }
@@ -982,6 +1039,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
     return Column(
       children: [
+        if (_usedSentenceFallback) const Text('实时识别额度已用完，本次使用一句话识别。'),
         const Text('内容匹配参考分'),
         // 分数显示
         Row(

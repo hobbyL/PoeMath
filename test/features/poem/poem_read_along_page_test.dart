@@ -19,6 +19,7 @@ import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/read_along_voice_status_button.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/streaming_speech_fake.dart';
 
 class _MockTtsService extends Mock implements TtsService {}
 
@@ -118,6 +119,78 @@ void main() {
         .thenAnswer((_) async => _verifiedSettings);
   });
   tearDown(tearDownHiveForTesting);
+
+  testWidgets('实时文字在停止前显示并替换修订，仅最终结果计分，重录清空旧文字', (tester) async {
+    final finalResult = Completer<SpeechRecognitionResult>();
+    final speech = StreamingSpeechFake()
+      ..startText = '床前明'
+      ..pendingResult = finalResult;
+    await _pumpPage(tester, speech, tts, settings, useFactory: true);
+    await tester.tap(find.text('读一读'));
+    await tester.pump();
+    await tester.pump();
+
+    final live = find.byKey(const ValueKey('read-along-live-transcript'));
+    expect(tester.widget<Text>(live).data, '床前明');
+    expect(speech.stops, 0);
+    expect(find.text('内容匹配参考分'), findsNothing);
+
+    speech.transcripts.add('床前明月关');
+    await tester.pump();
+    await tester.pump();
+    expect(tester.widget<Text>(live).data, '床前明月关');
+    speech.transcripts.add('床前明月光');
+    await tester.pump();
+    await tester.pump();
+    expect(tester.widget<Text>(live).data, '床前明月光');
+    expect(find.text('床前明月关'), findsNothing);
+    expect(speech.stops, 0);
+
+    await tester.tap(find.text('录音中'));
+    await tester.pump();
+    expect(tester.widget<Text>(live).data, '床前明月光');
+    expect(find.text('内容匹配参考分'), findsNothing);
+    finalResult.complete(
+      const SpeechRecognitionResult(text: '床前明月光', mode: 'realtime'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('100%', skipOffstage: false), findsOneWidget);
+    expect(speech.transcripts.hasListener, isFalse);
+    speech.transcripts.add('迟到的旧文字');
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('迟到的旧文字'), findsNothing);
+
+    await tester.tap(find.text('重读'));
+    await tester.pumpAndSettle();
+    speech.startText = null;
+    await tester.tap(find.text('读一读'));
+    await tester.pump();
+    expect(live, findsNothing);
+    speech.transcripts.add('新一轮文字');
+    await tester.pump();
+    await tester.pump();
+    expect(tester.widget<Text>(live).data, '新一轮文字');
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
+    expect(speech.disposals, 1);
+    expect(speech.transcripts.hasListener, isFalse);
+  });
+
+  testWidgets('实时额度耗尽显示回退原因，结束后使用一句话最终结果', (tester) async {
+    final speech = StreamingSpeechFake()..usedFallback = true;
+    await _pumpPage(tester, speech, tts, settings, useFactory: true);
+    await tester.tap(find.text('读一读'));
+    await tester.pump();
+    expect(find.text('实时识别额度已用完，将在录音结束后识别。'), findsOneWidget);
+    expect(speech.stops, 0);
+    await tester.tap(find.text('录音中'));
+    await tester.pumpAndSettle();
+    expect(find.text('实时识别额度已用完，本次使用一句话识别。'), findsOneWidget);
+    expect(find.text('100%', skipOffstage: false), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
 
   testWidgets('跟读页首帧应直接显示诗句内容', (tester) async {
     final speech = _FakeSpeechRecognitionService();
@@ -351,6 +424,7 @@ Future<void> _pumpPage(
   TtsService tts,
   SettingsRepository settings, {
   bool settleAnimations = true,
+  bool useFactory = false,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -358,6 +432,7 @@ Future<void> _pumpPage(
         settingsRepositoryProvider.overrideWithValue(settings),
         ttsServiceProvider.overrideWithValue(tts),
         poemByIdProvider(_poemId).overrideWith((ref) => _poem),
+        speechRecognitionServiceFactoryProvider.overrideWithValue(() => speech),
       ],
       child: MaterialApp(
         home: MediaQuery(
@@ -367,7 +442,7 @@ Future<void> _pumpPage(
           ),
           child: PoemReadAlongPage(
             poemId: _poemId,
-            speechRecognitionService: speech,
+            speechRecognitionService: useFactory ? null : speech,
           ),
         ),
       ),

@@ -11,6 +11,8 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/profile/speech_recognition_settings_page.dart';
 
+import '../../helpers/streaming_speech_fake.dart';
+
 final class _FakeSettingsRepository extends SettingsRepository {
   TencentAsrCredentials? _credentials;
   bool _verified = false;
@@ -163,7 +165,9 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           settingsRepositoryProvider.overrideWithValue(settings),
-          speechRecognitionServiceProvider.overrideWithValue(service),
+          speechRecognitionServiceFactoryProvider.overrideWithValue(
+            () => service,
+          ),
         ],
         child: const MaterialApp(
           home: SpeechRecognitionSettingsPage(),
@@ -209,7 +213,9 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           settingsRepositoryProvider.overrideWithValue(settings),
-          speechRecognitionServiceProvider.overrideWithValue(service),
+          speechRecognitionServiceFactoryProvider.overrideWithValue(
+            () => service,
+          ),
         ],
         child: const MaterialApp(home: SpeechRecognitionSettingsPage()),
       ),
@@ -309,6 +315,87 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 16));
+  });
+
+  testWidgets('设置测试显示实时修订，最终成功才验证密钥，取消重录不残留文字', (tester) async {
+    final service = StreamingSpeechFake()..startText = '床前';
+    await pumpPage(tester, service);
+    await enterCredentialsAndStart(tester);
+    final live = find.byKey(const ValueKey('speech-test-live-transcript'));
+    expect(tester.widget<Text>(live).data, '床前');
+    expect(
+      (await settings.loadSpeechRecognitionSettings()).isVerified,
+      isFalse,
+    );
+    expect(service.stops, 0);
+    service.transcripts.add('床前明月');
+    await tester.pump();
+    await tester.pump();
+    expect(tester.widget<Text>(live).data, '床前明月');
+
+    await tester.ensureVisible(find.text('取消测试'));
+    await tester.tap(find.text('取消测试'));
+    await tester.pumpAndSettle();
+    expect(service.transcripts.hasListener, isFalse);
+    service.transcripts.add('取消后的文字');
+    await tester.pump();
+    await tester.pump();
+    expect(live, findsNothing);
+    expect(
+      (await settings.loadSpeechRecognitionSettings()).isVerified,
+      isFalse,
+    );
+
+    service.startText = null;
+    await tester.ensureVisible(find.text('开始真实录音测试'));
+    await tester.tap(find.text('开始真实录音测试'));
+    await tester.pumpAndSettle();
+    expect(live, findsNothing);
+    service.transcripts.add('床前明月关');
+    await tester.pump();
+    await tester.pump();
+    expect(tester.widget<Text>(live).data, '床前明月关');
+    await tester.ensureVisible(find.text('结束并验证'));
+    await tester.tap(find.text('结束并验证'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(live).data, '床前明月光');
+    expect((await settings.loadSpeechRecognitionSettings()).isVerified, isTrue);
+    expect(service.transcripts.hasListener, isFalse);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(service.disposals, 1);
+  });
+
+  testWidgets('设置页仅在服务实际回退时说明一句话识别', (tester) async {
+    final service = StreamingSpeechFake()..usedFallback = true;
+    await pumpPage(tester, service);
+    await enterCredentialsAndStart(tester);
+    expect(find.text('实时识别额度已用完，将在录音结束后识别。'), findsOneWidget);
+    await tester.ensureVisible(find.text('结束并验证'));
+    await tester.tap(find.text('结束并验证'));
+    await tester.pumpAndSettle();
+    expect(find.text('实时识别额度已用完，本次使用一句话识别。'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  testWidgets('有实时中间文字但最终结果为空时不验证密钥并清空预览', (tester) async {
+    final service = StreamingSpeechFake()
+      ..startText = '床前'
+      ..finalText = '';
+    await pumpPage(tester, service);
+    await enterCredentialsAndStart(tester);
+    final live = find.byKey(const ValueKey('speech-test-live-transcript'));
+    expect(tester.widget<Text>(live).data, '床前');
+    await tester.ensureVisible(find.text('结束并验证'));
+    await tester.tap(find.text('结束并验证'));
+    await tester.pumpAndSettle();
+    expect(find.text('测试未返回文字，请重新朗读'), findsOneWidget);
+    expect((await settings.loadSpeechRecognitionSettings()).isVerified, isFalse);
+    expect(live, findsNothing);
+    expect(service.transcripts.hasListener, isFalse);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 
   testWidgets('腾讯测试失败时撤销验证并提示密钥状态', (tester) async {

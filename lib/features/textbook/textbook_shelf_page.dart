@@ -149,6 +149,8 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
                       bottom: SpacingTokens.sm,
                       child: IconButton(
                         style: IconButton.styleFrom(
+                          overlayColor: Colors.transparent,
+                          splashFactory: NoSplash.splashFactory,
                           fixedSize: const Size.square(
                             SpacingTokens.minTapTarget,
                           ),

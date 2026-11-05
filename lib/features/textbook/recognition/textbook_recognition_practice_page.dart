@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/services/tts/narration_session.dart';
 import 'package:poemath/core/services/tts/narration_audio_identity.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
+import 'package:poemath/core/services/speech/preferred_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -41,6 +42,9 @@ class _PracticeState
   SpeechRecognitionService? _oral;
   SpeechRecognitionSettingsSnapshot? _oralSettings;
   Timer? _recordingTimer;
+  StreamSubscription<String>? _transcriptSubscription;
+  String _liveText = '';
+  bool _usedSentenceFallback = false;
   int _oralGeneration = 0;
   bool _starting = false, _recording = false, _evaluating = false;
   String? _oralMessage;
@@ -189,6 +193,8 @@ class _PracticeState
     setState(() {
       _starting = true;
       _oralMessage = null;
+      _liveText = '';
+      _usedSentenceFallback = false;
     });
     try {
       await super.stopAudio();
@@ -204,11 +210,25 @@ class _PracticeState
       _oral ??= ref.read(speechRecognitionServiceFactoryProvider)();
       await _oral!.initialize();
       if (!current || generation != _oralGeneration) return;
+      _stopTranscriptUpdates();
+      final oral = _oral!;
+      if (oral is StreamingSpeechRecognitionService) {
+        _transcriptSubscription = (oral as StreamingSpeechRecognitionService)
+            .transcriptStream
+            .listen((text) {
+              if (current && generation == _oralGeneration && _oralWorking) {
+                setState(() => _liveText = text);
+              }
+            });
+      }
       await _oral!.start();
       if (!current || generation != _oralGeneration) return;
       setState(() {
         _starting = false;
         _recording = true;
+        _usedSentenceFallback =
+            oral is StreamingSpeechRecognitionService &&
+            (oral as StreamingSpeechRecognitionService).usedFallback;
       });
       _recordingTimer = Timer(
         const Duration(seconds: 10),
@@ -223,6 +243,10 @@ class _PracticeState
               ? e.message
               : '无法开始录音，请重试';
         });
+      }
+    } finally {
+      if (generation == _oralGeneration && !_recording) {
+        _stopTranscriptUpdates();
       }
     }
   }
@@ -248,6 +272,7 @@ class _PracticeState
         throw const SpeechRecognitionException('语音识别配置已变化，请重新进入练习');
       }
       final recognized = await _oral!.stop();
+      if (!current || generation != _oralGeneration) return;
       final result = matchRecognitionReading(
         target: target.text,
         pinyin: target.pinyin,
@@ -268,6 +293,7 @@ class _PracticeState
       }
       setState(() {
         _evaluating = false;
+        _usedSentenceFallback = recognized.usedFallback;
         _oralMessage = switch (result) {
           RecognitionReadingOutcome.inconclusive => '这次没听清，请靠近一些再读一次。也可以先听示范。',
           RecognitionReadingOutcome.needsContext =>
@@ -295,7 +321,15 @@ class _PracticeState
         });
       }
       if (generation == _oralGeneration) await _oral?.cancel();
+    } finally {
+      if (generation == _oralGeneration) _stopTranscriptUpdates();
     }
+  }
+
+  void _stopTranscriptUpdates() {
+    final subscription = _transcriptSubscription;
+    _transcriptSubscription = null;
+    unawaited(subscription?.cancel());
   }
 
   bool _sameConfiguration(
@@ -324,11 +358,13 @@ class _PracticeState
   Future<void> stopAudio() async {
     ++_oralGeneration;
     _recordingTimer?.cancel();
+    _stopTranscriptUpdates();
     if (mounted && current) {
       setState(() {
         _starting = false;
         _recording = false;
         _evaluating = false;
+        _liveText = '';
       });
     }
     await Future.wait([super.stopAudio(), if (_oral != null) _oral!.cancel()]);
@@ -346,6 +382,7 @@ class _PracticeState
   void dispose() {
     _recordingTimer?.cancel();
     ++_oralGeneration;
+    _stopTranscriptUpdates();
     unawaited(_oral?.dispose());
     super.dispose();
   }
@@ -542,7 +579,17 @@ class _PracticeState
                     : '读一读',
               ),
             ),
-            if (_recording) const Text('正在录音，10 秒后自动结束并识别。'),
+            if (_recording) const Text('正在聆听，10 秒后自动结束。'),
+            if (_recording || _evaluating) ...[
+              if (_usedSentenceFallback) const Text('实时识别额度已用完，将在录音结束后识别。'),
+              if (_liveText.isNotEmpty) ...[
+                const SizedBox(height: SpacingTokens.sm),
+                Text(
+                  '正在识别：$_liveText',
+                  key: const ValueKey('recognition-live-transcript'),
+                ),
+              ],
+            ],
           ],
           if (_oralWorking)
             TextButton(

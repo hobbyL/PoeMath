@@ -206,12 +206,7 @@ final workerTtsClientProvider = Provider<WorkerTtsClient>((ref) {
 final speechRecognitionServiceProvider = Provider<SpeechRecognitionService>((
   ref,
 ) {
-  final service = PreferredSpeechRecognitionService(
-    recorder: RecordSpeechAudioRecorder(),
-    sentenceClient: ref.watch(tencentAsrClientProvider),
-    realtimeClient: ref.watch(tencentRealtimeAsrClientProvider),
-    settingsRepository: ref.watch(settingsRepositoryProvider),
-  );
+  final service = ref.watch(speechRecognitionServiceFactoryProvider)();
   ref.onDispose(() => unawaited(service.dispose()));
   return service;
 });

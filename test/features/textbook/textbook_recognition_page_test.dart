@@ -1,10 +1,12 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/app_router.dart';
+import 'package:poemath/core/services/speech/preferred_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
@@ -29,6 +31,7 @@ import 'package:poemath/features/textbook/recognition/textbook_recognition_overv
 import 'package:poemath/features/textbook/recognition/textbook_recognition_practice_page.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_prepare_page.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_check_page.dart';
+
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/narration_fakes.dart';
@@ -78,7 +81,15 @@ class OralSettings extends SettingsRepository {
           );
 }
 
-class FakeOralService implements SpeechRecognitionService {
+class FakeOralService
+    implements SpeechRecognitionService, StreamingSpeechRecognitionService {
+  final transcripts = StreamController<String>.broadcast();
+  @override
+  Stream<String> get transcriptStream => transcripts.stream;
+  @override
+  bool usedFallback = false;
+  @override
+  String get recognitionMode => usedFallback ? 'sentence' : 'realtime';
   SpeechRecognitionException? startError;
   Completer<SpeechRecognitionResult>? pending;
   int starts = 0, cancels = 0, stops = 0;
@@ -173,6 +184,7 @@ void main() {
     );
   });
   tearDown(() async {
+    await oral.transcripts.close();
     lockParentForTesting();
     tts.dispose();
     ProfileScope.reset();
@@ -760,6 +772,121 @@ void main() {
     expect(tester.getRect(find.byType(BackButton)), back);
     expect(find.byType(BackButton).hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('认字实时展示文字但不提前判定，最终结果才写入认读记录', (tester) async {
+    await seed(
+      RecognitionQuestionKind.read,
+      recognitionFirst: true,
+      targetId: 'star',
+    );
+    await pump(
+      tester,
+      TextbookRecognitionPracticePage(
+        bookId: courseFixtureHash,
+        lessonId: 'lesson-001',
+        recognitionFirst: true,
+      ),
+    );
+    await tap(tester, '读一读');
+    oral.transcripts.add('兴');
+    await tester.pump();
+    await tester.pump();
+    final live = find.byKey(const ValueKey('recognition-live-transcript'));
+    expect(tester.widget<Text>(live).data, '正在识别：兴');
+    expect(oral.stops, 0);
+    expect((await repo().load()).records, isEmpty);
+    expect(find.text('xīng'), findsNothing);
+    oral.transcripts.add('星');
+    await tester.pump();
+    await tester.pump();
+    expect(tester.widget<Text>(live).data, '正在识别：星');
+    await tap(tester, '读完了，听听结果');
+    expect((await repo().load()).records, isEmpty);
+    expect(tester.widget<Text>(live).data, '正在识别：星');
+    oral.pending!.complete(
+      const SpeechRecognitionResult(text: '星', mode: 'realtime'),
+    );
+    await flush(tester);
+    expect((await repo().load()).records.values.single.oralCorrect, 1);
+    expect((await repo().load()).records.values.single.hints, 0);
+    expect(oral.transcripts.hasListener, isFalse);
+    oral.transcripts.add('旧识别文字');
+    await tester.pump();
+    await tester.pump();
+    expect(find.textContaining('旧识别文字'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('认字取消后清空实时文字，重录和后台切换不保留旧订阅', (tester) async {
+    await seed(
+      RecognitionQuestionKind.read,
+      recognitionFirst: true,
+      targetId: 'star',
+    );
+    await pump(
+      tester,
+      TextbookRecognitionPracticePage(
+        bookId: courseFixtureHash,
+        lessonId: 'lesson-001',
+        recognitionFirst: true,
+      ),
+    );
+    await tap(tester, '读一读');
+    oral.transcripts.add('第一轮');
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('正在识别：第一轮'), findsOneWidget);
+    await tap(tester, '取消本次录音');
+    expect(oral.transcripts.hasListener, isFalse);
+    oral.transcripts.add('迟到文字');
+    await tester.pump();
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('recognition-live-transcript')),
+      findsNothing,
+    );
+    await tap(tester, '读一读');
+    expect(
+      find.byKey(const ValueKey('recognition-live-transcript')),
+      findsNothing,
+    );
+    oral.transcripts.add('第二轮');
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('正在识别：第二轮'), findsOneWidget);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await flush(tester);
+    expect(oral.transcripts.hasListener, isFalse);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await flush(tester);
+    expect(
+      find.byKey(const ValueKey('recognition-live-transcript')),
+      findsNothing,
+    );
+    expect((await repo().load()).records, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('认字实时额度耗尽才显示结束后识别的提示', (tester) async {
+    oral.usedFallback = true;
+    await seed(
+      RecognitionQuestionKind.read,
+      recognitionFirst: true,
+      targetId: 'star',
+    );
+    await pump(
+      tester,
+      TextbookRecognitionPracticePage(
+        bookId: courseFixtureHash,
+        lessonId: 'lesson-001',
+        recognitionFirst: true,
+      ),
+    );
+    await tap(tester, '读一读');
+    expect(find.text('实时识别额度已用完，将在录音结束后识别。'), findsOneWidget);
+    expect(oral.stops, 0);
     await tester.pumpWidget(const SizedBox());
   });
 

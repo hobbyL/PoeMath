@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:poemath/core/services/speech/preferred_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_asr_client.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
@@ -42,6 +43,11 @@ class _SpeechRecognitionSettingsPageState
   String? _message;
   bool _messageIsError = false;
   Timer? _recordingTimer;
+  StreamSubscription<String>? _transcriptSubscription;
+  String _liveText = '';
+  bool _usedSentenceFallback = false;
+  bool _hasTestResult = false;
+  int _testGeneration = 0;
   late final SpeechRecognitionService _speechService;
 
   @override
@@ -50,7 +56,7 @@ class _SpeechRecognitionSettingsPageState
     _secretIdController = TextEditingController();
     _secretKeyController = TextEditingController();
     _appIdController = TextEditingController();
-    _speechService = ref.read(speechRecognitionServiceProvider);
+    _speechService = ref.read(speechRecognitionServiceFactoryProvider)();
     unawaited(_loadSettings());
   }
 
@@ -123,6 +129,9 @@ class _SpeechRecognitionSettingsPageState
     setState(() {
       _busy = true;
       _message = null;
+      _liveText = '';
+      _usedSentenceFallback = false;
+      _hasTestResult = false;
     });
     try {
       final credentials = await _saveFormCredentials();
@@ -145,9 +154,13 @@ class _SpeechRecognitionSettingsPageState
 
   Future<void> _startTest() async {
     if (_busy || _recording) return;
+    final generation = ++_testGeneration;
     setState(() {
       _busy = true;
       _message = null;
+      _liveText = '';
+      _usedSentenceFallback = false;
+      _hasTestResult = false;
     });
     try {
       final credentials = await _saveFormCredentials();
@@ -157,6 +170,17 @@ class _SpeechRecognitionSettingsPageState
       }
       await _speechService.initialize();
       if (!mounted) return;
+      _stopTranscriptUpdates();
+      final speech = _speechService;
+      if (speech is StreamingSpeechRecognitionService) {
+        _transcriptSubscription = (speech as StreamingSpeechRecognitionService)
+            .transcriptStream
+            .listen((text) {
+              if (mounted && generation == _testGeneration) {
+                setState(() => _liveText = text);
+              }
+            });
+      }
       await _speechService.start();
       if (!mounted) {
         await _speechService.cancel();
@@ -166,6 +190,9 @@ class _SpeechRecognitionSettingsPageState
         _recording = true;
         _busy = false;
         _message = '请朗读：$_testPhrase';
+        _usedSentenceFallback =
+            speech is StreamingSpeechRecognitionService &&
+            (speech as StreamingSpeechRecognitionService).usedFallback;
       });
       _recordingTimer = Timer(const Duration(seconds: 15), _finishTest);
     } on SpeechPermissionDeniedException catch (error) {
@@ -177,6 +204,8 @@ class _SpeechRecognitionSettingsPageState
     } on Object {
       if (mounted) _showMessage('无法开始录音，请检查麦克风权限', isError: true);
       if (mounted) setState(() => _busy = false);
+    } finally {
+      if (!mounted || !_recording) _stopTranscriptUpdates();
     }
   }
 
@@ -197,6 +226,15 @@ class _SpeechRecognitionSettingsPageState
       }
       final result = await _speechService.stop();
       if (!mounted) return;
+      _stopTranscriptUpdates();
+      if (result.text.trim().isEmpty) {
+        throw const SpeechRecognitionException('测试未返回文字，请重新朗读');
+      }
+      setState(() {
+        _liveText = result.text;
+        _hasTestResult = true;
+        _usedSentenceFallback = result.usedFallback;
+      });
       await repo.markTencentAsrCredentialsVerified(
         testedCredentials: credentials,
       );
@@ -220,8 +258,15 @@ class _SpeechRecognitionSettingsPageState
       await _invalidateAfterFailedTest();
       if (mounted) _showMessage('测试失败，请检查网络后重试', isError: true);
     } finally {
+      _stopTranscriptUpdates();
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _stopTranscriptUpdates() {
+    final subscription = _transcriptSubscription;
+    _transcriptSubscription = null;
+    unawaited(subscription?.cancel());
   }
 
   Future<void> _invalidateAfterFailedTest() async {
@@ -241,6 +286,14 @@ class _SpeechRecognitionSettingsPageState
     if (!_recording) return;
     _recordingTimer?.cancel();
     _recordingTimer = null;
+    ++_testGeneration;
+    _stopTranscriptUpdates();
+    setState(() {
+      _recording = false;
+      _busy = true;
+      _liveText = '';
+      _usedSentenceFallback = false;
+    });
     await _speechService.cancel();
     await _invalidateAfterFailedTest();
     if (mounted) {
@@ -254,7 +307,12 @@ class _SpeechRecognitionSettingsPageState
 
   Future<void> _deleteCredentials() async {
     if (_busy || _recording) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _liveText = '';
+      _usedSentenceFallback = false;
+      _hasTestResult = false;
+    });
     try {
       await ref.read(settingsRepositoryProvider).deleteTencentAsrCredentials();
       if (!mounted) return;
@@ -274,13 +332,20 @@ class _SpeechRecognitionSettingsPageState
     setState(() {
       _message = message;
       _messageIsError = isError;
+      if (isError && !_recording) {
+        _liveText = '';
+        _usedSentenceFallback = false;
+        _hasTestResult = false;
+      }
     });
   }
 
   @override
   void dispose() {
+    ++_testGeneration;
     _recordingTimer?.cancel();
-    if (_speechService.isRecording) unawaited(_speechService.cancel());
+    _stopTranscriptUpdates();
+    unawaited(_speechService.dispose());
     _secretIdController.dispose();
     _secretKeyController.dispose();
     _appIdController.dispose();
@@ -461,6 +526,27 @@ class _SpeechRecognitionSettingsPageState
                         icon: const Icon(Icons.close),
                         label: const Text('取消测试'),
                       ),
+                    ),
+                  ],
+                  if (_usedSentenceFallback) ...[
+                    const SizedBox(height: SpacingTokens.sm),
+                    Text(
+                      _hasTestResult
+                          ? '实时识别额度已用完，本次使用一句话识别。'
+                          : '实时识别额度已用完，将在录音结束后识别。',
+                    ),
+                  ],
+                  if (_liveText.isNotEmpty) ...[
+                    const SizedBox(height: SpacingTokens.sm),
+                    Text(
+                      _hasTestResult ? '系统识别到的文字' : '正在识别的文字',
+                      style: theme.textTheme.labelSmall,
+                    ),
+                    const SizedBox(height: SpacingTokens.xs),
+                    Text(
+                      _liveText,
+                      key: const ValueKey('speech-test-live-transcript'),
+                      style: theme.textTheme.bodyLarge,
                     ),
                   ],
                 ],
