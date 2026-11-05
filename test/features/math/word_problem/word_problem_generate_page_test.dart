@@ -443,119 +443,129 @@ void main() {
   testWidgets('配置等待时修改难度、提示词及选项，生成始终使用发起时设置快照', (tester) async {
     final settings = _DelayedSettingsRepository();
     await tester.runAsync(() => settings.setMathDifficulty('hard'));
-    await tester
-        .runAsync(() => settings.setWordProblemGenerationPrompt('发起时的自然观察偏好'));
-    final response = Completer<http.Response>();
+    await tester.runAsync(
+      () => settings.setWordProblemGenerationPrompt('发起时的自然观察偏好'),
+    );
     http.Request? request;
-    (int, String, String, int, DifficultyLevel)? capturedSkeleton;
+    final skeletonCalls = <(int, String, String, int, DifficultyLevel)>[];
     WordProblemPreviewData? preview;
     await _pumpDelayedGenerator(
       tester,
       settings,
-      skeletons: ({
-        required int grade,
-        required String semester,
-        required String topic,
-        required int count,
-        DifficultyLevel difficulty = DifficultyLevel.medium,
-      }) {
-        capturedSkeleton = (grade, semester, topic, count, difficulty);
-        return WordProblemSkeletonGenerator.generate(
-          grade: grade,
-          semester: semester,
-          topic: topic,
-          count: count,
-          difficulty: difficulty,
-        );
-      },
-      client: MockClient((incoming) {
+      skeletons:
+          ({
+            required int grade,
+            required String semester,
+            required String topic,
+            required int count,
+            DifficultyLevel difficulty = DifficultyLevel.medium,
+          }) {
+            skeletonCalls.add((grade, semester, topic, count, difficulty));
+            // 首批骨架重复，确保触发单题去重重试；重试时提供不同的骨架。
+            final left = 11 + skeletonCalls.length;
+            return List.generate(
+              count,
+              (_) => ProblemSkeleton(
+                operands: [left, 4],
+                operators: const [Operator.add],
+                answer: left + 4,
+                unitHint: '个',
+                difficulty: 3,
+              ),
+            );
+          },
+      client: MockClient((incoming) async {
         request = incoming;
-        return response.future;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode(
+                    List.generate(
+                      10,
+                      (i) => {
+                        'index': i + 1,
+                        'sceneId': 'apples',
+                        'variantId': 'standard',
+                      },
+                    ),
+                  ),
+                },
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
       }),
       onPreview: (data) => preview = data,
     );
-    expect(find.textContaining('出题难度'), findsNothing);
-    expect(find.widgetWithText(FilterChip, '混合运算'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '困难'), findsNothing);
-    await tester.tap(find.text('生成 10 题'));
-    await tester.pump();
-    await tester.tap(find.widgetWithText(ChoiceChip, '3 年级'));
-    await tester.pump();
-    await tester.tap(find.text('下学期'));
-    await tester.pump();
-    await tester.runAsync(() => settings.setMathDifficulty('easy'));
-    await tester
-        .runAsync(() => settings.setWordProblemGenerationPrompt('等待时改为购物偏好'));
-    settings.pending.complete(_config);
-    // 放行配置读取后，`_generate` 才真正开跑，它将经过
-    // `CloudUsageService.reserve` —— 其中 `HiveBoxes.meta.put` 的完成
-    // 回调挂在 Hive 写链上。fake 时钟只推得动帧、排不动写链，`await`
-    // 后面的 `_httpClient.post` 要到约 1 秒后才排到（`pumpAndSettle`
-    // 在这里也只能空等到 30s 超时）。
-    //
-    // 所以每一轮都在**真实异步区**里等一段真实时长，回到 fake 区再
-    // `pump()` 把写完排下的帧推出去，直到请求真正到达 MockClient。
-    for (var i = 0; i < 40 && request == null; i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
-      );
+    try {
+      expect(find.textContaining('出题难度'), findsNothing);
+      expect(find.widgetWithText(FilterChip, '混合运算'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, '困难'), findsNothing);
+      await tester.runAsync(() => tester.tap(find.text('生成 10 题')));
       await tester.pump();
+      await tester.tap(find.widgetWithText(ChoiceChip, '3 年级'));
+      await tester.pump();
+      await tester.tap(find.text('下学期'));
+      await tester.pump();
+      await tester.runAsync(() => settings.setMathDifficulty('easy'));
+      await tester.runAsync(
+        () => settings.setWordProblemGenerationPrompt('等待时改为购物偏好'),
+      );
+      await tester.tap(find.widgetWithText(FilterChip, '减法'));
+      await tester.pump();
+      final countSelector = tester.widget<Slider>(find.byType(Slider));
+      countSelector.onChanged!(5);
+      await tester.pump();
+      expect(skeletonCalls, isEmpty);
+      expect(request, isNull);
+      settings.pending.complete(_config);
+      // 交替推进真实 Hive IO 和页面帧，直到生成流程完成并进入预览。
+      for (var i = 0; i < 100 && preview == null; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump();
+      }
+      expect(preview, isNotNull);
+      await tester.pumpAndSettle();
+      expect(skeletonCalls.first, (
+        2,
+        '上',
+        'addition',
+        10,
+        DifficultyLevel.hard,
+      ));
+      expect(skeletonCalls.skip(1), isNotEmpty);
+      expect(
+        skeletonCalls.skip(1),
+        everyElement((2, '上', 'addition', 1, DifficultyLevel.hard)),
+      );
+      expect(request, isNotNull);
+      final body = jsonDecode(request!.body) as Map<String, dynamic>;
+      final systemPrompt =
+          (body['messages'] as List).first['content'] as String;
+      expect(systemPrompt, startsWith('发起时的自然观察偏好\n\n'));
+      expect(systemPrompt, isNot(contains('等待时改为购物偏好')));
+      final prompt = (body['messages'] as List).last['content'] as String;
+      expect(prompt, contains('小学2年级'));
+      expect(prompt, contains('上学期'));
+      expect(prompt, contains('加法'));
+      final candidates =
+          jsonDecode(prompt.substring(prompt.indexOf('['))) as List;
+      expect(candidates, hasLength(10));
+      expect(preview!.grade, 2);
+      expect(preview!.semester, '上');
+      expect(preview!.topics, [WordProblemTopic.addition]);
+      expect(preview!.items, hasLength(10));
+      expect(tester.takeException(), isNull);
+    } finally {
+      // 断言失败也必须排空写链，避免 Hive.close() 随后再报 30s 超时。
+      await drainHiveWritesForTesting(tester);
     }
-    expect(capturedSkeleton, (2, '上', 'addition', 10, DifficultyLevel.hard));
-    expect(request, isNotNull);
-    await tester.tap(find.widgetWithText(FilterChip, '减法'));
-    await tester.pump();
-    final countSelector = tester.widget<Slider>(find.byType(Slider));
-    countSelector.onChanged!(5);
-    await tester.pump();
-    response.complete(
-      http.Response(
-        jsonEncode({
-          'choices': [
-            {
-              'message': {
-                'content': jsonEncode(
-                  List.generate(
-                    10,
-                    (i) => {
-                      'index': i + 1,
-                      'sceneId': 'apples',
-                      'variantId': 'standard',
-                    },
-                  ),
-                ),
-              },
-            }
-          ],
-        }),
-        200,
-        headers: {'content-type': 'application/json; charset=utf-8'},
-      ),
-    );
-    await tester.runAsync(
-      () async => Future<void>.delayed(const Duration(milliseconds: 20)),
-    );
-    await tester.pumpAndSettle();
-    final body = jsonDecode(request!.body) as Map<String, dynamic>;
-    final systemPrompt = (body['messages'] as List).first['content'] as String;
-    expect(systemPrompt, startsWith('发起时的自然观察偏好\n\n'));
-    expect(systemPrompt, isNot(contains('等待时改为购物偏好')));
-    final prompt = (body['messages'] as List).last['content'] as String;
-    expect(prompt, contains('小学2年级'));
-    expect(prompt, contains('上学期'));
-    expect(prompt, contains('加法'));
-    expect(preview, isNotNull);
-    expect(preview!.grade, 2);
-    expect(preview!.semester, '上');
-    expect(preview!.topics, [WordProblemTopic.addition]);
-    expect(preview!.items, hasLength(10));
-    expect(tester.takeException(), isNull);
-
-    // 本用例经 `CloudUsageService.reserve` 写过 `HiveBoxes.meta`
-    // （用量计数）。写帧挂在 Hive 的写链上，tearDown 的 `Hive.close()`
-    // 排在链尾——fake 时钟下写任务的完成回调排不到，close() 会空等到
-    // 30s 超时。回到真实异步区把链推一下即可解开（helper 内有详述）。
-    await drainHiveWritesForTesting(tester);
   });
 
   testWidgets('未配置 LLM 时显示引导态而非生成表单', (tester) async {
