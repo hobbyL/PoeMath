@@ -4,7 +4,6 @@
 // 职责：挑战记录回顾 — 展示所有历史挑战的模式、成绩和统计。
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -84,17 +83,7 @@ class ChallengeHistoryPage extends ConsumerWidget {
                               rowWidgets.add(
                                 Expanded(
                                   child: _RecordCard(record: record)
-                                      .animatePage(context)
-                                      .fadeIn(
-                                        delay: (80 * idx).ms,
-                                        duration: 300.ms,
-                                      )
-                                      .slideX(
-                                        begin: 0.1,
-                                        end: 0,
-                                        delay: (80 * idx).ms,
-                                        duration: 300.ms,
-                                      ),
+                                      .animateListItem(context, index: idx),
                                 ),
                               );
                             } else {

@@ -44,6 +44,54 @@ class _InputProbeState extends State<_InputProbe> {
 }
 
 void main() {
+  testWidgets('滚动到长列表后部时内容立即可见，不按绝对位置重新等待入场', (tester) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedPageBody(
+          controller: controller,
+          children: List.generate(
+            80,
+            (index) => ConstrainedBox(
+              constraints: const BoxConstraints.tightFor(height: 80),
+              child: Text('条目 $index'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    controller.jumpTo(3200);
+    await tester.pump();
+    await _startEntrances(tester);
+    expect(find.text('条目 40'), findsOneWidget);
+    expect(_bodyOpacities(tester), everyElement(1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('密集内容的首轮入场在半秒内完成，间距不累计等待时间', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedPageBody(
+          children: [
+            for (var index = 0; index < 12; index++) ...[
+              Text('内容 $index'),
+              const SizedBox(height: SpacingTokens.xs),
+            ],
+          ],
+        ),
+      ),
+    );
+    await _startEntrances(tester);
+    // 分帧推动延迟计时器；单次跳过 500ms 会让计时器届时才开始动画。
+    for (var frame = 0; frame < 25; frame++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    expect(_bodyOpacities(tester), everyElement(1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('默认保留逐项淡入与滑入，间距不生成动画组件', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -58,7 +106,7 @@ void main() {
     );
     await _startEntrances(tester);
     expect(_bodyOpacities(tester), [0, 0]);
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 20));
     final values = _bodyOpacities(tester);
     expect(values.first, greaterThan(0));
     expect(values.last, 0);

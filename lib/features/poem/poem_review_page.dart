@@ -84,14 +84,7 @@ class PoemReviewPage extends ConsumerWidget {
                     ...dueToday.asMap().entries.map(
                       (e) =>
                           _buildReviewItem(context, ref, e.value, isDue: true)
-                              .animatePage(context)
-                              .fadeIn(delay: (80 * e.key).ms, duration: 300.ms)
-                              .slideX(
-                                begin: 0.1,
-                                end: 0,
-                                delay: (80 * e.key).ms,
-                                duration: 300.ms,
-                              ),
+                              .animateListItem(context, index: e.key),
                     ),
                     const SizedBox(height: SpacingTokens.lg),
                   ],
@@ -111,14 +104,7 @@ class PoemReviewPage extends ConsumerWidget {
                     ...upcoming.asMap().entries.map(
                       (e) =>
                           _buildReviewItem(context, ref, e.value, isDue: false)
-                              .animatePage(context)
-                              .fadeIn(delay: (80 * e.key).ms, duration: 300.ms)
-                              .slideX(
-                                begin: 0.1,
-                                end: 0,
-                                delay: (80 * e.key).ms,
-                                duration: 300.ms,
-                              ),
+                              .animateListItem(context, index: e.key),
                     ),
                   ],
                 ],

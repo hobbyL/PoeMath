@@ -3,7 +3,7 @@
 // 层级：core/widgets
 // 职责：带交错入场动画的页面内容容器，统一全局子页面内容动画。
 //
-// 开启页面动画时：fadeIn 300ms + slideX(0.1) 300ms，按原子项索引延迟 80ms。
+// 开启页面动画时：仅前几项短暂交错入场，后续滚动内容立即显示。
 // SizedBox 等间距组件不生成动画。关闭时直接显示最终状态并保留子组件 State。
 
 import 'package:flutter/material.dart';
@@ -14,7 +14,7 @@ import 'package:poemath/core/widgets/page_animation_scope.dart';
 
 /// 带交错入场动画的可滚动页面内容。
 ///
-/// 动画效果与复习计划页一致：fadeIn + slideX(0.1)，80ms 交错间隔。
+/// 复用列表入场策略，间距不计入序列，整体入场不超过半秒。
 ///
 /// 用法：
 /// ```dart
@@ -48,18 +48,16 @@ class AnimatedPageBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var contentIndex = 0;
     return ListView(
       controller: controller,
       padding: padding,
       children: [
-        for (final entry in children.asMap().entries)
-          if (AnimateList.ignoreTypes.contains(entry.value.runtimeType))
-            entry.value
+        for (final child in children)
+          if (AnimateList.ignoreTypes.contains(child.runtimeType))
+            child
           else
-            entry.value
-                .animatePage(context, delay: (entry.key * 80).ms)
-                .fadeIn(duration: 300.ms)
-                .slideX(begin: 0.1, end: 0, duration: 300.ms),
+            child.animateListItem(context, index: contentIndex++),
       ],
     );
   }

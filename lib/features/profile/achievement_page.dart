@@ -194,14 +194,7 @@ class _CategorySection extends StatelessWidget {
             achievement: achievement,
             color: color,
           )
-              .animatePage(context)
-              .fadeIn(delay: (60 * idx).ms, duration: 300.ms)
-              .slideX(
-                begin: 0.08,
-                end: 0,
-                delay: (60 * idx).ms,
-                duration: 300.ms,
-              );
+              .animateListItem(context, index: idx, begin: const Offset(0.08, 0));
         }),
       ],
     );

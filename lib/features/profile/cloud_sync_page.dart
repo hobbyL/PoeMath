@@ -5,7 +5,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/data/providers/backup_protection_providers.dart';
@@ -559,17 +558,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                                       ],
                                     ),
                                   )
-                                  .animatePage(context)
-                                  .fadeIn(
-                                    delay: (80 * index).ms,
-                                    duration: 300.ms,
-                                  )
-                                  .slideX(
-                                    begin: 0.1,
-                                    end: 0,
-                                    delay: (80 * index).ms,
-                                    duration: 300.ms,
-                                  );
+                                  .animateListItem(context, index: index);
                             },
                           ),
                         ),

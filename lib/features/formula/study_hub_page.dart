@@ -4,7 +4,6 @@
 // 职责：公式知识库 — 分类筛选 + 搜索 + 公式卡片列表。
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -187,14 +186,7 @@ class StudyHubPage extends ConsumerWidget {
                               ),
                             ),
                           )
-                          .animatePage(context)
-                          .fadeIn(delay: (80 * index).ms, duration: 300.ms)
-                          .slideX(
-                            begin: 0.1,
-                            end: 0,
-                            delay: (80 * index).ms,
-                            duration: 300.ms,
-                          );
+                          .animateListItem(context, index: index);
                     }, childCount: formulas.length),
                   ),
                 ),

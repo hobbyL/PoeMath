@@ -4,7 +4,6 @@
 // 职责：诗词 Tab 主页 — 搜索面板 + 诗词列表。
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -222,14 +221,7 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                               context.push(AppRoutes.poemDetailOf(poem.id));
                             },
                           )
-                          .animatePage(context)
-                          .fadeIn(delay: (80 * index).ms, duration: 300.ms)
-                          .slideX(
-                            begin: 0.1,
-                            end: 0,
-                            delay: (80 * index).ms,
-                            duration: 300.ms,
-                          );
+                          .animateListItem(context, index: index);
                     }, childCount: poems.length),
                   ),
                 ),

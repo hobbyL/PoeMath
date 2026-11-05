@@ -4,7 +4,6 @@
 // 职责：诗词收藏夹 — 集中展示所有已收藏的诗词，支持宽屏多列布局。
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -76,13 +75,10 @@ class PoemFavoritesPage extends ConsumerWidget {
                             onTap: () =>
                                 context.push(AppRoutes.poemDetailOf(poem.id)),
                           )
-                          .animatePage(context)
-                          .fadeIn(delay: (60 * index).ms, duration: 300.ms)
-                          .slideY(
-                            begin: 0.05,
-                            end: 0,
-                            delay: (60 * index).ms,
-                            duration: 300.ms,
+                          .animateListItem(
+                            context,
+                            index: index,
+                            begin: const Offset(0, 0.05),
                           );
                     }, childCount: favorites.length),
                   ),

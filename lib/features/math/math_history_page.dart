@@ -4,7 +4,6 @@
 // 职责：练习记录回顾 — 展示所有历史会话的成绩和统计。
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -84,17 +83,7 @@ class MathHistoryPage extends ConsumerWidget {
                                               session: session,
                                             ),
                                           )
-                                          .animatePage(context)
-                                          .fadeIn(
-                                            delay: (80 * idx).ms,
-                                            duration: 300.ms,
-                                          )
-                                          .slideX(
-                                            begin: 0.1,
-                                            end: 0,
-                                            delay: (80 * idx).ms,
-                                            duration: 300.ms,
-                                          ),
+                                          .animateListItem(context, index: idx),
                                 ),
                               );
                             } else {

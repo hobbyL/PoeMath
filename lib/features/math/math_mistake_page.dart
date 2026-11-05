@@ -310,17 +310,7 @@ class MathMistakePage extends ConsumerWidget {
                                                 mistake: mistake,
                                               ),
                                             )
-                                            .animatePage(context)
-                                            .fadeIn(
-                                              delay: (80 * idx).ms,
-                                              duration: 300.ms,
-                                            )
-                                            .slideX(
-                                              begin: 0.1,
-                                              end: 0,
-                                              delay: (80 * idx).ms,
-                                              duration: 300.ms,
-                                            ),
+                                            .animateListItem(context, index: idx),
                                   ),
                                 );
                               } else {
