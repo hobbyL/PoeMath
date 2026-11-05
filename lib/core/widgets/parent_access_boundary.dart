@@ -227,7 +227,7 @@ class _ParentUnlockDialogState extends State<_ParentUnlockDialog> {
   );
 }
 
-/// 同时用于 GoRouter 和 Navigator 页面，短时授权失效时移除可编辑页面。
+/// 同时用于 GoRouter 和 Navigator 管理页面，存续期间暂停授权超时。
 class ParentAccessBoundary extends StatefulWidget {
   const ParentAccessBoundary({
     super.key,
@@ -270,6 +270,7 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
     _boundaries.add(this);
     _access.observeLifecycle();
     _wasUnlocked = _access.isUnlocked;
+    _access.enterManagementPage();
     // 已验证的会话可在首帧显示子页，不重新进入安全存储读取和解锁占位页。
     _ready = _wasUnlocked;
     _access.addListener(_changed);
@@ -373,6 +374,7 @@ class _ParentAccessBoundaryState extends State<ParentAccessBoundary> {
   void dispose() {
     _boundaries.remove(this);
     _access.removeListener(_changed);
+    _access.leaveManagementPage();
     super.dispose();
   }
 

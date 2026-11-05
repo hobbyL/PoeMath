@@ -29,6 +29,8 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
   final DateTime Function() _clock;
   DateTime? _until;
   Timer? _expiry;
+  int _managementPages = 0;
+  Zone _expiryZone = Zone.current;
   bool _observing = false;
   bool _foreground = true;
   Future<void>? _operation;
@@ -44,7 +46,27 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
       _storageError == null &&
       _foreground &&
       enabled &&
-      (_until?.isAfter(_clock()) ?? false);
+      _until != null &&
+      (_managementPages > 0 || _until!.isAfter(_clock()));
+
+  /// 管理页面存续期间暂停超时；不授予权限，也不绕过后台或主动锁定。
+  void enterManagementPage() {
+    if (_managementPages == 0 && _until != null && !_until!.isAfter(_clock())) {
+      lock();
+    }
+    _managementPages++;
+    _expiry?.cancel();
+  }
+
+  void leaveManagementPage() {
+    if (_managementPages == 0) return;
+    _managementPages--;
+    if (_managementPages == 0 && _until != null) {
+      _until = _clock().add(unlockDuration);
+    _expiryZone = Zone.current;
+      _expiry = _expiryZone.createTimer(unlockDuration, lock);
+    }
+  }
 
   /// 首次建立 PIN 的资格不授予设置、额度或数据管理权限。
   bool get canSetPin =>
@@ -165,8 +187,11 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     _until = _clock().add(unlockDuration);
+    _expiryZone = Zone.current;
     _expiry?.cancel();
-    _expiry = Timer(unlockDuration, lock);
+    if (_managementPages == 0) {
+      _expiry = Timer(unlockDuration, lock);
+    }
     notifyListeners();
   }
 
@@ -383,6 +408,7 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _until = null;
     _expiry?.cancel();
     if (_observing) WidgetsBinding.instance.removeObserver(this);
     super.dispose();

@@ -92,6 +92,34 @@ void main() {
     expect(access.assertAllowed, throwsA(isA<ParentAccessDenied>()));
   });
 
+  test('管理子页长时间配置不超时，全部退出后恢复计时', () async {
+    await access.configure('123456');
+    access.enterManagementPage();
+    access.enterManagementPage();
+    now = now.add(const Duration(minutes: 20));
+    expect(access.isUnlocked, isTrue);
+    expect(access.assertAllowed, returnsNormally);
+    access.leaveManagementPage();
+    expect(access.isUnlocked, isTrue);
+    access.leaveManagementPage();
+    now = now.add(ParentAccessService.unlockDuration);
+    expect(access.isUnlocked, isFalse);
+  });
+
+  test('管理页面暂停计时仍不能绕过主动或后台锁定', () async {
+    access.enterManagementPage();
+    expect(access.isUnlocked, isFalse);
+    await access.configure('123456');
+    access.lock();
+    expect(access.isUnlocked, isFalse);
+    expect(await access.authenticate('123456'), isTrue);
+    access.didChangeAppLifecycleState(AppLifecycleState.paused);
+    access.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    expect(access.isUnlocked, isFalse);
+    access.leaveManagementPage();
+    expect(access.isUnlocked, isFalse);
+  });
+
   test('后台事件使进行中的验证失效，不能在await后重新解锁', () async {
     await access.configure('123456');
     access.lock();
@@ -235,8 +263,10 @@ void main() {
     access.lock();
     store.holdRead = Completer<void>();
     var current = true;
-    final authentication =
-        access.authenticate('123456', isCurrent: () => current);
+    final authentication = access.authenticate(
+      '123456',
+      isCurrent: () => current,
+    );
     await Future<void>.delayed(Duration.zero);
     current = false;
     store.holdRead!.complete();
@@ -252,8 +282,10 @@ void main() {
     store.holdNextSave = release;
     var current = true;
     final configuring = access.configure('123456', isCurrent: () => current);
-    final outcome =
-        expectLater(configuring, throwsA(isA<ParentAccessDenied>()));
+    final outcome = expectLater(
+      configuring,
+      throwsA(isA<ParentAccessDenied>()),
+    );
     await entered.future;
     current = false;
     release.complete();
