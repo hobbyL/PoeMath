@@ -152,6 +152,8 @@ class _TextbookPdfCoverState extends ConsumerState<TextbookPdfCover> {
   ui.Image? _image;
   TextbookCoverToken? _token;
   bool _failed = false;
+  Timer? _retry;
+  int _attempts = 0;
 
   @override
   void initState() {
@@ -162,10 +164,12 @@ class _TextbookPdfCoverState extends ConsumerState<TextbookPdfCover> {
   @override
   void didUpdateWidget(TextbookPdfCover oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.path != widget.path) _start();
+    if (oldWidget.path != widget.path || _failed) _start();
   }
 
   void _start() {
+    _retry?.cancel();
+    _attempts = 0;
     _token?.cancel();
     _image?.dispose();
     _image = null;
@@ -188,6 +192,7 @@ class _TextbookPdfCoverState extends ConsumerState<TextbookPdfCover> {
     TextbookCoverToken token,
     TextbookCoverRenderer renderer,
   ) async {
+    _attempts++;
     try {
       final image = await renderer(path, token);
       if (!mounted || token != _token || token.isCancelled) {
@@ -198,6 +203,7 @@ class _TextbookPdfCoverState extends ConsumerState<TextbookPdfCover> {
         _image = image;
         _failed = image == null;
       });
+      if (image == null) _scheduleRetry(path, token, renderer);
     } on Object catch (error, stackTrace) {
       if (!mounted || token != _token || token.isCancelled) return;
       AppLogger.e(
@@ -207,11 +213,26 @@ class _TextbookPdfCoverState extends ConsumerState<TextbookPdfCover> {
         stackTrace: stackTrace,
       );
       setState(() => _failed = true);
+      _scheduleRetry(path, token, renderer);
     }
+  }
+
+  void _scheduleRetry(
+    String path,
+    TextbookCoverToken token,
+    TextbookCoverRenderer renderer,
+  ) {
+    if (_attempts >= 3) return;
+    _retry = Timer(const Duration(seconds: 1), () {
+      if (!mounted || token != _token || token.isCancelled) return;
+      setState(() => _failed = false);
+      unawaited(_load(path, token, renderer));
+    });
   }
 
   @override
   void dispose() {
+    _retry?.cancel();
     _token?.cancel();
     _image?.dispose();
     super.dispose();

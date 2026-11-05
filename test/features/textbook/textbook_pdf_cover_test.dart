@@ -117,6 +117,87 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('首次封面暂不可用时自动重试恢复，不需要重启或换路径', (tester) async {
+    final image = await _image(tester);
+    var attempts = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          textbookCoverRendererProvider.overrideWithValue((_, __) async {
+            attempts++;
+            return attempts == 1 ? null : image;
+          }),
+        ],
+        child: const MaterialApp(
+          home: TextbookPdfCover(path: '/sample.pdf', title: '测试书籍'),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('封面暂不可用'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(find.byType(RawImage), findsOneWidget);
+    expect(attempts, 2);
+    await tester.pumpWidget(const SizedBox());
+    expect(image.debugDisposed, isTrue);
+  });
+
+  testWidgets('持续失败最多尝试三次，同路径刷新可恢复', (tester) async {
+    var attempts = 0;
+    final image = await _image(tester);
+    var available = false;
+    Future<void> mount() => tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          textbookCoverRendererProvider.overrideWithValue((_, __) async {
+            attempts++;
+            return available ? image : null;
+          }),
+        ],
+        child: MaterialApp(
+          home: TextbookPdfCover(path: '/sample.pdf', title: '测试书籍'),
+        ),
+      ),
+    );
+    await mount();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 10));
+    expect(attempts, 3);
+    expect(find.text('封面暂不可用'), findsOneWidget);
+    available = true;
+    await mount();
+    await tester.pump();
+    expect(find.byType(RawImage), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('离开页面取消尚未执行的封面重试', (tester) async {
+    var attempts = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          textbookCoverRendererProvider.overrideWithValue((_, __) async {
+            attempts++;
+            return null;
+          }),
+        ],
+        child: const MaterialApp(
+          home: TextbookPdfCover(path: '/sample.pdf', title: '测试书籍'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 5));
+    expect(attempts, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('同一会话再次进入直接用内存封面，首帧出图且不再渲染', (tester) async {
     final image = await _image(tester);
     const path = '/sample.pdf';
