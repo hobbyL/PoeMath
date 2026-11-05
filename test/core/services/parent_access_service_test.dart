@@ -106,6 +106,61 @@ void main() {
     expect(access.isUnlocked, isFalse);
   });
 
+  testWidgets('跨异步环境退出管理页后，授权计时和到期通知仍归属解锁环境', (tester) async {
+    final timerClock = Zone.current;
+    final timers = <Timer>[];
+    late Zone authorizationZone;
+    await tester.runAsync(() async {
+      authorizationZone = Zone.current.fork(
+        specification: ZoneSpecification(
+          createTimer: (self, parent, zone, duration, callback) {
+            if (duration != ParentAccessService.unlockDuration) {
+              return parent.createTimer(zone, duration, callback);
+            }
+            // 仅借测试时钟推进真实 Timer；调度和回调仍须经过授权环境。
+            final timer = timerClock.createTimer(duration, callback);
+            timers.add(timer);
+            return timer;
+          },
+        ),
+      );
+      await authorizationZone.run(() => access.configure('123456'));
+    });
+
+    try {
+      expect(timers, hasLength(1));
+      expect(timers.single.isActive, isTrue);
+      access.enterManagementPage();
+      access.enterManagementPage();
+      expect(timers.single.isActive, isFalse);
+      now = now.add(const Duration(minutes: 20));
+      await tester.pump(const Duration(minutes: 20));
+      expect(access.isUnlocked, isTrue);
+      access.leaveManagementPage();
+      expect(timers, hasLength(1), reason: '仍有管理页时不能启动倒计时');
+      access.leaveManagementPage();
+      expect(timers, hasLength(2), reason: '恢复计时必须复用解锁时的调度环境');
+      expect(timers.last.isActive, isTrue);
+
+      final notificationZones = <Zone>[];
+      access.addListener(() => notificationZones.add(Zone.current));
+      final beforeExpiry = ParentAccessService.unlockDuration -
+          const Duration(microseconds: 1);
+      now = now.add(beforeExpiry);
+      await tester.pump(beforeExpiry);
+      expect(access.isUnlocked, isTrue);
+      expect(notificationZones, isEmpty);
+      now = now.add(const Duration(microseconds: 1));
+      await tester.pump(const Duration(microseconds: 1));
+      expect(access.isUnlocked, isFalse);
+      expect(access.assertAllowed, throwsA(isA<ParentAccessDenied>()));
+      expect(notificationZones, [same(authorizationZone)]);
+      expect(timers.last.isActive, isFalse);
+    } finally {
+      access.lock();
+    }
+  });
+
   test('管理页面暂停计时仍不能绕过主动或后台锁定', () async {
     access.enterManagementPage();
     expect(access.isUnlocked, isFalse);

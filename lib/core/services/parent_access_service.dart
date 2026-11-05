@@ -63,8 +63,8 @@ class ParentAccessService extends ChangeNotifier with WidgetsBindingObserver {
     _managementPages--;
     if (_managementPages == 0 && _until != null) {
       _until = _clock().add(unlockDuration);
-    _expiryZone = Zone.current;
-      _expiry = _expiryZone.createTimer(unlockDuration, lock);
+      // 恢复解锁时的调度环境；页面卸载不能接管会话计时和异常处理。
+      _expiry = _expiryZone.run(() => Timer(unlockDuration, lock));
     }
   }
 
