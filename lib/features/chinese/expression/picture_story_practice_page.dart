@@ -565,7 +565,9 @@ class _PictureStoryPracticePageState
           requiresVision: true,
         );
         final text = completion.content?.trim();
-        return text == null || text.isEmpty ? null : text;
+        if (text == null || text.isEmpty) return null;
+        await client.acceptCompletion(completion);
+        return text;
       } finally {
         client.close();
       }

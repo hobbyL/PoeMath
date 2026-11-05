@@ -180,6 +180,8 @@ class PictureStoryGenerationService {
     required ImageGenerationConfig imageConfig,
     required bool Function() isActive,
     void Function()? onChanged,
+    void Function(int attempt)? onPlanningAttempt,
+    void Function(String signature)? onLlmSelectionSaved,
     String? candidateId,
     String? reuseImageId,
     bool regenerateImage = false,
@@ -258,7 +260,14 @@ class PictureStoryGenerationService {
         }
       }
       if (saved.candidates.isEmpty) {
-        final items = await _plan(saved, config, run.llm, planningPrompt);
+        final items = await _plan(
+          saved,
+          config,
+          run.llm,
+          planningPrompt,
+          onAttempt: onPlanningAttempt,
+          onSelectionSaved: onLlmSelectionSaved,
+        );
         check();
         await _serial(() async {
           final current = readDraft(profile);
@@ -342,6 +351,7 @@ class PictureStoryGenerationService {
             config,
             run.llm,
             questionPrompt,
+            onSelectionSaved: onLlmSelectionSaved,
           );
           check();
           item = item.copyWith(
@@ -396,8 +406,10 @@ class PictureStoryGenerationService {
     PictureStoryGenerationDraft draft,
     LlmConfig config,
     LlmClient client,
-    String systemPrompt,
-  ) async {
+    String systemPrompt, {
+    void Function(int attempt)? onAttempt,
+    void Function(String signature)? onSelectionSaved,
+  }) async {
     final response = await client.chatComplete(
       config: config,
       systemPrompt: systemPrompt,
@@ -412,12 +424,15 @@ class PictureStoryGenerationService {
         ),
       ],
       maxTokens: 3000,
+      onAttempt: onAttempt,
     );
     final data = _json(response.content);
     if (data is! List || data.length != draft.options.count) {
       throw const FormatException('场景规划数量不完整，请重新生成');
     }
-    return [for (final value in data) _plannedCandidate(value, draft)];
+    final items = [for (final value in data) _plannedCandidate(value, draft)];
+    await client.acceptCompletion(response, onSelectionSaved: onSelectionSaved);
+    return items;
   }
 
   static PictureStoryGenerationCandidate _plannedCandidate(
@@ -446,8 +461,9 @@ class PictureStoryGenerationService {
     PictureStoryLevel level,
     LlmConfig config,
     LlmClient client,
-    String systemPrompt,
-  ) async {
+    String systemPrompt, {
+    void Function(String signature)? onSelectionSaved,
+  }) async {
     final bytes = await _images.readForVision(item.edit.image!.value);
     final text = '观察这张实际图片，为${level.label}难度编写看图说话练习。'
         '不要以原始生图描述作为画面事实。';
@@ -508,13 +524,15 @@ class PictureStoryGenerationService {
       profileId: item.edit.profileId,
       original: prompt,
     );
-    return PictureStoryEditorDraft(
+    final edit = PictureStoryEditorDraft(
       id: item.id,
       profileId: item.edit.profileId,
       level: prompt.level,
       image: prompt.image,
       fields: populated.fields,
     );
+    await client.acceptCompletion(response, onSelectionSaved: onSelectionSaved);
+    return edit;
   }
 
   Future<void> setSelected(

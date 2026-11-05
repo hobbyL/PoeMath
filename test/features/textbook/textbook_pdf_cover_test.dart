@@ -155,7 +155,7 @@ void main() {
             return available ? image : null;
           }),
         ],
-        child: MaterialApp(
+        child: const MaterialApp(
           home: TextbookPdfCover(path: '/sample.pdf', title: '测试书籍'),
         ),
       ),

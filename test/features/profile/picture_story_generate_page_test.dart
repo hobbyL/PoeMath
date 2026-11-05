@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -20,6 +21,7 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/models/image_generation_config.dart';
 import 'package:poemath/data/models/picture_story_editor_draft.dart';
 import 'package:poemath/data/models/picture_story_generation_draft.dart';
@@ -59,6 +61,8 @@ class _GenerationFlow extends PictureStoryGenerationService {
     required ImageGenerationConfig imageConfig,
     required bool Function() isActive,
     void Function()? onChanged,
+    void Function(int attempt)? onPlanningAttempt,
+    void Function(String signature)? onLlmSelectionSaved,
     String? candidateId,
     String? reuseImageId,
     bool regenerateImage = false,
@@ -107,7 +111,11 @@ class _GenerationFlow extends PictureStoryGenerationService {
   }
 }
 
-Future<void> _until(WidgetTester tester, bool Function() condition) async {
+Future<void> _until(
+  WidgetTester tester,
+  bool Function() condition, {
+  bool settle = true,
+}) async {
   final deadline = DateTime.now().add(const Duration(seconds: 8));
   while (!condition() && DateTime.now().isBefore(deadline)) {
     await tester.runAsync(() async {
@@ -116,7 +124,8 @@ Future<void> _until(WidgetTester tester, bool Function() condition) async {
     });
   }
   expect(condition(), isTrue);
-  await tester.pumpAndSettle();
+  await tester.pump();
+  if (settle) await tester.pumpAndSettle();
 }
 
 void main() {
@@ -215,6 +224,7 @@ void main() {
     expect(service.readDraft('default'), isNull);
     expect(repository.catalogState().versions, isEmpty);
     expect(tester.takeException(), isNull);
+    lockParentForTesting();
     await tester.pumpWidget(const SizedBox.shrink());
     await drainHiveWritesForTesting(tester);
   });
@@ -233,6 +243,94 @@ void main() {
     expect(tester.widget<Slider>(slider).value, count.toDouble());
     expect(find.text('数量（$count 题）'), findsOneWidget);
   }
+
+  testWidgets('规划切换模型时显示重试，成功回写默认后页面继续完成生图和看图出题', (tester) async {
+    final settings = SettingsRepository();
+    final firstEntered = Completer<void>();
+    final firstReply = Completer<http.Response>();
+    final fallbackEntered = Completer<void>();
+    final fallbackReply = Completer<http.Response>();
+    final models = <String>[];
+    var imageRequests = 0;
+    var promotions = 0;
+    final png = (await tester.runAsync(() => pictureStoryPng()))!;
+    await tester.runAsync(() async {
+      await settings.saveImageGenerationConfig(
+        provider: const ImageGenerationProviderConfig(
+          name: '测试图片', baseUrl: 'https://image.example.com/v1', model: 'image',
+        ), apiKey: '',
+      );
+      for (final id in ['bad', 'good']) {
+        await settings.saveLlmProviderConfig(
+          id: id, name: id, baseUrl: 'https://$id.example.com/v1',
+          model: 'gpt-4o-mini', apiKey: 'synthetic-$id-key',
+        );
+      }
+    });
+    http.Response completion(Object value) => http.Response.bytes(
+      utf8.encode(jsonEncode({'choices': [{'message': {'content': jsonEncode(value)}}]})),
+      200,
+    );
+    final transport = MockClient((request) async {
+      models.add(request.url.host);
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      if ((body['messages'] as List).last['content'] is String) {
+        if (request.url.host == 'bad.example.com') {
+          firstEntered.complete();
+          return firstReply.future;
+        }
+        fallbackEntered.complete();
+        return fallbackReply.future;
+      }
+      return completion({'title': '雨中互助', 'questions': ['孩子正在做什么？']});
+    });
+    addTearDown(transport.close);
+    service = PictureStoryGenerationService(
+      images: images, repository: repository,
+      llmFactory: (active) => createRuntimeLlmClient(
+        httpClient: transport, settings: settings, isActive: active,
+        onSelectionChanged: () => promotions++,
+      ),
+      imageFactory: (active) => ImageGenerationClient(
+        isActive: active,
+        httpClient: MockClient((request) async {
+          imageRequests++;
+          expect(settings.llmActiveProviderId, 'good');
+          return http.Response(jsonEncode({'data': [{'b64_json': base64Encode(png)}]}), 200);
+        }),
+      ),
+    );
+    try {
+      await mount(tester);
+      await chooseCount(tester, 1);
+      await tester.ensureVisible(find.text('生成图文题目'));
+      await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
+      await _until(tester, () => firstEntered.isCompleted, settle: false);
+      expect(find.text('正在规划场景…'), findsOneWidget);
+      await tester.runAsync(() async {
+        firstReply.complete(http.Response('', 503));
+      });
+      await _until(tester, () => fallbackEntered.isCompleted, settle: false);
+      expect(find.text('正在切换模型，重试场景规划…'), findsOneWidget);
+      expect(settings.llmActiveProviderId, 'bad');
+      await tester.runAsync(() async {
+        fallbackReply.complete(completion([{'imagePrompt': '两个孩子在雨中分享雨伞。'}]));
+      });
+      await _until(tester, () => service.readDraft('default')?.readyCount == 1 &&
+          find.text('暂停生成').evaluate().isEmpty);
+      expect(settings.llmActiveProviderId, 'good');
+      expect(promotions, 1);
+      expect(imageRequests, 1);
+      expect(models, ['bad.example.com', 'good.example.com', 'good.example.com']);
+      expect(service.readDraft('default')!.candidates.single.edit.toPrompt().title, '雨中互助');
+    } finally {
+      lockParentForTesting();
+      if (!firstReply.isCompleted) firstReply.complete(http.Response('', 503));
+      if (!fallbackReply.isCompleted) fallbackReply.complete(http.Response('', 503));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await drainHiveWritesForTesting(tester);
+    }
+  });
 
   testWidgets('场景规划失败后重新进入仍显示原要求，并可重试生成同一草稿', (tester) async {
     var planningRequests = 0;
@@ -369,6 +467,7 @@ void main() {
     expect(imageRequests, 1);
     expect(repository.catalogState().versions, isEmpty);
     expect(tester.takeException(), isNull);
+    lockParentForTesting();
     await tester.pumpWidget(const SizedBox.shrink());
     await drainHiveWritesForTesting(tester);
   });
@@ -419,6 +518,7 @@ void main() {
     expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNotNull);
     expect(tester.widget<Slider>(find.byType(Slider)).value, 5);
     expect(tester.takeException(), isNull);
+    lockParentForTesting();
     await tester.pumpWidget(const SizedBox.shrink());
     await drainHiveWritesForTesting(tester);
   });
@@ -468,6 +568,7 @@ void main() {
         isTrue,
       );
       expect(tester.takeException(), isNull);
+      lockParentForTesting();
       await tester.pumpWidget(const SizedBox.shrink());
       await drainHiveWritesForTesting(tester);
     });
@@ -674,6 +775,7 @@ void main() {
       );
       expect(repository.catalogState().versions, isEmpty);
       expect(tester.takeException(), isNull);
+      lockParentForTesting();
       await tester.pumpWidget(const SizedBox.shrink());
       await drainHiveWritesForTesting(tester);
     });
@@ -810,6 +912,7 @@ void main() {
     expect(await tester.runAsync(() => images.readImage(image.value)), stored);
     expect(repository.catalogState().versions, isEmpty);
     expect(tester.takeException(), isNull);
+    lockParentForTesting();
     await tester.pumpWidget(const SizedBox.shrink());
     await drainHiveWritesForTesting(tester);
   });
@@ -950,6 +1053,7 @@ void main() {
       router.routerDelegate.state.uri.path,
       AppRoutes.pictureStoryGenerate,
     );
+    lockParentForTesting();
     await tester.pumpWidget(const SizedBox.shrink());
     await drainHiveWritesForTesting(tester);
   });

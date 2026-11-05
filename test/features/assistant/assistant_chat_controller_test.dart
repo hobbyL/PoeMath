@@ -618,9 +618,19 @@ void main() {
     );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
+    final received = Completer<void>();
+    final subscription = container.listen(
+      assistantChatControllerProvider,
+      (_, state) {
+        if (state.streamingText == '在的' && !received.isCompleted) {
+          received.complete();
+        }
+      },
+    );
+    addTearDown(subscription.close);
     final done = notifier.send('在吗');
     sse.add(utf8.encode(_sseData('在的')));
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await received.future.timeout(const Duration(seconds: 5));
     expect(container.read(assistantChatControllerProvider).isStreaming, isTrue);
     expect(container.read(assistantChatControllerProvider).streamingText, '在的');
 
@@ -654,9 +664,19 @@ void main() {
     );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
+    final received = Completer<void>();
+    final subscription = container.listen(
+      assistantChatControllerProvider,
+      (_, state) {
+        if (state.streamingText == '旧回答片段' && !received.isCompleted) {
+          received.complete();
+        }
+      },
+    );
+    addTearDown(subscription.close);
     final done = notifier.send('旧会话问题');
     sse.add(utf8.encode(_sseData('旧回答片段')));
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await received.future.timeout(const Duration(seconds: 5));
     expect(container.read(assistantChatControllerProvider).isStreaming, isTrue);
 
     notifier.startNewConversation();
@@ -677,17 +697,19 @@ void main() {
     await seedProviders();
     var requests = 0;
     final completer = Completer<http.Response>();
+    final entered = Completer<void>();
     final container = containerWith(
       MockClient((request) async {
         requests++;
         if (_isStream(request.body)) return _sseResponse('回答');
+        entered.complete();
         return completer.future;
       }),
     );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
     final first = notifier.send('第一问');
-    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await entered.future.timeout(const Duration(seconds: 5));
     expect(container.read(assistantChatControllerProvider).isLoading, isTrue);
 
     await notifier.send('插队问');
@@ -932,20 +954,30 @@ void main() {
   test('页面销毁在 loading（判定中无增量）：discardPending 收敛回 ready，不新增消息', () async {
     await seedProviders();
     final completer = Completer<http.Response>();
+    final entered = Completer<void>();
     final container = containerWith(
       MockClient((request) async {
         if (_isStream(request.body)) return _sseResponse('不该到这');
+        entered.complete();
         return completer.future; // 挂住 chatComplete 工具判定阶段。
       }),
     );
     final notifier = container.read(assistantChatControllerProvider.notifier);
 
+    final discarded = Completer<void>();
+    final subscription = container.listen(
+      assistantChatControllerProvider,
+      (_, next) {
+        if (next.isReady && !discarded.isCompleted) discarded.complete();
+      },
+    );
+    addTearDown(subscription.close);
     final done = notifier.send('在吗');
-    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await entered.future.timeout(const Duration(seconds: 5));
     expect(container.read(assistantChatControllerProvider).isLoading, isTrue);
 
     notifier.discardPending();
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await discarded.future.timeout(const Duration(seconds: 5));
 
     final state = container.read(assistantChatControllerProvider);
     expect(state.isBusy, isFalse);

@@ -35,22 +35,32 @@ class SettingsRepository {
   bool get hasPendingLlmSave => _pendingLlmSaves.isNotEmpty;
   static int _imageGenerationRevision = 0;
   int get imageGenerationRevision => _imageGenerationRevision;
-  String get pictureStoryGenerationSignature => jsonEncode({
-        'imageRevision': _imageGenerationRevision,
-        'image': imageGenerationProvider?.toJson(),
-        'imageProviders': ImageGenerationProviderConfig.encodeProviders(
-          imageGenerationProviders,
-        ),
-        'imageActive': imageGenerationActiveProviderId,
-        'imagePrompt': pictureStoryImageGenerationPromptOverride,
-        'questionPrompt': pictureStoryQuestionGenerationPromptOverride,
-        'llmVersions': _llmProviderVersions,
-        'llm': LlmProviderConfig.encodeList(llmProviders),
-        'active': HiveBoxes.settings.get('llm_active_provider_id'),
-        'provider':
-            HiveBoxes.settings.get(LlmScenario.pictureStory.settingsKey),
-        'model': HiveBoxes.settings.get(LlmScenario.pictureStory.modelKey),
-      });
+  String get pictureStoryGenerationSignature =>
+      _pictureStoryGenerationSignature();
+
+  String _pictureStoryGenerationSignature([
+    Map<String, Object?> changes = const {},
+  ]) {
+    Object? setting(String key) =>
+        changes.containsKey(key) ? changes[key] : HiveBoxes.settings.get(key);
+    return jsonEncode({
+      'imageRevision': _imageGenerationRevision,
+      'image': imageGenerationProvider?.toJson(),
+      'imageProviders': ImageGenerationProviderConfig.encodeProviders(
+        imageGenerationProviders,
+      ),
+      'imageActive': imageGenerationActiveProviderId,
+      'imagePrompt': pictureStoryImageGenerationPromptOverride,
+      'questionPrompt': pictureStoryQuestionGenerationPromptOverride,
+      'llmVersions': _llmProviderVersions,
+      'llm': changes.containsKey(_keyLlmProviders)
+          ? changes[_keyLlmProviders]
+          : LlmProviderConfig.encodeList(llmProviders),
+      'active': setting(_keyLlmActiveProviderId),
+      'provider': setting(LlmScenario.pictureStory.settingsKey),
+      'model': setting(LlmScenario.pictureStory.modelKey),
+    });
+  }
 
   List<LlmProviderConfig> get imageGenerationProviders {
     try {
@@ -1066,6 +1076,7 @@ class SettingsRepository {
     LlmConfig request,
     LlmConfig successful, {
     required bool Function() isActive,
+    void Function(String signature)? onSelectionSaved,
   }) async {
     final source = request.selection;
     final target = successful.selection;
@@ -1122,7 +1133,7 @@ class SettingsRepository {
       model: model,
       models: LlmProviderConfig.normalizeModels(current.models, model),
     );
-    await HiveBoxes.settings.putAll({
+    final changes = <String, Object?>{
       _keyLlmProviders: LlmProviderConfig.encodeList(providers),
       if (switchedProvider && source.boundProviderId == null)
         _keyLlmActiveProviderId: target.providerId,
@@ -1131,7 +1142,13 @@ class SettingsRepository {
       if (source.boundProviderId != null &&
           (switchedProvider || source.selectedModel != null))
         source.scenario.modelKey: model,
-    });
+    };
+    // 捕获这一次回写应产生的签名，不能在异步落盘后接受并发的手动改动。
+    final signature = onSelectionSaved == null
+        ? null
+        : _pictureStoryGenerationSignature(changes);
+    await HiveBoxes.settings.putAll(changes);
+    if (signature != null) onSelectionSaved?.call(signature);
     return true;
   }
 

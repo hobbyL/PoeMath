@@ -306,6 +306,102 @@ void main() {
     expect(promoted, isFalse);
   });
 
+  test('业务确认只保存本客户端对应响应的实际成功模型，重复确认只保存一次', () async {
+    const config = LlmConfig(
+      baseUrl: 'https://first.example/v1',
+      apiKey: '',
+      model: 'gpt-4o-mini',
+      fallbacks: [
+        LlmConfig(
+          baseUrl: 'https://second.example/v1',
+          apiKey: '',
+          model: 'gpt-4o-mini',
+        ),
+      ],
+    );
+    const laterConfig = LlmConfig(
+      baseUrl: 'https://third.example/v1',
+      apiKey: '',
+      model: 'gpt-4o-mini',
+    );
+    final saved = <(LlmConfig, String, String)>[];
+    var legacyNotifications = 0;
+    final client = LlmClient(
+      httpClient: MockClient.streaming((request, _) async {
+        if (request.url.host == 'first.example') {
+          return http.StreamedResponse(const Stream.empty(), 503);
+        }
+        return _response(_delta('{"title":"完整题目"}') + _finish('stop'));
+      }),
+      onSelectionSucceeded: (_, _) async => legacyNotifications++,
+      onCompletionAccepted: (request, successful, {onSelectionSaved}) async {
+        saved.add((request, successful.baseUrl, successful.model));
+        onSelectionSaved?.call('saved-selection');
+      },
+    );
+    final otherClient = LlmClient();
+    addTearDown(client.close);
+    addTearDown(otherClient.close);
+    final first = await _complete(client, config: config);
+    final later = await _complete(client, config: laterConfig);
+    expect(saved, isEmpty);
+    await client.acceptCompletion(ChatCompletion(content: first.content));
+    await otherClient.acceptCompletion(first);
+    expect(saved, isEmpty);
+    String? signature;
+    await client.acceptCompletion(
+      first,
+      onSelectionSaved: (value) => signature = value,
+    );
+    await client.acceptCompletion(first);
+    expect(saved.length, 1);
+    expect(saved.single.$1, same(config));
+    expect(saved.single.$2, 'https://second.example/v1');
+    expect(saved.single.$3, 'gpt-4o-mini');
+    expect(signature, 'saved-selection');
+    await client.acceptCompletion(later);
+    expect(saved.length, 2);
+    expect(saved.last.$1, same(laterConfig));
+    expect(saved.last.$2, 'https://third.example/v1');
+    expect(legacyNotifications, 0);
+  });
+
+  test('切换模型提示期间取消，不发送下一次请求或保存默认模型', () async {
+    var active = true;
+    var requests = 0;
+    var promotions = 0;
+    final attempts = <int>[];
+    final client = LlmClient(
+      isActive: () => active,
+      httpClient: MockClient((_) async {
+        requests++;
+        return http.Response('', 503);
+      }),
+      onSelectionSucceeded: (_, _) async => promotions++,
+    );
+    addTearDown(client.close);
+    await expectLater(
+      client.chatComplete(
+        config: const LlmConfig(
+          baseUrl: 'https://vision.example.com/v1',
+          apiKey: '',
+          model: 'gpt-4o-mini',
+          models: ['gpt-4o-mini', 'gpt-4o'],
+        ),
+        systemPrompt: '',
+        messages: _messages,
+        onAttempt: (attempt) {
+          attempts.add(attempt);
+          if (attempt == 2) active = false;
+        },
+      ),
+      throwsA(isA<LlmGenerationCancelled>()),
+    );
+    expect(attempts, [1, 2]);
+    expect(requests, 1);
+    expect(promotions, 0);
+  });
+
   for (final (name, body) in [
     ('空输出', 'data: [DONE]\n\n'),
     ('缺少结束信号', _delta('{"title":"没有结束信号"}')),

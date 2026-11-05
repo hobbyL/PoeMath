@@ -41,6 +41,7 @@ class _PictureStoryGeneratePageState
   bool _foreground = true;
   bool _busy = false;
   bool _generating = false;
+  String _generationStatus = '正在读取生成配置…';
   PictureStoryGenerationDraft? _draft;
   String? _error;
   bool _loadFailed = false;
@@ -119,6 +120,7 @@ class _PictureStoryGeneratePageState
     setState(() {
       _busy = true;
       _generating = true;
+      _generationStatus = '正在读取生成配置…';
       _error = null;
     });
     try {
@@ -127,7 +129,7 @@ class _PictureStoryGeneratePageState
       if (settings.hasPendingLlmSave) {
         throw const FormatException('大模型设置正在保存，请稍后重试');
       }
-      final signature = settings.pictureStoryGenerationSignature;
+      var signature = settings.pictureStoryGenerationSignature;
       final imagePromptOverride =
           settings.pictureStoryImageGenerationPromptOverride;
       final questionPromptOverride =
@@ -159,6 +161,15 @@ class _PictureStoryGeneratePageState
         imageConfig: images,
         isActive: active,
         onChanged: _reload,
+        onPlanningAttempt: (attempt) {
+          if (!active()) return;
+          setState(() {
+            _generationStatus = attempt == 1
+                ? '正在规划场景…'
+                : '正在切换模型，重试场景规划…';
+          });
+        },
+        onLlmSelectionSaved: (savedSignature) => signature = savedSignature,
         candidateId: candidateId,
         reuseImageId: reuseImageId,
         regenerateImage: regenerate,
@@ -482,7 +493,7 @@ class _PictureStoryGeneratePageState
           icon: const Icon(Icons.auto_awesome_outlined),
           label: Text(
             _busy
-                ? '正在规划场景…'
+                ? _generationStatus
                 : hasPendingPlan
                 ? '重试生成图文题目'
                 : '生成图文题目',

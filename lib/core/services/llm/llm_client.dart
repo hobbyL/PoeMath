@@ -39,6 +39,7 @@ final class LlmClient {
     this._isActive,
     this._onModelSucceeded,
     this._onSelectionSucceeded,
+    this._onCompletionAccepted,
   })  : _usage = usage ?? CloudUsageService.instance,
         _httpClient = BoundedHttpClient(
           httpClient ?? http.Client(),
@@ -59,6 +60,13 @@ final class LlmClient {
       _onModelSucceeded;
   final Future<void> Function(LlmConfig request, LlmConfig successful)?
       _onSelectionSucceeded;
+  final Future<void> Function(
+    LlmConfig request,
+    LlmConfig successful, {
+    void Function(String signature)? onSelectionSaved,
+  })? _onCompletionAccepted;
+  final _completions =
+      Expando<({LlmConfig request, LlmConfig provider, String model})>();
   bool _closed = false;
   final Map<LlmConfig, String> _preferredModels = {};
   final Map<LlmConfig, Set<String>> _failedModels = {};
@@ -158,15 +166,26 @@ final class LlmClient {
     Future<T> Function(LlmConfig candidate) request, {
     bool reportSuccess = true,
     bool requiresVision = false,
+    void Function(int attempt)? onAttempt,
   }) async {
     final attempts = _attemptsFor(config, requiresVision: requiresVision);
+    var attempt = 0;
     for (final (:provider, :model) in attempts) {
       _checkActive();
       if (_unavailableProviders.contains(provider)) continue;
+      onAttempt?.call(++attempt);
+      _checkActive();
       try {
         final result = await request(provider.withModel(model));
         _checkActive();
         _rememberSuccess(config, provider, model);
+        if (result is ChatCompletion) {
+          _completions[result] = (
+            request: config,
+            provider: provider,
+            model: model,
+          );
+        }
         if (reportSuccess) await _reportSuccess(config, provider, model);
         return result;
       } on LlmException catch (error) {
@@ -175,6 +194,43 @@ final class LlmClient {
       }
     }
     _throwExhausted(config);
+  }
+
+  /// 完整响应通过业务校验后，才将其实际成功供应商/模型保存为默认。
+  /// 工具探测、无效场景和不完整题目不得调用此方法。
+  Future<void> acceptCompletion(
+    ChatCompletion completion, {
+    void Function(String signature)? onSelectionSaved,
+  }) async {
+    _checkActive();
+    final selection = _completions[completion];
+    if (selection == null) return;
+    _completions[completion] = null;
+    if (_unavailableProviders.contains(selection.provider) ||
+        (_failedModels[selection.provider]?.contains(selection.model) ??
+            false)) {
+      return;
+    }
+    try {
+      if (_onCompletionAccepted != null) {
+        await _onCompletionAccepted(
+          selection.request,
+          selection.provider.withModel(selection.model),
+          onSelectionSaved: onSelectionSaved,
+        );
+      } else {
+        await _reportSuccess(
+          selection.request,
+          selection.provider,
+          selection.model,
+        );
+      }
+    } on LlmGenerationCancelled {
+      rethrow;
+    } on Object {
+      AppLogger.e('自动保存可用模型失败', tag: 'LLM');
+    }
+    _checkActive();
   }
 
   Stream<String> _streamWithModels(
@@ -849,23 +905,24 @@ final class LlmClient {
     int maxTokens = 1024,
     bool requiresVision = false,
     bool stream = false,
-  }) =>
-      _withModels(
-        config,
-        (candidate) => _chatComplete(
-          config: candidate,
-          systemPrompt: systemPrompt,
-          messages: messages,
-          tools: tools,
-          toolChoice: toolChoice,
-          maxTokens: maxTokens,
-          requiresVision: requiresVision,
-          stream: stream,
-        ),
-        // 工具探测并非最终回答，只有后续流完整成功才持久化。
-        reportSuccess: false,
-        requiresVision: requiresVision,
-      );
+    void Function(int attempt)? onAttempt,
+  }) => _withModels(
+    config,
+    (candidate) => _chatComplete(
+      config: candidate,
+      systemPrompt: systemPrompt,
+      messages: messages,
+      tools: tools,
+      toolChoice: toolChoice,
+      maxTokens: maxTokens,
+      requiresVision: requiresVision,
+      stream: stream,
+    ),
+    // 工具探测并非最终回答，只有后续流完整成功才持久化。
+    reportSuccess: false,
+    requiresVision: requiresVision,
+    onAttempt: onAttempt,
+  );
 
   Future<ChatCompletion> _chatComplete({
     required LlmConfig config,

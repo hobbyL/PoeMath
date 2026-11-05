@@ -10,12 +10,14 @@ import 'package:http/testing.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/speech/preferred_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_audio_service.dart';
@@ -265,7 +267,11 @@ void main() {
     await tearDownHiveForTesting();
   });
 
-  Future<void> mount(WidgetTester tester, {http.Client? client}) async {
+  Future<void> mount(
+    WidgetTester tester, {
+    http.Client? client,
+    SettingsRepository? settings,
+  }) async {
     tester.view.physicalSize = const Size(800, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -302,7 +308,7 @@ void main() {
           if (client != null)
             llmExplainHttpClientProvider.overrideWithValue(client),
           if (client != null)
-            settingsRepositoryProvider.overrideWithValue(_VisionSettings()),
+            settingsRepositoryProvider.overrideWithValue(settings ?? _VisionSettings()),
           pictureStoryRepositoryProvider.overrideWithValue(repository),
           pictureStoryAudioServiceProvider.overrideWithValue(audio),
           speechRecognitionServiceFactoryProvider.overrideWithValue(() {
@@ -508,8 +514,12 @@ void main() {
     expect(find.widgetWithText(FilledButton, '说好了'), findsOneWidget);
   });
 
-  Future<void> recordSegment(WidgetTester tester, {http.Client? client}) async {
-    await mount(tester, client: client);
+  Future<void> recordSegment(
+    WidgetTester tester, {
+    http.Client? client,
+    SettingsRepository? settings,
+  }) async {
+    await mount(tester, client: client, settings: settings);
     await tap(tester, '说一说');
     await tap(tester, '说好了');
     await waitUntil(
@@ -593,6 +603,64 @@ void main() {
     await tester.tap(find.byTooltip('完成练习').first);
     await waitUntil(tester, () => find.text('练习已完成').evaluate().isNotEmpty);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('家长锁定时练习反馈仍保存成功备用模型，下次直接读取已成功的选择', (tester) async {
+    final settings = SettingsRepository();
+    await tester.runAsync(() async {
+      await unlockParentForTesting();
+      for (final (id, model) in [('bad', 'gpt-4o-bad'), ('good', 'gpt-4o-mini')]) {
+        await settings.saveLlmProviderConfig(
+          id: id,
+          name: id,
+          baseUrl: 'https://$id.example.com/v1',
+          model: model,
+          apiKey: 'synthetic-$id-key',
+        );
+      }
+      await settings.setScenarioSelection(
+        LlmScenario.assistant,
+        providerId: 'bad',
+        model: 'gpt-4o-bad',
+      );
+      lockParentForTesting();
+    });
+    final requests = <(String, String)>[];
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      requests.add((request.url.host, body['model'] as String));
+      if (request.url.host == 'bad.example.com') return http.Response('', 503);
+      return http.Response.bytes(
+        utf8.encode(jsonEncode({
+          'choices': [
+            {'message': {'content': '你说清了地点。再补充一个动作。'}},
+          ],
+        })),
+        200,
+      );
+    });
+    addTearDown(client.close);
+    await recordSegment(tester, client: client, settings: settings);
+    await tester.runAsync(() => tester.tap(find.byTooltip('完成练习').first));
+    await waitUntil(tester, () => find.text('练习已完成').evaluate().isNotEmpty);
+    expect(find.text('你说清了地点。再补充一个动作。'), findsOneWidget);
+    expect(ParentAccessService.instance.isUnlocked, isFalse);
+    expect(requests, [
+      ('bad.example.com', 'gpt-4o-bad'),
+      ('good.example.com', 'gpt-4o-mini'),
+    ]);
+    expect(settings.llmActiveProviderId, 'bad');
+    expect(settings.providerIdForScenario(LlmScenario.assistant), 'good');
+    expect(settings.modelForScenario(LlmScenario.assistant), 'gpt-4o-mini');
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(PictureStoryPracticePage)),
+    );
+    expect(container.read(llmSelectionVersionProvider), 1);
+    final next = await tester.runAsync(
+      () => settings.readLlmConfigForScenario(LlmScenario.assistant),
+    );
+    expect(next!.selection!.providerId, 'good');
+    expect(next.model, 'gpt-4o-mini');
   });
 
   for (final failSave in [false, true]) {

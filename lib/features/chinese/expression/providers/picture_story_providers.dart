@@ -6,7 +6,9 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/services/picture_story_editor_service.dart';
 import 'package:poemath/core/services/picture_story_generation_service.dart';
+import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
+import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_audio_service.dart';
@@ -40,6 +42,13 @@ final pictureStoryGenerationServiceProvider =
     images: ref.watch(pictureStoryImageServiceProvider),
     repository: ref.watch(pictureStoryRepositoryProvider),
     backup: ref.watch(backupServiceProvider),
+    llmFactory: (active) => createRuntimeLlmClient(
+      httpClient: ref.read(llmExplainHttpClientProvider),
+      settings: ref.read(settingsRepositoryProvider),
+      isActive: active,
+      onSelectionChanged: () =>
+          ref.read(llmSelectionVersionProvider.notifier).state++,
+    ),
   );
 });
 
