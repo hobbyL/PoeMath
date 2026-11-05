@@ -45,6 +45,7 @@ class ChineseTabPage extends ConsumerStatefulWidget {
 
 class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
   late ChineseSection _section;
+  final _visitedSections = <ChineseSection>{};
   late String _profileId;
   late final StreamSubscription<String> _profileSubscription;
 
@@ -57,12 +58,16 @@ class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
     super.initState();
     _profileId = ProfileScope.currentId;
     _section = widget.section ?? _savedSection();
+    _visitedSections.add(_section);
     if (widget.section != null) unawaited(_rememberSection());
     _profileSubscription = ProfileScope.changes.listen((profileId) {
       if (!mounted) return;
       setState(() {
         _profileId = profileId;
         _section = _savedSection();
+        _visitedSections
+          ..clear()
+          ..add(_section);
       });
     });
   }
@@ -75,6 +80,7 @@ class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
         requested != oldWidget.section &&
         requested != _section) {
       _section = requested;
+      _visitedSections.add(requested);
       unawaited(_rememberSection());
     }
   }
@@ -97,7 +103,10 @@ class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
   void _select(ChineseSection section) {
     if (_section == section) return;
     FocusScope.of(context).unfocus();
-    setState(() => _section = section);
+    setState(() {
+      _section = section;
+      _visitedSections.add(section);
+    });
     unawaited(_rememberSection());
     context.go(AppRoutes.chineseSectionOf(section.name));
   }
@@ -161,24 +170,30 @@ class _ChineseTabPageState extends ConsumerState<ChineseTabPage> {
         children: [
           TickerMode(
             enabled: _section == ChineseSection.textbook,
-            child: TextbookLearningPage(
-              navigationTitle: switcher,
-              navigationToolbarHeight: toolbarHeight,
-            ),
+            child: _visitedSections.contains(ChineseSection.textbook)
+                ? TextbookLearningPage(
+                    navigationTitle: switcher,
+                    navigationToolbarHeight: toolbarHeight,
+                  )
+                : const SizedBox.shrink(),
           ),
           TickerMode(
             enabled: _section == ChineseSection.poem,
-            child: PoemTabPage(
-              navigationTitle: switcher,
-              navigationToolbarHeight: toolbarHeight,
-            ),
+            child: _visitedSections.contains(ChineseSection.poem)
+                ? PoemTabPage(
+                    navigationTitle: switcher,
+                    navigationToolbarHeight: toolbarHeight,
+                  )
+                : const SizedBox.shrink(),
           ),
           TickerMode(
             enabled: _section == ChineseSection.expression,
-            child: PictureStoryPage(
-              navigationTitle: switcher,
-              navigationToolbarHeight: toolbarHeight,
-            ),
+            child: _visitedSections.contains(ChineseSection.expression)
+                ? PictureStoryPage(
+                    navigationTitle: switcher,
+                    navigationToolbarHeight: toolbarHeight,
+                  )
+                : const SizedBox.shrink(),
           ),
         ],
       ),

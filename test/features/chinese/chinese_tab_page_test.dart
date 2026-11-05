@@ -16,9 +16,11 @@ import 'package:poemath/data/providers/provider_invalidation.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/features/chinese/chinese_tab_page.dart';
+import 'package:poemath/features/chinese/expression/picture_story_page.dart';
 import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/poem/poem_favorites_page.dart';
 import 'package:poemath/features/poem/poem_learning_path_page.dart';
+import 'package:poemath/features/poem/poem_tab_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_detail_page.dart';
@@ -109,6 +111,8 @@ void _expectPoemSection(WidgetTester tester) {
 
 Future<void> _finish(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
+  // 离开管理页会恢复授权倒计时，在框架检查遗留定时器前显式锁定。
+  lockParentForTesting();
   // 多次栏目切换会在 fake zone 排队写 Hive；在测试体内关闭并推动该队列，
   // 避免真实 zone 的 tearDown 等待已经停止的 fake 时钟。
   var closed = false;
@@ -182,6 +186,28 @@ void main() {
       app.router.routeInformationProvider.value.uri.path,
       AppRoutes.chineseTab,
     );
+    await _finish(tester);
+  });
+
+  testWidgets('栏目首次访问才创建，切换后保留已访问页面和搜索输入', (tester) async {
+    await _pumpAt(tester);
+    expect(find.byType(PoemTabPage, skipOffstage: false), findsNothing);
+    expect(find.byType(PictureStoryPage, skipOffstage: false), findsNothing);
+
+    await tester.tap(_poemSegment());
+    await tester.pumpAndSettle();
+    expect(find.byType(PoemTabPage), findsOneWidget);
+    expect(find.byType(PictureStoryPage, skipOffstage: false), findsNothing);
+    final poemState = tester.state(find.byType(PoemTabPage));
+    await tester.tap(find.byTooltip('搜索筛选'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '保留搜索');
+    await tester.tap(_textbookSegment());
+    await tester.pumpAndSettle();
+    await tester.tap(_poemSegment());
+    await tester.pumpAndSettle();
+    expect(tester.state(find.byType(PoemTabPage)), same(poemState));
+    expect(find.text('保留搜索'), findsOneWidget);
     await _finish(tester);
   });
 
