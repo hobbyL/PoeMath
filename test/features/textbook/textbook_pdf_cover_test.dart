@@ -147,7 +147,7 @@ void main() {
     var attempts = 0;
     final image = await _image(tester);
     var available = false;
-    Future<void> mount() => tester.pumpWidget(
+    Future<void> mount({String title = '测试书籍'}) => tester.pumpWidget(
       ProviderScope(
         overrides: [
           textbookCoverRendererProvider.overrideWithValue((_, __) async {
@@ -155,8 +155,9 @@ void main() {
             return available ? image : null;
           }),
         ],
-        child: const MaterialApp(
-          home: TextbookPdfCover(path: '/sample.pdf', title: '测试书籍'),
+        // 创建新 widget，真实触发同一路径的 didUpdateWidget 刷新。
+        child: MaterialApp(
+          home: TextbookPdfCover(path: '/sample.pdf', title: title),
         ),
       ),
     );
@@ -173,6 +174,7 @@ void main() {
     await mount();
     await tester.pump();
     expect(find.byType(RawImage), findsOneWidget);
+    expect(attempts, 4);
     await tester.pumpWidget(const SizedBox());
   });
 

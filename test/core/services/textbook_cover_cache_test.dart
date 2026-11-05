@@ -5,6 +5,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/textbook_cover_cache.dart';
 
+/// Profile / Release 禁止访问 debugDisposed，即使真实测试图像开启了断言。
+class _ProductionImage implements ui.Image {
+  _ProductionImage(this.image);
+
+  final ui.Image image;
+
+  @override
+  bool get debugDisposed => throw StateError('生产模式不提供 debugDisposed');
+
+  @override
+  int get width => image.width;
+
+  @override
+  int get height => image.height;
+
+  @override
+  ui.Image clone() => _ProductionImage(image.clone());
+
+  @override
+  void dispose() => image.dispose();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 Future<ui.Image> _renderImage(int width, int height) async {
   final recorder = ui.PictureRecorder();
   ui.Canvas(recorder).drawRect(
@@ -34,7 +59,28 @@ void main() {
   });
 
   tearDown(() async {
+    TextbookCoverCache.clearMemory();
     if (await root.exists()) await root.delete(recursive: true);
+  });
+
+  test('生产模式反复读取封面和统计内存不依赖调试属性，释放副本不影响缓存', () async {
+    final original = _ProductionImage(await _renderImage(12, 16));
+    cache.remember(pdfPath, original);
+    original.dispose();
+
+    expect(TextbookCoverCache.memoryUsage.bytes, 12 * 16 * 4);
+    expect(TextbookCoverCache.memoryUsage.entries, 1);
+    final first = cache.take(pdfPath)!;
+    expect((first.width, first.height), (12, 16));
+    first.dispose();
+    final second = cache.take(pdfPath)!;
+    expect((second.width, second.height), (12, 16));
+    second.dispose();
+
+    cache.forget(pdfPath);
+    expect(cache.take(pdfPath), isNull);
+    expect(TextbookCoverCache.memoryUsage.bytes, 0);
+    expect(TextbookCoverCache.memoryUsage.entries, 0);
   });
 
   test('只认 <sha256>.pdf，缓存落在派生缓存目录', () {

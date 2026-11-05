@@ -43,7 +43,6 @@ class TextbookCoverCache {
 
   static CacheUsage get memoryUsage => CacheUsage(
         bytes: _memory.values
-            .where((image) => !image.debugDisposed)
             .fold(0, (bytes, image) => bytes + image.width * image.height * 4),
         entries: _memory.length,
       );
@@ -63,10 +62,8 @@ class TextbookCoverCache {
     final image = _memory.remove(pdfPath);
     if (image == null) return null;
     _memory[pdfPath] = image;
-    if (image.debugDisposed) {
-      _memory.remove(pdfPath);
-      return null;
-    }
+    // 缓存独占自己的 clone，释放前会从 map 移除；调用方只拿到另一份引用。
+    // 不使用 debugDisposed：Profile / Release 读取该调试属性会直接抛错。
     return image.clone();
   }
 
