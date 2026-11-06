@@ -6,6 +6,7 @@
 import 'dart:convert';
 
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
+import 'package:poemath/core/prompts/picture_story_feedback_prompt.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/credential_configuration_access.dart';
 
@@ -912,7 +913,11 @@ class SettingsRepository {
   ///
   /// 返回 null 的条件与 [readLlmConfig] 一致（无可用配置/字段为空）。
   Future<LlmConfig?> readLlmConfigForScenario(LlmScenario scenario) async {
-    await migrateLegacyLlmConfigIfNeeded();
+    if (scenario == LlmScenario.pictureStoryFeedback) {
+      await migratePictureStoryFeedbackSelection();
+    } else {
+      await migrateLegacyLlmConfigIfNeeded();
+    }
     return CredentialConfigurationAccess.exclusive(
       () => _readLlmConfigForScenario(scenario),
     );
@@ -973,7 +978,12 @@ class SettingsRepository {
   ) async {
     ParentAccessService.instance.assertAllowed();
     if (id == null) {
-      await HiveBoxes.settings.delete(scenario.settingsKey);
+      if (scenario == LlmScenario.pictureStoryFeedback) {
+        // 空串标记明确选择跟随默认，不再继承旧助手绑定。
+        await HiveBoxes.settings.put(scenario.settingsKey, '');
+      } else {
+        await HiveBoxes.settings.delete(scenario.settingsKey);
+      }
       // 解绑同时清掉该场景选中的 model（旧 model 属于被解绑的配置）。
       await HiveBoxes.settings.delete(scenario.modelKey);
       return;
@@ -1247,7 +1257,11 @@ class SettingsRepository {
         // 先按原始存储值清理场景绑定（列表写回后无法再判断悬空归属）。
         for (final scenario in LlmScenario.values) {
           if (HiveBoxes.settings.get(scenario.settingsKey) == id) {
-            await HiveBoxes.settings.delete(scenario.settingsKey);
+            if (scenario == LlmScenario.pictureStoryFeedback) {
+              await HiveBoxes.settings.put(scenario.settingsKey, '');
+            } else {
+              await HiveBoxes.settings.delete(scenario.settingsKey);
+            }
             // 绑定被删，该场景选中的 model 一并清掉（属于被删配置）。
             await HiveBoxes.settings.delete(scenario.modelKey);
             authorize();
@@ -1267,10 +1281,7 @@ class SettingsRepository {
         if (activeId == null ||
             activeId == id ||
             !list.any((c) => c.id == activeId)) {
-          await HiveBoxes.settings.put(
-            _keyLlmActiveProviderId,
-            list.first.id,
-          );
+          await HiveBoxes.settings.put(_keyLlmActiveProviderId, list.first.id);
         }
       },
     );
@@ -1375,6 +1386,45 @@ class SettingsRepository {
   /// 旧版共享教学偏好，作为尚未分别设置的两阶段提示词的兼容来源。
   String? get pictureStoryGenerationPromptOverride =>
       _generationPromptOverride(_keyPictureStoryGenerationPrompt);
+
+  static const pictureStoryFeedbackPromptKey =
+      'llm_picture_story_feedback_prompt';
+
+  String? get pictureStoryFeedbackPromptOverride =>
+      _generationPromptOverride(pictureStoryFeedbackPromptKey);
+
+  Future<void> setPictureStoryFeedbackPrompt(String value) =>
+      _setGenerationPrompt(
+        pictureStoryFeedbackPromptKey,
+        value,
+        maxLength: kPictureStoryFeedbackPromptMaxLength,
+      );
+
+  Future<void> resetPictureStoryFeedbackPrompt() =>
+      setPictureStoryFeedbackPrompt('');
+
+  /// 一次性继承升级前实际用于点评的助手选择；后续独立配置。
+  Future<void> migratePictureStoryFeedbackSelection() async {
+    await migrateLegacyLlmConfigIfNeeded();
+    await CredentialConfigurationAccess.exclusive(() async {
+      final scenario = LlmScenario.pictureStoryFeedback;
+      if (HiveBoxes.settings.containsKey(scenario.settingsKey)) return;
+      final bound = providerIdForScenario(LlmScenario.assistant);
+      final id = bound ?? llmActiveProviderId;
+      final provider = llmProviders.where((p) => p.id == id).firstOrNull;
+      final selected = bound == null
+          ? null
+          : modelForScenario(LlmScenario.assistant);
+      await HiveBoxes.settings.putAll({
+        scenario.settingsKey: provider?.id ?? '',
+        scenario.modelKey: provider == null
+            ? ''
+            : (provider.models.contains(selected)
+                  ? selected!
+                  : provider.model),
+      });
+    });
+  }
 
   /// 生图与场景规划共用图片要求；显式默认标记阻止回退到旧教学偏好。
   String? get pictureStoryImageGenerationPromptOverride {

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poemath/core/routing/page_transitions.dart';
+import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
 
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -103,6 +105,26 @@ class _PictureStoryHistoryPageState
                           Text(record.answerText),
                         ],
                         PictureStoryFeedback(feedbackJson: record.feedbackJson),
+                        AppTile(
+                          flat: true,
+                          icon: Icons.edit_outlined,
+                          iconColor: theme.colorScheme.primary,
+                          title: '修改表达并重新点评',
+                          subtitle: record.revisionDraft == null
+                              ? '保留之前的表达与点评'
+                              : '有尚未点评的修改',
+                          onTap: () async {
+                            await _player.stop();
+                            if (!context.mounted) return;
+                            await Navigator.of(context).push(
+                              fadeSlideRoute<void>(
+                                builder: (_) =>
+                                    PictureStoryReviewPage(recordId: record.id),
+                              ),
+                            );
+                            if (mounted) setState(() => _playing = null);
+                          },
+                        ),
                         if (prompt != null && prompt.reference.isNotEmpty) ...[
                           const SizedBox(height: SpacingTokens.sm),
                           Text('参考表达', style: theme.textTheme.labelLarge),
@@ -110,6 +132,7 @@ class _PictureStoryHistoryPageState
                           Text(prompt.reference),
                         ],
                         const SizedBox(height: SpacingTokens.sm),
+                        Text('回听最初的表达', style: theme.textTheme.labelLarge),
                         for (final segment in record.segments)
                           AppTile(
                             flat: true,

@@ -19,6 +19,12 @@ enum LlmScenario {
     '看图说话出题',
   ),
 
+  pictureStoryFeedback(
+    'llm_provider_picture_story_feedback',
+    'llm_model_picture_story_feedback',
+    '看图说话点评',
+  ),
+
   /// 诗词 AI 讲解。
   poemExplain('llm_provider_poem_explain', 'llm_model_poem_explain', '诗词讲解'),
 

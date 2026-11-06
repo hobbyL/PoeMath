@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/prompts/assistant_prompt_defaults.dart';
 import 'package:poemath/core/prompts/explain_prompt_defaults.dart';
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
+import 'package:poemath/core/prompts/picture_story_feedback_prompt.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -49,6 +50,12 @@ enum _PromptScene {
     hintText: '输入根据图片出题的提示词',
     resetTitle: '恢复看图出题提示词默认',
     explanation: '调整观察提示、引导问题与参考表达，题目依据实际图片生成。',
+  ),
+  pictureStoryFeedback(
+    title: '看图说话点评',
+    hintText: '输入点评的教学重点与口吻',
+    resetTitle: '恢复看图说话点评默认',
+    explanation: '调整孩子作答后的教学重点和建议口吻。点评依据图片与孩子原话，区分事实、合理想象和无法判断的内容。',
   ),
   poemExplain(
     title: '诗词讲解',
@@ -82,9 +89,11 @@ enum _PromptScene {
   final String resetTitle;
   final String explanation;
 
-  int get maxLength => this == _PromptScene.pictureStoryImage
-      ? kPictureStoryImagePromptMaxLength
-      : kPromptMaxLength;
+  int get maxLength => switch (this) {
+    _PromptScene.pictureStoryImage => kPictureStoryImagePromptMaxLength,
+    _PromptScene.pictureStoryFeedback => kPictureStoryFeedbackPromptMaxLength,
+    _ => kPromptMaxLength,
+  };
 
   /// 内置默认全文。
   String get defaultText => switch (this) {
@@ -96,6 +105,7 @@ enum _PromptScene {
         _PromptScene.poemExplain => kPoemExplainSystemPrompt,
         _PromptScene.mathExplain => kMathExplainSystemPrompt,
         _PromptScene.assistant => kAssistantSystemPrompt,
+        _PromptScene.pictureStoryFeedback => kPictureStoryFeedbackPrompt,
       };
 
   /// 当前生效内容：用户覆盖值 ?? 内置默认。
@@ -114,6 +124,8 @@ enum _PromptScene {
           repo.mathExplainPromptOverride ?? kMathExplainSystemPrompt,
         _PromptScene.assistant =>
           repo.assistantPromptOverride ?? kAssistantSystemPrompt,
+        _PromptScene.pictureStoryFeedback =>
+          repo.pictureStoryFeedbackPromptOverride ?? kPictureStoryFeedbackPrompt,
       };
 
   /// 当前是否有用户覆盖（null = 内置默认态）。
@@ -126,6 +138,7 @@ enum _PromptScene {
         _PromptScene.poemExplain => repo.poemExplainPromptOverride,
         _PromptScene.mathExplain => repo.mathExplainPromptOverride,
         _PromptScene.assistant => repo.assistantPromptOverride,
+        _PromptScene.pictureStoryFeedback => repo.pictureStoryFeedbackPromptOverride,
       };
 
   Future<void> save(SettingsRepository repo, String value) => switch (this) {
@@ -137,6 +150,7 @@ enum _PromptScene {
         _PromptScene.poemExplain => repo.setPoemExplainPrompt(value),
         _PromptScene.mathExplain => repo.setMathExplainPrompt(value),
         _PromptScene.assistant => repo.setAssistantPrompt(value),
+        _PromptScene.pictureStoryFeedback => repo.setPictureStoryFeedbackPrompt(value),
       };
 
   Future<void> reset(SettingsRepository repo) => switch (this) {
@@ -148,6 +162,7 @@ enum _PromptScene {
         _PromptScene.poemExplain => repo.resetPoemExplainPrompt(),
         _PromptScene.mathExplain => repo.resetMathExplainPrompt(),
         _PromptScene.assistant => repo.resetAssistantPrompt(),
+        _PromptScene.pictureStoryFeedback => repo.resetPictureStoryFeedbackPrompt(),
       };
 }
 

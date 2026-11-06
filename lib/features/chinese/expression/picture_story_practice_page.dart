@@ -1,22 +1,20 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/routing/page_transitions.dart';
 
 import 'package:poemath/core/services/speech/preferred_speech_recognition_service.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/core/services/speech/tencent_speech_recognition_service.dart';
-import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
-import 'package:poemath/core/services/llm/llm_scenario.dart';
+import 'package:poemath/core/services/picture_story_feedback_service.dart';
+import 'package:poemath/data/models/picture_story_evaluation.dart';
 import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/theme/typography_tokens.dart';
@@ -29,8 +27,10 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_audio_service.dart';
+import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_illustration.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_feedback.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
 
@@ -51,10 +51,10 @@ class _PictureStoryPracticePageState
   final _player = AudioPlayer();
   final _disposals = Expando<Future<void>>();
   final _textControllers = <String, TextEditingController>{};
-  final _illustrationKey = GlobalKey();
   Timer? _timer;
   StreamSubscription<String>? _transcriptSubscription;
   SpeechRecognitionService? _speech;
+  PictureStoryFeedbackService? _feedbackService;
   PictureStoryPracticeRecord? _record;
   PictureStoryPracticeRecord? _savedRecord;
   bool get _completed => _savedRecord?.status == 'completed';
@@ -73,12 +73,20 @@ class _PictureStoryPracticePageState
   bool _showHints = false;
   bool _usedHints = false;
   late final PictureStoryRepository _repository;
+  late final String _profile;
+  late final int _profileRevision;
+  StreamSubscription<String>? _profileChanges;
   PictureStoryPrompt? _prompt;
   bool _promptReadFailed = false;
 
   @override
   void initState() {
     super.initState();
+    _profile = ProfileScope.currentId;
+    _profileRevision = ProfileScope.revision;
+    _profileChanges = ProfileScope.changes.listen(
+      (_) => _invalidateRecording(),
+    );
     _foreground =
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     WidgetsBinding.instance.addObserver(this);
@@ -105,6 +113,7 @@ class _PictureStoryPracticePageState
 
   @override
   void dispose() {
+    unawaited(_profileChanges?.cancel());
     WidgetsBinding.instance.removeObserver(this);
     _invalidateRecording();
     for (final controller in _textControllers.values) {
@@ -115,7 +124,12 @@ class _PictureStoryPracticePageState
   }
 
   bool _current(int generation) =>
-      mounted && _foreground && generation == _generation;
+      mounted &&
+      _foreground &&
+      generation == _generation &&
+      ProfileScope.currentId == _profile &&
+      ProfileScope.revision == _profileRevision &&
+      (ModalRoute.of(context)?.isCurrent ?? false);
 
   Future<void> _disposeSpeech(SpeechRecognitionService speech) {
     return _disposals[speech] ??= () async {
@@ -139,6 +153,7 @@ class _PictureStoryPracticePageState
 
   void _invalidateRecording() {
     ++_generation;
+    _feedbackService?.cancel();
     _timer?.cancel();
     _timer = null;
     final subscription = _transcriptSubscription;
@@ -387,26 +402,26 @@ class _PictureStoryPracticePageState
       return;
     }
     final generation = _generation;
+    _record!.setSegments(_segments);
+    if (_record!.answerText.trim().isEmpty) {
+      setState(() => _message = '请先填写或说出你的表达，再完成练习。');
+      return;
+    }
     setState(() {
       _finishing = true;
       _message = null;
     });
     final completed = _record!.copy();
     try {
+      final image = await _captureIllustration();
+      if (!_current(generation)) return;
       completed.setSegments(_segments);
       completed.status = 'completed';
       completed.completedAt = DateTime.now();
       completed.usedHints = _usedHints;
-      completed.feedbackJson = jsonEncode(<String, Object>{
-        'source': 'local',
-        'highlights': [
-          '你愿意把看到的内容说出来了。',
-          if (_segments.length > 1) '你用了多段话补充细节。',
-        ],
-        'suggestion': completed.answerText.trim().isEmpty
-            ? '可以先填写听到的文字，再请家长一起回听。'
-            : '再补充一个动作或人物的心情，故事会更生动。',
-      });
+      completed.feedbackJson = unavailablePictureStoryFeedback(
+        '表达已保存，可以回听或稍后重试点评。',
+      );
       if (!await _saveDraft(generation: generation, snapshot: completed)) {
         return;
       }
@@ -415,14 +430,12 @@ class _PictureStoryPracticePageState
       final aiFeedback = await _generateAiFeedback(
         prompt: _prompt!,
         generation: generation,
+        image: image,
       );
       if (!_current(generation)) return;
       if (aiFeedback != null) {
         final withAi = completed.copy();
-        withAi.feedbackJson = jsonEncode(<String, Object>{
-          'source': 'vision',
-          'text': aiFeedback,
-        });
+        withAi.feedbackJson = aiFeedback;
         final saved = await _saveDraft(
           generation: generation,
           snapshot: withAi,
@@ -431,7 +444,7 @@ class _PictureStoryPracticePageState
           if (saved) {
             _record = withAi;
           } else {
-            _message = '练习已保存，AI 反馈未能保存，先看看本地反馈。';
+            _message = '表达已保存，AI 点评未能保存，可稍后重试。';
           }
         }
       }
@@ -448,6 +461,10 @@ class _PictureStoryPracticePageState
     if (record == null) return false;
     final revision = ++_draftRevision;
     void check() {
+      if (ProfileScope.currentId != _profile ||
+          ProfileScope.revision != _profileRevision) {
+        throw const _PictureStoryRecordingCancelled();
+      }
       if (generation != null && !_current(generation)) {
         throw const _PictureStoryRecordingCancelled();
       }
@@ -498,13 +515,11 @@ class _PictureStoryPracticePageState
         return null;
       }
     }
-    final renderObject = _illustrationKey.currentContext?.findRenderObject();
-    if (renderObject is! RenderRepaintBoundary) return null;
     try {
-      final image = await renderObject.toImage(pixelRatio: 2);
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      return data?.buffer.asUint8List();
+      return await PictureStoryIllustration.renderForVision(
+        kind: prompt.image.value,
+        scheme: Theme.of(context).colorScheme,
+      );
     } on Object catch (error, stackTrace) {
       AppLogger.e(
         '看图说话图片采集失败',
@@ -519,67 +534,25 @@ class _PictureStoryPracticePageState
   Future<String?> _generateAiFeedback({
     required PictureStoryPrompt prompt,
     required int generation,
+    required Uint8List? image,
   }) async {
-    final image = await _captureIllustration();
-    if (image == null || !_current(generation)) return null;
-    final settings = ref.read(settingsRepositoryProvider);
-    try {
-      final config = await settings.readLlmConfigForScenario(
-        LlmScenario.assistant,
-      );
-      if (config == null || !config.supportsVision || !_current(generation)) {
-        return null;
-      }
-      final client = createRuntimeLlmClient(
-        httpClient: ref.read(llmExplainHttpClientProvider),
-        settings: settings,
-        isActive: () => _current(generation),
-        onSelectionChanged: () {
-          if (_current(generation)) {
-            ref.read(llmSelectionVersionProvider.notifier).state++;
-          }
-        },
-      );
-      final promptText =
-          '请评价孩子的看图说话：${_record?.answerText ?? ''}\n练习目标：${prompt.goals.join('；')}';
-      try {
-        final completion = await client.chatComplete(
-          config: config,
-          systemPrompt: '你是小学语文口语表达老师。请根据图片和孩子的表达，给出简短、具体、鼓励性的中文反馈。先说一个做得好的地方，再给一个可执行的改进建议。只输出两句话，不要编造图片中看不到的细节。',
-          messages: [
-            ChatMessage(
-              role: ChatRole.user,
-              content: promptText,
-              contentParts: [
-                <String, Object?>{'type': 'text', 'text': promptText},
-                <String, Object?>{
-                  'type': 'image_url',
-                  'image_url': <String, String>{
-                    'url': 'data:image/png;base64,${base64Encode(image)}',
-                  },
-                },
-              ],
-            ),
-          ],
-          maxTokens: 240,
-          requiresVision: true,
-        );
-        final text = completion.content?.trim();
-        if (text == null || text.isEmpty) return null;
-        await client.acceptCompletion(completion);
-        return text;
-      } finally {
-        client.close();
-      }
-    } on Object catch (error, stackTrace) {
-      AppLogger.e(
-        '看图说话 AI 反馈失败',
-        tag: 'PictureStory',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      return null;
-    }
+    final service = _feedbackService = PictureStoryFeedbackService(
+      settings: ref.read(settingsRepositoryProvider),
+      httpClient: ref.read(llmExplainHttpClientProvider),
+      onSelectionChanged: () {
+        if (_current(generation)) {
+          ref.read(llmSelectionVersionProvider.notifier).state++;
+        }
+      },
+    );
+    final answer = _record!.answerText;
+    if (!_current(generation)) return null;
+    return service.evaluate(
+      prompt: prompt,
+      answer: answer,
+      image: image,
+      isActive: () => _current(generation),
+    );
   }
 
   Future<void> _play(PictureStorySegment segment) async {
@@ -682,7 +655,42 @@ class _PictureStoryPracticePageState
               children: [
                 Text('练习已完成', style: theme.textTheme.titleLarge),
                 Text(prompt.title, style: theme.textTheme.titleMedium),
-                PictureStoryFeedback(feedbackJson: record.feedbackJson),
+                const SizedBox(height: SpacingTokens.sm),
+                Text(record.answerText),
+                if (!_finishing)
+                  PictureStoryFeedback(feedbackJson: record.feedbackJson),
+                if (_finishing) ...[
+                  const SizedBox(height: SpacingTokens.sm),
+                  const LinearProgressIndicator(semanticsLabel: '正在点评'),
+                  const Text('表达已保存，正在等待 AI 点评…'),
+                ],
+                const SizedBox(height: SpacingTokens.md),
+                FilledButton.tonalIcon(
+                  onPressed: _finishing
+                      ? null
+                      : () async {
+                          await _player.stop();
+                          if (!mounted) return;
+                          await Navigator.of(context).push(
+                            fadeSlideRoute<void>(
+                              builder: (_) =>
+                                  PictureStoryReviewPage(recordId: record.id),
+                            ),
+                          );
+                          if (!mounted ||
+                              ProfileScope.currentId != _profile ||
+                              ProfileScope.revision != _profileRevision) {
+                            return;
+                          }
+                          setState(() {
+                            _savedRecord = _repository.find(record.id)?.copy();
+                            _record = _savedRecord?.copy();
+                            _playingId = null;
+                          });
+                        },
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('修改表达并重新点评'),
+                ),
                 if (_message != null) ...[
                   const SizedBox(height: SpacingTokens.sm),
                   Text(_message!),
@@ -691,7 +699,7 @@ class _PictureStoryPracticePageState
             ),
           ),
           const SizedBox(height: SpacingTokens.md),
-          Text('回听我的表达', style: theme.textTheme.titleMedium),
+          Text('回听最初的表达', style: theme.textTheme.titleMedium),
           const SizedBox(height: SpacingTokens.sm),
           for (final segment in record.segments)
             AppTile(
@@ -738,10 +746,7 @@ class _PictureStoryPracticePageState
           children: [
             Stack(
               children: [
-                RepaintBoundary(
-                  key: _illustrationKey,
-                  child: PictureStoryImageView(image: prompt.image),
-                ),
+                PictureStoryImageView(image: prompt.image),
                 Positioned(
                   top: SpacingTokens.sm,
                   right: SpacingTokens.sm,

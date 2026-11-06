@@ -27,6 +27,7 @@ import 'package:poemath/features/chinese/expression/providers/picture_story_prov
 import '../../../helpers/hive_test_helper.dart';
 import '../../../helpers/parent_access_test_helper.dart';
 import '../../../helpers/picture_story_fixture.dart';
+import '../../../helpers/picture_story_feedback_fixture.dart';
 
 class _VisionSettings extends SettingsRepository {
   @override
@@ -252,6 +253,7 @@ void main() {
     changeLifecycle(AppLifecycleState.resumed);
     await setUpHiveForTesting();
     await unlockParentForTesting();
+    await SettingsRepository().migratePictureStoryFeedbackSelection();
     repository = _Repository(Zone.current);
     promptId = (await repository.savePrompt(
       prompt: pictureStoryFixture(),
@@ -308,7 +310,9 @@ void main() {
           if (client != null)
             llmExplainHttpClientProvider.overrideWithValue(client),
           if (client != null)
-            settingsRepositoryProvider.overrideWithValue(settings ?? _VisionSettings()),
+            settingsRepositoryProvider.overrideWithValue(
+              settings ?? _VisionSettings(),
+            ),
           pictureStoryRepositoryProvider.overrideWithValue(repository),
           pictureStoryAudioServiceProvider.overrideWithValue(audio),
           speechRecognitionServiceFactoryProvider.overrideWithValue(() {
@@ -545,19 +549,22 @@ void main() {
     complete();
     complete();
     await tester.pump();
-    await waitUntil(tester, () => find.text('练习已完成').evaluate().isNotEmpty);
+    await waitUntil(
+      tester,
+      () =>
+          find.text('练习已完成').evaluate().isNotEmpty &&
+          find.byType(LinearProgressIndicator).evaluate().isEmpty,
+    );
     final saved = HiveBoxes.pictureStoryPractice.values.single;
     final feedback = jsonDecode(saved.feedbackJson) as Map<String, dynamic>;
     expect(saved.status, 'completed');
-    expect(repository.completedSaves, 1);
-    expect(
-      find.text((feedback['highlights'] as List).first as String),
-      findsOneWidget,
-    );
+    expect(repository.completedSaves, 2);
+    expect(feedback['source'], 'unavailable');
+    expect(find.text('本次未获得 AI 点评'), findsOneWidget);
     expect(find.text(feedback['suggestion'] as String), findsOneWidget);
-    expect(find.text('孩子的表达'), findsOneWidget);
+    expect(find.text('孩子的表达'), findsNWidgets(2));
     expect(find.byType(TextField), findsNothing);
-    await tester.tap(find.text('孩子的表达'));
+    await tester.tap(find.text('孩子的表达').last);
     await waitUntil(
       tester,
       () => find.text('录音文件已清理，文字记录仍然保留').evaluate().isNotEmpty,
@@ -565,7 +572,31 @@ void main() {
     await background(tester);
     await foreground(tester);
     expect(find.text('练习已完成'), findsOneWidget);
-    expect(repository.completedSaves, 1);
+    expect(repository.completedSaves, 2);
+  });
+
+  testWidgets('主动清空转写文字后不能完成或请求点评，录音仍保留', (tester) async {
+    var requests = 0;
+    final client = MockClient((_) async {
+      requests++;
+      return http.Response('', 500);
+    });
+    addTearDown(client.close);
+    await recordSegment(tester, client: client);
+    await tester.enterText(find.byType(TextField), '');
+    await waitUntil(
+      tester,
+      () => HiveBoxes.pictureStoryPractice.values.single.answerText.isEmpty,
+    );
+    await tester.tap(find.byTooltip('完成练习').first);
+    await tester.pump();
+    expect(find.text('请先填写或说出你的表达，再完成练习。'), findsOneWidget);
+    final saved = HiveBoxes.pictureStoryPractice.values.single;
+    expect(saved.status, 'draft');
+    expect(saved.segments.single.answerText, '');
+    expect(saved.segments.single.transcript, '孩子的表达');
+    expect(saved.segments.single.audioPath, isNotEmpty);
+    expect(requests, 0);
   });
 
   testWidgets('完成保存失败保留草稿及重试，成功后才显示结果', (tester) async {
@@ -609,7 +640,10 @@ void main() {
     final settings = SettingsRepository();
     await tester.runAsync(() async {
       await unlockParentForTesting();
-      for (final (id, model) in [('bad', 'gpt-4o-bad'), ('good', 'gpt-4o-mini')]) {
+      for (final (id, model) in [
+        ('bad', 'gpt-4o-bad'),
+        ('good', 'gpt-4o-mini'),
+      ]) {
         await settings.saveLlmProviderConfig(
           id: id,
           name: id,
@@ -623,6 +657,11 @@ void main() {
         providerId: 'bad',
         model: 'gpt-4o-bad',
       );
+      await settings.setScenarioSelection(
+        LlmScenario.pictureStoryFeedback,
+        providerId: 'bad',
+        model: 'gpt-4o-bad',
+      );
       lockParentForTesting();
     });
     final requests = <(String, String)>[];
@@ -631,18 +670,17 @@ void main() {
       requests.add((request.url.host, body['model'] as String));
       if (request.url.host == 'bad.example.com') return http.Response('', 503);
       return http.Response.bytes(
-        utf8.encode(jsonEncode({
-          'choices': [
-            {'message': {'content': '你说清了地点。再补充一个动作。'}},
-          ],
-        })),
+        utf8.encode(pictureStoryFeedbackResponse()),
         200,
       );
     });
     addTearDown(client.close);
     await recordSegment(tester, client: client, settings: settings);
     await tester.runAsync(() => tester.tap(find.byTooltip('完成练习').first));
-    await waitUntil(tester, () => find.text('练习已完成').evaluate().isNotEmpty);
+    await waitUntil(
+      tester,
+      () => find.text('你说清了地点。再补充一个动作。').evaluate().isNotEmpty,
+    );
     expect(find.text('你说清了地点。再补充一个动作。'), findsOneWidget);
     expect(ParentAccessService.instance.isUnlocked, isFalse);
     expect(requests, [
@@ -650,14 +688,21 @@ void main() {
       ('good.example.com', 'gpt-4o-mini'),
     ]);
     expect(settings.llmActiveProviderId, 'bad');
-    expect(settings.providerIdForScenario(LlmScenario.assistant), 'good');
-    expect(settings.modelForScenario(LlmScenario.assistant), 'gpt-4o-mini');
+    expect(settings.providerIdForScenario(LlmScenario.assistant), 'bad');
+    expect(
+      settings.providerIdForScenario(LlmScenario.pictureStoryFeedback),
+      'good',
+    );
+    expect(
+      settings.modelForScenario(LlmScenario.pictureStoryFeedback),
+      'gpt-4o-mini',
+    );
     final container = ProviderScope.containerOf(
       tester.element(find.byType(PictureStoryPracticePage)),
     );
     expect(container.read(llmSelectionVersionProvider), 1);
     final next = await tester.runAsync(
-      () => settings.readLlmConfigForScenario(LlmScenario.assistant),
+      () => settings.readLlmConfigForScenario(LlmScenario.pictureStoryFeedback),
     );
     expect(next!.selection!.providerId, 'good');
     expect(next.model, 'gpt-4o-mini');
@@ -670,20 +715,19 @@ void main() {
       final client = MockClient((request) async {
         requests++;
         return http.Response(
-          jsonEncode({
-            'choices': [
-              {
-                'message': {'role': 'assistant', 'content': '你说清了地点。再补充一个动作。'},
-              },
-            ],
-          }),
+          pictureStoryFeedbackResponse(),
           200,
           headers: {'content-type': 'application/json'},
         );
       });
       await recordSegment(tester, client: client);
       await tester.runAsync(() => tester.tap(find.byTooltip('完成练习').first));
-      await waitUntil(tester, () => find.text('练习已完成').evaluate().isNotEmpty);
+      await waitUntil(
+        tester,
+        () =>
+            find.text('练习已完成').evaluate().isNotEmpty &&
+            find.byType(LinearProgressIndicator).evaluate().isEmpty,
+      );
       final saved = HiveBoxes.pictureStoryPractice.values.single;
       expect(requests, 1);
       expect(
@@ -692,11 +736,11 @@ void main() {
       );
       expect(
         (jsonDecode(saved.feedbackJson) as Map)['source'],
-        failSave ? 'local' : 'vision',
+        failSave ? 'unavailable' : 'vision',
       );
       if (failSave) {
-        expect(find.text('练习已保存，AI 反馈未能保存，先看看本地反馈。'), findsOneWidget);
-        expect(find.text('你愿意把看到的内容说出来了。'), findsOneWidget);
+        expect(find.text('表达已保存，AI 点评未能保存，可稍后重试。'), findsOneWidget);
+        expect(find.text('本次未获得 AI 点评'), findsOneWidget);
       }
     });
   }

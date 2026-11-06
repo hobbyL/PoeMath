@@ -13,6 +13,7 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/picture_story_editor_draft.dart';
 import 'package:poemath/data/models/picture_story_generation_draft.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
+import 'package:poemath/data/models/picture_story_evaluation.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
 
 export 'package:poemath/data/models/picture_story_prompt.dart';
@@ -522,6 +523,112 @@ class PictureStoryRepository {
       if (profileId != ProfileScope.currentId) return;
       final record = _records.get(key);
       if (record?.profileId == profileId) await _records.delete(key);
+    });
+  }
+
+  /// 原回答/录音保持不变，编辑草稿和每次点评通过版本号防止迟到覆盖。
+  Future<PictureStoryPracticeRecord> saveFeedbackDraft(
+    PictureStoryPracticeRecord expected,
+    String text, {
+    void Function()? check,
+  }) => _updateFeedback(
+    expected,
+    check: check,
+    change: (saved) {
+      if (text.runes.length > 6000) {
+        throw const FormatException('表达不能超过 6000 字');
+      }
+      saved.revisionDraft = text;
+    },
+  );
+
+  Future<PictureStoryPracticeRecord> appendFeedback(
+    PictureStoryPracticeRecord expected,
+    String feedbackJson, {
+    required void Function() check,
+  }) => _updateFeedback(
+    expected,
+    check: check,
+    change: (saved) {
+      final answer = saved.revisionDraft;
+      if (answer == null || answer.trim().isEmpty) {
+        throw const FormatException('请先填写表达文字');
+      }
+      final feedback = jsonDecode(feedbackJson);
+      if (feedback is! Map<String, dynamic> ||
+          feedback['source'] != 'vision' ||
+          feedback['answer'] != answer ||
+          feedback['prompts'] is! List ||
+          (feedback['prompts'] as List).any((p) => p is! String)) {
+        throw const FormatException('点评与本次表达不一致');
+      }
+      PictureStoryEvaluation.parse(
+        feedbackJson,
+        answer: answer,
+        questionCount: (feedback['prompts'] as List).length,
+      );
+      final history = saved.revisions;
+      saved.revisionsJson = jsonEncode([
+        if (history.isEmpty)
+          PictureStoryAnswerRevision(
+            answer: saved.answerText,
+            feedbackJson: saved.feedbackJson,
+            createdAt: saved.completedAt ?? saved.startedAt,
+          ).toJson(),
+        ...history.map((r) => r.toJson()),
+        PictureStoryAnswerRevision(
+          answer: answer,
+          feedbackJson: feedbackJson,
+          createdAt: DateTime.now(),
+        ).toJson(),
+      ]);
+      saved.answerText = answer;
+      saved.feedbackJson = feedbackJson;
+      saved.revisionDraft = null;
+    },
+  );
+
+  Future<PictureStoryPracticeRecord> _updateFeedback(
+    PictureStoryPracticeRecord expected, {
+    required void Function(PictureStoryPracticeRecord) change,
+    void Function()? check,
+  }) {
+    final profile = ProfileScope.currentId;
+    final revision = ProfileScope.revision;
+    return exclusive(() async {
+      void guard() {
+        check?.call();
+        if (profile != expected.profileId ||
+            profile != ProfileScope.currentId ||
+            revision != ProfileScope.revision) {
+          throw const FormatException('孩子档案已切换，请重新打开练习记录');
+        }
+      }
+
+      guard();
+      final current = find(expected.id);
+      if (current == null ||
+          current.status != 'completed' ||
+          current.feedbackRevision != expected.feedbackRevision ||
+          current.answerText != expected.answerText ||
+          current.feedbackJson != expected.feedbackJson ||
+          current.revisionsJson != expected.revisionsJson ||
+          current.promptId != expected.promptId ||
+          current.promptVersion != expected.promptVersion) {
+        throw const FormatException('这次表达已更新，请重新打开记录再修改');
+      }
+      final saved = current.copy();
+      change(saved);
+      saved.feedbackRevision++;
+      final key = ProfileScope.key('picture_story:${saved.id}');
+      try {
+        await _records.put(key, saved);
+        guard();
+      } on Object {
+        await _records.put(key, current.copy());
+        rethrow;
+      }
+      return saved;
     });
   }
 }

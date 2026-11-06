@@ -31,12 +31,12 @@ void main() {
       ),
     ]);
 
-    expect(record.answerText, '孩子在放风筝小狗也跑来了。');
+    expect(record.answerText, '孩子在放风筝\n小狗也跑来了。');
     expect(record.totalDurationSeconds, 5);
     expect(record.segments.map((segment) => segment.id), ['first', 'second']);
   });
 
-  test('空编辑文字回退到原始转写', () {
+  test('主动清空答案保存后仍为空，原始转写保留供回看', () {
     const segment = PictureStorySegment(
       id: 'one',
       position: 0,
@@ -46,6 +46,27 @@ void main() {
       editedText: '  ',
     );
 
-    expect(segment.answerText, '原始文字');
+    expect(segment.answerText.trim(), isEmpty);
+    final restored = PictureStorySegment.fromJson(segment.toJson());
+    expect(restored.answerText.trim(), isEmpty);
+    expect(restored.transcript, '原始文字');
+  });
+
+  test('旧版空编辑记录保持原有答案，随后清空采用新语义', () {
+    final legacy = PictureStorySegment.fromJson({
+      'id': 'old',
+      'position': 0,
+      'audioPath': '/tmp/old.wav',
+      'durationSeconds': 1,
+      'transcript': '旧回答',
+      'editedText': '',
+    });
+    expect(legacy.answerText, '旧回答');
+    expect(PictureStorySegment.fromJson(legacy.toJson()).answerText, '旧回答');
+    expect(
+      PictureStorySegment.fromJson(legacy.copyWith(editedText: '').toJson())
+          .answerText,
+      isEmpty,
+    );
   });
 }

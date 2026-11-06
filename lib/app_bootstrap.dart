@@ -53,6 +53,11 @@ Future<void> initializeCoreStorage() async {
   await MathMistakeKeyMigration.run();
   await PoemIdentityMigration.run();
   try {
+    await _settingsRepository().migratePictureStoryFeedbackSelection();
+  } on Object {
+    AppLogger.e('AI 点评配置迁移暂未完成，下次读取时重试', tag: 'Startup');
+  }
+  try {
     await ParentAccessService.instance.initialize();
   } on Object catch (error) {
     AppLogger.e('家长保护安全存储不可用，家长区保持锁定', tag: 'Startup', error: error);

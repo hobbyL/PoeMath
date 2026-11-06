@@ -129,6 +129,9 @@ const Map<String, String> _settingsValueType = <String, String>{
   'llm_model_word_problem': 'string', // AI 出题选中的模型名
   'llm_provider_picture_story': 'string', // 看图说话出题绑定
   'llm_model_picture_story': 'string', // 看图说话视觉模型
+  'llm_provider_picture_story_feedback': 'string', // 独立表达点评
+  'llm_model_picture_story_feedback': 'string',
+  'llm_picture_story_feedback_prompt': 'string',
   'llm_provider_poem_explain': 'string', // 诗词讲解绑定的配置 id
   'llm_model_poem_explain': 'string', // 诗词讲解选中的模型名
   'llm_provider_math_explain': 'string', // 口算解析绑定的配置 id
@@ -1872,6 +1875,11 @@ class BackupService {
     }
     for (final scenario in LlmScenario.values) {
       final boundId = values[scenario.settingsKey];
+      if (scenario == LlmScenario.pictureStoryFeedback && boundId == '') {
+        out[scenario.settingsKey] = '';
+        out[scenario.modelKey] = '';
+        continue;
+      }
       if (boundId is! String || !providerIds.contains(boundId)) continue;
       out[scenario.settingsKey] = boundId;
       // 5. 场景 model：仅在绑定也落盘时写入（boundId 已校验存在）。

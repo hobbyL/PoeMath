@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/spacing_tokens.dart';
@@ -13,6 +16,30 @@ class PictureStoryIllustration extends StatelessWidget {
 
   /// 默认使用卡片圆角；贴边嵌入外层卡片时可设为零，由外层统一裁切。
   final BorderRadiusGeometry? borderRadius;
+
+  /// 直接重绘完整原图，不依赖滚动位置、截图边界或屏幕尺寸。
+  static Future<Uint8List> renderForVision({
+    required String kind,
+    required ColorScheme scheme,
+  }) async {
+    final recorder = ui.PictureRecorder();
+    _ScenePainter(
+      kind: kind,
+      scheme: scheme,
+    ).paint(Canvas(recorder), const Size(1024, 768));
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(1024, 768);
+    try {
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) throw const FormatException('题图暂时无法读取');
+      return Uint8List.fromList(
+        bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+      );
+    } finally {
+      image.dispose();
+      picture.dispose();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
