@@ -22,6 +22,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/providers/llm_runtime_providers.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/models/image_generation_config.dart';
 import 'package:poemath/data/models/picture_story_editor_draft.dart';
 import 'package:poemath/data/models/picture_story_generation_draft.dart';
@@ -37,6 +38,7 @@ import 'package:poemath/features/profile/picture_story_management_page.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/picture_story_fixture.dart';
+import '../../helpers/picture_story_generation_harness.dart';
 
 class _GenerationFlow extends PictureStoryGenerationService {
   _GenerationFlow({
@@ -158,6 +160,7 @@ void main() {
     Size size = const Size(420, 900),
     double scale = 1,
     bool animationsEnabled = false,
+    SettingsRepository? settings,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -187,6 +190,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          if (settings != null)
+            settingsRepositoryProvider.overrideWithValue(settings),
           pictureStoryRepositoryProvider.overrideWithValue(repository),
           pictureStoryGenerationServiceProvider.overrideWithValue(service),
           pictureStoryImageServiceProvider.overrideWithValue(images),
@@ -257,18 +262,32 @@ void main() {
     await tester.runAsync(() async {
       await settings.saveImageGenerationConfig(
         provider: const ImageGenerationProviderConfig(
-          name: '测试图片', baseUrl: 'https://image.example.com/v1', model: 'image',
-        ), apiKey: '',
+          name: '测试图片',
+          baseUrl: 'https://image.example.com/v1',
+          model: 'image',
+        ),
+        apiKey: '',
       );
       for (final id in ['bad', 'good']) {
         await settings.saveLlmProviderConfig(
-          id: id, name: id, baseUrl: 'https://$id.example.com/v1',
-          model: 'gpt-4o-mini', apiKey: 'synthetic-$id-key',
+          id: id,
+          name: id,
+          baseUrl: 'https://$id.example.com/v1',
+          model: 'gpt-4o-mini',
+          apiKey: 'synthetic-$id-key',
         );
       }
     });
     http.Response completion(Object value) => http.Response.bytes(
-      utf8.encode(jsonEncode({'choices': [{'message': {'content': jsonEncode(value)}}]})),
+      utf8.encode(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'content': jsonEncode(value)},
+            },
+          ],
+        }),
+      ),
       200,
     );
     final transport = MockClient((request) async {
@@ -282,13 +301,19 @@ void main() {
         fallbackEntered.complete();
         return fallbackReply.future;
       }
-      return completion({'title': '雨中互助', 'questions': ['孩子正在做什么？']});
+      return completion({
+        'title': '雨中互助',
+        'questions': ['孩子正在做什么？'],
+      });
     });
     addTearDown(transport.close);
     service = PictureStoryGenerationService(
-      images: images, repository: repository,
+      images: images,
+      repository: repository,
       llmFactory: (active) => createRuntimeLlmClient(
-        httpClient: transport, settings: settings, isActive: active,
+        httpClient: transport,
+        settings: settings,
+        isActive: active,
         onSelectionChanged: () => promotions++,
       ),
       imageFactory: (active) => ImageGenerationClient(
@@ -296,7 +321,14 @@ void main() {
         httpClient: MockClient((request) async {
           imageRequests++;
           expect(settings.llmActiveProviderId, 'good');
-          return http.Response(jsonEncode({'data': [{'b64_json': base64Encode(png)}]}), 200);
+          return http.Response(
+            jsonEncode({
+              'data': [
+                {'b64_json': base64Encode(png)},
+              ],
+            }),
+            200,
+          );
         }),
       ),
     );
@@ -314,19 +346,38 @@ void main() {
       expect(find.text('正在切换模型，重试场景规划…'), findsOneWidget);
       expect(settings.llmActiveProviderId, 'bad');
       await tester.runAsync(() async {
-        fallbackReply.complete(completion([{'imagePrompt': '两个孩子在雨中分享雨伞。'}, {'imagePrompt': '两个孩子一起搬书。'}]));
+        fallbackReply.complete(
+          completion([
+            {'imagePrompt': '两个孩子在雨中分享雨伞。'},
+            {'imagePrompt': '两个孩子一起搬书。'},
+          ]),
+        );
       });
-      await _until(tester, () => service.readDraft('default')?.readyCount == 2 &&
-          find.text('暂停生成').evaluate().isEmpty);
+      await _until(
+        tester,
+        () =>
+            service.readDraft('default')?.readyCount == 2 &&
+            find.text('暂停生成').evaluate().isEmpty,
+      );
       expect(settings.llmActiveProviderId, 'good');
       expect(promotions, 1);
       expect(imageRequests, 2);
-      expect(models, ['bad.example.com', 'good.example.com', 'good.example.com', 'good.example.com']);
-      expect(service.readDraft('default')!.candidates.first.edit.toPrompt().title, '雨中互助');
+      expect(models, [
+        'bad.example.com',
+        'good.example.com',
+        'good.example.com',
+        'good.example.com',
+      ]);
+      expect(
+        service.readDraft('default')!.candidates.first.edit.toPrompt().title,
+        '雨中互助',
+      );
     } finally {
       lockParentForTesting();
       if (!firstReply.isCompleted) firstReply.complete(http.Response('', 503));
-      if (!fallbackReply.isCompleted) fallbackReply.complete(http.Response('', 503));
+      if (!fallbackReply.isCompleted) {
+        fallbackReply.complete(http.Response('', 503));
+      }
       await tester.pumpWidget(const SizedBox.shrink());
       await drainHiveWritesForTesting(tester);
     }
@@ -420,10 +471,7 @@ void main() {
     await tester.ensureVisible(find.text('生成图文题目'));
     await tester.pumpAndSettle();
     await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
-    await _until(
-      tester,
-      () => find.text('模型内容未通过格式校验').evaluate().isNotEmpty,
-    );
+    await _until(tester, () => find.text('模型内容未通过格式校验').evaluate().isNotEmpty);
     final failed = service.readDraft('default')!;
     expect(failed.candidates, isEmpty);
     expect(failed.options.count, 2);
@@ -916,6 +964,233 @@ void main() {
     lockParentForTesting();
     await tester.pumpWidget(const SizedBox.shrink());
     await drainHiveWritesForTesting(tester);
+  });
+
+  for (final step in ['config', 'plan', 'image:1', 'caption:1']) {
+    testWidgets('$step 等待时销毁页面并重进，继续显示同一任务，离页完成后可选中入库', (tester) async {
+      final harness = (await tester.runAsync(
+        PictureStoryGenerationHarness.create,
+      ))!;
+      images = harness.images;
+      repository = harness.repository;
+      service = harness.service;
+      final gate = harness.hold(step);
+      final last = harness.hold('caption:2');
+      final router = await mount(tester, settings: harness.settings);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(PictureStoryGeneratePage)),
+        listen: false,
+      );
+      final controller = container.read(
+        pictureStoryGenerationControllerProvider,
+      );
+      try {
+        await chooseCount(tester, 2);
+        await tester.enterText(find.byType(TextField), '两名孩子一起观察花朵');
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.ensureVisible(find.text('生成图文题目'));
+        await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
+        await _until(tester, () => gate.entered.isCompleted, settle: false);
+        await tester.runAsync(() async {
+          router.go(AppRoutes.pictureStoryManagement);
+          await tester.pump();
+        });
+        await _until(
+          tester,
+          () => find.byType(PictureStoryGeneratePage).evaluate().isEmpty,
+        );
+        expect(controller.stateFor('default').isBusy, isTrue);
+        await tester.runAsync(() async {
+          await tester.tap(find.byTooltip('AI 出题'));
+          await tester.pump();
+        });
+        await _until(
+          tester,
+          () => find.byType(PictureStoryGeneratePage).evaluate().isNotEmpty,
+          settle: false,
+        );
+        expect(find.text('暂停生成'), findsOneWidget);
+        expect(
+          identical(
+            container.read(pictureStoryGenerationControllerProvider),
+            controller,
+          ),
+          isTrue,
+        );
+        if (step == 'config' || step == 'plan') {
+          expect(tester.widget<Slider>(find.byType(Slider)).value, 2);
+          expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
+          expect(
+            tester.widget<TextField>(find.byType(TextField)).controller!.text,
+            '两名孩子一起观察花朵',
+          );
+        }
+        await tester.runAsync(() async {
+          gate.release();
+        });
+        await _until(tester, () => last.entered.isCompleted, settle: false);
+        expect(service.readDraft('default')!.readyCount, 1);
+        expect(
+          tester
+              .widget<FilledButton>(find.widgetWithText(FilledButton, '请稍候…'))
+              .onPressed,
+          isNull,
+        );
+        final batch = service.readDraft('default')!;
+        await tester.runAsync(() async {
+          router.go(AppRoutes.pictureStoryManagement);
+          await tester.pump();
+        });
+        await _until(
+          tester,
+          () => find.byType(PictureStoryGeneratePage).evaluate().isEmpty,
+        );
+        await tester.runAsync(() async {
+          last.release();
+        });
+        await _until(tester, () => !controller.stateFor('default').isBusy);
+        expect(service.readDraft('default')!.id, batch.id);
+        expect(service.readDraft('default')!.readyCount, 2);
+        expect(harness.order, [
+          'plan',
+          'image:1',
+          'caption:1',
+          'image:2',
+          'caption:2',
+        ]);
+        expect(repository.catalogState().versions, isEmpty);
+        await tester.runAsync(() async {
+          await tester.tap(find.byTooltip('AI 出题'));
+          await tester.pump();
+        });
+        await _until(
+          tester,
+          () => find.text('确认入库（2 道）').evaluate().isNotEmpty,
+        );
+        final deselect = find.byWidgetPredicate(
+          (w) => w is Checkbox && w.semanticLabel == '选择第 2 道题',
+        );
+        await tester.scrollUntilVisible(
+          deselect,
+          250,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(deselect);
+        await tester.pumpAndSettle();
+        expect(deselect.hitTestable(), findsOneWidget);
+        await tester.runAsync(() => tester.tap(deselect));
+        await _until(
+          tester,
+          () => find.text('确认入库（1 道）').evaluate().isNotEmpty,
+        );
+        await tester.runAsync(() => tester.tap(find.text('确认入库（1 道）')));
+        await _until(
+          tester,
+          () =>
+              repository.listPrompts().length == 1 &&
+              find.text('确认入库（0 道）').evaluate().isNotEmpty,
+        );
+        expect(repository.listPrompts().single.id, batch.candidates.first.id);
+        expect(
+          repository.listPrompts(enabledOnly: true).single.id,
+          batch.candidates.first.id,
+        );
+        expect(service.readDraft('default')!.candidates.last.isReady, isTrue);
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.runAsync(() async {
+          controller.pause('default');
+          harness.releaseAll();
+        });
+        await _until(
+          tester,
+          () => !controller.stateFor('default').isBusy,
+          settle: false,
+        );
+        await tester.runAsync(() => tester.pumpWidget(const SizedBox.shrink()));
+        await tester.runAsync(harness.dispose);
+        await drainHiveWritesForTesting(tester);
+      }
+    });
+  }
+
+  testWidgets('真实页面离开后切后台仍暂停，回前台重进显示原图可重试', (tester) async {
+    final harness = (await tester.runAsync(
+      PictureStoryGenerationHarness.create,
+    ))!;
+    images = harness.images;
+    repository = harness.repository;
+    service = harness.service;
+    final gate = harness.hold('caption:1');
+    final router = await mount(tester, settings: harness.settings);
+    final controller = ProviderScope.containerOf(
+      tester.element(find.byType(PictureStoryGeneratePage)),
+      listen: false,
+    ).read(pictureStoryGenerationControllerProvider);
+    try {
+      await chooseCount(tester, 2);
+      await tester.ensureVisible(find.text('生成图文题目'));
+      await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
+      await _until(tester, () => gate.entered.isCompleted, settle: false);
+      final before = service.readDraft('default')!;
+      await tester.runAsync(() async {
+        router.go(AppRoutes.pictureStoryManagement);
+        await tester.pump();
+      });
+      await _until(
+        tester,
+        () => find.byType(PictureStoryGeneratePage).evaluate().isEmpty,
+      );
+      await tester.runAsync(() async {
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      });
+      await _until(
+        tester,
+        () => !controller.stateFor('default').isBusy,
+        settle: false,
+      );
+      await tester.runAsync(() async {
+        gate.release();
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await ParentAccessService.instance.authenticate(testParentPin);
+      });
+      await tester.pump();
+      await tester.runAsync(() async {
+        router.go(AppRoutes.pictureStoryGenerate);
+        await tester.pump();
+      });
+      await _until(tester, () => find.text('重试出题').evaluate().isNotEmpty);
+      expect(find.text('暂停生成'), findsNothing);
+      expect(
+        service.readDraft('default')!.candidates.first.edit.image,
+        before.candidates.first.edit.image,
+      );
+      expect(
+        service.readDraft('default')!.candidates.first.stage,
+        PictureStoryGenerationStage.imageReady,
+      );
+      expect(harness.order, ['plan', 'image:1', 'caption:1']);
+      expect(tester.takeException(), isNull);
+    } finally {
+      await tester.runAsync(() async {
+        controller.pause('default');
+        harness.releaseAll();
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+      });
+      await _until(
+        tester,
+        () => !controller.stateFor('default').isBusy,
+        settle: false,
+      );
+      await tester.runAsync(() => tester.pumpWidget(const SizedBox.shrink()));
+      await tester.runAsync(harness.dispose);
+      await drainHiveWritesForTesting(tester);
+    }
   });
 
   testWidgets('使用自定义提示词生成、编辑草稿、勾选后确认入库的真实页面链路', (tester) async {

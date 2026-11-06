@@ -4,10 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
-import 'package:poemath/core/services/llm/llm_models.dart';
-import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_generation_service.dart';
+import 'package:poemath/core/services/picture_story_generation_controller.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/theme/typography_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -17,7 +16,6 @@ import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/picture_story_generation_draft.dart';
 import 'package:poemath/data/models/picture_story_editor_draft.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
-import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/profile/picture_story_candidate_editor_page.dart';
@@ -33,16 +31,19 @@ class _PictureStoryGeneratePageState
     extends ConsumerState<PictureStoryGeneratePage>
     with WidgetsBindingObserver {
   late final PictureStoryGenerationService _service;
+  late final PictureStoryGenerationController _controller;
   late final String _profile;
   late final int _profileRevision;
   final _requirements = TextEditingController();
   final _themes = <String>{'日常生活'};
   int _count = 3;
-  int _generation = 0;
+  int _publicationToken = 0;
   bool _foreground = true;
-  bool _busy = false;
-  bool _generating = false;
-  String _generationStatus = '正在读取生成配置…';
+  bool _publishing = false;
+  PictureStoryRunState get _run => _controller.stateFor(_profile);
+  bool get _busy => _publishing || _run.isBusy || _service.isRunning(_profile);
+  bool get _generating => _run.isBusy;
+  String get _generationStatus => _run.progress;
   PictureStoryGenerationDraft? _draft;
   String? _error;
   bool _loadFailed = false;
@@ -57,11 +58,13 @@ class _PictureStoryGeneratePageState
     _profile = ProfileScope.currentId;
     _profileRevision = ProfileScope.revision;
     _service = ref.read(pictureStoryGenerationServiceProvider);
+    _controller = ref.read(pictureStoryGenerationControllerProvider);
+    _controller.addListener(_reload);
     _reload(notify: false);
     WidgetsBinding.instance.addObserver(this);
     ParentAccessService.instance.addListener(_parentChanged);
     _profileChanges = ProfileScope.changes.listen((_) {
-      _pause();
+      _invalidatePage();
     });
   }
 
@@ -69,8 +72,8 @@ class _PictureStoryGeneratePageState
     try {
       final draft = _service.readDraft(_profile);
       _draft = draft;
-      if (draft != null && draft.candidates.isEmpty) {
-        final options = draft.options;
+      final options = draft?.options ?? (_run.isBusy ? _run.options : null);
+      if (options != null && (draft?.candidates.isEmpty ?? true)) {
         _count = options.count;
         _themes
           ..clear()
@@ -88,26 +91,27 @@ class _PictureStoryGeneratePageState
   }
 
   void _parentChanged() {
-    if (!ParentAccessService.instance.isUnlocked) _pause();
+    if (!ParentAccessService.instance.isUnlocked) _invalidatePage();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
-    if (!_foreground) _pause();
+    if (!_foreground) _invalidatePage();
   }
 
-  void _pause() {
-    _generation++;
-    _service.pause(_profile);
+  void _invalidatePage() {
+    _publicationToken++;
     if (mounted) setState(() {});
   }
 
-  bool _active(int token) =>
+  void _pause() => _controller.pause(_profile);
+
+  bool _canPublish(int token) =>
       mounted &&
       _foreground &&
       _sameProfile &&
-      token == _generation &&
+      token == _publicationToken &&
       ParentAccessService.instance.isUnlocked &&
       (ModalRoute.of(context)?.isCurrent ?? false);
 
@@ -115,87 +119,24 @@ class _PictureStoryGeneratePageState
     String? candidateId,
     String? reuseImageId,
     bool regenerate = false,
-  }) async {
-    if (_busy || !_sameProfile) return;
-    final token = ++_generation;
-    setState(() {
-      _busy = true;
-      _generating = true;
-      _generationStatus = '正在读取生成配置…';
-      _error = null;
-    });
-    try {
-      ParentAccessService.instance.assertAllowed();
-      final settings = ref.read(settingsRepositoryProvider);
-      if (settings.hasPendingLlmSave) {
-        throw const FormatException('大模型设置正在保存，请稍后重试');
-      }
-      var signature = settings.pictureStoryGenerationSignature;
-      final imagePromptOverride =
-          settings.pictureStoryImageGenerationPromptOverride;
-      final questionPromptOverride =
-          settings.pictureStoryQuestionGenerationPromptOverride;
-      bool active() =>
-          _active(token) &&
-          !settings.hasPendingLlmSave &&
-          signature == settings.pictureStoryGenerationSignature;
-      final images = await settings.readImageGenerationConfig();
-      if (!active()) return;
-      if (images == null) throw const FormatException('请先配置图片生成服务');
-      final llm = await settings.readLlmConfigForScenario(
-        LlmScenario.pictureStory,
-      );
-      if (!active()) return;
-      if (llm == null) throw const FormatException('请先配置用于看图出题的大模型');
-      _draft ??= await _service.createDraft(
-        PictureStoryGenerationOptions(
-          level: PictureStoryLevel.starter,
-          count: _count,
-          themes: _themes.toList(),
-          requirements: _requirements.text.trim(),
-        ),
-      );
-      if (!active()) return;
-      await _service.run(
-        draft: _draft!,
-        config: llm,
-        imageConfig: images,
-        isActive: active,
-        onChanged: _reload,
-        onPlanningAttempt: (attempt) {
-          if (!active()) return;
-          setState(() {
-            _generationStatus = attempt == 1
-                ? '正在规划场景…'
-                : '正在切换模型，重试场景规划…';
-          });
-        },
-        onLlmSelectionSaved: (savedSignature) => signature = savedSignature,
-        candidateId: candidateId,
-        reuseImageId: reuseImageId,
-        regenerateImage: regenerate,
-        imagePromptOverride: imagePromptOverride,
-        questionPromptOverride: questionPromptOverride,
-      );
-    } on Object catch (error) {
-      if (mounted) {
-        setState(
-          () => _error = error is FormatException
-              ? error.message
-              : error is LlmException
-              ? error.message
-              : error is ParentAccessDenied
-              ? error.toString()
-              : '生成未完成，已生成内容会保留，请稍后重试',
-        );
-      }
-    } finally {
-      if (mounted) {
-        _busy = false;
-        _generating = false;
-        _reload();
-      }
-    }
+  }) {
+    if (_busy || !_sameProfile) return Future<void>.value();
+    setState(() => _error = null);
+    return _controller.start(
+      profileId: _profile,
+      profileRevision: _profileRevision,
+      options:
+          _draft?.options ??
+          PictureStoryGenerationOptions(
+            level: PictureStoryLevel.starter,
+            count: _count,
+            themes: _themes.toList(),
+            requirements: _requirements.text.trim(),
+          ),
+      candidateId: candidateId,
+      reuseImageId: reuseImageId,
+      regenerateImage: regenerate,
+    );
   }
 
   Future<void> _regenerate(PictureStoryGenerationCandidate item) async {
@@ -261,23 +202,28 @@ class _PictureStoryGeneratePageState
 
   Future<void> _publish() async {
     if (_busy || _draft == null) return;
-    final token = ++_generation;
+    final token = ++_publicationToken;
     setState(() {
-      _busy = true;
+      _publishing = true;
       _error = null;
     });
     try {
+      final authorize = ParentAccessService.instance.captureAuthorization();
       final count = await _service.publish(
         _draft!,
         check: () {
-          if (!_active(token)) throw const ParentAccessDenied();
+          authorize();
+          if (!_canPublish(token)) throw const ParentAccessDenied();
         },
       );
       if (!mounted) return;
       _reload();
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('已入库 $count 道题，并为当前孩子启用')));
-      if (_draft == null) context.pop();
+      if (_draft == null) {
+        _controller.clearStatus(_profile);
+        context.pop();
+      }
     } on Object catch (error) {
       if (mounted) {
         setState(
@@ -290,7 +236,7 @@ class _PictureStoryGeneratePageState
       }
     } finally {
       if (mounted) {
-        _busy = false;
+        _publishing = false;
         _reload();
       }
     }
@@ -319,6 +265,7 @@ class _PictureStoryGeneratePageState
     if (confirmed != true || !mounted) return;
     try {
       await _service.discardDraft(draft);
+      _controller.clearStatus(_profile);
       if (mounted) _reload();
     } on Object {
       if (mounted) setState(() => _error = '草稿暂时无法移除，请重试');
@@ -327,8 +274,8 @@ class _PictureStoryGeneratePageState
 
   @override
   void dispose() {
-    _generation++;
-    _service.pause(_profile);
+    _publicationToken++;
+    _controller.removeListener(_reload);
     WidgetsBinding.instance.removeObserver(this);
     ParentAccessService.instance.removeListener(_parentChanged);
     unawaited(_profileChanges?.cancel());
@@ -343,6 +290,7 @@ class _PictureStoryGeneratePageState
     final hasCandidates = draft?.candidates.isNotEmpty ?? false;
     final canOperate = !_busy && _sameProfile && !_loadFailed;
     final selectedCount = draft?.selectedPrompts.length ?? 0;
+    final error = _error ?? _run.message;
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI 看图说话出题'),
@@ -366,8 +314,8 @@ class _PictureStoryGeneratePageState
                 ),
                 const SizedBox(height: SpacingTokens.md),
               ],
-              if (_error != null) ...[
-                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+              if (error != null) ...[
+                Text(error, style: TextStyle(color: theme.colorScheme.error)),
                 if (_loadFailed)
                   TextButton(
                     onPressed: () => _reload(),
@@ -375,7 +323,7 @@ class _PictureStoryGeneratePageState
                   ),
                 const SizedBox(height: SpacingTokens.md),
               ],
-              if (draft != null) ...[
+              if (draft != null || _generating) ...[
                 if (_busy)
                   LinearProgressIndicator(
                     semanticsLabel: _generating ? '正在生成题目' : '正在入库',
@@ -385,13 +333,23 @@ class _PictureStoryGeneratePageState
                     spacing: SpacingTokens.sm,
                     children: [
                       TextButton.icon(
-                        onPressed: _pause,
+                        onPressed: _run.phase == PictureStoryRunPhase.stopping
+                            ? null
+                            : _pause,
                         icon: const Icon(Icons.pause),
-                        label: const Text('暂停生成'),
+                        label: Text(
+                          _run.phase == PictureStoryRunPhase.stopping
+                              ? '正在暂停生成…'
+                              : '暂停生成',
+                        ),
                       ),
                     ],
                   ),
                 if (_busy) const SizedBox(height: SpacingTokens.md),
+              ],
+              if (_generating || !hasCandidates) ...[
+                const Text('离开此页仍会继续生成；切到后台或锁屏会暂停。'),
+                const SizedBox(height: SpacingTokens.md),
               ],
               if (!hasCandidates && !_loadFailed) _options(theme, canOperate),
               if (draft != null && hasCandidates)
@@ -514,6 +472,11 @@ class _PictureStoryGeneratePageState
   ) {
     final edit = item.edit;
     final published = item.stage == PictureStoryGenerationStage.published;
+    final interrupted =
+        !_generating &&
+        (item.stage == PictureStoryGenerationStage.generatingImage ||
+            item.stage == PictureStoryGenerationStage.generatingText);
+    final stageLabel = interrupted ? '生成已中断，可重试' : item.stage.label;
     // 图形居中在完整点击区域内，标题行需补偿其内置的水平留白。
     const checkboxInset = (kMinInteractiveDimension - Checkbox.width) / 2;
     return ColoredCard(
@@ -552,7 +515,7 @@ class _PictureStoryGeneratePageState
                           : '第 ${index + 1} 道题',
                       children: [
                         TextSpan(
-                          text: ' ${item.stage.label}',
+                          text: ' $stageLabel',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),

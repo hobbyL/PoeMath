@@ -6,6 +6,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/services/picture_story_editor_service.dart';
 import 'package:poemath/core/services/picture_story_generation_service.dart';
+import 'package:poemath/core/services/picture_story_generation_controller.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/providers/llm_runtime_providers.dart';
@@ -25,10 +26,10 @@ final pictureStoryEditorServiceProvider = Provider<PictureStoryEditorService>(
   (ref) => PictureStoryEditorService.instance,
 );
 
-final pictureStoryImageBytesProvider =
-    FutureProvider.autoDispose.family<Uint8List, String>((ref, id) {
-  return ref.watch(pictureStoryImageServiceProvider).readImage(id);
-});
+final pictureStoryImageBytesProvider = FutureProvider.autoDispose
+    .family<Uint8List, String>((ref, id) {
+      return ref.watch(pictureStoryImageServiceProvider).readImage(id);
+    });
 
 final pictureStoryRepositoryProvider = Provider<PictureStoryRepository>((ref) {
   return PictureStoryRepository(
@@ -38,19 +39,33 @@ final pictureStoryRepositoryProvider = Provider<PictureStoryRepository>((ref) {
 
 final pictureStoryGenerationServiceProvider =
     Provider<PictureStoryGenerationService>((ref) {
-  return PictureStoryGenerationService(
-    images: ref.watch(pictureStoryImageServiceProvider),
-    repository: ref.watch(pictureStoryRepositoryProvider),
-    backup: ref.watch(backupServiceProvider),
-    llmFactory: (active) => createRuntimeLlmClient(
-      httpClient: ref.read(llmExplainHttpClientProvider),
-      settings: ref.read(settingsRepositoryProvider),
-      isActive: active,
-      onSelectionChanged: () =>
-          ref.read(llmSelectionVersionProvider.notifier).state++,
-    ),
-  );
-});
+      final httpClient = ref.read(llmExplainHttpClientProvider);
+      final settings = ref.read(settingsRepositoryProvider);
+      final selectionVersion = ref.read(llmSelectionVersionProvider.notifier);
+      return PictureStoryGenerationService(
+        images: ref.watch(pictureStoryImageServiceProvider),
+        repository: ref.watch(pictureStoryRepositoryProvider),
+        backup: ref.watch(backupServiceProvider),
+        llmFactory: (active) => createRuntimeLlmClient(
+          httpClient: httpClient,
+          settings: settings,
+          isActive: active,
+          onSelectionChanged: () => selectionVersion.state++,
+        ),
+      );
+    });
+
+/// 普通 Provider 随应用存续；无页面监听时任务和生命周期订阅仍有效。
+final pictureStoryGenerationControllerProvider =
+    Provider<PictureStoryGenerationController>((ref) {
+      final controller = PictureStoryGenerationController(
+        // Controller 是应用级任务所有者；用 read 避免设置 Provider 刷新时重建它。
+        service: ref.read(pictureStoryGenerationServiceProvider),
+        settings: ref.read(settingsRepositoryProvider),
+      );
+      ref.onDispose(controller.dispose);
+      return controller;
+    });
 
 final pictureStoryCatalogProvider = Provider<List<PictureStoryPrompt>>((ref) {
   final repository = ref.watch(pictureStoryRepositoryProvider);
@@ -61,18 +76,20 @@ final pictureStoryCatalogProvider = Provider<List<PictureStoryPrompt>>((ref) {
 
 final pictureStoryPromptByIdProvider =
     Provider.family<PictureStoryPrompt?, String>((ref, id) {
-  ref.watch(pictureStoryCatalogProvider);
-  return ref.watch(pictureStoryRepositoryProvider).findPrompt(id);
-});
+      ref.watch(pictureStoryCatalogProvider);
+      return ref.watch(pictureStoryRepositoryProvider).findPrompt(id);
+    });
 
 final pictureStoryPromptVersionProvider =
-    Provider.family<PictureStoryPrompt?, ({String id, int version})>(
-        (ref, key) {
-  ref.watch(pictureStoryCatalogProvider);
-  return ref
-      .watch(pictureStoryRepositoryProvider)
-      .findPrompt(key.id, version: key.version);
-});
+    Provider.family<PictureStoryPrompt?, ({String id, int version})>((
+      ref,
+      key,
+    ) {
+      ref.watch(pictureStoryCatalogProvider);
+      return ref
+          .watch(pictureStoryRepositoryProvider)
+          .findPrompt(key.id, version: key.version);
+    });
 
 final pictureStoryPromptProvider = Provider<List<PictureStoryPrompt>>((ref) {
   final profile = ProfileScope.changes.listen((_) => ref.invalidateSelf());
@@ -90,8 +107,9 @@ final pictureStoryPromptCountProvider = Provider<int>((ref) {
   return ref.watch(pictureStoryPromptProvider).length;
 });
 
-final pictureStoryHistoryProvider =
-    Provider<List<PictureStoryPracticeRecord>>((ref) {
+final pictureStoryHistoryProvider = Provider<List<PictureStoryPracticeRecord>>((
+  ref,
+) {
   final profile = ProfileScope.changes.listen((_) => ref.invalidateSelf());
   ref.onDispose(profile.cancel);
   final repository = ref.watch(pictureStoryRepositoryProvider);
