@@ -26,33 +26,32 @@ Future<ChatCompletion> _complete(
   LlmConfig config = _config,
   List<ChatMessage> messages = _messages,
   bool requiresVision = false,
-}) =>
-    client.chatComplete(
-      config: config,
-      systemPrompt: '只输出完整题目的 JSON',
-      messages: messages,
-      maxTokens: 3000,
-      requiresVision: requiresVision,
-      stream: true,
-    );
+}) => client.chatComplete(
+  config: config,
+  systemPrompt: '只输出完整题目的 JSON',
+  messages: messages,
+  maxTokens: 3000,
+  requiresVision: requiresVision,
+  stream: true,
+);
 
 String _event(Object data) => 'data: ${jsonEncode(data)}\n\n';
 
 String _delta(String content) => _event({
-      'choices': [
-        {
-          'index': 0,
-          'delta': {'content': content},
-          'finish_reason': null,
-        },
-      ],
-    });
+  'choices': [
+    {
+      'index': 0,
+      'delta': {'content': content},
+      'finish_reason': null,
+    },
+  ],
+});
 
 String _finish(String reason) => _event({
-      'choices': [
-        {'index': 0, 'delta': <String, Object?>{}, 'finish_reason': reason},
-      ],
-    });
+  'choices': [
+    {'index': 0, 'delta': <String, Object?>{}, 'finish_reason': reason},
+  ],
+});
 
 http.StreamedResponse _response(
   String body, {
@@ -65,10 +64,7 @@ http.StreamedResponse _response(
   return http.StreamedResponse(
     Stream<List<int>>.fromIterable([
       for (var offset = 0; offset < bytes.length; offset += chunkSize)
-        bytes.sublist(
-          offset,
-          (offset + chunkSize).clamp(0, bytes.length),
-        ),
+        bytes.sublist(offset, (offset + chunkSize).clamp(0, bytes.length)),
     ]),
     200,
     headers: headers,
@@ -77,44 +73,51 @@ http.StreamedResponse _response(
 
 void main() {
   for (final mode in ['complete', 'streamed complete', 'explain']) {
-    test('HTTP 200 JSON error in $mode never exposes upstream secrets',
-        () async {
-      final client = LlmClient(
-        httpClient: MockClient((request) async {
-          expect(request.headers['Authorization'], 'Bearer ${_config.apiKey}');
-          return http.Response(
-            jsonEncode({
-              'error': {'message': '${_config.apiKey} provider-private-detail'},
-            }),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }),
-      );
-      addTearDown(client.close);
-      final Future<Object> response = mode == 'explain'
-          ? client.explain(
-              config: _config,
-              systemPrompt: '测试',
-              userPrompt: '测试',
-            )
-          : client.chatComplete(
-              config: _config,
-              systemPrompt: '测试',
-              messages: _messages,
-              stream: mode == 'streamed complete',
+    test(
+      'HTTP 200 JSON error in $mode never exposes upstream secrets',
+      () async {
+        final client = LlmClient(
+          httpClient: MockClient((request) async {
+            expect(
+              request.headers['Authorization'],
+              'Bearer ${_config.apiKey}',
             );
-      await expectLater(
-        response,
-        throwsA(
-          isA<LlmResponseFormatError>().having(
-            (error) => error.message,
-            'message',
-            '模型服务返回错误，请稍后重试或请家长检查配置',
+            return http.Response(
+              jsonEncode({
+                'error': {
+                  'message': '${_config.apiKey} provider-private-detail',
+                },
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }),
+        );
+        addTearDown(client.close);
+        final Future<Object> response = mode == 'explain'
+            ? client.explain(
+                config: _config,
+                systemPrompt: '测试',
+                userPrompt: '测试',
+              )
+            : client.chatComplete(
+                config: _config,
+                systemPrompt: '测试',
+                messages: _messages,
+                stream: mode == 'streamed complete',
+              );
+        await expectLater(
+          response,
+          throwsA(
+            isA<LlmResponseFormatError>().having(
+              (error) => error.message,
+              'message',
+              '模型服务返回错误，请稍后重试或请家长检查配置',
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   }
 
   test('汇总 SSE 后返回完整 JSON；中文跨字节、多行事件、空帧和统计帧均兼容', () async {
@@ -133,9 +136,9 @@ void main() {
           '${_delta('{"title":"雨天互助🌧️",')}'
           '${_delta('"questions":["你看到了什么？"]}')}'
           '${_event({
-                'choices': <Object?>[],
-                'usage': {'total_tokens': 40},
-              })}'
+            'choices': <Object?>[],
+            'usage': {'total_tokens': 40},
+          })}'
           'data:\n\n'
           'data: [DONE]',
           // 格式按实际 body 识别，也兼容服务误标 Content-Type。
@@ -145,10 +148,7 @@ void main() {
     );
     addTearDown(client.close);
     final result = await _complete(client);
-    expect(
-      result.content,
-      '{"title":"雨天互助🌧️","questions":["你看到了什么？"]}',
-    );
+    expect(result.content, '{"title":"雨天互助🌧️","questions":["你看到了什么？"]}');
     expect(jsonDecode(result.content!), {
       'title': '雨天互助🌧️',
       'questions': ['你看到了什么？'],
@@ -159,6 +159,141 @@ void main() {
     expect((requestBody['messages'] as List).last, _messages.single.toJson());
     expect(headers['authorization'], 'Bearer ${_config.apiKey}');
     expect(jsonEncode(requestBody), isNot(contains(_config.apiKey)));
+  });
+
+  for (final streaming in [false, true]) {
+    test('HTTP 200 限额通知按失败回退，只有通过业务校验的模型可接受：$streaming', () async {
+      const config = LlmConfig(
+        baseUrl: 'https://vision.example.com/v1',
+        apiKey: 'synthetic-vision-key',
+        model: 'gpt-4o-mini',
+        models: ['gpt-4o-mini', 'gpt-4o'],
+      );
+      final attempts = <String>[];
+      final accepted = <String>[];
+      final client = LlmClient(
+        httpClient: MockClient.streaming((request, body) async {
+          final model =
+              (jsonDecode(await body.bytesToString()) as Map)['model'];
+          attempts.add(model as String);
+          final content = attempts.length == 1
+              ? "You've used your daily chat limit. Please try again later."
+              : '{"questions":["你看到了什么？"]}';
+          return _response(
+            streaming
+                ? _delta(content) + _finish('stop')
+                : jsonEncode({
+                    'choices': [
+                      {
+                        'message': {'content': content},
+                        'finish_reason': 'stop',
+                      },
+                    ],
+                  }),
+          );
+        }),
+        onModelSucceeded: (_, model) async => accepted.add(model),
+      );
+      addTearDown(client.close);
+      var validations = 0;
+      final result = await client.chatComplete(
+        config: config,
+        systemPrompt: '只输出 JSON',
+        messages: _messages,
+        stream: streaming,
+        validate: (reply) {
+          validations++;
+          expect(jsonDecode(reply.content!)['questions'], isNotEmpty);
+        },
+      );
+      expect(attempts, ['gpt-4o-mini', 'gpt-4o']);
+      expect(validations, 1);
+      expect(accepted, isEmpty);
+      await client.acceptCompletion(result);
+      expect(accepted, ['gpt-4o']);
+    });
+  }
+
+  for (final status in [200, 429]) {
+    test('无备用模型时限额错误有明确提示，不泄漏服务响应：HTTP $status', () async {
+      final client = LlmClient(
+        httpClient: MockClient.streaming(
+          (_, __) async => http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                status == 200
+                    ? _delta(
+                            "You've used your daily chat limit. Please try again later.",
+                          ) +
+                          _finish('stop')
+                    : 'synthetic-vision-key private-provider-detail',
+              ),
+            ),
+            status,
+          ),
+        ),
+      );
+      addTearDown(client.close);
+      await expectLater(
+        _complete(client),
+        throwsA(
+          isA<LlmRateLimitError>().having(
+            (error) => error.message,
+            'message',
+            '模型服务额度已用尽或请求受限，请切换模型或稍后重试',
+          ),
+        ),
+      );
+    });
+  }
+
+  test('有效 JSON 中引用限额文字不被当作上游限额通知', () async {
+    final content = jsonEncode({
+      'quote': "You've used your daily chat limit. Please try again later.",
+    });
+    final client = LlmClient(
+      httpClient: MockClient.streaming(
+        (_, __) async => _response(_delta(content) + _finish('stop')),
+      ),
+    );
+    addTearDown(client.close);
+    expect((await _complete(client)).content, content);
+  });
+
+  test('业务格式校验失败会用相同视觉请求回退，坏内容不会被记为成功', () async {
+    const config = LlmConfig(
+      baseUrl: 'https://vision.example.com/v1',
+      apiKey: 'synthetic-vision-key',
+      model: 'gpt-4o-mini',
+      models: ['gpt-4o-mini', 'gpt-4o'],
+    );
+    final attempts = <String>[];
+    final client = LlmClient(
+      httpClient: MockClient.streaming((_, body) async {
+        final request = jsonDecode(await body.bytesToString()) as Map;
+        attempts.add(request['model'] as String);
+        expect(request['messages'].last, _messages.single.toJson());
+        return _response(
+          _delta(
+                attempts.length == 1
+                    ? 'synthetic-vision-key invalid JSON'
+                    : '{"questions":["你看到了什么？"]}',
+              ) +
+              _finish('stop'),
+        );
+      }),
+    );
+    addTearDown(client.close);
+    final result = await client.chatComplete(
+      config: config,
+      systemPrompt: '只输出 JSON',
+      messages: _messages,
+      requiresVision: true,
+      stream: true,
+      validate: (reply) => jsonDecode(reply.content!),
+    );
+    expect(attempts, ['gpt-4o-mini', 'gpt-4o']);
+    expect(jsonDecode(result.content!)['questions'], isNotEmpty);
   });
 
   for (final (name, terminal) in [
@@ -193,10 +328,10 @@ void main() {
         (_, __) async => _response(
           '${_delta('{"title":"完成"}')}'
           '${_event({
-                'choices': [
-                  {'index': 0, 'finish_reason': 'stop'},
-                ],
-              })}',
+            'choices': [
+              {'index': 0, 'finish_reason': 'stop'},
+            ],
+          })}',
         ),
       ),
     );
@@ -284,9 +419,7 @@ void main() {
         if (request.url.host == 'first.example') {
           return http.StreamedResponse(const Stream.empty(), 401);
         }
-        return _response(
-          _delta('{"title":"第二家服务的完整题目"}') + _finish('stop'),
-        );
+        return _response(_delta('{"title":"第二家服务的完整题目"}') + _finish('stop'));
       }),
       onSelectionSucceeded: (_, __) async => promoted = true,
     );
@@ -411,9 +544,7 @@ void main() {
       '错误事件',
       '${_delta('{"title":"服务随后报错"}')}'
           '${_event({
-            'error': {
-              'message': 'synthetic-vision-key provider-private-detail',
-            },
+            'error': {'message': 'synthetic-vision-key provider-private-detail'},
           })}'
           'data: [DONE]\n\n',
     ),
@@ -606,8 +737,7 @@ void main() {
       (await pending.timeout(
         const Duration(seconds: 5),
         onTimeout: () => throw TimeoutException('SSE DONE 后客户端未完成'),
-      ))
-          .content,
+      )).content,
       '{"title":"真实连接上的中文题目"}',
     );
     // 已在 response.close() 前取得完整结果，接收不依赖服务端关闭响应。

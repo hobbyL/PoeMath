@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
+import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_generation_service.dart';
@@ -180,6 +181,8 @@ class _PictureStoryGeneratePageState
       if (mounted) {
         setState(
           () => _error = error is FormatException
+              ? error.message
+              : error is LlmException
               ? error.message
               : error is ParentAccessDenied
               ? error.toString()

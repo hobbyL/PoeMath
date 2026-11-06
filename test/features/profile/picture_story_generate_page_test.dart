@@ -302,7 +302,7 @@ void main() {
     );
     try {
       await mount(tester);
-      await chooseCount(tester, 1);
+      await chooseCount(tester, 2);
       await tester.ensureVisible(find.text('生成图文题目'));
       await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
       await _until(tester, () => firstEntered.isCompleted, settle: false);
@@ -314,15 +314,15 @@ void main() {
       expect(find.text('正在切换模型，重试场景规划…'), findsOneWidget);
       expect(settings.llmActiveProviderId, 'bad');
       await tester.runAsync(() async {
-        fallbackReply.complete(completion([{'imagePrompt': '两个孩子在雨中分享雨伞。'}]));
+        fallbackReply.complete(completion([{'imagePrompt': '两个孩子在雨中分享雨伞。'}, {'imagePrompt': '两个孩子一起搬书。'}]));
       });
-      await _until(tester, () => service.readDraft('default')?.readyCount == 1 &&
+      await _until(tester, () => service.readDraft('default')?.readyCount == 2 &&
           find.text('暂停生成').evaluate().isEmpty);
       expect(settings.llmActiveProviderId, 'good');
       expect(promotions, 1);
-      expect(imageRequests, 1);
-      expect(models, ['bad.example.com', 'good.example.com', 'good.example.com']);
-      expect(service.readDraft('default')!.candidates.single.edit.toPrompt().title, '雨中互助');
+      expect(imageRequests, 2);
+      expect(models, ['bad.example.com', 'good.example.com', 'good.example.com', 'good.example.com']);
+      expect(service.readDraft('default')!.candidates.first.edit.toPrompt().title, '雨中互助');
     } finally {
       lockParentForTesting();
       if (!firstReply.isCompleted) firstReply.complete(http.Response('', 503));
@@ -372,6 +372,7 @@ void main() {
                 ? <Object>[]
                 : [
                     {'imagePrompt': '两只小动物在雨天共撑一把伞'},
+                    {'imagePrompt': '两只小动物一起收拾积木'},
                   ];
           } else {
             captionRequests++;
@@ -410,7 +411,7 @@ void main() {
       ),
     );
     final router = await mount(tester);
-    await chooseCount(tester, 1);
+    await chooseCount(tester, 2);
     await tester.tap(find.widgetWithText(FilterChip, '日常生活'));
     await tester.tap(find.widgetWithText(FilterChip, '动物朋友'));
     final requirements = find.byType(TextField);
@@ -421,11 +422,11 @@ void main() {
     await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
     await _until(
       tester,
-      () => find.text('场景规划数量不完整，请重新生成').evaluate().isNotEmpty,
+      () => find.text('模型内容未通过格式校验').evaluate().isNotEmpty,
     );
     final failed = service.readDraft('default')!;
     expect(failed.candidates, isEmpty);
-    expect(failed.options.count, 1);
+    expect(failed.options.count, 2);
     expect(failed.options.themes, ['动物朋友']);
     expect(failed.options.requirements, '雨天互相帮助');
     expect(planningRequests, 1);
@@ -435,7 +436,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('AI 出题'));
     await tester.pumpAndSettle();
-    expect(find.text('数量（1 题）'), findsOneWidget);
+    expect(find.text('数量（2 题）'), findsOneWidget);
     expect(tester.widget<TextField>(requirements).controller!.text, '雨天互相帮助');
     expect(
       tester
@@ -450,7 +451,7 @@ void main() {
     await tester.ensureVisible(retry);
     await tester.pumpAndSettle();
     await tester.runAsync(() => tester.tap(retry));
-    final publish = find.widgetWithText(FilledButton, '确认入库（1 道）');
+    final publish = find.widgetWithText(FilledButton, '确认入库（2 道）');
     await _until(
       tester,
       () =>
@@ -460,11 +461,11 @@ void main() {
     final ready = service.readDraft('default')!;
     expect(ready.id, failed.id);
     expect(ready.options.toJson(), failed.options.toJson());
-    expect(ready.candidates.single.edit.toPrompt().title, '雨天共撑一把伞');
+    expect(ready.candidates.first.edit.toPrompt().title, '雨天共撑一把伞');
     expect(planningRequests, 2);
     expect(planningMessages[1], planningMessages[0]);
-    expect(captionRequests, 1);
-    expect(imageRequests, 1);
+    expect(captionRequests, 2);
+    expect(imageRequests, 2);
     expect(repository.catalogState().versions, isEmpty);
     expect(tester.takeException(), isNull);
     lockParentForTesting();

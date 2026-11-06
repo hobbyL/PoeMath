@@ -136,8 +136,11 @@ void main() {
     await expectLater(
       client.explain(config: _config, systemPrompt: '', userPrompt: ''),
       throwsA(
-        isA<LlmServerError>()
-            .having((error) => error.message, 'message', contains('429')),
+        isA<LlmRateLimitError>().having(
+          (error) => error.message,
+          'message',
+          '模型服务额度已用尽或请求受限，请切换模型或稍后重试',
+        ),
       ),
     );
     expect(attempts, [

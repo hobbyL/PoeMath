@@ -62,13 +62,13 @@ String _event(Object value) => 'data: ${jsonEncode(value)}\n\n';
 http.Response _completion(Object value) => http.Response.bytes(
   utf8.encode(
     '${_event({
-          'choices': [
-            {
-              'delta': {'content': jsonEncode(value)},
-            },
-          ],
-        })}'
-        'data: [DONE]\n\n',
+      'choices': [
+        {
+          'delta': {'content': jsonEncode(value)},
+        },
+      ],
+    })}'
+    'data: [DONE]\n\n',
   ),
   200,
   headers: const {'content-type': 'text/event-stream; charset=utf-8'},
@@ -99,6 +99,8 @@ void main() {
   var changeCaptionModel = false;
   var invalidPlan = false;
   var invalidCaption = false;
+  var invalidFirstCaption = false;
+  var singleQuestion = false;
   Future<void> Function()? beforeGoodPlan;
 
   setUp(() async {
@@ -131,6 +133,8 @@ void main() {
     changeCaptionModel = false;
     invalidPlan = false;
     invalidCaption = false;
+    invalidFirstCaption = false;
+    singleQuestion = false;
     beforeGoodPlan = null;
     transport = MockClient((request) async {
       final body = jsonDecode(request.body) as Map<String, dynamic>;
@@ -143,18 +147,16 @@ void main() {
         return http.Response.bytes(
           utf8.encode(
             '${_event({
-                  'choices': [
-                    {
-                      'delta': {'content': '[{"imagePrompt":"失败模型的场景"}]'},
-                    },
-                  ],
-                })}'
-                '${_event({
-                  'error': {
-                    'message': 'synthetic-key-p1 provider-private-detail',
-                  },
-                })}'
-                'data: [DONE]\n\n',
+              'choices': [
+                {
+                  'delta': {'content': '[{"imagePrompt":"失败模型的场景"}]'},
+                },
+              ],
+            })}'
+            '${_event({
+              'error': {'message': 'synthetic-key-p1 provider-private-detail'},
+            })}'
+            'data: [DONE]\n\n',
           ),
           200,
           headers: const {'content-type': 'text/event-stream'},
@@ -167,6 +169,7 @@ void main() {
               ? []
               : [
                   {'imagePrompt': '小朋友在雨中分享雨伞。'},
+                  {'imagePrompt': '小朋友在教室帮同学捡起书本。'},
                 ],
         );
       }
@@ -174,7 +177,7 @@ void main() {
         return http.Response('', 503);
       }
       return _completion(
-        invalidCaption
+        (invalidCaption || (invalidFirstCaption && model == 'gpt-4o-mini'))
             ? {'title': '不完整题目'}
             : {
                 'title': '雨中互助',
@@ -204,11 +207,11 @@ void main() {
         isActive: active,
         httpClient: MockClient((request) async {
           imageRequests++;
-          // 规划成功的模型须在生图之前就已保存。
+          // 多题先保存规划成功模型；单题生图前不调用或回写大模型。
           expect(
             settings.providerIdForScenario(LlmScenario.pictureStory) ??
                 settings.llmActiveProviderId,
-            'p2',
+            singleQuestion ? 'p1' : 'p2',
           );
           return http.Response(
             jsonEncode({
@@ -239,7 +242,7 @@ void main() {
     final draft = await service.createDraft(
       PictureStoryGenerationOptions(
         level: PictureStoryLevel.starter,
-        count: 1,
+        count: singleQuestion ? 1 : 2,
         themes: ['友爱互助'],
       ),
     );
@@ -252,6 +255,24 @@ void main() {
     );
     return service.readDraft('default')!;
   }
+
+  test('单题先生图再执行视觉模型回退，只在有效题目完成后回写成功模型', () async {
+    singleQuestion = true;
+    changeCaptionModel = true;
+    final draft = await generate();
+    expect(draft.readyCount, 1);
+    expect(requests, [
+      ('bad.example.com', 'gpt-4o-bad', 'caption'),
+      ('good.example.com', 'gpt-4o-mini', 'caption'),
+      ('good.example.com', 'gpt-4o', 'caption'),
+    ]);
+    expect(imageRequests, 1);
+    expect(settings.llmActiveProviderId, 'p2');
+    expect(settings.llmProviders.last.model, 'gpt-4o');
+    expect(container.read(llmSelectionVersionProvider), 1);
+    expect(draft.candidates.single.edit.toPrompt().questions, ['小朋友正在做什么？']);
+    expect(repository.catalogState().versions, isEmpty);
+  });
 
   for (final explicit in [false, true]) {
     test('看图出题${explicit ? '显式场景' : '跟随默认'}回写两次成功选择，下次直接使用最终模型', () async {
@@ -269,11 +290,12 @@ void main() {
       );
       changeCaptionModel = true;
       final draft = await generate();
-      expect(draft.readyCount, 1);
+      expect(draft.readyCount, 2);
       expect(requests, [
         ('bad.example.com', 'gpt-4o-bad', 'plan'),
         ('good.example.com', 'gpt-4o-mini', 'plan'),
         ('good.example.com', 'gpt-4o-mini', 'caption'),
+        ('good.example.com', 'gpt-4o', 'caption'),
         ('good.example.com', 'gpt-4o', 'caption'),
       ]);
       expect(settings.llmActiveProviderId, explicit ? 'p1' : 'p2');
@@ -289,15 +311,16 @@ void main() {
       expect(settings.providerIdForScenario(LlmScenario.mathExplain), 'p1');
       expect(settings.modelForScenario(LlmScenario.mathExplain), 'gpt-4o-bad');
       expect(container.read(llmSelectionVersionProvider), 2);
-      expect(imageRequests, 1);
+      expect(imageRequests, 2);
       await service.discardDraft(draft);
       await HiveBoxes.close();
       await HiveBoxes.init();
       requests.clear();
       final next = await generate();
-      expect(next.readyCount, 1);
+      expect(next.readyCount, 2);
       expect(requests, [
         ('good.example.com', 'gpt-4o', 'plan'),
+        ('good.example.com', 'gpt-4o', 'caption'),
         ('good.example.com', 'gpt-4o', 'caption'),
       ]);
       expect(container.read(llmSelectionVersionProvider), 2);
@@ -312,7 +335,7 @@ void main() {
     );
     service = container.read(pictureStoryGenerationServiceProvider);
     final draft = await generate();
-    expect(draft.candidates.single.stage, PictureStoryGenerationStage.failed);
+    expect(draft.candidates.first.stage, PictureStoryGenerationStage.failed);
     expect(settings.llmActiveProviderId, 'p2');
     expect(settings.llmProviders.last.model, 'gpt-4o-mini');
     expect(container.read(llmSelectionVersionProvider), 1);
@@ -325,19 +348,36 @@ void main() {
 
   test('场景数量未通过校验不回写模型，也不发出图片请求', () async {
     invalidPlan = true;
-    await expectLater(generate(), throwsA(isA<FormatException>()));
+    await expectLater(generate(), throwsA(isA<LlmResponseFormatError>()));
     expect(settings.llmActiveProviderId, 'p1');
     expect(settings.llmProviders.last.model, 'gpt-4o-mini');
     expect(container.read(llmSelectionVersionProvider), 0);
     expect(imageRequests, 0);
   });
 
+  test('完整流中的题目结构无效也会回退，同一图片只生成一次且不回写坏模型', () async {
+    singleQuestion = true;
+    invalidFirstCaption = true;
+    final draft = await generate();
+    expect(draft.readyCount, 1);
+    expect(requests, [
+      ('bad.example.com', 'gpt-4o-bad', 'caption'),
+      ('good.example.com', 'gpt-4o-mini', 'caption'),
+      ('good.example.com', 'gpt-4o', 'caption'),
+    ]);
+    expect(imageRequests, 1);
+    expect(settings.llmActiveProviderId, 'p2');
+    expect(settings.llmProviders.last.model, 'gpt-4o');
+    expect(container.read(llmSelectionVersionProvider), 1);
+    expect(repository.catalogState().versions, isEmpty);
+  });
+
   test('看图内容未通过校验不覆盖之前已确认的场景规划模型', () async {
     changeCaptionModel = true;
     invalidCaption = true;
     final draft = await generate();
-    expect(draft.candidates.single.stage, PictureStoryGenerationStage.failed);
-    expect(draft.candidates.single.edit.image, isNotNull);
+    expect(draft.candidates.first.stage, PictureStoryGenerationStage.failed);
+    expect(draft.candidates.first.edit.image, isNotNull);
     expect(settings.llmActiveProviderId, 'p2');
     expect(settings.llmProviders.last.model, 'gpt-4o-mini');
     expect(container.read(llmSelectionVersionProvider), 1);
@@ -364,7 +404,7 @@ void main() {
     final draft = await service.createDraft(
       PictureStoryGenerationOptions(
         level: PictureStoryLevel.starter,
-        count: 1,
+        count: 2,
         themes: ['友爱互助'],
       ),
     );

@@ -15,6 +15,7 @@ import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/image_generation_client.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
+import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_generation_service.dart';
@@ -42,15 +43,17 @@ const _imageProvider = ImageGenerationProviderConfig(
   baseUrl: 'https://image.example.com/v1',
   model: 'image-model',
 );
-const _imageConfig =
-    ImageGenerationConfig(provider: _imageProvider, apiKey: 'test-image-key');
+const _imageConfig = ImageGenerationConfig(
+  provider: _imageProvider,
+  apiKey: 'test-image-key',
+);
 
 http.Response _completion(
   Object content, {
   bool sse = false,
   bool complete = true,
 }) {
-  final text = jsonEncode(content);
+  final text = content is String ? content : jsonEncode(content);
   if (sse) {
     final midpoint = text.length ~/ 2;
     final events = [
@@ -173,6 +176,7 @@ void main() {
   var failCaption = 0;
   var incompleteSseCaptions = false;
   int? captionStatus;
+  String? captionLimitNotice;
   String? plannedImagePrompt;
   final captionRequests = <Map<String, dynamic>>[];
   final planRequests = <Map<String, dynamic>>[];
@@ -201,21 +205,19 @@ void main() {
               planCalls++;
               requestOrder.add('规划');
               final saved = service.readDraft('default')!;
-              return _completion(
-                [
-                  for (var i = 0; i < saved.options.count; i++)
-                    {
-                      'imagePrompt': plannedImagePrompt ?? '场景 $i：公园里的孩子观察花朵。',
-                    },
-                ],
-                sse: sse,
-              );
+              return _completion([
+                for (var i = 0; i < saved.options.count; i++)
+                  {'imagePrompt': plannedImagePrompt ?? '场景 $i：公园里的孩子观察花朵。'},
+              ], sse: sse);
             }
             captionCalls++;
             requestOrder.add('看图 $captionCalls');
             captionRequests.add(body);
             if (captionStatus != null) {
               return http.Response('private provider response', captionStatus!);
+            }
+            if (captionLimitNotice != null) {
+              return _completion(captionLimitNotice!, sse: sse);
             }
             if (captionCalls == failCaption) {
               return _completion({'title': '不完整内容'}, sse: sse);
@@ -258,6 +260,7 @@ void main() {
 
   Future<PictureStoryGenerationDraft> start({
     int count = 3,
+    LlmConfig config = _llm,
     String? imagePromptOverride,
     String? questionPromptOverride,
   }) async {
@@ -270,7 +273,7 @@ void main() {
     );
     await service.run(
       draft: draft,
-      config: _llm,
+      config: config,
       imageConfig: _imageConfig,
       isActive: () => true,
       imagePromptOverride: imagePromptOverride,
@@ -283,8 +286,9 @@ void main() {
     ProfileScope.reset();
     await setUpHiveForTesting();
     await unlockParentForTesting();
-    directory =
-        await Directory.systemTemp.createTemp('picture_story_generation_');
+    directory = await Directory.systemTemp.createTemp(
+      'picture_story_generation_',
+    );
     png = await pictureStoryPng(width: 640, height: 480);
     images = PictureStoryImageService(directoryProvider: () async => directory);
     repository = PictureStoryRepository(images: images);
@@ -295,6 +299,7 @@ void main() {
     failCaption = 0;
     incompleteSseCaptions = false;
     captionStatus = null;
+    captionLimitNotice = null;
     plannedImagePrompt = null;
     captionRequests.clear();
     planRequests.clear();
@@ -316,8 +321,9 @@ void main() {
       prompt: pictureStoryFixture(image: oldImage),
       profileId: 'default',
     );
-    final paused =
-        _PausedGeneratedImages(directoryProvider: () async => directory);
+    final paused = _PausedGeneratedImages(
+      directoryProvider: () async => directory,
+    );
     service = createService(imageService: paused);
     final generating = start(count: 1);
     await paused.stored.future;
@@ -337,15 +343,61 @@ void main() {
     expect(captionCalls, 1);
   });
 
+  test('单题直接按原要求生图，只消耗一次看图请求，检查点及图片完整保留', () async {
+    service = createService(sse: true);
+    final options = PictureStoryGenerationOptions(
+      level: PictureStoryLevel.growing,
+      count: 1,
+      themes: PictureStoryGenerationOptions.availableThemes,
+      requirements: '补' * 1000,
+    );
+    final draft = await service.createDraft(options);
+    await service.run(
+      draft: draft,
+      config: _llm,
+      imageConfig: _imageConfig,
+      isActive: () => true,
+      imagePromptOverride: '图' * kPictureStoryImagePromptMaxLength,
+      questionPromptOverride: '从画面中的动作提问',
+      onPlanningAttempt: (_) => fail('单题不应请求场景规划'),
+    );
+    final saved = service.readDraft('default')!;
+    expect(saved.readyCount, 1);
+    expect(saved.options.toJson(), options.toJson());
+    expect(requestOrder, ['生图 1', '看图 1']);
+    expect(planCalls, 0);
+    final prompt = imageRequests.single['prompt'] as String;
+    expect(prompt, startsWith('图' * kPictureStoryImagePromptMaxLength));
+    expect(prompt, contains('主题：${options.themes.join('、')}'));
+    expect(prompt, contains('难度：${options.level.label}'));
+    expect(prompt, endsWith(options.requirements));
+    expect(prompt.runes.length, lessThanOrEqualTo(4000));
+    final candidate = saved.candidates.single;
+    expect(prompt, endsWith(candidate.imagePrompt));
+    final messages = captionRequests.single['messages'] as List;
+    expect(messages.first['content'], startsWith('从画面中的动作提问'));
+    final parts = messages.last['content'] as List;
+    final url = parts.last['image_url']['url'] as String;
+    expect(
+      base64Decode(url.split(',').last),
+      await images.readForVision(candidate.edit.image!.value),
+    );
+    expect(jsonEncode(messages), isNot(contains(options.requirements)));
+    expect(candidate.edit.toPrompt().questions, ['你看到了什么？', '想象孩子接下来会做什么？']);
+    expect(repository.catalogState().versions, isEmpty);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 1);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
+  });
+
   test('SSE 规划与逐题看图出题保留完整题图、内容和生成顺序', () async {
     service = createService(sse: true);
     final draft = await start(count: 2);
     expect(requestOrder, ['规划', '生图 1', '看图 1', '生图 2', '看图 2']);
     expect(draft.readyCount, 2);
-    expect(
-      draft.candidates.map((c) => c.edit.toPrompt().title),
-      ['观察花朵 1', '观察花朵 2'],
-    );
+    expect(draft.candidates.map((c) => c.edit.toPrompt().title), [
+      '观察花朵 1',
+      '观察花朵 2',
+    ]);
     expect(planRequests.single['stream'], isTrue);
     for (final (index, request) in captionRequests.indexed) {
       expect(request['stream'], isTrue);
@@ -393,12 +445,12 @@ void main() {
     expect(draft.candidates.single.edit.image, image);
     expect(draft.candidates.single.edit.toPrompt().title, '观察花朵 2');
     expect(await images.readImage(image.value), stored);
-    expect(requestOrder, ['规划', '生图 1', '看图 1', '看图 2']);
-    expect(planCalls, 1);
+    expect(requestOrder, ['生图 1', '看图 1', '看图 2']);
+    expect(planCalls, 0);
     expect(imageCalls, 1);
     expect(imageClients, 1);
     expect(captionCalls, 2);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
     expect(repository.catalogState().versions, isEmpty);
   });
@@ -445,17 +497,17 @@ void main() {
   test('生图提示词和规划场景均达长度上限时仍可实际请求，出题提示独立生效', () async {
     plannedImagePrompt = '场' * kPictureStorySceneDescriptionMaxLength;
     final draft = await start(
-      count: 1,
+      count: 2,
       imagePromptOverride: '图' * kPictureStoryImagePromptMaxLength,
       questionPromptOverride: '题' * kPictureStoryQuestionPromptMaxLength,
     );
-    expect(draft.readyCount, 1);
-    expect(requestOrder, ['规划', '生图 1', '看图 1']);
-    final prompt = imageRequests.single['prompt'] as String;
+    expect(draft.readyCount, 2);
+    expect(requestOrder, ['规划', '生图 1', '看图 1', '生图 2', '看图 2']);
+    final prompt = imageRequests.first['prompt'] as String;
     expect(prompt.runes.length, lessThanOrEqualTo(4000));
     expect(prompt, endsWith(plannedImagePrompt!));
-    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 2);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
   });
 
   test('生图提示词超长在规划及计费请求前拒绝，保留草稿', () async {
@@ -487,13 +539,85 @@ void main() {
 
   test('规划场景超长不进入生图，保留草稿且不使用图片额度', () async {
     plannedImagePrompt = '场' * (kPictureStorySceneDescriptionMaxLength + 1);
-    await expectLater(start(count: 1), throwsFormatException);
+    await expectLater(start(count: 2), throwsA(isA<LlmResponseFormatError>()));
     expect(requestOrder, ['规划']);
     expect(service.readDraft('default')!.candidates, isEmpty);
     expect(imageCalls, 0);
     expect(captionCalls, 0);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 0);
   });
+
+  for (final status in [200, 429]) {
+    test('全部看图模型限额后停止后续生图，恢复后可复用原图重试：HTTP $status', () async {
+      const config = LlmConfig(
+        baseUrl: 'https://llm.example.com',
+        apiKey: 'test-text-key',
+        model: 'gpt-4o-mini',
+        models: ['gpt-4o-mini', 'gpt-4o'],
+      );
+      if (status == 200) {
+        captionLimitNotice =
+            "You've used your daily chat limit. Please try again later.";
+      } else {
+        captionStatus = status;
+      }
+      service = createService(sse: true);
+      final draft = await start(config: config);
+      expect(requestOrder, ['规划', '生图 1', '看图 1', '看图 2']);
+      expect(captionRequests.map((request) => request['model']).toList(), [
+        'gpt-4o-mini',
+        'gpt-4o',
+      ]);
+      expect(imageCalls, 1);
+      expect(draft.candidates.map((candidate) => candidate.stage).toList(), [
+        PictureStoryGenerationStage.failed,
+        PictureStoryGenerationStage.planned,
+        PictureStoryGenerationStage.planned,
+      ]);
+      final failed = draft.candidates.first;
+      expect(failed.error, '看图模型额度已用尽或请求受限，请切换模型或稍后保留图片重试');
+      final image = failed.edit.image!;
+      final stored = await images.readImage(image.value);
+      expect(
+        draft.candidates.skip(1).map((candidate) => candidate.edit.image),
+        [null, null],
+      );
+      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
+      expect(
+        CloudUsageService.instance.used(CloudUsageKind.imageGeneration),
+        1,
+      );
+
+      captionLimitNotice = null;
+      captionStatus = null;
+      await service.run(
+        draft: draft,
+        config: config,
+        imageConfig: _imageConfig,
+        isActive: () => true,
+        candidateId: failed.id,
+        reuseImageId: image.value,
+      );
+      final retried = service.readDraft('default')!;
+      expect(retried.readyCount, 1);
+      expect(retried.candidates.first.edit.image, image);
+      expect(retried.candidates.first.edit.toPrompt().title, '观察花朵 3');
+      expect(await images.readImage(image.value), stored);
+      expect(imageCalls, 1);
+      expect(planCalls, 1);
+      expect(captionCalls, 3);
+      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 4);
+      expect(
+        CloudUsageService.instance.used(CloudUsageKind.imageGeneration),
+        1,
+      );
+      expect(retried.candidates.skip(1).map((candidate) => candidate.stage), [
+        PictureStoryGenerationStage.planned,
+        PictureStoryGenerationStage.planned,
+      ]);
+      expect(repository.catalogState().versions, isEmpty);
+    });
+  }
 
   test('先生成实图再看图出题，批量草稿可重读且确认前目录零变化', () async {
     final draft = await start();
@@ -513,21 +637,20 @@ void main() {
       expect(prompt, contains('平面手绘儿童教材插图'));
       expect(prompt, contains('正在做什么、与谁或什么物体互动'));
       expect(prompt, contains('不拼图、不分镜'));
-      expect(
-        prompt,
-        endsWith('具体场景：\n场景 $i：公园里的孩子观察花朵。'),
-      );
+      expect(prompt, endsWith('具体场景：\n场景 $i：公园里的孩子观察花朵。'));
     }
     expect(draft.candidates.map((c) => c.id).toSet().length, 3);
     expect(repository.catalogState().versions, isEmpty);
     expect(
-      HiveBoxes.settings
-          .containsKey(PictureStoryRepository.enabledKeyFor('default')),
+      HiveBoxes.settings.containsKey(
+        PictureStoryRepository.enabledKeyFor('default'),
+      ),
       isFalse,
     );
     expect(
-      draft.candidates
-          .every((c) => c.edit.original == null && c.edit.image!.isLocal),
+      draft.candidates.every(
+        (c) => c.edit.original == null && c.edit.image!.isLocal,
+      ),
       isTrue,
     );
     for (final request in captionRequests) {
@@ -584,7 +707,7 @@ void main() {
     png = await pictureStoryNoisePng();
     failCaption = 1;
     var draft = await start(count: 1);
-    expect(planCalls, 1);
+    expect(planCalls, 0);
     expect(imageCalls, 1);
     expect(captionCalls, 1);
     final failed = draft.candidates.single;
@@ -604,7 +727,7 @@ void main() {
     );
     draft = service.readDraft('default')!;
     expect(draft.readyCount, 1);
-    expect(planCalls, 1);
+    expect(planCalls, 0);
     expect(imageCalls, 1);
     expect(captionCalls, 2);
     expect(imageClients, 1);
@@ -615,7 +738,7 @@ void main() {
     expect(completed.edit.toPrompt().title, '观察花朵 2');
     expect(completed.edit.toPrompt().questions, ['你看到了什么？', '想象孩子接下来会做什么？']);
     expect(await images.readImage(image.value), stored);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
     expect(repository.catalogState().versions, isEmpty);
   });
@@ -639,7 +762,7 @@ void main() {
     draft = service.readDraft('default')!;
     expect(draft.readyCount, 1);
     expect(draft.candidates.single.edit.image, failed.edit.image);
-    expect(planCalls, 1);
+    expect(planCalls, 0);
     expect(imageCalls, 1);
     expect(captionCalls, 2);
     expect(imageClients, 1);
@@ -647,8 +770,9 @@ void main() {
 
   test('重试出题的图片缺失或已被替换时零请求失败，不新建图片', () async {
     final expected = await images.importBytes(await pictureStoryPng());
-    final replacement =
-        await images.importBytes(await pictureStoryPng(width: 5));
+    final replacement = await images.importBytes(
+      await pictureStoryPng(width: 5),
+    );
     for (final currentImage in [null, replacement]) {
       final draft = await service.createDraft(
         PictureStoryGenerationOptions(
@@ -891,8 +1015,10 @@ void main() {
     expect(enabled, isNot(contains(draft.candidates[1].id)));
     expect(repository.enabledByProfile(), isNot(contains('child-b')));
     // 模拟提交成功但清理快照失败，读取者见到旧草稿。
-    await HiveBoxes.settings
-        .put(PictureStoryGenerationService.keyFor('default'), snapshot);
+    await HiveBoxes.settings.put(
+      PictureStoryGenerationService.keyFor('default'),
+      snapshot,
+    );
     expect(await service.publish(draft, check: () {}), 2);
     expect(repository.catalogState().versions.length, 2);
     expect(service.readDraft('default')!.candidates[1].isReady, isTrue);
@@ -922,8 +1048,9 @@ void main() {
       isFalse,
     );
     expect(
-      HiveBoxes.settings
-          .containsKey(PictureStoryRepository.enabledKeyFor('default')),
+      HiveBoxes.settings.containsKey(
+        PictureStoryRepository.enabledKeyFor('default'),
+      ),
       isFalse,
     );
     expect(service.readDraft('default')!.readyCount, 2);
@@ -952,8 +1079,9 @@ void main() {
           for (var i = 11; i < 13; i++)
             pictureStoryFixture(
               id: 'local-new-$i',
-              image:
-                  PictureStoryImage.local(i.toRadixString(16).padLeft(64, '0')),
+              image: PictureStoryImage.local(
+                i.toRadixString(16).padLeft(64, '0'),
+              ),
             ),
         ],
         profileId: 'default',
@@ -964,8 +1092,9 @@ void main() {
     );
     expect(HiveBoxes.settings.get(PictureStoryRepository.catalogKey), raw);
     expect(
-      HiveBoxes.settings
-          .containsKey(PictureStoryRepository.enabledKeyFor('default')),
+      HiveBoxes.settings.containsKey(
+        PictureStoryRepository.enabledKeyFor('default'),
+      ),
       isFalse,
     );
     expect(budgetImages.reads, 0);
@@ -985,17 +1114,22 @@ void main() {
       model: _llm.model,
       apiKey: '',
     );
-    await HiveBoxes.settings
-        .put(LlmScenario.pictureStory.settingsKey, 'text-provider');
+    await HiveBoxes.settings.put(
+      LlmScenario.pictureStory.settingsKey,
+      'text-provider',
+    );
     await HiveBoxes.settings.put(LlmScenario.pictureStory.modelKey, _llm.model);
     await HiveBoxes.settings.put('cloud_daily_limit_image', 7);
     final draft = await start(count: 2);
     await service.setSelected(draft, draft.candidates.last.id, false);
     await service.publish(service.readDraft('default')!, check: () {});
-    final source =
-        BackupService(secureStore: secrets, pictureStoryImages: images);
-    final text =
-        await source.exportToJson(passphrase: 'test-backup-passphrase');
+    final source = BackupService(
+      secureStore: secrets,
+      pictureStoryImages: images,
+    );
+    final text = await source.exportToJson(
+      passphrase: 'test-backup-passphrase',
+    );
     expect(text, isNot(contains('image-backup-secret')));
     expect(text, isNot(contains(draft.id)));
     final data = jsonDecode(text) as Map<String, dynamic>;
@@ -1008,16 +1142,20 @@ void main() {
     final catalog = repository.catalogState().toJson();
     final enabled = repository.enabledByProfile();
     final usage = CloudUsageService.exportCounts();
-    final destination = await Directory.systemTemp
-        .createTemp('picture_story_generation_restored_');
+    final destination = await Directory.systemTemp.createTemp(
+      'picture_story_generation_restored_',
+    );
     addTearDown(() => destination.delete(recursive: true));
     await HiveBoxes.settings.clear();
     await unlockParentForTesting();
     secrets.key = null;
-    final restoredImages =
-        PictureStoryImageService(directoryProvider: () async => destination);
-    final restored =
-        BackupService(secureStore: secrets, pictureStoryImages: restoredImages);
+    final restoredImages = PictureStoryImageService(
+      directoryProvider: () async => destination,
+    );
+    final restored = BackupService(
+      secureStore: secrets,
+      pictureStoryImages: restoredImages,
+    );
     expect(
       BackupService.detectLlmEndpointChanges(text)!.added,
       contains('image.example.com'),

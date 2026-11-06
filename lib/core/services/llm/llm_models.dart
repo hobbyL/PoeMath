@@ -95,6 +95,12 @@ class LlmServerError extends LlmException {
   const LlmServerError(super.message, {super.retryable = true});
 }
 
+/// 上游额度用尽或限流；可能通过 HTTP 429，也可能被包装为成功文本。
+class LlmRateLimitError extends LlmException {
+  const LlmRateLimitError()
+    : super('模型服务额度已用尽或请求受限，请切换模型或稍后重试', retryable: true);
+}
+
 /// 响应格式错误（JSON 解析失败、结构非法）。
 class LlmResponseFormatError extends LlmException {
   const LlmResponseFormatError(super.message, {super.retryable = true});

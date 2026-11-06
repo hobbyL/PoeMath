@@ -13,6 +13,7 @@ import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_models.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/image_generation_config.dart';
@@ -46,7 +47,8 @@ class _GenerationRun {
   }
 }
 
-/// 每个孩子独立暂存。按“场景规划 → 图片 → 基于实际画面出题”串行执行。
+/// 每个孩子独立暂存。单题直接按要求生图；多题先规划不同场景。
+/// 图片保存后再基于实际画面出题。
 /// 候选与单次请求双重归属校验，迟到结果只能更新原草稿，不能自动发布。
 class PictureStoryGenerationService {
   PictureStoryGenerationService({
@@ -57,14 +59,15 @@ class PictureStoryGenerationService {
     LlmClient Function(bool Function() isActive)? llmFactory,
     ImageGenerationClient Function(bool Function() isActive)? imageFactory,
     void Function()? authorize,
-  })  : _settingsOverride = settings,
-        _images = images ?? PictureStoryImageService.instance,
-        _repositoryOverride = repository,
-        _backupOverride = backup,
-        _llmFactory = llmFactory ?? ((active) => LlmClient(isActive: active)),
-        _imageFactory = imageFactory ??
-            ((active) => ImageGenerationClient(isActive: active)),
-        _authorize = authorize ?? ParentAccessService.instance.assertAllowed;
+  }) : _settingsOverride = settings,
+       _images = images ?? PictureStoryImageService.instance,
+       _repositoryOverride = repository,
+       _backupOverride = backup,
+       _llmFactory = llmFactory ?? ((active) => LlmClient(isActive: active)),
+       _imageFactory =
+           imageFactory ??
+           ((active) => ImageGenerationClient(isActive: active)),
+       _authorize = authorize ?? ParentAccessService.instance.assertAllowed;
 
   static const draftSuffix = PictureStoryGenerationDraft.storageSuffix;
   static Future<void> _operations = Future<void>.value();
@@ -152,27 +155,26 @@ class PictureStoryGenerationService {
     PictureStoryGenerationCandidate candidate, {
     required String expectedRequest,
     void Function()? check,
-  }) =>
-      _serial(() async {
-        check?.call();
-        final saved = readDraft(owner.profileId);
-        if (saved == null || saved.id != owner.id) return false;
-        final index = saved.candidates.indexWhere((c) => c.id == candidate.id);
-        if (index < 0 ||
-            saved.candidates[index].requestId != expectedRequest ||
-            saved.candidates[index].stage ==
-                PictureStoryGenerationStage.published) {
-          return false;
-        }
-        final items = [...saved.candidates];
-        // 保留独立的家长勾选，异步结果不把选择恢复成请求开始时的值。
-        items[index] = candidate.copyWith(selected: items[index].selected);
-        await _settings.put(
-          keyFor(owner.profileId),
-          saved.copyWith(items).encode(),
-        );
-        return true;
-      });
+  }) => _serial(() async {
+    check?.call();
+    final saved = readDraft(owner.profileId);
+    if (saved == null || saved.id != owner.id) return false;
+    final index = saved.candidates.indexWhere((c) => c.id == candidate.id);
+    if (index < 0 ||
+        saved.candidates[index].requestId != expectedRequest ||
+        saved.candidates[index].stage ==
+            PictureStoryGenerationStage.published) {
+      return false;
+    }
+    final items = [...saved.candidates];
+    // 保留独立的家长勾选，异步结果不把选择恢复成请求开始时的值。
+    items[index] = candidate.copyWith(selected: items[index].selected);
+    await _settings.put(
+      keyFor(owner.profileId),
+      saved.copyWith(items).encode(),
+    );
+    return true;
+  });
 
   Future<void> run({
     required PictureStoryGenerationDraft draft,
@@ -209,8 +211,9 @@ class PictureStoryGenerationService {
       throw const FormatException('看图出题提示词过长，请缩短后重试');
     }
     final planningPrompt = buildPictureStoryPlanningPrompt(imagePromptOverride);
-    final questionPrompt =
-        buildPictureStoryQuestionPrompt(questionPromptOverride);
+    final questionPrompt = buildPictureStoryQuestionPrompt(
+      questionPromptOverride,
+    );
     late final _GenerationRun run;
     String? currentCandidate;
     String? currentRequest;
@@ -291,8 +294,10 @@ class PictureStoryGenerationService {
           continue;
         }
         check();
-        var item =
-            original.copyWith(requestId: _id('request'), clearError: true);
+        var item = original.copyWith(
+          requestId: _id('request'),
+          clearError: true,
+        );
         if (regenerateImage) {
           item = item.copyWith(
             edit: PictureStoryEditorDraft.create(
@@ -322,27 +327,30 @@ class PictureStoryGenerationService {
                 promptOverride: imagePromptOverride,
               ),
             );
-            await CacheActivity.use(TemporaryCacheKind.pictureStoryImages,
-                () async {
-              final image = await _images.importBytes(bytes);
-              item = item.copyWith(
-                edit: item.edit.copyWith(image: image),
-                stage: PictureStoryGenerationStage.imageReady,
-              );
-              // 租约持续到引用落盘，清理不能插入图片发布与草稿保存之间。
-              if (!await _update(
-                saved,
-                item,
-                expectedRequest: item.requestId,
-              )) {
-                throw const ImageGenerationCancelled();
-              }
-            });
+            await CacheActivity.use(
+              TemporaryCacheKind.pictureStoryImages,
+              () async {
+                final image = await _images.importBytes(bytes);
+                item = item.copyWith(
+                  edit: item.edit.copyWith(image: image),
+                  stage: PictureStoryGenerationStage.imageReady,
+                );
+                // 租约持续到引用落盘，清理不能插入图片发布与草稿保存之间。
+                if (!await _update(
+                  saved,
+                  item,
+                  expectedRequest: item.requestId,
+                )) {
+                  throw const ImageGenerationCancelled();
+                }
+              },
+            );
             changed();
           }
           check();
-          item =
-              item.copyWith(stage: PictureStoryGenerationStage.generatingText);
+          item = item.copyWith(
+            stage: PictureStoryGenerationStage.generatingText,
+          );
           await _update(saved, item, expectedRequest: item.requestId);
           changed();
           final edit = await _describe(
@@ -365,11 +373,17 @@ class PictureStoryGenerationService {
           changed();
         } on Object catch (error) {
           final stopped = !active();
+          if (!stopped) {
+            AppLogger.w(
+              '生成未完成：${item.stage.name}，${error.runtimeType}',
+              tag: 'PictureStory',
+            );
+          }
           item = item.copyWith(
             stage: stopped
                 ? (item.edit.image == null
-                    ? PictureStoryGenerationStage.planned
-                    : PictureStoryGenerationStage.imageReady)
+                      ? PictureStoryGenerationStage.planned
+                      : PictureStoryGenerationStage.imageReady)
                 : PictureStoryGenerationStage.failed,
             error: stopped ? '生成已暂停，可继续未完成的步骤' : _message(error),
           );
@@ -379,6 +393,7 @@ class PictureStoryGenerationService {
           // 本机额度和服务限流不应继续消耗其余题的请求。
           if (error is CloudQuotaExceededException ||
               error is ImageGenerationException ||
+              error is LlmRateLimitError ||
               error is LlmAuthError) {
             break;
           }
@@ -410,6 +425,21 @@ class PictureStoryGenerationService {
     void Function(int attempt)? onAttempt,
     void Function(String signature)? onSelectionSaved,
   }) async {
+    // 单题无需跨题去重，生图模型可以直接理解主题和补充要求。
+    // 保存同样的候选检查点，后续暂停、重试、看图和家长确认保持一致。
+    if (draft.options.count == 1) {
+      return [
+        _candidateFor(
+          draft,
+          '请构思并绘制一个符合以下要求的儿童单图场景。\n'
+          '难度：${draft.options.level.label}\n'
+          '主题：${draft.options.themes.join('、')}\n'
+          '补充要求：${draft.options.requirements}',
+        ),
+      ];
+    }
+    final timer = Stopwatch()..start();
+    late List<PictureStoryGenerationCandidate> items;
     final response = await client.chatComplete(
       config: config,
       systemPrompt: systemPrompt,
@@ -417,7 +447,8 @@ class PictureStoryGenerationService {
       messages: [
         ChatMessage(
           role: ChatRole.user,
-          content: '难度：${draft.options.level.label}\n'
+          content:
+              '难度：${draft.options.level.label}\n'
               '主题：${draft.options.themes.join('、')}\n'
               '补充要求：${draft.options.requirements}\n'
               '严格生成 ${draft.options.count} 个不同的单图场景。',
@@ -425,12 +456,18 @@ class PictureStoryGenerationService {
       ],
       maxTokens: 3000,
       onAttempt: onAttempt,
+      validate: (response) {
+        final data = _json(response.content);
+        if (data is! List || data.length != draft.options.count) {
+          throw const FormatException('场景规划数量不完整，请重新生成');
+        }
+        items = [for (final value in data) _plannedCandidate(value, draft)];
+      },
     );
-    final data = _json(response.content);
-    if (data is! List || data.length != draft.options.count) {
-      throw const FormatException('场景规划数量不完整，请重新生成');
-    }
-    final items = [for (final value in data) _plannedCandidate(value, draft)];
+    AppLogger.d(
+      '场景规划完成：${timer.elapsedMilliseconds}ms，${items.length} 道',
+      tag: 'PictureStory',
+    );
     await client.acceptCompletion(response, onSelectionSaved: onSelectionSaved);
     return items;
   }
@@ -446,15 +483,20 @@ class PictureStoryGenerationService {
             kPictureStorySceneDescriptionMaxLength) {
       throw const FormatException('场景规划内容无效，请重新生成');
     }
-    return PictureStoryGenerationCandidate(
-      edit: PictureStoryEditorDraft.create(
-        id: _id('local'),
-        profileId: draft.profileId,
-      ).copyWith(level: draft.options.level),
-      imagePrompt: (value['imagePrompt'] as String).trim(),
-      requestId: _id('request'),
-    );
+    return _candidateFor(draft, (value['imagePrompt'] as String).trim());
   }
+
+  static PictureStoryGenerationCandidate _candidateFor(
+    PictureStoryGenerationDraft draft,
+    String imagePrompt,
+  ) => PictureStoryGenerationCandidate(
+    edit: PictureStoryEditorDraft.create(
+      id: _id('local'),
+      profileId: draft.profileId,
+    ).copyWith(level: draft.options.level),
+    imagePrompt: imagePrompt,
+    requestId: _id('request'),
+  );
 
   Future<PictureStoryEditorDraft> _describe(
     PictureStoryGenerationCandidate item,
@@ -464,9 +506,17 @@ class PictureStoryGenerationService {
     String systemPrompt, {
     void Function(String signature)? onSelectionSaved,
   }) async {
+    final timer = Stopwatch()..start();
     final bytes = await _images.readForVision(item.edit.image!.value);
-    final text = '观察这张实际图片，为${level.label}难度编写看图说话练习。'
+    AppLogger.d(
+      '看图上传准备：${timer.elapsedMilliseconds}ms，${bytes.length} bytes',
+      tag: 'PictureStory',
+    );
+    timer.reset();
+    final text =
+        '观察这张实际图片，为${level.label}难度编写看图说话练习。'
         '不要以原始生图描述作为画面事实。';
+    late PictureStoryEditorDraft edit;
     final response = await client.chatComplete(
       config: config,
       requiresVision: true,
@@ -488,8 +538,21 @@ class PictureStoryGenerationService {
         ),
       ],
       maxTokens: 3000,
+      validate: (response) {
+        edit = _parseDescription(item, level, response.content);
+      },
     );
-    final value = _json(response.content);
+    AppLogger.d('看图出题响应：${timer.elapsedMilliseconds}ms', tag: 'PictureStory');
+    await client.acceptCompletion(response, onSelectionSaved: onSelectionSaved);
+    return edit;
+  }
+
+  static PictureStoryEditorDraft _parseDescription(
+    PictureStoryGenerationCandidate item,
+    PictureStoryLevel level,
+    String? content,
+  ) {
+    final value = _json(content);
     if (value is! Map) throw const FormatException('看图出题内容无效');
     String string(String key, {bool optional = false}) {
       final raw = value[key];
@@ -531,7 +594,8 @@ class PictureStoryGenerationService {
       image: prompt.image,
       fields: populated.fields,
     );
-    await client.acceptCompletion(response, onSelectionSaved: onSelectionSaved);
+    // 编辑器按换行保存列表，连同最终落盘结构一起校验后才接受模型。
+    edit.toPrompt();
     return edit;
   }
 
@@ -565,8 +629,7 @@ class PictureStoryGenerationService {
     final revision = ProfileScope.revision;
     _checkScope(draft.profileId, revision);
     if (isRunning(draft.profileId)) throw const FormatException('请先暂停生成再编辑');
-    final item = readDraft(draft.profileId)
-        ?.candidates
+    final item = readDraft(draft.profileId)?.candidates
         .where((c) => c.id == id)
         .firstOrNull;
     if (item == null ||
@@ -669,8 +732,9 @@ class PictureStoryGenerationService {
                   )
                 : c,
         ];
-        if (items
-            .every((c) => c.stage == PictureStoryGenerationStage.published)) {
+        if (items.every(
+          (c) => c.stage == PictureStoryGenerationStage.published,
+        )) {
           await _settings.delete(keyFor(draft.profileId));
         } else {
           await _settings.put(
@@ -686,17 +750,15 @@ class PictureStoryGenerationService {
   }
 
   static String _message(Object error) => switch (error) {
-        ImageGenerationException() => error.message,
-        CloudQuotaExceededException() => error.message,
-        PictureStoryImageException() => error.message,
-        LlmAuthError() => '大模型访问失败，请检查密钥和模型权限',
-        LlmNetworkError() => '看图出题请求超时或网络不可用，可保留图片重试',
-        LlmServerError() => '看图模型服务请求失败，请检查服务或稍后重试',
-        LlmResponseFormatError(retryable: false) =>
-          '看图出题内容超出上传限制，请调整图片或补充要求后重试',
-        LlmResponseFormatError() ||
-        FormatException() =>
-          '看图出题内容不完整或格式不正确，可保留图片重试',
-        _ => '看图出题未完成，可重试或编辑已生成的图片',
-      };
+    ImageGenerationException() => error.message,
+    CloudQuotaExceededException() => error.message,
+    PictureStoryImageException() => error.message,
+    LlmAuthError() => '大模型访问失败，请检查密钥和模型权限',
+    LlmNetworkError() => '看图出题请求超时或网络不可用，可保留图片重试',
+    LlmRateLimitError() => '看图模型额度已用尽或请求受限，请切换模型或稍后保留图片重试',
+    LlmServerError() => '看图模型服务请求失败，请检查服务或稍后重试',
+    LlmResponseFormatError(retryable: false) => '看图出题内容超出上传限制，请调整图片或补充要求后重试',
+    LlmResponseFormatError() || FormatException() => '看图出题内容不完整或格式不正确，可保留图片重试',
+    _ => '看图出题未完成，可重试或编辑已生成的图片',
+  };
 }

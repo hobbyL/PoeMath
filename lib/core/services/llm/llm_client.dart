@@ -40,14 +40,14 @@ final class LlmClient {
     this._onModelSucceeded,
     this._onSelectionSucceeded,
     this._onCompletionAccepted,
-  })  : _usage = usage ?? CloudUsageService.instance,
-        _httpClient = BoundedHttpClient(
-          httpClient ?? http.Client(),
-          timeout: chatTimeout,
-          maxResponseBytes: _maxResponseBytes,
-        ),
-        _ownsHttpClient = httpClient == null,
-        _chatTimeout = chatTimeout;
+  }) : _usage = usage ?? CloudUsageService.instance,
+       _httpClient = BoundedHttpClient(
+         httpClient ?? http.Client(),
+         timeout: chatTimeout,
+         maxResponseBytes: _maxResponseBytes,
+       ),
+       _ownsHttpClient = httpClient == null,
+       _chatTimeout = chatTimeout;
 
   final BoundedHttpClient _httpClient;
   final CloudUsageService _usage;
@@ -57,14 +57,15 @@ final class LlmClient {
   final Duration _explainTimeout;
   final bool Function()? _isActive;
   final Future<void> Function(LlmConfig config, String model)?
-      _onModelSucceeded;
+  _onModelSucceeded;
   final Future<void> Function(LlmConfig request, LlmConfig successful)?
-      _onSelectionSucceeded;
+  _onSelectionSucceeded;
   final Future<void> Function(
     LlmConfig request,
     LlmConfig successful, {
     void Function(String signature)? onSelectionSaved,
-  })? _onCompletionAccepted;
+  })?
+  _onCompletionAccepted;
   final _completions =
       Expando<({LlmConfig request, LlmConfig provider, String model})>();
   bool _closed = false;
@@ -127,6 +128,7 @@ final class LlmClient {
     LlmException error,
   ) {
     if (!error.retryable && error is! LlmAuthError) throw error;
+    AppLogger.w('模型请求未通过：${error.runtimeType}', tag: 'LLM');
     _recordFailure(provider, model, error);
     _lastErrors[request] = error;
     // 401 是整家供应商的凭据失败；403 仍可能只限制当前模型。
@@ -167,6 +169,7 @@ final class LlmClient {
     bool reportSuccess = true,
     bool requiresVision = false,
     void Function(int attempt)? onAttempt,
+    void Function(T result)? validate,
   }) async {
     final attempts = _attemptsFor(config, requiresVision: requiresVision);
     var attempt = 0;
@@ -178,6 +181,18 @@ final class LlmClient {
       try {
         final result = await request(provider.withModel(model));
         _checkActive();
+        try {
+          validate?.call(result);
+        } on FormatException {
+          // 业务格式失败只属于这次题目；下一道题仍可重新尝试该模型。
+          // JSON 异常可能携带原始响应，只记录固定分类。
+          _lastErrors[config] = const LlmResponseFormatError('模型内容未通过格式校验');
+          if (_preferredModels[provider] == model) {
+            _preferredModels.remove(provider);
+          }
+          AppLogger.w('模型内容未通过格式校验', tag: 'LLM');
+          continue;
+        }
         _rememberSuccess(config, provider, model);
         if (result is ChatCompletion) {
           _completions[result] = (
@@ -292,8 +307,9 @@ final class LlmClient {
   /// 回环 IPv4 段（127.0.0.0/8）。必须四段点分数字：
   /// 简单的 `startsWith('127.')` 会放行 `127.evil.com` 这类公网子域名。
   /// 段值合法性（0-255）由 socket 层兜底。
-  static final RegExp _loopbackIpv4Pattern =
-      RegExp(r'^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$');
+  static final RegExp _loopbackIpv4Pattern = RegExp(
+    r'^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$',
+  );
 
   /// 本地回环 host：http 明文 Bearer 仅放行这些地址（Ollama 等本地服务）。
   ///
@@ -355,8 +371,13 @@ final class LlmClient {
       return const LlmBatchResult(drafts: <LlmWordProblemDraft>[]);
     }
     final base = normalizeBaseUrl(config.baseUrl);
-    final body =
-        _buildGenerationBody(config, skeletons, grade, semester, topic);
+    final body = _buildGenerationBody(
+      config,
+      skeletons,
+      grade,
+      semester,
+      topic,
+    );
 
     Object? lastFormatError;
     for (var attempt = 0; attempt <= _maxFormatRetries; attempt++) {
@@ -427,8 +448,9 @@ final class LlmClient {
               'index': i + 1,
               'relation': plans[i].relation.name,
               'sceneCandidates': [
-                for (final scene
-                    in WordProblemCatalog.forRelation(plans[i].relation))
+                for (final scene in WordProblemCatalog.forRelation(
+                  plans[i].relation,
+                ))
                   {
                     'sceneId': scene.id,
                     'object': scene.object,
@@ -443,13 +465,11 @@ final class LlmClient {
         'temperature': 0.8,
         'max_tokens': remaining.length * 100 + 400,
         'messages': [
-          {
-            'role': 'system',
-            'content': systemPrompt,
-          },
+          {'role': 'system', 'content': systemPrompt},
           {
             'role': 'user',
-            'content': '小学$grade年级$semester学期，$topic。'
+            'content':
+                '小学$grade年级$semester学期，$topic。'
                 '请逐题选择素材：${jsonEncode(remaining)}',
           },
         ],
@@ -484,8 +504,9 @@ final class LlmClient {
       checkActive();
       repair = attempt;
       try {
-        final decoded =
-            jsonDecode(_extractJsonArray(_extractAssistantContent(response)));
+        final decoded = jsonDecode(
+          _extractJsonArray(_extractAssistantContent(response)),
+        );
         if (decoded is! List<Object?>) throw const FormatException('素材不是数组');
         final choices = <int, LlmWordProblemSceneChoice>{};
         final seen = <int>{};
@@ -496,8 +517,8 @@ final class LlmClient {
           final index = rawIndex is int
               ? rawIndex
               : rawIndex is String
-                  ? int.tryParse(rawIndex)
-                  : null;
+              ? int.tryParse(rawIndex)
+              : null;
           if (index == null ||
               index < 1 ||
               index > plans.length ||
@@ -574,9 +595,7 @@ final class LlmClient {
       throw const LlmModelsUnavailable('API Key 无效或未授权');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw LlmModelsUnavailable(
-        '模型列表接口不可用（HTTP ${response.statusCode}）',
-      );
+      throw LlmModelsUnavailable('模型列表接口不可用（HTTP ${response.statusCode}）');
     }
 
     try {
@@ -584,33 +603,35 @@ final class LlmClient {
       if (decoded is Map<String, dynamic>) {
         final data = decoded['data'];
         if (data is List<Object?>) {
-          final models = data
-              .map(
-                (item) => item is Map<Object?, Object?>
-                    ? item['id']?.toString()
-                    : null,
-              )
-              .whereType<String>()
-              .where((id) => id.isNotEmpty)
-              .toList()
-            ..sort();
+          final models =
+              data
+                  .map(
+                    (item) => item is Map<Object?, Object?>
+                        ? item['id']?.toString()
+                        : null,
+                  )
+                  .whereType<String>()
+                  .where((id) => id.isNotEmpty)
+                  .toList()
+                ..sort();
           return models;
         }
       } else if (decoded is List<Object?>) {
         // 少数实现直接返回数组（如某些代理）。
         // 仅保留 Map 的 id 与 String 元素；数字/布尔等垃圾条目丢弃。
-        final models = decoded
-            .map(
-              (item) => item is Map<Object?, Object?>
-                  ? item['id']?.toString()
-                  : item is String
+        final models =
+            decoded
+                .map(
+                  (item) => item is Map<Object?, Object?>
+                      ? item['id']?.toString()
+                      : item is String
                       ? item
                       : null,
-            )
-            .whereType<String>()
-            .where((id) => id.isNotEmpty)
-            .toList()
-          ..sort();
+                )
+                .whereType<String>()
+                .where((id) => id.isNotEmpty)
+                .toList()
+              ..sort();
         return models;
       }
       throw const LlmResponseFormatError('模型列表返回数据格式无效');
@@ -651,16 +672,15 @@ final class LlmClient {
     required String systemPrompt,
     required String userPrompt,
     int maxTokens = 800,
-  }) =>
-      _withModels(
-        config,
-        (candidate) => _explain(
-          config: candidate,
-          systemPrompt: systemPrompt,
-          userPrompt: userPrompt,
-          maxTokens: maxTokens,
-        ),
-      );
+  }) => _withModels(
+    config,
+    (candidate) => _explain(
+      config: candidate,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      maxTokens: maxTokens,
+    ),
+  );
 
   Future<LlmExplainResult> _explain({
     required LlmConfig config,
@@ -704,16 +724,15 @@ final class LlmClient {
     required String systemPrompt,
     required String userPrompt,
     int maxTokens = 800,
-  }) =>
-      _streamWithModels(
-        config,
-        (candidate) => _explainStream(
-          config: candidate,
-          systemPrompt: systemPrompt,
-          userPrompt: userPrompt,
-          maxTokens: maxTokens,
-        ),
-      );
+  }) => _streamWithModels(
+    config,
+    (candidate) => _explainStream(
+      config: candidate,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      maxTokens: maxTokens,
+    ),
+  );
 
   Stream<String> _explainStream({
     required LlmConfig config,
@@ -747,9 +766,8 @@ final class LlmClient {
       response.stream
           .timeout(
             _explainTimeout,
-            onTimeout: (sink) => sink.addError(
-              TimeoutException('AI 讲解生成超时，请稍后重试'),
-            ),
+            onTimeout: (sink) =>
+                sink.addError(TimeoutException('AI 讲解生成超时，请稍后重试')),
           )
           .transform(utf8.decoder),
     );
@@ -797,16 +815,15 @@ final class LlmClient {
     required String systemPrompt,
     required List<ChatMessage> messages,
     int maxTokens = 1024,
-  }) =>
-      _streamWithModels(
-        config,
-        (candidate) => _chatStream(
-          config: candidate,
-          systemPrompt: systemPrompt,
-          messages: messages,
-          maxTokens: maxTokens,
-        ),
-      );
+  }) => _streamWithModels(
+    config,
+    (candidate) => _chatStream(
+      config: candidate,
+      systemPrompt: systemPrompt,
+      messages: messages,
+      maxTokens: maxTokens,
+    ),
+  );
 
   Stream<String> _chatStream({
     required LlmConfig config,
@@ -839,9 +856,8 @@ final class LlmClient {
       response.stream
           .timeout(
             _chatTimeout,
-            onTimeout: (sink) => sink.addError(
-              TimeoutException('AI 助手响应超时，请稍后重试'),
-            ),
+            onTimeout: (sink) =>
+                sink.addError(TimeoutException('AI 助手响应超时，请稍后重试')),
           )
           .transform(utf8.decoder),
     );
@@ -896,6 +912,8 @@ final class LlmClient {
   /// [stream] 用于完整文本生成：汇总 SSE 后返回完整结果，也接受普通 JSON
   /// 响应。流式文本没有对外逐片展示，可在失败时丢弃片段并尝试下一模型。
   /// 工具探测保留默认非流式方式；流式模式不接受 [tools]。
+  /// [validate] 在当前模型被记为成功前检查业务结构；格式错误会尝试下一候选。
+  /// 校验只应解析响应，不应保存数据或修改设置。
   Future<ChatCompletion> chatComplete({
     required LlmConfig config,
     required String systemPrompt,
@@ -906,23 +924,46 @@ final class LlmClient {
     bool requiresVision = false,
     bool stream = false,
     void Function(int attempt)? onAttempt,
+    void Function(ChatCompletion completion)? validate,
   }) => _withModels(
     config,
-    (candidate) => _chatComplete(
-      config: candidate,
-      systemPrompt: systemPrompt,
-      messages: messages,
-      tools: tools,
-      toolChoice: toolChoice,
-      maxTokens: maxTokens,
-      requiresVision: requiresVision,
-      stream: stream,
-    ),
+    (candidate) async {
+      final completion = await _chatComplete(
+        config: candidate,
+        systemPrompt: systemPrompt,
+        messages: messages,
+        tools: tools,
+        toolChoice: toolChoice,
+        maxTokens: maxTokens,
+        requiresVision: requiresVision,
+        stream: stream,
+      );
+      _checkActive();
+      _checkCompletionLimit(completion);
+      return completion;
+    },
     // 工具探测并非最终回答，只有后续流完整成功才持久化。
     reportSuccess: false,
     requiresVision: requiresVision,
     onAttempt: onAttempt,
+    validate: validate,
   );
+
+  static void _checkCompletionLimit(ChatCompletion completion) {
+    if (completion.toolCalls.isNotEmpty) return;
+    final text = (completion.content ?? '').trim().replaceAll(
+      RegExp(r'\s+'),
+      ' ',
+    );
+    // 实测兼容服务会用 HTTP 200 + stop 返回这段限额通知。
+    // 只匹配整段通知，题目或聊天中引用该句不应被误判。
+    if (RegExp(
+      r"^you['’]ve used your daily chat limit\.(?: please try again later\.)?$",
+      caseSensitive: false,
+    ).hasMatch(text)) {
+      throw const LlmRateLimitError();
+    }
+  }
 
   Future<ChatCompletion> _chatComplete({
     required LlmConfig config,
@@ -1098,9 +1139,7 @@ final class LlmClient {
       ..writeln('7. 所有数字用阿拉伯数字表示。')
       ..writeln()
       ..writeln('只输出严格 JSON 数组，不要输出任何其他文字：')
-      ..writeln(
-        '[{"index":1,"text":"题面","unit":"单位","explanation":"讲解"}]',
-      );
+      ..writeln('[{"index":1,"text":"题面","unit":"单位","explanation":"讲解"}]');
 
     final userPrompt = StringBuffer()
       ..writeln('年级：小学$grade年级$semester学期')
@@ -1197,6 +1236,7 @@ final class LlmClient {
         retryable: response.statusCode == 403,
       );
     }
+    if (response.statusCode == 429) throw const LlmRateLimitError();
     if (response.statusCode >= 500) {
       throw LlmServerError('LLM 服务暂时不可用（HTTP ${response.statusCode}）');
     }
@@ -1248,6 +1288,7 @@ final class LlmClient {
         retryable: response.statusCode == 403,
       );
     }
+    if (response.statusCode == 429) throw const LlmRateLimitError();
     if (response.statusCode >= 500) {
       throw LlmServerError('LLM 服务暂时不可用（HTTP ${response.statusCode}）');
     }
@@ -1277,8 +1318,9 @@ final class LlmClient {
     var bytes = 0;
     for (var i = starts.length - 1; i >= 0; i--) {
       final group = messages.sublist(starts[i], start);
-      final size =
-          utf8.encode(jsonEncode(group.map((m) => m.toJson()).toList())).length;
+      final size = utf8
+          .encode(jsonEncode(group.map((m) => m.toJson()).toList()))
+          .length;
       if (bytes + size > maxBytes ||
           messages.length - starts[i] > maxMessages) {
         if (start == messages.length) {

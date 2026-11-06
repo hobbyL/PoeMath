@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:poemath/core/services/bounded_http_client.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/models/image_generation_config.dart';
 
 class ImageGenerationException implements Exception {
@@ -86,8 +87,14 @@ class ImageGenerationClient {
     try {
       await _usage.reserve(CloudUsageKind.imageGeneration, check: _check);
       _check();
-      final response = await http.Response.fromStream(
-        await _http.sendBounded(request),
+      final timer = Stopwatch()..start();
+      final stream = await _http.sendBounded(request);
+      final headersMs = timer.elapsedMilliseconds;
+      final response = await http.Response.fromStream(stream);
+      AppLogger.d(
+        '生图响应：首包 ${headersMs}ms，完整接收 ${timer.elapsedMilliseconds}ms，'
+        '${response.bodyBytes.length} bytes',
+        tag: 'PictureStory',
       );
       _checkStatus(response.statusCode);
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
