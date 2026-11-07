@@ -344,7 +344,9 @@ void main() {
       prompt.id,
     );
     expect(HiveBoxes.pictureStoryPractice.length, 4);
-    expect(find.text('题目练习记录'), findsOneWidget);
+    expect(find.text('题目练习记录'), findsNothing);
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.byType(BackButton).hitTestable(), findsOneWidget);
     expect(find.text('已完成 2 次练习'), findsNothing);
     expect(find.text(prompt.reference), findsOneWidget);
     expect(find.text('题目与参考表达'), findsNothing);
@@ -681,10 +683,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(prompt.title), findsOneWidget);
       final image = tester.getRect(find.byType(PictureStoryImageView));
-      final card = tester.getRect(find.byType(ColoredCard).first);
-      expect(image.left, closeTo(card.left, 0.01));
-      expect(image.top, closeTo(card.top, 0.01));
-      expect(image.right, closeTo(card.right, 0.01));
+      expect(find.byType(AppBar), findsNothing);
+      expect(image.center.dx, closeTo(width / 2, 0.01));
+      expect(image.top, closeTo(0, 0.01));
+      expect(image.left, closeTo(0, 0.01));
+      expect(image.right, closeTo(width, 0.01));
+      expect(
+        tester
+            .widget<PictureStoryImageView>(find.byType(PictureStoryImageView))
+            .borderRadius,
+        BorderRadius.zero,
+      );
       await tester.runAsync(() async {
         for (var index = 0; index < 3; index++) {
           await repository.save(

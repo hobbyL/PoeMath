@@ -14,9 +14,14 @@ String pictureStoryHistoryDate(DateTime value) {
 
 /// 历史列表与单次详情展示同一份原题内容，保持图片贴边和顶部圆角。
 class PictureStoryHistoryPromptCard extends StatelessWidget {
-  const PictureStoryHistoryPromptCard({super.key, required this.prompt});
+  const PictureStoryHistoryPromptCard({
+    super.key,
+    required this.prompt,
+    this.showImage = true,
+  });
 
   final PictureStoryPrompt? prompt;
+  final bool showImage;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +36,7 @@ class PictureStoryHistoryPromptCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (original != null)
+          if (original != null && showImage)
             PictureStoryImageView(
               image: original.image,
               borderRadius: const BorderRadius.vertical(

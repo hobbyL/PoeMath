@@ -28,6 +28,9 @@ import 'package:poemath/features/chinese/expression/picture_story_history_page.d
 import 'package:poemath/features/chinese/expression/picture_story_record_detail_page.dart';
 import 'package:poemath/features/chinese/expression/picture_story_page.dart';
 import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
+import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 
 import '../test/helpers/hive_test_helper.dart';
 import '../test/helpers/parent_access_test_helper.dart';
@@ -223,7 +226,20 @@ void main() {
     expect(find.text(prompt.reference), findsOneWidget);
     expect(find.text('题目与参考表达'), findsNothing);
     expect(find.text('修改表达并重新点评'), findsNothing);
+    expect(find.byType(AppBar), findsNothing);
     await capturePage(capture, 'picture-story-history-native');
+    final historyBack = tester.getRect(find.byType(BackButton));
+    final historyImage = tester.getRect(find.byType(PictureStoryImageView));
+    final historyScroll = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    historyScroll.position.jumpTo(160);
+    await tester.pumpAndSettle();
+    final movedImage = tester.getRect(find.byType(PictureStoryImageView));
+    expect(historyImage.top - movedImage.top, greaterThan(0));
+    expect(historyImage.top - movedImage.top, lessThan(160));
+    expect(tester.getRect(find.byType(BackButton)), historyBack);
+    await capturePage(capture, 'picture-story-history-parallax-native');
     await tester.scrollUntilVisible(find.text('孩子放风筝。'), 250);
     await tester.pumpAndSettle();
     await tester.tap(find.text('孩子放风筝。'));
@@ -333,6 +349,18 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(prompt.title));
     await tester.pumpAndSettle();
+    expect(find.byType(AppBar), findsNothing);
+    final practiceBack = tester.getRect(find.byType(BackButton));
+    final practiceComplete = tester.getRect(find.byTooltip('完成练习'));
+    await capturePage(capture, 'picture-story-practice-native');
+    tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position
+        .jumpTo(160);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byType(BackButton)), practiceBack);
+    expect(tester.getRect(find.byTooltip('完成练习')), practiceComplete);
+    await capturePage(capture, 'picture-story-practice-parallax-native');
     await tester.tap(find.byTooltip('完成练习'));
     await tester.pumpAndSettle();
     expect(
@@ -350,6 +378,36 @@ void main() {
       hasLength(2),
     );
     await capturePage(capture, 'picture-story-completion-hint-native');
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.byType(PictureStoryPage), findsOneWidget);
+    final squareBytes = await pictureStoryPng(width: 200, height: 200);
+    final squareClosed =
+        Navigator.of(tester.element(find.byType(PictureStoryPage))).push<void>(
+          MaterialPageRoute(
+            builder: (_) => ProviderScope(
+              overrides: [
+                pictureStoryImageBytesProvider('square-native')
+                    .overrideWith((ref) async => squareBytes),
+              ],
+              child: const PictureStorySceneScaffold(
+                image: PictureStoryImage.local('square-native'),
+                semanticLabel: '正方形题图',
+                child: Text('正方形题图'),
+              ),
+            ),
+          ),
+        );
+    await tester.pumpAndSettle();
+    final square = tester.getRect(find.byType(Image));
+    final screen = tester.getRect(find.byType(Scaffold));
+    expect(square.left, screen.left);
+    expect(square.right, screen.right);
+    expect(square.width, square.height);
+    await capturePage(capture, 'picture-story-square-native');
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await squareClosed;
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     router.dispose();

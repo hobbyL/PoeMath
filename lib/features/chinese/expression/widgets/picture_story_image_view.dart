@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -25,6 +26,34 @@ class PictureStoryImageView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (!image.isLocal) {
+      if (fit == BoxFit.cover) {
+        return AspectRatio(
+          aspectRatio: 4 / 3,
+          child: ClipRRect(
+            borderRadius:
+                borderRadius ??
+                BorderRadius.circular(SpacingTokens.radiusMedium),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final scale = math.max(
+                  constraints.maxWidth / 4,
+                  constraints.maxHeight / 3,
+                );
+                return OverflowBox(
+                  minWidth: scale * 4,
+                  maxWidth: scale * 4,
+                  minHeight: scale * 3,
+                  maxHeight: scale * 3,
+                  child: PictureStoryIllustration(
+                    kind: image.value,
+                    borderRadius: BorderRadius.zero,
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      }
       return PictureStoryIllustration(
         kind: image.value,
         borderRadius: borderRadius,
@@ -39,7 +68,8 @@ class PictureStoryImageView extends ConsumerWidget {
         return AspectRatio(
           aspectRatio: header.getUint32(16) / header.getUint32(20),
           child: ClipRRect(
-            borderRadius: borderRadius ??
+            borderRadius:
+                borderRadius ??
                 BorderRadius.circular(SpacingTokens.radiusMedium),
             child: Image.memory(
               data,

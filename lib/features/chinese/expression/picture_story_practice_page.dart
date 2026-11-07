@@ -29,9 +29,9 @@ import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_audio_service.dart';
 import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
-import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_illustration.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_feedback.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
 
 class PictureStoryPracticePage extends ConsumerStatefulWidget {
@@ -606,45 +606,53 @@ class _PictureStoryPracticePageState
     if (_completed && !_finishing) {
       return _buildResult(theme, prompt, _savedRecord!);
     }
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(prompt.title),
-        actions: [
-          IconButton(
-            onPressed: _canComplete ? _complete : null,
-            icon: const Icon(Icons.check_outlined),
-            tooltip: '完成练习',
+    return PictureStorySceneScaffold(
+      image: prompt.image,
+      semanticLabel: '看图说话练习：${prompt.title}',
+      actions: [
+        IconButton(
+          onPressed: () => setState(() {
+            _showHints = !_showHints;
+            if (_showHints) _usedHints = true;
+          }),
+          isSelected: _showHints,
+          tooltip: _showHints ? '隐藏提示' : '显示提示',
+          icon: const Icon(Icons.lightbulb_outline),
+          selectedIcon: Icon(
+            Icons.tips_and_updates_outlined,
+            color: theme.brightness == Brightness.dark
+                ? ColorTokens.mathYellow
+                : ColorTokens.hintAmber,
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide =
-                constraints.maxWidth >= ResponsiveLayout.wideBreakpoint;
-            final content = _buildContent(theme, prompt);
-            return wide
-                ? SingleChildScrollView(
-                    padding: const EdgeInsets.all(SpacingTokens.md),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: content[0]),
-                        const SizedBox(width: SpacingTokens.lg),
-                        Expanded(child: content[1]),
-                      ],
-                    ),
-                  )
-                : ListView(
-                    padding: const EdgeInsets.all(SpacingTokens.md),
-                    children: [
-                      content[0],
-                      const SizedBox(height: SpacingTokens.md),
-                      content[1],
-                    ],
-                  );
-          },
         ),
+        IconButton(
+          onPressed: _canComplete ? _complete : null,
+          icon: const Icon(Icons.check_outlined),
+          tooltip: '完成练习',
+        ),
+      ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= ResponsiveLayout.wideBreakpoint;
+          final content = _buildContent(theme, prompt);
+          return wide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: content[0]),
+                    const SizedBox(width: SpacingTokens.lg),
+                    Expanded(child: content[1]),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    content[0],
+                    const SizedBox(height: SpacingTokens.md),
+                    content[1],
+                  ],
+                );
+        },
       ),
     );
   }
@@ -751,63 +759,22 @@ class _PictureStoryPracticePageState
     return [
       ColoredCard(
         color: theme.colorScheme.primary,
-        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                PictureStoryImageView(image: prompt.image),
-                Positioned(
-                  top: SpacingTokens.sm,
-                  right: SpacingTokens.sm,
-                  child: IconButton(
-                    onPressed: () => setState(() {
-                      _showHints = !_showHints;
-                      if (_showHints) _usedHints = true;
-                    }),
-                    isSelected: _showHints,
-                    tooltip: _showHints ? '隐藏提示' : '显示提示',
-                    icon: const Icon(Icons.lightbulb_outline),
-                    selectedIcon: Icon(
-                      Icons.tips_and_updates_outlined,
-                      color: theme.brightness == Brightness.dark
-                          ? ColorTokens.mathYellow
-                          : ColorTokens.hintAmber,
-                      shadows: const [
-                        Shadow(
-                          color: ColorTokens.mathYellow,
-                          blurRadius: SpacingTokens.sm,
-                        ),
-                        Shadow(
-                          color: ColorTokens.mathYellow,
-                          blurRadius: SpacingTokens.lg,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('先观察，再说一说', style: titleStyle),
-                  const SizedBox(height: SpacingTokens.sm),
-                  for (final question in prompt.questions)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-                      child: Text('· $question', style: bodyStyle),
-                    ),
-                  if (_showHints) ...[
-                    const SizedBox(height: SpacingTokens.sm),
-                    Text(prompt.sceneFacts.join('\n'), style: bodyStyle),
-                  ],
-                ],
+            Text(prompt.title, style: titleStyle),
+            const SizedBox(height: SpacingTokens.sm),
+            Text('先观察，再说一说', style: bodyStyle),
+            const SizedBox(height: SpacingTokens.sm),
+            for (final question in prompt.questions)
+              Padding(
+                padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
+                child: Text('· $question', style: bodyStyle),
               ),
-            ),
+            if (_showHints) ...[
+              const SizedBox(height: SpacingTokens.sm),
+              Text(prompt.sceneFacts.join('\n'), style: bodyStyle),
+            ],
           ],
         ),
       ),
