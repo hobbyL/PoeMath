@@ -19,6 +19,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
@@ -381,7 +382,7 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.byType(PictureStoryPage), findsOneWidget);
-    final squareBytes = await pictureStoryPng(width: 200, height: 200);
+    final squareBytes = await pictureStoryContrastPng();
     final squareClosed =
         Navigator.of(tester.element(find.byType(PictureStoryPage))).push<void>(
           MaterialPageRoute(
@@ -390,10 +391,24 @@ void main() {
                 pictureStoryImageBytesProvider('square-native')
                     .overrideWith((ref) async => squareBytes),
               ],
-              child: const PictureStorySceneScaffold(
-                image: PictureStoryImage.local('square-native'),
+              child: PictureStorySceneScaffold(
+                image: const PictureStoryImage.local('square-native'),
                 semanticLabel: '正方形题图',
-                child: Text('正方形题图'),
+                actions: [
+                  IconButton(
+                    tooltip: '隐藏提示',
+                    isSelected: true,
+                    onPressed: () {},
+                    icon: const Icon(Icons.lightbulb_outline),
+                    selectedIcon: const Icon(Icons.tips_and_updates_outlined),
+                  ),
+                  IconButton(
+                    tooltip: '完成练习',
+                    onPressed: () {},
+                    icon: const Icon(Icons.check_outlined),
+                  ),
+                ],
+                child: const Text('正方形题图'),
               ),
             ),
           ),
@@ -404,7 +419,36 @@ void main() {
     expect(square.left, screen.left);
     expect(square.right, screen.right);
     expect(square.width, square.height);
+    final adaptiveBack = find.descendant(
+      of: find.byType(BackButton),
+      matching: find.byType(Icon),
+    );
+    final adaptiveHint = find.byIcon(Icons.tips_and_updates_outlined);
+    final adaptiveComplete = find.byIcon(Icons.check_outlined);
+    Color? iconColor(Finder icon) => IconTheme.of(tester.element(icon)).color;
+    for (
+      var i = 0;
+      i < 60 && iconColor(adaptiveBack) != ColorTokens.mathSurface;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    await tester.pumpAndSettle();
+    expect(iconColor(adaptiveBack), ColorTokens.mathSurface);
+    expect(iconColor(adaptiveHint), ColorTokens.hintAmber);
+    expect(iconColor(adaptiveComplete), ColorTokens.mathSurface);
     await capturePage(capture, 'picture-story-square-native');
+    final adaptiveBackRect = tester.getRect(find.byType(BackButton));
+    tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position
+        .jumpTo(220);
+    await tester.pumpAndSettle();
+    expect(iconColor(adaptiveBack), ColorTokens.poemInk);
+    expect(iconColor(adaptiveHint), ColorTokens.mathYellow);
+    expect(iconColor(adaptiveComplete), ColorTokens.poemInk);
+    expect(tester.getRect(find.byType(BackButton)), adaptiveBackRect);
+    await capturePage(capture, 'picture-story-contrast-scrolled-native');
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     await squareClosed;

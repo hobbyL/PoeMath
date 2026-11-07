@@ -6,11 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_contrast.dart';
 
 /// 题图作为顶部背景，内容向上覆盖；返回与页面操作始终固定在安全区内。
 class PictureStorySceneScaffold extends ConsumerStatefulWidget {
@@ -35,6 +37,7 @@ class PictureStorySceneScaffold extends ConsumerStatefulWidget {
 class _PictureStorySceneScaffoldState
     extends ConsumerState<PictureStorySceneScaffold> {
   final _scroll = ScrollController();
+  final _sceneKey = GlobalKey();
 
   @override
   void dispose() {
@@ -51,6 +54,19 @@ class _PictureStorySceneScaffoldState
               .watch(pictureStoryImageBytesProvider(widget.image.value))
               .valueOrNull
         : null;
+    final pixels = widget.image.isLocal && bytes == null
+        ? null
+        : ref
+              .watch(
+                pictureStorySceneContrastProvider((
+                  image: widget.image,
+                  imageBytes: bytes,
+                  builtinScheme: widget.image.isLocal
+                      ? null
+                      : theme.colorScheme,
+                )),
+              )
+              .valueOrNull;
     final header = bytes == null ? null : ByteData.sublistView(bytes);
     final aspectRatio = header == null
         ? 4 / 3
@@ -76,7 +92,18 @@ class _PictureStorySceneScaffoldState
                 media.size.height * .55,
                 constraints.maxWidth / aspectRatio,
               );
+              final parallaxFactor = reduceMotion ? 0.0 : .7;
+              Widget adaptiveAction(Widget child) => _SceneToolbarAction(
+                sceneKey: _sceneKey,
+                scroll: _scroll,
+                pixels: pixels,
+                viewport: constraints.biggest,
+                imageHeight: imageHeight,
+                parallaxFactor: parallaxFactor,
+                child: child,
+              );
               return Stack(
+                key: _sceneKey,
                 children: [
                   SingleChildScrollView(
                     controller: _scroll,
@@ -102,10 +129,7 @@ class _PictureStorySceneScaffoldState
                                     ? _scroll.offset.clamp(0.0, imageHeight)
                                     : 0.0;
                                 return Transform.translate(
-                                  offset: Offset(
-                                    0,
-                                    reduceMotion ? 0 : offset * .7,
-                                  ),
+                                  offset: Offset(0, offset * parallaxFactor),
                                   child: child,
                                 );
                               },
@@ -134,23 +158,15 @@ class _PictureStorySceneScaffoldState
                     right: 0,
                     child: SafeArea(
                       bottom: false,
-                      child: IconButtonTheme(
-                        data: IconButtonThemeData(
-                          style: IconButton.styleFrom(
-                            foregroundColor: theme.colorScheme.onSurface,
-                            disabledForegroundColor: theme.colorScheme.onSurface
-                                .withValues(alpha: .38),
-                            minimumSize: const Size.square(SpacingTokens.xxl),
-                          ),
-                        ),
-                        child: SizedBox(
-                          height: kToolbarHeight,
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: kToolbarHeight,
-                                child: Center(
-                                  child: BackButton(
+                      child: SizedBox(
+                        height: kToolbarHeight,
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: kToolbarHeight,
+                              child: Center(
+                                child: adaptiveAction(
+                                  BackButton(
                                     onPressed: () {
                                       final navigator = Navigator.of(context);
                                       if (navigator.canPop()) {
@@ -166,16 +182,16 @@ class _PictureStorySceneScaffoldState
                                   ),
                                 ),
                               ),
-                              const Spacer(),
-                              for (final action in widget.actions)
-                                Padding(
-                                  padding: const EdgeInsetsDirectional.only(
-                                    end: SpacingTokens.xs,
-                                  ),
-                                  child: action,
+                            ),
+                            const Spacer(),
+                            for (final action in widget.actions)
+                              Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  end: SpacingTokens.xs,
                                 ),
-                            ],
-                          ),
+                                child: adaptiveAction(action),
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -188,4 +204,130 @@ class _PictureStorySceneScaffoldState
       ),
     );
   }
+}
+
+class _SceneToolbarAction extends StatefulWidget {
+  const _SceneToolbarAction({
+    required this.sceneKey,
+    required this.scroll,
+    required this.pixels,
+    required this.viewport,
+    required this.imageHeight,
+    required this.parallaxFactor,
+    required this.child,
+  });
+
+  final GlobalKey sceneKey;
+  final ScrollController scroll;
+  final PictureStorySceneContrast? pixels;
+  final Size viewport;
+  final double imageHeight;
+  final double parallaxFactor;
+  final Widget child;
+
+  @override
+  State<_SceneToolbarAction> createState() => _SceneToolbarActionState();
+}
+
+class _SceneToolbarActionState extends State<_SceneToolbarAction> {
+  Rect? _iconRect;
+  bool? _lightForeground;
+  bool _measurementPending = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _measureAfterLayout();
+  }
+
+  @override
+  void didUpdateWidget(_SceneToolbarAction oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _measureAfterLayout();
+  }
+
+  void _measureAfterLayout() {
+    if (_measurementPending) return;
+    _measurementPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measurementPending = false;
+      if (!mounted) return;
+      final box = context.findRenderObject();
+      final scene = widget.sceneKey.currentContext?.findRenderObject();
+      if (box is! RenderBox || scene is! RenderBox || !box.hasSize) return;
+      final center = box.localToGlobal(
+        box.size.center(Offset.zero),
+        ancestor: scene,
+      );
+      final size = IconTheme.of(context).size ?? SpacingTokens.lg;
+      final rect = Rect.fromCenter(center: center, width: size, height: size);
+      if (rect != _iconRect) setState(() => _iconRect = rect);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.scroll,
+    child: widget.child,
+    builder: (context, child) {
+      final theme = Theme.of(context);
+      final offset = widget.scroll.hasClients ? widget.scroll.offset : 0.0;
+      final rect = _iconRect;
+      final overImage = rect != null && rect.top < widget.imageHeight - offset;
+      if (overImage) {
+        _lightForeground =
+            widget.pixels?.useLightForeground(
+              iconRect: rect,
+              viewport: widget.viewport,
+              imageHeight: widget.imageHeight,
+              scrollOffset: offset,
+              parallaxFactor: widget.parallaxFactor,
+              background: theme.scaffoldBackgroundColor,
+              previous: _lightForeground,
+            ) ??
+            (theme.brightness == Brightness.dark);
+      } else {
+        _lightForeground = null;
+      }
+      final light = _lightForeground ?? theme.brightness == Brightness.dark;
+      final foreground = overImage
+          ? (light ? ColorTokens.mathSurface : ColorTokens.poemInk)
+          : theme.colorScheme.onSurface;
+      final selected = light ? ColorTokens.mathYellow : ColorTokens.hintAmber;
+      final outline = (light ? ColorTokens.poemInk : ColorTokens.mathSurface)
+          .withValues(alpha: .8);
+      const width = SpacingTokens.imageIconOutline;
+      return IconTheme.merge(
+        data: IconThemeData(
+          shadows: overImage
+              ? [
+                  Shadow(color: outline, offset: const Offset(-width, 0)),
+                  Shadow(color: outline, offset: const Offset(width, 0)),
+                  Shadow(color: outline, offset: const Offset(0, -width)),
+                  Shadow(color: outline, offset: const Offset(0, width)),
+                ]
+              : const [],
+        ),
+        child: IconButtonTheme(
+          data: IconButtonThemeData(
+            style:
+                IconButton.styleFrom(
+                  foregroundColor: foreground,
+                  minimumSize: const Size.square(SpacingTokens.xxl),
+                ).copyWith(
+                  foregroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.disabled)) {
+                      return foreground.withValues(alpha: .38);
+                    }
+                    return states.contains(WidgetState.selected)
+                        ? selected
+                        : foreground;
+                  }),
+                ),
+          ),
+          child: child!,
+        ),
+      );
+    },
+  );
 }

@@ -9,19 +9,18 @@ PictureStoryPrompt pictureStoryFixture({
   String id = 'local-fixture',
   String title = '窗前的小猫',
   PictureStoryImage image = const PictureStoryImage.builtin('kite'),
-}) =>
-    PictureStoryPrompt(
-      id: id,
-      title: title,
-      level: PictureStoryLevel.starter,
-      theme: '观察与动作',
-      sceneFacts: const ['小猫坐在窗前'],
-      questions: const ['小猫在哪里？', '它在做什么？'],
-      goals: const ['说清地点和动作'],
-      reference: '一只小猫坐在窗前，看着外面的小鸟。',
-      illustration: image.isLocal ? '' : image.value,
-      imageId: image.isLocal ? image.value : null,
-    );
+}) => PictureStoryPrompt(
+  id: id,
+  title: title,
+  level: PictureStoryLevel.starter,
+  theme: '观察与动作',
+  sceneFacts: const ['小猫坐在窗前'],
+  questions: const ['小猫在哪里？', '它在做什么？'],
+  goals: const ['说清地点和动作'],
+  reference: '一只小猫坐在窗前，看着外面的小鸟。',
+  illustration: image.isLocal ? '' : image.value,
+  imageId: image.isLocal ? image.value : null,
+);
 
 Future<Uint8List> pictureStoryPng({int width = 4, int height = 3}) async {
   final recorder = ui.PictureRecorder();
@@ -38,6 +37,36 @@ Future<Uint8List> pictureStoryPng({int width = 4, int height = 3}) async {
     return Uint8List.fromList(
       data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
     );
+  } finally {
+    image.dispose();
+    picture.dispose();
+  }
+}
+
+/// 顶部左/右深、中间浅；下方反转，覆盖逐按钮取样与滚动后的颜色变化。
+Future<Uint8List> pictureStoryContrastPng() async {
+  final recorder = ui.PictureRecorder();
+  final canvas = ui.Canvas(recorder);
+  const dark = ui.Color(0xff181818);
+  const light = ui.Color(0xfff5f5f5);
+  canvas.drawColor(light, ui.BlendMode.src);
+  canvas.drawRect(
+    const ui.Rect.fromLTWH(0, 0, 400, 100),
+    ui.Paint()..color = dark,
+  );
+  canvas.drawRect(
+    const ui.Rect.fromLTWH(200, 0, 160, 100),
+    ui.Paint()..color = light,
+  );
+  canvas.drawRect(
+    const ui.Rect.fromLTWH(200, 100, 160, 300),
+    ui.Paint()..color = dark,
+  );
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(400, 400);
+  try {
+    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+    return Uint8List.fromList(bytes.buffer.asUint8List());
   } finally {
     image.dispose();
     picture.dispose();

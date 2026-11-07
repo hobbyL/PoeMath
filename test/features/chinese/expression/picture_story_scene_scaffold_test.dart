@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
@@ -22,6 +23,7 @@ void main() {
     VoidCallback? onComplete,
     Uint8List? imageBytes,
     Future<Uint8List> Function()? loadImage,
+    bool showHint = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -52,6 +54,14 @@ void main() {
                   : const PictureStoryImage.local('fixture-image'),
               semanticLabel: '题目练习记录',
               actions: [
+                if (showHint)
+                  IconButton(
+                    tooltip: '隐藏提示',
+                    isSelected: true,
+                    onPressed: () {},
+                    icon: const Icon(Icons.lightbulb_outline),
+                    selectedIcon: const Icon(Icons.tips_and_updates_outlined),
+                  ),
                 IconButton(
                   tooltip: '完成练习',
                   onPressed: onComplete,
@@ -228,5 +238,100 @@ void main() {
     expect(attempts, 2);
     expect(find.byType(Image), findsOneWidget);
     expect(find.text('图片暂时无法显示'), findsNothing);
+  });
+
+  testWidgets('三个按钮分别跟随局部明暗变色，滚出图片恢复主题色且保留点击', (tester) async {
+    final bytes = (await tester.runAsync(pictureStoryContrastPng))!;
+    var loads = 0;
+    var completions = 0;
+    await mount(
+      tester,
+      showHint: true,
+      onComplete: () => completions++,
+      loadImage: () async {
+        loads++;
+        return bytes;
+      },
+    );
+    final back = find.descendant(
+      of: find.byType(BackButton),
+      matching: find.byType(Icon),
+    );
+    final hint = find.byIcon(Icons.tips_and_updates_outlined);
+    final complete = find.byIcon(Icons.check_outlined);
+    Color? color(Finder icon) => IconTheme.of(tester.element(icon)).color;
+    for (var i = 0; i < 60 && color(back) != ColorTokens.mathSurface; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    await tester.pumpAndSettle();
+    expect(color(back), ColorTokens.mathSurface);
+    expect(color(hint), ColorTokens.hintAmber);
+    expect(color(complete), ColorTokens.mathSurface);
+    final backRect = tester.getRect(find.byType(BackButton));
+    final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
+    scroll.position.jumpTo(220);
+    await tester.pumpAndSettle();
+    expect(color(back), ColorTokens.poemInk);
+    expect(color(hint), ColorTokens.mathYellow);
+    expect(color(complete), ColorTokens.poemInk);
+    expect(tester.getRect(find.byType(BackButton)), backRect);
+    await tester.tap(find.byTooltip('完成练习'));
+    expect(completions, 1);
+    expect(loads, 1);
+
+    scroll.position.jumpTo(400);
+    await tester.pumpAndSettle();
+    final theme = Theme.of(tester.element(back));
+    expect(color(back), theme.colorScheme.onSurface);
+    expect(IconTheme.of(tester.element(back)).shadows, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('独立图片作用域使用对应图片取色，不读取父作用域图片', (tester) async {
+    final bytes = (await tester.runAsync(pictureStoryContrastPng))!;
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(top: 24);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: ProviderScope(
+          overrides: [
+            pictureStoryImageBytesProvider('scoped-image')
+                .overrideWith((ref) async => bytes),
+          ],
+          child: const MaterialApp(
+            home: PictureStorySceneScaffold(
+              image: PictureStoryImage.local('scoped-image'),
+              semanticLabel: '独立图片',
+              child: Text('题目内容'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
+    final back = find.descendant(
+      of: find.byType(BackButton),
+      matching: find.byType(Icon),
+    );
+    for (
+      var i = 0;
+      i < 60 &&
+          IconTheme.of(tester.element(back)).color != ColorTokens.mathSurface;
+      i++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    await tester.pumpAndSettle();
+    expect(IconTheme.of(tester.element(back)).color, ColorTokens.mathSurface);
+    expect(tester.takeException(), isNull);
   });
 }

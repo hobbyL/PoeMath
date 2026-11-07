@@ -15,7 +15,6 @@ import 'package:poemath/core/services/speech/tencent_speech_recognition_service.
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/picture_story_feedback_service.dart';
 import 'package:poemath/data/models/picture_story_evaluation.dart';
-import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/theme/typography_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
@@ -618,12 +617,7 @@ class _PictureStoryPracticePageState
           isSelected: _showHints,
           tooltip: _showHints ? '隐藏提示' : '显示提示',
           icon: const Icon(Icons.lightbulb_outline),
-          selectedIcon: Icon(
-            Icons.tips_and_updates_outlined,
-            color: theme.brightness == Brightness.dark
-                ? ColorTokens.mathYellow
-                : ColorTokens.hintAmber,
-          ),
+          selectedIcon: const Icon(Icons.tips_and_updates_outlined),
         ),
         IconButton(
           onPressed: _canComplete ? _complete : null,

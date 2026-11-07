@@ -27,6 +27,9 @@ class SpacingTokens {
   static const double minTapTarget = 44.0;
 
   // ============ 阴影 ============
+  /// 图片上的透明图标使用细轮廓，补足明暗混合纹理下的辨识度。
+  static const double imageIconOutline = 1.0;
+
   static const List<BoxShadow> softShadow = <BoxShadow>[
     BoxShadow(color: Color(0x1A000000), blurRadius: 12, offset: Offset(0, 4)),
   ];
