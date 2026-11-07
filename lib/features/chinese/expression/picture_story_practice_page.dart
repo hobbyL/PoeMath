@@ -79,6 +79,15 @@ class _PictureStoryPracticePageState
   PictureStoryPrompt? _prompt;
   bool _promptReadFailed = false;
 
+  bool get _canComplete =>
+      _foreground &&
+      !_starting &&
+      !_recording &&
+      !_processing &&
+      !_finishing &&
+      !_completed &&
+      _record != null;
+
   @override
   void initState() {
     super.initState();
@@ -390,21 +399,23 @@ class _PictureStoryPracticePageState
     );
   }
 
+  void _showCompletionHint(String message) {
+    setState(() => _message = message);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _complete() async {
-    if (!_foreground ||
-        _starting ||
-        _finishing ||
-        _completed ||
-        _record == null ||
-        _segments.isEmpty ||
-        _recording ||
-        _processing) {
+    if (!_canComplete) return;
+    if (_segments.isEmpty) {
+      _showCompletionHint('请先点击“说一说”，录制一段表达。');
       return;
     }
     final generation = _generation;
     _record!.setSegments(_segments);
     if (_record!.answerText.trim().isEmpty) {
-      setState(() => _message = '请先填写或说出你的表达，再完成练习。');
+      _showCompletionHint('请先填写或说出你的表达，再完成练习。');
       return;
     }
     setState(() {
@@ -600,7 +611,7 @@ class _PictureStoryPracticePageState
         title: Text(prompt.title),
         actions: [
           IconButton(
-            onPressed: _finishing ? null : _complete,
+            onPressed: _canComplete ? _complete : null,
             icon: const Icon(Icons.check_outlined),
             tooltip: '完成练习',
           ),
@@ -851,7 +862,7 @@ class _PictureStoryPracticePageState
                 if (_segments.isNotEmpty) ...[
                   const SizedBox(width: SpacingTokens.sm),
                   IconButton(
-                    onPressed: _finishing ? null : _complete,
+                    onPressed: _canComplete ? _complete : null,
                     icon: const Icon(Icons.done_all_outlined),
                     tooltip: '完成练习',
                   ),

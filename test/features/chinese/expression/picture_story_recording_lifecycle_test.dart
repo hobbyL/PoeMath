@@ -357,6 +357,33 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets('未录音点击完成显示可见提示，不完成记录或请求点评', (tester) async {
+    var requests = 0;
+    final client = MockClient((_) async {
+      requests++;
+      return http.Response('', 500);
+    });
+    addTearDown(client.close);
+    await mount(tester, client: client);
+    tester.view.physicalSize = const Size(400, 700);
+    await tester.pump();
+    await tester.tap(find.byTooltip('完成练习'));
+    await tester.pumpAndSettle();
+    expect(
+      find
+          .descendant(
+            of: find.byType(SnackBar),
+            matching: find.text('请先点击“说一说”，录制一段表达。'),
+          )
+          .hitTestable(),
+      findsOneWidget,
+    );
+    expect(HiveBoxes.pictureStoryPractice.values.single.status, 'draft');
+    expect(repository.completedSaves, 0);
+    expect(requests, 0);
+    expect(speeches, isEmpty);
+  });
+
   testWidgets('所有非前台状态取消录音和60秒计时，回来后须再次主动开始', (tester) async {
     await mount(tester);
     for (final state in [
@@ -539,6 +566,56 @@ void main() {
     );
   }
 
+  testWidgets('追加录音准备、录制和识别时禁用两个完成入口，识别完成后恢复', (tester) async {
+    await recordSegment(tester);
+    final completionButtons = find.byWidgetPredicate(
+      (widget) => widget is IconButton && widget.tooltip == '完成练习',
+    );
+    final complete = tester
+        .widget<IconButton>(completionButtons.first)
+        .onPressed!;
+    void expectCompletionEnabled(bool enabled) {
+      final buttons = tester.widgetList<IconButton>(completionButtons);
+      expect(buttons, hasLength(2));
+      for (final button in buttons) {
+        expect(button.onPressed, enabled ? isNotNull : isNull);
+      }
+    }
+
+    final speech = _Speech()
+      ..initialization = Completer<void>()
+      ..stopping = Completer<SpeechRecognitionResult>();
+    queued.add(speech);
+    await tap(tester, '说一说');
+    expectCompletionEnabled(false);
+    complete();
+    await tester.pump();
+    expect(repository.completedSaves, 0);
+
+    speech.initialization!.complete();
+    await tester.pump();
+    expect(speech.active, isTrue);
+    expectCompletionEnabled(false);
+
+    await tap(tester, '说好了');
+    expectCompletionEnabled(false);
+    expect(repository.completedSaves, 0);
+
+    speech.stopping!.complete(const SpeechRecognitionResult(text: '第二段表达'));
+    await waitUntil(
+      tester,
+      () => HiveBoxes.pictureStoryPractice.values.single.segments.length == 2,
+    );
+    expectCompletionEnabled(true);
+    expect(HiveBoxes.pictureStoryPractice.values.single.status, 'draft');
+    expect(repository.completedSaves, 0);
+
+    await background(tester);
+    expectCompletionEnabled(false);
+    await foreground(tester);
+    expectCompletionEnabled(true);
+  });
+
   testWidgets('完成后留在已保存的反馈，重复点击只完成一次，缺录音保留文字', (tester) async {
     await recordSegment(tester);
     final complete = tester
@@ -590,7 +667,13 @@ void main() {
     );
     await tester.tap(find.byTooltip('完成练习').first);
     await tester.pump();
-    expect(find.text('请先填写或说出你的表达，再完成练习。'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.text('请先填写或说出你的表达，再完成练习。'),
+      ),
+      findsOneWidget,
+    );
     final saved = HiveBoxes.pictureStoryPractice.values.single;
     expect(saved.status, 'draft');
     expect(saved.segments.single.answerText, '');

@@ -182,6 +182,7 @@ void main() {
         for (final route in production.configuration.routes)
           if (route is GoRoute &&
               {
+                AppRoutes.pictureStoryPractice,
                 AppRoutes.pictureStoryHistory,
                 AppRoutes.pictureStoryPromptHistory,
                 AppRoutes.pictureStoryRecordDetail,
@@ -328,6 +329,27 @@ void main() {
           .promptId,
       isNull,
     );
+    router.pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(prompt.title));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('完成练习'));
+    await tester.pumpAndSettle();
+    expect(
+      find
+          .descendant(
+            of: find.byType(SnackBar),
+            matching: find.text('请先点击“说一说”，录制一段表达。'),
+          )
+          .hitTestable(),
+      findsOneWidget,
+    );
+    expect(requests, 1);
+    expect(
+      repo.records(promptId: prompt.id).where((r) => r.status == 'completed'),
+      hasLength(2),
+    );
+    await capturePage(capture, 'picture-story-completion-hint-native');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     router.dispose();
