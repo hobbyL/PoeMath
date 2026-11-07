@@ -145,9 +145,7 @@ class _PictureStorySceneScaffoldState
                       child: IconButtonTheme(
                         data: IconButtonThemeData(
                           style: IconButton.styleFrom(
-                            backgroundColor: theme.colorScheme.surface,
                             foregroundColor: theme.colorScheme.onSurface,
-                            disabledBackgroundColor: theme.colorScheme.surface,
                             disabledForegroundColor: theme.colorScheme.onSurface
                                 .withValues(alpha: .38),
                             minimumSize: const Size.square(SpacingTokens.xxl),
