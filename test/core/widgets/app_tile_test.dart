@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/core/theme/app_theme.dart';
@@ -6,10 +7,76 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_tile.dart';
 
 void main() {
+  testWidgets('两行摘要与换行时间保持左右布局，未配置的列表行保留单行默认值', (tester) async {
+    final theme = AppTheme.resolve(
+      subject: AppSubject.poem,
+      brightness: Brightness.light,
+    );
+    const answer = '公园里的孩子正在放风筝，小狗在旁边开心地跑来跑去，天空中飘着白云。';
+    const date = '2026/01/01 14:30';
+    var taps = 0;
+    Future<void> pumpTile({required bool twoLines}) => tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: Scaffold(
+          body: SizedBox(
+            width: 260,
+            child: AppTile(
+              iconColor: theme.colorScheme.primary,
+              title: answer,
+              titleMaxLines: twoLines ? 2 : null,
+              subtitle: '',
+              trailingText: date,
+              trailingTextMaxLines: twoLines ? null : 1,
+              onTap: () => taps++,
+            ),
+          ),
+        ),
+      ),
+    );
+    await pumpTile(twoLines: true);
+    final answerRect = tester.getRect(find.text(answer));
+    final dateRect = tester.getRect(find.text(date));
+    final cardCenterY = tester.getCenter(find.byType(AppTile)).dy;
+    expect(answerRect.center.dy, closeTo(cardCenterY, 0.01));
+    expect(dateRect.center.dy, closeTo(cardCenterY, 0.01));
+    expect(
+      tester.getCenter(find.byIcon(Icons.chevron_right)).dy,
+      closeTo(cardCenterY, 0.01),
+    );
+    expect(
+      tester.renderObject<RenderParagraph>(find.text(answer)).didExceedMaxLines,
+      isTrue,
+    );
+    expect(
+      tester.renderObject<RenderParagraph>(find.text(date)).didExceedMaxLines,
+      isFalse,
+    );
+    expect(answerRect.right, lessThan(dateRect.left));
+    expect(
+      dateRect.right,
+      lessThanOrEqualTo(tester.getRect(find.byIcon(Icons.chevron_right)).left),
+    );
+    await tester.tap(find.text(date));
+    expect(taps, 1);
+    await pumpTile(twoLines: false);
+    expect(
+      tester.getSize(find.text(answer)).height,
+      lessThan(answerRect.height),
+    );
+    expect(tester.getSize(find.text(date)).height, lessThan(dateRect.height));
+    expect(
+      tester.getCenter(find.text(answer)).dy,
+      closeTo(tester.getCenter(find.byType(AppTile)).dy, 0.01),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final flat in [false, true]) {
     for (final allowTap in [false, true]) {
-      testWidgets('尾部开关独立交互，行点击遵循显式设置 flat=$flat allowTap=$allowTap',
-          (tester) async {
+      testWidgets('尾部开关独立交互，行点击遵循显式设置 flat=$flat allowTap=$allowTap', (
+        tester,
+      ) async {
         var rowCalls = 0;
         var switchCalls = 0;
         var enabled = true;
@@ -95,10 +162,7 @@ void main() {
       tester.getCenter(find.byKey(previewKey)).dy,
       closeTo(rowCenter, 0.001),
     );
-    expect(
-      tester.getCenter(find.byType(Switch)).dy,
-      closeTo(rowCenter, 0.001),
-    );
+    expect(tester.getCenter(find.byType(Switch)).dy, closeTo(rowCenter, 0.001));
     expect(tester.takeException(), isNull);
   });
 
@@ -117,9 +181,8 @@ void main() {
       MaterialApp(
         theme: theme,
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: const TextScaler.linear(2),
-          ),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(2)),
           child: child!,
         ),
         home: Scaffold(

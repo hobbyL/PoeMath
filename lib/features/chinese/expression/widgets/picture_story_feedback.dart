@@ -6,9 +6,42 @@ import 'package:poemath/data/models/picture_story_evaluation.dart';
 
 /// 完成结果与历史共用已保存的反馈，不重新请求评价。
 class PictureStoryFeedback extends StatelessWidget {
-  const PictureStoryFeedback({super.key, required this.feedbackJson});
+  const PictureStoryFeedback({
+    super.key,
+    required this.feedbackJson,
+    this.legacyHeading = '练习记录',
+    this.separated = false,
+  });
 
   final String feedbackJson;
+  final String legacyHeading;
+
+  /// 独立详情中的点评分区；练习完成页继续使用原有内嵌布局。
+  final bool separated;
+
+  Widget _heading(BuildContext context, String title) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (separated) ...[
+          const SizedBox(height: SpacingTokens.lg),
+          const Divider(height: 1),
+          const SizedBox(height: SpacingTokens.lg),
+        ] else
+          const SizedBox(height: SpacingTokens.md),
+        Text(
+          title,
+          style: separated
+              ? theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                )
+              : theme.textTheme.titleMedium,
+        ),
+        SizedBox(height: separated ? SpacingTokens.md : SpacingTokens.sm),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +65,16 @@ class PictureStoryFeedback extends StatelessWidget {
                 '$title · ${value.status.label}',
                 style: theme.textTheme.titleSmall,
               ),
-              if (value.evidence.isNotEmpty) Text('你的原话：“${value.evidence}”'),
+              const SizedBox(height: SpacingTokens.xs),
+              if (value.evidence.isNotEmpty) ...[
+                Text(
+                  '你的原话：“${value.evidence}”',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.xs),
+              ],
               Text(value.reason),
             ],
           ),
@@ -40,9 +82,7 @@ class PictureStoryFeedback extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: SpacingTokens.md),
-            Text('AI 表达点评', style: theme.textTheme.titleMedium),
-            const SizedBox(height: SpacingTokens.sm),
+            _heading(context, 'AI 表达点评'),
             Text(evaluation.summary),
             for (final dimension in evaluation.dimensions)
               item(
@@ -54,6 +94,10 @@ class PictureStoryFeedback extends StatelessWidget {
                 type: MaterialType.transparency,
                 child: ExpansionTile(
                   tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(
+                    bottom: SpacingTokens.md,
+                  ),
+                  expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
                   title: const Text('逐题看看'),
                   children: [
                     for (final question in evaluation.questions)
@@ -70,8 +114,15 @@ class PictureStoryFeedback extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('原句：${suggestion.original}'),
+                      Text(
+                        '原句：${suggestion.original}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: SpacingTokens.xs),
                       Text('建议：${suggestion.replacement}'),
+                      const SizedBox(height: SpacingTokens.xs),
                       Text('原因：${suggestion.reason}'),
                     ],
                   ),
@@ -94,12 +145,10 @@ class PictureStoryFeedback extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: SpacingTokens.md),
-          Text(
-            decoded['source'] == 'vision' ? 'AI 反馈' : '练习记录',
-            style: Theme.of(context).textTheme.labelLarge,
+          _heading(
+            context,
+            decoded['source'] == 'vision' ? 'AI 反馈' : legacyHeading,
           ),
-          const SizedBox(height: SpacingTokens.xs),
           for (final line in lines)
             Padding(
               padding: const EdgeInsets.only(bottom: SpacingTokens.xs),

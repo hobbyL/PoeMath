@@ -9,10 +9,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:poemath/core/routing/app_router.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/theme/app_theme.dart';
@@ -22,15 +25,34 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_history_page.dart';
+import 'package:poemath/features/chinese/expression/picture_story_record_detail_page.dart';
+import 'package:poemath/features/chinese/expression/picture_story_page.dart';
 import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
 
 import '../test/helpers/hive_test_helper.dart';
 import '../test/helpers/parent_access_test_helper.dart';
 import '../test/helpers/picture_story_feedback_fixture.dart';
+import '../test/helpers/picture_story_fixture.dart';
+
+Future<void> capturePage(GlobalKey capture, String name) async {
+  final boundary =
+      capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+  final image = await boundary.toImage();
+  try {
+    final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+    final file = File('${Directory.systemTemp.path}/$name.png');
+    await file.writeAsBytes(
+      bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+    );
+    AppLogger.d('EVIDENCE=${file.path}', tag: 'PictureStoryFeedbackNativeTest');
+  } finally {
+    image.dispose();
+  }
+}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  testWidgets('历史入口重评、保留原版本、退出重进与原生显示', (tester) async {
+  testWidgets('题目卡片进入多次记录、重评不增次数、退出重进与原生显示', (tester) async {
     expect(
       (await PackageInfo.fromPlatform()).packageName,
       'com.poemath.app.integration',
@@ -38,6 +60,17 @@ void main() {
     await setUpHiveForTesting();
     await unlockParentForTesting();
     final repo = PictureStoryRepository();
+    final content = PictureStoryCatalog.prompts.first;
+    final prompt = await repo.savePrompt(
+      prompt: pictureStoryFixture(id: 'local-native-history').copyWith(
+        title: content.title,
+        sceneFacts: content.sceneFacts,
+        questions: content.questions,
+        goals: content.goals,
+        reference: content.reference,
+      ),
+      profileId: 'default',
+    );
     final settings = SettingsRepository();
     await settings.saveLlmProviderConfig(
       id: 'fixture',
@@ -54,9 +87,9 @@ void main() {
     final original = PictureStoryPracticeRecord(
       id: 'native-review',
       profileId: 'default',
-      promptId: 'kite-in-the-park',
+      promptId: prompt.id,
       promptVersion: 1,
-      startedAt: DateTime(2026),
+      startedAt: DateTime(2026, 1, 2, 15, 30),
       status: 'completed',
       segmentsJson: '[]',
       feedbackJson: '{"source":"unavailable","text":"本次未获得 AI 点评"}',
@@ -71,6 +104,18 @@ void main() {
       ),
     ]);
     await repo.save(original);
+    await repo.save(
+      PictureStoryPracticeRecord(
+        id: 'native-review-older',
+        profileId: 'default',
+        promptId: prompt.id,
+        promptVersion: 1,
+        startedAt: DateTime(2026, 1, 1, 10, 5),
+        status: 'completed',
+        segmentsJson: '[]',
+        answerText: '有一个孩子和一只风筝。',
+      ),
+    );
     lockParentForTesting();
     var requests = 0;
     final client = MockClient((request) async {
@@ -126,7 +171,24 @@ void main() {
       );
     });
     final capture = GlobalKey();
-    final navigator = GlobalKey<NavigatorState>();
+    final production = createAppRouter();
+    final router = GoRouter(
+      initialLocation: '/test-expression',
+      routes: [
+        GoRoute(
+          path: '/test-expression',
+          builder: (_, _) => const PictureStoryPage(),
+        ),
+        for (final route in production.configuration.routes)
+          if (route is GoRoute &&
+              {
+                AppRoutes.pictureStoryHistory,
+                AppRoutes.pictureStoryPromptHistory,
+                AppRoutes.pictureStoryRecordDetail,
+              }.contains(route.path))
+            route,
+      ],
+    );
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -135,20 +197,73 @@ void main() {
         ],
         child: RepaintBoundary(
           key: capture,
-          child: MaterialApp(
-            navigatorKey: navigator,
+          child: MaterialApp.router(
+            routerConfig: router,
             theme: AppTheme.resolve(
               subject: AppSubject.poem,
               brightness: Brightness.light,
             ),
-            home: const PictureStoryHistoryPage(),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('修改表达并重新点评'));
-    await tester.tap(find.text('修改表达并重新点评'));
+    expect(find.text('练习记录 · 2 次'), findsOneWidget);
+    await capturePage(capture, 'picture-story-cards-native');
+    await tester.tap(find.text('练习记录 · 2 次'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PictureStoryHistoryPage>(find.byType(PictureStoryHistoryPage))
+          .promptId,
+      prompt.id,
+    );
+    expect(find.text('已完成 2 次练习'), findsNothing);
+    expect(find.text(prompt.reference), findsOneWidget);
+    expect(find.text('题目与参考表达'), findsNothing);
+    expect(find.text('修改表达并重新点评'), findsNothing);
+    await capturePage(capture, 'picture-story-history-native');
+    await tester.scrollUntilVisible(find.text('孩子放风筝。'), 250);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('孩子放风筝。'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PictureStoryRecordDetailPage>(
+            find.byType(PictureStoryRecordDetailPage),
+          )
+          .recordId,
+      original.id,
+    );
+    expect(find.text('练习详情'), findsOneWidget);
+    expect(find.text('第 2 次练习'), findsNothing);
+    expect(find.text(prompt.reference), findsNothing);
+    expect(find.text('我的表达'), findsOneWidget);
+    await tester.tap(find.byTooltip('查看题目'));
+    await tester.pumpAndSettle();
+    expect(find.text(prompt.reference), findsOneWidget);
+    await tester.tap(find.byTooltip('隐藏题目'));
+    await tester.pumpAndSettle();
+    expect(find.text(prompt.reference), findsNothing);
+    expect(requests, 0);
+    final edit = find.text('修改表达并重新点评');
+    expect(edit.hitTestable(), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('第 1 段录音')).dx,
+      closeTo(tester.getTopLeft(find.text('我的表达')).dx, 0.01),
+    );
+    expect(
+      tester.getRect(find.text('第 1 段录音')).top,
+      greaterThan(tester.getRect(find.text('孩子放风筝。')).bottom),
+    );
+    expect(
+      tester.getRect(find.text('点评')).top,
+      greaterThan(tester.getRect(find.text('第 1 段录音')).bottom),
+    );
+    await tester.scrollUntilVisible(edit, 250);
+    await tester.pumpAndSettle();
+    await capturePage(capture, 'picture-story-history-expanded-native');
+    await tester.tap(edit);
     await tester.pumpAndSettle();
     expect(find.byType(PictureStoryReviewPage), findsOneWidget);
     await tester.ensureVisible(find.byType(TextField));
@@ -167,42 +282,43 @@ void main() {
     expect(saved.segmentsJson, original.segmentsJson);
     expect(saved.revisions.first.answer, '孩子放风筝。');
     expect(requests, 1);
-    final boundary =
-        capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-    final image = await boundary.toImage();
-    try {
-      final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
-      final file = File(
-        '${Directory.systemTemp.path}/picture-story-feedback-native.png',
-      );
-      await file.writeAsBytes(
-        bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
-      );
-      AppLogger.d(
-        'EVIDENCE=${file.path}',
-        tag: 'PictureStoryFeedbackNativeTest',
-      );
-    } finally {
-      image.dispose();
-    }
-    navigator.currentState!.pop();
+    await capturePage(capture, 'picture-story-feedback-native');
+    router.pop();
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('修改表达并重新点评'));
+    await capturePage(capture, 'picture-story-detail-feedback-native');
+    await tester.ensureVisible(edit);
     await tester.pumpAndSettle();
-    await Scrollable.ensureVisible(
-      tester.element(find.text('修改表达并重新点评')),
-      alignment: 0.5,
-    );
+    await Scrollable.ensureVisible(tester.element(edit), alignment: 0.5);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('修改表达并重新点评'));
+    await tester.tap(edit);
     await tester.pumpAndSettle();
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller!.text,
       saved.answerText,
     );
     expect(requests, 1);
+    expect(repo.records(promptId: prompt.id).length, 2);
+    expect(repo.find('native-review-older')!.answerText, '有一个孩子和一只风筝。');
+    router.pop();
+    await tester.pumpAndSettle();
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text(saved.answerText), findsOneWidget);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('练习记录 · 2 次'), findsOneWidget);
+    await tester.tap(find.byTooltip('全部记录'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PictureStoryHistoryPage>(find.byType(PictureStoryHistoryPage))
+          .promptId,
+      isNull,
+    );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
+    router.dispose();
+    production.dispose();
     client.close();
     lockParentForTesting();
     await tearDownHiveForTesting();

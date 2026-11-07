@@ -34,6 +34,7 @@ class AppTile extends StatelessWidget {
     this.leadingEdgeWidth,
     required this.iconColor,
     required this.title,
+    this.titleMaxLines,
     this.titleSuffix,
     this.titleSuffixInline = false,
     required this.subtitle,
@@ -41,6 +42,7 @@ class AppTile extends StatelessWidget {
     this.allowTapWithTrailing = false,
     this.trailing,
     this.trailingText,
+    this.trailingTextMaxLines = 1,
     this.trailingAction,
     this.trailingInTitle = false,
     this.trailingIcon = Icons.chevron_right,
@@ -48,17 +50,20 @@ class AppTile extends StatelessWidget {
     this.trailingTooltip,
     this.subtitleMaxLines,
     this.flat = false,
+    this.flatLeadingEdgeAligned = false,
     this.flatTrailingEdgeAligned = false,
     this.selected = false,
     this.crossAxisAlignment = CrossAxisAlignment.center,
-  })  : assert(trailing == null || trailingAction == null),
-        assert(
-          onTrailingTap == null || (trailing == null && trailingAction == null),
-        ),
-        assert(subtitleMaxLines == null || subtitleMaxLines > 0),
-        assert(!selected || flat),
-        assert(leadingEdgeWidth == null || leadingEdgeWidth > 0),
-        assert(leadingEdgeWidth == null || (leading != null && !flat));
+  }) : assert(trailing == null || trailingAction == null),
+       assert(
+         onTrailingTap == null || (trailing == null && trailingAction == null),
+       ),
+       assert(titleMaxLines == null || titleMaxLines > 0),
+       assert(subtitleMaxLines == null || subtitleMaxLines > 0),
+       assert(trailingTextMaxLines == null || trailingTextMaxLines > 0),
+       assert(!selected || flat),
+       assert(leadingEdgeWidth == null || leadingEdgeWidth > 0),
+       assert(leadingEdgeWidth == null || (leading != null && !flat));
 
   /// 图标；未提供 [leading] 时展示，省略时不保留图标占位。
   final IconData? icon;
@@ -75,6 +80,9 @@ class AppTile extends StatelessWidget {
 
   /// 标题文本；为空时省略标题行，仅显示副标题内容。
   final String title;
+
+  /// 标题最大行数；设置后超出部分以省略号显示。
+  final int? titleMaxLines;
 
   /// 紧跟标题的辅助信息；标题过长时省略，大字号空间不足时辅助信息另起一行。
   final String? titleSuffix;
@@ -95,8 +103,11 @@ class AppTile extends StatelessWidget {
   /// 尾部组件。为 null 时显示 chevron 箭头。
   final Widget? trailing;
 
-  /// 箭头前靠右显示的单行状态文字；保留整行点击，长文字省略。
+  /// 箭头前靠右显示的状态文字；保留整行点击，长文字省略。
   final String? trailingText;
+
+  /// 尾部状态文字最大行数，默认单行；null 时允许完整换行。
+  final int? trailingTextMaxLines;
 
   /// 默认箭头下方的独立操作，与主行并排；不能与 [trailing] 同时使用。
   final Widget? trailingAction;
@@ -117,6 +128,9 @@ class AppTile extends StatelessWidget {
   /// 普通列表行，无独立卡片背景或圆角，适用于抽屉目录。
   final bool flat;
 
+  /// 普通列表行中将起始内容贴到内容区边界，避免与外层页面边距叠加。
+  final bool flatLeadingEdgeAligned;
+
   /// 普通列表行中将尾部图形贴到内容区右边界；整行仍保留 44dp 点击高度。
   final bool flatTrailingEdgeAligned;
 
@@ -135,8 +149,11 @@ class AppTile extends StatelessWidget {
     );
     final titleText = Text(
       title,
-      maxLines: titleSuffix == null && trailingText == null ? null : 1,
-      overflow: titleSuffix == null && trailingText == null
+      maxLines:
+          titleMaxLines ??
+          (titleSuffix == null && trailingText == null ? null : 1),
+      overflow:
+          titleMaxLines == null && titleSuffix == null && trailingText == null
           ? null
           : TextOverflow.ellipsis,
       style: titleStyle,
@@ -159,6 +176,10 @@ class AppTile extends StatelessWidget {
                     ],
                   ),
                   style: titleStyle,
+                  maxLines: titleMaxLines,
+                  overflow: titleMaxLines == null
+                      ? null
+                      : TextOverflow.ellipsis,
                 );
               }
               final suffix = Text(titleSuffix!, style: suffixStyle);
@@ -184,7 +205,8 @@ class AppTile extends StatelessWidget {
               );
             },
           );
-    final trailingContent = trailing ??
+    final trailingContent =
+        trailing ??
         (onTrailingTap != null
             ? IconButton(
                 tooltip: trailingTooltip,
@@ -207,18 +229,18 @@ class AppTile extends StatelessWidget {
               ));
     final trailingWidget = flat
         ? flatTrailingEdgeAligned
-            ? SizedBox(
-                height: SpacingTokens.minTapTarget,
-                child: Align(
-                  widthFactor: 1,
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: trailingContent,
-                ),
-              )
-            : SizedBox.square(
-                dimension: SpacingTokens.minTapTarget,
-                child: Align(child: trailingContent),
-              )
+              ? SizedBox(
+                  height: SpacingTokens.minTapTarget,
+                  child: Align(
+                    widthFactor: 1,
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: trailingContent,
+                  ),
+                )
+              : SizedBox.square(
+                  dimension: SpacingTokens.minTapTarget,
+                  child: Align(child: trailingContent),
+                )
         : trailingContent;
     final hasTitleRow =
         title.isNotEmpty || titleSuffix != null || trailingInTitle;
@@ -235,8 +257,10 @@ class AppTile extends StatelessWidget {
                   Flexible(
                     child: Text(
                       trailingText!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: trailingTextMaxLines,
+                      overflow: trailingTextMaxLines == null
+                          ? null
+                          : TextOverflow.ellipsis,
                       textAlign: TextAlign.end,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: selected
@@ -282,13 +306,14 @@ class AppTile extends StatelessWidget {
                   )
                 else if (hasTitleRow)
                   titleWidget,
-                if (!flat || subtitle.isNotEmpty) ...[
+                if (subtitle.isNotEmpty) ...[
                   if (hasTitleRow) const SizedBox(height: 2),
                   Text(
                     subtitle,
                     maxLines: subtitleMaxLines,
-                    overflow:
-                        subtitleMaxLines == null ? null : TextOverflow.ellipsis,
+                    overflow: subtitleMaxLines == null
+                        ? null
+                        : TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: selected
                           ? theme.colorScheme.onPrimaryContainer
@@ -324,11 +349,12 @@ class AppTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
             onTap: trailing == null || allowTapWithTrailing ? onTap : null,
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(minHeight: SpacingTokens.minTapTarget),
+              constraints: const BoxConstraints(
+                minHeight: SpacingTokens.minTapTarget,
+              ),
               child: Padding(
                 padding: EdgeInsetsDirectional.fromSTEB(
-                  SpacingTokens.sm,
+                  flatLeadingEdgeAligned ? 0 : SpacingTokens.sm,
                   SpacingTokens.xs,
                   flatTrailingEdgeAligned ? 0 : SpacingTokens.sm,
                   SpacingTokens.xs,

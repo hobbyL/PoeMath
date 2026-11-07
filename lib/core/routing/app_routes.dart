@@ -51,6 +51,10 @@ class AppRoutes {
   // ============ 看图说话 ==========
   static const String pictureStoryPractice = '/chinese/expression/practice/:id';
   static const String pictureStoryHistory = '/chinese/expression/history';
+  static const String pictureStoryRecordDetail =
+      '/chinese/expression/records/:id';
+  static const String pictureStoryPromptHistory =
+      '/chinese/expression/history/:id';
   static const String pictureStoryManagement =
       '/profile/settings/picture-story';
   static const String pictureStoryCreate = '$pictureStoryManagement/new';
@@ -147,6 +151,10 @@ class AppRoutes {
       '/profile/settings/books/$id';
   static String pictureStoryPracticeOf(String id) =>
       '/chinese/expression/practice/${Uri.encodeComponent(id)}';
+  static String pictureStoryPromptHistoryOf(String id) =>
+      '/chinese/expression/history/${Uri.encodeComponent(id)}';
+  static String pictureStoryRecordDetailOf(String id) =>
+      '/chinese/expression/records/${Uri.encodeComponent(id)}';
   static String pictureStoryDetailOf(String id) =>
       '$pictureStoryManagement/detail/${Uri.encodeComponent(id)}';
   static String pictureStoryEditOf(String id) =>

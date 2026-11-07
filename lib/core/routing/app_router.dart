@@ -21,6 +21,7 @@ import 'package:poemath/core/services/update/update_client.dart';
 import 'package:poemath/features/assistant/assistant_page.dart';
 import 'package:poemath/features/chinese/chinese_tab_page.dart';
 import 'package:poemath/features/chinese/expression/picture_story_history_page.dart';
+import 'package:poemath/features/chinese/expression/picture_story_record_detail_page.dart';
 import 'package:poemath/features/chinese/expression/picture_story_practice_page.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
 import 'package:poemath/features/formula/study_hub_page.dart';
@@ -295,6 +296,22 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const PictureStoryHistoryPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.pictureStoryPromptHistory,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: PictureStoryHistoryPage(promptId: state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.pictureStoryRecordDetail,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: PictureStoryRecordDetailPage(
+            recordId: state.pathParameters['id']!,
+          ),
         ),
       ),
       // ============ 公式知识库（全屏，从口算页或首页进入） ============

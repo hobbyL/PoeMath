@@ -39,7 +39,7 @@ class PictureStoryPage extends ConsumerWidget {
           IconButton(
             onPressed: () => context.push(AppRoutes.pictureStoryHistory),
             icon: const Icon(Icons.history_outlined),
-            tooltip: '练习记录',
+            tooltip: '全部记录',
           ),
         ],
       ),
@@ -111,64 +111,86 @@ class _PromptCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final practiced = ref
-        .watch(pictureStoryHistoryProvider)
-        .where((record) => record.promptId == prompt.id)
-        .isNotEmpty;
+    final records = ref.watch(pictureStoryPromptHistoryProvider(prompt.id));
+    final practiced = records.isNotEmpty;
     void openPractice() =>
         context.push(AppRoutes.pictureStoryPracticeOf(prompt.id));
 
-    return Semantics(
-      label: prompt.title,
-      value: practiced ? '已练习' : null,
-      button: true,
-      excludeSemantics: true,
-      onTap: openPractice,
-      child: ColoredCard(
-        color: theme.colorScheme.secondary,
-        padding: EdgeInsets.zero,
-        onTap: openPractice,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Stack(
-              children: [
-                PictureStoryImageView(
-                  image: prompt.image,
-                  preview: true,
-                  borderRadius: BorderRadius.zero,
+    return ColoredCard(
+      color: theme.colorScheme.secondary,
+      padding: EdgeInsets.zero,
+      child: Stack(
+        children: [
+          Semantics(
+            label: prompt.title,
+            value: practiced ? '已练习 ${records.length} 次，开始新练习' : '开始练习',
+            button: true,
+            excludeSemantics: true,
+            onTap: openPractice,
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                onTap: openPractice,
+                excludeFromSemantics: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    PictureStoryImageView(
+                      image: prompt.image,
+                      preview: true,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(SpacingTokens.radiusMedium),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(SpacingTokens.md),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              prompt.title,
+                              style: theme.textTheme.titleMedium,
+                            ),
+                          ),
+                          const SizedBox(width: SpacingTokens.sm),
+                          Icon(
+                            Icons.chevron_right,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                if (practiced)
-                  Positioned(
-                    top: SpacingTokens.sm,
-                    right: SpacingTokens.sm,
-                    child: Icon(
-                      Icons.check_circle_outline,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      prompt.title,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ),
-                  const SizedBox(width: SpacingTokens.sm),
-                  Icon(
-                    Icons.chevron_right,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
               ),
             ),
-          ],
-        ),
+          ),
+          if (practiced)
+            Positioned(
+              top: SpacingTokens.sm,
+              left: SpacingTokens.sm,
+              right: SpacingTokens.sm,
+              child: Align(
+                alignment: Alignment.topRight,
+                child: FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: theme.colorScheme.surface,
+                    foregroundColor: theme.colorScheme.primary,
+                    minimumSize: const Size(0, SpacingTokens.minTapTarget),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.sm,
+                      vertical: SpacingTokens.xs,
+                    ),
+                  ),
+                  onPressed: () => context.push(
+                    AppRoutes.pictureStoryPromptHistoryOf(prompt.id),
+                  ),
+                  icon: const Icon(Icons.history_outlined),
+                  label: Text('练习记录 · ${records.length} 次'),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

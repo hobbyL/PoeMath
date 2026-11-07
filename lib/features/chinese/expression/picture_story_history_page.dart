@@ -1,160 +1,122 @@
-import 'dart:io';
-
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:poemath/core/routing/page_transitions.dart';
-import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
-import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
-import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
-import 'package:poemath/features/chinese/expression/widgets/picture_story_feedback.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_history_prompt_card.dart';
 
-class PictureStoryHistoryPage extends ConsumerStatefulWidget {
-  const PictureStoryHistoryPage({super.key});
+class PictureStoryHistoryPage extends ConsumerWidget {
+  const PictureStoryHistoryPage({super.key, this.promptId});
 
-  @override
-  ConsumerState<PictureStoryHistoryPage> createState() =>
-      _PictureStoryHistoryPageState();
-}
-
-class _PictureStoryHistoryPageState
-    extends ConsumerState<PictureStoryHistoryPage> {
-  final _player = AudioPlayer();
-  String? _playing;
+  final String? promptId;
 
   @override
-  void dispose() {
-    _player.dispose();
-    super.dispose();
-  }
-
-  Future<void> _play(PictureStorySegment segment) async {
-    if (!await File(segment.audioPath).exists()) return;
-    if (_playing == segment.id) {
-      await _player.stop();
-      if (mounted) setState(() => _playing = null);
-      return;
-    }
-    await _player.stop();
-    setState(() => _playing = segment.id);
-    await _player.play(DeviceFileSource(segment.audioPath));
-    _player.onPlayerComplete.first.then((_) {
-      if (mounted && _playing == segment.id) setState(() => _playing = null);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final records = ref
-        .watch(pictureStoryHistoryProvider)
-        .whereType<PictureStoryPracticeRecord>()
-        .where((record) => record.status == 'completed')
-        .toList();
+    final id = promptId;
+    final records = id == null
+        ? ref.watch(pictureStoryHistoryProvider)
+        : ref.watch(pictureStoryPromptHistoryProvider(id));
+    PictureStoryPrompt? headerPrompt;
+    if (id != null) {
+      try {
+        headerPrompt = records.isEmpty
+            ? ref.watch(pictureStoryPromptByIdProvider(id))
+            : ref.watch(
+                pictureStoryPromptVersionProvider((
+                  id: id,
+                  version: records.first.promptVersion,
+                )),
+              );
+      } on Object {
+        // 保留历史记录，不用当前题目替代无法读取的原版本。
+      }
+    }
+    final empty = AppEmptyState(
+      icon: Icons.history_outlined,
+      title: id == null ? '还没有完成的练习' : '这道题还没有完成的练习',
+      description: '完成练习后，可在这里回看表达、点评与录音。',
+    );
     return Scaffold(
-      appBar: AppBar(title: const Text('看图说话记录')),
-      body: records.isEmpty
-          ? const AppEmptyState(
-              icon: Icons.history_outlined,
-              title: '还没有完成的练习',
-              description: '完成一次看图说话练习后，可在这里回看表达与录音。',
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              itemCount: records.length,
-              itemBuilder: (context, index) {
-                final record = records[index];
-                PictureStoryPrompt? prompt;
-                try {
-                  prompt = ref.watch(
-                    pictureStoryPromptVersionProvider((
-                      id: record.promptId,
-                      version: record.promptVersion,
-                    )),
-                  );
-                } on Object {
-                  // 历史缺失时明确提示，不用新版题目代替原版本。
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: SpacingTokens.md),
-                  child: ColoredCard(
-                    color: theme.colorScheme.primary,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (prompt != null)
-                          PictureStoryImageView(image: prompt.image),
-                        if (prompt == null)
-                          const Text('原题版本暂时无法读取，表达与录音记录仍保留。'),
-                        const SizedBox(height: SpacingTokens.sm),
-                        Text(
-                          prompt?.title ?? '看图说话',
-                          style: theme.textTheme.titleMedium,
+      appBar: AppBar(title: Text(id == null ? '看图说话记录' : '题目练习记录')),
+      body: records.isEmpty && id == null
+          ? empty
+          : SafeArea(
+              top: false,
+              child: ListView(
+                padding: const EdgeInsets.all(SpacingTokens.md),
+                children: [
+                  if (id != null)
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: ResponsiveLayout.mediumBreakpoint,
                         ),
-                        const SizedBox(height: SpacingTokens.xs),
-                        Text(
-                          '${record.segments.length} 段 · ${record.totalDurationSeconds} 秒 · ${_date(record.startedAt)}',
-                        ),
-                        if (record.answerText.isNotEmpty) ...[
-                          const SizedBox(height: SpacingTokens.sm),
-                          Text(record.answerText),
-                        ],
-                        PictureStoryFeedback(feedbackJson: record.feedbackJson),
-                        AppTile(
-                          flat: true,
-                          icon: Icons.edit_outlined,
-                          iconColor: theme.colorScheme.primary,
-                          title: '修改表达并重新点评',
-                          subtitle: record.revisionDraft == null
-                              ? '保留之前的表达与点评'
-                              : '有尚未点评的修改',
-                          onTap: () async {
-                            await _player.stop();
-                            if (!context.mounted) return;
-                            await Navigator.of(context).push(
-                              fadeSlideRoute<void>(
-                                builder: (_) =>
-                                    PictureStoryReviewPage(recordId: record.id),
-                              ),
-                            );
-                            if (mounted) setState(() => _playing = null);
-                          },
-                        ),
-                        if (prompt != null && prompt.reference.isNotEmpty) ...[
-                          const SizedBox(height: SpacingTokens.sm),
-                          Text('参考表达', style: theme.textTheme.labelLarge),
-                          const SizedBox(height: SpacingTokens.xs),
-                          Text(prompt.reference),
-                        ],
-                        const SizedBox(height: SpacingTokens.sm),
-                        Text('回听最初的表达', style: theme.textTheme.labelLarge),
-                        for (final segment in record.segments)
-                          AppTile(
-                            flat: true,
-                            iconColor: theme.colorScheme.primary,
-                            icon: _playing == segment.id
-                                ? Icons.stop_circle_outlined
-                                : Icons.play_circle_outline,
-                            title: segment.answerText.isEmpty
-                                ? '未填写文字'
-                                : segment.answerText,
-                            subtitle:
-                                '${segment.durationSeconds} 秒 · ${segment.recognitionMode == 'realtime' ? '实时识别' : '一句话识别'}',
-                            onTap: () => _play(segment),
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: SpacingTokens.md,
                           ),
-                      ],
+                          child: PictureStoryHistoryPromptCard(
+                            prompt: headerPrompt,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                );
-              },
+                  if (records.isEmpty)
+                    empty
+                  else
+                    LayoutBuilder(
+                      builder: (context, constraints) => MasonryLayout(
+                        columnCount: ResponsiveLayout.columns(
+                          constraints.maxWidth,
+                        ),
+                        gap: SpacingTokens.md,
+                        children: records.map((record) {
+                          PictureStoryPrompt? original;
+                          if (id == null) {
+                            try {
+                              original = ref.watch(
+                                pictureStoryPromptVersionProvider((
+                                  id: record.promptId,
+                                  version: record.promptVersion,
+                                )),
+                              );
+                            } on Object {
+                              // 原题缺失仍可打开该次表达详情。
+                            }
+                          }
+                          return AppTile(
+                            key: ValueKey('picture-story-record-${record.id}'),
+                            iconColor: theme.colorScheme.primary,
+                            title: record.answerText.trim().isEmpty
+                                ? '本次未保存表达文字'
+                                : record.answerText
+                                      .replaceAll(RegExp(r'\s+'), ' ')
+                                      .trim(),
+                            titleMaxLines: 2,
+                            subtitle: id == null
+                                ? original?.title ?? '原题版本暂时无法读取'
+                                : '',
+                            subtitleMaxLines: 1,
+                            trailingText: pictureStoryHistoryDate(
+                              record.startedAt,
+                            ),
+                            trailingTextMaxLines: null,
+                            onTap: () => context.push(
+                              AppRoutes.pictureStoryRecordDetailOf(record.id),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                ],
+              ),
             ),
     );
   }
-
-  String _date(DateTime value) => '${value.year}/${value.month}/${value.day}';
 }

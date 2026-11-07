@@ -117,3 +117,12 @@ final pictureStoryHistoryProvider = Provider<List<PictureStoryPracticeRecord>>((
   ref.onDispose(records.cancel);
   return repository.records();
 });
+
+/// 同一题目的完成记录；文字重评保存在原记录内，不增加练习次数。
+final pictureStoryPromptHistoryProvider =
+    Provider.family<List<PictureStoryPracticeRecord>, String>((ref, promptId) {
+      return ref
+          .watch(pictureStoryHistoryProvider)
+          .where((record) => record.promptId == promptId)
+          .toList();
+    });
