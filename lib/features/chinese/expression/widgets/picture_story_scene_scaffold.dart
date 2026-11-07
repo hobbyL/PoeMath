@@ -83,26 +83,17 @@ class _PictureStorySceneScaffoldState
                     child: Stack(
                       children: [
                         SizedBox(
-                          height: imageHeight + SpacingTokens.radiusMedium,
+                          height: imageHeight,
                           width: double.infinity,
                           child: ClipRect(
                             child: AnimatedBuilder(
                               animation: _scroll,
                               child: RepaintBoundary(
-                                child: ColoredBox(
-                                  color:
-                                      theme.colorScheme.surfaceContainerHighest,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      bottom: SpacingTokens.radiusMedium,
-                                    ),
-                                    child: SizedBox.expand(
-                                      child: PictureStoryImageView(
-                                        image: widget.image,
-                                        fit: BoxFit.cover,
-                                        borderRadius: BorderRadius.zero,
-                                      ),
-                                    ),
+                                child: SizedBox.expand(
+                                  child: PictureStoryImageView(
+                                    image: widget.image,
+                                    fit: BoxFit.cover,
+                                    borderRadius: BorderRadius.zero,
                                   ),
                                 ),
                               ),
@@ -126,6 +117,7 @@ class _PictureStorySceneScaffoldState
                           child: ColoredCard(
                             color: theme.scaffoldBackgroundColor,
                             backgroundOpacity: 1,
+                            borderRadius: BorderRadius.zero,
                             constraints: BoxConstraints(
                               minHeight: constraints.maxHeight,
                             ),

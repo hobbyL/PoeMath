@@ -41,10 +41,10 @@ class ColoredCard extends StatelessWidget {
     this.backgroundOpacity = 0.08,
     this.width,
     this.constraints,
-  }) : assert(
-          color != null || gradient != null,
-          'color 与 gradient 至少提供一个',
-        );
+    this.borderRadius = const BorderRadius.all(
+      Radius.circular(SpacingTokens.radiusMedium),
+    ),
+  }) : assert(color != null || gradient != null, 'color 与 gradient 至少提供一个');
 
   /// 卡片主色调，背景色将基于此色生成；提供 [gradient] 时可省略。
   final Color? color;
@@ -75,15 +75,19 @@ class ColoredCard extends StatelessWidget {
   /// 卡片约束，默认不限制。
   final BoxConstraints? constraints;
 
+  /// 默认卡片圆角；铺满页面的背景区域可显式使用 [BorderRadius.zero]。
+  final BorderRadius borderRadius;
+
   @override
   Widget build(BuildContext context) {
     final decoration = BoxDecoration(
-      color:
-          gradient == null ? color!.withValues(alpha: backgroundOpacity) : null,
+      color: gradient == null
+          ? color!.withValues(alpha: backgroundOpacity)
+          : null,
       gradient: gradient,
       boxShadow: boxShadow,
       border: border,
-      borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+      borderRadius: borderRadius,
     );
 
     final container = Container(
@@ -96,10 +100,6 @@ class ColoredCard extends StatelessWidget {
 
     if (onTap == null) return container;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      child: container,
-    );
+    return InkWell(onTap: onTap, borderRadius: borderRadius, child: container);
   }
 }
