@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/typography_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
@@ -20,6 +21,9 @@ class PictureStoryHistoryPromptCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final contentStyle = theme.textTheme.bodyLarge?.copyWith(
+      fontSize: TypographyTokens.fsBodySmall,
+    );
     final original = prompt;
     return ColoredCard(
       color: theme.colorScheme.primary,
@@ -45,18 +49,18 @@ class PictureStoryHistoryPromptCard extends StatelessWidget {
                 ),
                 if (original != null) ...[
                   const SizedBox(height: SpacingTokens.md),
-                  Text('引导问题', style: theme.textTheme.titleSmall),
+                  Text('引导问题', style: theme.textTheme.titleMedium),
                   const SizedBox(height: SpacingTokens.sm),
                   for (final question in original.questions)
                     Padding(
                       padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-                      child: Text(question),
+                      child: Text(question, style: contentStyle),
                     ),
                   if (original.reference.isNotEmpty) ...[
                     const SizedBox(height: SpacingTokens.md),
-                    Text('参考表达', style: theme.textTheme.titleSmall),
+                    Text('参考表达', style: theme.textTheme.titleMedium),
                     const SizedBox(height: SpacingTokens.sm),
-                    Text(original.reference),
+                    Text(original.reference, style: contentStyle),
                   ],
                 ],
               ],

@@ -767,6 +767,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('我的表达'), findsOneWidget);
       expect(find.text('AI 表达点评'), findsOneWidget);
+      expect(find.text('逐题看看'), findsNothing);
+      expect(find.byType(ExpansionTile), findsNothing);
+      for (final question in prompt.questions) {
+        expect(find.text(question), findsOneWidget);
+      }
+      for (final assessment in PictureStoryAssessment.values) {
+        expect(find.text(assessment.label), findsNothing);
+      }
       expect(find.byType(PictureStoryImageView), findsNothing);
       expect(find.byType(ColoredCard), findsNothing);
       expect(find.text('第 1 次练习'), findsNothing);

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/theme/typography_tokens.dart';
 import 'package:poemath/data/models/picture_story_evaluation.dart';
 
 /// 完成结果与历史共用已保存的反馈，不重新请求评价。
@@ -56,26 +57,27 @@ class PictureStoryFeedback extends StatelessWidget {
           questionCount: prompts.length,
         );
         final theme = Theme.of(context);
+        final contentStyle = theme.textTheme.bodyLarge?.copyWith(
+          fontSize: TypographyTokens.fsBodySmall,
+        );
+        final quoteStyle = contentStyle?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        );
         Widget item(String title, PictureStoryFeedbackItem value) => Padding(
           padding: const EdgeInsets.only(top: SpacingTokens.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '$title · ${value.status.label}',
-                style: theme.textTheme.titleSmall,
+              Semantics(
+                header: true,
+                child: Text(title, style: theme.textTheme.titleMedium),
               ),
-              const SizedBox(height: SpacingTokens.xs),
+              const SizedBox(height: SpacingTokens.sm),
               if (value.evidence.isNotEmpty) ...[
-                Text(
-                  '你的原话：“${value.evidence}”',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
+                Text('你的原话：“${value.evidence}”', style: quoteStyle),
                 const SizedBox(height: SpacingTokens.xs),
               ],
-              Text(value.reason),
+              Text(value.reason, style: contentStyle),
             ],
           ),
         );
@@ -89,22 +91,8 @@ class PictureStoryFeedback extends StatelessWidget {
                 PictureStoryEvaluation.dimensionLabels[dimension.id]!,
                 dimension,
               ),
-            if (evaluation.questions.isNotEmpty)
-              Material(
-                type: MaterialType.transparency,
-                child: ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(
-                    bottom: SpacingTokens.md,
-                  ),
-                  expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-                  title: const Text('逐题看看'),
-                  children: [
-                    for (final question in evaluation.questions)
-                      item(prompts[int.parse(question.id) - 1], question),
-                  ],
-                ),
-              ),
+            for (final question in evaluation.questions)
+              item(prompts[int.parse(question.id) - 1], question),
             if (evaluation.suggestions.isNotEmpty) ...[
               const SizedBox(height: SpacingTokens.lg),
               Text('试着这样改', style: theme.textTheme.titleMedium),
@@ -114,16 +102,11 @@ class PictureStoryFeedback extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '原句：${suggestion.original}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                      Text('原句：${suggestion.original}', style: quoteStyle),
                       const SizedBox(height: SpacingTokens.xs),
-                      Text('建议：${suggestion.replacement}'),
+                      Text('建议：${suggestion.replacement}', style: contentStyle),
                       const SizedBox(height: SpacingTokens.xs),
-                      Text('原因：${suggestion.reason}'),
+                      Text('原因：${suggestion.reason}', style: contentStyle),
                     ],
                   ),
                 ),

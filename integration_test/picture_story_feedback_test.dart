@@ -286,6 +286,19 @@ void main() {
     router.pop();
     await tester.pumpAndSettle();
     await capturePage(capture, 'picture-story-detail-feedback-native');
+    expect(find.byType(ExpansionTile), findsNothing);
+    expect(find.text('逐题看看'), findsNothing);
+    expect(find.text('可以再补充'), findsNothing);
+    expect(find.text('说清楚了'), findsNothing);
+    for (final question in prompt.questions) {
+      expect(find.text(question), findsOneWidget);
+    }
+    await Scrollable.ensureVisible(
+      tester.element(find.text(prompt.questions.first)),
+      alignment: 0,
+    );
+    await tester.pumpAndSettle();
+    await capturePage(capture, 'picture-story-questions-native');
     await tester.ensureVisible(edit);
     await tester.pumpAndSettle();
     await Scrollable.ensureVisible(tester.element(edit), alignment: 0.5);
