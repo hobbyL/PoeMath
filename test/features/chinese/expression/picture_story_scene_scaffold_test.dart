@@ -7,12 +7,17 @@ import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
-import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_contrast.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 
 import '../../../helpers/picture_story_fixture.dart';
 
 void main() {
+  final sceneImage = find.byKey(const ValueKey('picture-story-scene-image'));
+  final rasterImage = find.descendant(
+    of: sceneImage,
+    matching: find.byType(Image),
+  );
   Future<void> mount(
     WidgetTester tester, {
     Size size = const Size(400, 900),
@@ -91,7 +96,7 @@ void main() {
     await mount(tester, onComplete: () => completions++);
     final backBefore = tester.getRect(find.byType(BackButton));
     final actionBefore = tester.getRect(find.byTooltip('完成练习'));
-    final imageBefore = tester.getRect(find.byType(PictureStoryImageView));
+    final imageBefore = tester.getRect(sceneImage);
     final contentBefore = tester.getRect(find.text('题目内容'));
     expect(find.byType(AppBar), findsNothing);
     expect(backBefore.center, const Offset(28, 52));
@@ -102,7 +107,7 @@ void main() {
     final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
     scroll.position.jumpTo(160);
     await tester.pump();
-    final imageAfter = tester.getRect(find.byType(PictureStoryImageView));
+    final imageAfter = tester.getRect(sceneImage);
     final contentAfter = tester.getRect(find.text('题目内容'));
     expect(contentBefore.top - contentAfter.top, closeTo(160, .01));
     expect(imageBefore.top - imageAfter.top, greaterThan(0));
@@ -129,7 +134,7 @@ void main() {
         imageBytes: bytes,
         onComplete: () => completions++,
       );
-      final image = find.byType(PictureStoryImageView);
+      final image = sceneImage;
       final imageBefore = tester.getRect(image);
       final contentBefore = tester.getRect(find.text('题目内容'));
       final backBefore = tester.getRect(find.byType(BackButton));
@@ -177,14 +182,14 @@ void main() {
         disableAnimations: systemPreference,
         accessibleNavigation: !systemPreference,
       );
-      final imageBefore = tester.getRect(find.byType(PictureStoryImageView));
+      final imageBefore = tester.getRect(sceneImage);
       final contentBefore = tester.getRect(find.text('题目内容'));
       tester
           .state<ScrollableState>(find.byType(Scrollable).first)
           .position
           .jumpTo(160);
       await tester.pump();
-      final imageAfter = tester.getRect(find.byType(PictureStoryImageView));
+      final imageAfter = tester.getRect(sceneImage);
       final contentAfter = tester.getRect(find.text('题目内容'));
       expect(imageBefore.top - imageAfter.top, closeTo(160, .01));
       expect(contentBefore.top - contentAfter.top, closeTo(160, .01));
@@ -196,31 +201,27 @@ void main() {
       await tester.pump();
       await tester.dragFrom(imageBefore.center, const Offset(0, 180));
       await tester.pumpAndSettle();
-      expect(tester.getRect(find.byType(PictureStoryImageView)), imageBefore);
+      expect(tester.getRect(sceneImage), imageBefore);
     });
   }
 
   for (final size in [const Size(320, 900), const Size(1100, 600)]) {
-    testWidgets('窄屏大字与横屏背景铺满宽度，插图不变形且返回固定：$size', (tester) async {
+    testWidgets('窄屏大字与横屏完整插图不变形，返回固定：$size', (tester) async {
       await mount(
         tester,
         size: size,
         textScale: 2,
         brightness: Brightness.dark,
       );
-      final image = tester.getRect(find.byType(PictureStoryImageView));
-      expect(image.left, 0);
-      expect(image.right, size.width);
+      final image = tester.getRect(sceneImage);
+      expect(image.center.dx, size.width / 2);
+      expect(image.width / image.height, closeTo(4 / 3, .01));
       expect(image.bottom, lessThanOrEqualTo(size.height * .55));
       final scene = tester.getRect(
-        find.descendant(
-          of: find.byType(PictureStoryImageView),
-          matching: find.byType(CustomPaint),
-        ),
+        find.descendant(of: sceneImage, matching: find.byType(CustomPaint)),
       );
       expect(scene.width / scene.height, closeTo(4 / 3, .01));
-      expect(scene.left, lessThanOrEqualTo(image.left));
-      expect(scene.right, greaterThanOrEqualTo(image.right));
+      expect(scene, image);
       final back = tester.getRect(find.byType(BackButton));
       expect(back.top, greaterThanOrEqualTo(24));
       expect(back.width, greaterThanOrEqualTo(44));
@@ -238,11 +239,11 @@ void main() {
 
   testWidgets('键盘出现不会改变题图高度或浮动按钮位置', (tester) async {
     await mount(tester);
-    final image = tester.getRect(find.byType(PictureStoryImageView));
+    final image = tester.getRect(sceneImage);
     final back = tester.getRect(find.byType(BackButton));
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
     await tester.pump();
-    expect(tester.getRect(find.byType(PictureStoryImageView)), image);
+    expect(tester.getRect(sceneImage), image);
     expect(tester.getRect(find.byType(BackButton)), back);
     await tester.scrollUntilVisible(
       find.byType(TextField),
@@ -260,10 +261,10 @@ void main() {
         () => pictureStoryPng(width: dimensions.$1, height: dimensions.$2),
       ))!;
       await mount(tester, imageBytes: bytes);
-      final image = tester.getRect(find.byType(Image));
+      final image = tester.getRect(rasterImage);
       final naturalHeight = 400 * dimensions.$2 / dimensions.$1;
       expect(image.height, closeTo(naturalHeight.clamp(0, 900 * .55), .01));
-      expect(tester.widget<Image>(find.byType(Image)).fit, BoxFit.cover);
+      expect(tester.widget<Image>(rasterImage).fit, BoxFit.cover);
       expect(image.left, 0);
       expect(image.right, 400);
       expect(
@@ -275,24 +276,105 @@ void main() {
     });
   }
 
-  testWidgets('宽屏本地题图等比铺满背景，两侧无留白', (tester) async {
-    final bytes = (await tester.runAsync(
-      () => pictureStoryPng(width: 1, height: 1),
-    ))!;
-    await mount(tester, size: const Size(1100, 600), imageBytes: bytes);
-    final image = tester.getRect(find.byType(Image));
-    expect(image.left, 0);
-    expect(image.right, 1100);
-    expect(image.height, 330);
-    expect(tester.widget<Image>(find.byType(Image)).fit, BoxFit.cover);
-    expect(tester.takeException(), isNull);
-  });
+  for (final dimensions in [(16, 9), (1, 1), (3, 4), (4, 1)]) {
+    testWidgets('横屏本地题图完整居中，四边不裁切：$dimensions', (tester) async {
+      final bytes = (await tester.runAsync(
+        () => pictureStoryPng(width: dimensions.$1, height: dimensions.$2),
+      ))!;
+      await mount(tester, size: const Size(1100, 600), imageBytes: bytes);
+      final image = tester.getRect(rasterImage);
+      expect(image.center.dx, 550);
+      expect(image.top, 0);
+      expect(image.left, greaterThanOrEqualTo(0));
+      expect(image.right, lessThanOrEqualTo(1100));
+      expect(image.height, lessThanOrEqualTo(330));
+      expect(
+        image.width / image.height,
+        closeTo(dimensions.$1 / dimensions.$2, .001),
+      );
+      expect(image.bottom, lessThan(tester.getRect(find.text('题目内容')).top));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets('旋转横屏两侧用模糊题图取色，转回竖屏恢复完整清晰题图：$brightness', (tester) async {
+      final bytes = (await tester.runAsync(pictureStoryContrastPng))!;
+      var loads = 0;
+      var completions = 0;
+      await mount(
+        tester,
+        brightness: brightness,
+        showHint: true,
+        onComplete: () => completions++,
+        loadImage: () async {
+          loads++;
+          return bytes;
+        },
+      );
+      final back = find.descendant(
+        of: find.byType(BackButton),
+        matching: find.byType(Icon),
+      );
+      final complete = find.byIcon(Icons.check_outlined);
+      Color? color(Finder icon) => IconTheme.of(tester.element(icon)).color;
+      // 深色主题的加载占位也是白色，不能用图标颜色代替缓存完成信号。
+      final container = ProviderScope.containerOf(tester.element(sceneImage));
+      final contrast = pictureStorySceneContrastProvider((
+        image: const PictureStoryImage.local('fixture-image'),
+        imageBytes: bytes,
+        builtinScheme: null,
+      ));
+      for (
+        var i = 0;
+        i < 60 && container.read(contrast).valueOrNull == null;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(container.read(contrast).valueOrNull, isNotNull);
+      await tester.pumpAndSettle();
+      final portrait = tester.getRect(rasterImage);
+      tester.view.physicalSize = const Size(1100, 600);
+      await tester.pumpAndSettle();
+      final landscape = tester.getRect(rasterImage);
+      expect(landscape.size, const Size.square(330));
+      expect(landscape.center.dx, 550);
+      expect(color(back), ColorTokens.poemInk);
+      expect(color(complete), ColorTokens.poemInk);
+      expect(IconTheme.of(tester.element(back)).shadows, isNotEmpty);
+      expect(
+        tester.getRect(find.byType(ImageFiltered)),
+        const Rect.fromLTWH(0, 0, 1100, 330),
+      );
+      await tester.tap(find.byTooltip('完成练习'));
+      expect(completions, 1);
+
+      // 键盘压缩可用高度时，仍沿用横屏窗口的完整题图尺寸。
+      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(rasterImage), landscape);
+      tester.view.viewInsets = const FakeViewPadding();
+      tester.view.physicalSize = const Size(400, 900);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(rasterImage), portrait);
+      expect(color(back), ColorTokens.mathSurface);
+      expect(color(complete), ColorTokens.mathSurface);
+      expect(loads, 1);
+      expect(find.byType(ImageFiltered), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('背景题图读取失败时重新加载入口仍可点击', (tester) async {
     final bytes = (await tester.runAsync(pictureStoryPng))!;
     var attempts = 0;
     await mount(
       tester,
+      size: const Size(1100, 600),
       loadImage: () async {
         if (++attempts == 1) throw StateError('synthetic image failure');
         return bytes;
@@ -302,7 +384,7 @@ void main() {
     await tester.tap(find.text('重新加载'));
     await tester.pumpAndSettle();
     expect(attempts, 2);
-    expect(find.byType(Image), findsOneWidget);
+    expect(rasterImage, findsOneWidget);
     expect(find.text('图片暂时无法显示'), findsNothing);
   });
 
@@ -380,7 +462,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(Image), findsOneWidget);
+    expect(rasterImage, findsOneWidget);
     final back = find.descendant(
       of: find.byType(BackButton),
       matching: find.byType(Icon),

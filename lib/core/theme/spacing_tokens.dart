@@ -30,6 +30,9 @@ class SpacingTokens {
   /// 图片上的透明图标使用细轮廓，补足明暗混合纹理下的辨识度。
   static const double imageIconOutline = 1.0;
 
+  /// 完整题图两侧使用同图模糊背景，柔化放大后的细节。
+  static const double imageBackdropBlur = 24.0;
+
   static const List<BoxShadow> softShadow = <BoxShadow>[
     BoxShadow(color: Color(0x1A000000), blurRadius: 12, offset: Offset(0, 4)),
   ];

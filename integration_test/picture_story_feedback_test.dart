@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +21,7 @@ import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/color_tokens.dart';
+import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
@@ -32,6 +34,7 @@ import 'package:poemath/features/chinese/expression/picture_story_page.dart';
 import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_history_prompt_card.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 
 import '../test/helpers/hive_test_helper.dart';
@@ -62,6 +65,24 @@ void main() {
       (await PackageInfo.fromPlatform()).packageName,
       'com.poemath.app.integration',
     );
+    Future<void> rotate(DeviceOrientation orientation) async {
+      await SystemChrome.setPreferredOrientations([orientation]);
+      final landscape = orientation == DeviceOrientation.landscapeLeft;
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        final size = tester.view.physicalSize;
+        if ((size.width > size.height) == landscape) {
+          await tester.pumpAndSettle();
+          return;
+        }
+      }
+      fail('设备未切换到 $orientation');
+    }
+
+    addTearDown(
+      () => SystemChrome.setPreferredOrientations(DeviceOrientation.values),
+    );
+    await rotate(DeviceOrientation.portraitUp);
     await setUpHiveForTesting();
     await unlockParentForTesting();
     final repo = PictureStoryRepository();
@@ -233,6 +254,17 @@ void main() {
     expect(find.text('修改表达并重新点评'), findsNothing);
     expect(find.byType(AppBar), findsNothing);
     await capturePage(capture, 'picture-story-history-native');
+    try {
+      await rotate(DeviceOrientation.landscapeLeft);
+      final card = tester.getRect(find.byType(PictureStoryHistoryPromptCard));
+      final viewport = tester.getRect(find.byType(Scaffold));
+      expect(card.left, closeTo(SpacingTokens.md, .01));
+      expect(viewport.right - card.right, closeTo(SpacingTokens.md, .01));
+      expect(find.byType(ImageFiltered), findsOneWidget);
+      await capturePage(capture, 'picture-story-history-landscape-native');
+    } finally {
+      await rotate(DeviceOrientation.portraitUp);
+    }
     final historyBack = tester.getRect(find.byType(BackButton));
     final historyImage = tester.getRect(find.byType(PictureStoryImageView));
     final historyScroll = tester.state<ScrollableState>(
@@ -386,6 +418,10 @@ void main() {
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     expect(find.byType(PictureStoryPage), findsOneWidget);
+    final sceneRaster = find.descendant(
+      of: find.byKey(const ValueKey('picture-story-scene-image')),
+      matching: find.byType(Image),
+    );
     final squareBytes = await pictureStoryContrastPng();
     final squareClosed =
         Navigator.of(tester.element(find.byType(PictureStoryPage))).push<void>(
@@ -418,7 +454,7 @@ void main() {
           ),
         );
     await tester.pumpAndSettle();
-    final square = tester.getRect(find.byType(Image));
+    final square = tester.getRect(sceneRaster);
     final screen = tester.getRect(find.byType(Scaffold));
     expect(square.left, screen.left);
     expect(square.right, screen.right);
@@ -449,7 +485,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 16));
     await gesture.moveBy(const Offset(0, 140));
     await tester.pump(const Duration(milliseconds: 100));
-    final stretched = tester.getRect(find.byType(Image));
+    final stretched = tester.getRect(sceneRaster);
     expect(stretched.top, closeTo(0, .01));
     expect(stretched.width, greaterThan(square.width));
     expect(stretched.height, greaterThan(square.height));
@@ -461,7 +497,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     await gesture.up();
     await tester.pumpAndSettle();
-    final restored = tester.getRect(find.byType(Image));
+    final restored = tester.getRect(sceneRaster);
     expect(restored.top, closeTo(square.top, .1));
     expect(restored.width, closeTo(square.width, .1));
     tester
@@ -474,6 +510,49 @@ void main() {
     expect(iconColor(adaptiveComplete), ColorTokens.poemInk);
     expect(tester.getRect(find.byType(BackButton)), adaptiveBackRect);
     await capturePage(capture, 'picture-story-contrast-scrolled-native');
+    tester
+        .state<ScrollableState>(find.byType(Scrollable).first)
+        .position
+        .jumpTo(0);
+    await tester.pumpAndSettle();
+
+    try {
+      await rotate(DeviceOrientation.landscapeLeft);
+      final landscapeImage = tester.getRect(sceneRaster);
+      final landscapeScreen = tester.getRect(find.byType(Scaffold));
+      expect(landscapeImage.width, closeTo(landscapeImage.height, .01));
+      expect(landscapeImage.center.dx, closeTo(landscapeScreen.center.dx, .01));
+      expect(landscapeImage.left, greaterThan(landscapeScreen.left));
+      expect(landscapeImage.right, lessThan(landscapeScreen.right));
+      expect(landscapeImage.top, closeTo(0, .01));
+      expect(iconColor(adaptiveBack), ColorTokens.poemInk);
+      expect(iconColor(adaptiveComplete), ColorTokens.poemInk);
+      expect(IconTheme.of(tester.element(adaptiveBack)).shadows, isNotEmpty);
+      expect(find.byType(ImageFiltered), findsOneWidget);
+      await capturePage(capture, 'picture-story-landscape-native');
+      final landscapeBack = tester.getRect(find.byType(BackButton));
+      final landscapeGesture = await tester.startGesture(landscapeImage.center);
+      await landscapeGesture.moveBy(const Offset(0, 50));
+      await tester.pump(const Duration(milliseconds: 16));
+      await landscapeGesture.moveBy(const Offset(0, 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      final landscapeStretch = tester.getRect(sceneRaster);
+      expect(landscapeStretch.top, closeTo(0, .01));
+      expect(landscapeStretch.width, greaterThan(landscapeImage.width));
+      expect(landscapeStretch.width / landscapeStretch.height, closeTo(1, .01));
+      expect(tester.getRect(find.byType(BackButton)), landscapeBack);
+      await tester.pump(const Duration(milliseconds: 200));
+      await landscapeGesture.up();
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(sceneRaster).width,
+        closeTo(landscapeImage.width, .1),
+      );
+    } finally {
+      await rotate(DeviceOrientation.portraitUp);
+    }
+    expect(tester.getRect(sceneRaster).width, closeTo(square.width, .1));
+    expect(iconColor(adaptiveBack), ColorTokens.mathSurface);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
     await squareClosed;

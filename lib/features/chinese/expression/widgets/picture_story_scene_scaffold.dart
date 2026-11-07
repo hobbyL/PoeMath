@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -87,18 +88,22 @@ class _PictureStorySceneScaffoldState
         child: Scaffold(
           body: LayoutBuilder(
             builder: (context, constraints) {
-              // 按原图比例铺满宽度；横屏限制背景高度，键盘不改变题图尺寸。
+              // 竖屏铺满宽度；横屏在高度上限内完整居中，键盘不改变题图尺寸。
               final imageHeight = math.min(
                 media.size.height * .55,
                 constraints.maxWidth / aspectRatio,
               );
+              final imageWidth = media.orientation == Orientation.landscape
+                  ? math.min(constraints.maxWidth, imageHeight * aspectRatio)
+                  : constraints.maxWidth;
+              final imageSize = Size(imageWidth, imageHeight);
               final parallaxFactor = reduceMotion ? 0.0 : .7;
               Widget adaptiveAction(Widget child) => _SceneToolbarAction(
                 sceneKey: _sceneKey,
                 scroll: _scroll,
                 pixels: pixels,
                 viewport: constraints.biggest,
-                imageHeight: imageHeight,
+                imageSize: imageSize,
                 parallaxFactor: parallaxFactor,
                 child: child,
               );
@@ -123,12 +128,45 @@ class _PictureStorySceneScaffoldState
                             child: AnimatedBuilder(
                               animation: _scroll,
                               child: RepaintBoundary(
-                                child: SizedBox.expand(
-                                  child: PictureStoryImageView(
-                                    image: widget.image,
-                                    fit: BoxFit.cover,
-                                    borderRadius: BorderRadius.zero,
-                                  ),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    if (imageWidth < constraints.maxWidth)
+                                      ExcludeSemantics(
+                                        child: IgnorePointer(
+                                          child: ClipRect(
+                                            child: ImageFiltered(
+                                              imageFilter: ui.ImageFilter.blur(
+                                                sigmaX: SpacingTokens
+                                                    .imageBackdropBlur,
+                                                sigmaY: SpacingTokens
+                                                    .imageBackdropBlur,
+                                                tileMode: TileMode.clamp,
+                                              ),
+                                              child: PictureStoryImageView(
+                                                image: widget.image,
+                                                preview: true,
+                                                fit: BoxFit.cover,
+                                                borderRadius: BorderRadius.zero,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    Center(
+                                      child: SizedBox.fromSize(
+                                        size: imageSize,
+                                        child: PictureStoryImageView(
+                                          key: const ValueKey(
+                                            'picture-story-scene-image',
+                                          ),
+                                          image: widget.image,
+                                          fit: BoxFit.cover,
+                                          borderRadius: BorderRadius.zero,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               builder: (context, child) {
@@ -250,7 +288,7 @@ class _SceneToolbarAction extends StatefulWidget {
     required this.scroll,
     required this.pixels,
     required this.viewport,
-    required this.imageHeight,
+    required this.imageSize,
     required this.parallaxFactor,
     required this.child,
   });
@@ -259,7 +297,7 @@ class _SceneToolbarAction extends StatefulWidget {
   final ScrollController scroll;
   final PictureStorySceneContrast? pixels;
   final Size viewport;
-  final double imageHeight;
+  final Size imageSize;
   final double parallaxFactor;
   final Widget child;
 
@@ -311,13 +349,14 @@ class _SceneToolbarActionState extends State<_SceneToolbarAction> {
       final theme = Theme.of(context);
       final offset = widget.scroll.hasClients ? widget.scroll.offset : 0.0;
       final rect = _iconRect;
-      final overImage = rect != null && rect.top < widget.imageHeight - offset;
+      final overImage =
+          rect != null && rect.top < widget.imageSize.height - offset;
       if (overImage) {
         _lightForeground =
             widget.pixels?.useLightForeground(
               iconRect: rect,
               viewport: widget.viewport,
-              imageHeight: widget.imageHeight,
+              imageSize: widget.imageSize,
               scrollOffset: offset,
               parallaxFactor: widget.parallaxFactor,
               background: theme.scaffoldBackgroundColor,

@@ -45,18 +45,11 @@ class PictureStoryHistoryPage extends ConsumerWidget {
     );
     final content = [
       if (id != null)
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: ResponsiveLayout.mediumBreakpoint,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: SpacingTokens.md),
-              child: PictureStoryHistoryPromptCard(
-                prompt: headerPrompt,
-                showImage: false,
-              ),
-            ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+          child: PictureStoryHistoryPromptCard(
+            prompt: headerPrompt,
+            showImage: false,
           ),
         ),
       if (records.isEmpty)

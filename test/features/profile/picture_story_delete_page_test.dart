@@ -10,8 +10,10 @@ import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_tile.dart';
+import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/profile/picture_story_detail_page.dart';
@@ -176,11 +178,21 @@ void main() {
     await drainHiveWritesForTesting(tester);
   }
 
-  testWidgets('直接进入题目详情后，浮动返回按钮回到题库', (tester) async {
+  testWidgets('横屏题目详情卡片铺满可用宽度，浮动返回按钮回到题库', (tester) async {
     final (router, _) = await pumpFlow(
       tester,
       location: AppRoutes.pictureStoryDetailOf(prompts.first.id),
+      size: const Size(1200, 700),
     );
+    for (final title in [prompts.first.title, '引导问题', '观察提示', '练习目标', '参考表达']) {
+      final card = tester.getRect(
+        find
+            .ancestor(of: find.text(title), matching: find.byType(ColoredCard))
+            .first,
+      );
+      expect(card.left, closeTo(SpacingTokens.md, .01));
+      expect(card.right, closeTo(1200 - SpacingTokens.md, .01));
+    }
     expect(router.canPop(), isFalse);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();

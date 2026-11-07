@@ -8,7 +8,6 @@ import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
-import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_prompt.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart'
@@ -150,44 +149,36 @@ class _PictureStoryDetailPageState
           onPressed: _deleting ? null : () => _delete(prompt!),
         ),
       ],
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: ResponsiveLayout.wideBreakpoint,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ColoredCard(
-                color: theme.colorScheme.primary,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(prompt.title, style: theme.textTheme.headlineSmall),
-                    const SizedBox(height: SpacingTokens.sm),
-                    Text(
-                      [
-                        prompt.levelLabel,
-                        if (prompt.theme.isNotEmpty) prompt.theme,
-                      ].join(' · '),
-                    ),
-                  ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ColoredCard(
+            color: theme.colorScheme.primary,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(prompt.title, style: theme.textTheme.headlineSmall),
+                const SizedBox(height: SpacingTokens.sm),
+                Text(
+                  [
+                    prompt.levelLabel,
+                    if (prompt.theme.isNotEmpty) prompt.theme,
+                  ].join(' · '),
                 ),
-              ),
-              const SizedBox(height: SpacingTokens.md),
-              _section(theme, '引导问题', prompt.questions),
-              const SizedBox(height: SpacingTokens.md),
-              _section(theme, '观察提示', prompt.sceneFacts),
-              const SizedBox(height: SpacingTokens.md),
-              _section(theme, '练习目标', prompt.goals),
-              const SizedBox(height: SpacingTokens.md),
-              _section(theme, '参考表达', [
-                if (prompt.reference.isNotEmpty) prompt.reference,
-              ], numbered: false),
-            ],
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: SpacingTokens.md),
+          _section(theme, '引导问题', prompt.questions),
+          const SizedBox(height: SpacingTokens.md),
+          _section(theme, '观察提示', prompt.sceneFacts),
+          const SizedBox(height: SpacingTokens.md),
+          _section(theme, '练习目标', prompt.goals),
+          const SizedBox(height: SpacingTokens.md),
+          _section(theme, '参考表达', [
+            if (prompt.reference.isNotEmpty) prompt.reference,
+          ], numbered: false),
+        ],
       ),
     );
   }

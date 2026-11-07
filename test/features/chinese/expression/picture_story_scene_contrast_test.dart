@@ -22,12 +22,12 @@ void main() {
     double offset = 0,
     double parallax = .7,
     Size viewport = const Size(400, 900),
-    double imageHeight = 400,
+    Size imageSize = const Size.square(400),
     Color background = Colors.white,
   }) => pixels.useLightForeground(
     iconRect: rect,
     viewport: viewport,
-    imageHeight: imageHeight,
+    imageSize: imageSize,
     scrollOffset: offset,
     parallaxFactor: parallax,
     background: background,
@@ -56,14 +56,60 @@ void main() {
     expect(lightAt(right, offset: -200), isFalse);
   });
 
-  test('宽屏 cover 裁切后从原图中部取样', () {
+  test('横屏完整题图按居中位置取色，两侧按铺满的模糊背景取色', () {
+    const viewport = Size(800, 600);
+    const imageSize = Size.square(220);
     expect(
       lightAt(
         const Rect.fromLTWH(16, 40, 24, 24),
-        viewport: const Size(800, 600),
-        imageHeight: 220,
+        viewport: viewport,
+        imageSize: imageSize,
       ),
       isFalse,
+    );
+    expect(
+      lightAt(
+        const Rect.fromLTWH(16, 40, 24, 24),
+        viewport: viewport,
+        imageSize: imageSize,
+        background: Colors.black,
+      ),
+      isFalse,
+    );
+    expect(
+      lightAt(
+        const Rect.fromLTWH(306, 12, 24, 24),
+        viewport: viewport,
+        imageSize: imageSize,
+      ),
+      isTrue,
+    );
+    expect(
+      lightAt(
+        const Rect.fromLTWH(436, 12, 24, 24),
+        viewport: viewport,
+        imageSize: imageSize,
+      ),
+      isFalse,
+    );
+    expect(
+      lightAt(
+        const Rect.fromLTWH(620, 40, 24, 24),
+        viewport: viewport,
+        imageSize: imageSize,
+      ),
+      isTrue,
+    );
+  });
+
+  test('横屏下拉放大覆盖到侧边后，从模糊背景取色切换为清晰图片取色', () {
+    const icon = Rect.fromLTWH(220, 12, 24, 24);
+    const viewport = Size(800, 600);
+    const imageSize = Size.square(220);
+    expect(lightAt(icon, viewport: viewport, imageSize: imageSize), isFalse);
+    expect(
+      lightAt(icon, viewport: viewport, imageSize: imageSize, offset: -200),
+      isTrue,
     );
   });
 
@@ -96,7 +142,7 @@ void main() {
         grey.useLightForeground(
           iconRect: const Rect.fromLTWH(16, 40, 24, 24),
           viewport: const Size(400, 900),
-          imageHeight: 400,
+          imageSize: const Size.square(400),
           scrollOffset: 0,
           parallaxFactor: .7,
           background: Colors.white,
@@ -114,7 +160,7 @@ void main() {
         transparent.useLightForeground(
           iconRect: const Rect.fromLTWH(16, 40, 24, 24),
           viewport: const Size(400, 900),
-          imageHeight: 400,
+          imageSize: const Size.square(400),
           scrollOffset: 0,
           parallaxFactor: .7,
           background: background,

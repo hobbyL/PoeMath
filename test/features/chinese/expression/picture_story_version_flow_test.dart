@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/app_theme.dart';
+import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -26,6 +27,7 @@ import 'package:poemath/features/chinese/expression/picture_story_practice_page.
 import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_history_prompt_card.dart';
 
 import '../../../helpers/hive_test_helper.dart';
 import '../../../helpers/parent_access_test_helper.dart';
@@ -682,16 +684,27 @@ void main() {
       await tester.tap(find.text('练习记录 · 1 次'));
       await tester.pumpAndSettle();
       expect(find.text(prompt.title), findsOneWidget);
-      final image = tester.getRect(find.byType(PictureStoryImageView));
+      final sceneImage = find.byKey(
+        const ValueKey('picture-story-scene-image'),
+      );
+      final image = tester.getRect(sceneImage);
       expect(find.byType(AppBar), findsNothing);
       expect(image.center.dx, closeTo(width / 2, 0.01));
       expect(image.top, closeTo(0, 0.01));
-      expect(image.left, closeTo(0, 0.01));
-      expect(image.right, closeTo(width, 0.01));
+      if (width > 900) {
+        expect(image.width / image.height, closeTo(4 / 3, .01));
+        expect(find.byType(ImageFiltered), findsOneWidget);
+      } else {
+        expect(image.left, closeTo(0, 0.01));
+        expect(image.right, closeTo(width, 0.01));
+      }
+      final promptCard = tester.getRect(
+        find.byType(PictureStoryHistoryPromptCard),
+      );
+      expect(promptCard.left, closeTo(SpacingTokens.md, .01));
+      expect(promptCard.right, closeTo(width - SpacingTokens.md, .01));
       expect(
-        tester
-            .widget<PictureStoryImageView>(find.byType(PictureStoryImageView))
-            .borderRadius,
+        tester.widget<PictureStoryImageView>(sceneImage).borderRadius,
         BorderRadius.zero,
       );
       await tester.runAsync(() async {
