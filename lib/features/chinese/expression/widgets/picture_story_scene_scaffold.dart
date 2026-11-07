@@ -14,7 +14,7 @@ import 'package:poemath/features/chinese/expression/providers/picture_story_prov
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_contrast.dart';
 
-/// 题图作为顶部背景，内容向上覆盖；返回与页面操作始终固定在安全区内。
+/// 题图支持上滑视差、下拉等比放大；返回与页面操作始终固定在安全区内。
 class PictureStorySceneScaffold extends ConsumerStatefulWidget {
   const PictureStorySceneScaffold({
     super.key,
@@ -73,10 +73,8 @@ class _PictureStorySceneScaffoldState
     final aspectRatio = header == null
         ? 4 / 3
         : header.getUint32(16) / header.getUint32(20);
-    final reduceMotion =
-        media.disableAnimations ||
-        media.accessibleNavigation ||
-        !PageAnimationScope.enabledOf(context);
+    // 页面动画开关只控制转场与入场；跟随手势的视差、下拉反馈仍然可用。
+    final reduceMotion = media.disableAnimations || media.accessibleNavigation;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: theme.brightness == Brightness.dark
           ? SystemUiOverlayStyle.light
@@ -107,14 +105,21 @@ class _PictureStorySceneScaffoldState
               return Stack(
                 key: _sceneKey,
                 children: [
-                  SingleChildScrollView(
-                    controller: _scroll,
-                    child: Stack(
-                      children: [
-                        SizedBox(
-                          height: imageHeight,
-                          width: double.infinity,
-                          child: ClipRect(
+                  ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context)
+                        .copyWith(overscroll: false),
+                    child: SingleChildScrollView(
+                      controller: _scroll,
+                      physics: reduceMotion
+                          ? const ClampingScrollPhysics()
+                          : const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                      child: Stack(
+                        children: [
+                          SizedBox(
+                            height: imageHeight,
+                            width: double.infinity,
                             child: AnimatedBuilder(
                               animation: _scroll,
                               child: RepaintBoundary(
@@ -128,30 +133,42 @@ class _PictureStorySceneScaffoldState
                               ),
                               builder: (context, child) {
                                 final offset = _scroll.hasClients
-                                    ? _scroll.offset.clamp(0.0, imageHeight)
+                                    ? _scroll.offset
                                     : 0.0;
-                                return Transform.translate(
-                                  offset: Offset(0, offset * parallaxFactor),
-                                  child: child,
+                                final stretch = math.max(0.0, -offset);
+                                return ClipRect(
+                                  clipper: _SceneImageClipper(stretch),
+                                  child: Transform.translate(
+                                    offset: Offset(
+                                      0,
+                                      offset.clamp(0.0, imageHeight) *
+                                          parallaxFactor,
+                                    ),
+                                    child: Transform.scale(
+                                      scale: 1 + stretch / imageHeight,
+                                      alignment: Alignment.bottomCenter,
+                                      child: child,
+                                    ),
+                                  ),
                                 );
                               },
                             ),
                           ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.only(top: imageHeight),
-                          child: ColoredCard(
-                            color: theme.scaffoldBackgroundColor,
-                            backgroundOpacity: 1,
-                            borderRadius: BorderRadius.zero,
-                            constraints: BoxConstraints(
-                              minHeight: constraints.maxHeight,
+                          Padding(
+                            padding: EdgeInsets.only(top: imageHeight),
+                            child: ColoredCard(
+                              color: theme.scaffoldBackgroundColor,
+                              backgroundOpacity: 1,
+                              borderRadius: BorderRadius.zero,
+                              constraints: BoxConstraints(
+                                minHeight: constraints.maxHeight,
+                              ),
+                              padding: const EdgeInsets.all(SpacingTokens.md),
+                              child: SafeArea(top: false, child: widget.child),
                             ),
-                            padding: const EdgeInsets.all(SpacingTokens.md),
-                            child: SafeArea(top: false, child: widget.child),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   Positioned(
@@ -210,6 +227,21 @@ class _PictureStorySceneScaffoldState
       ),
     );
   }
+}
+
+/// 下拉时允许图片向上放大到视口顶边，横向仍裁切在屏幕宽度内。
+class _SceneImageClipper extends CustomClipper<Rect> {
+  const _SceneImageClipper(this.stretch);
+
+  final double stretch;
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTWH(0, -stretch, size.width, size.height + stretch);
+
+  @override
+  bool shouldReclip(_SceneImageClipper oldClipper) =>
+      oldClipper.stretch != stretch;
 }
 
 class _SceneToolbarAction extends StatefulWidget {

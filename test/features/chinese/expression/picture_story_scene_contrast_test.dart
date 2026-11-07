@@ -48,6 +48,14 @@ void main() {
     expect(lightAt(icon, offset: 220), isFalse);
   });
 
+  test('下拉放大后顶部仍从图片取色，并按等比放大后的横向位置取样', () {
+    const left = Rect.fromLTWH(16, 40, 24, 24);
+    const right = Rect.fromLTWH(368, 40, 24, 24);
+    expect(lightAt(left, offset: -200), isTrue);
+    expect(lightAt(right), isTrue);
+    expect(lightAt(right, offset: -200), isFalse);
+  });
+
   test('宽屏 cover 裁切后从原图中部取样', () {
     expect(
       lightAt(

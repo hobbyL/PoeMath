@@ -21,6 +21,7 @@ import 'package:poemath/core/services/llm/llm_scenario.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
@@ -204,6 +205,9 @@ void main() {
           key: capture,
           child: MaterialApp.router(
             routerConfig: router,
+            // 实际应用关闭转场/入场动画时，仍须支持跟随手势的视差和下拉。
+            builder: (context, child) =>
+                PageAnimationScope(enabled: false, child: child!),
             theme: AppTheme.resolve(
               subject: AppSubject.poem,
               brightness: Brightness.light,
@@ -439,6 +443,27 @@ void main() {
     expect(iconColor(adaptiveComplete), ColorTokens.mathSurface);
     await capturePage(capture, 'picture-story-square-native');
     final adaptiveBackRect = tester.getRect(find.byType(BackButton));
+    final adaptiveCompleteRect = tester.getRect(find.byTooltip('完成练习'));
+    final gesture = await tester.startGesture(square.center);
+    await gesture.moveBy(const Offset(0, 60));
+    await tester.pump(const Duration(milliseconds: 16));
+    await gesture.moveBy(const Offset(0, 140));
+    await tester.pump(const Duration(milliseconds: 100));
+    final stretched = tester.getRect(find.byType(Image));
+    expect(stretched.top, closeTo(0, .01));
+    expect(stretched.width, greaterThan(square.width));
+    expect(stretched.height, greaterThan(square.height));
+    expect(stretched.width / stretched.height, closeTo(1, .01));
+    expect(tester.getRect(find.byType(BackButton)), adaptiveBackRect);
+    expect(tester.getRect(find.byTooltip('完成练习')), adaptiveCompleteRect);
+    expect(iconColor(adaptiveBack), ColorTokens.mathSurface);
+    await capturePage(capture, 'picture-story-stretched-native');
+    await tester.pump(const Duration(milliseconds: 200));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    final restored = tester.getRect(find.byType(Image));
+    expect(restored.top, closeTo(square.top, .1));
+    expect(restored.width, closeTo(square.width, .1));
     tester
         .state<ScrollableState>(find.byType(Scrollable).first)
         .position

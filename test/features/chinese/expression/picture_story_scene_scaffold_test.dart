@@ -18,6 +18,7 @@ void main() {
     Size size = const Size(400, 900),
     double textScale = 1,
     bool disableAnimations = false,
+    bool accessibleNavigation = false,
     bool pageAnimations = true,
     Brightness brightness = Brightness.light,
     VoidCallback? onComplete,
@@ -45,6 +46,7 @@ void main() {
               data: MediaQuery.of(context).copyWith(
                 textScaler: TextScaler.linear(textScale),
                 disableAnimations: disableAnimations,
+                accessibleNavigation: accessibleNavigation,
               ),
               child: child!,
             ),
@@ -112,12 +114,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final sample in [
+    (size: const Size(400, 900), pageAnimations: true),
+    (size: const Size(1100, 600), pageAnimations: true),
+    (size: const Size(400, 900), pageAnimations: false),
+  ]) {
+    testWidgets('下拉等比放大图片且顶边无留白，按钮固定，松手回到原位：$sample', (tester) async {
+      final bytes = (await tester.runAsync(pictureStoryContrastPng))!;
+      var completions = 0;
+      await mount(
+        tester,
+        size: sample.size,
+        pageAnimations: sample.pageAnimations,
+        imageBytes: bytes,
+        onComplete: () => completions++,
+      );
+      final image = find.byType(PictureStoryImageView);
+      final imageBefore = tester.getRect(image);
+      final contentBefore = tester.getRect(find.text('题目内容'));
+      final backBefore = tester.getRect(find.byType(BackButton));
+      final actionBefore = tester.getRect(find.byTooltip('完成练习'));
+      final scroll = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      final gesture = await tester.startGesture(imageBefore.center);
+      await gesture.moveBy(const Offset(0, 60));
+      await tester.pump(const Duration(milliseconds: 16));
+      await gesture.moveBy(const Offset(0, 120));
+      await tester.pump(const Duration(milliseconds: 16));
+      final enlarged = tester.getRect(image);
+      expect(scroll.position.pixels, lessThan(0));
+      expect(enlarged.top, closeTo(0, .01));
+      expect(enlarged.width, greaterThan(imageBefore.width));
+      expect(enlarged.height, greaterThan(imageBefore.height));
+      expect(
+        enlarged.width / enlarged.height,
+        closeTo(imageBefore.width / imageBefore.height, .01),
+      );
+      expect(
+        tester.getRect(find.text('题目内容')).top - contentBefore.top,
+        closeTo(enlarged.bottom - imageBefore.bottom, .01),
+      );
+      expect(tester.getRect(find.byType(BackButton)), backBefore);
+      expect(tester.getRect(find.byTooltip('完成练习')), actionBefore);
+      // 停住再松手，验证回弹而非快速甩动产生的惯性滚动。
+      await tester.pump(const Duration(milliseconds: 200));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(scroll.position.pixels, closeTo(0, .1));
+      expect(tester.getRect(image).top, closeTo(imageBefore.top, .1));
+      expect(tester.getRect(image).width, closeTo(imageBefore.width, .1));
+      await tester.tap(find.byTooltip('完成练习'));
+      expect(completions, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final systemPreference in [true, false]) {
-    testWidgets('关闭动画后题图随内容正常滚动（系统设置：$systemPreference）', (tester) async {
+    testWidgets('系统减少动态效果时保持普通滚动且不放大（禁用动画：$systemPreference）', (tester) async {
       await mount(
         tester,
         disableAnimations: systemPreference,
-        pageAnimations: systemPreference,
+        accessibleNavigation: !systemPreference,
       );
       final imageBefore = tester.getRect(find.byType(PictureStoryImageView));
       final contentBefore = tester.getRect(find.text('题目内容'));
@@ -131,6 +189,14 @@ void main() {
       expect(imageBefore.top - imageAfter.top, closeTo(160, .01));
       expect(contentBefore.top - contentAfter.top, closeTo(160, .01));
       expect(find.byType(BackButton).hitTestable(), findsOneWidget);
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(0);
+      await tester.pump();
+      await tester.dragFrom(imageBefore.center, const Offset(0, 180));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byType(PictureStoryImageView)), imageBefore);
     });
   }
 

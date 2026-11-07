@@ -67,7 +67,7 @@ class PictureStorySceneContrast {
     }
   }
 
-  /// 将按钮下方 7×7 个采样点映射回 cover 裁切、视差平移后的原图。
+  /// 将按钮下方 7×7 个采样点映射回裁切、视差平移和下拉放大后的原图。
   bool useLightForeground({
     required Rect iconRect,
     required Size viewport,
@@ -83,8 +83,13 @@ class PictureStorySceneContrast {
       applyBoxFit(BoxFit.cover, sourceSize, output).source,
       Offset.zero & sourceSize,
     );
+    final stretch = math.max(0.0, -scrollOffset);
+    final scale = 1 + stretch / imageHeight;
+    final imageLeft = output.width * (1 - scale) / 2;
     final imageTop =
-        -scrollOffset + scrollOffset.clamp(0.0, imageHeight) * parallaxFactor;
+        -scrollOffset +
+        scrollOffset.clamp(0.0, imageHeight) * parallaxFactor -
+        stretch;
     var luminance = 0.0;
     const samples = 7;
     for (var row = 0; row < samples; row++) {
@@ -92,15 +97,18 @@ class PictureStorySceneContrast {
         final x = iconRect.left + iconRect.width * (column + .5) / samples;
         final y = iconRect.top + iconRect.height * (row + .5) / samples;
         var color = background;
-        if (y >= -scrollOffset &&
+        if (y >= -math.max(0.0, scrollOffset) &&
             y < imageHeight - scrollOffset &&
             x >= 0 &&
             x < viewport.width) {
-          final pixelX = (source.left + x / output.width * source.width)
-              .floor()
-              .clamp(0, width - 1);
+          final pixelX =
+              (source.left +
+                      (x - imageLeft) / (output.width * scale) * source.width)
+                  .floor()
+                  .clamp(0, width - 1);
           final pixelY =
-              (source.top + (y - imageTop) / output.height * source.height)
+              (source.top +
+                      (y - imageTop) / (output.height * scale) * source.height)
                   .floor()
                   .clamp(0, height - 1);
           final index = (pixelY * width + pixelX) * 4;
