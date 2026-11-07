@@ -22,12 +22,14 @@ class PictureStorySceneScaffold extends ConsumerStatefulWidget {
     required this.semanticLabel,
     required this.child,
     this.actions = const [],
+    this.onBack,
   });
 
   final PictureStoryImage image;
   final String semanticLabel;
   final Widget child;
   final List<Widget> actions;
+  final VoidCallback? onBack;
 
   @override
   ConsumerState<PictureStorySceneScaffold> createState() =>
@@ -167,18 +169,22 @@ class _PictureStorySceneScaffoldState
                               child: Center(
                                 child: adaptiveAction(
                                   BackButton(
-                                    onPressed: () {
-                                      final navigator = Navigator.of(context);
-                                      if (navigator.canPop()) {
-                                        navigator.pop();
-                                      } else {
-                                        GoRouter.maybeOf(context)?.go(
-                                          AppRoutes.chineseSectionOf(
-                                            'expression',
-                                          ),
-                                        );
-                                      }
-                                    },
+                                    onPressed:
+                                        widget.onBack ??
+                                        () {
+                                          final navigator = Navigator.of(
+                                            context,
+                                          );
+                                          if (navigator.canPop()) {
+                                            navigator.pop();
+                                          } else {
+                                            GoRouter.maybeOf(context)?.go(
+                                              AppRoutes.chineseSectionOf(
+                                                'expression',
+                                              ),
+                                            );
+                                          }
+                                        },
                                   ),
                                 ),
                               ),

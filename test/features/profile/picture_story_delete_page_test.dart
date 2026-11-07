@@ -176,6 +176,23 @@ void main() {
     await drainHiveWritesForTesting(tester);
   }
 
+  testWidgets('直接进入题目详情后，浮动返回按钮回到题库', (tester) async {
+    final (router, _) = await pumpFlow(
+      tester,
+      location: AppRoutes.pictureStoryDetailOf(prompts.first.id),
+    );
+    expect(router.canPop(), isFalse);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.state.uri.path,
+      AppRoutes.pictureStoryManagement,
+    );
+    expect(find.byType(PictureStoryManagementPage), findsOneWidget);
+    expect(repository.listPrompts(), hasLength(3));
+    await unmount(tester);
+  });
+
   testWidgets('真实题库详情可取消删除，确认后返回题库并刷新启用数量', (tester) async {
     final (router, container) = await pumpFlow(tester);
     final prompt = prompts.first;

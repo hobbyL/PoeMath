@@ -29,6 +29,7 @@ import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 import 'package:poemath/features/profile/picture_story_detail_page.dart';
 import 'package:poemath/features/profile/picture_story_editor_page.dart';
 import 'package:poemath/features/profile/picture_story_management_page.dart';
@@ -271,6 +272,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(PictureStoryDetailPage), findsOneWidget);
     expect(find.text(saved.title), findsOneWidget);
+    expect(find.byType(PictureStorySceneScaffold), findsOneWidget);
+    expect(find.byType(AppBar), findsNothing);
+    final detailImage = tester.getRect(find.byType(PictureStoryImageView));
+    final detailScene = tester.getRect(find.byType(Scaffold));
+    expect(detailImage.left, detailScene.left);
+    expect(detailImage.right, detailScene.right);
+    expect(find.byTooltip('编辑题目'), findsOneWidget);
+    expect(find.byTooltip('删除题目'), findsOneWidget);
+    final toolbar = [
+      find.byType(BackButton),
+      find.byTooltip('编辑题目'),
+      find.byTooltip('删除题目'),
+    ];
+    final toolbarRects = toolbar.map(tester.getRect).toList();
+    final detailScroll = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    detailScroll.position.jumpTo(120);
+    await tester.pumpAndSettle();
+    expect(toolbar.map(tester.getRect).toList(), toolbarRects);
+    final movedImage = tester.getRect(find.byType(PictureStoryImageView));
+    expect(detailImage.top - movedImage.top, greaterThan(0));
+    expect(detailImage.top - movedImage.top, lessThan(120));
+    detailScroll.position.jumpTo(0);
+    await tester.pumpAndSettle();
     expect(saved.image.isLocal, isTrue);
     expect(repository.listPrompts().map((prompt) => prompt.id), [saved.id]);
     expect(container.read(pictureStoryPromptCountProvider), 1);
@@ -414,8 +440,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.descendant(of: tile, matching: find.textContaining('1个文件')),
           findsOneWidget,);
-      expect(find.descendant(of: tile, matching: find.byType(TextButton)),
-          findsNothing,);
+      final clear = find.descendant(
+        of: tile,
+        matching: find.byType(TextButton),
+      );
+      expect(clear, findsOneWidget);
+      expect(tester.widget<TextButton>(clear).onPressed, isNull);
       expect(tester.widget<AppTile>(tile).onTap, isNull);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
