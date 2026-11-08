@@ -269,11 +269,24 @@ void main() {
     );
     expect(image.image, first.image);
     expect(image.preview, isFalse);
-    final cardRect = tester.getRect(find.byType(ColoredCard).first);
     final imageRect = tester.getRect(find.byType(PictureStoryImageView));
-    expect(imageRect.left, closeTo(cardRect.left, 0.01));
-    expect(imageRect.top, closeTo(cardRect.top, 0.01));
-    expect(imageRect.right, closeTo(cardRect.right, 0.01));
+    expect(imageRect.left, 0);
+    expect(imageRect.top, 0);
+    expect(imageRect.right, 420);
+    expect(image.borderRadius, BorderRadius.zero);
+    expect(find.byType(AppBar), findsNothing);
+    expect(
+      tester
+          .widget<PictureStoryHistoryPromptCard>(
+            find.byType(PictureStoryHistoryPromptCard),
+          )
+          .showImage,
+      isFalse,
+    );
+    expect(
+      tester.getRect(find.byType(PictureStoryHistoryPromptCard)).top,
+      greaterThan(imageRect.bottom),
+    );
     expect(tester.takeException(), isNull);
     await unmount(tester);
   });
@@ -562,7 +575,7 @@ void main() {
     await tester.tap(find.byTooltip('查看题目'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text(versions.$1.reference), 250);
-    expect(find.text('练习详情'), findsOneWidget);
+    expect(find.text('练习详情'), findsNothing);
     expect(find.text('第 1 次练习'), findsNothing);
     expect(find.text(versions.$1.title), findsOneWidget);
     expect(find.text(versions.$1.questions.first), findsOneWidget);
@@ -820,12 +833,38 @@ void main() {
       }
       await tester.tap(find.byTooltip('查看题目'));
       await tester.pumpAndSettle();
-      expect(find.byType(PictureStoryImageView), findsOneWidget);
+      final expandedImage = find.byKey(
+        const ValueKey('picture-story-scene-image'),
+      );
+      expect(expandedImage, findsOneWidget);
+      expect(find.byType(AppBar), findsNothing);
+      final expandedImageRect = tester.getRect(expandedImage);
+      expect(expandedImageRect.top, closeTo(0, .01));
+      expect(expandedImageRect.center.dx, closeTo(width / 2, .01));
+      final promptRect = tester.getRect(
+        find.byType(PictureStoryHistoryPromptCard),
+      );
+      expect(promptRect.left, closeTo(SpacingTokens.md, .01));
+      expect(promptRect.right, closeTo(width - SpacingTokens.md, .01));
       expect(find.text(prompt.title), findsOneWidget);
       expect(tester.getRect(editButton), editRect);
+      final hideButton = find.byTooltip('隐藏题目');
+      final hideRect = tester.getRect(hideButton);
+      final expandedScroll = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      expandedScroll.position.jumpTo(120);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(editButton), editRect);
+      expect(tester.getRect(hideButton), hideRect);
+      expect(
+        expandedImageRect.top - tester.getRect(expandedImage).top,
+        closeTo(36, .01),
+      );
       await tester.tap(find.byTooltip('隐藏题目'));
       await tester.pumpAndSettle();
       expect(find.byType(PictureStoryImageView), findsNothing);
+      expect(find.byType(AppBar), findsOneWidget);
       final historyScroll = find
           .descendant(
             of: find.byType(PictureStoryRecordDetailPage),
@@ -843,6 +882,20 @@ void main() {
       expect(
         tester.getRect(find.text('根据图片与文字提供建议，不评价发音和语调。')).bottom,
         lessThanOrEqualTo(editRect.top),
+      );
+      final readingOffset = tester
+          .state<ScrollableState>(historyScroll)
+          .position
+          .pixels;
+      await tester.tap(find.byTooltip('查看题目'));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(expandedImage).top, closeTo(0, .01));
+      expect(tester.getRect(editButton), editRect);
+      await tester.tap(find.byTooltip('隐藏题目'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.state<ScrollableState>(historyScroll).position.pixels,
+        closeTo(readingOffset, .01),
       );
       expect(find.text('原录音'), findsNothing);
       router.pop();
@@ -924,6 +977,12 @@ void main() {
     expect(audioCalls, contains('resume'));
     expect(find.byIcon(Icons.stop_circle_outlined), findsOneWidget);
     final stopCount = audioCalls.where((method) => method == 'stop').length;
+    await tester.tap(find.byTooltip('查看题目'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.stop_circle_outlined), findsOneWidget);
+    await tester.tap(find.byTooltip('隐藏题目'));
+    await tester.pumpAndSettle();
+    expect(audioCalls.where((method) => method == 'stop').length, stopCount);
     router.pop();
     await tester.pumpAndSettle();
     for (
@@ -1098,6 +1157,14 @@ void main() {
     expect(find.text('孩子已保存的表达。'), findsOneWidget);
     expect(find.byType(PictureStoryImageView), findsNothing);
     expect(find.text('参考表达'), findsNothing);
+    await tester.tap(find.byTooltip('查看题目'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppBar), findsOneWidget);
+    expect(find.byType(PictureStoryImageView), findsNothing);
+    expect(find.text('孩子已保存的表达。'), findsOneWidget);
+    await tester.tap(find.byTooltip('隐藏题目'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('查看题目'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await unmount(tester);
   });

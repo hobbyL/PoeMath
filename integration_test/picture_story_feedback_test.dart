@@ -293,12 +293,65 @@ void main() {
     expect(find.text('第 2 次练习'), findsNothing);
     expect(find.text(prompt.reference), findsNothing);
     expect(find.text('我的表达'), findsOneWidget);
+    final detailEdit = find.widgetWithText(FilledButton, '修改表达并重新点评');
+    final detailEditRect = tester.getRect(detailEdit);
     await tester.tap(find.byTooltip('查看题目'));
     await tester.pumpAndSettle();
     expect(find.text(prompt.reference), findsOneWidget);
+    expect(find.byType(AppBar), findsNothing);
+    final detailScene = find.byKey(const ValueKey('picture-story-scene-image'));
+    final detailImage = tester.getRect(detailScene);
+    final detailBack = tester.getRect(find.byType(BackButton));
+    final detailToggle = tester.getRect(find.byTooltip('隐藏题目'));
+    expect(detailImage.top, closeTo(0, .01));
+    expect(detailImage.left, closeTo(0, .01));
+    expect(tester.getRect(detailEdit), detailEditRect);
+    await capturePage(capture, 'picture-story-record-expanded-native');
+    final detailScroll = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    detailScroll.position.jumpTo(120);
+    await tester.pumpAndSettle();
+    expect(detailImage.top - tester.getRect(detailScene).top, closeTo(36, .01));
+    expect(tester.getRect(find.byType(BackButton)), detailBack);
+    expect(tester.getRect(find.byTooltip('隐藏题目')), detailToggle);
+    expect(tester.getRect(detailEdit), detailEditRect);
+    detailScroll.position.jumpTo(0);
+    await tester.pumpAndSettle();
+    final detailGesture = await tester.startGesture(detailImage.center);
+    await detailGesture.moveBy(const Offset(0, 50));
+    await tester.pump(const Duration(milliseconds: 16));
+    await detailGesture.moveBy(const Offset(0, 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.getRect(detailScene).width, greaterThan(detailImage.width));
+    expect(tester.getRect(detailScene).top, closeTo(0, .01));
+    expect(tester.getRect(detailEdit), detailEditRect);
+    await tester.pump(const Duration(milliseconds: 200));
+    await detailGesture.up();
+    await tester.pumpAndSettle();
+    try {
+      await rotate(DeviceOrientation.landscapeLeft);
+      final landscape = tester.getRect(detailScene);
+      final screen = tester.getRect(find.byType(Scaffold));
+      expect(landscape.width / landscape.height, closeTo(4 / 3, .01));
+      expect(landscape.center.dx, closeTo(screen.center.dx, .01));
+      expect(find.byType(ImageFiltered), findsOneWidget);
+      final card = tester.getRect(find.byType(PictureStoryHistoryPromptCard));
+      expect(card.left, closeTo(SpacingTokens.md, .01));
+      expect(screen.right - card.right, closeTo(SpacingTokens.md, .01));
+      expect(detailEdit.hitTestable(), findsOneWidget);
+      await capturePage(
+        capture,
+        'picture-story-record-expanded-landscape-native',
+      );
+    } finally {
+      await rotate(DeviceOrientation.portraitUp);
+    }
     await tester.tap(find.byTooltip('隐藏题目'));
     await tester.pumpAndSettle();
     expect(find.text(prompt.reference), findsNothing);
+    expect(find.text('练习详情'), findsOneWidget);
+    expect(tester.getRect(detailEdit), detailEditRect);
     expect(requests, 0);
     final edit = find.text('修改表达并重新点评');
     expect(edit.hitTestable(), findsOneWidget);

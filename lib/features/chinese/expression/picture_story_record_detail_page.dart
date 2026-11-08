@@ -16,6 +16,7 @@ import 'package:poemath/features/chinese/expression/picture_story_review_page.da
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_feedback.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_history_prompt_card.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 
 /// 查看一次已完成练习；只有主动进入重评页后才允许修改表达。
 class PictureStoryRecordDetailPage extends ConsumerStatefulWidget {
@@ -111,7 +112,6 @@ class _PictureStoryRecordDetailPageState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final records = ref.watch(pictureStoryHistoryProvider);
     final record = _sameProfile
         ? records.where((item) => item.id == widget.recordId).firstOrNull
@@ -129,75 +129,37 @@ class _PictureStoryRecordDetailPageState
         // 原题缺失时仍保留该次表达、点评与录音。
       }
     }
+    final togglePrompt = record == null
+        ? null
+        : IconButton(
+            tooltip: _showPrompt ? '隐藏题目' : '查看题目',
+            isSelected: _showPrompt,
+            icon: const Icon(Icons.image_outlined),
+            selectedIcon: const Icon(Icons.image),
+            onPressed: () => setState(() => _showPrompt = !_showPrompt),
+          );
+    final reviewAction = record == null ? null : _reviewAction(context, record);
+    final content = record == null
+        ? const <Widget>[]
+        : _recordContent(context, record, prompt);
+    if (_showPrompt && prompt != null && record != null) {
+      return PictureStorySceneScaffold(
+        image: prompt.image,
+        semanticLabel: '练习详情：${prompt.title}',
+        actions: [togglePrompt!],
+        bottomNavigationBar: reviewAction,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: content,
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('练习详情'),
-        actions: [
-          if (record != null)
-            IconButton(
-              tooltip: _showPrompt ? '隐藏题目' : '查看题目',
-              isSelected: _showPrompt,
-              icon: const Icon(Icons.image_outlined),
-              selectedIcon: const Icon(Icons.image),
-              onPressed: () => setState(() => _showPrompt = !_showPrompt),
-            ),
-        ],
+        actions: [if (togglePrompt != null) togglePrompt],
       ),
-      bottomNavigationBar: record == null
-          ? null
-          : SafeArea(
-              top: false,
-              child: Align(
-                heightFactor: 1,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: ResponsiveLayout.mediumBreakpoint,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      SpacingTokens.md,
-                      SpacingTokens.sm,
-                      SpacingTokens.md,
-                      SpacingTokens.md,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (record.revisionDraft != null) ...[
-                          Text(
-                            '有尚未点评的修改',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: SpacingTokens.sm),
-                        ],
-                        FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(
-                              0,
-                              SpacingTokens.minTapTarget,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: SpacingTokens.md,
-                              vertical: SpacingTokens.md,
-                            ),
-                          ),
-                          onPressed: () => _edit(record),
-                          icon: const Icon(Icons.edit_outlined),
-                          label: const Text(
-                            '修改表达并重新点评',
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+      bottomNavigationBar: reviewAction,
       body: record == null
           ? AppEmptyState(
               icon: Icons.history_outlined,
@@ -215,52 +177,115 @@ class _PictureStoryRecordDetailPageState
                     maxWidth: ResponsiveLayout.mediumBreakpoint,
                   ),
                   child: ListView(
+                    // 展开题图使用独立滚动区域，收起后回到原先阅读位置。
+                    key: PageStorageKey('record-expression-${record.id}'),
                     padding: const EdgeInsets.all(SpacingTokens.md),
-                    children: [
-                      if (_showPrompt) ...[
-                        PictureStoryHistoryPromptCard(prompt: prompt),
-                        const SizedBox(height: SpacingTokens.lg),
-                      ],
-                      _expressionHeading(context, record.startedAt),
-                      const SizedBox(height: SpacingTokens.md),
-                      if (prompt == null) ...[
-                        const Text('原题版本暂时无法读取，表达与录音记录仍保留。'),
-                        const SizedBox(height: SpacingTokens.sm),
-                      ],
-                      Text(
-                        record.answerText.isEmpty
-                            ? '本次未保存表达文字'
-                            : record.answerText,
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                      if (record.segments.isNotEmpty) ...[
-                        const SizedBox(height: SpacingTokens.sm),
-                        for (final (index, segment) in record.segments.indexed)
-                          AppTile(
-                            flat: true,
-                            flatLeadingEdgeAligned: true,
-                            flatTrailingEdgeAligned: true,
-                            iconColor: theme.colorScheme.primary,
-                            trailingIcon: _playing == segment.id
-                                ? Icons.stop_circle_outlined
-                                : Icons.play_circle_outline,
-                            title: '第 ${index + 1} 段录音',
-                            subtitle: '',
-                            trailingText: '${segment.durationSeconds} 秒',
-                            onTap: () => _play(segment),
-                          ),
-                      ],
-                      PictureStoryFeedback(
-                        feedbackJson: record.feedbackJson,
-                        legacyHeading: '点评',
-                        separated: true,
-                      ),
-                    ],
+                    children: content,
                   ),
                 ),
               ),
             ),
     );
+  }
+
+  Widget _reviewAction(
+    BuildContext context,
+    PictureStoryPracticeRecord record,
+  ) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Align(
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: ResponsiveLayout.mediumBreakpoint,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              SpacingTokens.md,
+              SpacingTokens.sm,
+              SpacingTokens.md,
+              SpacingTokens.md,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (record.revisionDraft != null) ...[
+                  Text(
+                    '有尚未点评的修改',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                ],
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, SpacingTokens.minTapTarget),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.md,
+                      vertical: SpacingTokens.md,
+                    ),
+                  ),
+                  onPressed: () => _edit(record),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('修改表达并重新点评', textAlign: TextAlign.center),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _recordContent(
+    BuildContext context,
+    PictureStoryPracticeRecord record,
+    PictureStoryPrompt? prompt,
+  ) {
+    final theme = Theme.of(context);
+    return [
+      if (_showPrompt) ...[
+        PictureStoryHistoryPromptCard(prompt: prompt, showImage: false),
+        const SizedBox(height: SpacingTokens.lg),
+      ],
+      _expressionHeading(context, record.startedAt),
+      const SizedBox(height: SpacingTokens.md),
+      if (prompt == null) ...[
+        const Text('原题版本暂时无法读取，表达与录音记录仍保留。'),
+        const SizedBox(height: SpacingTokens.sm),
+      ],
+      Text(
+        record.answerText.isEmpty ? '本次未保存表达文字' : record.answerText,
+        style: theme.textTheme.bodyLarge,
+      ),
+      if (record.segments.isNotEmpty) ...[
+        const SizedBox(height: SpacingTokens.sm),
+        for (final (index, segment) in record.segments.indexed)
+          AppTile(
+            flat: true,
+            flatLeadingEdgeAligned: true,
+            flatTrailingEdgeAligned: true,
+            iconColor: theme.colorScheme.primary,
+            trailingIcon: _playing == segment.id
+                ? Icons.stop_circle_outlined
+                : Icons.play_circle_outline,
+            title: '第 ${index + 1} 段录音',
+            subtitle: '',
+            trailingText: '${segment.durationSeconds} 秒',
+            onTap: () => _play(segment),
+          ),
+      ],
+      PictureStoryFeedback(
+        feedbackJson: record.feedbackJson,
+        legacyHeading: '点评',
+        separated: true,
+      ),
+    ];
   }
 
   Widget _expressionHeading(BuildContext context, DateTime startedAt) {

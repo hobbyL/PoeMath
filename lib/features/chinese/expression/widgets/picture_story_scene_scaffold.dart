@@ -24,6 +24,7 @@ class PictureStorySceneScaffold extends ConsumerStatefulWidget {
     required this.child,
     this.actions = const [],
     this.onBack,
+    this.bottomNavigationBar,
   });
 
   final PictureStoryImage image;
@@ -31,6 +32,7 @@ class PictureStorySceneScaffold extends ConsumerStatefulWidget {
   final Widget child;
   final List<Widget> actions;
   final VoidCallback? onBack;
+  final Widget? bottomNavigationBar;
 
   @override
   ConsumerState<PictureStorySceneScaffold> createState() =>
@@ -86,6 +88,7 @@ class _PictureStorySceneScaffoldState
         explicitChildNodes: true,
         label: widget.semanticLabel,
         child: Scaffold(
+          bottomNavigationBar: widget.bottomNavigationBar,
           body: LayoutBuilder(
             builder: (context, constraints) {
               // 竖屏铺满宽度；横屏在高度上限内完整居中，键盘不改变题图尺寸。
