@@ -143,11 +143,11 @@ final class TencentRealtimeAsrClient {
     );
 
     late final WebSocket socket;
+    var connectionAbandoned = false;
     try {
       final connecting = _connectSocket(uri).then((socket) {
-        if (cancelToken?.isCancelled ?? false) {
-          unawaited(socket.close(WebSocketStatus.goingAway));
-          throw const SpeechRecognitionCancelled();
+        if (connectionAbandoned || (cancelToken?.isCancelled ?? false)) {
+          _closeLateSocket(socket);
         }
         return socket;
       }).timeout(_timeout);
@@ -176,6 +176,10 @@ final class TencentRealtimeAsrClient {
         '腾讯云实时识别连接失败，请检查网络后重试',
         kind: TencentRealtimeErrorKind.network,
       );
+    } finally {
+      // timeout/cancel/error 后，底层连接 Future 仍可能稍后完成；其 socket
+      // 必须由 then 回调关闭，避免在网络层留下无法使用的 WebSocket。
+      connectionAbandoned = true;
     }
 
     final ready = Completer<void>();
@@ -187,18 +191,41 @@ final class TencentRealtimeAsrClient {
     final sentenceTexts = <int, String>{};
     StreamSubscription<Object?>? subscription;
 
+    void failResponse(String message) {
+      final error = TencentRealtimeAsrException(
+        message,
+        kind: TencentRealtimeErrorKind.response,
+      );
+      failure ??= error;
+      if (!ready.isCompleted) ready.completeError(failure!);
+      if (!finished.isCompleted) finished.completeError(failure!);
+    }
+
     void handle(Object? message) {
-      if (message is! String) return;
+      if (failure != null || finished.isCompleted) return;
+      if (message is! String) {
+        failResponse('腾讯云实时识别返回了无法解析的响应');
+        return;
+      }
       Map<String, dynamic> json;
       try {
         final decoded = jsonDecode(message);
-        if (decoded is! Map<String, dynamic>) return;
+        if (decoded is! Map<String, dynamic>) {
+          failResponse('腾讯云实时识别返回了无法解析的响应');
+          return;
+        }
         json = decoded;
       } on Object {
+        failResponse('腾讯云实时识别返回了无法解析的响应');
         return;
       }
-      final code = (json['code'] as num?)?.toInt();
-      if (code != null && code != 0) {
+      final codeValue = json['code'];
+      if (codeValue is! int) {
+        failResponse('腾讯云实时识别返回了无效的响应码');
+        return;
+      }
+      final code = codeValue;
+      if (code != 0) {
         failure = TencentRealtimeAsrException(
           _messageForCode(code),
           kind: _kindForCode(code),
@@ -208,22 +235,43 @@ final class TencentRealtimeAsrClient {
         if (!finished.isCompleted) finished.completeError(failure!);
         return;
       }
-      if (!ready.isCompleted && json['voice_id'] != null) ready.complete();
+      if (!ready.isCompleted) {
+        final voiceId = json['voice_id'];
+        if (voiceId is! String || voiceId.trim().isEmpty) {
+          failResponse('腾讯云实时识别返回了无效的会话标识');
+          return;
+        }
+        ready.complete();
+      }
       final result = json['result'];
+      if (result != null && result is! Map<String, dynamic>) {
+        failResponse('腾讯云实时识别返回了无效的识别结果');
+        return;
+      }
       if (result is Map<String, dynamic>) {
         final text = result['voice_text_str'];
-        if (text is String) {
-          final index = (result['index'] as num?)?.toInt() ?? 0;
-          sentenceTexts[index] = text;
-          final indices = sentenceTexts.keys.toList()..sort();
-          finalText = indices.map((item) => sentenceTexts[item]!).join();
-          onText?.call(
-            finalText,
-            stable: (result['slice_type'] as num?)?.toInt() == 2,
-          );
+        final index = result['index'];
+        final sliceType = result['slice_type'];
+        if (text is! String || index is! int || index < 0 ||
+            sliceType is! int || sliceType < 0 || sliceType > 2) {
+          failResponse('腾讯云实时识别返回了无效的识别结果');
+          return;
         }
+        sentenceTexts[index] = text;
+        final indices = sentenceTexts.keys.toList()..sort();
+        finalText = indices.map((item) => sentenceTexts[item]!).join();
+        onText?.call(finalText, stable: sliceType == 2);
       }
-      if (json['final'] == 1 && !finished.isCompleted) finished.complete();
+      final finalValue = json['final'];
+      if (finalValue != null && finalValue is! int) {
+        failResponse('腾讯云实时识别返回了无效的结束标记');
+        return;
+      }
+      if (finalValue != null && finalValue != 0 && finalValue != 1) {
+        failResponse('腾讯云实时识别返回了无效的结束标记');
+        return;
+      }
+      if (finalValue == 1 && !finished.isCompleted) finished.complete();
     }
 
     subscription = socket.listen(
@@ -238,14 +286,19 @@ final class TencentRealtimeAsrClient {
       },
       onDone: () {
         if (!ready.isCompleted) {
-          ready.completeError(
-            const TencentRealtimeAsrException(
-              '腾讯云实时识别握手失败',
-              kind: TencentRealtimeErrorKind.authentication,
-            ),
+          failure ??= const TencentRealtimeAsrException(
+            '腾讯云实时识别握手失败',
+            kind: TencentRealtimeErrorKind.authentication,
           );
+          ready.completeError(failure!);
         }
-        if (!finished.isCompleted) finished.complete();
+        if (!finished.isCompleted) {
+          failure ??= const TencentRealtimeAsrException(
+            '腾讯云实时识别连接中断',
+            kind: TencentRealtimeErrorKind.network,
+          );
+          finished.completeError(failure!);
+        }
       },
     );
 
@@ -306,6 +359,16 @@ final class TencentRealtimeAsrClient {
       6001 => '腾讯云实时识别不支持当前访问区域，请检查账号地区和网络',
       _ => '腾讯云实时识别失败（错误码 $code）',
     };
+  }
+
+  void _closeLateSocket(WebSocket socket) {
+    unawaited(() async {
+      try {
+        await socket.close(WebSocketStatus.goingAway);
+      } on Object {
+        // 连接已失败时，关闭失败不能覆盖原始连接错误。
+      }
+    }());
   }
 
   void close() {
