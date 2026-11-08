@@ -15,6 +15,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
@@ -850,6 +851,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       );
     }
 
+    final size = MediaQuery.sizeOf(context);
+    final sideBySide =
+        size.width >= ResponsiveLayout.mediumBreakpoint &&
+        size.width > size.height;
     return Scaffold(
       appBar: AppBar(
         title: Text('${currentIndex + 1} / ${problems.length}'),
@@ -869,112 +874,140 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildAnswerControls(context),
+      bottomNavigationBar: sideBySide ? null : _buildAnswerControls(context),
       body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: SpacingTokens.md,
-              vertical: SpacingTokens.sm,
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final question = Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // 题目文本（竖式模式特殊展示）
-                    KeyedSubtree(
-                      key: ValueKey('q_$currentIndex'),
-                      child:
-                          (problem.mode == ProblemMode.vertical
-                                  ? VerticalCalcWidget(
-                                      problem: problem,
-                                      showAnswer: _judgement != null,
-                                    ) as Widget
-                                  : MathText(
-                                      problem.problemText,
-                                      style: TypographyTokens.mathProblemStyle(
-                                        color: theme.colorScheme.onSurface,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ))
-                              .animatePage(context)
-                              .fadeIn(duration: 350.ms)
-                              .slideX(
-                                begin: 0.12,
-                                end: 0,
-                                duration: 350.ms,
-                                curve: Curves.easeOutCubic,
-                              ),
+          if (sideBySide)
+            SafeArea(
+              top: false,
+              bottom: false,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SafeArea(
+                      top: false,
+                      left: false,
+                      right: false,
+                      child: _buildQuestionArea(context),
                     ),
-                    const SizedBox(height: SpacingTokens.xl),
-
-                    // 判定反馈
-                    if (_judgement != null) ...[
-                      _buildJudgementFeedback(context)
-                          .animatePage(context)
-                          .fadeIn(duration: 300.ms)
-                          .scale(
-                            begin: const Offset(0.9, 0.9),
-                            end: const Offset(1, 1),
-                            duration: 300.ms,
-                            curve: Curves.easeOutBack,
-                          )
-                          .then()
-                          .shimmer(
-                            delay: 200.ms,
-                            duration: 600.ms,
-                            color: _judgement!.isCorrect
-                                ? theme.semantic.success.withValues(alpha: 0.3)
-                                : Colors.transparent,
-                          ),
-                      const SizedBox(height: SpacingTokens.md),
-                      if (_judgement!.correctSteps.isNotEmpty)
-                        _buildStepsSection(context),
-                    ],
-                  ],
-                );
-                final progress = LinearProgressIndicator(
-                  value: (currentIndex + 1) / problems.length,
-                  backgroundColor: theme.colorScheme.primary.withValues(
-                    alpha: 0.1,
                   ),
-                  color: theme.colorScheme.primary,
-                  borderRadius: BorderRadius.circular(
-                    SpacingTokens.radiusSmall,
-                  ),
-                );
-                return Column(
-                  children: [
-                    progress,
-                    const SizedBox(height: SpacingTokens.md),
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, area) => SingleChildScrollView(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minHeight: area.maxHeight,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                question,
-                                if (_judgement == null &&
-                                    problem.mode != ProblemMode.compare)
-                                  _buildAnswerInput(context),
-                              ],
-                            ),
-                          ),
-                        ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: SingleChildScrollView(
+                        child: _buildAnswerControls(context),
                       ),
                     ),
-                  ],
-                );
-              },
-            ),
-          ),
+                  ),
+                ],
+              ),
+            )
+          else
+            _buildQuestionArea(context),
           ConfettiOverlay(controller: _confettiController),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuestionArea(BuildContext context) {
+    final problems = ref.watch(mathProblemsProvider);
+    final currentIndex = ref.watch(mathCurrentIndexProvider);
+    final problem = ref.watch(currentProblemProvider)!;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SpacingTokens.md,
+        vertical: SpacingTokens.sm,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final question = Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 题目文本（竖式模式特殊展示）
+              KeyedSubtree(
+                key: ValueKey('q_$currentIndex'),
+                child:
+                    (problem.mode == ProblemMode.vertical
+                            ? VerticalCalcWidget(
+                                problem: problem,
+                                showAnswer: _judgement != null,
+                              ) as Widget
+                            : MathText(
+                                problem.problemText,
+                                style: TypographyTokens.mathProblemStyle(
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                                textAlign: TextAlign.center,
+                              ))
+                        .animatePage(context)
+                        .fadeIn(duration: 350.ms)
+                        .slideX(
+                          begin: 0.12,
+                          end: 0,
+                          duration: 350.ms,
+                          curve: Curves.easeOutCubic,
+                        ),
+              ),
+              const SizedBox(height: SpacingTokens.xl),
+
+              // 判定反馈
+              if (_judgement != null) ...[
+                _buildJudgementFeedback(context)
+                    .animatePage(context)
+                    .fadeIn(duration: 300.ms)
+                    .scale(
+                      begin: const Offset(0.9, 0.9),
+                      end: const Offset(1, 1),
+                      duration: 300.ms,
+                      curve: Curves.easeOutBack,
+                    )
+                    .then()
+                    .shimmer(
+                      delay: 200.ms,
+                      duration: 600.ms,
+                      color: _judgement!.isCorrect
+                          ? theme.semantic.success.withValues(alpha: 0.3)
+                          : Colors.transparent,
+                    ),
+                const SizedBox(height: SpacingTokens.md),
+                if (_judgement!.correctSteps.isNotEmpty)
+                  _buildStepsSection(context),
+              ],
+            ],
+          );
+          final progress = LinearProgressIndicator(
+            value: (currentIndex + 1) / problems.length,
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+            color: theme.colorScheme.primary,
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+          );
+          return Column(
+            children: [
+              progress,
+              const SizedBox(height: SpacingTokens.md),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, area) => SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: area.maxHeight),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          question,
+                          if (_judgement == null &&
+                              problem.mode != ProblemMode.compare)
+                            _buildAnswerInput(context),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1253,13 +1286,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     );
   }
 
-  /// 作答内容位于可滚动题目区，数字键盘独立固定在页面底部。
+  /// 作答内容位于可滚动题目区，数字键盘独立位于底部或横屏右侧。
   Widget _buildAnswerInput(BuildContext context) {
     final problem = ref.watch(currentProblemProvider);
     // 余数模式：显示商…余格式提示
     final isRemainder = problem?.resultForm == ResultForm.withRemainder;
 
-    // 数字键盘独立固定在底部，此处仅展示当前输入。
+    // 数字键盘独立布局，此处仅展示当前输入。
     final theme = Theme.of(context);
     final process = problem != null && VerticalAttempt.supports(problem);
 
@@ -1293,9 +1326,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                     fontSize: TypographyTokens.fsTitle,
                     fontWeight: FontWeight.bold,
                     color: _answerController.text.isEmpty
-                        ? theme.colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.5,
-                          )
+                        ? theme.colorScheme.onSurfaceVariant
                         : theme.colorScheme.onSurface,
                   ),
                 ),
@@ -1305,9 +1336,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                     child: Text(
                       '例如：3…2',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withValues(
-                          alpha: 0.6,
-                        ),
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -1317,7 +1346,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         if (problem?.mode == ProblemMode.vertical && !process)
           Padding(
             padding: const EdgeInsets.only(top: SpacingTokens.xs),
-            child: Text('请使用下方键盘填写完整结果。', style: theme.textTheme.bodySmall),
+            child: Text('请使用数字键盘填写完整结果。', style: theme.textTheme.bodySmall),
           ),
       ],
     );

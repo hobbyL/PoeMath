@@ -35,21 +35,24 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       icon: Icons.auto_stories_rounded,
       title: '读诗',
       subtitle: '小学必背古诗文',
-      description: '精选教材古诗词，配合朗读、背诵、测验三步学习法，'
+      description:
+          '精选教材古诗词，配合朗读、背诵、测验三步学习法，'
           '搭配科学复习算法，让背诵更高效。',
     ),
     _OnboardingData(
       icon: Icons.calculate_rounded,
       title: '算数',
       subtitle: '口算能力提升',
-      description: '多难度分级口算练习，自动归纳错题，'
+      description:
+          '多难度分级口算练习，自动归纳错题，'
           '公式卡片收藏，帮助孩子扎实掌握数学基础。',
     ),
     _OnboardingData(
       icon: Icons.emoji_events_rounded,
       title: '成长',
       subtitle: '记录每一步进步',
-      description: '打卡激励、星星等级、成就勋章，'
+      description:
+          '打卡激励、星星等级、成就勋章，'
           '让学习像闯关一样有趣，每一次努力都被看见。',
     ),
   ];
@@ -75,9 +78,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('保存失败，请重试')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('保存失败，请重试')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -100,9 +102,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 onPressed: _saving ? null : _finishOnboarding,
                 child: Text(
                   '跳过',
-                  style: TextStyle(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
             ),
@@ -152,8 +152,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                         decoration: BoxDecoration(
                           color: isActive
                               ? theme.colorScheme.primary
-                              : theme.colorScheme.primary
-                                  .withValues(alpha: 0.2),
+                              : theme.colorScheme.primary.withValues(
+                                  alpha: 0.2,
+                                ),
                           borderRadius: BorderRadius.circular(
                             SpacingTokens.radiusPill,
                           ),
@@ -188,105 +189,113 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     );
   }
 
-  Widget _buildPage(
-    BuildContext context,
-    _OnboardingData data,
-    int index,
-  ) {
+  Widget _buildPage(BuildContext context, _OnboardingData data, int index) {
     final theme = Theme.of(context);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.xl),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // 图标
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              shape: BoxShape.circle,
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SpacingTokens.xl,
+              vertical: SpacingTokens.md,
             ),
-            child: Icon(
-              data.icon,
-              size: 56,
-              color: theme.colorScheme.primary,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 图标
+                Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        data.icon,
+                        size: 56,
+                        color: theme.colorScheme.primary,
+                      ),
+                    )
+                    .animatePage(
+                      context,
+                      key: ValueKey('onboarding_icon_$index'),
+                    )
+                    .scaleXY(
+                      begin: 0.5,
+                      end: 1.0,
+                      duration: 500.ms,
+                      curve: Curves.easeOutBack,
+                    )
+                    .fadeIn(duration: 400.ms),
+
+                const SizedBox(height: SpacingTokens.xl),
+
+                // 标题
+                Text(
+                      data.title,
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    )
+                    .animatePage(
+                      context,
+                      key: ValueKey('onboarding_title_$index'),
+                    )
+                    .fadeIn(delay: 200.ms, duration: 400.ms)
+                    .slideY(begin: 0.3, end: 0, duration: 400.ms),
+
+                const SizedBox(height: SpacingTokens.sm),
+
+                // 副标题
+                Text(
+                      data.subtitle,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                    .animatePage(
+                      context,
+                      key: ValueKey('onboarding_subtitle_$index'),
+                    )
+                    .fadeIn(delay: 300.ms, duration: 400.ms),
+
+                const SizedBox(height: SpacingTokens.lg),
+
+                // 描述
+                Text(
+                      data.description,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        height: 1.8,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                    .animatePage(
+                      context,
+                      key: ValueKey('onboarding_desc_$index'),
+                    )
+                    .fadeIn(delay: 400.ms, duration: 400.ms),
+
+                const SizedBox(height: SpacingTokens.xl),
+
+                // 品牌 slogan（仅首页）
+                if (index == 0)
+                  Text(
+                        AppConstants.slogan,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontStyle: FontStyle.italic,
+                          color: theme.colorScheme.primary,
+                        ),
+                      )
+                      .animatePage(context)
+                      .fadeIn(delay: 600.ms, duration: 600.ms),
+              ],
             ),
-          )
-              .animatePage(
-                context,
-                key: ValueKey('onboarding_icon_$index'),
-              )
-              .scaleXY(
-                begin: 0.5,
-                end: 1.0,
-                duration: 500.ms,
-                curve: Curves.easeOutBack,
-              )
-              .fadeIn(duration: 400.ms),
-
-          const SizedBox(height: SpacingTokens.xl),
-
-          // 标题
-          Text(
-            data.title,
-            style: theme.textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.primary,
-            ),
-          )
-              .animatePage(
-                context,
-                key: ValueKey('onboarding_title_$index'),
-              )
-              .fadeIn(delay: 200.ms, duration: 400.ms)
-              .slideY(begin: 0.3, end: 0, duration: 400.ms),
-
-          const SizedBox(height: SpacingTokens.sm),
-
-          // 副标题
-          Text(
-            data.subtitle,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-          )
-              .animatePage(
-                context,
-                key: ValueKey('onboarding_subtitle_$index'),
-              )
-              .fadeIn(delay: 300.ms, duration: 400.ms),
-
-          const SizedBox(height: SpacingTokens.lg),
-
-          // 描述
-          Text(
-            data.description,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              height: 1.8,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          )
-              .animatePage(
-                context,
-                key: ValueKey('onboarding_desc_$index'),
-              )
-              .fadeIn(delay: 400.ms, duration: 400.ms),
-
-          const SizedBox(height: SpacingTokens.xl),
-
-          // 品牌 slogan（仅首页）
-          if (index == 0)
-            Text(
-              AppConstants.slogan,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: theme.colorScheme.primary.withValues(alpha: 0.5),
-              ),
-            ).animatePage(context).fadeIn(delay: 600.ms, duration: 600.ms),
-        ],
+          ),
+        ),
       ),
     );
   }

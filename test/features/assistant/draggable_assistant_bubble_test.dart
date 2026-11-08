@@ -25,18 +25,15 @@ import 'package:poemath/features/assistant/widgets/draggable_assistant_bubble.da
 /// 子类无法 super 调用）。
 class _RecordingRouter extends GoRouter {
   _RecordingRouter()
-      : super.routingConfig(
-          routingConfig: ValueNotifier<RoutingConfig>(
-            RoutingConfig(
-              routes: <RouteBase>[
-                GoRoute(
-                  path: '/',
-                  builder: (_, __) => const SizedBox.shrink(),
-                ),
-              ],
-            ),
+    : super.routingConfig(
+        routingConfig: ValueNotifier<RoutingConfig>(
+          RoutingConfig(
+            routes: <RouteBase>[
+              GoRoute(path: '/', builder: (_, __) => const SizedBox.shrink()),
+            ],
           ),
-        );
+        ),
+      );
 
   final List<String> pushed = <String>[];
 
@@ -98,7 +95,7 @@ Widget _bubbleTree({
 }
 
 Future<({_RecordingRouter router, _FakeSettingsRepository settings})>
-    _pumpBubble(
+_pumpBubble(
   WidgetTester tester, {
   _FakeSettingsRepository? settings,
   Key? bubbleKey,
@@ -124,6 +121,26 @@ AnimatedPositioned _positioned(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets('读屏提供具名按钮并可进入助手', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final harness = await _pumpBubble(tester);
+    final button = find.bySemanticsLabel('AI 学习助手');
+    expect(
+      tester.getSemantics(button),
+      matchesSemantics(
+        label: 'AI 学习助手',
+        isButton: true,
+        hasEnabledState: true,
+        isEnabled: true,
+        hasTapAction: true,
+      ),
+    );
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(harness.router.pushed, [AppRoutes.assistant]);
+    semantics.dispose();
+  });
+
   testWidgets('显示：气泡与 smart_toy 图标存在', (tester) async {
     await _pumpBubble(tester);
 

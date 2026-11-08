@@ -8,6 +8,69 @@ import 'package:poemath/features/math/widgets/number_keypad.dart';
 
 void main() {
   group('NumberKeypad', () {
+    testWidgets('读屏能辨认操作，禁用提交没有动作并显示不同状态', (tester) async {
+      final semantics = tester.ensureSemantics();
+      var submissions = 0;
+      var deletions = 0;
+      Future<void> pumpKeypad(bool enabled) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NumberKeypad(
+              onNumberTap: (_) {},
+              onBackspace: () => deletions++,
+              onSubmit: () => submissions++,
+              submitEnabled: enabled,
+            ),
+          ),
+        ),
+      );
+      await pumpKeypad(false);
+      final submit = find.bySemanticsLabel('提交答案');
+      expect(
+        tester.getSemantics(submit),
+        matchesSemantics(label: '提交答案', isButton: true, hasEnabledState: true),
+      );
+      final disabledColor = tester
+          .widget<Icon>(find.byIcon(Icons.check_rounded))
+          .color;
+      await tester.tap(submit);
+      await tester.pump();
+      expect(submissions, 0);
+      final backspace = find.bySemanticsLabel('删除一位');
+      expect(
+        tester.getSemantics(backspace),
+        matchesSemantics(
+          label: '删除一位',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      await tester.tap(backspace);
+      await tester.pump();
+      expect(deletions, 1);
+      await pumpKeypad(true);
+      expect(
+        tester.getSemantics(submit),
+        matchesSemantics(
+          label: '提交答案',
+          isButton: true,
+          hasEnabledState: true,
+          isEnabled: true,
+          hasTapAction: true,
+        ),
+      );
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.check_rounded)).color,
+        isNot(disabledColor),
+      );
+      await tester.tap(submit);
+      await tester.pump();
+      expect(submissions, 1);
+      semantics.dispose();
+    });
+
     testWidgets('应该显示 0-9 数字键', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -197,11 +260,7 @@ void main() {
 
         for (final container in containers) {
           final height = container.constraints?.minHeight ?? 0;
-          expect(
-            height,
-            greaterThanOrEqualTo(56),
-            reason: '键盘按钮高度应 ≥56pt',
-          );
+          expect(height, greaterThanOrEqualTo(56), reason: '键盘按钮高度应 ≥56pt');
         }
       }
     });
@@ -433,11 +492,7 @@ void main() {
 
       for (final container in containers) {
         final height = container.constraints?.minHeight ?? 0;
-        expect(
-          height,
-          greaterThanOrEqualTo(56),
-          reason: '键盘按钮高度应 ≥56pt',
-        );
+        expect(height, greaterThanOrEqualTo(56), reason: '键盘按钮高度应 ≥56pt');
       }
     });
   });

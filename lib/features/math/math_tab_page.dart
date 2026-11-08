@@ -174,6 +174,11 @@ class MathTabPage extends ConsumerWidget {
     final accuracy = ref.watch(overallAccuracyProvider);
     final mistakeCount = ref.watch(mistakeCountProvider);
     final isWide = MediaQuery.sizeOf(context).width >= 420;
+    final textScaler = MediaQuery.textScalerOf(context);
+    final titleStyle = theme.textTheme.titleLarge!;
+    final titleScale =
+        textScaler.scale(titleStyle.fontSize!) / titleStyle.fontSize!;
+    final stackedTitle = !isWide && titleScale > 1.3;
     // 按枚举声明顺序渲染卡片，与 MathEntryKind 的文档约定一致。
     final visible = MathEntryKind.values.where(kinds.contains).toList();
 
@@ -183,7 +188,19 @@ class MathTabPage extends ConsumerWidget {
         // 决定且页面上不再有别的常驻展示位，附在标题后是最省空间的告知。
         // 不叫「口算练习」：页面已含四类入口，且「口算练习」是其中一张
         // 卡片的标题，同名会造成语义混淆（也影响按文案定位的测试）。
-        title: Text('数学练习 · ${_shortVolume(grade, semester)}'),
+        toolbarHeight: stackedTitle
+            ? textScaler.scale(theme.textTheme.titleMedium!.fontSize!) *
+                      2 *
+                      1.3 +
+                  SpacingTokens.md
+            : kToolbarHeight,
+        title: Text(
+          stackedTitle
+              ? '数学练习\n${_shortVolume(grade, semester)}'
+              : '数学练习 · ${_shortVolume(grade, semester)}',
+          textAlign: TextAlign.center,
+          style: stackedTitle ? theme.textTheme.titleMedium : null,
+        ),
         automaticallyImplyLeading: false,
         leadingWidth: mistakeCount > 0 ? (isWide ? 160.0 : 96.0) : null,
         leading: mistakeCount > 0
@@ -228,10 +245,14 @@ class MathTabPage extends ConsumerWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // 按 ~160px 每列计算列数，与旧版年级网格同款响应式策略
-            // （`GradeSemesterCard` 的注释亦注明"适合 Grid 一行两个"）。
+            // 文字放大时同步增加目标列宽；小屏允许单列，保留完整入口名。
             final gridWidth = constraints.maxWidth - SpacingTokens.md * 2;
-            final columns = (gridWidth / 160).floor().clamp(2, 4);
+            final entryFontSize = theme.textTheme.titleSmall!.fontSize!;
+            final entryScale = textScaler.scale(entryFontSize) / entryFontSize;
+            final columns = (gridWidth / (160 * entryScale)).floor().clamp(
+              entryScale > 1.3 ? 1 : 2,
+              4,
+            );
 
             return ListView(
               // 顶部 0：统计卡与 AppBar 下沿之间不留白。左右保持 md

@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/widgets/colored_card.dart';
 
 /// 儿童友好数字键盘，用于口算练习答题。
 ///
@@ -81,10 +82,7 @@ class NumberKeypad extends StatelessWidget {
     // 负号键独立叠加（结果可能为负时与值形态键同现），
     // 最后一行最多 5 键（⌫ 0 - / ✓）。
     final specialKeys = <String>[
-      if (showEllipsis)
-        '…'
-      else if (showDecimal)
-        '.',
+      if (showEllipsis) '…' else if (showDecimal) '.',
       if (showNegative) '-',
       if (showSlash && !showEllipsis && !showDecimal) '/',
     ];
@@ -93,21 +91,15 @@ class NumberKeypad extends StatelessWidget {
       ['1', '2', '3'],
       ['4', '5', '6'],
       ['7', '8', '9'],
-      [
-        '⌫',
-        '0',
-        ...specialKeys,
-        '✓',
-      ],
+      ['⌫', '0', ...specialKeys, '✓'],
     ];
 
-    return Container(
+    return ColoredCard(
+      color: theme.colorScheme.surfaceContainerHighest,
+      backgroundOpacity: 1,
       padding: const EdgeInsets.all(SpacingTokens.sm),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(SpacingTokens.radiusLarge),
-        ),
+      borderRadius: const BorderRadius.vertical(
+        top: Radius.circular(SpacingTokens.radiusLarge),
       ),
       child: SafeArea(
         top: false,
@@ -141,50 +133,63 @@ class NumberKeypad extends StatelessWidget {
     // 特殊键：退格、提交
     final isBackspace = key == '⌫';
     final isSubmit = key == '✓';
+    final enabled = !isSubmit || submitEnabled;
+    final VoidCallback? onTap = !enabled
+        ? null
+        : isBackspace
+        ? onBackspace
+        : isSubmit
+        ? onSubmit
+        : () => onNumberTap(key);
+    final label = switch (key) {
+      '⌫' => '删除一位',
+      '✓' => '提交答案',
+      '.' => '小数点',
+      '…' => '余数分隔符',
+      '-' => '负号',
+      '/' => '分数线',
+      _ => key,
+    };
 
-    final buttonColor = isSubmit
+    final buttonColor = !enabled
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.12)
+        : isSubmit
         ? theme.colorScheme.primary
         : theme.colorScheme.surfaceContainerHigh;
 
-    final textColor =
-        isSubmit ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
+    final textColor = !enabled
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.38)
+        : isSubmit
+        ? theme.colorScheme.onPrimary
+        : theme.colorScheme.onSurface;
 
-    return Material(
-      color: buttonColor,
-      borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      child: InkWell(
-        onTap: () {
-          if (isBackspace) {
-            onBackspace();
-          } else if (isSubmit) {
-            if (submitEnabled) onSubmit();
-          } else {
-            onNumberTap(key);
-          }
-        },
+    return Semantics(
+      label: label,
+      button: true,
+      enabled: enabled,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Material(
+        color: buttonColor,
         borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        child: Container(
-          height: 56,
-          alignment: Alignment.center,
-          child: isBackspace
-              ? Icon(
-                  Icons.backspace_outlined,
-                  color: textColor,
-                  size: 24,
-                )
-              : isSubmit
-                  ? Icon(
-                      Icons.check_rounded,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+          child: Container(
+            height: 56,
+            alignment: Alignment.center,
+            child: isBackspace
+                ? Icon(Icons.backspace_outlined, color: textColor, size: 24)
+                : isSubmit
+                ? Icon(Icons.check_rounded, color: textColor, size: 28)
+                : Text(
+                    key,
+                    style: theme.textTheme.headlineSmall?.copyWith(
                       color: textColor,
-                      size: 28,
-                    )
-                  : Text(
-                      key,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: textColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      fontWeight: FontWeight.w600,
                     ),
+                  ),
+          ),
         ),
       ),
     );

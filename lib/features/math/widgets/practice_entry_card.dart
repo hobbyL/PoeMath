@@ -33,7 +33,9 @@ class PracticeEntryCard extends StatelessWidget {
       backgroundOpacity: 0.06,
       onTap: onTap,
       padding: const EdgeInsets.symmetric(
-          horizontal: SpacingTokens.md, vertical: SpacingTokens.sm,),
+        horizontal: SpacingTokens.md,
+        vertical: SpacingTokens.sm,
+      ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -45,8 +47,6 @@ class PracticeEntryCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
               color: theme.colorScheme.onSurface,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: SpacingTokens.xs),
@@ -54,7 +54,6 @@ class PracticeEntryCard extends StatelessWidget {
             description,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 10,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,

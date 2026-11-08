@@ -76,7 +76,8 @@ class _DraggableAssistantBubbleState
     final dy = repo.assistantBubbleDy;
     if (dx == null || dy == null) return;
     final saved = Offset(dx, dy);
-    final withinBounds = saved.dx >= bounds.minX &&
+    final withinBounds =
+        saved.dx >= bounds.minX &&
         saved.dx <= bounds.maxX &&
         saved.dy >= bounds.minY &&
         saved.dy <= bounds.maxY;
@@ -102,10 +103,7 @@ class _DraggableAssistantBubbleState
   }
 
   Offset _clampToBounds(Offset pos, _Bounds b) {
-    return Offset(
-      pos.dx.clamp(b.minX, b.maxX),
-      pos.dy.clamp(b.minY, b.maxY),
-    );
+    return Offset(pos.dx.clamp(b.minX, b.maxX), pos.dy.clamp(b.minY, b.maxY));
   }
 
   void _onPanStart(DragStartDetails _) {
@@ -168,10 +166,7 @@ class _DraggableAssistantBubbleState
         _restoreFromStorage(bounds);
 
         // 默认右下角；已交互则用当前位置（随约束变化重新 clamp）。
-        final pos = _clampToBounds(
-          _position ?? Offset(maxX, maxY),
-          bounds,
-        );
+        final pos = _clampToBounds(_position ?? Offset(maxX, maxY), bounds);
 
         return SizedBox(
           width: maxW,
@@ -186,6 +181,7 @@ class _DraggableAssistantBubbleState
                 width: _diameter,
                 height: _diameter,
                 child: GestureDetector(
+                  excludeFromSemantics: true,
                   onPanStart: _onPanStart,
                   onPanUpdate: _onPanUpdate,
                   onPanEnd: _onPanEnd,
@@ -200,17 +196,28 @@ class _DraggableAssistantBubbleState
   }
 
   Widget _buildBubble(ThemeData theme) {
-    return Material(
-      color: theme.colorScheme.primary,
-      shape: const CircleBorder(),
-      elevation: _elevation,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        customBorder: const CircleBorder(),
+    return Tooltip(
+      message: 'AI 学习助手',
+      excludeFromSemantics: true,
+      child: Semantics(
+        label: 'AI 学习助手',
+        button: true,
+        enabled: true,
         onTap: _openAssistant,
-        child: Icon(
-          Icons.smart_toy_outlined,
-          color: theme.colorScheme.onPrimary,
+        excludeSemantics: true,
+        child: Material(
+          color: theme.colorScheme.primary,
+          shape: const CircleBorder(),
+          elevation: _elevation,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: _openAssistant,
+            child: Icon(
+              Icons.smart_toy_outlined,
+              color: theme.colorScheme.onPrimary,
+            ),
+          ),
         ),
       ),
     );

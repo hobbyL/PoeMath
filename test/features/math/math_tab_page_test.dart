@@ -10,6 +10,7 @@
 // Animations」）。
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -32,8 +33,10 @@ class _RouteProbe {
 Future<_RouteProbe> _pumpTab(
   WidgetTester tester, {
   required ProviderContainer container,
+  Size size = const Size(800, 1600),
+  double textScale = 1,
 }) async {
-  tester.view.physicalSize = const Size(800, 1600);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -70,7 +73,14 @@ Future<_RouteProbe> _pumpTab(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(
+        routerConfig: router,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+      ),
     ),
   );
   await tester.pump();
@@ -81,6 +91,34 @@ Future<_RouteProbe> _pumpTab(
 void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
+
+  for (final mistakes in [0, 3]) {
+    testWidgets('320dp 两倍字号完整显示标题和四类入口，错题 $mistakes', (tester) async {
+      final container = ProviderContainer(
+        overrides: [mistakeCountProvider.overrideWith((ref) => mistakes)],
+      );
+      addTearDown(container.dispose);
+      await _pumpTab(
+        tester,
+        container: container,
+        size: const Size(320, 640),
+        textScale: 2,
+      );
+      for (final label in ['数学练习\n一上', '口算练习', '竖式计算', '应用题', '挑战模式']) {
+        final text = find.text(label);
+        expect(text, findsOneWidget);
+        if (label != '数学练习\n一上') await tester.ensureVisible(text);
+        await tester.pump();
+        final paragraph = tester.renderObject<RenderParagraph>(text);
+        expect(paragraph.didExceedMaxLines, isFalse, reason: label);
+        expect(text.hitTestable(), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 1));
+      await drainHiveWritesForTesting(tester);
+    });
+  }
 
   testWidgets('册次只读展示：不再有年级网格与学期选择', (tester) async {
     await tester.runAsync(() async {
@@ -113,9 +151,12 @@ void main() {
     }
     // 网格按行优先排布：宽度 800 时列数 = (800-32)/160 = 4，故四张同在一行。
     // 断言 y 相同（同一行）且 x 递增（顺序正确）。
-    final xs = ['口算练习', '竖式计算', '应用题', '挑战模式']
-        .map((t) => tester.getTopLeft(find.text(t)))
-        .toList();
+    final xs = [
+      '口算练习',
+      '竖式计算',
+      '应用题',
+      '挑战模式',
+    ].map((t) => tester.getTopLeft(find.text(t))).toList();
     expect(xs.map((o) => o.dy).toSet().length, 1, reason: '四张卡片应在同一行');
     expect(
       xs.map((o) => o.dx).toList(),
@@ -242,6 +283,9 @@ class SettingsRepositorySeed {
   }
 
   static Future<void> setKinds(Set<MathEntryKind> kinds) async {
-    await HiveBoxes.settings.put('math_entry_kinds', encodeMathEntryKinds(kinds));
+    await HiveBoxes.settings.put(
+      'math_entry_kinds',
+      encodeMathEntryKinds(kinds),
+    );
   }
 }
