@@ -29,6 +29,8 @@ class PoemSentenceWritingSheet extends StatelessWidget {
     required this.currentStrokeData,
     required this.onCharConfirmed,
     this.maxBoardSide = 240,
+    this.pendingInk,
+    this.onInkChanged,
   });
 
   final List<String> targetChars;
@@ -36,6 +38,8 @@ class PoemSentenceWritingSheet extends StatelessWidget {
   final CharacterStrokeData? currentStrokeData;
   final ValueChanged<PoemHandwrittenChar> onCharConfirmed;
   final double maxBoardSide;
+  final PoemHandwrittenChar? pendingInk;
+  final ValueChanged<PoemHandwrittenChar>? onInkChanged;
 
   /// 当前活跃格下标 = 已确认字数。
   int get _activeIndex => confirmedChars.length;
@@ -43,19 +47,23 @@ class PoemSentenceWritingSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hanziCount =
-        targetChars.where((ch) => !_isPunct(ch)).length.clamp(1, 99);
+    final hanziCount = targetChars
+        .where((ch) => !_isPunct(ch))
+        .length
+        .clamp(1, 99);
 
     // 格宽随句长收缩；标点占位约半格。书写板保持独立可用尺寸。
-    final slotSize = (math.min(
-              (MediaQuery.sizeOf(context).width - SpacingTokens.lg * 2) /
-                  (hanziCount * 1.15),
-              72.0,
-            ) +
-            28)
-        .clamp(30.0, 72.0);
-    final currentChar =
-        _activeIndex < targetChars.length ? targetChars[_activeIndex] : '';
+    final slotSize =
+        (math.min(
+                  (MediaQuery.sizeOf(context).width - SpacingTokens.lg * 2) /
+                      (hanziCount * 1.15),
+                  72.0,
+                ) +
+                28)
+            .clamp(30.0, 72.0);
+    final currentChar = _activeIndex < targetChars.length
+        ? targetChars[_activeIndex]
+        : '';
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -87,6 +95,8 @@ class PoemSentenceWritingSheet extends StatelessWidget {
               strokeData: currentStrokeData,
               side: maxBoardSide,
               onConfirmed: onCharConfirmed,
+              initialInk: pendingInk,
+              onInkChanged: onInkChanged,
             ),
           )
         else
@@ -107,9 +117,35 @@ class PoemSentenceWritingSheet extends StatelessWidget {
   static bool _isPunct(String ch) =>
       ch != ch.trim() ||
       const {
-        '，', '。', '！', '？', '、', '；', '：', '“', '”', '‘', '’',
-        '（', '）', '《', '》', '【', '】', '…', '—', ',', '.', '!', '?',
-        ':', ';', '"', "'", '(', ')',
+        '，',
+        '。',
+        '！',
+        '？',
+        '、',
+        '；',
+        '：',
+        '“',
+        '”',
+        '‘',
+        '’',
+        '（',
+        '）',
+        '《',
+        '》',
+        '【',
+        '】',
+        '…',
+        '—',
+        ',',
+        '.',
+        '!',
+        '?',
+        ':',
+        ';',
+        '"',
+        "'",
+        '(',
+        ')',
       }.contains(ch);
 }
 
@@ -141,15 +177,13 @@ class _CharSlot extends StatelessWidget {
     if (written != null) {
       // 已写：笔迹缩略（无笔顺数据直通时也是真笔迹；空笔迹兜底显字形）。
       content = written.strokes.isEmpty
-          ? Text(
-              expected,
-              style: TextStyle(fontSize: size * 0.6),
-            )
+          ? Text(expected, style: TextStyle(fontSize: size * 0.6))
           : FittedBox(
               child: SizedBox.square(
                 dimension: boardSide,
                 child: WritingCanvas(
                   strokes: written.strokes,
+                  strokesSide: written.side,
                   enabled: false,
                   side: boardSide,
                 ),
@@ -171,18 +205,15 @@ class _CharSlot extends StatelessWidget {
     final borderColor = active
         ? theme.colorScheme.primary
         : written != null
-            ? theme.colorScheme.outline
-            : theme.colorScheme.outline.withValues(alpha: 0.4);
+        ? theme.colorScheme.outline
+        : theme.colorScheme.outline.withValues(alpha: 0.4);
 
     return Container(
       width: size,
       height: size,
       margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: borderColor,
-          width: active ? 2 : 1,
-        ),
+        border: Border.all(color: borderColor, width: active ? 2 : 1),
         borderRadius: BorderRadius.circular(4),
       ),
       alignment: Alignment.center,

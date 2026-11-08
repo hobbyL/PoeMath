@@ -9,11 +9,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/data/models/poem.dart';
+import 'package:poemath/features/poem/poem_practice_draft.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/immediate_practice_draft_repository.dart';
 
 const _poemId = 'recite-submit-poem';
 
@@ -50,6 +52,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            // 按钮状态测试不等待磁盘；真实保存路径由续练测试覆盖。
+            poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+              ImmediatePracticeDraftRepository.new,
+            ),
             poemByIdProvider(_poemId).overrideWith((ref) => _poem),
             writingStrokeDataProvider.overrideWith(
               (ref) => const WritingStrokeAsset({}),

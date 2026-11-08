@@ -118,10 +118,7 @@ void defineAppJourneyTests({
     }
     await _tap(
       tester,
-      find.descendant(
-        of: keypad,
-        matching: find.byIcon(Icons.check_rounded),
-      ),
+      find.descendant(of: keypad, matching: find.byIcon(Icons.check_rounded)),
     );
 
     final resultsButton = find.widgetWithText(FilledButton, '查看成绩');
@@ -267,10 +264,7 @@ void defineAppJourneyTests({
       final restoredCount = await backup.restoreFromJson(json);
       expect(restoredCount, greaterThan(0));
       expect(HiveBoxes.mathSessions.values.single.id, 'backup');
-      expect(
-        HiveBoxes.settings.get('theme_mode'),
-        equals('dark'),
-      );
+      expect(HiveBoxes.settings.get('theme_mode'), equals('dark'));
     });
   });
 }
@@ -327,10 +321,19 @@ Future<void> _startApp(
   required Future<Directory> Function() directoryProvider,
 }) async {
   addTearDown(() async {
-    await tester.runAsync(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    });
+    await tester.pumpWidget(const SizedBox.shrink());
+    // 离开练习会写入最后一份草稿。交替推动真实 IO 与 widget 微任务，
+    // 在关闭 Hive 前排空写链，避免宿主测试的 fake 时钟阻塞 close。
+    var flushed = false;
+    final flushing = HiveBoxes.meta.flush().then((_) => flushed = true);
+    for (var i = 0; i < 100 && !flushed; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    expect(flushed, isTrue, reason: '关闭测试存储前应完成草稿写入');
+    await flushing;
   });
   await tester.runAsync(
     () => tester.pumpWidget(

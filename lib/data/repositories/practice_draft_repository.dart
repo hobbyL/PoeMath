@@ -14,6 +14,7 @@ class PracticeDraftRepository {
   final int _epoch;
   static bool _restoring = false;
   static final Object _restoreZone = Object();
+  static final Object _writeZone = Object();
   static final Set<Future<void>> _active = {};
   static bool get isRestoring => _restoring;
   static void assertSnapshotAllowed() {
@@ -23,7 +24,9 @@ class PracticeDraftRepository {
   }
 
   void assertCurrent() {
-    if (_restoring) throw StateError('正在恢复学习数据，请稍后重新进入练习');
+    if (_restoring && Zone.current[_writeZone] != true) {
+      throw StateError('正在恢复学习数据，请稍后重新进入练习');
+    }
     if (_epoch != HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0)) {
       throw StateError('学习数据已恢复，此练习已失效，请重新进入');
     }
@@ -36,7 +39,7 @@ class PracticeDraftRepository {
     final done = Completer<void>();
     _active.add(done.future);
     try {
-      final value = await action();
+      final value = await runZoned(action, zoneValues: {_writeZone: true});
       assertCurrent();
       return value;
     } finally {
@@ -62,16 +65,54 @@ class PracticeDraftRepository {
   }
 
   static const kinds = ['math', 'word'];
+  static const poemKinds = ['poemQuiz', 'poemRecite', 'poemDictation'];
   static const _prefix = 'practice_draft:';
   static final Map<String, Future<void>> _writes = {};
+  static final Map<String, Object> _owners = {};
+  final Map<String, Object> _leases = {};
 
-  String _key(String kind) {
-    if (!kinds.contains(kind)) throw ArgumentError.value(kind, 'kind');
+  String _key(String kind, [String? scope]) {
+    if (poemKinds.contains(kind)) {
+      if (scope == null || scope.isEmpty) {
+        throw ArgumentError.value(scope, 'scope');
+      }
+      return ProfileScope.key('$_prefix$kind:${Uri.encodeComponent(scope)}');
+    }
+    if (!kinds.contains(kind) || scope != null) {
+      throw ArgumentError.value(kind, 'kind');
+    }
     return ProfileScope.key('$_prefix$kind');
   }
 
-  Map<String, dynamic>? get(String kind) {
-    final raw = HiveBoxes.meta.get(_key(kind));
+  /// 同一作用域的新页面取得所有权后，旧页面的延迟保存不能覆盖它。
+  void claim(String kind, {required String scope}) {
+    assertCurrent();
+    final key = _key(kind, scope);
+    final lease = Object();
+    _owners[key] = lease;
+    _leases[key] = lease;
+  }
+
+  void assertOwner(String kind, {required String scope}) {
+    assertCurrent();
+    final key = _key(kind, scope);
+    if (_leases[key] == null || _owners[key] != _leases[key]) {
+      throw StateError('练习已切换，请重新进入');
+    }
+  }
+
+  Iterable<String> scopes(String kind) {
+    if (!poemKinds.contains(kind)) throw ArgumentError.value(kind, 'kind');
+    final prefix = ProfileScope.key('$_prefix$kind:');
+    return HiveBoxes.meta.keys
+        .whereType<String>()
+        .where((key) => key.startsWith(prefix))
+        .map((key) => Uri.decodeComponent(key.substring(prefix.length)))
+        .toList();
+  }
+
+  Map<String, dynamic>? get(String kind, {String? scope}) {
+    final raw = HiveBoxes.meta.get(_key(kind, scope));
     if (raw == null) return null;
     final data = jsonDecode(raw as String) as Map<String, dynamic>;
     if ((data['epoch'] as int? ?? 0) !=
@@ -80,16 +121,21 @@ class PracticeDraftRepository {
     }
     if (data['v'] != 1 ||
         data['profileId'] != ProfileScope.currentId ||
-        data['kind'] != kind) {
+        data['kind'] != kind ||
+        data['scope'] != scope) {
       throw const FormatException('练习草稿版本或档案不匹配');
     }
     return data;
   }
 
-  bool exists(String kind) => HiveBoxes.meta.containsKey(_key(kind));
+  bool exists(String kind, {String? scope}) =>
+      HiveBoxes.meta.containsKey(_key(kind, scope));
 
-  Future<void> save(String kind, Map<String, dynamic> data) {
-    final key = _key(kind);
+  Future<void> save(String kind, Map<String, dynamic> data, {String? scope}) {
+    final key = _key(kind, scope);
+    final profileId = ProfileScope.currentId;
+    final revision = ProfileScope.revision;
+    final lease = _leases[key];
     // 排队前编码，后续页面状态变化不能改变待写快照。
     final json = jsonEncode({
       ...data,
@@ -97,19 +143,31 @@ class PracticeDraftRepository {
       'epoch': _epoch,
       'profileId': ProfileScope.currentId,
       'kind': kind,
+      if (scope != null) 'scope': scope,
     });
     return _enqueue(key, () async {
       assertCurrent();
+      if (scope != null &&
+          (profileId != ProfileScope.currentId ||
+              revision != ProfileScope.revision ||
+              lease == null ||
+              _owners[key] != lease)) {
+        throw StateError('练习已切换，旧草稿不能覆盖当前练习');
+      }
       await HiveBoxes.meta.put(key, json);
     });
   }
 
-  Future<void> remove(String kind, {String? sessionId}) {
-    final key = _key(kind);
+  Future<void> remove(String kind, {String? sessionId, String? scope}) {
+    final key = _key(kind, scope);
     return _enqueue(key, () async {
       assertCurrent();
-      if (sessionId != null && get(kind)?['sessionId'] != sessionId) return;
+      if (sessionId != null &&
+          get(kind, scope: scope)?['sessionId'] != sessionId) {
+        return;
+      }
       await HiveBoxes.meta.delete(key);
+      if (scope != null) _owners.remove(key);
     });
   }
 

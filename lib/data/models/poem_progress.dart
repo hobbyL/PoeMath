@@ -58,6 +58,10 @@ class PoemProgress extends HiveObject {
   @HiveField(8)
   DateTime? firstMasteredAt;
 
+  /// 与学习次数同一 Hive 帧保存，重启重试结算时不重复累计。
+  @HiveField(9, defaultValue: <String>[])
+  List<String> appliedActivityIds;
+
   PoemProgress({
     required this.poemId,
     required this.profileId,
@@ -68,7 +72,8 @@ class PoemProgress extends HiveObject {
     this.firstStudiedAt,
     this.stars = 0,
     this.firstMasteredAt,
-  });
+    List<String> appliedActivityIds = const [],
+  }) : appliedActivityIds = List.of(appliedActivityIds);
 
   /// 修改后再保存，避免 IO 失败时污染 Hive 内存中的旧对象。
   PoemProgress copyWith({
@@ -79,16 +84,16 @@ class PoemProgress extends HiveObject {
     DateTime? firstStudiedAt,
     int? stars,
     DateTime? firstMasteredAt,
-  }) =>
-      PoemProgress(
-        poemId: poemId,
-        profileId: profileId,
-        status: status ?? this.status,
-        masteryLevel: masteryLevel ?? this.masteryLevel,
-        studyCount: studyCount ?? this.studyCount,
-        lastStudiedAt: lastStudiedAt ?? this.lastStudiedAt,
-        firstStudiedAt: firstStudiedAt ?? this.firstStudiedAt,
-        stars: stars ?? this.stars,
-        firstMasteredAt: firstMasteredAt ?? this.firstMasteredAt,
-      );
+  }) => PoemProgress(
+    poemId: poemId,
+    profileId: profileId,
+    status: status ?? this.status,
+    masteryLevel: masteryLevel ?? this.masteryLevel,
+    studyCount: studyCount ?? this.studyCount,
+    lastStudiedAt: lastStudiedAt ?? this.lastStudiedAt,
+    firstStudiedAt: firstStudiedAt ?? this.firstStudiedAt,
+    stars: stars ?? this.stars,
+    firstMasteredAt: firstMasteredAt ?? this.firstMasteredAt,
+    appliedActivityIds: appliedActivityIds,
+  );
 }

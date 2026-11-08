@@ -17,7 +17,6 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
-import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
@@ -29,8 +28,11 @@ import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/widgets/poem_handwriting_pad.dart';
+import 'package:poemath/features/poem/widgets/poem_practice_unavailable.dart';
 import 'package:poemath/features/poem/widgets/poem_sentence_writing_sheet.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
+import 'package:poemath/features/poem/poem_practice_draft.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 
 /// 背诵难度级别。
 enum ReciteLevel {
@@ -118,7 +120,9 @@ class PoemRecitePage extends ConsumerStatefulWidget {
 }
 
 class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
-  final _learningWrites = PracticeDraftRepository();
+  late final _learningWrites = ref.read(
+    poemPracticeDraftRepositoryFactoryProvider,
+  )();
   final _random = Random();
   final _celebrationCtrl = CelebrationController();
   final _dictController = TextEditingController();
@@ -152,7 +156,6 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   int _totalStars = 0;
   int _linesCompleted = 0;
   bool _isComplete = false;
-  DateTime _startTime = DateTime.now();
   late String _activityId;
   DateTime? _completedAt;
   bool _progressRecorded = false;
@@ -191,17 +194,213 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   /// 默写输入是否非空 —— 驱动「提交默写」按钮的启用状态。
   /// 由 `_dictController` 的监听器维护，覆盖键入与 `clear()` 两条路径。
   bool _canSubmitDictation = false;
+  PoemPracticeDraft? _draft;
+  bool _draftOpening = true;
+  int? _settledDuration;
+  PoemHandwrittenChar? _pendingInk;
+
+  void _update(VoidCallback action) {
+    setState(action);
+    _draft?.changed();
+  }
+
+  Map<String, dynamic> _captureDraft() => {
+    'activityId': _activityId,
+    'level': _level.name,
+    'line': _currentLineIndex,
+    'blanks': _blankPositions,
+    'blank': _currentBlankIdx,
+    'filled': {
+      for (final entry in _filledChars.entries) '${entry.key}': entry.value,
+    },
+    'candidates': _candidates,
+    'showHint': _showHint,
+    'hintUsed': _hintUsedThisLine,
+    'wrongAttempts': _wrongAttemptsThisLine,
+    'wrongAnswers': _wrongAnswers,
+    'stars': _totalStars,
+    'completedLines': _linesCompleted,
+    'input': _dictController.text,
+    'handwrite': _dictHandwrite,
+    'dictTargets': _dictTargetChars,
+    'dictConfirmed': _dictConfirmed.map((c) => c.toJson()).toList(),
+    'dictLines': {
+      for (final entry in _dictLineResults.entries)
+        '${entry.key}': entry.value.map((c) => c.toJson()).toList(),
+    },
+    'pendingInk': _pendingInk?.toJson(),
+    'accuracy': _dictationAccuracy,
+    'showDiff': _showDictDiff,
+    'snapshots': _snapshots.map((s) => s.toJson()).toList(),
+    'completedAt': _completedAt?.toIso8601String(),
+    'duration': _settledDuration,
+    'details': _detailsJson,
+  };
+
+  void _restoreDraft(Map<String, dynamic> data) {
+    final level = ReciteLevel.values.byName(data['level'] as String);
+    final line = data['line'] as int;
+    final blanks = (data['blanks'] as List).cast<int>();
+    final blank = data['blank'] as int;
+    final filled = (data['filled'] as Map<String, dynamic>).map(
+      (key, value) => MapEntry(int.parse(key), value as String),
+    );
+    final candidates = (data['candidates'] as List).cast<String>();
+    final wrong = (data['wrongAnswers'] as List).cast<String>();
+    final snapshots = (data['snapshots'] as List)
+        .map((s) => PoemLineResult.fromJson(s as Map<String, dynamic>))
+        .toList();
+    final targets = (data['dictTargets'] as List).cast<String>();
+    final confirmed = (data['dictConfirmed'] as List)
+        .map((s) => PoemHandwrittenChar.fromJson(s as Map<String, dynamic>))
+        .toList();
+    final dictLines = (data['dictLines'] as Map<String, dynamic>).map(
+      (key, value) => MapEntry(
+        int.parse(key),
+        (value as List)
+            .map((s) => PoemHandwrittenChar.fromJson(s as Map<String, dynamic>))
+            .toList(),
+      ),
+    );
+    final pending = data['pendingInk'] == null
+        ? null
+        : PoemHandwrittenChar.fromJson(
+            data['pendingInk'] as Map<String, dynamic>,
+          );
+    final completedAt = data['completedAt'] == null
+        ? null
+        : DateTime.parse(data['completedAt'] as String);
+    final duration = data['duration'] as int?;
+    final details = data['details'] as String?;
+    final id = data['activityId'] as String;
+    final showHint = data['showHint'] as bool;
+    final hintUsed = data['hintUsed'] as bool;
+    final attempts = data['wrongAttempts'] as int;
+    final stars = data['stars'] as int;
+    final count = data['completedLines'] as int;
+    final input = data['input'] as String;
+    final handwrite = data['handwrite'] as bool;
+    final accuracy = (data['accuracy'] as num?)?.toDouble();
+    final showDiff = data['showDiff'] as bool;
+    if (line < 0 ||
+        line >= _lines.length ||
+        blank < 0 ||
+        (blanks.isEmpty ? blank != 0 : blank >= blanks.length) ||
+        blanks.any((i) => i < 0 || i >= _lines[line].characters.length) ||
+        filled.keys.any((i) => !blanks.contains(i)) ||
+        count < 0 ||
+        count > _lines.length ||
+        confirmed.length > targets.length ||
+        dictLines.length > _lines.length ||
+        snapshots.any((s) => s.lineIndex >= _lines.length) ||
+        attempts < 0 ||
+        stars < 0 ||
+        (accuracy != null && (accuracy < 0 || accuracy > 1))) {
+      throw const FormatException('背诵草稿进度不完整');
+    }
+    _level = level;
+    _currentLineIndex = line;
+    _blankPositions = blanks;
+    _currentBlankIdx = blank;
+    _filledChars = filled;
+    _candidates = candidates;
+    _wrongAnswers
+      ..clear()
+      ..addAll(wrong);
+    _snapshots
+      ..clear()
+      ..addAll(snapshots);
+    _dictTargetChars = targets;
+    _dictConfirmed
+      ..clear()
+      ..addAll(confirmed);
+    _dictLineResults
+      ..clear()
+      ..addAll(dictLines);
+    _pendingInk = pending;
+    _completedAt = completedAt;
+    _settledDuration = duration;
+    _detailsJson = details;
+    _activityId = id;
+    _showHint = showHint;
+    _hintUsedThisLine = hintUsed;
+    _wrongAttemptsThisLine = attempts;
+    _totalStars = stars;
+    _linesCompleted = count;
+    _dictHandwrite = handwrite;
+    _dictationAccuracy = accuracy;
+    _showDictDiff = showDiff;
+    _dictController.text = input;
+  }
+
+  Future<void> _openPractice() async {
+    if (!mounted) return;
+    _initPoem();
+    final poem = ref.read(poemByIdProvider(widget.poemId));
+    if (poem == null || _lines.isEmpty) return;
+    final draft = _draft = PoemPracticeDraft(
+      identity: PoemDraftIdentity(
+        kind: 'poemRecite',
+        poem: poem,
+        variant: 'levels',
+        label: '背诵练习',
+        route: AppRoutes.poemReciteOf(Uri.encodeComponent(widget.poemId)),
+      ),
+      capture: _captureDraft,
+      repository: _learningWrites,
+    );
+    final opened = await draft.open(context, _restoreDraft);
+    if (!mounted) return;
+    if (!opened) {
+      Navigator.of(context).pop();
+      return;
+    }
+    _update(() => _draftOpening = false);
+    if (!draft.restored) return;
+    if (_completedAt != null) {
+      unawaited(_onAllLinesComplete());
+      return;
+    }
+    if (_level == ReciteLevel.dictation) {
+      if (_dictHandwrite) {
+        await _prepareHandwriteDictation(reset: false);
+        if (!mounted) return;
+        if (_dictTargetChars.isEmpty ||
+            _dictConfirmed.length == _dictTargetChars.length) {
+          _setupHandwriteLine(_dictLineResults.length);
+        }
+      }
+    } else if (_snapshots.any((s) => s.lineIndex == _currentLineIndex)) {
+      _setupLine(_currentLineIndex + 1);
+    } else if (_blankPositions.isNotEmpty &&
+        _filledChars.containsKey(_blankPositions[_currentBlankIdx])) {
+      if (_currentBlankIdx + 1 == _blankPositions.length) {
+        _onLineComplete();
+      } else {
+        _update(() {
+          _currentBlankIdx++;
+          _showHint = false;
+          _candidates = _generateCandidates(
+            _lines[_currentLineIndex].characters.elementAt(
+              _blankPositions[_currentBlankIdx],
+            ),
+          );
+        });
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _activityId = _newActivityId();
     _dictController.addListener(_onDictInputChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initPoem());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openPractice());
   }
 
   @override
   void dispose() {
+    _draft?.dispose();
     _celebrationCtrl.dispose();
     _dictController.removeListener(_onDictInputChanged);
     _dictController.dispose();
@@ -209,9 +408,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   }
 
   void _onDictInputChanged() {
+    _draft?.changed();
     final canSubmit = _dictController.text.trim().isNotEmpty;
     if (canSubmit != _canSubmitDictation) {
-      setState(() => _canSubmitDictation = canSubmit);
+      _update(() => _canSubmitDictation = canSubmit);
     }
   }
 
@@ -220,7 +420,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   // ─────────────────────────────────────────────────────────────
 
   /// 进入手写默写时预取笔顺资产到本地缓存（整诗目标字，缓存命中复用）。
-  Future<void> _prepareHandwriteDictation() async {
+  Future<void> _prepareHandwriteDictation({bool reset = true}) async {
+    final activityId = _activityId;
     final chars = _lines.join().characters.toList();
     WritingStrokeAsset? asset;
     try {
@@ -229,12 +430,16 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       // 资产加载失败：全部降级为自由书写（不崩溃，AC6 口径）。
       _strokeLoadingFailed = true;
     }
-    if (!mounted) return;
+    if (!mounted || activityId != _activityId) return;
     for (final ch in chars) {
       if (_isPunctuation(ch) || _strokeCache.containsKey(ch)) continue;
       _strokeCache[ch] = asset?[ch];
     }
-    setState(() {
+    if (!reset) {
+      _update(() {});
+      return;
+    }
+    _update(() {
       _dictConfirmed.clear();
       _dictLineResults.clear();
     });
@@ -248,7 +453,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       unawaited(_submitHandwriteDictation());
       return;
     }
-    setState(() {
+    _update(() {
+      _pendingInk = null;
       _dictTargetChars = _lines[index].characters.toList();
       _dictConfirmed.clear();
     });
@@ -257,8 +463,9 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   /// 手写板确认一个字：入当前句笔迹；写满整句保存后换下一句。
   void _onHandwriteCharConfirmed(PoemHandwrittenChar result) {
     if (_completedAt != null || _settlementStarted) return;
+    _pendingInk = null;
     final lineIdx = _currentHandwriteLine;
-    setState(() => _dictConfirmed.add(result));
+    _update(() => _dictConfirmed.add(result));
     if (_dictConfirmed.length >= _dictTargetChars.length) {
       _dictLineResults[lineIdx] = List.of(_dictConfirmed);
       // 下一帧换句（让「写满」的最后一格先渲染）。
@@ -277,10 +484,12 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   // ─────────────────────────────────────────────────────────────
 
   void _initPoem() {
+    if (!mounted) return;
     final poem = ref.read(poemByIdProvider(widget.poemId));
     if (poem == null) return;
 
     final lines = poemPracticeLines(poem.content);
+    if (lines.isEmpty) return;
     final pinyinLines = poem.pinyin.isNotEmpty
         ? poem.pinyin.split('\n')
         : List.filled(lines.length, '');
@@ -293,7 +502,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       }
     }
 
-    setState(() {
+    _update(() {
       _lines = lines;
       _pinyinLines = pinyinLines;
       _allCharsPool = pool.toList();
@@ -310,7 +519,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final chars = _lines[index].characters.toList();
     final blanks = _generateBlanks(chars);
 
-    setState(() {
+    _update(() {
       _currentLineIndex = index;
       _blankPositions = blanks;
       _currentBlankIdx = 0;
@@ -393,7 +602,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
     if (char == correctChar) {
       HapticFeedback.lightImpact();
-      setState(() {
+      _update(() {
         _filledChars[blankPos] = char;
         _correctFlash = true;
       });
@@ -402,11 +611,11 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       final activityId = _activityId;
       Future.delayed(350.ms, () {
         if (!mounted || activityId != _activityId) return;
-        setState(() => _correctFlash = false);
+        _update(() => _correctFlash = false);
 
         if (_currentBlankIdx + 1 < _blankPositions.length) {
           // 下一个空
-          setState(() {
+          _update(() {
             _currentBlankIdx++;
             _showHint = false;
             final nextBlankPos = _blankPositions[_currentBlankIdx];
@@ -422,13 +631,13 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     } else {
       // 选错
       HapticFeedback.mediumImpact();
-      setState(() {
+      _update(() {
         _wrongAttemptsThisLine++;
         _wrongAnswers.add(char);
         _shakeActive = true;
       });
       Future.delayed(400.ms, () {
-        if (mounted) setState(() => _shakeActive = false);
+        if (mounted) _update(() => _shakeActive = false);
       });
     }
   }
@@ -459,7 +668,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
         wrongAnswers: List.of(_wrongAnswers),
       ),
     );
-    setState(() {
+    _update(() {
       _totalStars += stars;
       _linesCompleted++;
     });
@@ -473,7 +682,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   }
 
   void _toggleHint() {
-    setState(() {
+    _update(() {
       _showHint = !_showHint;
       if (_showHint) _hintUsedThisLine = true;
     });
@@ -488,7 +697,8 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     _settlementError = null;
 
     final completedAt = _completedAt ??= DateTime.now();
-    final duration = completedAt.difference(_startTime).inSeconds;
+    _draft?.clock.finish();
+    final duration = _settledDuration ??= _draft!.clock.elapsedSeconds;
     final maxQualityPoints = _maxQualityPoints;
     final qualityPoints = _totalStars.clamp(0, maxQualityPoints);
     final rewardStars = _calculateRewardStars();
@@ -510,17 +720,31 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final checkInRepo = ref.read(checkInRepoProvider);
 
     try {
+      await _draft!.saveOrThrow();
       await _learningWrites.guard(() async {
         if (!_progressRecorded) {
           if (_level != ReciteLevel.dictation ||
               (_dictationAccuracy ?? 0) >= 0.8) {
-            await progressRepo.recordRecitation(poemId, level: masteryLevel);
+            _draft!.assertCurrent();
+            await progressRepo.recordRecitation(
+              poemId,
+              level: masteryLevel,
+              activityId: activityId,
+              completedAt: completedAt,
+            );
           } else {
-            await progressRepo.recordStudy(poemId);
+            _draft!.assertCurrent();
+            await progressRepo.recordStudy(
+              poemId,
+              activityId: activityId,
+              completedAt: completedAt,
+            );
           }
           _progressRecorded = true;
         }
+        _draft!.assertCurrent();
         await statsRepo.updatePoemStats(learned: progressRepo.learnedCount);
+        _draft!.assertCurrent();
         await activityRepo.record(
           id: activityId,
           activityType: LearningActivityType.poemRecitation,
@@ -535,8 +759,11 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
         // 记录星星到全局统计
         if (rewardStars > 0) {
+          _draft!.assertCurrent();
           await statsRepo.addStars(rewardStars, activityId: activityId);
         }
+
+        _draft!.assertCurrent();
 
         await checkInRepo.updateForDate(
           completedAt,
@@ -546,6 +773,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
           addDuration: duration,
         );
       });
+      await _draft!.complete(activityId);
     } on Object catch (error, stackTrace) {
       // Hive IO 失败抛的是 `HiveError extends Error`，`on Exception` 捕不到。
       AppLogger.e(
@@ -558,7 +786,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
       //（否则用户再次提交会被 `_settlementStarted` 静默拦住）。
       _settlementStarted = false;
       _settlementError = '学习记录保存失败，请重试';
-      if (mounted) setState(() {});
+      if (mounted) _update(() {});
       return;
     }
 
@@ -595,7 +823,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
     unawaited(ref.read(soundServiceProvider).playCompletion());
     _celebrationCtrl.play();
-    setState(() => _isComplete = true);
+    _update(() => _isComplete = true);
   }
 
   Future<List<Achievement>> _checkAchievementsSafely() async {
@@ -624,13 +852,14 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   }
 
   void _restart() {
-    setState(() {
+    _update(() {
       _totalStars = 0;
       _linesCompleted = 0;
       _isComplete = false;
       _showDictDiff = false;
       _dictController.clear();
-      _startTime = DateTime.now();
+      _settledDuration = null;
+      _draft?.restart();
       _activityId = _newActivityId();
       _completedAt = null;
       _progressRecorded = false;
@@ -649,14 +878,15 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
   void _changeLevel(ReciteLevel level) {
     if (level == _level || _settlementStarted || _completedAt != null) return;
-    setState(() {
+    _update(() {
       _level = level;
       _totalStars = 0;
       _linesCompleted = 0;
       _isComplete = false;
       _showDictDiff = false;
       _dictController.clear();
-      _startTime = DateTime.now();
+      _settledDuration = null;
+      _draft?.restart();
       _activityId = _newActivityId();
       _completedAt = null;
       _progressRecorded = false;
@@ -676,6 +906,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
   /// 重置手写默写进度（换级/重开共用）。
   void _resetHandwriteDictation() {
+    _pendingInk = null;
     _dictTargetChars = [];
     _dictConfirmed.clear();
     _dictLineResults.clear();
@@ -686,7 +917,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
   // ─────────────────────────────────────────────────────────────
 
   Future<void> _submitDictation() async {
-    setState(() => _showDictDiff = true);
+    _update(() => _showDictDiff = true);
 
     // 简单计分：正确字数 / 总字数
     final original = _lines.join('\n');
@@ -768,7 +999,10 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     final poem = ref.watch(poemByIdProvider(widget.poemId));
     final theme = Theme.of(context);
 
-    if (poem == null || _lines.isEmpty) {
+    if (poem == null || poemPracticeLines(poem.content).isEmpty) {
+      return PoemPracticeUnavailable(title: '背诵练习', missing: poem == null);
+    }
+    if (_draftOpening || _lines.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('背诵练习')),
         body: const Center(child: CircularProgressIndicator()),
@@ -776,9 +1010,14 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
     }
 
     return PopScope<PoemPracticeResult>(
-      canPop: !_isComplete || _allowResultPop,
+      canPop: _allowResultPop,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _isComplete) _exitWithResult();
+        if (didPop) return;
+        if (_isComplete) {
+          _exitWithResult();
+        } else {
+          unawaited(_draft?.exit(context));
+        }
       },
       child: Scaffold(
         appBar: AppBar(
@@ -817,35 +1056,38 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
             ),
           ),
         ),
-        body: Stack(
-          children: [
-            SafeArea(
-              child: _isComplete
-                  ? _buildResultCard(context)
-                  : _level == ReciteLevel.dictation
-                  ? _buildDictation(context)
-                  : _buildCharSelect(context),
-            ),
-            ConfettiOverlay(controller: _celebrationCtrl),
-            if (_settlementError != null)
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: ColoredCard(
-                  color: Theme.of(context).colorScheme.error,
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(_settlementError!)),
-                      TextButton(
-                        onPressed: _settlementStarted
-                            ? null
-                            : _onAllLinesComplete,
-                        child: const Text('重试保存'),
-                      ),
-                    ],
+        body: PoemDraftSaveStatus(
+          draft: _draft,
+          child: Stack(
+            children: [
+              SafeArea(
+                child: _isComplete
+                    ? _buildResultCard(context)
+                    : _level == ReciteLevel.dictation
+                    ? _buildDictation(context)
+                    : _buildCharSelect(context),
+              ),
+              ConfettiOverlay(controller: _celebrationCtrl),
+              if (_settlementError != null)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: ColoredCard(
+                    color: Theme.of(context).colorScheme.error,
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(_settlementError!)),
+                        TextButton(
+                          onPressed: _settlementStarted
+                              ? null
+                              : _onAllLinesComplete,
+                          child: const Text('重试保存'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1211,7 +1453,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                 color: theme.colorScheme.onSurfaceVariant,
                 onPressed: _showDictDiff
                     ? null
-                    : () => setState(() {
+                    : () => _update(() {
                         _dictHandwrite = !_dictHandwrite;
                         _resetHandwriteDictation();
                         if (_dictHandwrite) {
@@ -1283,6 +1525,12 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.sm),
             child: PoemSentenceWritingSheet(
+              key: ValueKey('recite-sheet-$_activityId-$_currentHandwriteLine'),
+              pendingInk: _pendingInk,
+              onInkChanged: (ink) {
+                _pendingInk = ink;
+                _draft?.changed();
+              },
               targetChars: _dictTargetChars,
               confirmedChars: _dictConfirmed,
               currentStrokeData: _strokeLoadingFailed
@@ -1302,7 +1550,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
   /// 手写整诗完成：按句序组装全文（标点已在位），走既有逐字比对结算。
   Future<void> _submitHandwriteDictation() async {
-    setState(() => _showDictDiff = true);
+    _update(() => _showDictDiff = true);
     _dictController.text = [
       for (var i = 0; i < _lines.length; i++)
         ...?_dictLineResults[i]?.map((c) => c.character),
@@ -1373,9 +1621,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
 
   Widget _buildResultCard(BuildContext context) {
     final theme = Theme.of(context);
-    final elapsed = (_completedAt ?? DateTime.now())
-        .difference(_startTime)
-        .inSeconds;
+    final elapsed = _settledDuration ?? _draft!.clock.elapsedSeconds;
     final maxStars = _level == ReciteLevel.dictation ? 3 : _lines.length * 3;
     final displayStars = _calculateRewardStars();
 

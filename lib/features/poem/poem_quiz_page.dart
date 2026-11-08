@@ -18,7 +18,6 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
-import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
@@ -29,6 +28,8 @@ import 'package:poemath/features/poem/poem_practice_score.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 import 'package:poemath/features/poem/quiz/quiz_engine.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
+import 'package:poemath/features/poem/poem_practice_draft.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 
 class PoemQuizPage extends ConsumerStatefulWidget {
   const PoemQuizPage({super.key, required this.poemId, required this.quizType});
@@ -41,7 +42,9 @@ class PoemQuizPage extends ConsumerStatefulWidget {
 }
 
 class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
-  final _learningWrites = PracticeDraftRepository();
+  late final _learningWrites = ref.read(
+    poemPracticeDraftRepositoryFactoryProvider,
+  )();
   QuizSession? _session;
   bool _answered = false;
   final _fillController = TextEditingController();
@@ -58,22 +61,107 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   String? _detailsJson;
   bool _progressRecorded = false;
   PoemProgress? _recordedProgress;
+  PoemPracticeDraft? _draft;
+
+  void _update(VoidCallback action) {
+    setState(action);
+    _draft?.changed();
+  }
+
+  Map<String, dynamic> _captureDraft() => {
+    'activityId': _activityId,
+    'session': _session!.toJson(),
+    'input': _fillController.text,
+    'answered': _answered,
+    'completedAt': _completedAt?.toIso8601String(),
+    'duration': _settledDuration,
+    'details': _detailsJson,
+  };
+
+  void _restoreDraft(Map<String, dynamic> data) {
+    final session = QuizSession.fromJson(
+      data['session'] as Map<String, dynamic>,
+    );
+    if (session.poemId != widget.poemId || session.type != widget.quizType) {
+      throw const FormatException('测试模式不匹配');
+    }
+    final input = data['input'] as String;
+    final answered = data['answered'] as bool;
+    if (!session.isFinished &&
+        answered != (session.userAnswers[session.currentIndex] != null)) {
+      throw const FormatException('测试作答状态不完整');
+    }
+    final completed = data['completedAt'] == null
+        ? null
+        : DateTime.parse(data['completedAt'] as String);
+    final duration = data['duration'] as int?;
+    final details = data['details'] as String?;
+    final id = data['activityId'] as String;
+    _session = session;
+    _activityId = id;
+    _answered = answered;
+    _fillController.text = input;
+    _completedAt = completed;
+    _settledDuration = duration;
+    _detailsJson = details;
+  }
+
+  Future<void> _openPractice() async {
+    if (!mounted) return;
+    final poem = ref.read(poemByIdProvider(widget.poemId));
+    if (poem == null) return;
+    final type = switch (widget.quizType) {
+      QuizType.fillBlank => 'fill',
+      QuizType.multipleChoice => 'choice',
+      QuizType.chooseAuthor => 'author',
+      QuizType.chooseDynasty => 'dynasty',
+    };
+    final draft = _draft = PoemPracticeDraft(
+      identity: PoemDraftIdentity(
+        kind: 'poemQuiz',
+        poem: poem,
+        variant: widget.quizType.name,
+        label: widget.quizType.label,
+        route:
+            '${AppRoutes.poemQuizOf(Uri.encodeComponent(widget.poemId))}?type=$type',
+      ),
+      capture: _captureDraft,
+      repository: _learningWrites,
+    );
+    final opened = await draft.open(context, _restoreDraft);
+    if (!mounted) return;
+    if (!opened) {
+      Navigator.of(context).pop();
+      return;
+    }
+    if (draft.restored) {
+      _update(() {});
+      if (_session!.isFinished) unawaited(_finishQuiz());
+    } else {
+      _initQuiz();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _confettiController = CelebrationController();
     // 延迟初始化，等 ref 可用
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initQuiz());
+    _fillController.addListener(_saveInput);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openPractice());
   }
 
   @override
   void dispose() {
+    _draft?.dispose();
+    _session?.stop();
     _fillController.dispose();
     _fillFocusNode.dispose();
     _confettiController.dispose();
     super.dispose();
   }
+
+  void _saveInput() => _draft?.changed();
 
   void _initQuiz() {
     _detailsJson = null;
@@ -149,7 +237,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       return;
     }
 
-    setState(() {
+    _update(() {
       _activityId =
           'poem_quiz:${widget.poemId}:${DateTime.now().microsecondsSinceEpoch}';
       _session = QuizSession(
@@ -164,14 +252,14 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final text = _fillController.text.trim();
     if (text.isEmpty || _answered) return;
     _session!.submitAnswer(text);
-    setState(() => _answered = true);
+    _update(() => _answered = true);
     _playAnswerFeedback();
   }
 
   void _submitChoiceAnswer(String choice) {
     if (_answered) return;
     _session!.submitAnswer(choice);
-    setState(() => _answered = true);
+    _update(() => _answered = true);
     _playAnswerFeedback();
   }
 
@@ -193,7 +281,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   void _nextQuestion() {
     _session!.advance();
     _fillController.clear();
-    setState(() => _answered = false);
+    _update(() => _answered = false);
     if (!_session!.isFinished) {
       _fillFocusNode.requestFocus();
     }
@@ -203,7 +291,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     if (_isFinishing || _settled) return;
     _isFinishing = true;
     _settlementError = null;
-    if (mounted) setState(() {});
+    if (mounted) _update(() {});
 
     final session = _session!;
     final activityId = _activityId!;
@@ -231,7 +319,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       successfulItems: session.correctCount,
     );
     final completedAt = _completedAt ??= DateTime.now();
-    final duration = _settledDuration ??= session.elapsedSeconds;
+    _draft?.clock.finish();
+    final duration = _settledDuration ??= _draft!.clock.elapsedSeconds;
     _starsEarned = stars;
     final progressRepo = ref.read(poemProgressRepoProvider);
     final statsRepo = ref.read(userStatsRepoProvider);
@@ -239,16 +328,21 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final checkInRepo = ref.read(checkInRepoProvider);
     final reviewRepo = ref.read(reviewRepoProvider);
     try {
+      await _draft!.saveOrThrow();
       await _learningWrites.guard(() async {
         if (!_progressRecorded) {
-          _recordedProgress = await progressRepo.recordStudy(widget.poemId);
+          _recordedProgress = await progressRepo.recordStudy(
+            widget.poemId,
+            activityId: activityId,
+            completedAt: completedAt,
+          );
           _progressRecorded = true;
         }
-        final progress = _recordedProgress!.copyWith();
-
         // 更新全局统计
         final learnedCount = progressRepo.learnedCount;
+        _draft!.assertCurrent();
         await statsRepo.updatePoemStats(learned: learnedCount);
+        _draft!.assertCurrent();
         await activityRepo.record(
           id: activityId,
           activityType: LearningActivityType.poemQuiz,
@@ -261,8 +355,10 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
           detailsJson: detailsJson,
         );
         if (stars > 0) {
+          _draft!.assertCurrent();
           await statsRepo.addStars(stars, activityId: activityId);
         }
+        _draft!.assertCurrent();
         await checkInRepo.updateForDate(
           completedAt,
           activityId: activityId,
@@ -272,6 +368,10 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
         );
         // 通过时更新掌握等级、状态和复习计划
         if (session.isPassed) {
+          // 结算可能中断后重试；使用当前进度，保留期间其他练习的次数与幂等标记。
+          final progress =
+              (progressRepo.get(widget.poemId) ?? _recordedProgress!)
+                  .copyWith();
           var needSave = false;
 
           if (progress.masteryLevel < 5) {
@@ -286,17 +386,20 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
           }
 
           if (needSave) {
+            _draft!.assertCurrent();
             await progressRepo.save(progress);
           }
 
           // 首次通过 → 创建艾宾浩斯复习计划
           final existing = reviewRepo.get(widget.poemId);
           if (existing == null) {
+            _draft!.assertCurrent();
             await reviewRepo.createSchedule(widget.poemId);
           }
         }
       });
 
+      await _draft!.complete(activityId);
       _settled = true;
       if (!mounted) return;
       unawaited(ref.read(soundServiceProvider).playCompletion());
@@ -328,7 +431,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       _settlementError = '学习记录保存失败，请重试';
     } finally {
       _isFinishing = false;
-      if (mounted) setState(() {});
+      if (mounted) _update(() {});
     }
   }
 
@@ -384,19 +487,27 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final session = _session!;
 
     return PopScope<PoemPracticeResult>(
-      canPop: !session.isFinished || _allowResultPop,
+      canPop: _allowResultPop,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && session.isFinished) _exitWithResult();
+        if (didPop) return;
+        if (session.isFinished && _settled) {
+          _exitWithResult();
+        } else {
+          unawaited(_draft?.exit(context));
+        }
       },
       child: Scaffold(
         appBar: AppBar(title: Text('${widget.quizType.label} · ${poem.title}')),
-        body: Stack(
-          children: [
-            session.isFinished
-                ? _buildResult(context, session)
-                : _buildQuestion(context, session, theme),
-            ConfettiOverlay(controller: _confettiController),
-          ],
+        body: PoemDraftSaveStatus(
+          draft: _draft,
+          child: Stack(
+            children: [
+              session.isFinished
+                  ? _buildResult(context, session)
+                  : _buildQuestion(context, session, theme),
+              ConfettiOverlay(controller: _confettiController),
+            ],
+          ),
         ),
       ),
     );
@@ -741,8 +852,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
       ratingColor = theme.colorScheme.secondary;
     }
 
-    final minutes = session.elapsedSeconds ~/ 60;
-    final seconds = session.elapsedSeconds % 60;
+    final minutes = (_settledDuration ?? _draft!.clock.elapsedSeconds) ~/ 60;
+    final seconds = (_settledDuration ?? _draft!.clock.elapsedSeconds) % 60;
     final timeText = minutes > 0 ? '$minutes 分 $seconds 秒' : '$seconds 秒';
 
     return SingleChildScrollView(
@@ -903,7 +1014,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                       ? null
                       : () {
                           // 重新测试
-                          setState(() {
+                          _update(() {
                             _completedAt = null;
                             _settledDuration = null;
                             _progressRecorded = false;
@@ -915,6 +1026,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                             _allowResultPop = false;
                             _fillController.clear();
                           });
+                          _draft?.restart();
                           _initQuiz();
                         },
                   icon: const Icon(Icons.refresh),

@@ -80,6 +80,7 @@ void main() {
         profileId: 'default',
         status: LearningStatus.mastered,
         firstMasteredAt: at,
+        appliedActivityIds: ['poem-session-1'],
       ),
     );
     await box.put(
@@ -115,6 +116,9 @@ void main() {
       '{"rawAnswer":"明月光","lines":[{"hintUsed":true}]}',
     );
     expect((reopened.get('progress') as PoemProgress).firstMasteredAt, at);
+    expect((reopened.get('progress') as PoemProgress).appliedActivityIds, [
+      'poem-session-1',
+    ]);
     expect(
       (reopened.get('review') as ReviewSchedule).historyJson,
       '{"cycleId":"cycle-2","reviews":[{"id":"review-1"}]}',
@@ -152,96 +156,105 @@ void main() {
     expect(reopened.get('vertical')!.calculationModeLabel, '竖式');
   });
 
-  final legacyCases = <({
-    int typeId,
-    Map<int, Object?> fields,
-    void Function(Object) verify,
-  })>[
-    (
-      typeId: 14,
-      fields: {
-        0: 'old-challenge',
-        1: 'default',
-        2: 'fixed',
-        3: 80,
-        4: 10,
-        5: 8,
-        6: 4,
-        7: 2,
-        8: '上',
-        9: 'medium',
-        10: 60,
-        11: at,
-        12: 2,
-      },
-      verify: (value) =>
-          expect((value as ChallengeRecord).calculationMode, 'normal'),
-    ),
-    (
-      typeId: 15,
-      fields: {
-        0: 'activity',
-        1: 'default',
-        2: 'poemQuiz',
-        3: 1,
-        4: 1,
-        5: 'poem',
-        6: 3,
-        7: 60,
-        8: at,
-      },
-      verify: (value) =>
-          expect((value as LearningActivity).detailsJson, isNull),
-    ),
-    (
-      typeId: 5,
-      fields: {
-        0: 'poem',
-        1: 'default',
-        2: LearningStatus.mastered,
-        3: 4,
-        4: 2,
-        5: at,
-        6: at,
-        7: 3,
-      },
-      verify: (value) =>
-          expect((value as PoemProgress).firstMasteredAt, isNull),
-    ),
-    (
-      typeId: 7,
-      fields: {0: 'poem', 1: 'default', 2: 5, 3: at, 4: at, 5: true, 6: 1.0},
-      verify: (value) => expect((value as ReviewSchedule).historyJson, isNull),
-    ),
-    (
-      typeId: 8,
-      fields: {
-        0: 'mistake',
-        1: 'default',
-        2: '38+45',
-        3: '83',
-        4: '82',
-        5: 'vertical',
-        6: 2,
-        7: null,
-        8: null,
-        9: at,
-        10: false,
-        11: 0,
-        12: 1,
-        13: null,
-        14: 0,
-        15: null,
-      },
-      verify: (value) {
-        final mistake = value as MathMistake;
-        expect(mistake.skillId, isNull);
-        expect(mistake.semester, isNull);
-        expect(mistake.problemJson, isNull);
-        expect(mistake.attemptJson, isNull);
-      },
-    ),
-  ];
+  final legacyCases =
+      <({int typeId, Map<int, Object?> fields, void Function(Object) verify})>[
+        (
+          typeId: 14,
+          fields: {
+            0: 'old-challenge',
+            1: 'default',
+            2: 'fixed',
+            3: 80,
+            4: 10,
+            5: 8,
+            6: 4,
+            7: 2,
+            8: '上',
+            9: 'medium',
+            10: 60,
+            11: at,
+            12: 2,
+          },
+          verify: (value) =>
+              expect((value as ChallengeRecord).calculationMode, 'normal'),
+        ),
+        (
+          typeId: 15,
+          fields: {
+            0: 'activity',
+            1: 'default',
+            2: 'poemQuiz',
+            3: 1,
+            4: 1,
+            5: 'poem',
+            6: 3,
+            7: 60,
+            8: at,
+          },
+          verify: (value) =>
+              expect((value as LearningActivity).detailsJson, isNull),
+        ),
+        (
+          typeId: 5,
+          fields: {
+            0: 'poem',
+            1: 'default',
+            2: LearningStatus.mastered,
+            3: 4,
+            4: 2,
+            5: at,
+            6: at,
+            7: 3,
+          },
+          verify: (value) {
+            final progress = value as PoemProgress;
+            expect(progress.firstMasteredAt, isNull);
+            expect(progress.appliedActivityIds, isEmpty);
+          },
+        ),
+        (
+          typeId: 7,
+          fields: {
+            0: 'poem',
+            1: 'default',
+            2: 5,
+            3: at,
+            4: at,
+            5: true,
+            6: 1.0,
+          },
+          verify: (value) =>
+              expect((value as ReviewSchedule).historyJson, isNull),
+        ),
+        (
+          typeId: 8,
+          fields: {
+            0: 'mistake',
+            1: 'default',
+            2: '38+45',
+            3: '83',
+            4: '82',
+            5: 'vertical',
+            6: 2,
+            7: null,
+            8: null,
+            9: at,
+            10: false,
+            11: 0,
+            12: 1,
+            13: null,
+            14: 0,
+            15: null,
+          },
+          verify: (value) {
+            final mistake = value as MathMistake;
+            expect(mistake.skillId, isNull);
+            expect(mistake.semester, isNull);
+            expect(mistake.problemJson, isNull);
+            expect(mistake.attemptJson, isNull);
+          },
+        ),
+      ];
   for (final fixture in legacyCases) {
     test('旧字段集合 typeId=${fixture.typeId} 可读取，新增历史保持未知', () async {
       Hive.registerAdapter(

@@ -16,10 +16,12 @@ import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/features/poem/poem_detail_page.dart';
+import 'package:poemath/features/poem/poem_practice_draft.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
 import '../../helpers/hive_test_helper.dart';
+import '../../helpers/immediate_practice_draft_repository.dart';
 
 class _MockTtsService extends Mock implements TtsService {}
 
@@ -124,6 +126,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          // 本组只检查排版；真实草稿写入与退出在续练集成测试中验证。
+          poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+            ImmediatePracticeDraftRepository.new,
+          ),
           poemByIdProvider(_poemId).overrideWith((ref) => _longLinePoem),
         ],
         child: const MaterialApp(home: PoemRecitePage(poemId: _poemId)),

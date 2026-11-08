@@ -1,3 +1,6 @@
+import '../../helpers/immediate_practice_draft_repository.dart';
+
+import 'package:poemath/features/poem/poem_practice_draft.dart';
 // test/features/poem/poem_recite_page_race_test.dart
 //
 // 背诵页竞态守卫回归测试（batch2 R1-R5）：
@@ -72,7 +75,11 @@ class _BlockingReciteProgressRepository extends PoemProgressRepository {
   var studyCalls = 0;
 
   @override
-  Future<PoemProgress> recordStudy(String poemId) async {
+  Future<PoemProgress> recordStudy(
+    String poemId, {
+    String? activityId,
+    DateTime? completedAt,
+  }) async {
     studyCalls++;
     return PoemProgress(poemId: poemId, profileId: 'test');
   }
@@ -81,14 +88,15 @@ class _BlockingReciteProgressRepository extends PoemProgressRepository {
   Future<PoemProgress> recordRecitation(
     String poemId, {
     required int level,
+    String? activityId,
+    DateTime? completedAt,
   }) {
     recordCalls++;
     return _release.future;
   }
 
-  void release() => _release.complete(
-        PoemProgress(poemId: _poemId, profileId: 'test'),
-      );
+  void release() =>
+      _release.complete(PoemProgress(poemId: _poemId, profileId: 'test'));
 
   @override
   int get learnedCount => 1;
@@ -206,12 +214,7 @@ class _CountingActivityRepository extends LearningActivityRepository {
 class _UnlockedAchievementRepository extends AchievementRepository {
   @override
   Achievement? getById(String id) {
-    return Achievement(
-      id: id,
-      profileId: 'test',
-      title: id,
-      isUnlocked: true,
-    );
+    return Achievement(id: id, profileId: 'test', title: id, isUnlocked: true);
   }
 
   @override
@@ -294,10 +297,14 @@ void main() {
     final resolvedPoem = poem ?? _poem;
     return ProviderContainer(
       overrides: [
+        poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+          ImmediatePracticeDraftRepository.new,
+        ),
         soundServiceProvider.overrideWithValue(sound),
         poemByIdProvider(poemId).overrideWith((ref) => resolvedPoem),
-        poemRepoProvider
-            .overrideWith((ref) => _StubPoemRepository([resolvedPoem])),
+        poemRepoProvider.overrideWith(
+          (ref) => _StubPoemRepository([resolvedPoem]),
+        ),
         poemProgressRepoProvider.overrideWith((ref) => progressRepo),
         userStatsRepoProvider.overrideWith((ref) => statsRepo),
         checkInRepoProvider.overrideWith((ref) => checkInRepo),
@@ -322,9 +329,7 @@ void main() {
     return tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
-          home: home ?? PoemRecitePage(poemId: poemId),
-        ),
+        child: MaterialApp(home: home ?? PoemRecitePage(poemId: poemId)),
       ),
     );
   }
@@ -376,8 +381,9 @@ void main() {
     expect(progress.recordCalls, 0);
     expect(progress.studyCalls, 1);
     expect(activities.recorded.single.starsEarned, 0);
-    final details =
-        PoemPracticeDetails.decode(activities.recorded.single.detailsJson)!;
+    final details = PoemPracticeDetails.decode(
+      activities.recorded.single.detailsJson,
+    )!;
     expect(details.rawAnswer, '错');
     expect(details.lines.first.answer, '错');
     expect(details.lines.first.passed, isFalse);
@@ -435,10 +441,7 @@ void main() {
 
     // R5：监听 filteredPoemsProvider，结算后应被失效并重算。
     var filteredRebuilds = 0;
-    container.listen(
-      filteredPoemsProvider,
-      (_, __) => filteredRebuilds++,
-    );
+    container.listen(filteredPoemsProvider, (_, __) => filteredRebuilds++);
 
     await prepareDictation(tester, container);
 
@@ -509,6 +512,9 @@ void main() {
     final achievementRepo = _HangingAchievementRepository();
     final container = ProviderContainer(
       overrides: [
+        poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+          ImmediatePracticeDraftRepository.new,
+        ),
         soundServiceProvider.overrideWithValue(sound),
         poemByIdProvider(_poemId).overrideWith((ref) => _poem),
         poemRepoProvider.overrideWith((ref) => _StubPoemRepository([_poem])),
@@ -603,43 +609,44 @@ void main() {
     const Duration(milliseconds: 350),
   ]) {
     testWidgets(
-        '切级别后旧 ${advanceBeforeSwitch == Duration.zero ? 350 : 800}ms 回调不能推进新一轮',
-        (tester) async {
-      final progressRepo = _BlockingReciteProgressRepository();
-      final activityRepo = _CountingActivityRepository();
-      final container = createContainer(
-        statsRepo: _CountingStatsRepository(),
-        checkInRepo: _CountingCheckInRepository(),
-        activityRepo: activityRepo,
-        progressRepo: progressRepo,
-      );
-      addTearDown(container.dispose);
-      await pumpHost(tester, container);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.text('床').last);
-      await tester.pump(advanceBeforeSwitch);
-      await tester.tap(find.text('中等'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump(const Duration(milliseconds: 900));
+      '切级别后旧 ${advanceBeforeSwitch == Duration.zero ? 350 : 800}ms 回调不能推进新一轮',
+      (tester) async {
+        final progressRepo = _BlockingReciteProgressRepository();
+        final activityRepo = _CountingActivityRepository();
+        final container = createContainer(
+          statsRepo: _CountingStatsRepository(),
+          checkInRepo: _CountingCheckInRepository(),
+          activityRepo: activityRepo,
+          progressRepo: progressRepo,
+        );
+        addTearDown(container.dispose);
+        await pumpHost(tester, container);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.tap(find.text('床').last);
+        await tester.pump(advanceBeforeSwitch);
+        await tester.tap(find.text('中等'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pump(const Duration(milliseconds: 900));
 
-      expect(progressRepo.recordCalls, 0);
-      expect(progressRepo.studyCalls, 0);
-      expect(activityRepo.recordCalls, 0);
-      expect(find.text('1/1'), findsOneWidget);
-      expect(find.text('床'), findsWidgets);
-      expect(
-        tester
-            .widget<LinearProgressIndicator>(
-              find.byType(LinearProgressIndicator),
-            )
-            .value,
-        0,
-      );
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    });
+        expect(progressRepo.recordCalls, 0);
+        expect(progressRepo.studyCalls, 0);
+        expect(activityRepo.recordCalls, 0);
+        expect(find.text('1/1'), findsOneWidget);
+        expect(find.text('床'), findsWidgets);
+        expect(
+          tester
+              .widget<LinearProgressIndicator>(
+                find.byType(LinearProgressIndicator),
+              )
+              .value,
+          0,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
   }
 
   testWidgets('R4 冷却期内误点候选字：不计错误，满星结算', (tester) async {

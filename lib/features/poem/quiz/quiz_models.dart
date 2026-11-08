@@ -1,6 +1,6 @@
 // lib/features/poem/quiz/quiz_models.dart
 //
-// 诗词测试题目模型。纯会话模型，不持久化。
+// 诗词测试题目模型及版本化草稿快照。
 
 /// 测试题型。
 enum QuizType {
@@ -47,6 +47,26 @@ class QuizQuestion {
   /// 原诗行定位；作者/朝代题没有诗句作答，不生成错句。
   final int? sourceLineIndex;
   final String? sourceLineText;
+
+  Map<String, dynamic> toJson() => {
+    'type': type.name,
+    'context': contextLine,
+    'prompt': promptLine,
+    'correct': correctAnswer,
+    'options': options,
+    'sourceIndex': sourceLineIndex,
+    'sourceText': sourceLineText,
+  };
+
+  factory QuizQuestion.fromJson(Map<String, dynamic> json) => QuizQuestion(
+    type: QuizType.values.byName(json['type'] as String),
+    contextLine: json['context'] as String,
+    promptLine: json['prompt'] as String,
+    correctAnswer: json['correct'] as String,
+    options: (json['options'] as List?)?.cast<String>(),
+    sourceLineIndex: json['sourceIndex'] as int?,
+    sourceLineText: json['sourceText'] as String?,
+  );
 }
 
 /// 一次测试会话。
@@ -55,8 +75,8 @@ class QuizSession {
     required this.poemId,
     required this.type,
     required this.questions,
-  })  : userAnswers = List.filled(questions.length, null),
-        _stopwatch = Stopwatch()..start();
+  }) : userAnswers = List.filled(questions.length, null),
+       _stopwatch = Stopwatch()..start();
 
   final String poemId;
   final QuizType type;
@@ -69,6 +89,45 @@ class QuizSession {
 
   /// 当前题目索引。
   int currentIndex = 0;
+
+  Map<String, dynamic> toJson() => {
+    'poemId': poemId,
+    'type': type.name,
+    'questions': questions.map((question) => question.toJson()).toList(),
+    'answers': userAnswers,
+    'index': currentIndex,
+  };
+
+  factory QuizSession.fromJson(Map<String, dynamic> json) {
+    final questions = (json['questions'] as List)
+        .map((value) => QuizQuestion.fromJson(value as Map<String, dynamic>))
+        .toList();
+    final answers = (json['answers'] as List).cast<String?>();
+    final index = json['index'] as int;
+    if (questions.isEmpty ||
+        answers.length != questions.length ||
+        index < 0 ||
+        index > questions.length ||
+        answers.take(index).any((answer) => answer == null) ||
+        questions.any(
+          (question) =>
+              question.correctAnswer.isEmpty ||
+              (question.type.isChoice &&
+                  !(question.options?.contains(question.correctAnswer) ??
+                      false)),
+        )) {
+      throw const FormatException('测试草稿题组不完整');
+    }
+    final session = QuizSession(
+      poemId: json['poemId'] as String,
+      type: QuizType.values.byName(json['type'] as String),
+      questions: questions,
+    );
+    session.currentIndex = index;
+    session.userAnswers.setAll(0, answers);
+    if (session.isFinished) session.stop();
+    return session;
+  }
 
   /// 是否已完成全部题目。
   bool get isFinished => currentIndex >= questions.length;

@@ -201,9 +201,9 @@ class BackupService {
     SecureCredentialStore? secureStore,
     PictureStoryImageService? pictureStoryImages,
     this._pictureStoryRepository,
-  })  : _secureStore = secureStore ?? SecureCredentialStore(),
-        _pictureStoryImages =
-            pictureStoryImages ?? PictureStoryImageService.instance;
+  }) : _secureStore = secureStore ?? SecureCredentialStore(),
+       _pictureStoryImages =
+           pictureStoryImages ?? PictureStoryImageService.instance;
 
   final SecureCredentialStore _secureStore;
   final PictureStoryImageService _pictureStoryImages;
@@ -289,16 +289,15 @@ class BackupService {
     String? passphrase,
     bool encryptPayload = false,
     bool includeCredentials = true,
-  }) =>
-      PictureStoryRepository.exclusive(
-        () => CredentialConfigurationAccess.exclusive(
-          () => _exportToJson(
-            passphrase: passphrase,
-            encryptPayload: encryptPayload,
-            includeCredentials: includeCredentials,
-          ),
-        ),
-      );
+  }) => PictureStoryRepository.exclusive(
+    () => CredentialConfigurationAccess.exclusive(
+      () => _exportToJson(
+        passphrase: passphrase,
+        encryptPayload: encryptPayload,
+        includeCredentials: includeCredentials,
+      ),
+    ),
+  );
 
   Future<String> _exportToJson({
     String? passphrase,
@@ -348,18 +347,19 @@ class BackupService {
       'activitySettlements': ActivitySettlementLedger.completedKeys,
       'settings': _exportSettings(),
     };
-    final credentials =
-        includeCredentials ? await _exportCredentials(passphrase) : null;
+    final credentials = includeCredentials
+        ? await _exportCredentials(passphrase)
+        : null;
     if (credentials != null) {
       data['credentials'] = credentials;
     }
     if (includePictureStoryCatalog) {
       data[PictureStoryCatalogBackup.jsonKey] =
           await PictureStoryCatalogBackup.export(
-        repository: _pictureStories,
-        images: _pictureStoryImages,
-        parentPayload: data,
-      );
+            repository: _pictureStories,
+            images: _pictureStoryImages,
+            parentPayload: data,
+          );
     }
     final json = const JsonEncoder.withIndent('  ').convert(data);
     validateBackupSize(json);
@@ -404,8 +404,8 @@ class BackupService {
       for (final config in imageSettings.imageGenerationProviders) {
         final key = await _secureStore.readImageGenerationApiKeyFor(config.id);
         if (key == null || key.isEmpty) continue;
-        final hint =
-            ImageGenerationProviderConfig.fromProvider(config).credentialHint;
+        final hint = ImageGenerationProviderConfig.fromProvider(config)
+            .credentialHint;
         imageKeys[config.id] = key;
         imageHints[config.id] = hint;
         if (config.id == imageSettings.imageGenerationActiveProviderId) {
@@ -464,9 +464,9 @@ class BackupService {
 
   /// 导出并保存到临时文件，返回文件路径。
   Future<String> exportToFile({String? passphrase}) => CacheActivity.use(
-        TemporaryCacheKind.sharing,
-        () => _exportToFile(passphrase: passphrase),
-      );
+    TemporaryCacheKind.sharing,
+    () => _exportToFile(passphrase: passphrase),
+  );
 
   Future<String> _exportToFile({String? passphrase}) async {
     final json = await exportToJson(
@@ -474,8 +474,11 @@ class BackupService {
       encryptPayload: passphrase?.trim().isNotEmpty == true,
     );
     final dir = await getTemporaryDirectory();
-    final timestamp =
-        DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+    final timestamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .split('.')
+        .first;
     final file = File('${dir.path}/poemath_backup_$timestamp.json');
     await file.writeAsString(json);
     return file.path;
@@ -601,11 +604,7 @@ class BackupService {
             final localHost = _endpointOf(localLegacy);
             if (localHost != host) {
               changed.add(
-                LlmEndpointChange(
-                  label: '默认服务地址',
-                  from: localHost,
-                  to: host,
-                ),
+                LlmEndpointChange(label: '默认服务地址', from: localHost, to: host),
               );
             }
           }
@@ -640,7 +639,9 @@ class BackupService {
           }
         }
       }
-    } on FormatException {/* 非法备份配置由恢复过滤器丢弃。 */}
+    } on FormatException {
+      /* 非法备份配置由恢复过滤器丢弃。 */
+    }
 
     // 没有普通供应商列表，也没有新增或变更端点 → 不弹框。
     if (incoming == null && added.isEmpty && changed.isEmpty) {
@@ -695,8 +696,10 @@ class BackupService {
   }) async {
     authorize();
     if (isEncryptedBackup(jsonString)) {
-      jsonString =
-          await decryptBackupPayload(jsonString, passphrase: passphrase);
+      jsonString = await decryptBackupPayload(
+        jsonString,
+        passphrase: passphrase,
+      );
     }
     final data = _decodeAndValidate(jsonString);
     final pictureStories =
@@ -1016,8 +1019,9 @@ class BackupService {
     final hint = credentials[kCredKeyLlmApiKeyHint];
     if (hint == null || hint.isEmpty) return;
     final settings = data['settings'] as Map<String, dynamic>?;
-    final incoming =
-        settings == null ? null : _acceptedSettings(settings)['llm_providers'];
+    final incoming = settings == null
+        ? null
+        : _acceptedSettings(settings)['llm_providers'];
     _matchLlmProviderByHint(
       hint,
       providers: LlmProviderConfig.decodeList(
@@ -1032,12 +1036,15 @@ class BackupService {
     String hint, {
     List<LlmProviderConfig>? providers,
   }) {
-    final candidates = (providers ??
-            LlmProviderConfig.decodeList(
-              HiveBoxes.settings.get('llm_providers') as String?,
-            ))
-        .where((config) => _llmKeyHintOf(config.baseUrl, config.model) == hint)
-        .toList();
+    final candidates =
+        (providers ??
+                LlmProviderConfig.decodeList(
+                  HiveBoxes.settings.get('llm_providers') as String?,
+                ))
+            .where(
+              (config) => _llmKeyHintOf(config.baseUrl, config.model) == hint,
+            )
+            .toList();
     if (candidates.length > 1) {
       throw const FormatException('旧备份无法确定 AI 密钥对应的配置，请跳过凭据恢复并重新填写密钥');
     }
@@ -1106,9 +1113,11 @@ class BackupService {
     bool canonicalize = true,
   }) async {
     var count = 0;
-    final hasAliases = canonicalize &&
-        (data['poemProgress'] as List? ?? [])
-            .any((m) => PoemIdentity.aliases.containsKey((m as Map)['poemId']));
+    final hasAliases =
+        canonicalize &&
+        (data['poemProgress'] as List? ?? []).any(
+          (m) => PoemIdentity.aliases.containsKey((m as Map)['poemId']),
+        );
 
     if (canonicalize) {
       data = Map<String, dynamic>.from(data);
@@ -1117,8 +1126,10 @@ class BackupService {
         'poemFavorites': 'favorite',
         'reviewSchedules': 'review',
       }.entries) {
-        data[entry.key] =
-            PoemIdentity.merge(entry.value, data[entry.key] as List? ?? []);
+        data[entry.key] = PoemIdentity.merge(
+          entry.value,
+          data[entry.key] as List? ?? [],
+        );
       }
     }
 
@@ -1143,12 +1154,8 @@ class BackupService {
     count += await _restoreAchievements(
       data['achievements'] as List<dynamic>? ?? [],
     );
-    count += await _restoreCheckIns(
-      data['checkIns'] as List<dynamic>? ?? [],
-    );
-    count += await _restoreUserStats(
-      data['userStats'] as List<dynamic>? ?? [],
-    );
+    count += await _restoreCheckIns(data['checkIns'] as List<dynamic>? ?? []);
+    count += await _restoreUserStats(data['userStats'] as List<dynamic>? ?? []);
     count += await _restoreChallengeRecords(
       data['challengeRecords'] as List<dynamic>? ?? [],
     );
@@ -1187,8 +1194,10 @@ class BackupService {
           toolName: m['toolName'] as String?,
           toolCallId: m['toolCallId'] as String?,
         );
-        await HiveBoxes.messages
-            .put('${message.profileId}_${message.id}', message);
+        await HiveBoxes.messages.put(
+          '${message.profileId}_${message.id}',
+          message,
+        );
         count++;
       }
     }
@@ -1247,6 +1256,7 @@ class BackupService {
         'lastStudiedAt': p.lastStudiedAt?.toIso8601String(),
         'firstStudiedAt': p.firstStudiedAt?.toIso8601String(),
         'firstMasteredAt': p.firstMasteredAt?.toIso8601String(),
+        'appliedActivityIds': p.appliedActivityIds,
         'stars': p.stars,
       };
     }).toList();
@@ -1481,14 +1491,17 @@ class BackupService {
             ImageGenerationProviderConfig.encodeProviders(providers);
         result[ImageGenerationProviderConfig.activeProviderSettingsKey] =
             activeId ?? '';
-        final active =
-            providers.where((config) => config.id == activeId).firstOrNull;
+        final active = providers
+            .where((config) => config.id == activeId)
+            .firstOrNull;
         if (active != null) {
           result[ImageGenerationProviderConfig.settingsKey] =
               ImageGenerationProviderConfig.fromProvider(active).encode();
         }
       }
-    } on FormatException {/* 无效配置不进入备份，不能冒充合法空列表。 */}
+    } on FormatException {
+      /* 无效配置不进入备份，不能冒充合法空列表。 */
+    }
     return result;
   }
 
@@ -1510,6 +1523,8 @@ class BackupService {
         firstMasteredAt: m['firstMasteredAt'] == null
             ? null
             : _parseDateTime(m['firstMasteredAt']),
+        appliedActivityIds: (m['appliedActivityIds'] as List<dynamic>? ?? [])
+            .cast<String>(),
         stars: m['stars'] as int? ?? 0,
       );
       await box.put('${obj.profileId}_${obj.poemId}', obj);
@@ -1578,8 +1593,8 @@ class BackupService {
         semester: m['semester'] as String?,
         problemJson: m['problemJson'] as String?,
         attemptJson: m['attemptJson'] as String?,
-        appliedActivityIds:
-            (m['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
+        appliedActivityIds: (m['appliedActivityIds'] as List<dynamic>? ?? [])
+            .cast<String>(),
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -1662,8 +1677,8 @@ class BackupService {
         durationSeconds: m['durationSeconds'] as int? ?? 0,
         isCheckedIn: m['isCheckedIn'] as bool? ?? true,
         activitySources: m['activitySources'] as int? ?? 0,
-        appliedActivityIds:
-            (m['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
+        appliedActivityIds: (m['appliedActivityIds'] as List<dynamic>? ?? [])
+            .cast<String>(),
       );
       await box.put('${obj.profileId}_${obj.date}', obj);
     }
@@ -1687,8 +1702,8 @@ class BackupService {
         level: m['level'] as int? ?? 0,
         createdAt: _parseDateTime(m['createdAt']),
         mathBestStreak: m['mathBestStreak'] as int? ?? 0,
-        appliedActivityIds:
-            (m['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
+        appliedActivityIds: (m['appliedActivityIds'] as List<dynamic>? ?? [])
+            .cast<String>(),
       );
       await box.put('${obj.profileId}_stats', obj);
     }
@@ -1738,8 +1753,8 @@ class BackupService {
         poemId: m['poemId'] == null
             ? null
             : canonicalize
-                ? PoemIdentity.canonical(m['poemId'] as String)
-                : m['poemId'] as String,
+            ? PoemIdentity.canonical(m['poemId'] as String)
+            : m['poemId'] as String,
         starsEarned: m['starsEarned'] as int,
         durationSeconds: m['durationSeconds'] as int,
         completedAt: DateTime.parse(m['completedAt'] as String),
@@ -1774,8 +1789,8 @@ class BackupService {
         attempts: m['attempts'] as int? ?? 0,
         correctCount: m['correctCount'] as int? ?? 0,
         lastDoneAt: _parseDateTime(m['lastDoneAt']),
-        appliedActivityIds:
-            (m['appliedActivityIds'] as List<dynamic>? ?? []).cast<String>(),
+        appliedActivityIds: (m['appliedActivityIds'] as List<dynamic>? ?? [])
+            .cast<String>(),
         generationMetadataJson: m['generationMetadataJson'] as String? ?? '',
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
@@ -1800,8 +1815,9 @@ class BackupService {
     final legacy = normalized['llm_picture_story_prompt'];
     if (legacy is String) {
       if (!items.containsKey('llm_picture_story_image_prompt')) {
-        normalized['llm_picture_story_image_prompt'] =
-            legacy.trim().isEmpty ? '' : legacyPictureStoryImagePrompt(legacy);
+        normalized['llm_picture_story_image_prompt'] = legacy.trim().isEmpty
+            ? ''
+            : legacyPictureStoryImagePrompt(legacy);
       }
       if (!items.containsKey('llm_picture_story_question_prompt')) {
         normalized['llm_picture_story_question_prompt'] = legacy.trim();
@@ -1855,7 +1871,7 @@ class BackupService {
             values[ImageGenerationProviderConfig.activeProviderSettingsKey];
         final active =
             providers.where((config) => config.id == rawActive).firstOrNull ??
-                providers.firstOrNull;
+            providers.firstOrNull;
         out[ImageGenerationProviderConfig.providersSettingsKey] =
             ImageGenerationProviderConfig.encodeProviders(providers);
         out[ImageGenerationProviderConfig.activeProviderSettingsKey] =
@@ -1865,7 +1881,9 @@ class BackupService {
               ImageGenerationProviderConfig.fromProvider(active).encode();
         }
       }
-    } on FormatException {/* 单项无效不影响其他设置。 */}
+    } on FormatException {
+      /* 单项无效不影响其他设置。 */
+    }
 
     // 1. llm_providers：结构探测。区分「坏结构 → 跳过」与「合法空列表 → 放行」
     //    （用户主动清空厂商列表必须能恢复）。
@@ -2029,8 +2047,8 @@ class BackupService {
       // 下游只消费已经验证的类型，图片不会重复解码分配。
       data[PictureStoryCatalogBackup.jsonKey] =
           PictureStoryCatalogBackup.fromJson(
-        data[PictureStoryCatalogBackup.jsonKey],
-      );
+            data[PictureStoryCatalogBackup.jsonKey],
+          );
     }
 
     if (data.containsKey('settings')) {
@@ -2189,6 +2207,7 @@ class BackupService {
   }
 
   void _validatePoemProgress(Map<String, dynamic> item, String path) {
+    _validateAppliedActivityIds(item, path);
     _requiredString(item, 'poemId', path);
     _requiredString(item, 'profileId', path);
     _optionalInt(
@@ -2314,20 +2333,14 @@ class BackupService {
     _optionalNullableString(item, 'semester', path);
     _optionalNullableString(item, 'difficulty', path);
     if (item['semester'] != null) {
-      _optionalEnumString(
-        item,
-        'semester',
-        path,
-        const <String>{'上', '下'},
-      );
+      _optionalEnumString(item, 'semester', path, const <String>{'上', '下'});
     }
     if (item['difficulty'] != null) {
-      _optionalEnumString(
-        item,
-        'difficulty',
-        path,
-        const <String>{'easy', 'medium', 'hard'},
-      );
+      _optionalEnumString(item, 'difficulty', path, const <String>{
+        'easy',
+        'medium',
+        'hard',
+      });
     }
     _optionalNullableString(item, 'problemsJson', path);
   }
@@ -2400,12 +2413,10 @@ class BackupService {
   }
 
   void _validateChallengeRecord(Map<String, dynamic> item, String path) {
-    _optionalEnumString(
-      item,
-      'calculationMode',
-      path,
-      const {'normal', 'vertical'},
-    );
+    _optionalEnumString(item, 'calculationMode', path, const {
+      'normal',
+      'vertical',
+    });
     for (final key in <String>[
       'id',
       'profileId',
@@ -2415,19 +2426,16 @@ class BackupService {
     ]) {
       _requiredString(item, key, path);
     }
-    _optionalEnumString(
-      item,
-      'mode',
-      path,
-      const <String>{'fixed', 'extending'},
-    );
+    _optionalEnumString(item, 'mode', path, const <String>{
+      'fixed',
+      'extending',
+    });
     _optionalEnumString(item, 'semester', path, const <String>{'上', '下'});
-    _optionalEnumString(
-      item,
-      'difficulty',
-      path,
-      const <String>{'easy', 'medium', 'hard'},
-    );
+    _optionalEnumString(item, 'difficulty', path, const <String>{
+      'easy',
+      'medium',
+      'hard',
+    });
     for (final key in <String>[
       'score',
       'totalAnswered',
@@ -2452,8 +2460,9 @@ class BackupService {
     _requiredString(item, 'id', path);
     _requiredString(item, 'profileId', path);
     final activityType = _requiredString(item, 'activityType', path);
-    final allowedTypes =
-        LearningActivityType.values.map((type) => type.name).toSet();
+    final allowedTypes = LearningActivityType.values
+        .map((type) => type.name)
+        .toSet();
     if (!allowedTypes.contains(activityType)) {
       _invalidField('$path.activityType', '不是受支持的枚举值');
     }
@@ -2482,9 +2491,9 @@ class BackupService {
     }
     final requiresPoem =
         activityType == LearningActivityType.poemRecitation.name ||
-            activityType == LearningActivityType.poemQuiz.name ||
-            activityType == LearningActivityType.poemDictation.name ||
-            activityType == LearningActivityType.readAlong.name;
+        activityType == LearningActivityType.poemQuiz.name ||
+        activityType == LearningActivityType.poemDictation.name ||
+        activityType == LearningActivityType.readAlong.name;
     if (requiresPoem && poemId is! String) {
       _invalidField('$path.poemId', '诗词活动必须提供诗词 ID');
     }
@@ -2606,10 +2615,7 @@ class BackupService {
       final activity = activities[index] as Map<Object?, Object?>;
       final key = '${activity['profileId']}\u0000${activity['id']}';
       if (!keys.add(key)) {
-        _invalidField(
-          'learningActivities[$index].id',
-          '同一用户下活动 ID 重复',
-        );
+        _invalidField('learningActivities[$index].id', '同一用户下活动 ID 重复');
       }
     }
   }
@@ -2640,11 +2646,7 @@ class BackupService {
     _invalidField(path, '不是有效的 JSON 值');
   }
 
-  String _requiredString(
-    Map<String, dynamic> item,
-    String key,
-    String path,
-  ) {
+  String _requiredString(Map<String, dynamic> item, String key, String path) {
     final value = item[key];
     if (value is! String || value.isEmpty) {
       _invalidField('$path.$key', '必须是非空字符串');
@@ -2706,22 +2708,14 @@ class BackupService {
     }
   }
 
-  void _optionalBool(
-    Map<String, dynamic> item,
-    String key,
-    String path,
-  ) {
+  void _optionalBool(Map<String, dynamic> item, String key, String path) {
     final value = item[key];
     if (value != null && value is! bool) {
       _invalidField('$path.$key', '必须是布尔值');
     }
   }
 
-  void _optionalScore(
-    Map<String, dynamic> item,
-    String key,
-    String path,
-  ) {
+  void _optionalScore(Map<String, dynamic> item, String key, String path) {
     final value = item[key];
     if (value == null) return;
     if (value is! num || value < 0 || value > 1) {
@@ -2788,11 +2782,7 @@ class BackupPreview {
 }
 
 class BackupRestoreException implements Exception {
-  const BackupRestoreException(
-    this.message, {
-    this.cause,
-    this.rollbackError,
-  });
+  const BackupRestoreException(this.message, {this.cause, this.rollbackError});
 
   final String message;
   final Object? cause;
@@ -2848,6 +2838,7 @@ class LlmEndpointChangeSet {
   bool get isEmpty => added.isEmpty && changed.isEmpty;
 
   @override
-  String toString() => 'LlmEndpointChangeSet(added: $added, changed: $changed, '
+  String toString() =>
+      'LlmEndpointChangeSet(added: $added, changed: $changed, '
       'removed: $removed)';
 }

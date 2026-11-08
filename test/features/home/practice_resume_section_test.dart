@@ -16,6 +16,49 @@ void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
 
+  testWidgets('首页显示诗词续练并保留错句作用域参数', (tester) async {
+    final drafts = PracticeDraftRepository();
+    const scope = '["poem","1,3"]';
+    drafts.claim('poemDictation', scope: scope);
+    await tester.runAsync(
+      () => drafts.save('poemDictation', {
+        'sessionId': 'poem-session',
+        'poemVersion': 1,
+        'title': '静夜思',
+        'label': '错句听写',
+        'route': '/poem/dictation/poem?lines=1%2C3',
+        'state': <String, dynamic>{},
+      }, scope: scope),
+    );
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) => const Scaffold(body: PracticeResumeSection()),
+        ),
+        GoRoute(
+          path: AppRoutes.poemDictation,
+          builder: (_, state) => Scaffold(
+            body: Text('恢复错句：${state.uri.queryParameters['lines']}'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(child: MaterialApp.router(routerConfig: router)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('继续错句听写'), findsOneWidget);
+    expect(find.text('静夜思'), findsOneWidget);
+    await tester.tap(find.text('继续错句听写'));
+    await tester.pumpAndSettle();
+    expect(find.text('恢复错句：1,3'), findsOneWidget);
+    expect(drafts.exists('poemDictation', scope: scope), isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await drainHiveWritesForTesting(tester);
+  });
+
   for (final (width, scale, horizontal) in [
     (599.0, 1.0, false),
     (600.0, 1.0, true),
@@ -26,14 +69,11 @@ void main() {
       final drafts = PracticeDraftRepository();
       await tester.runAsync(() async {
         for (final kind in PracticeDraftRepository.kinds) {
-          await drafts.save(
-            kind,
-            {
-              'sessionId': 'resume-$kind',
-              'records': [<String, dynamic>{}],
-              'problems': List.filled(10, <String, dynamic>{}),
-            },
-          );
+          await drafts.save(kind, {
+            'sessionId': 'resume-$kind',
+            'records': [<String, dynamic>{}],
+            'problems': List.filled(10, <String, dynamic>{}),
+          });
         }
       });
       final wordDraft = drafts.get('word');
@@ -138,14 +178,11 @@ void main() {
       testWidgets('$kind 续练卡片保持紧凑高度、箭头下放弃操作独立点击（字号 $scale）', (tester) async {
         final drafts = PracticeDraftRepository();
         await tester.runAsync(
-          () => drafts.save(
-            kind,
-            {
-              'sessionId': 'resume-$kind',
-              'records': [<String, dynamic>{}],
-              'problems': List.filled(10, <String, dynamic>{}),
-            },
-          ),
+          () => drafts.save(kind, {
+            'sessionId': 'resume-$kind',
+            'records': [<String, dynamic>{}],
+            'problems': List.filled(10, <String, dynamic>{}),
+          }),
         );
         final original = drafts.get(kind);
         var resumed = 0;
@@ -199,9 +236,8 @@ void main() {
                 brightness: Brightness.light,
               ),
               builder: (context, child) => MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: TextScaler.linear(scale),
-                ),
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(scale)),
                 child: child!,
               ),
             ),
@@ -229,13 +265,17 @@ void main() {
         expect(arrowRect.top, closeTo(tester.getTopLeft(resumeTitle).dy, 1));
         expect(discardRect.top, closeTo(arrowRect.bottom, 1));
         expect(discardRect.center.dx, greaterThan(cardRect.center.dx));
+        expect(discardRect.width, greaterThanOrEqualTo(44));
+        expect(discardRect.height, greaterThanOrEqualTo(44));
         expect(cardRect.contains(discardRect.topLeft), isTrue);
         expect(cardRect.contains(discardRect.bottomRight), isTrue);
         if (scale == 1) {
           expect(
             cardRect.height,
-            tester.getSize(find.byKey(const ValueKey('baseline'))).height,
-            reason: '新增放弃操作不能撑高正常字号的续练卡片',
+            greaterThanOrEqualTo(
+              tester.getSize(find.byKey(const ValueKey('baseline'))).height,
+            ),
+            reason: '卡片可适当增高，为放弃操作保留完整触控区',
           );
         }
         expect(tester.takeException(), isNull);

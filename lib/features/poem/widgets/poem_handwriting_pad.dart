@@ -23,6 +23,7 @@ class PoemHandwrittenChar {
     required this.strokes,
     required this.passed,
     this.checked = false,
+    this.side = 240,
   });
 
   /// 格位上的目标字（非孩子实际写的字——默写不回显对错字形）。
@@ -36,6 +37,45 @@ class PoemHandwrittenChar {
 
   /// 是否经过几何核对（false = 无数据降级直通或带错推进）。
   final bool checked;
+  final double side;
+
+  Map<String, dynamic> toJson() => {
+    'character': character,
+    'passed': passed,
+    'checked': checked,
+    'side': side,
+    'strokes': [
+      for (final stroke in strokes)
+        [
+          for (final point in stroke) [point.dx, point.dy],
+        ],
+    ],
+  };
+
+  factory PoemHandwrittenChar.fromJson(Map<String, dynamic> json) {
+    final side = (json['side'] as num).toDouble();
+    if (!side.isFinite || side <= 0) throw const FormatException('手写画布尺寸无效');
+    final strokes = (json['strokes'] as List)
+        .map(
+          (stroke) => (stroke as List).map((value) {
+            final point = value as List;
+            final x = (point[0] as num).toDouble();
+            final y = (point[1] as num).toDouble();
+            if (!x.isFinite || !y.isFinite) {
+              throw const FormatException('手写笔迹坐标无效');
+            }
+            return Offset(x, y);
+          }).toList(),
+        )
+        .toList();
+    return PoemHandwrittenChar(
+      character: json['character'] as String,
+      strokes: strokes,
+      passed: json['passed'] as bool,
+      checked: json['checked'] as bool,
+      side: side,
+    );
+  }
 }
 
 /// 单字手写默写板。
@@ -50,12 +90,16 @@ class PoemHandwritingPad extends StatefulWidget {
     required this.strokeData,
     required this.onConfirmed,
     this.side = 240,
+    this.initialInk,
+    this.onInkChanged,
   });
 
   final String character;
   final CharacterStrokeData? strokeData;
   final ValueChanged<PoemHandwrittenChar> onConfirmed;
   final double side;
+  final PoemHandwrittenChar? initialInk;
+  final ValueChanged<PoemHandwrittenChar>? onInkChanged;
 
   @override
   State<PoemHandwritingPad> createState() => _PoemHandwritingPadState();
@@ -65,6 +109,37 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
   List<List<Offset>> _strokes = [];
   WritingCheckResult? _result;
   bool _answered = false; // 防重入：每字只回调一次
+
+  @override
+  void initState() {
+    super.initState();
+    final ink = widget.initialInk;
+    if (ink != null && ink.character == widget.character) {
+      _strokes = [
+        for (final stroke in ink.strokes)
+          [for (final point in stroke) point * (widget.side / ink.side)],
+      ];
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant PoemHandwritingPad oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.side != widget.side) {
+      _strokes = [
+        for (final stroke in _strokes)
+          [for (final point in stroke) point * (widget.side / oldWidget.side)],
+      ];
+    }
+  }
+
+  void _changeInk(List<List<Offset>> strokes) {
+    setState(() {
+      _strokes = strokes;
+      _result = null;
+    });
+    widget.onInkChanged?.call(_emit(passed: false, checked: false));
+  }
 
   /// medians（1024 字体画布坐标）缩放到格内像素坐标后比对，口径同写一写。
   void _runCheck() {
@@ -99,9 +174,7 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
   void _giveUp() {
     if (_answered) return;
     _answered = true;
-    widget.onConfirmed(
-      _emit(passed: false, checked: false),
-    );
+    widget.onConfirmed(_emit(passed: false, checked: false));
   }
 
   /// 无笔顺数据：自由书写直通（诚实自负，与写一写家长确认同哲学）。
@@ -118,11 +191,12 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
         strokes: List.of(_strokes.map((s) => List<Offset>.of(s))),
         passed: passed,
         checked: checked ?? passed,
+        side: widget.side,
       );
 
   void _undoStroke() {
     if (_strokes.isEmpty) return;
-    setState(() => _strokes = _strokes.sublist(0, _strokes.length - 1));
+    _changeInk(_strokes.sublist(0, _strokes.length - 1));
   }
 
   @override
@@ -136,11 +210,7 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
       children: [
         WritingCanvas(
           strokes: _strokes,
-          onStrokesChanged: (next) => setState(() {
-            _strokes = next;
-            // 继续落笔即退出上一轮核对结果，回到书写态。
-            _result = null;
-          }),
+          onStrokesChanged: _changeInk,
           side: widget.side,
         ),
         const SizedBox(height: SpacingTokens.sm),
@@ -154,9 +224,7 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
               ),
               const SizedBox(width: SpacingTokens.sm),
               TextButton(
-                onPressed: _strokes.isEmpty
-                    ? null
-                    : () => setState(() => _strokes = []),
+                onPressed: _strokes.isEmpty ? null : () => _changeInk([]),
                 child: const Text('清空'),
               ),
               const SizedBox(width: SpacingTokens.sm),
@@ -164,8 +232,8 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
                 onPressed: _strokes.isEmpty
                     ? null
                     : data == null
-                        ? _nextFreeform
-                        : _runCheck,
+                    ? _nextFreeform
+                    : _runCheck,
                 child: Text(data == null ? '下一个' : '核对'),
               ),
             ],
@@ -183,10 +251,7 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => setState(() {
-                    _strokes = [];
-                    _result = null;
-                  }),
+                  onPressed: () => _changeInk([]),
                   child: const Text('重写'),
                 ),
               ),

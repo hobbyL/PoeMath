@@ -1,3 +1,6 @@
+import '../../helpers/immediate_practice_draft_repository.dart';
+
+import 'package:poemath/features/poem/poem_practice_draft.dart';
 // test/features/poem/poem_dictation_page_test.dart
 //
 // ⑧ 诗词听写页 Widget 测试：
@@ -20,8 +23,10 @@ import 'package:poemath/data/repositories/user_stats_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/domain/poem_practice_details.dart';
+
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/recording_sound_service.dart';
+
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/poem/poem_dictation_page.dart';
 import 'package:poemath/features/poem/widgets/poem_sentence_writing_sheet.dart';
@@ -39,7 +44,11 @@ class _Progress extends PoemProgressRepository {
   @override
   int get learnedCount => 1;
   @override
-  Future<PoemProgress> recordStudy(String poemId) async {
+  Future<PoemProgress> recordStudy(
+    String poemId, {
+    String? activityId,
+    DateTime? completedAt,
+  }) async {
     studies++;
     return PoemProgress(
       poemId: poemId,
@@ -153,6 +162,9 @@ void main() {
   }) async {
     final container = ProviderContainer(
       overrides: [
+        poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+          ImmediatePracticeDraftRepository.new,
+        ),
         soundServiceProvider.overrideWithValue(sound),
         ttsServiceProvider.overrideWithValue(tts),
         poemProgressRepoProvider.overrideWithValue(progress),
@@ -269,6 +281,9 @@ void main() {
     // 先预置陈旧分数，再挂载页面（_initPoem 在 postFrame 内清空）。
     final container = ProviderContainer(
       overrides: [
+        poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+          ImmediatePracticeDraftRepository.new,
+        ),
         ttsServiceProvider.overrideWithValue(tts),
         poemByIdProvider(_poemId).overrideWith((ref) => _makePoem()),
       ],
@@ -345,10 +360,7 @@ void main() {
 
   /// 从候选格中找一个不在 [exclude] 字集内的干扰字并点选。
   /// 干扰字按构造必然不属于本句目标字（候选池 = 目标字 + 非目标干扰字）。
-  Future<void> pickDistractor(
-    WidgetTester tester,
-    Set<String> exclude,
-  ) async {
+  Future<void> pickDistractor(WidgetTester tester, Set<String> exclude) async {
     final tiles = find.ancestor(
       of: find.byType(Text),
       matching: find.byType(InkWell),

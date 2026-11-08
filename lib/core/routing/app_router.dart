@@ -218,8 +218,9 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: ParentAccessBoundary(
-            child:
-                TextbookCourseReviewPage(bookId: state.pathParameters['id']!),
+            child: TextbookCourseReviewPage(
+              bookId: state.pathParameters['id']!,
+            ),
           ),
         ),
       ),
@@ -327,10 +328,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
       // ============ 公式知识库（全屏，从口算页或首页进入） ============
       GoRoute(
         path: AppRoutes.studyHub,
-        pageBuilder: (context, state) => fadeSlideTransitionPage(
-          state: state,
-          child: const StudyHubPage(),
-        ),
+        pageBuilder: (context, state) =>
+            fadeSlideTransitionPage(state: state, child: const StudyHubPage()),
       ),
       // ============ 诗词详情（非 Shell 子路由，全屏） ============
       GoRoute(
@@ -403,7 +402,16 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         path: AppRoutes.poemDictation,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: PoemDictationPage(poemId: state.pathParameters['id']!),
+          child: PoemDictationPage(
+            poemId: state.pathParameters['id']!,
+            targetLineIndices: state.uri.queryParameters.containsKey('lines')
+                ? state.uri.queryParameters['lines']!
+                      .split(',')
+                      .map(int.tryParse)
+                      .whereType<int>()
+                      .toList()
+                : null,
+          ),
         ),
       ),
       // ============ 口算练习（非 Shell 子路由，全屏） ============
@@ -513,8 +521,9 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           }
           return fadeSlideTransitionPage(
             state: state,
-            child:
-                ParentAccessBoundary(child: WordProblemPreviewPage(data: data)),
+            child: ParentAccessBoundary(
+              child: WordProblemPreviewPage(data: data),
+            ),
           );
         },
       ),
@@ -556,18 +565,14 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         path: AppRoutes.formulaDetail,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child: FormulaDetailPage(
-            formulaId: state.pathParameters['id']!,
-          ),
+          child: FormulaDetailPage(formulaId: state.pathParameters['id']!),
         ),
       ),
       // ============ AI 助手（非 Shell 子路由，全屏） ============
       GoRoute(
         path: AppRoutes.assistant,
-        pageBuilder: (context, state) => fadeSlideTransitionPage(
-          state: state,
-          child: const AssistantPage(),
-        ),
+        pageBuilder: (context, state) =>
+            fadeSlideTransitionPage(state: state, child: const AssistantPage()),
       ),
       // ============ 设置（非 Shell 子路由，全屏） ============
       GoRoute(
@@ -623,8 +628,9 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         path: AppRoutes.imageGenerationSettings,
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
-          child:
-              const ParentAccessBoundary(child: ImageGenerationSettingsPage()),
+          child: const ParentAccessBoundary(
+            child: ImageGenerationSettingsPage(),
+          ),
         ),
       ),
       GoRoute(
@@ -639,8 +645,9 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: ParentAccessBoundary(
-            child:
-                PictureStoryDetailPage(promptId: state.pathParameters['id']!),
+            child: PictureStoryDetailPage(
+              promptId: state.pathParameters['id']!,
+            ),
           ),
         ),
       ),
@@ -649,8 +656,9 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: ParentAccessBoundary(
-            child:
-                PictureStoryEditorPage(promptId: state.pathParameters['id']!),
+            child: PictureStoryEditorPage(
+              promptId: state.pathParameters['id']!,
+            ),
           ),
         ),
       ),
@@ -680,10 +688,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
       // ============ 关于页面（非 Shell 子路由，全屏） ============
       GoRoute(
         path: AppRoutes.about,
-        pageBuilder: (context, state) => fadeSlideTransitionPage(
-          state: state,
-          child: const AboutPage(),
-        ),
+        pageBuilder: (context, state) =>
+            fadeSlideTransitionPage(state: state, child: const AboutPage()),
       ),
       // ============ 检查更新（非 Shell 子路由，全屏） ============
       GoRoute(

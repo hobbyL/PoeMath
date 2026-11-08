@@ -33,8 +33,15 @@ class DelayedProgress extends PoemProgressRepository {
   Future<PoemProgress> recordRecitation(
     String poemId, {
     required int level,
+    String? activityId,
+    DateTime? completedAt,
   }) async {
-    final progress = await super.recordRecitation(poemId, level: level);
+    final progress = await super.recordRecitation(
+      poemId,
+      level: level,
+      activityId: activityId,
+      completedAt: completedAt,
+    );
     entered.complete();
     await gate.future;
     return progress;
@@ -122,7 +129,7 @@ void main() {
     expect(progress.entered.isCompleted, isTrue);
     // Use the production AppBar back button, respecting PopScope.
     final route = ModalRoute.of(tester.element(find.byType(PoemRecitePage)));
-    expect(route!.popDisposition, RoutePopDisposition.pop);
+    expect(route!.popDisposition, RoutePopDisposition.doNotPop); // 先保存草稿再退出。
     await tester.tap(find.byType(BackButton));
     await tester.pump();
     for (

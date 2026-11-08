@@ -5,14 +5,16 @@
 
 import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 
 class PoemProgressRepository {
   /// 获取某首诗的进度
   PoemProgress? get(String poemId) {
-    return HiveBoxes.poemProgress
-        .get(ProfileScope.key(PoemIdentity.canonical(poemId)));
+    return HiveBoxes.poemProgress.get(
+      ProfileScope.key(PoemIdentity.canonical(poemId)),
+    );
   }
 
   /// 创建或更新进度
@@ -65,35 +67,83 @@ class PoemProgressRepository {
   }
 
   /// 记录一次学习
-  Future<PoemProgress> recordStudy(String poemId) async {
-    return _recordStudy(poemId);
+  Future<PoemProgress> recordStudy(
+    String poemId, {
+    String? activityId,
+    DateTime? completedAt,
+  }) async {
+    return _recordStudy(
+      poemId,
+      activityId: activityId,
+      completedAt: completedAt,
+    );
   }
 
   /// 记录完成一次背诵，并保留历史最高背诵等级（1-4）。
   Future<PoemProgress> recordRecitation(
     String poemId, {
     required int level,
+    String? activityId,
+    DateTime? completedAt,
   }) async {
     if (level < 1 || level > 4) {
       throw RangeError.range(level, 1, 4, 'level');
     }
-    return _recordStudy(poemId, recitationLevel: level);
+    return _recordStudy(
+      poemId,
+      recitationLevel: level,
+      activityId: activityId,
+      completedAt: completedAt,
+    );
   }
 
   Future<PoemProgress> _recordStudy(
     String poemId, {
     int? recitationLevel,
+    String? activityId,
+    DateTime? completedAt,
+  }) {
+    final profileId = ProfileScope.currentId;
+    final revision = ProfileScope.revision;
+    return ActivitySettlementLedger.serial('poem_progress', () {
+      if (profileId != ProfileScope.currentId ||
+          revision != ProfileScope.revision) {
+        throw StateError('孩子档案已切换，不能提交旧练习');
+      }
+      return _applyStudy(
+        poemId,
+        recitationLevel: recitationLevel,
+        activityId: activityId,
+        completedAt: completedAt,
+      );
+    });
+  }
+
+  Future<PoemProgress> _applyStudy(
+    String poemId, {
+    int? recitationLevel,
+    String? activityId,
+    DateTime? completedAt,
   }) async {
     poemId = PoemIdentity.canonical(poemId);
     var progress = get(poemId)?.copyWith();
+    if (activityId != null &&
+        (progress?.appliedActivityIds.contains(activityId) ?? false)) {
+      return progress!;
+    }
     progress ??= PoemProgress(
       poemId: poemId,
       profileId: ProfileScope.currentId,
       status: LearningStatus.learning,
-      firstStudiedAt: DateTime.now(),
+      firstStudiedAt: completedAt ?? DateTime.now(),
     );
     progress.studyCount++;
-    progress.lastStudiedAt = DateTime.now();
+    final studiedAt = completedAt ?? DateTime.now();
+    if (progress.lastStudiedAt == null ||
+        studiedAt.isAfter(progress.lastStudiedAt!)) {
+      progress.lastStudiedAt = studiedAt;
+    }
+    if (activityId != null) progress.appliedActivityIds.add(activityId);
     if (progress.status == LearningStatus.notStarted) {
       progress.status = LearningStatus.learning;
     }

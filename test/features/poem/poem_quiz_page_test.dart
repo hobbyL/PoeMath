@@ -1,3 +1,7 @@
+import '../../helpers/immediate_practice_draft_repository.dart';
+
+import 'package:poemath/features/poem/poem_practice_draft.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -35,7 +39,11 @@ class _BlockingPoemProgressRepository extends PoemProgressRepository {
   var recordStudyCalls = 0;
 
   @override
-  Future<PoemProgress> recordStudy(String poemId) {
+  Future<PoemProgress> recordStudy(
+    String poemId, {
+    String? activityId,
+    DateTime? completedAt,
+  }) {
     recordStudyCalls++;
     return _pending.future;
   }
@@ -80,7 +88,11 @@ class _ImmediatePoemProgressRepository extends PoemProgressRepository {
   int get learnedCount => 1;
 
   @override
-  Future<PoemProgress> recordStudy(String poemId) async {
+  Future<PoemProgress> recordStudy(
+    String poemId, {
+    String? activityId,
+    DateTime? completedAt,
+  }) async {
     return PoemProgress(
       poemId: poemId,
       profileId: 'test',
@@ -137,12 +149,7 @@ class _ExistingReviewRepository extends ReviewRepository {
 class _AlreadyUnlockedAchievementRepository extends AchievementRepository {
   @override
   Achievement? getById(String id) {
-    return Achievement(
-      id: id,
-      profileId: 'test',
-      title: id,
-      isUnlocked: true,
-    );
+    return Achievement(id: id, profileId: 'test', title: id, isUnlocked: true);
   }
 
   @override
@@ -182,6 +189,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+              ImmediatePracticeDraftRepository.new,
+            ),
             soundServiceProvider.overrideWithValue(sound),
             poemByIdProvider('quiz_guard').overrideWith((ref) => poem),
             poemProgressRepoProvider.overrideWith((ref) => progressRepo),
@@ -265,14 +275,15 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+            ImmediatePracticeDraftRepository.new,
+          ),
           soundServiceProvider.overrideWithValue(sound),
           poemByIdProvider('quiz_reward').overrideWith((ref) => poem),
           poemProgressRepoProvider.overrideWith(
             (ref) => _ImmediatePoemProgressRepository(),
           ),
-          reviewRepoProvider.overrideWith(
-            (ref) => _ExistingReviewRepository(),
-          ),
+          reviewRepoProvider.overrideWith((ref) => _ExistingReviewRepository()),
           checkInRepoProvider.overrideWith((ref) => checkInRepo),
           userStatsRepoProvider.overrideWith((ref) => statsRepo),
           learningActivityRepositoryProvider.overrideWith(
@@ -352,14 +363,13 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+            ImmediatePracticeDraftRepository.new,
+          ),
           soundServiceProvider.overrideWithValue(sound),
           poemByIdProvider('quiz_reward').overrideWith((ref) => poem),
-          poemProgressRepoProvider.overrideWith(
-            (ref) => progressRepo,
-          ),
-          reviewRepoProvider.overrideWith(
-            (ref) => _ExistingReviewRepository(),
-          ),
+          poemProgressRepoProvider.overrideWith((ref) => progressRepo),
+          reviewRepoProvider.overrideWith((ref) => _ExistingReviewRepository()),
           checkInRepoProvider.overrideWith((ref) => checkInRepo),
           userStatsRepoProvider.overrideWith((ref) => statsRepo),
           learningActivityRepositoryProvider.overrideWith(
@@ -433,6 +443,9 @@ void main() {
     // 在 fake-async 区挂起；同时验证 ④ 侧信道双端纪律。
     final scoreContainer = ProviderContainer(
       overrides: [
+        poemPracticeDraftRepositoryFactoryProvider.overrideWithValue(
+          ImmediatePracticeDraftRepository.new,
+        ),
         soundServiceProvider.overrideWithValue(sound),
         poemByIdProvider('quiz_back_double').overrideWith((ref) => poem),
         poemByIdProvider('quiz_back_double').overrideWith((ref) => poem),
@@ -443,8 +456,9 @@ void main() {
         checkInRepoProvider.overrideWith(
           (ref) => _ImmediateCheckInRepository(),
         ),
-        userStatsRepoProvider
-            .overrideWith((ref) => _ImmediateStatsRepository()),
+        userStatsRepoProvider.overrideWith(
+          (ref) => _ImmediateStatsRepository(),
+        ),
         learningActivityRepositoryProvider.overrideWith(
           (ref) => _ImmediateLearningActivityRepository(),
         ),
@@ -527,9 +541,17 @@ class _FailOnceMasteryRepository extends _ImmediatePoemProgressRepository {
   int studyCalls = 0;
   PoemProgress? saved;
   @override
-  Future<PoemProgress> recordStudy(String poemId) async {
+  Future<PoemProgress> recordStudy(
+    String poemId, {
+    String? activityId,
+    DateTime? completedAt,
+  }) async {
     studyCalls++;
-    return super.recordStudy(poemId);
+    return super.recordStudy(
+      poemId,
+      activityId: activityId,
+      completedAt: completedAt,
+    );
   }
 
   @override

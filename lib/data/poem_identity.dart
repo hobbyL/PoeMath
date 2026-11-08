@@ -22,62 +22,65 @@ class PoemIdentity {
   static String canonical(String id) => aliases[id] ?? id;
 
   static Map<String, dynamic> progressMap(PoemProgress p) => {
-        'poemId': p.poemId,
-        'profileId': p.profileId,
-        'status': p.status.index,
-        'masteryLevel': p.masteryLevel,
-        'studyCount': p.studyCount,
-        'lastStudiedAt': p.lastStudiedAt?.toIso8601String(),
-        'firstStudiedAt': p.firstStudiedAt?.toIso8601String(),
-        'stars': p.stars,
-        'firstMasteredAt': p.firstMasteredAt?.toIso8601String(),
-      };
+    'poemId': p.poemId,
+    'profileId': p.profileId,
+    'status': p.status.index,
+    'masteryLevel': p.masteryLevel,
+    'studyCount': p.studyCount,
+    'lastStudiedAt': p.lastStudiedAt?.toIso8601String(),
+    'firstStudiedAt': p.firstStudiedAt?.toIso8601String(),
+    'stars': p.stars,
+    'firstMasteredAt': p.firstMasteredAt?.toIso8601String(),
+    'appliedActivityIds': p.appliedActivityIds,
+  };
 
   static PoemProgress progress(Map<String, dynamic> m) => PoemProgress(
-        poemId: canonical(m['poemId'] as String),
-        profileId: m['profileId'] as String,
-        status: LearningStatus.values[m['status'] as int? ?? 0],
-        masteryLevel: m['masteryLevel'] as int? ?? 0,
-        studyCount: m['studyCount'] as int? ?? 0,
-        stars: m['stars'] as int? ?? 0,
-        firstStudiedAt: _date(m['firstStudiedAt']),
-        lastStudiedAt: _date(m['lastStudiedAt']),
-        firstMasteredAt: _date(m['firstMasteredAt']),
-      );
+    poemId: canonical(m['poemId'] as String),
+    profileId: m['profileId'] as String,
+    status: LearningStatus.values[m['status'] as int? ?? 0],
+    masteryLevel: m['masteryLevel'] as int? ?? 0,
+    studyCount: m['studyCount'] as int? ?? 0,
+    stars: m['stars'] as int? ?? 0,
+    firstStudiedAt: _date(m['firstStudiedAt']),
+    lastStudiedAt: _date(m['lastStudiedAt']),
+    firstMasteredAt: _date(m['firstMasteredAt']),
+    appliedActivityIds: (m['appliedActivityIds'] as List<dynamic>? ?? [])
+        .cast<String>(),
+  );
 
   static Map<String, dynamic> favoriteMap(PoemFavorite f) => {
-        'poemId': f.poemId,
-        'profileId': f.profileId,
-        'createdAt': f.createdAt.toIso8601String(),
-      };
+    'poemId': f.poemId,
+    'profileId': f.profileId,
+    'createdAt': f.createdAt.toIso8601String(),
+  };
 
   static PoemFavorite favorite(Map<String, dynamic> m) => PoemFavorite(
-        poemId: canonical(m['poemId'] as String),
-        profileId: m['profileId'] as String,
-        createdAt: _date(m['createdAt']),
-      );
+    poemId: canonical(m['poemId'] as String),
+    profileId: m['profileId'] as String,
+    createdAt: _date(m['createdAt']),
+  );
 
   static Map<String, dynamic> reviewMap(ReviewSchedule r) => {
-        'poemId': r.poemId,
-        'profileId': r.profileId,
-        'currentRound': r.currentRound,
-        'nextReviewDate': r.nextReviewDate.toIso8601String(),
-        'lastReviewedAt': r.lastReviewedAt?.toIso8601String(),
-        'isCompleted': r.isCompleted,
-        'lastScore': r.lastScore,
-        'historyJson': r.historyJson,
-      };
+    'poemId': r.poemId,
+    'profileId': r.profileId,
+    'currentRound': r.currentRound,
+    'nextReviewDate': r.nextReviewDate.toIso8601String(),
+    'lastReviewedAt': r.lastReviewedAt?.toIso8601String(),
+    'isCompleted': r.isCompleted,
+    'lastScore': r.lastScore,
+    'historyJson': r.historyJson,
+  };
 
   static ReviewSchedule review(Map<String, dynamic> m) => ReviewSchedule(
-        poemId: canonical(m['poemId'] as String),
-        profileId: m['profileId'] as String,
-        currentRound: m['currentRound'] as int? ?? 0,
-        nextReviewDate: _date(m['nextReviewDate']) ?? DateTime.now(),
-        lastReviewedAt: _date(m['lastReviewedAt']),
-        isCompleted: m['isCompleted'] as bool? ?? false,
-        lastScore: (m['lastScore'] as num?)?.toDouble(),
-        historyJson: m['historyJson'] as String?,
-      );
+    poemId: canonical(m['poemId'] as String),
+    profileId: m['profileId'] as String,
+    currentRound: m['currentRound'] as int? ?? 0,
+    nextReviewDate: _date(m['nextReviewDate']) ?? DateTime.now(),
+    lastReviewedAt: _date(m['lastReviewedAt']),
+    isCompleted: m['isCompleted'] as bool? ?? false,
+    lastScore: (m['lastScore'] as num?)?.toDouble(),
+    historyJson: m['historyJson'] as String?,
+  );
 
   /// 纯合并：输入是迁移前快照，输出可安全重复写入。
   static List<Map<String, dynamic>> merge(String kind, List<dynamic> records) {
@@ -94,20 +97,33 @@ class PoemIdentity {
       );
       var result = Map<String, dynamic>.from(group.first);
       if (kind == 'progress') {
+        result['appliedActivityIds'] = {
+          for (final record in group)
+            ...(record['appliedActivityIds'] as List<dynamic>? ?? [])
+                .cast<String>(),
+        }.toList();
         for (final field in ['status', 'masteryLevel']) {
           result[field] = group
               .map((m) => m[field] as int? ?? 0)
               .reduce((a, b) => a > b ? a : b);
         }
         for (final field in ['studyCount', 'stars']) {
-          result[field] =
-              group.fold<int>(0, (n, m) => n + (m[field] as int? ?? 0));
+          result[field] = group.fold<int>(
+            0,
+            (n, m) => n + (m[field] as int? ?? 0),
+          );
         }
-        result['firstStudiedAt'] =
-            _extremeDate(group, 'firstStudiedAt', earliest: true);
+        result['firstStudiedAt'] = _extremeDate(
+          group,
+          'firstStudiedAt',
+          earliest: true,
+        );
         result['lastStudiedAt'] = _extremeDate(group, 'lastStudiedAt');
-        result['firstMasteredAt'] =
-            _extremeDate(group, 'firstMasteredAt', earliest: true);
+        result['firstMasteredAt'] = _extremeDate(
+          group,
+          'firstMasteredAt',
+          earliest: true,
+        );
       } else if (kind == 'favorite') {
         result['createdAt'] = _extremeDate(group, 'createdAt', earliest: true);
       } else if (kind == 'review') {
@@ -116,17 +132,21 @@ class PoemIdentity {
               ?.cycleStartedAt;
           final bStarted = PoemReviewHistory.decode(b['historyJson'] as String?)
               ?.cycleStartedAt;
-          final cycle =
-              (aStarted ?? DateTime(1)).compareTo(bStarted ?? DateTime(1));
+          final cycle = (aStarted ?? DateTime(1)).compareTo(
+            bStarted ?? DateTime(1),
+          );
           if (cycle != 0) return cycle;
-          final completed = (a['isCompleted'] == true ? 1 : 0)
-              .compareTo(b['isCompleted'] == true ? 1 : 0);
+          final completed = (a['isCompleted'] == true ? 1 : 0).compareTo(
+            b['isCompleted'] == true ? 1 : 0,
+          );
           if (completed != 0) return completed;
-          final round = (a['currentRound'] as int? ?? 0)
-              .compareTo(b['currentRound'] as int? ?? 0);
+          final round = (a['currentRound'] as int? ?? 0).compareTo(
+            b['currentRound'] as int? ?? 0,
+          );
           if (round != 0) return round;
-          return (_date(a['lastReviewedAt']) ?? DateTime(1))
-              .compareTo(_date(b['lastReviewedAt']) ?? DateTime(1));
+          return (_date(a['lastReviewedAt']) ?? DateTime(1)).compareTo(
+            _date(b['lastReviewedAt']) ?? DateTime(1),
+          );
         }
 
         for (final candidate in group.skip(1)) {
@@ -134,8 +154,9 @@ class PoemIdentity {
             result = Map<String, dynamic>.from(candidate);
           }
         }
-        final winnerHistory =
-            PoemReviewHistory.decode(result['historyJson'] as String?);
+        final winnerHistory = PoemReviewHistory.decode(
+          result['historyJson'] as String?,
+        );
         final allHistories = group
             .map(
               (row) => PoemReviewHistory.decode(row['historyJson'] as String?),
