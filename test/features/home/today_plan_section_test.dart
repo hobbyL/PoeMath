@@ -22,6 +22,17 @@ import 'package:poemath/features/poem/poem_practice_score.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 
+class _RetryPlanRepository extends TodayPlanRepository {
+  int attempts = 0;
+  bool fail = true;
+  @override
+  Future<void> saveConfig(TodayPlanConfig config) async {
+    attempts++;
+    if (fail) throw StateError('模拟保存失败');
+    await super.saveConfig(config);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
@@ -31,6 +42,64 @@ void main() {
   tearDown(() async {
     lockParentForTesting();
     await tearDownHiveForTesting();
+  });
+
+  testWidgets('保存失败保留编辑，重试成功只写一次；放弃不重复写入', (tester) async {
+    final repository = _RetryPlanRepository();
+    const plan = TodayPlan(
+      dateKey: '2026-11-08',
+      profileId: 'default',
+      grade: 1,
+      semester: '上',
+      tasks: [],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          todayPlanRepositoryProvider.overrideWithValue(repository),
+          todayPlanProvider.overrideWith((ref) async => plan),
+        ],
+        child: const MaterialApp(home: Scaffold(body: TodayPlanSection())),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('调整计划'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('增加复习'));
+    await tester.pumpAndSettle();
+    final navigator = Navigator.of(tester.element(find.text('调整每日计划')));
+    await navigator.maybePop();
+    await tester.pumpAndSettle();
+    expect(repository.attempts, 1);
+    expect(repository.config.reviewCount, 2);
+    expect(find.text('调整每日计划'), findsOneWidget);
+    expect(find.text('每天最多 3 项'), findsWidgets);
+    expect(find.text('计划保存失败，修改已保留，请重试。'), findsOneWidget);
+    repository.fail = false;
+    await tester.runAsync(() async {
+      await tester.tap(find.text('重试保存'));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pumpAndSettle();
+    expect(repository.attempts, 2);
+    expect(repository.config.reviewCount, 3);
+    expect(find.text('调整每日计划'), findsNothing);
+
+    await tester.tap(find.text('调整计划'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('增加复习'));
+    await tester.pumpAndSettle();
+    repository.fail = true;
+    await tester.tap(find.byTooltip('保存并关闭'));
+    await tester.pumpAndSettle();
+    expect(repository.attempts, 3);
+    await tester.tap(find.text('放弃修改'));
+    await tester.pumpAndSettle();
+    expect(repository.attempts, 3);
+    expect(repository.config.reviewCount, 3);
+    expect(find.text('调整每日计划'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await drainHiveWritesForTesting(tester);
   });
 
   for (final scale in [1.0, 1.7]) {
@@ -145,14 +214,15 @@ void main() {
       final adjustRect = tester.getRect(adjust);
       expect(arrowRect.top, tester.getTopLeft(find.text('新学 · 静夜思')).dy);
       expect(arrowRect.left, greaterThan(cardRect.center.dx));
-      expect(adjustRect.top, closeTo(arrowRect.bottom, 1));
-      expect(cardRect.contains(adjustRect.topLeft), isTrue);
-      expect(cardRect.contains(adjustRect.bottomRight), isTrue);
+      expect(adjustRect.bottom, lessThan(cardRect.top));
+      expect(adjustRect.height, greaterThanOrEqualTo(44));
+      expect(adjustRect.width, greaterThanOrEqualTo(44));
+      expect(cardRect.overlaps(adjustRect), isFalse);
       if (scale == 1) {
         expect(
           cardRect.height,
           tester.getSize(find.byKey(const ValueKey('baseline'))).height,
-          reason: '调整计划移入卡内后不能撑高正常字号的任务卡片',
+          reason: '调整计划放在区块标题，任务卡片保持正常高度',
         );
       }
       await tester.runAsync(() async {
@@ -183,19 +253,18 @@ void main() {
       // `handlePopRoute()` 那样依赖全局路由栈 —— 后者在并发测试下会被
       // 其他用例的路由状态干扰。
       await tester.runAsync(() async {
-        final navigator = Navigator.of(
-          tester.element(find.text('调整每日计划')),
-        );
+        final navigator = Navigator.of(tester.element(find.text('调整每日计划')));
         await navigator.maybePop();
         await Future<void>.delayed(const Duration(milliseconds: 150));
       });
       await tester.pumpAndSettle();
       final config = TodayPlanRepository().config;
       expect(config.reviewCount, 3);
-      expect(
-        config.order,
-        [TodayTaskKind.review, TodayTaskKind.newPoem, TodayTaskKind.mistake],
-      );
+      expect(config.order, [
+        TodayTaskKind.review,
+        TodayTaskKind.newPoem,
+        TodayTaskKind.mistake,
+      ]);
       expect(find.text('今日练习清单 0/1'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
@@ -229,9 +298,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [todayPlanProvider.overrideWith((ref) async => plan)],
-          child: const MaterialApp(
-            home: Scaffold(body: TodayPlanSection()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: TodayPlanSection())),
         ),
       );
       await tester.pumpAndSettle();
@@ -241,7 +308,7 @@ void main() {
       if (state != '无任务') {
         expect(
           find.ancestor(of: adjust, matching: find.byType(ColoredCard)),
-          findsOneWidget,
+          findsNothing,
         );
       }
       await tester.runAsync(() async {

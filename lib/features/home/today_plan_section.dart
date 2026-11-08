@@ -14,6 +14,7 @@ import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/today_plan.dart';
 import 'package:poemath/features/home/providers/home_providers.dart' as home;
 import 'package:poemath/features/home/providers/today_plan_providers.dart';
+import 'package:poemath/features/home/today_plan_editor.dart';
 import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 import 'package:poemath/features/poem/poem_practice_result.dart';
 import 'package:poemath/features/poem/poem_practice_score.dart';
@@ -35,7 +36,10 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
     final adjustPlan = TextButton(
       style: TextButton.styleFrom(
         padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
+        minimumSize: const Size(
+          SpacingTokens.minTapTarget,
+          SpacingTokens.minTapTarget,
+        ),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),
       ),
@@ -69,7 +73,8 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                       ),
                     ),
                   ),
-                  if (plan.tasks.isEmpty) adjustPlan,
+                  const SizedBox(width: SpacingTokens.sm),
+                  adjustPlan,
                 ],
               ),
               const SizedBox(height: SpacingTokens.sm),
@@ -79,7 +84,7 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                   title: '今天没有待安排的任务',
                   description: '可按自己的节奏学习。',
                 ),
-              for (final (index, task) in plan.tasks.indexed) ...[
+              for (final task in plan.tasks) ...[
                 AppTile(
                   icon: task.completed
                       ? Icons.check_circle_outline
@@ -98,13 +103,7 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                       ? null
                       : () => _open(task),
                   trailing: task.completed || !_available(task)
-                      ? index == 0
-                            ? adjustPlan
-                            : const SizedBox.shrink()
-                      : null,
-                  trailingAction:
-                      index == 0 && !task.completed && _available(task)
-                      ? adjustPlan
+                      ? const SizedBox.shrink()
                       : null,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
@@ -228,141 +227,19 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
     try {
       if (!await ensureParentAccess(context) || !mounted) return;
       final repository = ref.read(todayPlanRepositoryProvider);
-      final current = repository.config;
-      final counts = {
-        for (final kind in TodayTaskKind.values) kind: current.countFor(kind),
-      };
-      final order = List<TodayTaskKind>.of(current.order);
-
-      /// 组装当前 sheet 内状态为配置对象。
-      TodayPlanConfig snapshot() => TodayPlanConfig(
-        reviewCount: counts[TodayTaskKind.review]!,
-        mistakeCount: counts[TodayTaskKind.mistake]!,
-        newPoemCount: counts[TodayTaskKind.newPoem]!,
-        order: List.of(order),
-      );
-
-      /// 落盘并提示。失败不回滚 UI —— 用户刚做的调整保留在 sheet 里，
-      /// 只是明确告知没存上（原实现靠「保存计划」按钮，失败路径同一套）。
-      Future<void> persist() async {
-        try {
-          await repository.saveConfig(snapshot());
-        } on Object catch (error, stack) {
-          AppLogger.e(
-            '计划配置保存失败',
-            tag: 'TodayPlan',
-            error: error,
-            stackTrace: stack,
-          );
-          if (mounted) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(const SnackBar(content: Text('计划保存失败，请重试')));
-          }
-        }
-      }
-
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        // 关闭即保存：sheet 是模态的，"每次调整立即落盘"与"关闭时落盘"
-        // 对用户无感差异，但后者避免连点加减号触发多次写盘与乱序覆盖。
-        // PopScope 覆盖系统手势/返回键关闭路径。
-        builder: (context) => PopScope<void>(
-          canPop: false,
-          onPopInvokedWithResult: (didPop, _) async {
-            if (didPop) return;
-            await persist();
-            if (context.mounted) Navigator.pop(context);
-          },
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-            ),
-            child: ParentAccessBoundary(
-              child: StatefulBuilder(
-                builder: (context, setSheetState) => SafeArea(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(SpacingTokens.md),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '调整每日计划',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: SpacingTokens.sm),
-                        const Text('每类 0–5 项，最多 15 项；数量及顺序从明天起生效。今天的清单保持固定。'),
-                        const SizedBox(height: SpacingTokens.md),
-                        for (final (index, kind) in order.indexed) ...[
-                          AppTile(
-                            icon: _icon(kind),
-                            iconColor: Theme.of(context).colorScheme.primary,
-                            title: kind.label,
-                            subtitle: '每天最多 ${counts[kind]} 项',
-                            trailing: Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                IconButton(
-                                  tooltip: '减少${kind.label}',
-                                  onPressed: counts[kind]! > 0
-                                      ? () => setSheetState(
-                                          () =>
-                                              counts[kind] = counts[kind]! - 1,
-                                        )
-                                      : null,
-                                  icon: const Icon(Icons.remove),
-                                ),
-                                Text('${counts[kind]}'),
-                                IconButton(
-                                  tooltip: '增加${kind.label}',
-                                  onPressed: counts[kind]! < 5
-                                      ? () => setSheetState(
-                                          () =>
-                                              counts[kind] = counts[kind]! + 1,
-                                        )
-                                      : null,
-                                  icon: const Icon(Icons.add),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: index > 0
-                                    ? () => setSheetState(() {
-                                        order[index] = order[index - 1];
-                                        order[index - 1] = kind;
-                                      })
-                                    : null,
-                                child: const Text('上移'),
-                              ),
-                              TextButton(
-                                onPressed: index < order.length - 1
-                                    ? () => setSheetState(() {
-                                        order[index] = order[index + 1];
-                                        order[index + 1] = kind;
-                                      })
-                                    : null,
-                                child: const Text('下移'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+        // 关闭必须经过保存结果，禁止拖动/遮罩直接 pop 绕过失败处理。
+        isDismissible: false,
+        enableDrag: false,
+        builder: (context) => ParentAccessBoundary(
+          child: TodayPlanEditor(
+            initial: repository.config,
+            onSave: repository.saveConfig,
           ),
         ),
       );
-      // 点「关闭」/ 点空白关闭这两条路径由上面的 PopScope 处理；此处兜底
-      // 覆盖 builder 之外的关闭（如父级被移除），重复保存是同值覆盖，无害。
-      await persist();
     } finally {
       if (mounted) setState(() => _configuring = false);
     }
