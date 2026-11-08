@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -30,47 +29,33 @@ final recentTextbookProvider =
             );
     });
 
-class TextbookResumeSection extends ConsumerWidget {
-  const TextbookResumeSection({super.key});
+class TextbookResumeCard extends ConsumerWidget {
+  const TextbookResumeCard({super.key, required this.book, required this.page});
+
+  final Textbook book;
+  final int page;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    ({Textbook book, int page})? recent;
-    try {
-      recent = ref.watch(recentTextbookProvider);
-    } on Object {
-      return AppTile(
-        icon: Icons.refresh,
-        iconColor: theme.colorScheme.error,
-        title: '最近阅读暂时无法读取',
-        subtitle: '点击重试',
-        onTap: () => ref.invalidate(recentTextbookProvider),
-      );
-    }
-    if (recent == null) return const SizedBox.shrink();
-    final book = recent.book;
     final path = ref.watch(textbookPathProvider(book.pdfSha256));
     final status = path.when(
       data: (value) => value == null ? ' · 课本文件缺失，点击恢复' : '',
       loading: () => ' · 正在检查文件',
       error: (_, __) => ' · 文件检查失败，点击重试',
     );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: SpacingTokens.md),
-      child: AppTile(
-        icon: Icons.menu_book_outlined,
-        iconColor: theme.colorScheme.primary,
-        title: '继续读《${book.title}》',
-        subtitle:
-            'PDF 第 ${recent.page} / ${book.pageCount} 页 · ${book.volumeLabel}$status',
-        onTap: () async {
-          if (path.hasError) {
-            ref.invalidate(textbookPathProvider(book.pdfSha256));
-          }
-          await context.push(AppRoutes.textbookDetailOf(book.pdfSha256));
-        },
-      ),
+    return AppTile(
+      icon: Icons.menu_book_outlined,
+      iconColor: theme.colorScheme.primary,
+      title: '继续读《${book.title}》',
+      subtitle:
+          'PDF 第 $page / ${book.pageCount} 页 · ${book.volumeLabel}$status',
+      onTap: () async {
+        if (path.hasError) {
+          ref.invalidate(textbookPathProvider(book.pdfSha256));
+        }
+        await context.push(AppRoutes.textbookDetailOf(book.pdfSha256));
+      },
     );
   }
 }

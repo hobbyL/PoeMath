@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
-import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
+import 'package:poemath/features/home/textbook_resume_section.dart';
 
 final practiceDraftsProvider =
     StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) async* {
@@ -98,9 +98,23 @@ class PracticeResumeSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final drafts = ref.watch(practiceDraftsProvider).valueOrNull ?? [];
-    if (drafts.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    final cards = [
+    Widget? readingCard;
+    try {
+      final recent = ref.watch(recentTextbookProvider);
+      if (recent != null) {
+        readingCard = TextbookResumeCard(book: recent.book, page: recent.page);
+      }
+    } on Object {
+      readingCard = AppTile(
+        icon: Icons.refresh,
+        iconColor: theme.colorScheme.error,
+        title: '最近阅读暂时无法读取',
+        subtitle: '点击重试',
+        onTap: () => ref.invalidate(recentTextbookProvider),
+      );
+    }
+    final cards = <Widget>[
       for (final draft in drafts)
         AppTile(
           icon: draft['kind'] == 'math'
@@ -155,7 +169,9 @@ class PracticeResumeSection extends ConsumerWidget {
             ],
           ),
         ),
+      if (readingCard != null) readingCard,
     ];
+    if (cards.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -166,28 +182,8 @@ class PracticeResumeSection extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: SpacingTokens.sm),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth >= ResponsiveLayout.mediumBreakpoint &&
-                cards.length > 1) {
-              return MasonryLayout(
-                columnCount: ResponsiveLayout.columns(constraints.maxWidth)
-                    .clamp(1, cards.length),
-                gap: SpacingTokens.sm,
-                children: cards,
-              );
-            }
-            return Column(
-              children: [
-                for (var i = 0; i < cards.length; i++) ...[
-                  if (i > 0) const SizedBox(height: SpacingTokens.sm),
-                  cards[i],
-                ],
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: SpacingTokens.sm),
+        ResponsiveCardGrid(children: cards),
+        const SizedBox(height: SpacingTokens.lg),
       ],
     );
   }

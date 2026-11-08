@@ -6,7 +6,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
-import 'package:poemath/features/home/textbook_resume_section.dart';
+import 'package:poemath/features/home/practice_resume_section.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 
 import '../../helpers/hive_test_helper.dart';
@@ -40,7 +40,7 @@ void main() {
         GoRoute(
           path: '/',
           builder: (_, __) => const Scaffold(
-            body: SingleChildScrollView(child: TextbookResumeSection()),
+            body: SingleChildScrollView(child: PracticeResumeSection()),
           ),
         ),
         GoRoute(
@@ -98,7 +98,7 @@ void main() {
     await tester.runAsync(() => HiveBoxes.settings.put(key, 42));
     await tester.pumpWidget(
       const ProviderScope(
-        child: MaterialApp(home: Scaffold(body: TextbookResumeSection())),
+        child: MaterialApp(home: Scaffold(body: PracticeResumeSection())),
       ),
     );
     await tester.pumpAndSettle();

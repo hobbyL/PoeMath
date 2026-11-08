@@ -17,5 +17,6 @@ export 'package:poemath/core/widgets/auto_fit_text_lines.dart';
 export 'package:poemath/core/widgets/colored_card.dart';
 export 'package:poemath/core/widgets/masonry_layout.dart';
 export 'package:poemath/core/widgets/page_animation_scope.dart';
+export 'package:poemath/core/widgets/responsive_card_grid.dart';
 export 'package:poemath/core/widgets/startup_failure_view.dart';
 export 'package:poemath/core/widgets/stat_overview_card.dart';

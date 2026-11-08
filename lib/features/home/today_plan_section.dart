@@ -84,27 +84,32 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
                   title: '今天没有待安排的任务',
                   description: '可按自己的节奏学习。',
                 ),
-              for (final task in plan.tasks) ...[
-                AppTile(
-                  icon: task.completed
-                      ? Icons.check_circle_outline
-                      : _icon(task.kind),
-                  iconColor: task.completed
-                      ? theme.semantic.success
-                      : theme.colorScheme.primary,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  title: '${task.kind.label} · ${task.title}',
-                  subtitle: task.completed
-                      ? '今日已完成'
-                      : _available(task)
-                      ? '开始这一项'
-                      : '内容已移除，今天不补发',
-                  onTap: task.completed || _opening || !_available(task)
-                      ? null
-                      : () => _open(task),
-                  trailing: task.completed || !_available(task)
-                      ? const SizedBox.shrink()
-                      : null,
+              if (plan.tasks.isNotEmpty) ...[
+                ResponsiveCardGrid(
+                  children: [
+                    for (final task in plan.tasks)
+                      AppTile(
+                        icon: task.completed
+                            ? Icons.check_circle_outline
+                            : _icon(task.kind),
+                        iconColor: task.completed
+                            ? theme.semantic.success
+                            : theme.colorScheme.primary,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        title: '${task.kind.label} · ${task.title}',
+                        subtitle: task.completed
+                            ? '今日已完成'
+                            : _available(task)
+                            ? '开始这一项'
+                            : '内容已移除，今天不补发',
+                        onTap: task.completed || _opening || !_available(task)
+                            ? null
+                            : () => _open(task),
+                        trailing: task.completed || !_available(task)
+                            ? const SizedBox.shrink()
+                            : null,
+                      ),
+                  ],
                 ),
                 const SizedBox(height: SpacingTokens.sm),
               ],

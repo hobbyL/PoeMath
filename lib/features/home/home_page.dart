@@ -25,7 +25,6 @@ import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/home/home_check_in_header.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
 import 'package:poemath/features/home/today_plan_section.dart';
-import 'package:poemath/features/home/textbook_resume_section.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
@@ -62,7 +61,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       _buildDailyGoal(context, ref),
       const SizedBox(height: SpacingTokens.lg),
       const PracticeResumeSection(),
-      const TextbookResumeSection(),
       const TodayPlanSection(),
 
       // 累计概览放在今日行动之后。
@@ -627,26 +625,33 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
         const SizedBox(height: SpacingTokens.sm),
-        AppTile(
-          icon: poemDone
-              ? Icons.check_circle_outline
-              : Icons.menu_book_outlined,
-          iconColor: theme.colorScheme.primary,
-          title: '诗词 $todayPoems/$poemGoal 首',
-          subtitle: poemDone ? '目标已完成' : '还差 ${poemGoal - todayPoems} 首 · 去学诗词',
-          onTap: poemDone ? null : () => context.go(AppRoutes.poemTab),
-          trailing: poemDone ? const SizedBox.shrink() : null,
-        ),
-        const SizedBox(height: SpacingTokens.sm),
-        AppTile(
-          icon: mathDone
-              ? Icons.check_circle_outline
-              : Icons.calculate_outlined,
-          iconColor: theme.colorScheme.secondary,
-          title: '口算 $todayMath/$mathGoal 题',
-          subtitle: mathDone ? '目标已完成' : '还差 ${mathGoal - todayMath} 题 · 去练口算',
-          onTap: mathDone ? null : () => context.go(AppRoutes.mathTab),
-          trailing: mathDone ? const SizedBox.shrink() : null,
+        ResponsiveCardGrid(
+          children: [
+            AppTile(
+              icon: poemDone
+                  ? Icons.check_circle_outline
+                  : Icons.menu_book_outlined,
+              iconColor: theme.colorScheme.primary,
+              title: '诗词 $todayPoems/$poemGoal 首',
+              subtitle: poemDone
+                  ? '目标已完成'
+                  : '还差 ${poemGoal - todayPoems} 首 · 去学诗词',
+              onTap: poemDone ? null : () => context.go(AppRoutes.poemTab),
+              trailing: poemDone ? const SizedBox.shrink() : null,
+            ),
+            AppTile(
+              icon: mathDone
+                  ? Icons.check_circle_outline
+                  : Icons.calculate_outlined,
+              iconColor: theme.colorScheme.secondary,
+              title: '口算 $todayMath/$mathGoal 题',
+              subtitle: mathDone
+                  ? '目标已完成'
+                  : '还差 ${mathGoal - todayMath} 题 · 去练口算',
+              onTap: mathDone ? null : () => context.go(AppRoutes.mathTab),
+              trailing: mathDone ? const SizedBox.shrink() : null,
+            ),
+          ],
         ),
       ],
     );
