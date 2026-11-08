@@ -9,6 +9,9 @@ import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 
 class CheckInRepository {
+  CheckInRepository({DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+
+  final DateTime Function() _clock;
   /// 日期格式化辅助
   static String _dateKey(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -20,7 +23,7 @@ class CheckInRepository {
   }
 
   /// 获取今日打卡记录
-  CheckIn? getToday() => getByDate(DateTime.now());
+  CheckIn? getToday() => getByDate(_clock());
 
   /// 记录今日打卡（创建或更新）
   Future<CheckIn> checkInToday() => ActivitySettlementLedger.serial(
@@ -35,7 +38,7 @@ class CheckInRepository {
       });
 
   Future<CheckIn> _getOrCreateToday({required bool isCheckedIn}) async {
-    final now = DateTime.now();
+    final now = _clock();
     final dateStr = _dateKey(now);
     final key = ProfileScope.key(dateStr);
 
@@ -61,7 +64,7 @@ class CheckInRepository {
     int? addDuration,
   }) async {
     await updateForDate(
-      DateTime.now(),
+      _clock(),
       activityId: activityId,
       addPoems: addPoems,
       addMathTotal: addMathTotal,
@@ -130,16 +133,16 @@ class CheckInRepository {
   /// 计算连续打卡天数（往回数）
   int calculateStreak() {
     int streak = 0;
-    var date = DateTime.now();
+    var date = _clock();
 
     // 今天没打卡的话，从昨天开始数
     if (getByDate(date)?.isCheckedIn != true) {
-      date = date.subtract(const Duration(days: 1));
+      date = DateTime(date.year, date.month, date.day - 1);
     }
 
     while (getByDate(date)?.isCheckedIn == true) {
       streak++;
-      date = date.subtract(const Duration(days: 1));
+      date = DateTime(date.year, date.month, date.day - 1);
     }
     return streak;
   }

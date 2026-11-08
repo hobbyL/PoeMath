@@ -59,6 +59,11 @@ jobs:
           mkdir -p build/test-results
           flutter test --no-pub --file-reporter json:build/test-results/flutter-tests.json
 
+      - name: Test calendar boundaries across daylight saving changes
+        env:
+          TZ: America/New_York
+        run: flutter test --no-pub test/data/repositories/calendar_boundaries_test.dart
+
       - name: Archive test report
         if: always()
         uses: actions/upload-artifact@v4

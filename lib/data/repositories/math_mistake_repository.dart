@@ -222,8 +222,9 @@ class MathMistakeRepository {
       final now = DateTime.now();
       mistake
         ..consolidationRound = nextRound
-        ..nextConsolidationDate = DateTime(now.year, now.month, now.day)
-            .add(Duration(days: consolidationIntervals[nextRound - 1]));
+        ..nextConsolidationDate = DateTime(
+          now.year, now.month, now.day + consolidationIntervals[nextRound - 1],
+        );
       outcome = nextRound == 1
           ? RepracticeOutcome.enteredConsolidation
           : RepracticeOutcome.advanced;

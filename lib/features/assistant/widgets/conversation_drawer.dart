@@ -7,6 +7,7 @@
 //       触发重建后重新读取 repo（见 session provider 注释）。
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/utils/calendar_dates.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -203,9 +204,7 @@ class ConversationDrawer extends ConsumerWidget {
   /// 友好的相对时间：今天 HH:mm / 昨天 HH:mm / N 天前 / yyyy/MM/dd。
   String _formatTime(DateTime t) {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final that = DateTime(t.year, t.month, t.day);
-    final diffDays = today.difference(that).inDays;
+    final diffDays = calendarDaysBetween(t, now);
     final hh = t.hour.toString().padLeft(2, '0');
     final mm = t.minute.toString().padLeft(2, '0');
     if (diffDays == 0) return '$hh:$mm';

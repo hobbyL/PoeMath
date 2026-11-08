@@ -4,6 +4,7 @@
 // 职责：艾宾浩斯复习调度模型。Profile-scoped。
 
 import 'package:hive/hive.dart';
+import 'package:poemath/core/utils/calendar_dates.dart';
 
 part 'review_schedule.g.dart';
 
@@ -59,9 +60,7 @@ class ReviewSchedule extends HiveObject {
     if (currentRound >= intervals.length) {
       isCompleted = true;
     } else {
-      nextReviewDate = DateTime.now().add(
-        Duration(days: intervals[currentRound]),
-      );
+      nextReviewDate = addCalendarDays(lastReviewedAt!, intervals[currentRound]);
     }
   }
 }

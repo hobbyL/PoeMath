@@ -6,12 +6,16 @@
 import 'dart:async';
 
 import 'package:poemath/data/poem_identity.dart';
+import 'package:poemath/core/utils/calendar_dates.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/review_schedule.dart';
 import 'package:poemath/domain/poem_review_history.dart';
 
 class ReviewRepository {
+  ReviewRepository({DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+
+  final DateTime Function() _clock;
   static final Map<String, Future<void>> _pending = {};
 
   List<ReviewSchedule> getAll() => HiveBoxes.reviewSchedules.values
@@ -93,9 +97,7 @@ class ReviewRepository {
     final schedule = ReviewSchedule(
       poemId: poemId,
       profileId: ProfileScope.currentId,
-      nextReviewDate: DateTime.now().add(
-        Duration(days: ReviewSchedule.intervals[0]),
-      ),
+      nextReviewDate: addCalendarDays(_clock(), ReviewSchedule.intervals[0]),
     );
     await save(schedule);
     return schedule;
@@ -103,14 +105,14 @@ class ReviewRepository {
 
   /// 获取今日待复习的诗词
   List<ReviewSchedule> getDueToday() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final now = _clock();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
     return HiveBoxes.reviewSchedules.values
         .where(
           (s) =>
               s.profileId == ProfileScope.currentId &&
               !s.isCompleted &&
-              !s.nextReviewDate.isAfter(today.add(const Duration(days: 1))),
+              s.nextReviewDate.isBefore(tomorrow),
         )
         .toList();
   }
@@ -139,7 +141,7 @@ class ReviewRepository {
     if (score != null && (!score.isFinite || score < 0 || score > 1)) {
       throw ArgumentError.value(score, 'score');
     }
-    final now = reviewedAt ?? DateTime.now();
+    final now = reviewedAt ?? _clock();
     final id = activityId ?? 'review_${now.microsecondsSinceEpoch}';
     await _serialized(poemId, () async {
       final schedule = get(poemId);
@@ -178,8 +180,8 @@ class ReviewRepository {
           isCompleted: completed,
           nextReviewDate: completed
               ? schedule.nextReviewDate
-              : now.add(
-                  Duration(days: passed ? ReviewSchedule.intervals[round] : 1),
+              : addCalendarDays(
+                  now, passed ? ReviewSchedule.intervals[round] : 1,
                 ),
           lastReviewedAt: passed ? now : schedule.lastReviewedAt,
           lastScore: score ?? schedule.lastScore,
@@ -195,7 +197,7 @@ class ReviewRepository {
     String? operationId,
     DateTime? startedAt,
   }) async {
-    final now = startedAt ?? DateTime.now();
+    final now = startedAt ?? _clock();
     final cycleId = operationId ?? 'cycle_${now.microsecondsSinceEpoch}';
     await _serialized(poemId, () async {
       final schedule = get(poemId);

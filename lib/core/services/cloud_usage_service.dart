@@ -1,6 +1,7 @@
 import 'package:hive/hive.dart';
 
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/core/utils/calendar_dates.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
 
 enum CloudUsageKind {
@@ -84,8 +85,7 @@ class CloudUsageService {
     final today = _clock();
     return List.generate(days, (i) {
       // 从最早的一天开始生成，保证升序且末项为今天。
-      final date = DateTime(today.year, today.month, today.day)
-          .subtract(Duration(days: days - 1 - i));
+      final date = DateTime(today.year, today.month, today.day - days + 1 + i);
       return DailyCloudUsage(
         date: date,
         counts: {
@@ -158,7 +158,7 @@ class CloudUsageService {
       }
       await HiveBoxes.meta.put(key, current + 1);
       // 仅保留最近 32 个日期的计数，不触碰结算或练习草稿。
-      final cutoff = _clock().subtract(const Duration(days: 32));
+      final cutoff = addCalendarDays(_clock(), -32);
       final keys = HiveBoxes.meta.keys.whereType<String>().where((key) {
         if (!key.startsWith(_usagePrefix)) return false;
         final date = DateTime.tryParse(key.split(':')[1]);

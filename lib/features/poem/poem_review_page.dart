@@ -3,6 +3,7 @@
 // 艾宾浩斯复习列表页：展示今日待复习和所有进行中的复习计划。
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/utils/calendar_dates.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -204,13 +205,7 @@ class PoemReviewPage extends ConsumerWidget {
 
     // 距离下次复习天数
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final reviewDay = DateTime(
-      schedule.nextReviewDate.year,
-      schedule.nextReviewDate.month,
-      schedule.nextReviewDate.day,
-    );
-    final daysUntil = reviewDay.difference(today).inDays;
+    final daysUntil = calendarDaysBetween(now, schedule.nextReviewDate);
 
     String timeLabel;
     if (isDue) {

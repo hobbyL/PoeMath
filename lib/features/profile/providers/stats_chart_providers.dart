@@ -48,8 +48,8 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
   final startDate = DateTime(
     effectiveNow.year,
     effectiveNow.month,
-    effectiveNow.day,
-  ).subtract(Duration(days: days - 1));
+    effectiveNow.day - days + 1,
+  );
 
   // 旧版回退：poemProgress 只能表示每首诗最后一次学习日期。
   final poemMap = <String, int>{};
@@ -182,7 +182,7 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
   // 生成连续日期列表
   final result = <DailyStat>[];
   for (var i = 0; i < days; i++) {
-    final date = startDate.add(Duration(days: i));
+    final date = DateTime(startDate.year, startDate.month, startDate.day + i);
     final key = _dateKey(date);
 
     final summary = summaryMap[key];
