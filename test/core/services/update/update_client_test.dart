@@ -367,6 +367,78 @@ void main() {
     );
   });
 
+  for (final status in [200, 503]) {
+    test('下载在消费响应前失败会取消响应流（HTTP $status）', () async {
+      var cancelled = false;
+      var aborted = false;
+      final response = StreamController<List<int>>(
+        onCancel: () => cancelled = true,
+      );
+      final client = UpdateClient(
+        updateUrl: 'https://updates.example.com/latest.json',
+        temporaryDirectoryProvider: () async {
+          throw const FileSystemException('synthetic directory failure');
+        },
+        client: MockClient.streaming((request, _) async {
+          unawaited((request as http.AbortableRequest).abortTrigger!
+              .then((_) => aborted = true));
+          return http.StreamedResponse(response.stream, status);
+        }),
+      );
+      await expectLater(
+        client.downloadApk(_updateInfo()),
+        throwsA(status == 200
+            ? isA<FileSystemException>()
+            : isA<UpdateException>()),
+      );
+      expect(cancelled, isTrue);
+      expect(aborted, isTrue);
+      await response.close();
+    });
+  }
+
+  test('下载响应超时后仍关闭晚到的响应流', () async {
+    final arriving = Completer<http.StreamedResponse>();
+    var cancelled = false;
+    final response = StreamController<List<int>>(
+      onCancel: () => cancelled = true,
+    );
+    final client = UpdateClient(
+      updateUrl: 'https://updates.example.com/latest.json',
+      requestTimeout: const Duration(milliseconds: 10),
+      client: MockClient.streaming((_, _) => arriving.future),
+    );
+    await expectLater(
+      client.downloadApk(_updateInfo()),
+      throwsA(isA<UpdateException>()),
+    );
+    arriving.complete(http.StreamedResponse(response.stream, 200));
+    await Future<void>.delayed(Duration.zero);
+    expect(cancelled, isTrue);
+    await response.close();
+  });
+
+  test('安装包文件无法写入时取消下载流且错误可捕获', () async {
+    await Directory(_downloadFile(temporaryDirectory).path)
+        .create(recursive: true);
+    var cancelled = false;
+    final response = StreamController<List<int>>(
+      onCancel: () => cancelled = true,
+    )..add([1, 2, 3]);
+    final client = UpdateClient(
+      updateUrl: 'https://updates.example.com/latest.json',
+      temporaryDirectoryProvider: () async => temporaryDirectory,
+      client: MockClient.streaming((_, _) async =>
+          http.StreamedResponse(response.stream, 200)),
+    );
+    await expectLater(
+      client.downloadApk(_updateInfo()),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(cancelled, isTrue);
+    await response.close();
+  });
+
   group('强制 HTTPS', () {
     test('明文 HTTP 更新地址：已配置但不安全，检查更新直接拒绝', () async {
       var requested = false;

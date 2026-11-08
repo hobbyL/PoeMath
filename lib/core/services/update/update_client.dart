@@ -269,8 +269,14 @@ class UpdateClient {
       abortTrigger: abortTrigger,
     );
     final http.StreamedResponse response;
+    var awaitingResponse = true;
     try {
-      response = await _client.send(request).timeout(
+      response = await _client.send(request).then((response) {
+        if (!awaitingResponse) {
+          unawaited(_cancelUnconsumedResponse(response));
+        }
+        return response;
+      }).timeout(
         _requestTimeout,
         onTimeout: () {
           if (!timeoutAbortCompleter.isCompleted) {
@@ -283,74 +289,96 @@ class UpdateClient {
       _throwDownloadInterrupted(cancelToken);
     } on TimeoutException {
       _throwDownloadInterrupted(cancelToken);
+    } finally {
+      awaitingResponse = false;
     }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw UpdateException('安装包下载失败', statusCode: response.statusCode);
-    }
-
-    cancelToken?.throwIfCancelled();
-    final directory = await _temporaryDirectoryProvider();
-    final updateDirectory = Directory('${directory.path}/poemath_update');
-    if (!await updateDirectory.exists()) {
-      await updateDirectory.create(recursive: true);
-    }
-    // versionName 来自更新源（不可信输入），文件名拼接前做字符白名单消毒，
-    // 防止 `../evil` 之类的路径遍历写出下载目录；不命中白名单用 'app' 兜底。
-    // versionCode 是已验证 >0 的 int，天然安全。
-    final safeVersionName =
-        RegExp(r'^[A-Za-z0-9._-]{1,64}$').hasMatch(update.versionName)
-            ? update.versionName
-            : 'app';
-    final file = File(
-      '${updateDirectory.path}/poemath-$safeVersionName+${update.versionCode}.apk',
-    );
-
-    final responseLength = response.contentLength;
-    final total = responseLength != null && responseLength > 0
-        ? responseLength
-        : update.apkSize;
-    var received = 0;
-    final sink = file.openWrite();
     try {
-      final responseStream = response.stream.timeout(
-        _requestTimeout,
-        onTimeout: (eventSink) {
-          if (!timeoutAbortCompleter.isCompleted) {
-            timeoutAbortCompleter.complete();
-          }
-          eventSink
-            ..addError(TimeoutException('安装包下载数据等待超时'))
-            ..close();
-        },
-      );
-      await for (final chunk in responseStream) {
-        cancelToken?.throwIfCancelled();
-        sink.add(chunk);
-        received += chunk.length;
-        // 大小硬上限：更新源被劫持前提下的磁盘耗尽纵深防御，
-        // 超限中断下载并清理半成品文件。
-        if (received > maxDownloadBytes) {
-          throw const UpdateException('安装包超出大小上限，已中止下载');
-        }
-        onProgress?.call(received, total > 0 ? total : null);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw UpdateException('安装包下载失败', statusCode: response.statusCode);
       }
+
       cancelToken?.throwIfCancelled();
-      await sink.close();
-    } on UpdateCancelledException {
-      await _discardPartialFile(file, sink);
-      rethrow;
-    } on http.RequestAbortedException {
-      await _discardPartialFile(file, sink);
-      _throwDownloadInterrupted(cancelToken);
-    } on TimeoutException {
-      await _discardPartialFile(file, sink);
-      _throwDownloadInterrupted(cancelToken);
-    } catch (_) {
-      await _discardPartialFile(file, sink);
-      rethrow;
+      final directory = await _temporaryDirectoryProvider();
+      final updateDirectory = Directory('${directory.path}/poemath_update');
+      if (!await updateDirectory.exists()) {
+        await updateDirectory.create(recursive: true);
+      }
+      // versionName 来自更新源（不可信输入），文件名拼接前做字符白名单消毒，
+      // 防止 `../evil` 之类的路径遍历写出下载目录；不命中白名单用 'app' 兜底。
+      // versionCode 是已验证 >0 的 int，天然安全。
+      final safeVersionName =
+          RegExp(r'^[A-Za-z0-9._-]{1,64}$').hasMatch(update.versionName)
+              ? update.versionName
+              : 'app';
+      final file = File(
+        '${updateDirectory.path}/poemath-$safeVersionName+${update.versionCode}.apk',
+      );
+
+      final responseLength = response.contentLength;
+      final total = responseLength != null && responseLength > 0
+          ? responseLength
+          : update.apkSize;
+      var received = 0;
+      final sink = file.openWrite();
+      // done 可能先于 addStream/close 报错；保留下面 await 路径的异常，
+      // 同时避免磁盘写入失败成为未处理的异步错误。
+      unawaited(sink.done.then<void>((_) {}, onError: (Object _) {}));
+      try {
+        final responseStream = response.stream.timeout(
+          _requestTimeout,
+          onTimeout: (eventSink) {
+            if (!timeoutAbortCompleter.isCompleted) {
+              timeoutAbortCompleter.complete();
+            }
+            eventSink
+              ..addError(TimeoutException('安装包下载数据等待超时'))
+              ..close();
+          },
+        );
+        await sink.addStream(responseStream.map((chunk) {
+          cancelToken?.throwIfCancelled();
+          received += chunk.length;
+          // 大小硬上限：更新源被劫持前提下的磁盘耗尽纵深防御，
+          // 超限中断下载并清理半成品文件。
+          if (received > maxDownloadBytes) {
+            throw const UpdateException('安装包超出大小上限，已中止下载');
+          }
+          onProgress?.call(received, total > 0 ? total : null);
+          return chunk;
+        }));
+        cancelToken?.throwIfCancelled();
+        await sink.close();
+      } on UpdateCancelledException {
+        await _discardPartialFile(file, sink);
+        rethrow;
+      } on http.RequestAbortedException {
+        await _discardPartialFile(file, sink);
+        _throwDownloadInterrupted(cancelToken);
+      } on TimeoutException {
+        await _discardPartialFile(file, sink);
+        _throwDownloadInterrupted(cancelToken);
+      } catch (_) {
+        await _discardPartialFile(file, sink);
+        rethrow;
+      }
+      onProgress?.call(received, total > 0 ? total : null);
+      return file;
+    } finally {
+      if (!timeoutAbortCompleter.isCompleted) timeoutAbortCompleter.complete();
+      // addStream 可能在订阅响应前因打开文件失败；调用过不代表已经消费。
+      await _cancelUnconsumedResponse(response);
     }
-    onProgress?.call(received, total > 0 ? total : null);
-    return file;
+  }
+
+  static Future<void> _cancelUnconsumedResponse(
+    http.StreamedResponse response,
+  ) async {
+    try {
+      await response.stream.listen((_) {}, onError: (Object _) {}).cancel();
+    } on Object {
+      // 已消费的单订阅流由原消费者结束/取消，不能再次监听。
+      // 释放失败也不得覆盖 HTTP、文件或取消的原始错误。
+    }
   }
 
   /// 计算文件 SHA256 校验值。
