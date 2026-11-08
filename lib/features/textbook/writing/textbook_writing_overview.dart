@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/color_tokens.dart';
+import 'package:poemath/core/theme/semantic_colors_ext.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook_course.dart';
@@ -57,7 +58,7 @@ class _WritingOverviewState extends ConsumerState<TextbookWritingOverview> {
       switch (badge) {
         WritingBadge.none => theme.colorScheme.onSurfaceVariant,
         WritingBadge.traced => theme.colorScheme.tertiary,
-        WritingBadge.written => ColorTokens.success,
+        WritingBadge.written => theme.semantic.success,
       };
 
   Widget _card(

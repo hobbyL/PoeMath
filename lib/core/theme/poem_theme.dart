@@ -29,7 +29,8 @@ class PoemTheme {
       onSecondaryContainer: primary,
       surface: ColorTokens.poemPaper,
       onSurface: ColorTokens.poemInk,
-      error: ColorTokens.error,
+      error: ColorTokens.poemSeal,
+      onError: Colors.white,
     );
     final base = ThemeData.light(useMaterial3: true);
     return base.copyWith(
@@ -48,27 +49,29 @@ class PoemTheme {
       extensions: const <ThemeExtension<dynamic>>[
         PoemThemeExt(),
         SemanticColorsExt(
-          success: ColorTokens.success,
-          caution: ColorTokens.poemGold,
+          success: ColorTokens.successText,
+          caution: ColorTokens.cautionText,
         ),
       ],
     );
   }
 
-  /// 暗色主题：深色底 + 墨绿主色（护眼模式）。
+  /// 暗色主题：深色底 + 明亮墨绿前景。
   static ThemeData dark() {
-    const primary = ColorTokens.poemGreen;
+    const primary = ColorTokens.poemGreenLight;
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.dark,
       primary: primary,
-      onPrimary: Colors.white,
-      secondary: ColorTokens.poemCinnabar,
+      onPrimary: ColorTokens.poemGreenDeep,
+      secondary: ColorTokens.poemCinnabarLight,
+      onSecondary: ColorTokens.poemInk,
       secondaryContainer: primary.withValues(alpha: 0.25),
       onSecondaryContainer: primary,
       surface: ColorTokens.darkSurface,
       onSurface: ColorTokens.darkTextPrimary,
-      error: ColorTokens.error,
+      error: ColorTokens.mathCoral,
+      onError: ColorTokens.poemInk,
     );
     final base = ThemeData.dark(useMaterial3: true);
     return base.copyWith(
@@ -87,7 +90,7 @@ class PoemTheme {
       extensions: const <ThemeExtension<dynamic>>[
         PoemThemeExt(),
         SemanticColorsExt(
-          success: ColorTokens.success,
+          success: ColorTokens.mathMint,
           caution: ColorTokens.poemGold,
         ),
       ],
@@ -106,75 +109,57 @@ class PoemTheme {
 
   /// 使用系统默认字体；字号与字重区分层级。
   static TextTheme _textTheme(Color color) => TextTheme(
-        displayLarge: TextStyle(
-          fontSize: TypographyTokens.fsDisplay,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-        displayMedium: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-        displaySmall: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-        headlineLarge: TextStyle(
-          fontSize: TypographyTokens.fsHeadline,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-        headlineMedium: TextStyle(
-          fontSize: TypographyTokens.fsHeadline,
-          color: color,
-        ),
-        headlineSmall: TextStyle(
-          fontSize: 22,
-          color: color,
-        ),
-        titleLarge: TextStyle(
-          fontSize: TypographyTokens.fsTitle,
-          color: color,
-        ),
-        titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-        titleSmall: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: TypographyTokens.fsBody,
-          height: 1.5,
-          color: color,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: TypographyTokens.fsBody,
-          color: color,
-        ),
-        bodySmall: TextStyle(
-          fontSize: TypographyTokens.fsCaption,
-          color: color,
-        ),
-        labelLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-        labelMedium: TextStyle(
-          fontSize: TypographyTokens.fsLabel,
-          color: color,
-        ),
-        labelSmall: TextStyle(
-          fontSize: 11,
-          color: color,
-        ),
-      );
+    displayLarge: TextStyle(
+      fontSize: TypographyTokens.fsDisplay,
+      fontWeight: FontWeight.w700,
+      color: color,
+    ),
+    displayMedium: TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.w600,
+      color: color,
+    ),
+    displaySmall: TextStyle(
+      fontSize: 24,
+      fontWeight: FontWeight.w600,
+      color: color,
+    ),
+    headlineLarge: TextStyle(
+      fontSize: TypographyTokens.fsHeadline,
+      fontWeight: FontWeight.w600,
+      color: color,
+    ),
+    headlineMedium: TextStyle(
+      fontSize: TypographyTokens.fsHeadline,
+      color: color,
+    ),
+    headlineSmall: TextStyle(fontSize: 22, color: color),
+    titleLarge: TextStyle(fontSize: TypographyTokens.fsTitle, color: color),
+    titleMedium: TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w500,
+      color: color,
+    ),
+    titleSmall: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: color,
+    ),
+    bodyLarge: TextStyle(
+      fontSize: TypographyTokens.fsBody,
+      height: 1.5,
+      color: color,
+    ),
+    bodyMedium: TextStyle(fontSize: TypographyTokens.fsBody, color: color),
+    bodySmall: TextStyle(fontSize: TypographyTokens.fsCaption, color: color),
+    labelLarge: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: color,
+    ),
+    labelMedium: TextStyle(fontSize: TypographyTokens.fsLabel, color: color),
+    labelSmall: TextStyle(fontSize: 11, color: color),
+  );
 }
 
 /// 挂在 ThemeData 上的诗词专属样式扩展。
@@ -186,9 +171,9 @@ class PoemThemeExt extends ThemeExtension<PoemThemeExt> {
   TextStyle get poemContent => TypographyTokens.poemContentStyle();
 
   TextStyle get pinyin => const TextStyle(
-        fontSize: TypographyTokens.fsPinyin,
-        color: ColorTokens.poemInkLight,
-      );
+    fontSize: TypographyTokens.fsPinyin,
+    color: ColorTokens.poemInkLight,
+  );
 
   @override
   PoemThemeExt copyWith() => const PoemThemeExt();

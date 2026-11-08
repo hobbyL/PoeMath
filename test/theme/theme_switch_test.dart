@@ -29,7 +29,7 @@ void main() {
       subject: AppSubject.math,
       brightness: Brightness.light,
     );
-    expect(mathLight.colorScheme.primary, ColorTokens.mathPurple);
+    expect(mathLight.colorScheme.primary, ColorTokens.mathPurpleDeep);
   });
 
   group('widget 主题切换', () {
@@ -82,16 +82,11 @@ void main() {
     testWidgets('切换 activeSubject 时派生的 lightTheme 应随之变化', (tester) async {
       // dayKey override 为静态值：跳过 DayKeyNotifier 的 30s 轮询 Timer，
       // 避免外部 container 在 pending timer 检查后 dispose 报错。
-      final container = ProviderContainer(
-        overrides: [staticDayKeyOverride()],
-      );
+      final container = ProviderContainer(overrides: [staticDayKeyOverride()]);
       addTearDown(container.dispose);
 
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const App(),
-        ),
+        UncontrolledProviderScope(container: container, child: const App()),
       );
       // 让 splash + 路由跳转完成（用 pump 代替 pumpAndSettle 避免动画超时）
       await tester.pump(const Duration(milliseconds: 500));
@@ -112,7 +107,7 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
 
       final ThemeData light2 = container.read(lightThemeProvider);
-      expect(light2.colorScheme.primary, ColorTokens.mathPurple);
+      expect(light2.colorScheme.primary, ColorTokens.mathPurpleDeep);
 
       // 排空 Hive 写链，否则 tearDown 的 Hive.close() 在 fake 时钟下永不返回。
       await drainHiveWritesForTesting(tester);

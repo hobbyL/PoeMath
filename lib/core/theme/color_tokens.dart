@@ -31,8 +31,13 @@ class ColorTokens {
   /// 墨绿深：按下 / 强调
   static const Color poemGreenDeep = Color(0xFF2F4A31);
 
+  /// 深色主题的墨绿前景，保持在深底及着色卡片上的可读性。
+  static const Color poemGreenLight = Color(0xFFAAC9A5);
+
   /// 朱砂：点缀强调色
   static const Color poemCinnabar = Color(0xFFB35C5C);
+
+  static const Color poemCinnabarLight = Color(0xFFE5AAA8);
 
   /// 描金：装饰线 / 徽章
   static const Color poemGold = Color(0xFFC9A56A);
@@ -62,6 +67,9 @@ class ColorTokens {
   /// 樱花粉：装饰 / 女孩向
   static const Color mathPink = Color(0xFFFFB1C1);
 
+  /// 浅色主题中可承载白字、也可用于文字的樱花色。
+  static const Color mathPinkDeep = Color(0xFF963F64);
+
   /// 冰川蓝：进度 / 信息
   static const Color mathBlue = Color(0xFF9FD3E8);
 
@@ -82,6 +90,10 @@ class ColorTokens {
   static const Color warning = Color(0xFFFAAD14);
   static const Color error = Color(0xFFFF4D4F);
   static const Color info = Color(0xFF1890FF);
+
+  /// 信息文字使用的浅色主题前景；装饰色仍使用上方原始调色板。
+  static const Color successText = Color(0xFF256735);
+  static const Color cautionText = Color(0xFF795517);
 
   /// 提示灯亮起时的琥珀色，在浅色图片上保留清晰轮廓。
   static const Color hintAmber = Color(0xFF9A6700);

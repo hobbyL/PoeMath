@@ -117,7 +117,10 @@ class HomePage extends ConsumerWidget {
 
     return ColoredCard(
       gradient: LinearGradient(
-        colors: [primary, primary.withValues(alpha: 0.6)],
+        colors: [
+          primary,
+          Color.lerp(primary, theme.colorScheme.surface, 0.06)!,
+        ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -138,18 +141,10 @@ class HomePage extends ConsumerWidget {
                     Text(
                       isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onPrimary.withValues(
-                          alpha: 0.9,
-                        ),
+                        color: theme.colorScheme.onPrimary,
                       ),
                     ),
-                    // 等级徽章（原 AppBar 右上角）。
-                    //
-                    // 配色刻意用 onPrimary 半透明底 + 白字，而不是沿用原来
-                    // 的 `caution` 黄：本卡背景是 primary 绿色渐变，黄字
-                    // 压在绿底上对比度不足（实测在暗色主题下更糟）。
-                    // 这里用白色系保证在任何主题下都读得清 —— 等级是展示
-                    // 信息，可读性优先于配色一致性。
+                    // 等级徽章与打卡按钮均使用实色前景/背景组合。
                     _LevelBadge(levelName: stats.levelName),
                   ],
                 ),
@@ -170,9 +165,7 @@ class HomePage extends ConsumerWidget {
                       child: Text(
                         '天连续',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onPrimary.withValues(
-                            alpha: 0.8,
-                          ),
+                          color: theme.colorScheme.onPrimary,
                         ),
                       ),
                     ),
@@ -296,12 +289,8 @@ class HomePage extends ConsumerWidget {
                 }
               },
               style: FilledButton.styleFrom(
-                // 主色渐变卡片上的按钮：用 onPrimary 而非白色硬编码，
-                // 换主题时自动跟随（与下方 `onPrimary` 图标同源）。
-                backgroundColor: theme.colorScheme.onPrimary.withValues(
-                  alpha: 0.2,
-                ),
-                foregroundColor: theme.colorScheme.onPrimary,
+                backgroundColor: theme.colorScheme.onPrimary,
+                foregroundColor: theme.colorScheme.primary,
               ),
               child: const Text('打卡'),
             ),
@@ -640,18 +629,18 @@ class _LevelBadge extends StatelessWidget {
         vertical: SpacingTokens.xs,
       ),
       decoration: BoxDecoration(
-        color: onPrimary.withValues(alpha: 0.18),
+        color: onPrimary,
         borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.stars_rounded, size: 14, color: onPrimary),
+          Icon(Icons.stars_rounded, size: 14, color: theme.colorScheme.primary),
           const SizedBox(width: 4),
           Text(
             levelName,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: onPrimary,
+              color: theme.colorScheme.primary,
               fontWeight: FontWeight.w600,
             ),
           ),

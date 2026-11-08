@@ -17,17 +17,14 @@ import 'package:poemath/core/theme/color_tokens.dart';
 /// color: theme.semantic.success,
 /// ```
 class SemanticColorsExt extends ThemeExtension<SemanticColorsExt> {
-  const SemanticColorsExt({
-    required this.success,
-    required this.caution,
-  });
+  const SemanticColorsExt({required this.success, required this.caution});
 
   /// 正确 / 成功 / 已解决。
-  /// 诗词：翠绿 (0xFF52C41A)，口算：薄荷绿 (0xFFA8E6C9)。
+  /// 按亮暗主题校准的信息前景，也可低透明度用于提示区域背景。
   final Color success;
 
   /// 中等 / 警告 / 装饰强调。
-  /// 诗词：描金 (0xFFC9A56A)，口算：奶油黄 (0xFFFFD98A)。
+  /// 浅色主题使用深金色，深色主题使用明亮金色/奶油黄。
   final Color caution;
 
   @override
@@ -39,10 +36,7 @@ class SemanticColorsExt extends ThemeExtension<SemanticColorsExt> {
   }
 
   @override
-  SemanticColorsExt lerp(
-    ThemeExtension<SemanticColorsExt>? other,
-    double t,
-  ) {
+  SemanticColorsExt lerp(ThemeExtension<SemanticColorsExt>? other, double t) {
     if (other is! SemanticColorsExt) return this;
     return SemanticColorsExt(
       success: Color.lerp(success, other.success, t)!,
@@ -56,11 +50,15 @@ class SemanticColorsExt extends ThemeExtension<SemanticColorsExt> {
 /// 若 ThemeData 未注册 [SemanticColorsExt]（如测试中使用裸 MaterialApp），
 /// 回退到诗词主题默认值，避免空指针。
 extension ThemeDataSemanticX on ThemeData {
-  static const _fallback = SemanticColorsExt(
-    success: ColorTokens.success,
-    caution: ColorTokens.poemGold,
-  );
-
   SemanticColorsExt get semantic =>
-      extension<SemanticColorsExt>() ?? _fallback;
+      extension<SemanticColorsExt>() ??
+      (brightness == Brightness.dark
+          ? const SemanticColorsExt(
+              success: ColorTokens.mathMint,
+              caution: ColorTokens.poemGold,
+            )
+          : const SemanticColorsExt(
+              success: ColorTokens.successText,
+              caution: ColorTokens.cautionText,
+            ));
 }

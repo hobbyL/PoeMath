@@ -17,7 +17,7 @@ class MathTheme {
 
   /// 亮色主题：温白底 + 薰衣草紫主色 + 奶油黄/樱花粉次级色。
   static ThemeData light() {
-    const primary = ColorTokens.mathPurple;
+    const primary = ColorTokens.mathPurpleDeep;
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.light,
@@ -27,10 +27,12 @@ class MathTheme {
       onSecondary: ColorTokens.mathTextDark,
       secondaryContainer: primary.withValues(alpha: 0.15),
       onSecondaryContainer: primary,
-      tertiary: ColorTokens.mathPink,
+      tertiary: ColorTokens.mathPinkDeep,
+      onTertiary: Colors.white,
       surface: ColorTokens.mathSurface,
       onSurface: ColorTokens.mathTextDark,
-      error: ColorTokens.mathCoral,
+      error: ColorTokens.poemSeal,
+      onError: Colors.white,
     );
     final base = ThemeData.light(useMaterial3: true);
     return base.copyWith(
@@ -48,28 +50,31 @@ class MathTheme {
       extensions: const <ThemeExtension<dynamic>>[
         MathThemeExt(),
         SemanticColorsExt(
-          success: ColorTokens.mathMint,
-          caution: ColorTokens.mathYellow,
+          success: ColorTokens.successText,
+          caution: ColorTokens.cautionText,
         ),
       ],
     );
   }
 
-  /// 暗色主题（占位）：深色底 + 薰衣草紫。
+  /// 暗色主题：深色底 + 薰衣草紫，浅色强调底使用深色前景。
   static ThemeData dark() {
     const primary = ColorTokens.mathPurple;
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       brightness: Brightness.dark,
       primary: primary,
-      onPrimary: Colors.white,
+      onPrimary: ColorTokens.mathTextDark,
       secondary: ColorTokens.mathYellow,
+      onSecondary: ColorTokens.mathTextDark,
       secondaryContainer: primary.withValues(alpha: 0.25),
-      onSecondaryContainer: primary,
+      onSecondaryContainer: ColorTokens.darkTextPrimary,
       tertiary: ColorTokens.mathPink,
+      onTertiary: ColorTokens.mathTextDark,
       surface: ColorTokens.darkSurface,
       onSurface: ColorTokens.darkTextPrimary,
       error: ColorTokens.mathCoral,
+      onError: ColorTokens.mathTextDark,
     );
     final base = ThemeData.dark(useMaterial3: true);
     return base.copyWith(
@@ -106,78 +111,66 @@ class MathTheme {
 
   /// 使用系统默认字体；口算主题用偏粗字重保持童趣识别度。
   static TextTheme _textTheme(Color color) => TextTheme(
-        displayLarge: TextStyle(
-          fontSize: TypographyTokens.fsDisplay,
-          fontWeight: FontWeight.w800,
-          color: color,
-        ),
-        displayMedium: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-        displaySmall: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-        headlineLarge: TextStyle(
-          fontSize: TypographyTokens.fsHeadline,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-        headlineMedium: TextStyle(
-          fontSize: TypographyTokens.fsHeadline,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-        headlineSmall: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-        titleLarge: TextStyle(
-          fontSize: TypographyTokens.fsTitle,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-        titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-        titleSmall: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: TypographyTokens.fsBody,
-          height: 1.5,
-          color: color,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: TypographyTokens.fsBody,
-          color: color,
-        ),
-        bodySmall: TextStyle(
-          fontSize: TypographyTokens.fsCaption,
-          color: color,
-        ),
-        labelLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-        labelMedium: TextStyle(
-          fontSize: TypographyTokens.fsLabel,
-          color: color,
-        ),
-        labelSmall: TextStyle(
-          fontSize: 11,
-          color: color,
-        ),
-      );
+    displayLarge: TextStyle(
+      fontSize: TypographyTokens.fsDisplay,
+      fontWeight: FontWeight.w800,
+      color: color,
+    ),
+    displayMedium: TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.w700,
+      color: color,
+    ),
+    displaySmall: TextStyle(
+      fontSize: 24,
+      fontWeight: FontWeight.w700,
+      color: color,
+    ),
+    headlineLarge: TextStyle(
+      fontSize: TypographyTokens.fsHeadline,
+      fontWeight: FontWeight.w700,
+      color: color,
+    ),
+    headlineMedium: TextStyle(
+      fontSize: TypographyTokens.fsHeadline,
+      fontWeight: FontWeight.w700,
+      color: color,
+    ),
+    headlineSmall: TextStyle(
+      fontSize: 22,
+      fontWeight: FontWeight.w600,
+      color: color,
+    ),
+    titleLarge: TextStyle(
+      fontSize: TypographyTokens.fsTitle,
+      fontWeight: FontWeight.w600,
+      color: color,
+    ),
+    titleMedium: TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      color: color,
+    ),
+    titleSmall: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: color,
+    ),
+    bodyLarge: TextStyle(
+      fontSize: TypographyTokens.fsBody,
+      height: 1.5,
+      color: color,
+    ),
+    bodyMedium: TextStyle(fontSize: TypographyTokens.fsBody, color: color),
+    bodySmall: TextStyle(fontSize: TypographyTokens.fsCaption, color: color),
+    labelLarge: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: color,
+    ),
+    labelMedium: TextStyle(fontSize: TypographyTokens.fsLabel, color: color),
+    labelSmall: TextStyle(fontSize: 11, color: color),
+  );
 }
 
 /// 挂在 ThemeData 上的口算专属样式扩展。
