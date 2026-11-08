@@ -185,12 +185,12 @@ class AssistantChatController extends Notifier<AssistantChatState> {
   /// element markNeedsBuild 断言；微任务时点 unmount 已完成。
   void discardPending() {
     _activeClient?.close();
-    _sessionToken++;
+    final token = ++_sessionToken;
     if (!state.isBusy) return;
     final snapshot = state;
     scheduleMicrotask(() {
       // 期间已被 stop / 切换会话收敛，或 provider 已销毁：不再写。
-      if (_disposed || !state.isBusy) return;
+      if (_disposed || token != _sessionToken || !state.isBusy) return;
       final partial = snapshot.streamingText.trim();
       if (partial.isEmpty) {
         state = snapshot.copyWith(

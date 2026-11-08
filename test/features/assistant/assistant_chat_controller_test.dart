@@ -892,6 +892,59 @@ void main() {
     });
   }
 
+  test('旧页面的延迟收尾不能覆盖同一轮事件中新建会话的请求', () async {
+    await seedProviders();
+    final entered = Completer<void>();
+    final firstResponse = Completer<http.Response>();
+    final nextResponse = Completer<http.Response>();
+    var probes = 0;
+    final container = containerWith(MockClient((request) {
+      if (_isStream(request.body)) return Future.value(_sseResponse('新回答'));
+      probes++;
+      if (probes == 1) {
+        entered.complete();
+        return firstResponse.future;
+      }
+      return nextResponse.future;
+    }));
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+    final first = notifier.send('旧问题');
+    await entered.future;
+    notifier.discardPending();
+    notifier.startNewConversation();
+    final next = notifier.send('新问题');
+    try {
+      await Future<void>.delayed(Duration.zero);
+      final state = container.read(assistantChatControllerProvider);
+      expect(state.isBusy, isTrue);
+      expect(state.messages.single.content, '新问题');
+    } finally {
+      firstResponse.complete(_completionResponse());
+      nextResponse.complete(_completionResponse());
+      await Future.wait([first, next]);
+    }
+    expect(
+      container.read(assistantChatControllerProvider).messages.map((m) => m.content),
+      ['新问题', '新回答'],
+    );
+  });
+
+  test('provider 销毁后晚到响应正常退出，不写入已销毁状态', () async {
+    await seedProviders();
+    final entered = Completer<void>();
+    final response = Completer<http.Response>();
+    final container = containerWith(MockClient((_) {
+      entered.complete();
+      return response.future;
+    }));
+    final notifier = container.read(assistantChatControllerProvider.notifier);
+    final pending = notifier.send('问题');
+    await entered.future;
+    container.invalidate(assistantChatControllerProvider);
+    response.complete(_completionResponse());
+    await expectLater(pending, completes);
+  });
+
   test('页面销毁在 streaming：discardPending 收敛状态（固化增量），不卡 busy', () async {
     await seedProviders();
     final sse = StreamController<List<int>>();
