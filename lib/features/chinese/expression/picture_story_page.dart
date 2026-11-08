@@ -9,6 +9,8 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_image_action.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_contrast.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
 
 class PictureStoryPage extends ConsumerWidget {
@@ -85,6 +87,9 @@ class PictureStoryPage extends ConsumerWidget {
                                 Expanded(
                                   child: start + column < available.length
                                       ? _PromptCard(
+                                          key: ValueKey(
+                                            available[start + column].id,
+                                          ),
                                           prompt: available[start + column],
                                         )
                                       : const SizedBox.shrink(),
@@ -103,16 +108,42 @@ class PictureStoryPage extends ConsumerWidget {
   }
 }
 
-class _PromptCard extends ConsumerWidget {
-  const _PromptCard({required this.prompt});
+class _PromptCard extends ConsumerStatefulWidget {
+  const _PromptCard({super.key, required this.prompt});
 
   final PictureStoryPrompt prompt;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PromptCard> createState() => _PromptCardState();
+}
+
+class _PromptCardState extends ConsumerState<_PromptCard> {
+  final _imageKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final prompt = widget.prompt;
     final records = ref.watch(pictureStoryPromptHistoryProvider(prompt.id));
     final practiced = records.isNotEmpty;
+    final bytes = practiced && prompt.image.isLocal
+        ? ref
+              .watch(pictureStoryImageBytesProvider(prompt.image.value))
+              .valueOrNull
+        : null;
+    final pixels = !practiced || (prompt.image.isLocal && bytes == null)
+        ? null
+        : ref
+              .watch(
+                pictureStorySceneContrastProvider((
+                  image: prompt.image,
+                  imageBytes: bytes,
+                  builtinScheme: prompt.image.isLocal
+                      ? null
+                      : theme.colorScheme,
+                )),
+              )
+              .valueOrNull;
     void openPractice() =>
         context.push(AppRoutes.pictureStoryPracticeOf(prompt.id));
 
@@ -136,6 +167,7 @@ class _PromptCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     PictureStoryImageView(
+                      key: _imageKey,
                       image: prompt.image,
                       preview: true,
                       borderRadius: const BorderRadius.vertical(
@@ -168,25 +200,16 @@ class _PromptCard extends ConsumerWidget {
           if (practiced)
             Positioned(
               top: SpacingTokens.sm,
-              left: SpacingTokens.sm,
               right: SpacingTokens.sm,
-              child: Align(
-                alignment: Alignment.topRight,
-                child: FilledButton.tonalIcon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surface,
-                    foregroundColor: theme.colorScheme.primary,
-                    minimumSize: const Size(0, SpacingTokens.minTapTarget),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SpacingTokens.sm,
-                      vertical: SpacingTokens.xs,
-                    ),
-                  ),
+              child: PictureStoryImageAction(
+                surfaceKey: _imageKey,
+                pixels: pixels,
+                child: IconButton(
                   onPressed: () => context.push(
                     AppRoutes.pictureStoryPromptHistoryOf(prompt.id),
                   ),
                   icon: const Icon(Icons.history_outlined),
-                  label: Text('练习记录 · ${records.length} 次'),
+                  tooltip: '练习记录 · ${records.length} 次',
                 ),
               ),
             ),

@@ -238,9 +238,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('练习记录 · 2 次'), findsOneWidget);
+    expect(find.byTooltip('练习记录 · 2 次'), findsOneWidget);
     await capturePage(capture, 'picture-story-cards-native');
-    await tester.tap(find.text('练习记录 · 2 次'));
+    await tester.tap(find.byTooltip('练习记录 · 2 次'));
     await tester.pumpAndSettle();
     expect(
       tester
@@ -373,7 +373,7 @@ void main() {
     expect(find.text(saved.answerText), findsOneWidget);
     router.pop();
     await tester.pumpAndSettle();
-    expect(find.text('练习记录 · 2 次'), findsOneWidget);
+    expect(find.byTooltip('练习记录 · 2 次'), findsOneWidget);
     await tester.tap(find.byTooltip('全部记录'));
     await tester.pumpAndSettle();
     expect(

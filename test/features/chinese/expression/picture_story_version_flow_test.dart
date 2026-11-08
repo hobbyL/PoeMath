@@ -327,17 +327,17 @@ void main() {
     final router = historyRouter();
     final semantics = tester.ensureSemantics();
     final container = await pumpPage(tester, Router.withConfig(config: router));
-    await tester.scrollUntilVisible(find.text('练习记录 · 2 次'), 250);
+    await tester.scrollUntilVisible(find.byTooltip('练习记录 · 2 次'), 250);
     await tester.pumpAndSettle();
-    expect(find.text('练习记录 · 2 次'), findsOneWidget);
+    expect(find.byTooltip('练习记录 · 2 次'), findsOneWidget);
     expect(
       tester
-          .getSemantics(find.text('练习记录 · 2 次'))
+          .getSemantics(find.byTooltip('练习记录 · 2 次'))
           .getSemanticsData()
           .hasAction(SemanticsAction.tap),
       isTrue,
     );
-    await tester.tap(find.text('练习记录 · 2 次'));
+    await tester.tap(find.byTooltip('练习记录 · 2 次'));
     await tester.pumpAndSettle();
     expect(
       tester
@@ -437,7 +437,7 @@ void main() {
       );
     });
     await tester.pumpAndSettle();
-    expect(find.text('练习记录 · 2 次'), findsOneWidget);
+    expect(find.byTooltip('练习记录 · 2 次'), findsOneWidget);
     expect(repository.find('practice-two')!.revisions.length, 2);
     await tester.tap(find.byTooltip('全部记录'));
     await tester.pumpAndSettle();
@@ -599,13 +599,13 @@ void main() {
     await tester.runAsync(() => saveCompleted('第一个孩子的表达'));
     final router = historyRouter();
     await pumpPage(tester, Router.withConfig(config: router));
-    expect(find.text('练习记录 · 1 次'), findsOneWidget);
+    expect(find.byTooltip('练习记录 · 1 次'), findsOneWidget);
     ProfileScope.switchTo('another-child');
     await tester.runAsync(() => repository.setEnabled(prompt.id, true));
     await tester.pumpAndSettle();
     expect(find.text('尚未练习'), findsNothing);
     expect(find.text('练习记录'), findsNothing);
-    expect(find.text('练习记录 · 1 次'), findsNothing);
+    expect(find.byTooltip('练习记录 · 1 次'), findsNothing);
     // 没有记录时卡片不显示入口，原来的记录路由仍能展示空态。
     unawaited(router.push(AppRoutes.pictureStoryPromptHistoryOf(prompt.id)));
     await tester.pumpAndSettle();
@@ -625,7 +625,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.runAsync(() => saveCompleted('第一个孩子再次表达'));
     await tester.pumpAndSettle();
-    expect(find.text('练习记录 · 2 次'), findsOneWidget);
+    expect(find.byTooltip('练习记录 · 2 次'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await unmount(tester);
   });
@@ -649,7 +649,7 @@ void main() {
         size: Size(width, 900),
         textScale: textScale,
       );
-      expect(find.byType(FilledButton), findsNothing);
+      expect(find.byTooltip('练习记录 · 1 次'), findsNothing);
       expect(find.byIcon(Icons.check_circle_outline), findsNothing);
       expect(find.text('尚未练习'), findsNothing);
       final draft = PictureStoryPracticeRecord(
@@ -664,7 +664,7 @@ void main() {
       );
       await tester.runAsync(() => repository.save(draft));
       await tester.pumpAndSettle();
-      expect(find.byType(FilledButton), findsNothing);
+      expect(find.byTooltip('练习记录 · 1 次'), findsNothing);
       draft.status = 'completed';
       draft.feedbackJson = PictureStoryEvaluation.parse(
         jsonEncode(pictureStoryFeedbackFixture(answer: draft.answerText)),
@@ -673,15 +673,15 @@ void main() {
       ).encode(answer: draft.answerText, prompts: prompt.questions);
       await tester.runAsync(() => repository.save(draft));
       await tester.pumpAndSettle();
-      expect(find.text('练习记录 · 1 次').hitTestable(), findsOneWidget);
+      expect(find.byTooltip('练习记录 · 1 次').hitTestable(), findsOneWidget);
       expect(find.byIcon(Icons.check_circle_outline), findsNothing);
       final imageBefore = tester.getRect(find.byType(PictureStoryImageView));
-      final entry = tester.getRect(find.byType(FilledButton));
+      final entry = tester.getRect(find.byTooltip('练习记录 · 1 次'));
       expect(imageBefore.contains(entry.topLeft), isTrue);
       expect(imageBefore.contains(entry.bottomRight), isTrue);
       expect(entry.top - imageBefore.top, lessThan(imageBefore.height / 4));
       expect(imageBefore.right - entry.right, lessThan(imageBefore.width / 4));
-      await tester.tap(find.text('练习记录 · 1 次'));
+      await tester.tap(find.byTooltip('练习记录 · 1 次'));
       await tester.pumpAndSettle();
       expect(find.text(prompt.title), findsOneWidget);
       final sceneImage = find.byKey(
