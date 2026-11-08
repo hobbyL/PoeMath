@@ -260,15 +260,25 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
       ),
       GoRoute(
         path: AppRoutes.textbookWriting,
-        pageBuilder: (context, state) => fadeSlideTransitionPage(
-          state: state,
-          child: WritingPracticePage(
-            bookId: state.pathParameters['id']!,
-            lessonId: state.pathParameters['lesson']!,
-            targetId: state.uri.queryParameters['target']!,
-            routeObserver: textbookObserver,
-          ),
-        ),
+        pageBuilder: (context, state) {
+          final bookId = state.pathParameters['id']!;
+          final targetId = state.uri.queryParameters['target'];
+          return fadeSlideTransitionPage(
+            state: state,
+            child: targetId == null || targetId.trim().isEmpty
+                ? RouteFallbackPage.dataMissing(
+                    title: '写字练习',
+                    fallbackLocation: AppRoutes.textbookDetailOf(bookId),
+                    fallbackLabel: '返回教材',
+                  )
+                : WritingPracticePage(
+                    bookId: bookId,
+                    lessonId: state.pathParameters['lesson']!,
+                    targetId: targetId,
+                    routeObserver: textbookObserver,
+                  ),
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.textbookDictation,

@@ -44,6 +44,13 @@ void main() {
         title: '应用题练习',
         fallbackLabel: '前往题库',
       ),
+      '写字练习缺少目标': (
+        path: AppRoutes.textbookWriting
+            .replaceFirst(':id', 'book')
+            .replaceFirst(':lesson', 'lesson'),
+        title: '写字练习',
+        fallbackLabel: '返回教材',
+      ),
     };
 
     for (final entry in cases.entries) {
