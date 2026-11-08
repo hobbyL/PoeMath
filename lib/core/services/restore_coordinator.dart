@@ -29,17 +29,19 @@ class RestoreCoordinator {
 
   Future<RestoreResult> restore(BackupPreview preview,
       {String? passphrase,}) async {
-    parent.assertAllowed();
+    final authorize = parent.captureAuthorization();
     if (_restoring) throw StateError('正在恢复数据');
     _restoring = true;
     var restoreAttempted = false;
     try {
       // 错口令不会生成保护文件，更不会触碰学习数据。
       await backup.validateRestoreCredentials(preview, passphrase: passphrase);
+      authorize();
       final count = await assistantBarrier(() =>
           PracticeDraftRepository.whileRestoring(() async {
+            authorize();
             await history.create(reason: 'before_restore');
-            parent.assertAllowed();
+            authorize();
             restoreAttempted = true;
             return backup.restoreFromJson(preview.json, passphrase: passphrase);
           }),);

@@ -674,17 +674,26 @@ class BackupService {
   /// 恢复失败时分别补偿 Hive 数据、设置键的存在状态及已写入凭据。
   /// 补偿失败会通过 [BackupRestoreException.rollbackFailed] 显式报告。
   Future<int> restoreFromJson(String jsonString, {String? passphrase}) async {
-    ParentAccessService.instance.assertAllowed();
+    final authorize = ParentAccessService.instance.captureAuthorization();
     return PracticeDraftRepository.whileRestoring(
       () => PictureStoryRepository.exclusive(
         () => CredentialConfigurationAccess.exclusive(
-          () => _restoreFromJson(jsonString, passphrase: passphrase),
+          () => _restoreFromJson(
+            jsonString,
+            passphrase: passphrase,
+            authorize: authorize,
+          ),
         ),
       ),
     );
   }
 
-  Future<int> _restoreFromJson(String jsonString, {String? passphrase}) async {
+  Future<int> _restoreFromJson(
+    String jsonString, {
+    String? passphrase,
+    required void Function() authorize,
+  }) async {
+    authorize();
     if (isEncryptedBackup(jsonString)) {
       jsonString =
           await decryptBackupPayload(jsonString, passphrase: passphrase);
@@ -716,7 +725,7 @@ class BackupService {
       }
     }
 
-    ParentAccessService.instance.assertAllowed();
+    authorize();
     // 恢复前先快照当前数据（不含凭据节），失败时用于回滚
     // 题库补偿保留原始键和值，不能依赖旧图片可读或目录 JSON 有效。
     final snapshot = await _exportToJson(includePictureStoryCatalog: false);
@@ -736,7 +745,7 @@ class BackupService {
     var startedRestore = false;
 
     try {
-      ParentAccessService.instance.assertAllowed();
+      authorize();
       await preparedImages?.publish();
       startedRestore = true;
       // 先持久失效代次；若无法落盘则整次恢复失败，主体不会先被替换。
@@ -1198,18 +1207,30 @@ class BackupService {
   }
 
   /// 从文件路径恢复。
-  Future<int> restoreFromFile(String filePath, {String? passphrase}) =>
-      CacheActivity.use(
-        TemporaryCacheKind.pickers,
-        () => _restoreFromFile(filePath, passphrase: passphrase),
-      );
+  Future<int> restoreFromFile(String filePath, {String? passphrase}) async {
+    final authorize = ParentAccessService.instance.captureAuthorization();
+    return CacheActivity.use(
+      TemporaryCacheKind.pickers,
+      () => _restoreFromFile(
+        filePath,
+        passphrase: passphrase,
+        authorize: authorize,
+      ),
+    );
+  }
 
-  Future<int> _restoreFromFile(String filePath, {String? passphrase}) async {
+  Future<int> _restoreFromFile(
+    String filePath, {
+    String? passphrase,
+    required void Function() authorize,
+  }) async {
+    authorize();
     final file = File(filePath);
     if (!file.existsSync()) {
       throw const FormatException('备份文件不存在');
     }
     final json = await readBackupFile(file);
+    authorize();
     return restoreFromJson(json, passphrase: passphrase);
   }
 

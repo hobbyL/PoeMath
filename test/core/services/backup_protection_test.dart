@@ -5,6 +5,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/backup_history_service.dart';
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/cache_activity.dart';
+import 'package:poemath/core/services/credential_configuration_access.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/services/restore_coordinator.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
@@ -142,6 +145,87 @@ void main() {
     expect(retained, hasLength(3));
     expect(retained.map((e) => e.id), contains(fresh.id));
     expect(await history.read(fresh.id), contains('"version"'));
+  });
+
+  test('协调恢复等待期间锁定再解锁，旧授权不能创建快照或恢复数据', () async {
+    await HiveBoxes.settings.put('theme_mode', 'dark');
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    var refreshes = 0;
+    final coordinator = RestoreCoordinator(
+      backup: backup,
+      history: history,
+      assistantBarrier: (action) async {
+        entered.complete();
+        await release.future;
+        return action();
+      },
+      reconcile: () async => true,
+      invalidate: () => refreshes++,
+    );
+    final result = expectLater(
+      coordinator.restore(
+        backup.inspectJson('{"version":1,"settings":{"theme_mode":"light"}}'),
+      ),
+      throwsA(isA<ParentAccessDenied>()),
+    );
+    await entered.future;
+    final parent = ParentAccessService.instance;
+    parent.lock();
+    expect(await parent.authenticate(testParentPin), isTrue);
+    release.complete();
+    await result;
+    expect(HiveBoxes.settings.get('theme_mode'), 'dark');
+    expect(await history.list(), isEmpty);
+    expect(refreshes, 0);
+  });
+
+  test('底层恢复等待配置队列时锁定再解锁，旧请求不能替换数据', () async {
+    await HiveBoxes.settings.put('theme_mode', 'dark');
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    final blocker = CredentialConfigurationAccess.exclusive(() async {
+      entered.complete();
+      await release.future;
+    });
+    await entered.future;
+    final result = expectLater(
+      backup.restoreFromJson('{"version":1,"settings":{"theme_mode":"light"}}'),
+      throwsA(isA<ParentAccessDenied>()),
+    );
+    final parent = ParentAccessService.instance;
+    parent.lock();
+    expect(await parent.authenticate(testParentPin), isTrue);
+    release.complete();
+    await blocker;
+    await result;
+    expect(HiveBoxes.settings.get('theme_mode'), 'dark');
+    expect(HiveBoxes.meta.containsKey('practice_draft_epoch'), isFalse);
+  });
+
+  test('文件恢复等待选择器缓存时锁定再解锁，旧请求不能重新取得授权', () async {
+    await HiveBoxes.settings.put('theme_mode', 'dark');
+    final file = File('${directory.path}/incoming.json');
+    await file.writeAsString('{"version":1,"settings":{"theme_mode":"light"}}');
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    final blocker = CacheActivity.clear(TemporaryCacheKind.pickers, () async {
+      entered.complete();
+      await release.future;
+    });
+    await entered.future;
+    final result = expectLater(
+      backup.restoreFromFile(file.path),
+      throwsA(isA<ParentAccessDenied>()),
+    );
+    final parent = ParentAccessService.instance;
+    parent.lock();
+    expect(await parent.authenticate(testParentPin), isTrue);
+    release.complete();
+    await blocker;
+    await result;
+    expect(HiveBoxes.settings.get('theme_mode'), 'dark');
+    expect(HiveBoxes.meta.containsKey('practice_draft_epoch'), isFalse);
   });
 
   test('保护文件写入失败时数据及草稿不改变', () async {
