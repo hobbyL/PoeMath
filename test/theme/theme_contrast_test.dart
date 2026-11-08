@@ -70,6 +70,16 @@ void main() {
       final scheme = theme.colorScheme;
       test('$subject/$brightness 操作、容器及信息文字对比度', () {
         final pairs = <String, (Color, Color)>{
+          '导航选中文字': (
+            theme.navigationBarTheme.labelTextStyle!.resolve({
+              WidgetState.selected,
+            })!.color!,
+            scheme.surfaceContainer,
+          ),
+          '导航未选中文字': (
+            theme.navigationBarTheme.labelTextStyle!.resolve({})!.color!,
+            scheme.surfaceContainer,
+          ),
           '主按钮': (scheme.onPrimary, scheme.primary),
           '次要按钮': (scheme.onSecondary, scheme.secondary),
           '第三色按钮': (scheme.onTertiary, scheme.tertiary),

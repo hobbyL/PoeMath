@@ -22,15 +22,24 @@ class AppTheme {
     required AppSubject subject,
     required Brightness brightness,
   }) {
-    switch (subject) {
-      case AppSubject.poem:
-        return brightness == Brightness.light
-            ? PoemTheme.light()
-            : PoemTheme.dark();
-      case AppSubject.math:
-        return brightness == Brightness.light
-            ? MathTheme.light()
-            : MathTheme.dark();
-    }
+    final theme = switch (subject) {
+      AppSubject.poem =>
+        brightness == Brightness.light ? PoemTheme.light() : PoemTheme.dark(),
+      AppSubject.math =>
+        brightness == Brightness.light ? MathTheme.light() : MathTheme.dark(),
+    };
+    return theme.copyWith(
+      navigationBarTheme: NavigationBarThemeData(
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return theme.textTheme.labelMedium?.copyWith(
+            color: selected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+          );
+        }),
+      ),
+    );
   }
 }

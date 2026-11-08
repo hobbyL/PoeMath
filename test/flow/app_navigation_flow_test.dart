@@ -76,6 +76,17 @@ void main() {
         entry.value,
         reason: '点击「${entry.key}」后应切到下标 ${entry.value}',
       );
+      for (final label in ['首页', '语文', '口算', '我的']) {
+        final labelContext = tester.element(_bottomBarItem(label));
+        final style = tester.widget<Text>(_bottomBarItem(label)).style!;
+        final selected = label == entry.key;
+        final colors = Theme.of(labelContext).colorScheme;
+        expect(
+          style.color,
+          selected ? colors.primary : colors.onSurfaceVariant,
+        );
+        expect(style.fontWeight, selected ? FontWeight.w700 : FontWeight.w400);
+      }
     }
 
     expect(tester.takeException(), isNull);
