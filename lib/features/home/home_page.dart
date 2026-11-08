@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -21,17 +22,31 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/home/home_check_in_header.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
 import 'package:poemath/features/home/today_plan_section.dart';
 import 'package:poemath/features/home/textbook_resume_section.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final stats = ref.watch(userStatsProvider);
     final streak = ref.watch(streakProvider);
     final isCheckedIn = ref.watch(isCheckedInProvider);
@@ -41,65 +56,110 @@ class HomePage extends ConsumerWidget {
     final recommendedPoem = ref.watch(dailyRecommendedPoemProvider);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      // 本页不用 AppBar：顶部只放应用名 + 等级徽章，占掉整条高度却只承载
-      // 一个「当前等级」的展示。应用名移除（底部导航已标明「首页」，
-      // 无需重复）；等级徽章移入打卡卡片首行 —— 连续天数、打卡状态、
-      // 等级同属「个人进度」，放一起语义一致，且不新增任何高度。
-      //
-      // 必须包 `SafeArea`：`MainShell` 的 Scaffold 直接用 `Stack` 装子页，
-      // 没有 SafeArea，去掉 AppBar 后首张卡片会直接顶到状态栏下面。
-      // 仅靠 `AnimatedPageBody` 的 padding 不够 —— 它是相对屏幕物理顶边
-      // 的，量不出状态栏那 40px。`ProfilePage` 一直有 SafeArea，本页补上
-      // 才与其他 Tab 一致。
-      body: SafeArea(
-        child: AnimatedPageBody(
-          children: [
-            // 打卡 + 连续天数
-            _buildStreakCard(context, streak, isCheckedIn, stats, ref),
-            const SizedBox(height: SpacingTokens.md),
+    final media = MediaQuery.of(context);
+    final reduceMotion = media.disableAnimations || media.accessibleNavigation;
+    final content = <Widget>[
+      _buildDailyGoal(context, ref),
+      const SizedBox(height: SpacingTokens.lg),
+      const PracticeResumeSection(),
+      const TextbookResumeSection(),
+      const TodayPlanSection(),
 
-            _buildDailyGoal(context, ref),
-            const SizedBox(height: SpacingTokens.lg),
-            const PracticeResumeSection(),
-            const TextbookResumeSection(),
-            const TodayPlanSection(),
+      // 累计概览放在今日行动之后。
+      _buildStatsOverview(context, stats, learnedPoems),
+      const SizedBox(height: SpacingTokens.lg),
+      Text(
+        '快捷入口',
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: SpacingTokens.sm),
+      _buildQuickActions(context, mistakeCount),
+      const SizedBox(height: SpacingTokens.lg),
 
-            // 累计概览放在今日行动之后。
-            _buildStatsOverview(context, stats, learnedPoems),
-            const SizedBox(height: SpacingTokens.lg),
-            Text(
-              '快捷入口',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            _buildQuickActions(context, mistakeCount),
-            const SizedBox(height: SpacingTokens.lg),
+      // 今日推荐
+      if (recommendedPoem != null) ...[
+        Text(
+          '今日推荐',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        _buildDailyRecommendation(context, recommendedPoem),
+        const SizedBox(height: SpacingTokens.lg),
+      ],
 
-            // 今日推荐
-            if (recommendedPoem != null) ...[
-              Text(
-                '今日推荐',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+      // 复习提醒（有待复习时显示）
+      if (dueReviews > 0) ...[
+        _buildReviewReminder(context, dueReviews),
+        const SizedBox(height: SpacingTokens.lg),
+      ],
+
+      // 底部留白：为底部导航栏预留空间
+      const SizedBox(height: 100),
+    ];
+    var contentIndex = 0;
+    final pageOverlayStyle = theme.brightness == Brightness.dark
+        ? SystemUiOverlayStyle.light
+        : SystemUiOverlayStyle.dark;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: pageOverlayStyle,
+      child: Scaffold(
+        // 背景贴边，前景分别避开安全区。后续实色内容覆盖顶部视差背景。
+        body: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
+          child: SingleChildScrollView(
+            controller: _scroll,
+            physics: reduceMotion
+                ? const ClampingScrollPhysics()
+                : const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                HomeCheckInHeader(
+                  scrollController: _scroll,
+                  pending: !isCheckedIn,
+                  child: _buildStreakCard(
+                    context,
+                    streak,
+                    isCheckedIn,
+                    stats,
+                    ref,
+                  ),
                 ),
-              ),
-              const SizedBox(height: SpacingTokens.sm),
-              _buildDailyRecommendation(context, recommendedPoem),
-              const SizedBox(height: SpacingTokens.lg),
-            ],
-
-            // 复习提醒（有待复习时显示）
-            if (dueReviews > 0) ...[
-              _buildReviewReminder(context, dueReviews),
-              const SizedBox(height: SpacingTokens.lg),
-            ],
-
-            // 底部留白：为底部导航栏预留空间
-            const SizedBox(height: 100),
-          ],
+                // 覆盖背景时也覆盖它的状态栏样式，避免浅底仍显示白图标。
+                AnnotatedRegion<SystemUiOverlayStyle>(
+                  value: pageOverlayStyle,
+                  child: ColoredCard(
+                    color: theme.scaffoldBackgroundColor,
+                    backgroundOpacity: 1,
+                    borderRadius: BorderRadius.zero,
+                    child: SafeArea(
+                      top: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final child in content)
+                            if (child is SizedBox)
+                              child
+                            else
+                              child.animateListItem(
+                                context,
+                                index: contentIndex++,
+                              ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -113,195 +173,183 @@ class HomePage extends ConsumerWidget {
     WidgetRef ref,
   ) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final colors = HomeCheckInColors(theme);
+    final action = isCheckedIn
+        ? Icon(
+            Icons.check_circle_rounded,
+            size: SpacingTokens.xxl,
+            color: colors.foreground,
+          )
+        : FilledButton.tonal(
+            onPressed: () async {
+              // 读取今日实际完成量
+              final todayPoems = ref.read(todayPoemCountProvider);
+              final todayMath = ref.read(todayMathCountProvider);
 
-    return ColoredCard(
-      gradient: LinearGradient(
-        colors: [
-          primary,
-          Color.lerp(primary, theme.colorScheme.surface, 0.06)!,
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      boxShadow: SpacingTokens.softShadow,
-      width: double.infinity,
-      padding: const EdgeInsets.all(SpacingTokens.lg),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: SpacingTokens.sm,
-                  runSpacing: SpacingTokens.xs,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onPrimary,
-                      ),
-                    ),
-                    // 等级徽章与打卡按钮均使用实色前景/背景组合。
-                    _LevelBadge(levelName: stats.levelName),
-                  ],
-                ),
-                const SizedBox(height: SpacingTokens.xs),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '$streak',
-                      style: theme.textTheme.displaySmall?.copyWith(
-                        color: theme.colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: SpacingTokens.xs),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '天连续',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (!isCheckedIn)
-            FilledButton.tonal(
-              onPressed: () async {
-                // 读取今日实际完成量
-                final todayPoems = ref.read(todayPoemCountProvider);
-                final todayMath = ref.read(todayMathCountProvider);
+              // 读取每日目标
+              final poemGoal = ref.read(dailyPoemGoalProvider);
+              final mathGoal = ref.read(dailyMathGoalProvider);
 
-                // 读取每日目标
-                final poemGoal = ref.read(dailyPoemGoalProvider);
-                final mathGoal = ref.read(dailyMathGoalProvider);
+              // 检查是否所有目标都已完成
+              final poemDone = todayPoems >= poemGoal;
+              final mathDone = todayMath >= mathGoal;
 
-                // 检查是否所有目标都已完成
-                final poemDone = todayPoems >= poemGoal;
-                final mathDone = todayMath >= mathGoal;
-
-                if (!poemDone || !mathDone) {
-                  if (context.mounted) {
-                    final missing = <String>[];
-                    if (!poemDone) {
-                      missing.add('诗词 $todayPoems/$poemGoal 首');
-                    }
-                    if (!mathDone) {
-                      missing.add('口算 $todayMath/$mathGoal 题');
-                    }
-                    // 先清除已有提示，避免叠加
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('每日目标未完成：${missing.join("、")}'),
-                        duration: const Duration(seconds: 3),
-                      ),
-                    );
-                  }
-                  return;
-                }
-
-                final checkInRepo = ref.read(checkInRepoProvider);
-                final statsRepo = ref.read(userStatsRepoProvider);
-                final messenger = ScaffoldMessenger.of(context);
-
-                // 打卡落库。磁盘满 / Box 损坏时 `Hive.put` 抛 `HiveError`
-                // ——`HiveError extends Error` 而非 `Exception`，故捕 `Object`
-                // （项目其余页面同一约定）。不捕获的话异常冒泡成 unhandled
-                // error，用户只看到按钮弹回、连续天数没涨，会以为没点上而
-                // 反复点，损伤「打卡有记录」这一核心信任。
-                int newStreak;
-                try {
-                  await checkInRepo.checkInToday();
-                  // 更新连续打卡天数到 UserStats
-                  newStreak = checkInRepo.calculateStreak();
-                  await statsRepo.updateStreak(newStreak);
-                } on Object catch (error, stackTrace) {
-                  AppLogger.e(
-                    '打卡落库失败',
-                    tag: 'Home',
-                    error: error,
-                    stackTrace: stackTrace,
-                  );
-                  if (!context.mounted) return;
-                  messenger
-                    ..clearSnackBars()
-                    ..showSnackBar(
-                      const SnackBar(content: Text('打卡失败，请检查设备存储空间后重试')),
-                    );
-                  return;
-                }
-
-                ref.read(soundServiceProvider).play(SoundEffect.checkIn);
-                await ref.read(hapticServiceProvider).medium();
-                ref.invalidate(isCheckedInProvider);
-                ref.invalidate(streakProvider);
-                ref.invalidate(userStatsProvider);
-
-                // 成就自动检查。这里失败不影响打卡本身（打卡已落库），
-                // 故只记日志不打断庆祝流程。
-                var newlyUnlocked = <Achievement>[];
-                try {
-                  newlyUnlocked = await checkAchievements(ref);
-                } on Object catch (error, stackTrace) {
-                  AppLogger.e(
-                    '打卡后成就检查失败',
-                    tag: 'Home',
-                    error: error,
-                    stackTrace: stackTrace,
-                  );
-                }
-                ref.invalidate(unlockedAchievementsCountProvider);
-
+              if (!poemDone || !mathDone) {
                 if (context.mounted) {
-                  // 打卡庆祝；若同时解锁成就，等它关闭后再弹成就庆祝。
-                  // await 而非 `Future.delayed(1800ms)` 猜时长：后者一旦短于
-                  // 庆祝弹窗自身时长，两窗就会重叠。
-                  final checkInDone = showCelebration(
-                    context,
-                    type: CelebrationType.checkIn,
-                    subtitle: '连续打卡 $newStreak 天！继续保持！',
-                  );
-                  if (newlyUnlocked.isNotEmpty) {
-                    unawaited(
-                      checkInDone.then((_) async {
-                        if (!context.mounted) return;
-                        final names = newlyUnlocked
-                            .map((a) => a.title)
-                            .join('、');
-                        await showCelebration(
-                          context,
-                          type: CelebrationType.achievement,
-                          subtitle: names,
-                        );
-                      }),
-                    );
+                  final missing = <String>[];
+                  if (!poemDone) {
+                    missing.add('诗词 $todayPoems/$poemGoal 首');
                   }
+                  if (!mathDone) {
+                    missing.add('口算 $todayMath/$mathGoal 题');
+                  }
+                  // 先清除已有提示，避免叠加
+                  ScaffoldMessenger.of(context).clearSnackBars();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('每日目标未完成：${missing.join("、")}'),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
                 }
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: theme.colorScheme.onPrimary,
-                foregroundColor: theme.colorScheme.primary,
+                return;
+              }
+
+              final checkInRepo = ref.read(checkInRepoProvider);
+              final statsRepo = ref.read(userStatsRepoProvider);
+              final messenger = ScaffoldMessenger.of(context);
+
+              // 打卡落库。磁盘满 / Box 损坏时 `Hive.put` 抛 `HiveError`
+              // ——`HiveError extends Error` 而非 `Exception`，故捕 `Object`
+              // （项目其余页面同一约定）。不捕获的话异常冒泡成 unhandled
+              // error，用户只看到按钮弹回、连续天数没涨，会以为没点上而
+              // 反复点，损伤「打卡有记录」这一核心信任。
+              int newStreak;
+              try {
+                await checkInRepo.checkInToday();
+                // 更新连续打卡天数到 UserStats
+                newStreak = checkInRepo.calculateStreak();
+                await statsRepo.updateStreak(newStreak);
+              } on Object catch (error, stackTrace) {
+                AppLogger.e(
+                  '打卡落库失败',
+                  tag: 'Home',
+                  error: error,
+                  stackTrace: stackTrace,
+                );
+                if (!context.mounted) return;
+                messenger
+                  ..clearSnackBars()
+                  ..showSnackBar(
+                    const SnackBar(content: Text('打卡失败，请检查设备存储空间后重试')),
+                  );
+                return;
+              }
+
+              ref.read(soundServiceProvider).play(SoundEffect.checkIn);
+              await ref.read(hapticServiceProvider).medium();
+              ref.invalidate(isCheckedInProvider);
+              ref.invalidate(streakProvider);
+              ref.invalidate(userStatsProvider);
+
+              // 成就自动检查。这里失败不影响打卡本身（打卡已落库），
+              // 故只记日志不打断庆祝流程。
+              var newlyUnlocked = <Achievement>[];
+              try {
+                newlyUnlocked = await checkAchievements(ref);
+              } on Object catch (error, stackTrace) {
+                AppLogger.e(
+                  '打卡后成就检查失败',
+                  tag: 'Home',
+                  error: error,
+                  stackTrace: stackTrace,
+                );
+              }
+              ref.invalidate(unlockedAchievementsCountProvider);
+
+              if (context.mounted) {
+                // 打卡庆祝；若同时解锁成就，等它关闭后再弹成就庆祝。
+                // await 而非 `Future.delayed(1800ms)` 猜时长：后者一旦短于
+                // 庆祝弹窗自身时长，两窗就会重叠。
+                final checkInDone = showCelebration(
+                  context,
+                  type: CelebrationType.checkIn,
+                  subtitle: '连续打卡 $newStreak 天！继续保持！',
+                );
+                if (newlyUnlocked.isNotEmpty) {
+                  unawaited(
+                    checkInDone.then((_) async {
+                      if (!context.mounted) return;
+                      final names = newlyUnlocked.map((a) => a.title).join('、');
+                      await showCelebration(
+                        context,
+                        type: CelebrationType.achievement,
+                        subtitle: names,
+                      );
+                    }),
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.foreground,
+              foregroundColor: colors.base,
+            ),
+            child: const Text('打卡'),
+          );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            key: const ValueKey('home-check-in-summary'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Wrap(
+                spacing: SpacingTokens.sm,
+                runSpacing: SpacingTokens.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.foreground,
+                    ),
+                  ),
+                  _LevelBadge(levelName: stats.levelName, colors: colors),
+                ],
               ),
-              child: const Text('打卡'),
-            ),
-          if (isCheckedIn)
-            Icon(
-              Icons.check_circle_rounded,
-              size: 48,
-              color: theme.colorScheme.onPrimary,
-            ),
-        ],
-      ),
+              const SizedBox(height: SpacingTokens.sm),
+              Wrap(
+                spacing: SpacingTokens.xs,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                children: [
+                  Text(
+                    '$streak',
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      color: colors.foreground,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
+                    child: Text(
+                      '天连续',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.foreground,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: SpacingTokens.md),
+        if (isCheckedIn) action else HomeCheckInReminder(child: action),
+      ],
     );
   }
 
@@ -611,17 +659,16 @@ class HomePage extends ConsumerWidget {
 
 /// 等级徽章：`⭐ 童生`。
 ///
-/// 原先挂在 AppBar 的 actions 里（黄色系，白底）。AppBar 移除后迁入打卡
-/// 卡片的绿色渐变背景上，配色随之改为白色系 —— 见调用点注释。
+/// 与打卡操作共用实色前景/背景组合，避免光晕改变徽章文字对比度。
 class _LevelBadge extends StatelessWidget {
-  const _LevelBadge({required this.levelName});
+  const _LevelBadge({required this.levelName, required this.colors});
 
   final String levelName;
+  final HomeCheckInColors colors;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final onPrimary = theme.colorScheme.onPrimary;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -629,18 +676,18 @@ class _LevelBadge extends StatelessWidget {
         vertical: SpacingTokens.xs,
       ),
       decoration: BoxDecoration(
-        color: onPrimary,
+        color: colors.foreground,
         borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.stars_rounded, size: 14, color: theme.colorScheme.primary),
+          Icon(Icons.stars_rounded, size: 14, color: colors.base),
           const SizedBox(width: 4),
           Text(
             levelName,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.primary,
+              color: colors.base,
               fontWeight: FontWeight.w600,
             ),
           ),

@@ -1,6 +1,8 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/theme/app_theme.dart';
@@ -16,6 +18,46 @@ double _contrast(Color foreground, Color background) {
   final front = Color.alphaBlend(foreground, background).computeLuminance();
   final back = background.computeLuminance();
   return (math.max(front, back) + .05) / (math.min(front, back) + .05);
+}
+
+// 读取真实绘制的背景（含光晕和光带），避免只检查渐变端点而漏掉叠色。
+Future<void> _expectRenderedHeaderContrast(WidgetTester tester) async {
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('home-check-in-background')),
+  );
+  final pixels = (await tester.runAsync(() async {
+    final image = await boundary.toImage();
+    try {
+      return await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    } finally {
+      image.dispose();
+    }
+  }))!;
+  var darkest = double.infinity;
+  var lightest = 0.0;
+  for (var offset = 0; offset < pixels.lengthInBytes; offset += 4) {
+    final color = Color.fromARGB(
+      pixels.getUint8(offset + 3),
+      pixels.getUint8(offset),
+      pixels.getUint8(offset + 1),
+      pixels.getUint8(offset + 2),
+    );
+    expect(color.a, 1, reason: '贴边背景不能透出页面底色');
+    final luminance = color.computeLuminance();
+    darkest = math.min(darkest, luminance);
+    lightest = math.max(lightest, luminance);
+  }
+  for (final label in ['今日待打卡', '天连续']) {
+    final text = tester.widget<Text>(find.text(label));
+    final foreground = text.style!.color!.computeLuminance();
+    // 前景必须完全高于或低于所有背景亮度，再检查最接近的像素。
+    final contrast = foreground > lightest
+        ? (foreground + .05) / (lightest + .05)
+        : foreground < darkest
+        ? (darkest + .05) / (foreground + .05)
+        : 1.0;
+    expect(contrast, greaterThanOrEqualTo(4.5), reason: '$label/实际光效');
+  }
 }
 
 void main() {
@@ -81,6 +123,8 @@ void main() {
           ),
         );
         await tester.pump(const Duration(seconds: 1));
+        await drainHiveWritesForTesting(tester);
+        await tester.pump(const Duration(milliseconds: 400));
         final cardFinder = find.byWidgetPredicate(
           (widget) => widget is ColoredCard && widget.gradient != null,
         );
@@ -110,6 +154,24 @@ void main() {
           ),
           greaterThanOrEqualTo(4.5),
         );
+        // 覆盖整个光效周期，避免移动到文字下方时叠色降低可读性。
+        for (var frame = 0; frame < 12; frame++) {
+          await _expectRenderedHeaderContrast(tester);
+          await tester.pump(const Duration(milliseconds: 500));
+        }
+        final gesture = await tester.startGesture(
+          tester.getCenter(
+            find.byKey(const ValueKey('home-check-in-background')),
+          ),
+        );
+        await gesture.moveBy(const Offset(0, 60));
+        await tester.pump();
+        await gesture.moveBy(const Offset(0, 160));
+        await tester.pump();
+        await _expectRenderedHeaderContrast(tester);
+        await gesture.up();
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump(const Duration(seconds: 1));
         await drainHiveWritesForTesting(tester);

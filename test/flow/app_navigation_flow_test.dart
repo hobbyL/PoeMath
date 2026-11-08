@@ -56,12 +56,7 @@ void main() {
     // 标题承诺的「均可切换」完全没被验证。现在逐个断言高亮下标。
     expect(_selectedTab(tester), 0, reason: '启动应停在首页 tab');
 
-    const expectedIndex = <String, int>{
-      '语文': 1,
-      '口算': 2,
-      '我的': 3,
-      '首页': 0,
-    };
+    const expectedIndex = <String, int>{'语文': 1, '口算': 2, '我的': 3, '首页': 0};
     const pages = [HomePage, ChineseTabPage, MathTabPage, ProfilePage];
     for (final entry in expectedIndex.entries) {
       await tester.tap(_bottomBarItem(entry.key));
@@ -73,7 +68,9 @@ void main() {
         1,
         reason: '切换底部栏目后应立即可见，不等待整页淡入转场',
       );
-      await tester.pumpAndSettle();
+      // 首页待打卡区持续流动，不以全局动画静止作为导航完成条件。
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(pages[entry.value]), findsOneWidget);
       expect(
         _selectedTab(tester),
         entry.value,
