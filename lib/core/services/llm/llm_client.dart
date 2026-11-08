@@ -1208,7 +1208,7 @@ final class LlmClient {
       throw const LlmResponseFormatError('请求内容过长，请缩短后重试', retryable: false);
     }
     try {
-      await _usage.reserve(CloudUsageKind.llm);
+      await _usage.reserve(CloudUsageKind.llm, check: _checkActive);
     } on CloudQuotaExceededException catch (error) {
       throw LlmNetworkError(error.message, retryable: false);
     }
@@ -1260,7 +1260,7 @@ final class LlmClient {
       throw const LlmResponseFormatError('请求内容过长，请缩短后重试', retryable: false);
     }
     try {
-      await _usage.reserve(CloudUsageKind.llm);
+      await _usage.reserve(CloudUsageKind.llm, check: _checkActive);
     } on CloudQuotaExceededException catch (error) {
       throw LlmNetworkError(error.message, retryable: false);
     }

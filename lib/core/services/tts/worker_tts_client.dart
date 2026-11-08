@@ -259,9 +259,14 @@ final class WorkerTtsClient {
     required String timeoutMessage,
   }) async {
     final generation = _requestGeneration;
-    await _usage.reserve(CloudUsageKind.tts);
+    void check() {
+      if (generation != _requestGeneration) {
+        throw http.RequestAbortedException(uri);
+      }
+    }
     try {
-      if (generation != _requestGeneration) throw http.RequestAbortedException(uri);
+      await _usage.reserve(CloudUsageKind.tts, check: check);
+      check();
       return await _httpClient.request(
         'POST',
         uri,
