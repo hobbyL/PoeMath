@@ -8,6 +8,7 @@
 
 export 'package:poemath/core/widgets/ai_action_tag.dart';
 export 'package:poemath/core/widgets/animated_favorite_button.dart';
+export 'package:poemath/core/widgets/animated_hero_header.dart';
 export 'package:poemath/core/widgets/animated_page_body.dart';
 export 'package:poemath/core/widgets/app_empty_state.dart';
 export 'package:poemath/core/widgets/app_tile.dart';

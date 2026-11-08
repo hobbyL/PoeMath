@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -16,174 +17,225 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/profile/providers/hive_key_recovery_providers.dart';
 
-class ProfilePage extends ConsumerWidget {
+class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends ConsumerState<ProfilePage> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final stats = ref.watch(userStatsProvider);
     final streak = ref.watch(streakProvider);
     final unlockedCount = ref.watch(unlockedAchievementsCountProvider);
     final keyRecovered = ref.watch(hiveKeyRecoveredProvider);
+    final media = MediaQuery.of(context);
+    final reduceMotion = media.disableAnimations || media.accessibleNavigation;
+    final colors = AnimatedHeroColors(theme);
+    final pageStyle = theme.brightness == Brightness.dark
+        ? SystemUiOverlayStyle.light
+        : SystemUiOverlayStyle.dark;
+    final content = <Widget>[
+      // 统计面板
+      _buildStatsPanel(context, stats, streak),
+      const SizedBox(height: SpacingTokens.md),
 
-    return Scaffold(
-      // 本页不用 AppBar：顶部只放一个「我的」标题，占掉整条导航栏的
-      // 高度却不承载任何交互。改为内容顶格显示 + 设置按钮悬浮右上角
-      // （见下方 Stack）。返回由底部导航栏承担，本页是 4 个 Tab 之一，
-      // 本就不需要返回按钮。
-      body: SafeArea(
-        child: Stack(
-          children: <Widget>[
-            AnimatedPageBody(
-              // 水平用 md（Tab 页统一值，与首页/设置一致）；顶部多留一点，
-              // 让内容不与悬浮的设置按钮重叠（按钮高约 40，给到 lg + xs）。
-              padding: const EdgeInsets.fromLTRB(
-                SpacingTokens.md,
-                SpacingTokens.lg + SpacingTokens.xs,
-                SpacingTokens.md,
-                SpacingTokens.md,
-              ),
-              children: <Widget>[
-                // 密钥丢失降级提示（一次性）。放最顶：它是本次启动唯一需要
-                // 用户知道的事，不能压在统计卡片下面。
-                if (keyRecovered) ...[
-                  _HiveKeyRecoveredNotice(),
-                  const SizedBox(height: SpacingTokens.md),
+      // 学习报告 + 学习日历 + 成就勋章（一行三个卡片）
+      Row(
+        children: [
+          Expanded(
+            child: ColoredCard(
+              color: theme.colorScheme.primary,
+              onTap: () => context.push(AppRoutes.learningStats),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.bar_chart_rounded,
+                    size: 32,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  Text(
+                    '学习报告',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
+              ),
+            ),
+          ),
+          const SizedBox(width: SpacingTokens.sm),
+          Expanded(
+            child: ColoredCard(
+              color: theme.semantic.caution,
+              onTap: () => context.push(AppRoutes.learningCalendar),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.calendar_month_rounded,
+                    size: 32,
+                    color: theme.semantic.caution,
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  Text(
+                    '学习日历',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: SpacingTokens.sm),
+          Expanded(child: _buildAchievementCard(context, theme, unlockedCount)),
+        ],
+      ),
+      const SizedBox(height: SpacingTokens.sm),
 
-                // 用户头像 + 等级
-                Center(
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundColor:
-                            theme.colorScheme.primary.withValues(alpha: 0.15),
-                        child: Text(
-                          stats.levelName,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.bold,
+      // 本周学习周报
+      AppTile(
+        icon: Icons.insert_chart_outlined,
+        iconColor: theme.colorScheme.tertiary,
+        title: '本周学习周报',
+        subtitle: '查看本周学习汇总与趋势',
+        onTap: () => context.push(AppRoutes.weeklyReport),
+      ),
+      const SizedBox(height: SpacingTokens.md),
+    ];
+    var contentIndex = 0;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: pageStyle,
+      child: Scaffold(
+        body: Stack(
+          children: [
+            ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context)
+                  .copyWith(overscroll: false),
+              child: SingleChildScrollView(
+                controller: _scroll,
+                physics: reduceMotion
+                    ? const ClampingScrollPhysics()
+                    : const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AnimatedHeroHeader(
+                      scrollController: _scroll,
+                      backgroundKey: const ValueKey(
+                        'profile-header-background',
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          right: SpacingTokens.minTapTarget,
+                        ),
+                        child: Column(
+                          key: const ValueKey('profile-header-content'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (keyRecovered) ...[
+                              _HiveKeyRecoveredNotice(),
+                              const SizedBox(height: SpacingTokens.md),
+                            ],
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: SpacingTokens.xl,
+                                  backgroundColor: colors.foreground,
+                                  child: Icon(
+                                    Icons.person_rounded,
+                                    color: colors.base,
+                                    size: SpacingTokens.xl,
+                                  ),
+                                ),
+                                const SizedBox(width: SpacingTokens.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        stats.levelName,
+                                        style: theme.textTheme.headlineSmall
+                                            ?.copyWith(
+                                              color: colors.foreground,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                      const SizedBox(height: SpacingTokens.sm),
+                                      Text(
+                                        '${stats.totalStars} 颗星星',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: colors.foreground,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    AnnotatedRegion<SystemUiOverlayStyle>(
+                      value: pageStyle,
+                      child: ColoredCard(
+                        color: theme.scaffoldBackgroundColor,
+                        backgroundOpacity: 1,
+                        borderRadius: BorderRadius.zero,
+                        child: SafeArea(
+                          top: false,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final child in content)
+                                if (child is SizedBox)
+                                  child
+                                else
+                                  child.animateListItem(
+                                    context,
+                                    index: contentIndex++,
+                                  ),
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: SpacingTokens.sm),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: SpacingTokens.md,
-                          vertical: SpacingTokens.xs,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.semantic.caution.withValues(alpha: 0.12),
-                          borderRadius:
-                              BorderRadius.circular(SpacingTokens.radiusPill),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.stars_rounded,
-                              size: 16,
-                              color: theme.semantic.caution,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${stats.totalStars} 颗星星',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.semantic.caution,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: SpacingTokens.lg),
-
-                // 统计面板
-                _buildStatsPanel(context, stats, streak),
-                const SizedBox(height: SpacingTokens.md),
-
-                // 学习报告 + 学习日历 + 成就勋章（一行三个卡片）
-                Row(
-                  children: [
-                    Expanded(
-                      child: ColoredCard(
-                        color: theme.colorScheme.primary,
-                        onTap: () => context.push(AppRoutes.learningStats),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.bar_chart_rounded,
-                              size: 32,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(height: SpacingTokens.sm),
-                            Text(
-                              '学习报告',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: SpacingTokens.sm),
-                    Expanded(
-                      child: ColoredCard(
-                        color: theme.semantic.caution,
-                        onTap: () => context.push(AppRoutes.learningCalendar),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.calendar_month_rounded,
-                              size: 32,
-                              color: theme.semantic.caution,
-                            ),
-                            const SizedBox(height: SpacingTokens.sm),
-                            Text(
-                              '学习日历',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: SpacingTokens.sm),
-                    Expanded(
-                      child:
-                          _buildAchievementCard(context, theme, unlockedCount),
                     ),
                   ],
                 ),
-                const SizedBox(height: SpacingTokens.sm),
-
-                // 本周学习周报
-                AppTile(
-                  icon: Icons.insert_chart_outlined,
-                  iconColor: theme.colorScheme.tertiary,
-                  title: '本周学习周报',
-                  subtitle: '查看本周学习汇总与趋势',
-                  onTap: () => context.push(AppRoutes.weeklyReport),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-              ],
+              ),
             ),
-            // 设置按钮悬浮固定右上角：
-            // 不随内容滚动，任何滚动位置都够得着。
             Positioned(
               top: 0,
               right: 0,
-              child: IconButton(
-                tooltip: '设置',
-                onPressed: () => context.push(AppRoutes.settings),
-                icon: const Icon(Icons.settings_rounded),
+              child: SafeArea(
+                bottom: false,
+                child: IconButton.filledTonal(
+                  tooltip: '设置',
+                  style: IconButton.styleFrom(
+                    backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                    foregroundColor: theme.colorScheme.onSurface,
+                  ),
+                  onPressed: () => context.push(AppRoutes.settings),
+                  icon: const Icon(Icons.settings_rounded),
+                ),
               ),
             ),
           ],
@@ -192,11 +244,7 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsPanel(
-    BuildContext context,
-    UserStats stats,
-    int streak,
-  ) {
+  Widget _buildStatsPanel(BuildContext context, UserStats stats, int streak) {
     final theme = Theme.of(context);
 
     return ColoredCard(
@@ -362,14 +410,12 @@ class _HiveKeyRecoveredNoticeState extends State<_HiveKeyRecoveredNotice> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ColoredCard(
-      color: theme.semantic.caution,
+      color: theme.colorScheme.surfaceContainerHigh,
+      backgroundOpacity: 1,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.warning_amber_rounded,
-            color: theme.semantic.caution,
-          ),
+          Icon(Icons.warning_amber_rounded, color: theme.semantic.caution),
           const SizedBox(width: SpacingTokens.sm),
           Expanded(
             child: Column(
