@@ -34,7 +34,7 @@ class AppTheme {
           final selected = states.contains(WidgetState.selected);
           return theme.textTheme.labelMedium?.copyWith(
             color: selected
-                ? theme.colorScheme.primary
+                ? theme.colorScheme.onPrimary
                 : theme.colorScheme.onSurfaceVariant,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
           );

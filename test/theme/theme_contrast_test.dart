@@ -74,7 +74,7 @@ void main() {
             theme.navigationBarTheme.labelTextStyle!.resolve({
               WidgetState.selected,
             })!.color!,
-            scheme.surfaceContainer,
+            scheme.primary,
           ),
           '导航未选中文字': (
             theme.navigationBarTheme.labelTextStyle!.resolve({})!.color!,

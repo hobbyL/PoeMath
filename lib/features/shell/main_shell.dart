@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/config/app_config.dart';
+import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/services/notification_service.dart';
@@ -58,6 +59,25 @@ class _MainShellState extends ConsumerState<MainShell>
     AppRoutes.chineseTab,
     AppRoutes.mathTab,
     AppRoutes.profile,
+  ];
+
+  static const _destinations = [
+    (icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: '首页'),
+    (
+      icon: Icons.menu_book_outlined,
+      selectedIcon: Icons.menu_book_rounded,
+      label: '语文',
+    ),
+    (
+      icon: Icons.calculate_outlined,
+      selectedIcon: Icons.calculate_rounded,
+      label: '口算',
+    ),
+    (
+      icon: Icons.person_outlined,
+      selectedIcon: Icons.person_rounded,
+      label: '我的',
+    ),
   ];
 
   UpdateCheckController? _updateController;
@@ -254,30 +274,100 @@ class _MainShellState extends ConsumerState<MainShell>
         ],
       ),
       bottomNavigationBar: NavigationBar(
+        height: SpacingTokens.xl * 2,
         selectedIndex: currentIndex,
         onDestinationSelected: _switch,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: '首页',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book_rounded),
-            label: '语文',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calculate_outlined),
-            selectedIcon: Icon(Icons.calculate_rounded),
-            label: '口算',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outlined),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: '我的',
-          ),
+        destinations: [
+          for (var i = 0; i < _destinations.length; i++)
+            _NavigationTab(
+              key: ValueKey('navigation-tab-${_destinations[i].label}'),
+              selected: i == currentIndex,
+              label: _destinations[i].label,
+              icon: _destinations[i].icon,
+              selectedIcon: _destinations[i].selectedIcon,
+              onTap: () => _switch(i),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// 原生 NavigationBar 管理选中语义，胶囊按钮统一包裹横排图标与文字。
+class _NavigationTab extends StatelessWidget {
+  const _NavigationTab({
+    super.key,
+    required this.selected,
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final states = <WidgetState>{if (selected) WidgetState.selected};
+    final labelStyle =
+        theme.navigationBarTheme.labelTextStyle?.resolve(states) ??
+        theme.textTheme.labelMedium!.copyWith(
+          color: selected
+              ? theme.colorScheme.onPrimary
+              : theme.colorScheme.onSurfaceVariant,
+        );
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: SpacingTokens.xxl * 2),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.xs),
+          // 沿用 Material NavigationDestination 的标签缩放上限。
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.3,
+            child: Tooltip(
+              message: label,
+              excludeFromSemantics: true,
+              child: SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: onTap,
+                  style: TextButton.styleFrom(
+                    foregroundColor: labelStyle.color,
+                    backgroundColor: selected
+                        ? theme.colorScheme.primary
+                        : Colors.transparent,
+                    textStyle: labelStyle,
+                    iconSize: SpacingTokens.lg,
+                    minimumSize: const Size(0, SpacingTokens.minTapTarget),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.xs,
+                      vertical: SpacingTokens.sm,
+                    ),
+                    shape: const StadiumBorder(),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    animationDuration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(selected ? selectedIcon : icon),
+                      const SizedBox(width: SpacingTokens.xs),
+                      Text(label),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

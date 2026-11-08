@@ -3,6 +3,7 @@
 // 流程测试：App 启动 → Tab 导航 → 首页内容验证。
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -41,6 +42,11 @@ void main() {
   });
 
   testWidgets('App 启动后 4 个 Tab 均可切换', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(const ProviderScope(child: App()));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 200));
@@ -59,7 +65,13 @@ void main() {
     const expectedIndex = <String, int>{'语文': 1, '口算': 2, '我的': 3, '首页': 0};
     const pages = [HomePage, ChineseTabPage, MathTabPage, ProfilePage];
     for (final entry in expectedIndex.entries) {
-      await tester.tap(_bottomBarItem(entry.key));
+      if (entry.key == '语文') {
+        Focus.of(tester.element(_bottomBarItem(entry.key))).requestFocus();
+        await tester.pump();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      } else {
+        await tester.tap(_bottomBarItem(entry.key));
+      }
       await tester.pump();
       await tester.pump();
       final pageContext = tester.element(find.byType(pages[entry.value]));
@@ -78,14 +90,39 @@ void main() {
       );
       for (final label in ['首页', '语文', '口算', '我的']) {
         final labelContext = tester.element(_bottomBarItem(label));
-        final style = tester.widget<Text>(_bottomBarItem(label)).style!;
+        final style = DefaultTextStyle.of(labelContext).style
+            .merge(tester.widget<Text>(_bottomBarItem(label)).style);
         final selected = label == entry.key;
         final colors = Theme.of(labelContext).colorScheme;
         expect(
           style.color,
-          selected ? colors.primary : colors.onSurfaceVariant,
+          selected ? colors.onPrimary : colors.onSurfaceVariant,
         );
         expect(style.fontWeight, selected ? FontWeight.w700 : FontWeight.w400);
+        expect(
+          style.fontSize,
+          Theme.of(labelContext).textTheme.labelMedium!.fontSize,
+        );
+        final tab = find.byKey(ValueKey('navigation-tab-$label'));
+        final buttonFinder = find.descendant(
+          of: tab,
+          matching: find.byType(TextButton),
+        );
+        final button = tester.widget<TextButton>(buttonFinder);
+        expect(
+          button.style!.backgroundColor!.resolve({}),
+          selected ? colors.primary : Colors.transparent,
+        );
+        final bounds = tester.getRect(buttonFinder);
+        final labelBounds = tester.getRect(_bottomBarItem(label));
+        final icon = find.descendant(of: tab, matching: find.byType(Icon));
+        final iconBounds = tester.getRect(icon);
+        expect(iconBounds.center.dy, closeTo(labelBounds.center.dy, 0.1));
+        expect(iconBounds.right, lessThan(labelBounds.left));
+        expect(bounds.width, greaterThan(bounds.height * 1.5));
+        expect(bounds.height, greaterThanOrEqualTo(44));
+        expect(bounds.contains(iconBounds.topLeft), isTrue);
+        expect(bounds.contains(labelBounds.bottomRight), isTrue);
       }
     }
 
