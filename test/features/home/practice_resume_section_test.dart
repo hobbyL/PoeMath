@@ -137,7 +137,14 @@ void main() {
           of: card,
           matching: find.widgetWithText(TextButton, '放弃草稿'),
         );
-        expect(tester.getTopLeft(discard).dy, tester.getBottomLeft(arrow).dy);
+        expect(
+          tester.getCenter(discard).dy,
+          closeTo(tester.getCenter(arrow).dy, .01),
+        );
+        expect(
+          tester.getTopRight(discard).dx + SpacingTokens.sm,
+          closeTo(tester.getTopLeft(arrow).dx, .01),
+        );
         expect(
           tester.getRect(card).contains(tester.getBottomRight(discard)),
           isTrue,
@@ -164,8 +171,8 @@ void main() {
       if (scale == 1) {
         expect(
           tester.getSize(wordCard).height,
-          wordRect.height,
-          reason: '横排不应额外撑高正常字号的卡片',
+          lessThanOrEqualTo(wordRect.height),
+          reason: '铺满后文字可减少换行，卡片高度不应增加',
         );
       }
       expect(tester.takeException(), isNull);
@@ -175,7 +182,7 @@ void main() {
 
   for (final kind in PracticeDraftRepository.kinds) {
     for (final (width, scale) in [(400.0, 1.0), (320.0, 1.7)]) {
-      testWidgets('$kind 续练卡片保持紧凑高度、箭头下放弃操作独立点击（字号 $scale）', (tester) async {
+      testWidgets('$kind 续练图标居中、放弃操作在箭头左侧独立点击（字号 $scale）', (tester) async {
         final drafts = PracticeDraftRepository();
         await tester.runAsync(
           () => drafts.save(kind, {
@@ -258,12 +265,25 @@ void main() {
           matching: find.byIcon(Icons.chevron_right),
         );
         final discard = find.widgetWithText(TextButton, '放弃草稿');
+        final icon = find.descendant(
+          of: card,
+          matching: find.byIcon(
+            kind == 'math'
+                ? Icons.calculate_outlined
+                : Icons.auto_awesome_outlined,
+          ),
+        );
         final cardRect = tester.getRect(card);
         final arrowRect = tester.getRect(arrow);
         final discardRect = tester.getRect(discard);
         expect(arrowRect.left, greaterThan(cardRect.center.dx));
-        expect(arrowRect.top, closeTo(tester.getTopLeft(resumeTitle).dy, 1));
-        expect(discardRect.top, closeTo(arrowRect.bottom, 1));
+        expect(tester.getCenter(icon).dy, closeTo(cardRect.center.dy, .01));
+        expect(arrowRect.center.dy, closeTo(cardRect.center.dy, .01));
+        expect(discardRect.center.dy, closeTo(arrowRect.center.dy, .01));
+        expect(
+          discardRect.right + SpacingTokens.sm,
+          closeTo(arrowRect.left, .01),
+        );
         expect(discardRect.center.dx, greaterThan(cardRect.center.dx));
         expect(discardRect.width, greaterThanOrEqualTo(44));
         expect(discardRect.height, greaterThanOrEqualTo(44));

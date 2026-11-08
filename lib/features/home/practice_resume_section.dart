@@ -107,7 +107,6 @@ class PracticeResumeSection extends ConsumerWidget {
               ? Icons.calculate_outlined
               : Icons.auto_awesome_outlined,
           iconColor: theme.colorScheme.secondary,
-          crossAxisAlignment: CrossAxisAlignment.start,
           title: PracticeDraftRepository.poemKinds.contains(draft['kind'])
               ? '继续${draft['label'] ?? '诗词练习'}'
               : draft['kind'] == 'math'
@@ -125,23 +124,35 @@ class PracticeResumeSection extends ConsumerWidget {
                       ? draft['route'] as String
                       : '${draft['kind'] == 'math' ? AppRoutes.mathPractice : AppRoutes.wordProblemPractice}?resume=1',
                 ),
-          trailingAction: TextButton(
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(
-                SpacingTokens.minTapTarget,
-                SpacingTokens.minTapTarget,
+          allowTapWithTrailing: true,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(width: SpacingTokens.sm),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(
+                    SpacingTokens.minTapTarget,
+                    SpacingTokens.minTapTarget,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),
+                ),
+                onPressed: () => _discard(
+                  context,
+                  draft['kind'] as String,
+                  scope: draft['scope'] as String?,
+                  sessionId: draft['sessionId'] as String?,
+                ),
+                child: const Text('放弃草稿', maxLines: 1, softWrap: false),
               ),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),
-            ),
-            onPressed: () => _discard(
-              context,
-              draft['kind'] as String,
-              scope: draft['scope'] as String?,
-              sessionId: draft['sessionId'] as String?,
-            ),
-            child: const Text('放弃草稿'),
+              const SizedBox(width: SpacingTokens.sm),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
           ),
         ),
     ];
@@ -176,7 +187,7 @@ class PracticeResumeSection extends ConsumerWidget {
             );
           },
         ),
-        const SizedBox(height: SpacingTokens.lg),
+        const SizedBox(height: SpacingTokens.sm),
       ],
     );
   }
