@@ -54,12 +54,12 @@ class ChatMessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final maxWidth = MediaQuery.sizeOf(context).width * 0.82;
     // 用户 primary、助手/工具 secondary；ColoredCard 内部按 8% 透明度着色。
-    final bubbleColor =
-        _isUser ? theme.colorScheme.primary : theme.colorScheme.secondary;
-    // 完成态才显示操作行（流式中内容仍在增长，不可复制 / 重答）。
-    // 用户气泡仅在调用方给出 onResend 时出操作行（在途轮次不给）。
-    final showActions =
-        !isStreaming && (_isUser ? onResend != null : true);
+    final bubbleColor = _isUser
+        ? theme.colorScheme.primary
+        : theme.colorScheme.secondary;
+    // 已有消息始终保留复制操作；新回答生成时只移除重试按钮，
+    // 不改变历史消息高度，避免用户上翻阅读的位置跳动。
+    final showActions = !isStreaming;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: SpacingTokens.xs),
@@ -68,8 +68,9 @@ class ChatMessageBubble extends StatelessWidget {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth),
           child: Column(
-            crossAxisAlignment:
-                _isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment: _isUser
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               GestureDetector(
@@ -137,10 +138,7 @@ class ChatMessageBubble extends StatelessWidget {
   void _copy(BuildContext context) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('已复制'),
-        duration: Duration(seconds: 1),
-      ),
+      const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)),
     );
   }
 }

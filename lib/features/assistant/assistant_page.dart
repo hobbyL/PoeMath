@@ -12,6 +12,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -42,6 +43,10 @@ class AssistantPage extends ConsumerStatefulWidget {
 
 class _AssistantPageState extends ConsumerState<AssistantPage> {
   final ScrollController _scrollController = ScrollController();
+  bool _followLatest = true;
+  bool _scrollScheduled = false;
+  bool _userScrolling = false;
+  static const double _followDistance = SpacingTokens.xxl;
   late final AssistantSessionController _session;
 
   /// TTS 服务（dispose 阶段 ref 不可用，initState 先捕获）。
@@ -75,10 +80,7 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
       // 早退（provider 常驻、会话仍打开），聊天状态无变化、ref.listen 不
       // 触发，列表会停在顶部——故此处无条件定位；无历史时 jumpTo(0) 无感。
       if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_scrollController.hasClients) return;
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-      });
+      _scrollToBottomSoon();
     });
   }
 
@@ -103,24 +105,61 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
   }
 
   void _scrollToBottomSoon() {
+    if (_scrollScheduled) return;
+    _scrollScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      );
+      _scrollScheduled = false;
+      if (!mounted || !_followLatest || !_scrollController.hasClients) return;
+      // 流式跟随即时定位，避免不断重启动画追赶增长的内容。
+      if (_scrollController.position.extentAfter > 0.5) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
     });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  bool _trackReadingPosition(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _userScrolling = true;
+    }
+    if (notification is UserScrollNotification &&
+        notification.direction == ScrollDirection.forward) {
+      // 用户开始上翻时就撤销已经排队的跟随，防止下一帧抢回位置。
+      if (_followLatest) setState(() => _followLatest = false);
+    } else if (notification is ScrollEndNotification && _userScrolling) {
+      _userScrolling = false;
+      final follow = notification.metrics.extentAfter <= _followDistance;
+      if (follow != _followLatest) setState(() => _followLatest = follow);
+    } else if (notification is ScrollUpdateNotification &&
+        notification.dragDetails != null &&
+        notification.metrics.extentAfter <= _followDistance &&
+        (notification.scrollDelta ?? 0) > 0) {
+      if (!_followLatest) setState(() => _followLatest = true);
+    }
+    return false;
+  }
+
+  void _showLatest() {
+    setState(() => _followLatest = true);
+    _scrollToBottomSoon();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chatState = ref.watch(assistantChatControllerProvider);
-    // 消息 / 流式变化后滚到底部。
+    ref.listen(
+      assistantSessionProvider.select((state) => state.conversationId),
+      (previous, next) {
+        if (previous != next) _showLatest();
+      },
+    );
+    // 流式更新只跟随正在阅读最新内容的用户。
     ref.listen<AssistantChatState>(assistantChatControllerProvider, (_, next) {
       _syncSpeakingMessage(next.messages);
-      _scrollToBottomSoon();
+      if (_followLatest) _scrollToBottomSoon();
     });
 
     return Scaffold(
@@ -174,13 +213,44 @@ class _AssistantPageState extends ConsumerState<AssistantPage> {
     }
     return Column(
       children: <Widget>[
-        Expanded(child: _buildMessageList(theme, chatState)),
+        Expanded(
+          child: Stack(
+            children: [
+              NotificationListener<ScrollNotification>(
+                onNotification: _trackReadingPosition,
+                child: NotificationListener<ScrollMetricsNotification>(
+                  onNotification: (notification) {
+                    // 懒列表进入新区域后会修正末尾估算，继续跟随新末尾。
+                    if (_followLatest &&
+                        notification.metrics.extentAfter > 0.5) {
+                      _scrollToBottomSoon();
+                    }
+                    return false;
+                  },
+                  child: _buildMessageList(theme, chatState),
+                ),
+              ),
+              if (!_followLatest)
+                Positioned(
+                  right: SpacingTokens.md,
+                  bottom: SpacingTokens.sm,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _showLatest,
+                    icon: const Icon(Icons.arrow_downward),
+                    label: const Text('回到最新回复'),
+                  ),
+                ),
+            ],
+          ),
+        ),
         if (chatState.isError && chatState.message != null)
           _buildErrorBanner(theme, chatState.message!),
         ChatInputBar(
           isBusy: chatState.isBusy,
-          onSend: (text) =>
-              ref.read(assistantSessionProvider.notifier).send(text),
+          onSend: (text) {
+            _showLatest();
+            ref.read(assistantSessionProvider.notifier).send(text);
+          },
           onStop: () => ref.read(assistantSessionProvider.notifier).stop(),
         ),
       ],

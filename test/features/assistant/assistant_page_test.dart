@@ -41,6 +41,8 @@ class _FakeChat extends AssistantChatController {
   @override
   AssistantChatState build() => _state;
 
+  void emit(AssistantChatState value) => state = value;
+
   @override
   Future<void> send(String userInput) async {}
 
@@ -220,6 +222,54 @@ ChatMessage _assistant(String content) =>
     ChatMessage(role: ChatRole.assistant, content: content);
 
 void main() {
+  testWidgets('上翻历史后流式输出保持位置，回到最新回复后恢复跟随', (tester) async {
+    tester.view.physicalSize = const Size(411, 914);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final initial = AssistantChatState(
+      status: AssistantChatStatus.ready,
+      messages: List.generate(
+        40,
+        (i) =>
+            ChatMessage(role: ChatRole.user, content: '第 $i 条历史消息，需要向上滚动阅读。'),
+      ),
+    );
+    final h = _harness(initial);
+    await _pump(tester, h.container);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    final list = find.byType(ListView);
+    final controller = tester.widget<ListView>(list).controller!;
+    await tester.drag(list, const Offset(0, 500));
+    await tester.pumpAndSettle();
+    final position = controller.offset;
+    expect(controller.position.extentAfter, greaterThan(48));
+    for (var i = 1; i <= 3; i++) {
+      h.chat.emit(
+        initial.copyWith(
+          status: AssistantChatStatus.streaming,
+          streamingText: List.filled(i * 10, '新的回复正在继续。').join(),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(controller.offset, position);
+    }
+    await tester.tap(find.text('回到最新回复'));
+    await tester.pumpAndSettle();
+    expect(controller.position.extentAfter, closeTo(0, 1));
+    expect(find.text('回到最新回复'), findsNothing);
+    h.chat.emit(
+      initial.copyWith(
+        status: AssistantChatStatus.streaming,
+        streamingText: List.filled(100, '继续生成，保持底部跟随。').join(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.position.extentAfter, closeTo(0, 1));
+    await _teardownAnim(tester);
+  });
+
   // AppBar 的 AssistantProviderSwitcher 读 settingsRepositoryProvider →
   // HiveBoxes.settings，需初始化 Hive（否则 LateInitializationError）。
   setUp(() async {
@@ -278,13 +328,13 @@ void main() {
   /// 「清除上下文」按钮的 onPressed（null = 灰态不可点）。
   /// byTooltip 命中的是 Tooltip 组件，需向上取 IconButton 才能断言 onPressed。
   IconButton clearButton(WidgetTester tester) => tester.widget<IconButton>(
-        find
-            .ancestor(
-              of: find.byTooltip('清除上下文'),
-              matching: find.byType(IconButton),
-            )
-            .first,
-      );
+    find
+        .ancestor(
+          of: find.byTooltip('清除上下文'),
+          matching: find.byType(IconButton),
+        )
+        .first,
+  );
 
   testWidgets('清除上下文按钮：ready 且有未清除消息时可点', (tester) async {
     final h = _harness(
@@ -382,7 +432,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600)); // 推进淡入
 
     expect(find.byType(ChatMessageBubble), findsNWidgets(2)); // user + 流式
-    expect(find.byTooltip('复制'), findsNothing); // 流式气泡不出操作
+    expect(
+      find.descendant(
+        of: find.byWidgetPredicate(
+          (widget) => widget is ChatMessageBubble && widget.isStreaming,
+        ),
+        matching: find.byTooltip('复制'),
+      ),
+      findsNothing,
+    ); // 流式气泡无操作，原有用户消息仍可复制。
     expect(find.byTooltip('重新生成'), findsNothing);
     expect(find.byIcon(Icons.stop), findsOneWidget);
     expect(find.byIcon(Icons.arrow_upward), findsNothing);
@@ -627,10 +685,7 @@ void main() {
       ],
     ];
     final h = _harness(
-      AssistantChatState(
-        status: AssistantChatStatus.ready,
-        messages: messages,
-      ),
+      AssistantChatState(status: AssistantChatStatus.ready, messages: messages),
     );
     await _pump(tester, h.container);
     await tester.pumpAndSettle();
@@ -642,8 +697,7 @@ void main() {
     expect(find.textContaining('回答 0'), findsNothing);
   });
 
-  testWidgets(
-      '工具轮次：assistant.toolCalls 与 role:tool 渲染为可折叠工具卡，'
+  testWidgets('工具轮次：assistant.toolCalls 与 role:tool 渲染为可折叠工具卡，'
       '最终回答仍为气泡', (tester) async {
     final h = _harness(
       AssistantChatState(
