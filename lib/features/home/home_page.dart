@@ -617,42 +617,38 @@ class _HomePageState extends ConsumerState<HomePage> {
     final poemDone = todayPoems >= poemGoal;
     final mathDone = todayMath >= mathGoal;
 
-    return ColoredCard(
-      color: theme.colorScheme.primary,
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('打卡目标 · 诗词与口算', style: theme.textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.sm),
-          AppTile(
-            flat: true,
-            icon: poemDone
-                ? Icons.check_circle_outline
-                : Icons.menu_book_outlined,
-            iconColor: theme.colorScheme.primary,
-            title: '诗词 $todayPoems/$poemGoal 首',
-            subtitle: poemDone
-                ? '目标已完成'
-                : '还差 ${poemGoal - todayPoems} 首 · 去学诗词',
-            onTap: poemDone ? null : () => context.go(AppRoutes.poemTab),
-            trailing: poemDone ? const SizedBox.shrink() : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '打卡目标 · 诗词与口算',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
           ),
-          AppTile(
-            flat: true,
-            icon: mathDone
-                ? Icons.check_circle_outline
-                : Icons.calculate_outlined,
-            iconColor: theme.colorScheme.secondary,
-            title: '口算 $todayMath/$mathGoal 题',
-            subtitle: mathDone
-                ? '目标已完成'
-                : '还差 ${mathGoal - todayMath} 题 · 去练口算',
-            onTap: mathDone ? null : () => context.go(AppRoutes.mathTab),
-            trailing: mathDone ? const SizedBox.shrink() : null,
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        AppTile(
+          icon: poemDone
+              ? Icons.check_circle_outline
+              : Icons.menu_book_outlined,
+          iconColor: theme.colorScheme.primary,
+          title: '诗词 $todayPoems/$poemGoal 首',
+          subtitle: poemDone ? '目标已完成' : '还差 ${poemGoal - todayPoems} 首 · 去学诗词',
+          onTap: poemDone ? null : () => context.go(AppRoutes.poemTab),
+          trailing: poemDone ? const SizedBox.shrink() : null,
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        AppTile(
+          icon: mathDone
+              ? Icons.check_circle_outline
+              : Icons.calculate_outlined,
+          iconColor: theme.colorScheme.secondary,
+          title: '口算 $todayMath/$mathGoal 题',
+          subtitle: mathDone ? '目标已完成' : '还差 ${mathGoal - todayMath} 题 · 去练口算',
+          onTap: mathDone ? null : () => context.go(AppRoutes.mathTab),
+          trailing: mathDone ? const SizedBox.shrink() : null,
+        ),
+      ],
     );
   }
 }
