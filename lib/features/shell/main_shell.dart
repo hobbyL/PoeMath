@@ -37,12 +37,14 @@ class MainShell extends ConsumerStatefulWidget {
     super.key,
     required this.child,
     this.updateControllerFactory,
+    this.notifications,
   });
 
   final Widget child;
 
   /// 自动更新检测控制器工厂（测试注入 seam；生产不传，走真实依赖）。
   final UpdateCheckControllerFactory? updateControllerFactory;
+  final NotificationService? notifications;
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -59,6 +61,8 @@ class _MainShellState extends ConsumerState<MainShell>
   ];
 
   UpdateCheckController? _updateController;
+  late final NotificationService _notifications =
+      widget.notifications ?? NotificationService.instance;
 
   @override
   void initState() {
@@ -79,11 +83,8 @@ class _MainShellState extends ConsumerState<MainShell>
   void dispose() {
     // 撤销通知点击回调注册，避免 service 持有已 dispose State 的闭包
     // （identical 防止清掉测试中后续 shell 注册的新回调）。
-    if (identical(
-      NotificationService.instance.onNotificationTap,
-      _onNotificationTap,
-    )) {
-      NotificationService.instance.onNotificationTap = null;
+    if (identical(_notifications.onNotificationTap, _onNotificationTap)) {
+      _notifications.onNotificationTap = null;
     }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -202,24 +203,25 @@ class _MainShellState extends ConsumerState<MainShell>
   /// 回调注入；service 若尚未初始化完成，[consumePendingLaunchPayload]
   /// 内部会等待初始化后再返回。
   void _wireNotificationTap() {
-    NotificationService.instance.onNotificationTap = _onNotificationTap;
+    _notifications.onNotificationTap = _onNotificationTap;
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => unawaited(_consumeNotificationLaunchPayload()),
     );
   }
 
-  /// 已知通知 payload（每日提醒/周报）跳转复习页。
+  /// 实时与冷启动通知共用落点，周报进入报告、每日提醒进入复习。
   void _onNotificationTap(String payload) {
     if (!mounted) return;
-    if (payload == NotificationService.payloadDailyReminder ||
-        payload == NotificationService.payloadWeeklyReport) {
-      ref.read(appRouterProvider).push(AppRoutes.poemReview);
-    }
+    final route = switch (payload) {
+      NotificationService.payloadDailyReminder => AppRoutes.poemReview,
+      NotificationService.payloadWeeklyReport => AppRoutes.weeklyReport,
+      _ => null,
+    };
+    if (route != null) ref.read(appRouterProvider).push(route);
   }
 
   Future<void> _consumeNotificationLaunchPayload() async {
-    final payload = await NotificationService.instance
-        .consumePendingLaunchPayload();
+    final payload = await _notifications.consumePendingLaunchPayload();
     if (payload == null || !mounted) return;
     _onNotificationTap(payload);
   }

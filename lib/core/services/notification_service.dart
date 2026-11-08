@@ -29,9 +29,9 @@ class NotificationService {
   NotificationService._({
     FlutterLocalNotificationsPlugin? plugin,
     LocalTimeZoneIdentifierResolver? localTimeZoneIdentifierResolver,
-  })  : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
-        _localTimeZoneIdentifierResolver =
-            localTimeZoneIdentifierResolver ?? _resolveLocalTimeZoneIdentifier;
+  }) : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
+       _localTimeZoneIdentifierResolver =
+           localTimeZoneIdentifierResolver ?? _resolveLocalTimeZoneIdentifier;
 
   @visibleForTesting
   NotificationService.forTesting({
@@ -93,7 +93,7 @@ class NotificationService {
   /// 每日提醒通知的点击 payload（跳转复习页）。
   static const String payloadDailyReminder = 'daily_reminder';
 
-  /// 周报通知的点击 payload（跳转复习页）。
+  /// 周报通知的点击 payload（跳转学习周报）。
   static const String payloadWeeklyReport = 'weekly_report';
 
   // ============ 鼓励文案池 ============
@@ -209,11 +209,7 @@ class NotificationService {
         await initialize();
         return _lastReconciliationSucceeded;
       } on Exception catch (error) {
-        AppLogger.e(
-          '初始化通知服务失败，无法应用恢复设置',
-          tag: 'Notify',
-          error: error,
-        );
+        AppLogger.e('初始化通知服务失败，无法应用恢复设置', tag: 'Notify', error: error);
         return false;
       }
     }
@@ -228,8 +224,10 @@ class NotificationService {
     // 厂商 ROM 限制），却被静默改写成「用户关掉了」，且不再重试。
     // 现在只记录一个独立的降级标记供设置页提示，用户开关保持不变。
     if (isReminderEnabled) {
-      final scheduled =
-          await scheduleDailyReminder(reminderHour, reminderMinute);
+      final scheduled = await scheduleDailyReminder(
+        reminderHour,
+        reminderMinute,
+      );
       if (!scheduled) {
         await _markReminderDegraded(true);
         succeeded = false;
@@ -240,11 +238,7 @@ class NotificationService {
       try {
         await cancelDailyReminder();
       } on Exception catch (error) {
-        AppLogger.e(
-          '取消每日提醒失败',
-          tag: 'Notify',
-          error: error,
-        );
+        AppLogger.e('取消每日提醒失败', tag: 'Notify', error: error);
         succeeded = false;
       }
     }
@@ -261,11 +255,7 @@ class NotificationService {
       try {
         await cancelWeeklyReport();
       } on Exception catch (error) {
-        AppLogger.e(
-          '取消周报通知失败',
-          tag: 'Notify',
-          error: error,
-        );
+        AppLogger.e('取消周报通知失败', tag: 'Notify', error: error);
         succeeded = false;
       }
     }
@@ -314,8 +304,10 @@ class NotificationService {
   /// 返回是否已授权。
   Future<bool> requestPermission() async {
     // Android
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android != null) {
       final granted = await android.requestNotificationsPermission();
       if (granted != null) return granted;
@@ -326,8 +318,10 @@ class NotificationService {
     }
 
     // iOS / macOS
-    final darwin = _plugin.resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>();
+    final darwin = _plugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
     if (darwin != null) {
       final granted = await darwin.requestPermissions(
         alert: true,
@@ -376,11 +370,7 @@ class NotificationService {
         payload: payloadDailyReminder,
       );
     } on Exception catch (error) {
-      AppLogger.e(
-        '调度每日提醒失败',
-        tag: 'Notify',
-        error: error,
-      );
+      AppLogger.e('调度每日提醒失败', tag: 'Notify', error: error);
       return false;
     }
 
@@ -457,11 +447,7 @@ class NotificationService {
         payload: payloadWeeklyReport,
       );
     } on Exception catch (error) {
-      AppLogger.e(
-        '调度周报通知失败',
-        tag: 'Notify',
-        error: error,
-      );
+      AppLogger.e('调度周报通知失败', tag: 'Notify', error: error);
       return false;
     }
 
