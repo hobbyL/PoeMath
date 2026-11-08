@@ -47,7 +47,7 @@ Future<void> _expectRenderedHeaderContrast(WidgetTester tester) async {
     darkest = math.min(darkest, luminance);
     lightest = math.max(lightest, luminance);
   }
-  for (final label in ['今日待打卡', '天连续']) {
+  for (final label in ['今日待打卡', '天连续', '已学诗词', '口算做题', '总星星']) {
     final text = tester.widget<Text>(find.text(label));
     final foreground = text.style!.color!.computeLuminance();
     // 前景必须完全高于或低于所有背景亮度，再检查最接近的像素。
@@ -145,7 +145,7 @@ void main() {
             color,
             theme.scaffoldBackgroundColor,
           );
-          for (final label in ['今日待打卡', '天连续']) {
+          for (final label in ['今日待打卡', '天连续', '已学诗词', '口算做题', '总星星']) {
             final text = tester.widget<Text>(find.text(label));
             expect(
               _contrast(text.style!.color!, background),

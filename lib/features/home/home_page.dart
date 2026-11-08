@@ -14,6 +14,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/sound_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
+import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/data/models/achievement.dart';
@@ -63,9 +64,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       const PracticeResumeSection(),
       const TodayPlanSection(),
 
-      // 累计概览放在今日行动之后。
-      _buildStatsOverview(context, stats, learnedPoems),
-      const SizedBox(height: SpacingTokens.lg),
       Text(
         '快捷入口',
         style: theme.textTheme.titleMedium?.copyWith(
@@ -127,6 +125,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     streak,
                     isCheckedIn,
                     stats,
+                    learnedPoems,
                     ref,
                   ),
                 ),
@@ -168,6 +167,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     int streak,
     bool isCheckedIn,
     UserStats stats,
+    int learnedPoems,
     WidgetRef ref,
   ) {
     final theme = Theme.of(context);
@@ -296,134 +296,132 @@ class _HomePageState extends ConsumerState<HomePage> {
             child: const Text('打卡'),
           );
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    final summary = Column(
+      key: const ValueKey('home-check-in-summary'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Column(
-            key: const ValueKey('home-check-in-summary'),
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Wrap(
-                spacing: SpacingTokens.sm,
-                runSpacing: SpacingTokens.xs,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colors.foreground,
-                    ),
-                  ),
-                  _LevelBadge(levelName: stats.levelName, colors: colors),
-                ],
+        Wrap(
+          spacing: SpacingTokens.sm,
+          runSpacing: SpacingTokens.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              isCheckedIn ? '今日已打卡 ✓' : '今日待打卡',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colors.foreground,
               ),
-              const SizedBox(height: SpacingTokens.sm),
-              Wrap(
-                spacing: SpacingTokens.xs,
-                crossAxisAlignment: WrapCrossAlignment.end,
+            ),
+            _LevelBadge(levelName: stats.levelName, colors: colors),
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        Wrap(
+          spacing: SpacingTokens.xs,
+          crossAxisAlignment: WrapCrossAlignment.end,
+          children: [
+            Text(
+              '$streak',
+              style: theme.textTheme.displaySmall?.copyWith(
+                color: colors.foreground,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
+              child: Text(
+                '天连续',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.foreground,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    final reminder = isCheckedIn ? action : HomeCheckInReminder(child: action);
+    final overview = _buildHeaderStats(context, stats, learnedPoems, colors);
+    // 顶部始终铺满页面，前景宽度扣除安全区和共享背景的左右留白。
+    // 不在前景放 LayoutBuilder，避免手势帧重新布局时钳制滚动偏移。
+    final media = MediaQuery.of(context);
+    final contentWidth =
+        media.size.width - media.padding.horizontal - SpacingTokens.lg * 2;
+    if (contentWidth >= ResponsiveLayout.mediumBreakpoint) {
+      return Row(
+        key: const ValueKey('home-check-in-content'),
+        children: [
+          Expanded(child: summary),
+          const SizedBox(width: SpacingTokens.lg),
+          Expanded(flex: 2, child: overview),
+          const SizedBox(width: SpacingTokens.md),
+          reminder,
+        ],
+      );
+    }
+    return Column(
+      key: const ValueKey('home-check-in-content'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(child: summary),
+            const SizedBox(width: SpacingTokens.md),
+            reminder,
+          ],
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        overview,
+      ],
+    );
+  }
+
+  Widget _buildHeaderStats(
+    BuildContext context,
+    UserStats stats,
+    int learnedPoems,
+    HomeCheckInColors colors,
+  ) {
+    final theme = Theme.of(context);
+    return Row(
+      key: const ValueKey('home-check-in-stats'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (index, (label, value)) in [
+          ('已学诗词', learnedPoems),
+          ('口算做题', stats.mathTotalProblems),
+          ('总星星', stats.totalStars),
+        ].indexed) ...[
+          if (index > 0) const SizedBox(width: SpacingTokens.sm),
+          Expanded(
+            child: Semantics(
+              label: '$label $value',
+              excludeSemantics: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '$streak',
-                    style: theme.textTheme.displaySmall?.copyWith(
+                    '$value',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(
                       color: colors.foreground,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-                    child: Text(
-                      '天连续',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colors.foreground,
-                      ),
+                  const SizedBox(height: SpacingTokens.xs),
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colors.foreground,
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        const SizedBox(width: SpacingTokens.md),
-        if (isCheckedIn) action else HomeCheckInReminder(child: action),
-      ],
-    );
-  }
-
-  Widget _buildStatsOverview(
-    BuildContext context,
-    UserStats stats,
-    int learnedPoems,
-  ) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final secondary = theme.colorScheme.secondary;
-
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatCard(
-            context,
-            icon: Icons.menu_book_rounded,
-            value: '$learnedPoems',
-            label: '已学诗词',
-            color: primary,
-          ),
-        ),
-        const SizedBox(width: SpacingTokens.sm),
-        Expanded(
-          child: _buildStatCard(
-            context,
-            icon: Icons.calculate_rounded,
-            value: '${stats.mathTotalProblems}',
-            label: '口算做题',
-            color: secondary,
-          ),
-        ),
-        const SizedBox(width: SpacingTokens.sm),
-        Expanded(
-          child: _buildStatCard(
-            context,
-            icon: Icons.star_rounded,
-            value: '${stats.totalStars}',
-            label: '总星星',
-            color: theme.semantic.caution,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context, {
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
-    final theme = Theme.of(context);
-    return ColoredCard(
-      color: color,
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: SpacingTokens.xs),
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 

@@ -8,6 +8,7 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/home/home_check_in_header.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
+import 'package:poemath/features/poem/providers/poem_providers.dart' as poem;
 
 import '../../helpers/day_key_override.dart';
 import '../../helpers/hive_test_helper.dart';
@@ -24,6 +25,8 @@ Future<void> _pump(
   bool accessibleNavigation = false,
   bool checkedIn = false,
   int streak = 0,
+  UserStats? stats,
+  int learnedPoems = 0,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -34,6 +37,8 @@ Future<void> _pump(
         staticDayKeyOverride(),
         streakProvider.overrideWithValue(streak),
         isCheckedInProvider.overrideWithValue(checkedIn),
+        if (stats != null) userStatsProvider.overrideWithValue(stats),
+        poem.learnedCountProvider.overrideWithValue(learnedPoems),
       ],
       child: MaterialApp(
         builder: (context, child) => MediaQuery(
@@ -76,7 +81,7 @@ void main() {
     final background = tester.getRect(_background);
     expect(background.topLeft, Offset.zero);
     expect(background.right, 411);
-    expect(background.height, lessThanOrEqualTo(160));
+    expect(background.height, lessThanOrEqualTo(240));
     expect(tester.getTopLeft(find.text('今日待打卡')).dy, greaterThan(32));
     final card = tester.widget<ColoredCard>(
       find.descendant(of: _background, matching: find.byType(ColoredCard)),
@@ -92,6 +97,44 @@ void main() {
         .01,
       ),
     );
+  });
+
+  testWidgets('三项累计统计位于顶部，不再显示独立统计卡片', (tester) async {
+    await _pump(
+      tester,
+      learnedPoems: 12,
+      stats: UserStats(
+        profileId: 'default',
+        poemsLearned: 99,
+        mathTotalProblems: 456,
+        totalStars: 789,
+      ),
+    );
+    for (final (label, value) in [
+      ('已学诗词', '12'),
+      ('口算做题', '456'),
+      ('总星星', '789'),
+    ]) {
+      expect(find.text(label), findsOneWidget);
+      expect(find.text(value), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.text(label),
+          matching: find.byType(HomeCheckInHeader),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.ancestor(of: find.text(label), matching: find.byType(ColoredCard)),
+        findsNothing,
+      );
+      expect(
+        tester
+            .getRect(_background)
+            .contains(tester.getCenter(find.text(label))),
+        isTrue,
+      );
+    }
   });
 
   testWidgets('等级徽章显示在打卡卡片内，与打卡状态同一行', (tester) async {
@@ -127,6 +170,8 @@ void main() {
       final buttonSize = tester.getSize(button);
       final summary = find.byKey(const ValueKey('home-check-in-summary'));
       final summaryRect = tester.getRect(summary);
+      final content = find.byKey(const ValueKey('home-check-in-content'));
+      final contentSize = tester.getSize(content);
       final safeTop = MediaQuery.paddingOf(
         tester.element(find.byType(HomePage)),
       ).top;
@@ -135,8 +180,12 @@ void main() {
         // 屏幕状态栏之外的可用背景区域，上下留白应相等。
         final contentCenter =
             (background.top + safeTop + background.bottom) / 2;
-        expect(tester.getCenter(summary).dy, closeTo(contentCenter, .01));
-        expect(tester.getCenter(button).dy, closeTo(contentCenter, .01));
+        expect(tester.getCenter(content).dy, closeTo(contentCenter, .01));
+        expect(
+          tester.getCenter(button).dy,
+          closeTo(tester.getCenter(summary).dy, .01),
+        );
+        expect(tester.getSize(content), contentSize);
         expect(tester.getSize(summary), summaryRect.size);
         expect(tester.getSize(button), buttonSize);
       }
@@ -253,6 +302,12 @@ void main() {
           textScale: scale,
           safeInsets: safe,
           streak: 3650,
+          learnedPoems: 123,
+          stats: UserStats(
+            profileId: 'default',
+            mathTotalProblems: 23456,
+            totalStars: 7890,
+          ),
         );
         final status = tester.getRect(find.text('今日待打卡'));
         final streak = tester.getRect(find.text('3650'));
