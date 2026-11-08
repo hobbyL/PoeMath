@@ -21,15 +21,21 @@ class PictureStorySceneScaffold extends ConsumerStatefulWidget {
     super.key,
     required this.image,
     required this.semanticLabel,
-    required this.child,
+    this.child,
+    this.slivers,
+    this.scrollController,
+    this.scrollStorageKey,
     this.actions = const [],
     this.onBack,
     this.bottomNavigationBar,
-  });
+  }) : assert((child == null) != (slivers == null));
 
   final PictureStoryImage image;
   final String semanticLabel;
-  final Widget child;
+  final Widget? child;
+  final List<Widget>? slivers;
+  final ScrollController? scrollController;
+  final PageStorageKey<String>? scrollStorageKey;
   final List<Widget> actions;
   final VoidCallback? onBack;
   final Widget? bottomNavigationBar;
@@ -41,12 +47,12 @@ class PictureStorySceneScaffold extends ConsumerStatefulWidget {
 
 class _PictureStorySceneScaffoldState
     extends ConsumerState<PictureStorySceneScaffold> {
-  final _scroll = ScrollController();
+  late final _scroll = widget.scrollController ?? ScrollController();
   final _sceneKey = GlobalKey();
 
   @override
   void dispose() {
-    _scroll.dispose();
+    if (widget.scrollController == null) _scroll.dispose();
     super.dispose();
   }
 
@@ -110,107 +116,130 @@ class _PictureStorySceneScaffoldState
                 parallaxFactor: parallaxFactor,
                 child: child,
               );
+              final sceneImage = SizedBox(
+                height: imageHeight,
+                width: double.infinity,
+                child: AnimatedBuilder(
+                  animation: _scroll,
+                  child: RepaintBoundary(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (imageWidth < constraints.maxWidth)
+                          ExcludeSemantics(
+                            child: IgnorePointer(
+                              child: ClipRect(
+                                child: ImageFiltered(
+                                  imageFilter: ui.ImageFilter.blur(
+                                    sigmaX: SpacingTokens.imageBackdropBlur,
+                                    sigmaY: SpacingTokens.imageBackdropBlur,
+                                    tileMode: TileMode.clamp,
+                                  ),
+                                  child: PictureStoryImageView(
+                                    image: widget.image,
+                                    preview: true,
+                                    fit: BoxFit.cover,
+                                    borderRadius: BorderRadius.zero,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        Center(
+                          child: SizedBox.fromSize(
+                            size: imageSize,
+                            child: PictureStoryImageView(
+                              key: const ValueKey('picture-story-scene-image'),
+                              image: widget.image,
+                              fit: BoxFit.cover,
+                              borderRadius: BorderRadius.zero,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  builder: (context, child) {
+                    final offset = _scroll.hasClients ? _scroll.offset : 0.0;
+                    final stretch = math.max(0.0, -offset);
+                    return ClipRect(
+                      clipper: _SceneImageClipper(stretch),
+                      child: Transform.translate(
+                        offset: Offset(
+                          0,
+                          offset.clamp(0.0, imageHeight) * parallaxFactor,
+                        ),
+                        child: Transform.scale(
+                          scale: 1 + stretch / imageHeight,
+                          alignment: Alignment.bottomCenter,
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
               return Stack(
                 key: _sceneKey,
                 children: [
                   ScrollConfiguration(
                     behavior: ScrollConfiguration.of(context)
                         .copyWith(overscroll: false),
-                    child: SingleChildScrollView(
-                      controller: _scroll,
-                      physics: reduceMotion
-                          ? const ClampingScrollPhysics()
-                          : const BouncingScrollPhysics(
-                              parent: AlwaysScrollableScrollPhysics(),
-                            ),
-                      child: Stack(
-                        children: [
-                          SizedBox(
-                            height: imageHeight,
-                            width: double.infinity,
-                            child: AnimatedBuilder(
-                              animation: _scroll,
-                              child: RepaintBoundary(
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    if (imageWidth < constraints.maxWidth)
-                                      ExcludeSemantics(
-                                        child: IgnorePointer(
-                                          child: ClipRect(
-                                            child: ImageFiltered(
-                                              imageFilter: ui.ImageFilter.blur(
-                                                sigmaX: SpacingTokens
-                                                    .imageBackdropBlur,
-                                                sigmaY: SpacingTokens
-                                                    .imageBackdropBlur,
-                                                tileMode: TileMode.clamp,
-                                              ),
-                                              child: PictureStoryImageView(
-                                                image: widget.image,
-                                                preview: true,
-                                                fit: BoxFit.cover,
-                                                borderRadius: BorderRadius.zero,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    Center(
-                                      child: SizedBox.fromSize(
-                                        size: imageSize,
-                                        child: PictureStoryImageView(
-                                          key: const ValueKey(
-                                            'picture-story-scene-image',
-                                          ),
-                                          image: widget.image,
-                                          fit: BoxFit.cover,
-                                          borderRadius: BorderRadius.zero,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                    child: widget.slivers != null
+                        ? CustomScrollView(
+                            key: widget.scrollStorageKey,
+                            controller: _scroll,
+                            physics: reduceMotion
+                                ? const ClampingScrollPhysics()
+                                : const BouncingScrollPhysics(
+                                    parent: AlwaysScrollableScrollPhysics(),
+                                  ),
+                            slivers: [
+                              SliverToBoxAdapter(child: sceneImage),
+                              SliverSafeArea(
+                                top: false,
+                                sliver: SliverPadding(
+                                  padding: const EdgeInsets.all(
+                                    SpacingTokens.md,
+                                  ),
+                                  sliver: SliverMainAxisGroup(
+                                    slivers: widget.slivers!,
+                                  ),
                                 ),
                               ),
-                              builder: (context, child) {
-                                final offset = _scroll.hasClients
-                                    ? _scroll.offset
-                                    : 0.0;
-                                final stretch = math.max(0.0, -offset);
-                                return ClipRect(
-                                  clipper: _SceneImageClipper(stretch),
-                                  child: Transform.translate(
-                                    offset: Offset(
-                                      0,
-                                      offset.clamp(0.0, imageHeight) *
-                                          parallaxFactor,
+                            ],
+                          )
+                        : SingleChildScrollView(
+                            controller: _scroll,
+                            physics: reduceMotion
+                                ? const ClampingScrollPhysics()
+                                : const BouncingScrollPhysics(
+                                    parent: AlwaysScrollableScrollPhysics(),
+                                  ),
+                            child: Stack(
+                              children: [
+                                sceneImage,
+                                Padding(
+                                  padding: EdgeInsets.only(top: imageHeight),
+                                  child: ColoredCard(
+                                    color: theme.scaffoldBackgroundColor,
+                                    backgroundOpacity: 1,
+                                    borderRadius: BorderRadius.zero,
+                                    constraints: BoxConstraints(
+                                      minHeight: constraints.maxHeight,
                                     ),
-                                    child: Transform.scale(
-                                      scale: 1 + stretch / imageHeight,
-                                      alignment: Alignment.bottomCenter,
-                                      child: child,
+                                    padding: const EdgeInsets.all(
+                                      SpacingTokens.md,
+                                    ),
+                                    child: SafeArea(
+                                      top: false,
+                                      child: widget.child!,
                                     ),
                                   ),
-                                );
-                              },
+                                ),
+                              ],
                             ),
                           ),
-                          Padding(
-                            padding: EdgeInsets.only(top: imageHeight),
-                            child: ColoredCard(
-                              color: theme.scaffoldBackgroundColor,
-                              backgroundOpacity: 1,
-                              borderRadius: BorderRadius.zero,
-                              constraints: BoxConstraints(
-                                minHeight: constraints.maxHeight,
-                              ),
-                              padding: const EdgeInsets.all(SpacingTokens.md),
-                              child: SafeArea(top: false, child: widget.child),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   Positioned(
                     top: 0,
