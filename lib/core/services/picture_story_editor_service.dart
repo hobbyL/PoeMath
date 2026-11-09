@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
+import 'package:poemath/core/services/profile_avatar_camera_service.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -29,13 +30,16 @@ class PictureStoryEditorService extends ChangeNotifier {
     PictureStoryImageService? images,
     PictureStoryPickPath? pickPath,
     PictureStoryRecoverPath? recoverPath,
+    ProfileAvatarCameraService? avatarCamera,
     bool? supportsLostData,
-  })  : _settingsOverride = settings,
-        _images = images ?? PictureStoryImageService.instance,
-        _pickPath = pickPath ?? _pick,
-        _recoverPath = recoverPath ?? _retrieveLostPath,
-        _supportsLostData = supportsLostData ??
-            (!kIsWeb && defaultTargetPlatform == TargetPlatform.android);
+  }) : _settingsOverride = settings,
+       _images = images ?? PictureStoryImageService.instance,
+       _pickPath = pickPath ?? _pick,
+       _recoverPath = recoverPath ?? _retrieveLostPath,
+       _avatarCamera = avatarCamera ?? ProfileAvatarCameraService.instance,
+       _supportsLostData =
+           supportsLostData ??
+           (!kIsWeb && defaultTargetPlatform == TargetPlatform.android);
 
   static final instance = PictureStoryEditorService();
   static const draftKey = PictureStoryEditorDraft.storageKey;
@@ -43,6 +47,7 @@ class PictureStoryEditorService extends ChangeNotifier {
   final PictureStoryImageService _images;
   final PictureStoryPickPath _pickPath;
   final PictureStoryRecoverPath _recoverPath;
+  final ProfileAvatarCameraService _avatarCamera;
   final bool _supportsLostData;
   bool _picking = false;
   bool _recovering = false;
@@ -90,11 +95,10 @@ class PictureStoryEditorService extends ChangeNotifier {
   Future<void> chooseImage(
     PictureStoryEditorDraft draft,
     PictureStoryImageSource source,
-  ) =>
-      CacheActivity.use(
-        TemporaryCacheKind.pickers,
-        () => _chooseImage(draft, source),
-      );
+  ) => CacheActivity.use(
+    TemporaryCacheKind.pickers,
+    () => _chooseImage(draft, source),
+  );
 
   Future<void> _chooseImage(
     PictureStoryEditorDraft draft,
@@ -118,8 +122,10 @@ class PictureStoryEditorService extends ChangeNotifier {
       });
       if (!_matches(draft, request)) return;
       try {
-        final path = await _pickPath(source);
-        await _complete(draft, request, path);
+        await _avatarCamera.withRecovery(() async {
+          final path = await _pickPath(source);
+          await _complete(draft, request, path);
+        });
       } on Object catch (error, stackTrace) {
         AppLogger.e(
           '题目选图失败，原表单保留',
@@ -147,36 +153,50 @@ class PictureStoryEditorService extends ChangeNotifier {
     String request,
     String? path, {
     String? message,
-  }) =>
-      CacheActivity.use(TemporaryCacheKind.pictureStoryImages, () async {
-        if (!_matches(draft, request)) return;
-        PictureStoryImage? image;
-        if (path != null) image = await _images.importPath(path);
-        await PictureStoryRepository.exclusive(() async {
-          if (!_matches(draft, request)) return;
-          final current = readDraft()!;
-          await _settings.put(
-            draftKey,
-            current
-                .copyWith(
-                  image: image,
-                  clearPendingRequest: true,
-                  message: message,
-                  clearMessage: message == null,
-                )
-                .encode(),
-          );
-          notifyListeners();
-        });
-      });
+  }) => CacheActivity.use(TemporaryCacheKind.pictureStoryImages, () async {
+    if (!_matches(draft, request)) return;
+    PictureStoryImage? image;
+    if (path != null) image = await _images.importPath(path);
+    await PictureStoryRepository.exclusive(() async {
+      if (!_matches(draft, request)) return;
+      final current = readDraft()!;
+      await _settings.put(
+        draftKey,
+        current
+            .copyWith(
+              image: image,
+              clearPendingRequest: true,
+              message: message,
+              clearMessage: message == null,
+            )
+            .encode(),
+      );
+      notifyListeners();
+    });
+  });
 
   Future<void> recoverLostImage() => _recovery ??= CacheActivity.use(
-        TemporaryCacheKind.pickers,
-        _recoverLostImage,
-      );
+    TemporaryCacheKind.pickers,
+    _recoverLostImage,
+  );
 
   Future<void> _recoverLostImage() async {
     if (!_supportsLostData || _picking) return;
+    // 原生恢复缓存由 image_picker 全局共享，先处理属于头像的拍照结果。
+    try {
+      await _avatarCamera.withRecovery(_recoverEditorImage);
+    } on Object catch (error, stackTrace) {
+      // 恢复是一次性的启动工作；失败不能阻断之后重新选图。
+      AppLogger.e(
+        '拍照恢复失败，原头像和题目表单保留',
+        tag: 'PictureStory',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _recoverEditorImage() async {
     _recovering = true;
     notifyListeners();
     PictureStoryEditorDraft? draft;
@@ -205,15 +225,17 @@ class PictureStoryEditorService extends ChangeNotifier {
   }
 
   static String _imageError(Object error) => switch (error) {
-        PictureStoryImageException(:final message) => message,
-        PlatformException() => '无法获取图片，请检查相册或相机权限后重试',
-        _ => '图片选择或保存失败，原有内容已保留，请重试',
-      };
+    PictureStoryImageException(:final message) => message,
+    PlatformException() => '无法获取图片，请检查相册或相机权限后重试',
+    _ => '图片选择或保存失败，原有内容已保留，请重试',
+  };
 
   static Future<String?> _pick(PictureStoryImageSource source) async {
     if (source == PictureStoryImageSource.file) {
-      final result =
-          await FilePicker.pickFiles(type: FileType.image, withData: false);
+      final result = await FilePicker.pickFiles(
+        type: FileType.image,
+        withData: false,
+      );
       if (result == null) return null;
       final path = result.files.single.path;
       if (path == null) {

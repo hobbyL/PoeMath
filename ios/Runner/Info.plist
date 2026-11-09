@@ -44,9 +44,9 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>韵算需要使用麦克风来录制你的朗读，以便进行跟读评分</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>韵算使用你选择的照片制作看图说话题目</string>
+	<string>韵算使用你选择的照片设置头像或制作看图说话题目</string>
 	<key>NSCameraUsageDescription</key>
-	<string>韵算使用相机拍摄看图说话题目的图片</string>
+	<string>韵算使用相机拍摄头像或看图说话题目的图片</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>韵算需要使用语音识别来将你的朗读转换为文字，以便进行跟读评分</string>
 	<key>NSUserNotificationsUsageDescription</key>

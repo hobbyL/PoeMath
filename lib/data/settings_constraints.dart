@@ -1,6 +1,7 @@
 import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
+import 'package:poemath/data/models/profile_avatar.dart';
 
 /// UI、备份导入与历史读取共用的普通设置范围。
 class SettingsConstraints {
@@ -20,6 +21,7 @@ class SettingsConstraints {
       return value is int && value >= range.$1 && value <= range.$2;
     }
     return switch (key) {
+      ProfileAvatar.settingsKey => ProfileAvatar.accepts(value),
       CompletionSound.settingsKey => CompletionSound.fromId(value) != null,
       AnswerFeedbackSound.settingsKey =>
         AnswerFeedbackSound.fromId(value) != null,
@@ -30,13 +32,13 @@ class SettingsConstraints {
       'selected_semester' => const ['上', '下'].contains(value),
       'math_difficulty' => const ['easy', 'medium', 'hard'].contains(value),
       'math_practice_mode' => const [
-          'findResult',
-          'findMissing',
-          'compare',
-          'vertical',
-          'chain',
-          'withBrackets',
-        ].contains(value),
+        'findResult',
+        'findMissing',
+        'compare',
+        'vertical',
+        'chain',
+        'withBrackets',
+      ].contains(value),
       // 口算页一级入口集合：逗号分隔的 MathEntryKind.name。
       //
       // 「至少保留一类」是跨项约束，用单 key 存整个集合才能在此单点校验；
@@ -44,11 +46,11 @@ class SettingsConstraints {
       // parseMathEntryKinds 丢弃，故此处接受含未知项的串（前向兼容），
       // 但要求**至少有一个已知项**且不含空项（空串/连续逗号属于脏数据）。
       'math_entry_kinds' => switch (value) {
-          final String raw =>
-            raw.split(',').every((part) => part.trim().isNotEmpty) &&
-                parseMathEntryKinds(raw).isNotEmpty,
-          _ => false,
-        },
+        final String raw =>
+          raw.split(',').every((part) => part.trim().isNotEmpty) &&
+              parseMathEntryKinds(raw).isNotEmpty,
+        _ => false,
+      },
       _ => true,
     };
   }

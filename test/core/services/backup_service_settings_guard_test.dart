@@ -18,6 +18,7 @@ import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/services/speech/speech_recognition_models.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/profile_avatar.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
@@ -77,6 +78,7 @@ Map<String, dynamic> _llmEndpointSettings() => <String, dynamic>{
 
 /// 全量白名单 key 的合法 settings 节（正常旧备份）。
 Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
+      ProfileAvatar.settingsKey: '{}',
       'theme_mode': 'light',
       'active_subject': 'math',
       'page_animations_enabled': false,

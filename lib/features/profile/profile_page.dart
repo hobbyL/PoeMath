@@ -16,6 +16,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/profile/providers/hive_key_recovery_providers.dart';
+import 'package:poemath/features/profile/widgets/profile_avatar_button.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -187,19 +188,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               children: [
                                 HeroAvatarHalo(
                                   key: const ValueKey('profile-avatar-halo'),
-                                  child: CircleAvatar(
-                                    radius: SpacingTokens.xl,
-                                    backgroundColor: Color.lerp(
-                                      colors.base,
-                                      colors.glow,
-                                      .16,
-                                    ),
-                                    child: Icon(
-                                      Icons.person_rounded,
-                                      color: colors.foreground,
-                                      size: SpacingTokens.xl,
-                                    ),
-                                  ),
+                                  child: ProfileAvatarButton(colors: colors),
                                 ),
                                 const SizedBox(height: SpacingTokens.sm),
                                 Text(
