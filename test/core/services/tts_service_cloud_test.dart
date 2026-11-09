@@ -103,6 +103,13 @@ class _FakeFlutterTts extends Fake implements FlutterTts {
 }
 
 final _base = Uri.parse('https://tts.cloudm.cc');
+
+class _UnavailableSystemTts extends _FakeFlutterTts {
+  @override
+  Future<dynamic> setLanguage(String language) async =>
+      throw StateError('本机没有可用的系统语音引擎');
+}
+
 final _config = WorkerTtsConfig(
   base: _base,
   apiKey: 'worker-secret-key-example',
@@ -230,6 +237,54 @@ SettingsRepository _stubSettings({
 }
 
 void main() {
+  test('云朗读不依赖本机系统语音引擎初始化，全文和逐句均可播放', () async {
+    await setUpHiveForTesting();
+    addTearDown(tearDownHiveForTesting);
+    final counter = _RequestCounter();
+    final client = _client(counter);
+    addTearDown(client.close);
+    final player = _FakeCloudAudioPlayer();
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: _UnavailableSystemTts(),
+      cloudClient: client,
+      cloudPlayer: player,
+    );
+    addTearDown(service.dispose);
+    await service.speak('第一段');
+    await service.speakLines(['第二段', '第三段']);
+    await service.speakSentences('第四段。');
+    expect(player.played.length, 4);
+    expect(counter.value, 4);
+    expect(service.isSpeaking, isFalse);
+  });
+
+  test('云合成期间停止，不再初始化不可用的系统引擎或开始播放', () async {
+    await setUpHiveForTesting();
+    addTearDown(tearDownHiveForTesting);
+    final sent = Completer<void>();
+    final aborted = Completer<void>();
+    final client = WorkerTtsClient(
+      httpClient: _BlockingHttpClient(sent, aborted),
+    );
+    addTearDown(client.close);
+    final player = _FakeCloudAudioPlayer();
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: _UnavailableSystemTts(),
+      cloudClient: client,
+      cloudPlayer: player,
+    );
+    addTearDown(service.dispose);
+    final playing = service.speakLines(['已取消的云朗读']);
+    await sent.future;
+    await service.stop();
+    await playing;
+    await aborted.future;
+    expect(player.played, isEmpty);
+    expect(service.isSpeaking, isFalse);
+  });
+
   test('云端缓存按总字节淘汰旧段，停止立即取消在途合成', () async {
     await setUpHiveForTesting();
     addTearDown(tearDownHiveForTesting);

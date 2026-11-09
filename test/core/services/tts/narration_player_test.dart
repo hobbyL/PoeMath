@@ -10,6 +10,7 @@ class _AudioPlayer extends Fake implements AudioPlayer {
   final states = StreamController<PlayerState>.broadcast(sync: true);
   final events = StreamController<AudioEvent>.broadcast(sync: true);
   final sources = <Source>[];
+  final contexts = <AudioContext?>[];
   Completer<void>? load;
   bool paused = false;
   bool destroyed = false;
@@ -31,6 +32,7 @@ class _AudioPlayer extends Fake implements AudioPlayer {
     PlayerMode? mode,
   }) async {
     sources.add(source);
+    contexts.add(ctx);
     paused = false;
     if (load != null) await load!.future;
     if (destroyed || paused) return;
@@ -77,6 +79,31 @@ class _AudioPlayer extends Fake implements AudioPlayer {
 
 void main() {
   NarrationAudio clip() => NarrationAudio(bytes: Uint8List(16), format: 'mp3');
+  test('教材缓存与内存音频声明格式及媒体播放路由', () async {
+    final native = _AudioPlayer();
+    final player = AudioplayersNarrationPlayer(player: native);
+    for (final audio in [
+      clip(),
+      NarrationAudio(path: '/cache/clip.mp3', format: 'mp3'),
+    ]) {
+      final task = player.play(audio, onStarted: () {});
+      await flushNarration();
+      expect(native.sources.last.mimeType, 'audio/mpeg');
+      expect(native.contexts.last!.android.usageType, AndroidUsageType.media);
+      expect(
+        native.contexts.last!.android.contentType,
+        AndroidContentType.speech,
+      );
+      expect(
+        native.contexts.last!.iOS.category,
+        AVAudioSessionCategory.playback,
+      );
+      native.finish();
+      await task;
+    }
+    await player.dispose();
+    await native.close();
+  });
   test('暂停保留同一音源，长暂停不计超时，恢复不重新play或seek', () async {
     final native = _AudioPlayer();
     final player = AudioplayersNarrationPlayer(

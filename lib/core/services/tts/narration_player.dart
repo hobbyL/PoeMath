@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 import 'package:poemath/core/services/tts/system_tts_file_synthesizer.dart';
+import 'package:poemath/core/services/tts/speech_audio_context.dart';
 
 abstract interface class NarrationPlayer {
   Future<void> play(NarrationAudio audio, {required void Function() onStarted});
@@ -72,13 +73,15 @@ class AudioplayersNarrationPlayer implements NarrationPlayer {
       },
     );
     try {
+      final mimeType = audio.format == 'wav' ? 'audio/wav' : 'audio/mpeg';
       final source = audio.path != null
-          ? DeviceFileSource(audio.path!)
-          : BytesSource(
-              audio.bytes!,
-              mimeType: audio.format == 'wav' ? 'audio/wav' : 'audio/mpeg',
-            );
-      final starting = _player.play(source);
+          ? DeviceFileSource(audio.path!, mimeType: mimeType)
+          : BytesSource(audio.bytes!, mimeType: mimeType);
+      final starting = _player.play(
+        source,
+        ctx: speechAudioContext(),
+        volume: 1,
+      );
       _loading = starting;
       // 在播放器初始化窗口内退出，也立即释放会话；晚到启动再次停止。
       unawaited(

@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:poemath/core/services/tts/speech_audio_context.dart';
 
 /// 自建 Worker TTS 错误分类。
 enum WorkerTtsErrorKind {
@@ -219,6 +220,8 @@ final class AudioplayersCloudAudioPlayer implements CloudAudioPlayer {
 
   final AudioPlayer _player;
   Completer<void>? _session;
+  int _generation = 0;
+  bool _disposed = false;
 
   void _completeSession() {
     final session = _session;
@@ -228,28 +231,63 @@ final class AudioplayersCloudAudioPlayer implements CloudAudioPlayer {
 
   @override
   Future<void> play(Uint8List bytes) async {
-    await stop();
+    if (_disposed) return;
+    final generation = ++_generation;
+    _completeSession();
+    await _player.stop();
+    if (_disposed || generation != _generation) return;
     final session = Completer<void>();
     _session = session;
-    final subscription = _player.onPlayerComplete.listen((_) {
-      if (!session.isCompleted) session.complete();
-    });
+    // 完成流会转发底层错误；统一监听事件并接住错误，避免无声等待到超时。
+    final subscription = _player.eventStream.listen(
+      (event) {
+        if (event.eventType == AudioEventType.complete &&
+            !session.isCompleted) {
+          session.complete();
+        }
+      },
+      onError: (Object error, StackTrace stack) {
+        if (!session.isCompleted) session.completeError(error, stack);
+      },
+    );
     try {
-      await _player.play(BytesSource(bytes));
-      await session.future.timeout(_completionTimeout);
+      final completion = session.future.timeout(_completionTimeout);
+      final starting = _player.play(
+        BytesSource(bytes, mimeType: 'audio/mpeg'),
+        ctx: speechAudioContext(),
+        volume: 1,
+      );
+      // 停止可以在准备阶段立即结束等待，迟到启动仍交给停止意图抑制。
+      await Future.any<void>([starting, completion]);
+      if (_disposed || generation != _generation) return;
+      await completion;
+    } on Object {
+      if (!_disposed && generation == _generation) {
+        try {
+          await _player.stop();
+        } on Object {
+          /* 保留原始播放异常。 */
+        }
+      }
+      rethrow;
     } finally {
+      if (identical(_session, session)) _session = null;
+      if (!session.isCompleted) session.complete();
       await subscription.cancel();
     }
   }
 
   @override
   Future<void> stop() async {
+    ++_generation;
     _completeSession();
     await _player.stop();
   }
 
   @override
   Future<void> dispose() async {
+    _disposed = true;
+    ++_generation;
     _completeSession();
     await _player.dispose();
   }

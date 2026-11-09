@@ -300,6 +300,10 @@ class TtsService {
         }
       }
     }
+    // 合成取消或旧请求返回时，不再初始化系统引擎触发额外错误。
+    if (!_sessionCompleted(generation)) return _SegmentPlayResult.notStarted;
+    // 云音频可直接播放；只有实际回退系统朗读时才初始化本机引擎。
+    await _ensureInitialized();
     var initiated = false;
     // failureMessage 会被页面拼接前缀（如「朗读失败：${message}」），
     // 文案须自成体系且不含前缀字样，避免「朗读失败：朗读失败」式重复。
@@ -503,8 +507,10 @@ class TtsService {
         await retiring;
         if (generation != _sessionGeneration) return;
       }
-      await _ensureInitialized();
       await _refreshCloudState();
+      if (!_cloudMode && _sessionCompleted(generation)) {
+        await _ensureInitialized();
+      }
       final result = await _speakSegmentBestEffort(
         text,
         generation: generation,
@@ -629,8 +635,10 @@ class TtsService {
         await retiring;
         if (generation != _sessionGeneration) return;
       }
-      await _ensureInitialized();
       await _refreshCloudState();
+      if (!_cloudMode && _sessionCompleted(generation)) {
+        await _ensureInitialized();
+      }
       for (var i = 0; i < segments.length; i++) {
         if (_stopRequested || generation != _sessionGeneration) break;
         onSegmentStart?.call(i, generation);

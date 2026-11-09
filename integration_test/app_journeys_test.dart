@@ -16,18 +16,22 @@ import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/hive/hive_registrar.dart';
 import 'package:poemath/data/repositories/poem_repository.dart';
 
+import 'cloud_narration_playback_test.dart' as cloud_narration;
 import 'support/app_journey_suite.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  defineAppJourneyTests(
-    setUpStorage: _setUpIntegrationStorage,
-    tearDownStorage: HiveBoxes.close,
-    directoryProvider: () async {
-      final support = await getApplicationSupportDirectory();
-      return Directory('${support.path}/integration_test');
-    },
-  );
+  group('应用流程', () {
+    defineAppJourneyTests(
+      setUpStorage: _setUpIntegrationStorage,
+      tearDownStorage: HiveBoxes.close,
+      directoryProvider: () async {
+        final support = await getApplicationSupportDirectory();
+        return Directory('${support.path}/integration_test');
+      },
+    );
+  });
+  cloud_narration.main();
 }
 
 Future<void> _setUpIntegrationStorage() async {
