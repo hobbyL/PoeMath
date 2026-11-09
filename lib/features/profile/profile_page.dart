@@ -26,10 +26,28 @@ class ProfilePage extends ConsumerStatefulWidget {
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _scroll = ScrollController();
+  final _headerKey = GlobalKey();
+  final _settingsOverHeader = ValueNotifier(true);
+  double _settingsCenterY = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_updateSettingsContrast);
+  }
+
+  void _updateSettingsContrast() {
+    if (!mounted || !_scroll.hasClients) return;
+    final header = _headerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (header == null || !header.hasSize) return;
+    _settingsOverHeader.value =
+        header.size.height - _scroll.offset > _settingsCenterY;
+  }
 
   @override
   void dispose() {
     _scroll.dispose();
+    _settingsOverHeader.dispose();
     super.dispose();
   }
 
@@ -41,6 +59,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final unlockedCount = ref.watch(unlockedAchievementsCountProvider);
     final keyRecovered = ref.watch(hiveKeyRecoveredProvider);
     final media = MediaQuery.of(context);
+    _settingsCenterY = media.padding.top + SpacingTokens.lg;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _updateSettingsContrast(),
+    );
     final reduceMotion = media.disableAnimations || media.accessibleNavigation;
     final colors = AnimatedHeroColors(theme);
     final pageStyle = theme.brightness == Brightness.dark
@@ -135,23 +157,29 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     AnimatedHeroHeader(
+                      key: _headerKey,
                       scrollController: _scroll,
                       backgroundKey: const ValueKey(
                         'profile-header-background',
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.only(
-                          right: SpacingTokens.minTapTarget,
-                        ),
-                        child: Column(
-                          key: const ValueKey('profile-header-content'),
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (keyRecovered) ...[
-                              _HiveKeyRecoveredNotice(),
-                              const SizedBox(height: SpacingTokens.md),
-                            ],
-                            Row(
+                      child: Column(
+                        key: const ValueKey('profile-header-content'),
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (keyRecovered) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                right: SpacingTokens.minTapTarget,
+                              ),
+                              child: _HiveKeyRecoveredNotice(),
+                            ),
+                            const SizedBox(height: SpacingTokens.md),
+                          ],
+                          Center(
+                            child: Column(
+                              key: const ValueKey('profile-user-info'),
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 CircleAvatar(
                                   radius: SpacingTokens.xl,
@@ -162,36 +190,28 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                     size: SpacingTokens.xl,
                                   ),
                                 ),
-                                const SizedBox(width: SpacingTokens.md),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        stats.levelName,
-                                        style: theme.textTheme.headlineSmall
-                                            ?.copyWith(
-                                              color: colors.foreground,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                const SizedBox(height: SpacingTokens.md),
+                                Text(
+                                  stats.levelName,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        color: colors.foreground,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      const SizedBox(height: SpacingTokens.sm),
-                                      Text(
-                                        '${stats.totalStars} 颗星星',
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              color: colors.foreground,
-                                            ),
-                                      ),
-                                    ],
+                                ),
+                                const SizedBox(height: SpacingTokens.xs),
+                                Text(
+                                  '${stats.totalStars} 颗星星',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colors.foreground,
                                   ),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                     AnnotatedRegion<SystemUiOverlayStyle>(
@@ -227,14 +247,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               right: 0,
               child: SafeArea(
                 bottom: false,
-                child: IconButton.filledTonal(
-                  tooltip: '设置',
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surfaceContainerHigh,
-                    foregroundColor: theme.colorScheme.onSurface,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _settingsOverHeader,
+                  builder: (context, overHeader, child) => IconButton(
+                    tooltip: '设置',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: overHeader
+                          ? colors.foreground
+                          : theme.colorScheme.onSurface,
+                    ),
+                    onPressed: () => context.push(AppRoutes.settings),
+                    icon: const Icon(Icons.settings_rounded),
                   ),
-                  onPressed: () => context.push(AppRoutes.settings),
-                  icon: const Icon(Icons.settings_rounded),
                 ),
               ),
             ),

@@ -100,6 +100,23 @@ void main() {
       Icons.settings_rounded,
     );
     expect(settingsButton, findsOneWidget);
+    final theme = Theme.of(tester.element(settingsButton));
+    expect(
+      tester
+          .widget<IconButton>(settingsButton)
+          .style!
+          .backgroundColor!
+          .resolve({}),
+      Colors.transparent,
+    );
+    expect(
+      tester
+          .widget<IconButton>(settingsButton)
+          .style!
+          .foregroundColor!
+          .resolve({}),
+      AnimatedHeroColors(theme).foreground,
+    );
 
     final before = tester.getTopRight(settingsButton);
 
@@ -112,6 +129,14 @@ void main() {
 
     expect(settingsButton, findsOneWidget);
     expect(tester.getTopRight(settingsButton), before);
+    expect(
+      tester
+          .widget<IconButton>(settingsButton)
+          .style!
+          .foregroundColor!
+          .resolve({}),
+      theme.colorScheme.onSurface,
+    );
     expect(
       tester
           .state<ScrollableState>(find.byType(Scrollable).first)
@@ -173,6 +198,7 @@ void main() {
 
   testWidgets('个人页横竖屏及大字号完整展示等级和星星', (tester) async {
     for (final (size, scale, brightness) in [
+      (const Size(411, 914), 1.0, Brightness.light),
       (const Size(320, 640), 2.0, Brightness.light),
       (const Size(914, 411), 2.0, Brightness.dark),
     ]) {
@@ -182,8 +208,18 @@ void main() {
       );
       expect(background.left, 0);
       expect(background.right, size.width);
+      final identity = tester.getRect(
+        find.byKey(const ValueKey('profile-user-info')),
+      );
+      expect(identity.center.dx, closeTo(background.center.dx, .01));
+      final avatar = tester.getRect(find.byType(CircleAvatar));
+      expect(avatar.center.dx, closeTo(background.center.dx, .01));
+      var previousBottom = avatar.bottom;
       for (final label in ['诗仙', '12345 颗星星']) {
         final bounds = tester.getRect(find.text(label));
+        expect(bounds.center.dx, closeTo(background.center.dx, .01));
+        expect(bounds.top, greaterThan(previousBottom));
+        previousBottom = bounds.bottom;
         expect(background.contains(bounds.topLeft), isTrue);
         expect(background.contains(bounds.bottomRight), isTrue);
       }
