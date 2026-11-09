@@ -57,7 +57,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final theme = Theme.of(context);
 
     final media = MediaQuery.of(context);
-    final reduceMotion = media.disableAnimations || media.accessibleNavigation;
+    final reduceMotion = media.disableAnimations;
     final content = <Widget>[
       _buildDailyGoal(context, ref),
       const SizedBox(height: SpacingTokens.lg),

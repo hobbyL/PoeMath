@@ -142,14 +142,22 @@ void main() {
     });
   }
 
-  for (final mode in ['减少动态效果', '无障碍导航', '不可见']) {
+  testWidgets('启用无障碍导航但未要求减少动态效果时，顶部背景继续播放', (tester) async {
+    await _mount(tester, animations: false, accessibleNavigation: true);
+    await tester.pump(const Duration(milliseconds: 350));
+    final before = await _pixels(tester);
+    await tester.pump(const Duration(milliseconds: 1500));
+    expect(listEquals(await _pixels(tester), before), isFalse);
+    expect(tester.binding.hasScheduledFrame, isTrue);
+  });
+
+  for (final mode in ['减少动态效果', '不可见']) {
     testWidgets('$mode 时按钮保持静态、可操作', (tester) async {
       var taps = 0;
       await _mount(
         tester,
         animations: false,
         reduceMotion: mode == '减少动态效果',
-        accessibleNavigation: mode == '无障碍导航',
         tickerEnabled: mode != '不可见',
         onPressed: () => taps++,
       );

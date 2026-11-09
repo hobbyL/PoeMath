@@ -107,10 +107,7 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final media = MediaQuery.of(context);
-    _allowed =
-        !media.disableAnimations &&
-        !media.accessibleNavigation &&
-        TickerMode.valuesOf(context).enabled;
+    _allowed = !media.disableAnimations && TickerMode.valuesOf(context).enabled;
     _currentRoute = ModalRoute.of(context)?.isCurrent ?? true;
     _refreshMotion();
   }
@@ -173,7 +170,8 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final colors = AnimatedHeroColors(Theme.of(context), style: widget.style);
-    final reduceMotion = media.disableAnimations || media.accessibleNavigation;
+    // 辅助导航并不表示用户要求减少动态效果，两种系统偏好不能混用。
+    final reduceMotion = media.disableAnimations;
     // 顶部是独立的动态区域，按产品约定直接展示动效；
     // 局部覆盖仅作用于本卡片，不受页面转场/入场开关影响。
     return PageAnimationScope(

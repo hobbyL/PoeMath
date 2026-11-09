@@ -66,7 +66,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _updateSettingsContrast(),
     );
-    final reduceMotion = media.disableAnimations || media.accessibleNavigation;
+    final reduceMotion = media.disableAnimations;
     final colors = AnimatedHeroColors(
       theme,
       style: AnimatedHeroStyle.starlight,

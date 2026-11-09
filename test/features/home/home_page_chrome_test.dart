@@ -261,27 +261,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final accessibility in [false, true]) {
-    testWidgets('系统减少动态效果/无障碍导航时禁用拉伸：$accessibility', (tester) async {
+  for (final reduceMotion in [false, true]) {
+    testWidgets('无障碍导航下仅按减少动态效果偏好控制拉伸：$reduceMotion', (tester) async {
       await _pump(
         tester,
-        reduceMotion: !accessibility,
-        accessibleNavigation: accessibility,
+        reduceMotion: reduceMotion,
+        accessibleNavigation: true,
       );
       final before = tester.getRect(_background);
-      await tester.dragFrom(
+      final gesture = await tester.startGesture(
         tester.getCenter(_background),
-        const Offset(0, 180),
       );
-      await tester.pumpAndSettle();
-      expect(tester.getRect(_background), before);
+      await gesture.moveBy(const Offset(0, 180));
+      await tester.pump();
+      if (reduceMotion) {
+        expect(tester.getRect(_background), before);
+      } else {
+        expect(tester.getRect(_background).height, greaterThan(before.height));
+      }
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.getRect(_background).height, closeTo(before.height, .01));
       final scroll = tester.state<ScrollableState>(
         find.byType(Scrollable).first,
       );
-      expect(scroll.position.pixels, 0);
+      expect(scroll.position.pixels, closeTo(0, .01));
       scroll.position.jumpTo(100);
       await tester.pump();
-      expect(tester.getTopLeft(_background).dy, -100);
+      if (reduceMotion) {
+        expect(tester.getTopLeft(_background).dy, -100);
+      } else {
+        expect(tester.getTopLeft(_background).dy, greaterThan(-100));
+        expect(tester.binding.hasScheduledFrame, isTrue);
+      }
     });
   }
 

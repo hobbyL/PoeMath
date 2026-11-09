@@ -41,6 +41,7 @@ Future<void> _pump(
   Size size = const Size(411, 914),
   double textScale = 1,
   bool reduceMotion = false,
+  bool accessibleNavigation = false,
   Brightness brightness = Brightness.light,
   AppSubject subject = AppSubject.poem,
   String nickname = '小小学习家',
@@ -66,6 +67,7 @@ Future<void> _pump(
             viewPadding: const EdgeInsets.only(top: 32),
             textScaler: TextScaler.linear(textScale),
             disableAnimations: reduceMotion,
+            accessibleNavigation: accessibleNavigation,
           ),
           child: PageAnimationScope(enabled: false, child: child!),
         ),
@@ -183,7 +185,11 @@ void main() {
 
   for (final reduceMotion in [false, true]) {
     testWidgets('个人页星光与下拉放大遵循系统减少动态效果：$reduceMotion', (tester) async {
-      await _pump(tester, reduceMotion: reduceMotion);
+      await _pump(
+        tester,
+        reduceMotion: reduceMotion,
+        accessibleNavigation: true,
+      );
       final background = find.byKey(
         const ValueKey('profile-header-background'),
       );
