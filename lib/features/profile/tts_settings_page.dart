@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/services/tts/tts_models.dart';
@@ -317,6 +318,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       _verifyError = null;
     });
     try {
+      final authorize = ParentAccessService.instance.captureAuthorization();
       // 先验证后落盘：无效 Key 不写入安全存储。
       final config = WorkerTtsConfig(
         base: WorkerTtsClient.normalizeBaseUrl(baseUrl),
@@ -324,8 +326,10 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
       );
       await _tts.verifyCloud(config);
       if (!mounted) return;
+      authorize();
       await settingsRepo.saveWorkerTtsConfig(baseUrl: baseUrl, apiKey: apiKey);
-      await settingsRepo.markWorkerTtsVerified();
+      authorize();
+      await settingsRepo.markWorkerTtsVerified(expectedConfig: config);
       if (mounted) {
         setState(() {
           _workerVerified = true;

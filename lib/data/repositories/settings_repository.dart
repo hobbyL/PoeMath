@@ -193,7 +193,7 @@ class SettingsRepository {
     if (apiKey.length > 8192) {
       throw const FormatException('密钥过长，请检查输入');
     }
-    return _changeImageGenerationProviders((undo) async {
+    return _changeImageGenerationProviders((undo, authorize) async {
       final providers = imageGenerationProviders.toList();
       final activeId = imageGenerationActiveProviderId;
       final index = providers.indexWhere((config) => config.id == value.id);
@@ -203,6 +203,7 @@ class SettingsRepository {
           value.id,
           clearApiKey ? null : key,
           undo,
+          authorize,
         );
       }
       if (index < 0) {
@@ -210,57 +211,65 @@ class SettingsRepository {
       } else {
         providers[index] = value;
       }
-      await _writeImageGenerationProviders(providers, activeId ?? value.id);
+      await _writeImageGenerationProviders(
+        providers,
+        activeId ?? value.id,
+        authorize,
+      );
     });
   }
 
   Future<void> setImageGenerationActiveProvider(String id) =>
-      _changeImageGenerationProviders((_) async {
+      _changeImageGenerationProviders((_, authorize) async {
         final providers = imageGenerationProviders;
         if (!providers.any((config) => config.id == id)) {
           throw ArgumentError.value(id, 'id', '生图配置不存在');
         }
-        await _writeImageGenerationProviders(providers, id);
+        await _writeImageGenerationProviders(providers, id, authorize);
       });
 
   Future<void> clearImageGenerationApiKey(String id) =>
-      _changeImageGenerationProviders((undo) async {
+      _changeImageGenerationProviders((undo, authorize) async {
         if (!imageGenerationProviders.any((config) => config.id == id)) {
           throw const FormatException('生图配置不存在');
         }
-        await _changeImageGenerationKey(id, null, undo);
+        await _changeImageGenerationKey(id, null, undo, authorize);
       });
 
   Future<void> deleteImageGenerationProviderConfig(String id) =>
-      _changeImageGenerationProviders((undo) async {
+      _changeImageGenerationProviders((undo, authorize) async {
         final providers = imageGenerationProviders;
         if (!providers.any((config) => config.id == id)) {
           throw const FormatException('生图配置不存在');
         }
         final remaining = providers.where((config) => config.id != id).toList();
         final activeId = imageGenerationActiveProviderId;
-        await _changeImageGenerationKey(id, null, undo);
+        await _changeImageGenerationKey(id, null, undo, authorize);
         await _writeImageGenerationProviders(
           remaining,
           activeId == id ? remaining.firstOrNull?.id : activeId,
+          authorize,
         );
       });
 
   Future<void> migrateLegacyImageGenerationConfigIfNeeded() {
-    if (HiveBoxes.settings
-            .containsKey(ImageGenerationProviderConfig.providersSettingsKey) ||
+    if (HiveBoxes.settings.containsKey(
+          ImageGenerationProviderConfig.providersSettingsKey,
+        ) ||
         imageGenerationProviders.isEmpty) {
       return Future.value();
     }
-    return _changeImageGenerationProviders((_) async {
-      if (HiveBoxes.settings
-          .containsKey(ImageGenerationProviderConfig.providersSettingsKey)) {
+    return _changeImageGenerationProviders((_, authorize) async {
+      if (HiveBoxes.settings.containsKey(
+        ImageGenerationProviderConfig.providersSettingsKey,
+      )) {
         return;
       }
       final providers = imageGenerationProviders;
       await _writeImageGenerationProviders(
         providers,
         providers.firstOrNull?.id,
+        authorize,
       );
     });
   }
@@ -269,9 +278,10 @@ class SettingsRepository {
     String id,
     String? key,
     List<Future<void> Function()> undo,
+    void Function() authorize,
   ) async {
     final previous = await readImageGenerationApiKeyFor(id);
-    ParentAccessService.instance.assertAllowed();
+    authorize();
     undo.add(
       () => previous == null
           ? _credentialStore.deleteImageGenerationApiKeyFor(id)
@@ -282,32 +292,36 @@ class SettingsRepository {
     } else {
       await _credentialStore.saveImageGenerationApiKeyFor(id, key);
     }
-    ParentAccessService.instance.assertAllowed();
+    authorize();
   }
 
   Future<void> _writeImageGenerationProviders(
     List<LlmProviderConfig> providers,
     String? activeId,
+    void Function() authorize,
   ) async {
-    ParentAccessService.instance.assertAllowed();
+    authorize();
     await HiveBoxes.settings.putAll({
       ImageGenerationProviderConfig.providersSettingsKey:
           ImageGenerationProviderConfig.encodeProviders(providers),
       ImageGenerationProviderConfig.activeProviderSettingsKey: activeId ?? '',
     });
-    ParentAccessService.instance.assertAllowed();
+    authorize();
     await HiveBoxes.settings.delete(ImageGenerationProviderConfig.settingsKey);
-    ParentAccessService.instance.assertAllowed();
+    authorize();
   }
 
   Future<void> _changeImageGenerationProviders(
-    Future<void> Function(List<Future<void> Function()> undo) work,
+    Future<void> Function(
+      List<Future<void> Function()> undo,
+      void Function() authorize,
+    )
+    work,
   ) {
-    ParentAccessService.instance.assertAllowed();
+    final authorize = ParentAccessService.instance.captureAuthorization();
     _imageGenerationRevision++;
     return PictureStoryRepository.exclusive(() async {
-      final parent = ParentAccessService.instance;
-      parent.assertAllowed();
+      authorize();
       const keys = [
         ImageGenerationProviderConfig.settingsKey,
         ImageGenerationProviderConfig.providersSettingsKey,
@@ -338,8 +352,8 @@ class SettingsRepository {
         },
       ];
       try {
-        await work(undo);
-        parent.assertAllowed();
+        await work(undo, authorize);
+        authorize();
       } on Object {
         var rollbackFailed = false;
         for (final restore in undo.reversed) {
@@ -802,61 +816,123 @@ class SettingsRepository {
   }
 
   /// 读取自建服务完整配置；API Key 缺失时返回 null。
-  Future<WorkerTtsConfig?> readWorkerTtsConfig() async {
-    final apiKey = await _credentialStore.readWorkerTtsApiKey();
-    if (apiKey == null || apiKey.isEmpty) return null;
-    final base = WorkerTtsClient.normalizeBaseUrl(ttsCloudBaseUrl);
-    return WorkerTtsConfig(base: base, apiKey: apiKey);
+  Future<WorkerTtsConfig?> readWorkerTtsConfig() =>
+      CredentialConfigurationAccess.exclusive(() async {
+        _assertCredentialConsistent('worker_tts', 'default');
+        final apiKey = await _credentialStore.readWorkerTtsApiKey();
+        if (apiKey == null || apiKey.isEmpty) return null;
+        final base = WorkerTtsClient.normalizeBaseUrl(ttsCloudBaseUrl);
+        return WorkerTtsConfig(base: base, apiKey: apiKey);
+      });
+
+  Future<void> _changeWorkerTtsKey(
+    String? key,
+    List<Future<void> Function()> undo,
+    void Function() authorize,
+  ) async {
+    final previous = await _credentialStore.readWorkerTtsApiKey();
+    authorize();
+    undo.add(
+      () => previous == null
+          ? _credentialStore.deleteWorkerTtsApiKey()
+          : _credentialStore.saveWorkerTtsApiKey(previous),
+    );
+    if (key == null) {
+      await _credentialStore.deleteWorkerTtsApiKey();
+    } else {
+      await _credentialStore.saveWorkerTtsApiKey(key);
+    }
+    authorize();
   }
 
-  /// 保存服务配置（地址入 Hive、Key 入安全存储）并清除验证指纹（强制重验）。
+  /// 地址、密钥和验证状态一起保存；失败恢复原配置。
   Future<void> saveWorkerTtsConfig({
     required String baseUrl,
     required String apiKey,
   }) async {
-    ParentAccessService.instance.assertAllowed();
     final normalized = WorkerTtsClient.normalizeBaseUrl(baseUrl);
     final key = apiKey.trim();
-    if (key.isEmpty) {
-      throw ArgumentError('API Key 不能为空');
-    }
-    await _credentialStore.saveWorkerTtsApiKey(key);
-    await setTtsCloudBaseUrl(normalized.toString());
-    await HiveBoxes.settings.delete(_keyWorkerTtsVerifiedFingerprint);
-  }
-
-  /// 当前存储的配置是否已通过验证（指纹匹配）。
-  Future<bool> isWorkerTtsVerified() async {
-    final config = await readWorkerTtsConfig();
-    if (config == null) return false;
-    final stored =
-        HiveBoxes.settings.get(_keyWorkerTtsVerifiedFingerprint) as String?;
-    return stored == _workerTtsConfigFingerprint(config);
-  }
-
-  /// 标记当前配置已通过验证。
-  Future<void> markWorkerTtsVerified() async {
-    ParentAccessService.instance.assertAllowed();
-    final config = await readWorkerTtsConfig();
-    if (config == null) {
-      throw StateError('尚未保存自建语音服务配置');
-    }
-    await HiveBoxes.settings.put(
-      _keyWorkerTtsVerifiedFingerprint,
-      _workerTtsConfigFingerprint(config),
+    if (key.isEmpty) throw ArgumentError('API Key 不能为空');
+    await _changeCredentialConfiguration(
+      kind: 'worker_tts',
+      id: 'default',
+      settingsKeys: [_keyTtsCloudBaseUrl, _keyWorkerTtsVerifiedFingerprint],
+      work: (undo, authorize) async {
+        await _changeWorkerTtsKey(key, undo, authorize);
+        await HiveBoxes.settings.put(
+          _keyTtsCloudBaseUrl,
+          normalized.toString(),
+        );
+        authorize();
+        await HiveBoxes.settings.delete(_keyWorkerTtsVerifiedFingerprint);
+      },
     );
   }
 
-  /// 删除已保存的服务配置（Key + 指纹），并关闭云端朗读开关。
-  Future<void> deleteWorkerTtsConfig() async {
-    ParentAccessService.instance.assertAllowed();
-    await _credentialStore.deleteWorkerTtsApiKey();
-    await HiveBoxes.settings.delete(_keyWorkerTtsVerifiedFingerprint);
-    await HiveBoxes.settings.delete(_keyTtsCloudBaseUrl);
-    await HiveBoxes.settings.delete(_keyTtsCloudVoice);
-    await HiveBoxes.settings.delete(_keyTtsCloudStyle);
-    await setTtsCloudEnabled(false);
+  Future<bool> isWorkerTtsVerified() =>
+      CredentialConfigurationAccess.exclusive(() async {
+        final config = await readWorkerTtsConfig();
+        if (config == null) return false;
+        final stored =
+            HiveBoxes.settings.get(_keyWorkerTtsVerifiedFingerprint) as String?;
+        return stored == _workerTtsConfigFingerprint(config);
+      });
+
+  /// 验证结果只能标记实际探测的配置，不能标记等待期间被替换的配置。
+  Future<void> markWorkerTtsVerified({WorkerTtsConfig? expectedConfig}) {
+    return _changeCredentialConfiguration(
+      kind: 'worker_tts',
+      id: 'default',
+      settingsKeys: [_keyWorkerTtsVerifiedFingerprint],
+      replacesCredentials: false,
+      work: (_, authorize) async {
+        // 此处已在配置事务中，pending 标记由本次标记操作持有。
+        final key = await _credentialStore.readWorkerTtsApiKey();
+        authorize();
+        if (key == null || key.isEmpty) throw StateError('尚未保存自建语音服务配置');
+        final config = WorkerTtsConfig(
+          base: WorkerTtsClient.normalizeBaseUrl(ttsCloudBaseUrl),
+          apiKey: key,
+        );
+        final fingerprint = _workerTtsConfigFingerprint(config);
+        if (expectedConfig != null &&
+            fingerprint != _workerTtsConfigFingerprint(expectedConfig)) {
+          throw const FormatException('服务配置已改变，请重新验证');
+        }
+        await HiveBoxes.settings.put(
+          _keyWorkerTtsVerifiedFingerprint,
+          fingerprint,
+        );
+      },
+    );
   }
+
+  /// 删除失败恢复原配置与云端开关。
+  Future<void> deleteWorkerTtsConfig() => _changeCredentialConfiguration(
+    kind: 'worker_tts',
+    id: 'default',
+    settingsKeys: [
+      _keyWorkerTtsVerifiedFingerprint,
+      _keyTtsCloudBaseUrl,
+      _keyTtsCloudVoice,
+      _keyTtsCloudStyle,
+      _keyTtsCloudEnabled,
+    ],
+    work: (undo, authorize) async {
+      await _changeWorkerTtsKey(null, undo, authorize);
+      for (final key in [
+        _keyWorkerTtsVerifiedFingerprint,
+        _keyTtsCloudBaseUrl,
+        _keyTtsCloudVoice,
+        _keyTtsCloudStyle,
+      ]) {
+        authorize();
+        await HiveBoxes.settings.delete(key);
+      }
+      authorize();
+      await HiveBoxes.settings.put(_keyTtsCloudEnabled, false);
+    },
+  );
 
   static String _workerTtsConfigFingerprint(WorkerTtsConfig config) {
     final canonical = jsonEncode(<String>[

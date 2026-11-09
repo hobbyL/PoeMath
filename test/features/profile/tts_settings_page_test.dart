@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+
+import '../../helpers/hive_test_helper.dart';
+import '../../helpers/parent_access_test_helper.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -79,10 +83,7 @@ Future<void> _pumpPage(
 /// 点击指定音色 tile 的试听按钮。
 Future<void> _tapVoicePlay(WidgetTester tester, String voiceName) async {
   final playButton = find.descendant(
-    of: find.ancestor(
-      of: find.text(voiceName),
-      matching: find.byType(AppTile),
-    ),
+    of: find.ancestor(of: find.text(voiceName), matching: find.byType(AppTile)),
     matching: find.byIcon(Icons.play_circle_outline),
   );
   await tester.ensureVisible(playButton);
@@ -93,12 +94,17 @@ Future<void> _tapVoicePlay(WidgetTester tester, String voiceName) async {
 }
 
 void main() {
+  setUp(() async {
+    await setUpHiveForTesting();
+    await unlockParentForTesting();
+  });
+  tearDown(() async {
+    lockParentForTesting();
+    await tearDownHiveForTesting();
+  });
   setUpAll(() {
     registerFallbackValue(
-      WorkerTtsConfig(
-        base: Uri.parse('https://fallback.example'),
-        apiKey: '',
-      ),
+      WorkerTtsConfig(base: Uri.parse('https://fallback.example'), apiKey: ''),
     );
   });
 
@@ -174,7 +180,11 @@ void main() {
         apiKey: any(named: 'apiKey'),
       ),
     ).thenAnswer((_) async {});
-    when(() => settings.markWorkerTtsVerified()).thenAnswer((_) async {});
+    when(
+      () => settings.markWorkerTtsVerified(
+        expectedConfig: any(named: 'expectedConfig'),
+      ),
+    ).thenAnswer((_) async {});
 
     await _pumpPage(tester, tts: tts, settings: settings);
 
@@ -196,8 +206,7 @@ void main() {
     expect(cloudSwitch.onChanged, isNotNull);
 
     // 验证走零成本探测：携带 Key 的 config、无真实合成请求。
-    final captured = verify(() => tts.verifyCloud(captureAny()))
-        .captured
+    final captured = verify(() => tts.verifyCloud(captureAny())).captured
         .cast<WorkerTtsConfig>();
     expect(captured, hasLength(1));
     expect(captured.single.base, Uri.parse('https://tts.cloudm.cc'));
@@ -211,7 +220,11 @@ void main() {
         apiKey: 'test-key',
       ),
     ).called(1);
-    verify(() => settings.markWorkerTtsVerified()).called(1);
+    verify(
+      () => settings.markWorkerTtsVerified(
+        expectedConfig: any(named: 'expectedConfig'),
+      ),
+    ).called(1);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));
@@ -243,10 +256,7 @@ void main() {
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('API Key 无效或未授权，请检查后重试'),
-      findsOneWidget,
-    );
+    expect(find.text('API Key 无效或未授权，请检查后重试'), findsOneWidget);
     expect(find.text('已连接 · tts.cloudm.cc'), findsNothing);
     final cloudSwitch = tester.widget<Switch>(find.byType(Switch).first);
     expect(cloudSwitch.onChanged, isNull);
@@ -257,7 +267,11 @@ void main() {
         apiKey: any(named: 'apiKey'),
       ),
     );
-    verifyNever(() => settings.markWorkerTtsVerified());
+    verifyNever(
+      () => settings.markWorkerTtsVerified(
+        expectedConfig: any(named: 'expectedConfig'),
+      ),
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));
@@ -276,10 +290,7 @@ void main() {
 
     expect(find.text('已连接 · tts.cloudm.cc'), findsOneWidget);
     expect(find.text('标准音色（Neural）', skipOffstage: false), findsOneWidget);
-    expect(
-      find.text('高清音色（DragonHD）', skipOffstage: false),
-      findsOneWidget,
-    );
+    expect(find.text('高清音色（DragonHD）', skipOffstage: false), findsOneWidget);
     expect(find.text('晓晓', skipOffstage: false), findsOneWidget);
     expect(find.text('云希', skipOffstage: false), findsOneWidget);
     expect(find.text('晓晓高清', skipOffstage: false), findsOneWidget);
@@ -310,10 +321,7 @@ void main() {
     expect(find.text('晓晓', skipOffstage: false), findsOneWidget);
     expect(find.text('云希', skipOffstage: false), findsOneWidget);
     // 兜底目录全部为标准 Neural 音色，无 DragonHD 分组。
-    expect(
-      find.text('高清音色（DragonHD）', skipOffstage: false),
-      findsNothing,
-    );
+    expect(find.text('高清音色（DragonHD）', skipOffstage: false), findsNothing);
 
     // 兜底目录仍可选择并试听。
     await _tapVoicePlay(tester, '晓晓');
@@ -342,9 +350,8 @@ void main() {
 
     // 晓晓高清 styleList 为空 → bestStyle 回落 general。
     await _tapVoicePlay(tester, '晓晓高清');
-    verify(
-      () => settings.setTtsCloudVoice('zh-CN-XiaoxiaoDragonHDNeural'),
-    ).called(1);
+    verify(() => settings.setTtsCloudVoice('zh-CN-XiaoxiaoDragonHDNeural'))
+        .called(1);
     verify(() => settings.setTtsCloudStyle('general')).called(1);
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -451,8 +458,7 @@ void main() {
     final settings = _MockSettingsRepository();
     _stubBaseSettings(settings, verified: true, cloudEnabled: true);
     _stubTtsIdle(tts);
-    when(() => settings.setTtsSpeed(any()))
-        .thenThrow(StateError('磁盘写入失败'));
+    when(() => settings.setTtsSpeed(any())).thenThrow(StateError('磁盘写入失败'));
 
     await _pumpPage(tester, tts: tts, settings: settings);
 
