@@ -17,6 +17,7 @@ import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/profile/providers/hive_key_recovery_providers.dart';
 import 'package:poemath/features/profile/widgets/profile_avatar_button.dart';
+import 'package:poemath/features/profile/widgets/profile_badge_styles.dart';
 import 'package:poemath/features/profile/widgets/profile_nickname_button.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -205,15 +206,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                       key: const ValueKey('profile-level-tag'),
                                       label: stats.levelName,
                                       icon: Icons.workspace_premium_rounded,
-                                      accent: ColorTokens.mathPurple,
-                                      secondaryAccent: ColorTokens.mathBlue,
+                                      style: ProfileBadgeStyles.level(
+                                        stats.level,
+                                      ),
                                     ),
                                     HeroStatusTag(
                                       key: const ValueKey('profile-stars-tag'),
                                       label: '${stats.totalStars} 颗星星',
                                       icon: Icons.star_rounded,
-                                      accent: ColorTokens.mathYellow,
-                                      secondaryAccent: ColorTokens.poemGold,
+                                      style: ProfileBadgeStyles.stars(
+                                        stats.totalStars,
+                                      ),
                                       phaseOffset: .45,
                                     ),
                                   ],

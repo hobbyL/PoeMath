@@ -44,6 +44,7 @@ Future<void> _pump(
   Brightness brightness = Brightness.light,
   AppSubject subject = AppSubject.poem,
   String nickname = '小小学习家',
+  UserStats? stats,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -54,7 +55,7 @@ Future<void> _pump(
         staticDayKeyOverride(),
         profileNicknameProvider.overrideWithValue(nickname),
         userStatsProvider.overrideWithValue(
-          UserStats(profileId: 'default', level: 7, totalStars: 12345),
+          stats ?? UserStats(profileId: 'default', level: 7, totalStars: 12345),
         ),
       ],
       child: MaterialApp(
@@ -91,6 +92,39 @@ void main() {
     expect(find.byType(AppBar), findsNothing);
     // 本页正文里没有「我的」字样，因此整棵树上都不该出现。
     expect(find.text('我的'), findsNothing);
+  });
+
+  testWidgets('统计更新后等级配色与星芒一起更新，无需重进页面', (tester) async {
+    await _pump(
+      tester,
+      reduceMotion: true,
+      stats: UserStats(profileId: 'default', level: 0, totalStars: 49),
+    );
+    final pageState = tester.state(find.byType(ProfilePage));
+    final levelFinder = find.byKey(const ValueKey('profile-level-tag'));
+    final starsFinder = find.byKey(const ValueKey('profile-stars-tag'));
+    final initialLevel = tester.widget<HeroStatusTag>(levelFinder).style;
+    final initialStars = tester.widget<HeroStatusTag>(starsFinder).style;
+    expect(find.text('童生'), findsOneWidget);
+    expect(find.text('49 颗星星'), findsOneWidget);
+
+    await _pump(
+      tester,
+      reduceMotion: true,
+      stats: UserStats(profileId: 'default', level: 1, totalStars: 50),
+    );
+    expect(tester.state(find.byType(ProfilePage)), same(pageState));
+    expect(find.text('秀才'), findsOneWidget);
+    expect(find.text('50 颗星星'), findsOneWidget);
+    expect(
+      tester.widget<HeroStatusTag>(levelFinder).style.accent,
+      isNot(initialLevel.accent),
+    );
+    expect(
+      tester.widget<HeroStatusTag>(starsFinder).style.sparkleCount,
+      greaterThan(initialStars.sparkleCount),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('设置按钮悬浮右上角且不随内容滚动', (tester) async {

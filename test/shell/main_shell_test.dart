@@ -60,10 +60,7 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const App(),
-      ),
+      UncontrolledProviderScope(container: container, child: const App()),
     );
 
     await _pumpPastSplashAndAnimations(tester);
@@ -104,10 +101,7 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const App(),
-      ),
+      UncontrolledProviderScope(container: container, child: const App()),
     );
 
     await _pumpPastSplashAndAnimations(tester);
@@ -131,17 +125,39 @@ void main() {
   });
 
   testWidgets('我的页设置按钮在未配置时先打开家长设置', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: App()));
+    await tester.pumpWidget(
+      ProviderScope(overrides: [staticDayKeyOverride()], child: const App()),
+    );
 
     await _pumpPastSplashAndAnimations(tester);
 
-    await tester.tap(find.text('我的'));
-    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(find.text('我的'));
+      await tester.pump();
+    });
+    // 星空与徽章会持续重绘，只等待有限的页面切换，不等待所有动画停止。
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
-    expect(find.byTooltip('设置'), findsOneWidget);
+    expect(_selectedTab(tester), 3);
+    expect(find.byTooltip('设置').hitTestable(), findsOneWidget);
 
-    await tester.tap(find.byTooltip('设置'));
-    await tester.pumpAndSettle();
+    // 家长验证入口会读取本地设置，交替推进真实 I/O 与导航帧。
+    await tester.runAsync(() async {
+      await tester.tap(find.byTooltip('设置'));
+      await tester.pump();
+    });
+    for (
+      var i = 0;
+      i < 100 && find.byType(ParentProtectionPage).evaluate().isEmpty;
+      i++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(ParentProtectionPage), findsOneWidget);
     expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);

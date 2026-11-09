@@ -383,21 +383,39 @@ class HeroAvatarHalo extends StatelessWidget {
   }
 }
 
+/// 徽章配色与有上限的装饰强度；业务门槛由使用方解析。
+@immutable
+class HeroTagStyle {
+  const HeroTagStyle({
+    required this.accent,
+    required this.secondaryAccent,
+    this.emphasis = 0,
+    this.trailCount = 1,
+    this.sparkleCount = 0,
+  }) : assert(emphasis >= 0 && emphasis <= 1),
+       assert(trailCount >= 1 && trailCount <= 2),
+       assert(sparkleCount >= 0 && sparkleCount <= 4);
+
+  final Color accent;
+  final Color secondaryAccent;
+  final double emphasis;
+  final int trailCount;
+  final int sparkleCount;
+}
+
 /// 星空区域的信息徽章；流光只重绘边缘，与顶部背景共用动画时钟。
 class HeroStatusTag extends StatelessWidget {
   const HeroStatusTag({
     super.key,
     required this.label,
     required this.icon,
-    required this.accent,
-    required this.secondaryAccent,
+    required this.style,
     this.phaseOffset = 0,
   });
 
   final String label;
   final IconData icon;
-  final Color accent;
-  final Color secondaryAccent;
+  final HeroTagStyle style;
   final double phaseOffset;
 
   @override
@@ -411,8 +429,7 @@ class HeroStatusTag extends StatelessWidget {
     return RepaintBoundary(
       child: CustomPaint(
         foregroundPainter: _HeroTagEdgePainter(
-          accent: accent,
-          secondaryAccent: secondaryAccent,
+          style: style,
           foreground: colors.foreground,
           motion: motion.animation,
           phaseOffset: phaseOffset,
@@ -422,8 +439,8 @@ class HeroStatusTag extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color.lerp(colors.depth, accent, .24)!,
-              Color.lerp(colors.depth, secondaryAccent, .08)!,
+              Color.lerp(colors.depth, style.accent, .24)!,
+              Color.lerp(colors.depth, style.secondaryAccent, .08)!,
             ],
           ),
           borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
@@ -435,7 +452,7 @@ class HeroStatusTag extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ExcludeSemantics(
-                child: Icon(icon, size: SpacingTokens.md, color: accent),
+                child: Icon(icon, size: SpacingTokens.md, color: style.accent),
               ),
               const SizedBox(width: SpacingTokens.xs),
               Flexible(
@@ -459,15 +476,13 @@ class HeroStatusTag extends StatelessWidget {
 /// 光线和星芒沿胶囊边缘移动，不扫过文字，也不改变标签几何尺寸。
 class _HeroTagEdgePainter extends CustomPainter {
   _HeroTagEdgePainter({
-    required this.accent,
-    required this.secondaryAccent,
+    required this.style,
     required this.foreground,
     required this.motion,
     required this.phaseOffset,
   }) : super(repaint: motion);
 
-  final Color accent;
-  final Color secondaryAccent;
+  final HeroTagStyle style;
   final Color foreground;
   final Animation<double> motion;
   final double phaseOffset;
@@ -485,51 +500,102 @@ class _HeroTagEdgePainter extends CustomPainter {
     }
     final edge = _edge!;
     final phase = (motion.value * 4 + phaseOffset) % 1;
+    final accent = style.accent;
+    final secondaryAccent = style.secondaryAccent;
     canvas.drawRRect(
       rim,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
+        ..strokeWidth = 1 + style.emphasis * .4
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            accent.withValues(alpha: .7),
+            accent.withValues(alpha: .6 + style.emphasis * .2),
             secondaryAccent.withValues(alpha: .2),
-            accent.withValues(alpha: .45),
+            accent.withValues(alpha: .4 + style.emphasis * .2),
           ],
         ).createShader(rect),
     );
 
-    // 分段渐亮的短光尾可连续跨过闭合路径起点，不出现整圈闪烁。
-    for (var step = 0; step < 12; step++) {
-      final start = ((phase + step * .014) % 1) * edge.length;
-      final end = math.min(edge.length, start + edge.length * .017);
-      final segment = edge.extractPath(start, end);
-      final strength = (step + 1) / 12;
-      final light = Color.lerp(secondaryAccent, foreground, strength * .8)!;
-      canvas.drawPath(
-        segment,
+    if (style.emphasis >= .8) {
+      canvas.drawRRect(
+        rim.deflate(SpacingTokens.xs / 2),
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 4
-          ..color = accent.withValues(alpha: strength * .28)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
-      );
-      canvas.drawPath(
-        segment,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.4
-          ..strokeCap = StrokeCap.round
-          ..color = light.withValues(alpha: strength * .95),
+          ..strokeWidth = .6
+          ..color = secondaryAccent.withValues(alpha: .28),
       );
     }
 
-    final head = edge.getTangentForOffset(((phase + .168) % 1) * edge.length)!;
-    final pulse = .65 + .35 * math.sin(phase * math.pi * 2).abs();
-    final reach = SpacingTokens.xs * pulse;
-    final point = head.position;
+    // 最高两束短光尾；高阶的第二束更柔和，亮光始终留在胶囊边缘。
+    final tailLength = .14 + .07 * style.emphasis;
+    for (var trail = 0; trail < style.trailCount; trail++) {
+      final offset = phase + trail / style.trailCount;
+      final opacity = trail == 0 ? 1.0 : .65;
+      for (var step = 0; step < 12; step++) {
+        final start = ((offset + step * tailLength / 12) % 1) * edge.length;
+        final end = math.min(
+          edge.length,
+          start + edge.length * tailLength / 10,
+        );
+        final segment = edge.extractPath(start, end);
+        final strength = (step + 1) / 12;
+        final light = Color.lerp(secondaryAccent, foreground, strength * .8)!;
+        canvas.drawPath(
+          segment,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3 + 2 * style.emphasis
+            ..color = accent.withValues(
+              alpha: strength * (.2 + .18 * style.emphasis) * opacity,
+            )
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+        );
+        canvas.drawPath(
+          segment,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2 + .4 * style.emphasis
+            ..strokeCap = StrokeCap.round
+            ..color = light.withValues(alpha: strength * .95 * opacity),
+        );
+      }
+      final head = edge.getTangentForOffset(
+        ((offset + tailLength) % 1) * edge.length,
+      )!;
+      final pulse = .75 + .25 * math.sin(offset * math.pi * 2).abs();
+      _paintSparkle(
+        canvas,
+        head.position,
+        SpacingTokens.xs * pulse * (.8 + .2 * style.emphasis),
+        foreground.withValues(alpha: .85 * opacity),
+      );
+    }
+
+    // 里程碑星芒固定在边缘错峰闪烁，不随着累计值无限增加。
+    const positions = [.08, .36, .6, .86];
+    for (var i = 0; i < style.sparkleCount; i++) {
+      final point = edge.getTangentForOffset(positions[i] * edge.length)!;
+      final pulse = (1 + math.sin((phase + i * .27) * math.pi * 2)) / 2;
+      final reach = SpacingTokens.xs * (.5 + .35 * pulse);
+      canvas.drawCircle(
+        point.position,
+        reach,
+        Paint()
+          ..color = accent.withValues(alpha: .18 + pulse * .2)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+      );
+      _paintSparkle(
+        canvas,
+        point.position,
+        reach,
+        Color.lerp(accent, foreground, .65)!.withValues(alpha: .5 + pulse * .4),
+      );
+    }
+  }
+
+  void _paintSparkle(Canvas canvas, Offset point, double reach, Color color) {
     final sparkle = Path()
       ..moveTo(point.dx, point.dy - reach)
       ..quadraticBezierTo(point.dx, point.dy, point.dx + reach, point.dy)
@@ -537,16 +603,12 @@ class _HeroTagEdgePainter extends CustomPainter {
       ..quadraticBezierTo(point.dx, point.dy, point.dx - reach, point.dy)
       ..quadraticBezierTo(point.dx, point.dy, point.dx, point.dy - reach)
       ..close();
-    canvas.drawPath(
-      sparkle,
-      Paint()..color = foreground.withValues(alpha: .85),
-    );
+    canvas.drawPath(sparkle, Paint()..color = color);
   }
 
   @override
   bool shouldRepaint(_HeroTagEdgePainter oldDelegate) =>
-      oldDelegate.accent != accent ||
-      oldDelegate.secondaryAccent != secondaryAccent ||
+      oldDelegate.style != style ||
       oldDelegate.foreground != foreground ||
       oldDelegate.motion != motion ||
       oldDelegate.phaseOffset != phaseOffset;

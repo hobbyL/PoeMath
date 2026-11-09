@@ -49,7 +49,8 @@ void main() {
       await tester.tap(find.text('取消'));
       await tester.pump();
     });
-    await tester.pumpAndSettle();
+    // 我的页有持续星空动画，等待导航过渡即可，不能等待帧调度停止。
+    await tester.pump(const Duration(seconds: 1));
     expect(router.routerDelegate.state.uri.path, AppRoutes.profile);
     expect(ParentAccessService.instance.isUnlocked, isFalse);
     expect(find.byType(SettingsPage, skipOffstage: false), findsNothing);
