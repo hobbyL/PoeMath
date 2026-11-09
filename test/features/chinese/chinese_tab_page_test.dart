@@ -82,9 +82,9 @@ Finder _bookCard(Textbook book) =>
     find.byKey(ValueKey('textbook-${book.pdfSha256}'));
 
 Finder _textbookSegment() => find.ancestor(
-      of: find.textContaining(RegExp(r'^课本\(\d+\)$')),
-      matching: find.byType(FittedBox),
-    );
+  of: find.textContaining(RegExp(r'^课本\(\d+\)$')),
+  matching: find.byType(FittedBox),
+);
 
 void _expectTextbookSection(WidgetTester tester) {
   final switcher = tester.widget<SegmentedButton<ChineseSection>>(
@@ -97,9 +97,9 @@ void _expectTextbookSection(WidgetTester tester) {
 }
 
 Finder _poemSegment() => find.ancestor(
-      of: find.textContaining(RegExp(r'^诗词\(\d+\)$')),
-      matching: find.byType(FittedBox),
-    );
+  of: find.textContaining(RegExp(r'^诗词\(\d+\)$')),
+  matching: find.byType(FittedBox),
+);
 
 void _expectPoemSection(WidgetTester tester) {
   final switcher = tester.widget<SegmentedButton<ChineseSection>>(
@@ -107,6 +107,21 @@ void _expectPoemSection(WidgetTester tester) {
   );
   expect(switcher.selected, {ChineseSection.poem});
   expect(find.byTooltip('搜索筛选'), findsOneWidget);
+}
+
+Future<void> _pumpHome(WidgetTester tester) async {
+  // 首页待打卡卡片会持续重绘；导航完成以实际页面和底栏选中项为准。
+  // 只推进有限的入场动画，不等待整页动画停止，也不关闭真实动效。
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+  expect(find.byType(HomePage), findsOneWidget);
+  expect(
+    tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+    0,
+  );
+  final context = tester.element(find.byType(HomePage));
+  expect(GoRouterState.of(context).uri.path, AppRoutes.home);
+  expect(ModalRoute.of(context)!.isCurrent, isTrue);
 }
 
 Future<void> _finish(WidgetTester tester) async {
@@ -164,9 +179,15 @@ void main() {
     final navigation = tester.widget<NavigationBar>(find.byType(NavigationBar));
     expect(navigation.selectedIndex, 1);
     expect(
-      navigation.destinations
-          .cast<NavigationDestination>()
-          .map((item) => item.label),
+      tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byType(NavigationBar),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((item) => item.data)
+          .toList(),
       ['首页', '语文', '口算', '我的'],
     );
     await tester.tap(_bookCard(current));
@@ -244,14 +265,14 @@ void main() {
     await tester.tap(_poemSegment());
     await tester.pumpAndSettle();
     await tester.tap(find.text('首页'));
-    await tester.pumpAndSettle();
+    await _pumpHome(tester);
     await tester.tap(find.text('语文'));
     await tester.pumpAndSettle();
     _expectPoemSection(tester);
     await tester.tap(_textbookSegment());
     await tester.pumpAndSettle();
     app.router.go(AppRoutes.home);
-    await tester.pumpAndSettle();
+    await _pumpHome(tester);
     await tester.scrollUntilVisible(
       find.text('背诗词'),
       250,
@@ -272,8 +293,9 @@ void main() {
 
   testWidgets('背景改变后课本立即换册，设置管理仍展示所有教材', (tester) async {
     final app = await _pumpAt(tester);
-    await tester
-        .runAsync(() => SettingsRepository().setLearningBackground(3, '下'));
+    await tester.runAsync(
+      () => SettingsRepository().setLearningBackground(3, '下'),
+    );
     invalidateLearningBackground(app.container.invalidate);
     await tester.pumpAndSettle();
     _expectTextbookSection(tester);
@@ -312,8 +334,9 @@ void main() {
     ProfileScope.reset();
     await tester.pumpAndSettle();
     _expectPoemSection(tester);
-    await tester
-        .runAsync(() => SettingsRepository().setLearningBackground(6, '下'));
+    await tester.runAsync(
+      () => SettingsRepository().setLearningBackground(6, '下'),
+    );
     invalidateLearningBackground(app.container.invalidate);
     await tester.tap(_textbookSegment());
     await tester.pumpAndSettle();
@@ -342,10 +365,7 @@ void main() {
     await tester.pumpAndSettle();
     double offset() => tester
         .state<ScrollableState>(
-          find.descendant(
-            of: scrollView,
-            matching: find.byType(Scrollable),
-          ),
+          find.descendant(of: scrollView, matching: find.byType(Scrollable)),
         )
         .position
         .pixels;
@@ -357,7 +377,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(offset(), closeTo(before, 1));
     await tester.tap(find.text('首页'));
-    await tester.pumpAndSettle();
+    await _pumpHome(tester);
     await tester.tap(find.text('语文'));
     await tester.pumpAndSettle();
     expect(offset(), closeTo(before, 1));
@@ -395,10 +415,7 @@ void main() {
     await tester.pumpAndSettle();
     double offset() => tester
         .state<ScrollableState>(
-          find.descendant(
-            of: list,
-            matching: find.byType(Scrollable),
-          ),
+          find.descendant(of: list, matching: find.byType(Scrollable)),
         )
         .position
         .pixels;
@@ -410,7 +427,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(offset(), closeTo(before, 1));
     await tester.tap(find.text('首页'));
-    await tester.pumpAndSettle();
+    await _pumpHome(tester);
     await tester.tap(find.text('语文'));
     await tester.pumpAndSettle();
     expect(offset(), closeTo(before, 1));
