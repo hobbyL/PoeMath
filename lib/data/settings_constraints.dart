@@ -2,6 +2,7 @@ import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
 import 'package:poemath/data/models/profile_avatar.dart';
+import 'package:poemath/data/models/profile_nickname.dart';
 
 /// UI、备份导入与历史读取共用的普通设置范围。
 class SettingsConstraints {
@@ -22,6 +23,7 @@ class SettingsConstraints {
     }
     return switch (key) {
       ProfileAvatar.settingsKey => ProfileAvatar.accepts(value),
+      ProfileNickname.settingsKey => ProfileNickname.accepts(value),
       CompletionSound.settingsKey => CompletionSound.fromId(value) != null,
       AnswerFeedbackSound.settingsKey =>
         AnswerFeedbackSound.fromId(value) != null,

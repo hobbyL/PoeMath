@@ -374,7 +374,7 @@ class HeroAvatarHalo extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: SpacingTokens.lg,
-            vertical: SpacingTokens.md,
+            vertical: SpacingTokens.xs,
           ),
           child: child,
         ),

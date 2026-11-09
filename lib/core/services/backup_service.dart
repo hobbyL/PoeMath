@@ -47,6 +47,7 @@ import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
 import 'package:poemath/data/models/profile_avatar.dart';
+import 'package:poemath/data/models/profile_nickname.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
@@ -99,6 +100,7 @@ const int _backupVersion = 1;
 /// 新增 settings key 时必须同步登记本白名单（并注明类型），否则不会随备份迁移。
 const Map<String, String> _settingsValueType = <String, String>{
   ProfileAvatar.settingsKey: 'string', // 按档案保存的压缩 PNG 头像，包含图片内容
+  ProfileNickname.settingsKey: 'string', // 按档案保存的昵称
   ImageGenerationProviderConfig.settingsKey: 'string', // 生图地址/模型，无密钥；恢复前确认
   ImageGenerationProviderConfig.providersSettingsKey: 'string', // 生图供应商列表
   ImageGenerationProviderConfig.activeProviderSettingsKey: 'string', // 生效生图供应商

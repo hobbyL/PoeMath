@@ -31,6 +31,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/profile/profile_page.dart';
+import 'package:poemath/features/profile/providers/profile_nickname_providers.dart';
 
 import '../../helpers/day_key_override.dart';
 import '../../helpers/hive_test_helper.dart';
@@ -42,6 +43,7 @@ Future<void> _pump(
   bool reduceMotion = false,
   Brightness brightness = Brightness.light,
   AppSubject subject = AppSubject.poem,
+  String nickname = '小小学习家',
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -50,6 +52,7 @@ Future<void> _pump(
     ProviderScope(
       overrides: [
         staticDayKeyOverride(),
+        profileNicknameProvider.overrideWithValue(nickname),
         userStatsProvider.overrideWithValue(
           UserStats(profileId: 'default', level: 7, totalStars: 12345),
         ),
@@ -293,7 +296,13 @@ void main() {
       (const Size(320, 640), 2.0, Brightness.light),
       (const Size(914, 411), 2.0, Brightness.dark),
     ]) {
-      await _pump(tester, size: size, textScale: scale, brightness: brightness);
+      await _pump(
+        tester,
+        size: size,
+        textScale: scale,
+        brightness: brightness,
+        nickname: '喜欢看星星也喜欢读诗的小小学习家呀',
+      );
       final background = tester.getRect(
         find.byKey(const ValueKey('profile-header-background')),
       );
@@ -305,11 +314,18 @@ void main() {
       expect(identity.center.dx, closeTo(background.center.dx, .01));
       final avatar = tester.getRect(find.byType(CircleAvatar));
       expect(avatar.center.dx, closeTo(background.center.dx, .01));
+      final nickname = tester.getRect(
+        find.byKey(const ValueKey('profile-nickname-label')),
+      );
+      expect(nickname.center.dx, closeTo(avatar.center.dx, .01));
+      expect(nickname.top, greaterThan(avatar.bottom));
+      expect(background.contains(nickname.topLeft), isTrue);
+      expect(background.contains(nickname.bottomRight), isTrue);
       final tags = tester.getRect(
         find.byKey(const ValueKey('profile-user-tags')),
       );
       expect(tags.center.dx, closeTo(avatar.center.dx, .01));
-      expect(tags.top, greaterThan(avatar.bottom));
+      expect(tags.top, greaterThan(nickname.bottom));
       final level = tester.getRect(
         find.byKey(const ValueKey('profile-level-tag')),
       );
