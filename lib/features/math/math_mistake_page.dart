@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_mistake.dart';
@@ -19,11 +20,18 @@ import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 import 'package:poemath/math_engine/diagnostics/error_cause_labels.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 
-class MathMistakePage extends ConsumerWidget {
+class MathMistakePage extends ConsumerStatefulWidget {
   const MathMistakePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MathMistakePage> createState() => _MathMistakePageState();
+}
+
+class _MathMistakePageState extends ConsumerState<MathMistakePage> {
+  bool _batchRunning = false;
+
+  @override
+  Widget build(BuildContext context) {
     final allMistakes = ref.watch(mathMistakesProvider);
     final filteredMistakes = ref.watch(filteredMistakesProvider);
     final gradeFilter = ref.watch(mistakeGradeFilterProvider);
@@ -251,11 +259,9 @@ class MathMistakePage extends ConsumerWidget {
                             0,
                           ),
                           child: FilledButton.icon(
-                            onPressed: () => _startBatchRepractice(
-                              context,
-                              ref,
-                              repracticeQueue,
-                            ),
+                            onPressed: _batchRunning
+                                ? null
+                                : () => _startBatchRepractice(repracticeQueue),
                             icon: const Icon(Icons.replay_rounded),
                             label: Text('开始重练（${repracticeQueue.length} 题）'),
                             style: FilledButton.styleFrom(
@@ -300,17 +306,13 @@ class MathMistakePage extends ConsumerWidget {
                                 final mistake = filteredMistakes[idx];
                                 rowWidgets.add(
                                   Expanded(
-                                    child:
-                                        GestureDetector(
-                                              onTap: () => context.push(
-                                                AppRoutes.mathMistakeDetail,
-                                                extra: mistake.id,
-                                              ),
-                                              child: _MistakeCard(
-                                                mistake: mistake,
-                                              ),
-                                            )
-                                            .animateListItem(context, index: idx),
+                                    child: GestureDetector(
+                                      onTap: () => context.push(
+                                        AppRoutes.mathMistakeDetail,
+                                        extra: mistake.id,
+                                      ),
+                                      child: _MistakeCard(mistake: mistake),
+                                    ).animateListItem(context, index: idx),
                                   ),
                                 );
                               } else {
@@ -345,44 +347,89 @@ class MathMistakePage extends ConsumerWidget {
       mistakeStatusFilterLabel(filter);
 
   /// 批量重练：未掌握题与今日到期的巩固抽查混合，逐题走巩固状态机。
-  Future<void> _startBatchRepractice(
-    BuildContext context,
-    WidgetRef ref,
-    List<MathMistake> queue,
-  ) async {
+  Future<void> _startBatchRepractice(List<MathMistake> queue) async {
+    if (_batchRunning) return;
+    setState(() => _batchRunning = true);
     var correctCount = 0;
     var totalDone = 0;
     final repo = ref.read(mathMistakeRepoProvider);
-
-    for (final mistake in queue) {
-      if (!context.mounted) break;
-
-      final result = await showMistakeRepractice(
-        context,
-        mistake,
-        barrierDismissible: false,
-        title: '再练一次 (${totalDone + 1}/${queue.length})',
-      );
-
-      // 用户取消 → 退出重练
-      if (result == null) break;
-
-      totalDone++;
-      if (result) correctCount++;
-      await repo.recordRepracticeResult(mistake.id, isCorrect: result);
-    }
-
-    if (totalDone > 0 && context.mounted) {
-      ref.invalidate(mathMistakesProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '重练完成：$totalDone 题中答对 $correctCount 题'
-            '（正确率 ${(correctCount / totalDone * 100).round()}%）',
+    final batch = List<MathMistake>.of(queue);
+    try {
+      for (final mistake in batch) {
+        if (!mounted) break;
+        final result = await showMistakeRepractice(
+          context,
+          mistake,
+          barrierDismissible: false,
+          title: '再练一次 (${totalDone + 1}/${batch.length})',
+        );
+        if (result == null || !mounted) break;
+        var saved = false;
+        while (mounted && !saved) {
+          try {
+            final outcome = await repo.recordRepracticeResult(
+              mistake.id,
+              isCorrect: result,
+            );
+            if (outcome == null) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('这道错题已移除，本次重练已结束')),
+                );
+              }
+              break;
+            }
+            saved = true;
+            totalDone++;
+            if (result) correctCount++;
+            if (mounted) ref.invalidate(mathMistakesProvider);
+          } on Object catch (error, stackTrace) {
+            AppLogger.e(
+              '批量重练结果保存失败',
+              tag: 'MathMistake',
+              error: error,
+              stackTrace: stackTrace,
+            );
+            if (!mounted) break;
+            final retry = await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('重练结果未保存'),
+                content: const Text('本题答案已保留，可以重试保存。退出将放弃本题结果，之前保存的题目不受影响。'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('退出重练'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const Text('重试保存'),
+                  ),
+                ],
+              ),
+            );
+            if (retry != true) break;
+          }
+        }
+        if (!saved) break;
+      }
+      if (mounted && totalDone > 0) {
+        final label = totalDone == batch.length ? '重练完成' : '本次已保存';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$label：$totalDone 题中答对 $correctCount 题'
+              '（正确率 ${(correctCount / totalDone * 100).round()}%）',
+            ),
+            duration: const Duration(seconds: 3),
           ),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+        );
+      }
+    } finally {
+      if (mounted) {
+        ref.invalidate(mathMistakesProvider);
+        setState(() => _batchRunning = false);
+      }
     }
   }
 }
