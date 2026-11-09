@@ -419,6 +419,9 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
 
   /// 按固定题组和题序写入检查点，恢复后允许幂等重放。
   Future<void> _persistProgress() async {
+    final sessionProblems = List<MathProblem>.of(_sessionProblems);
+    final bestStreak = _bestConsecutive;
+    final records = List<ProblemRecord>.of(_problemRecords);
     final answered = ref.read(mathAnsweredCountProvider);
     final correctCount = ref.read(mathCorrectCountProvider);
     final duration = _clock.elapsedSeconds;
@@ -441,25 +444,24 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       isComplete: false,
       semester: _request!.semester,
       difficulty: _request!.difficulty.name,
-      problemsJson: jsonEncode(_problemRecords.map((r) => r.toJson()).toList()),
+      problemsJson: jsonEncode(records.map((r) => r.toJson()).toList()),
     );
-    if (_completedAt == null) await _drafts.guard(() => sessions.save(session));
+    // 恢复必须排空整个检查点，不能在会话与统计/错题之间截断。
+    await _drafts.guard(() async {
+      if (_completedAt == null) await sessions.save(session);
 
-    // 增量更新用户统计（每题 +1），与其余练习页共用同一仓储写入路径。
-    for (var i = 0; i < _problemRecords.length; i++) {
-      await _drafts.guard(
-        () => stats.recordMathAttempt(
-          isCorrect: _problemRecords[i].isCorrect,
-          bestStreak: _bestConsecutive,
+      // 增量更新用户统计（每题 +1），与其余练习页共用同一仓储写入路径。
+      for (var i = 0; i < records.length; i++) {
+        await stats.recordMathAttempt(
+          isCorrect: records[i].isCorrect,
+          bestStreak: bestStreak,
           activityId: 'math_attempt:$_sessionId:$i',
-        ),
-      );
-      final record = _problemRecords[i];
-      if (!record.isCorrect) {
-        final problem = _sessionProblems[i];
-        final judgement = _judgeRecordedAnswer(problem, record);
-        await _drafts.guard(
-          () => mistakes.recordWrong(
+        );
+        final record = records[i];
+        if (!record.isCorrect) {
+          final problem = sessionProblems[i];
+          final judgement = _judgeRecordedAnswer(problem, record);
+          await mistakes.recordWrong(
             problemText: problem.problemText,
             correctAnswer: problem.answerText,
             userAnswer: record.userAnswer,
@@ -474,12 +476,11 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                 ? null
                 : jsonEncode(record.attempt),
             activityId: 'math_mistake_attempt:$_sessionId:$i',
-          ),
-        );
+          );
+        }
       }
-    }
+    });
 
-    // 刷新 providers
     if (mounted) {
       ref.invalidate(userStatsProvider);
       ref.invalidate(todayMathCountProvider);
@@ -661,7 +662,6 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final completedAt = _completedAt ??= DateTime.now();
     _clock.finish();
     final duration = _clock.elapsedSeconds;
-    final draftWrite = _saveDraft();
 
     final stars = LearningRewardCalculator.calculateStars(
       activityType: LearningActivityType.mathPractice,
@@ -690,11 +690,13 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final activityRepo = ref.read(learningActivityRepositoryProvider);
     final statsRepo = ref.read(userStatsRepoProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
-    await draftWrite;
-    await _drafts.guard(() => repo.save(session));
-    final activityId = 'math_practice:${session.id}';
-    await _drafts.guard(
-      () => activityRepo.record(
+    late final int levelBeforeReward;
+    // 关联结算共用一次登记；动画与导航留在屏障外。
+    await _drafts.guard(() async {
+      await _saveDraft();
+      await repo.save(session);
+      final activityId = 'math_practice:${session.id}';
+      await activityRepo.record(
         id: activityId,
         activityType: LearningActivityType.mathPractice,
         totalItems: problems.length,
@@ -702,33 +704,29 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
         starsEarned: stars,
         durationSeconds: duration,
         completedAt: completedAt,
-      ),
-    );
-
-    // 做题数和连对数已在 _persistProgress() 中逐题更新，只需添加星星
-    final levelBeforeReward = statsRepo.get().level;
-    if (stars > 0) {
-      await _drafts.guard(
-        () => statsRepo.addStars(stars, activityId: activityId),
       );
-    }
-    await _drafts.guard(
-      () => checkInRepo.updateForDate(
+
+      // 做题数和连对数已在 _persistProgress() 中逐题更新，只需添加星星
+      levelBeforeReward = statsRepo.get().level;
+      if (stars > 0) {
+        await statsRepo.addStars(stars, activityId: activityId);
+      }
+      await checkInRepo.updateForDate(
         completedAt,
         activityId: activityId,
         addMathTotal: problems.length,
         addMathCorrect: correctCount,
         addStars: stars,
         addDuration: duration,
-      ),
-    );
-    _draftDisabled = true;
-    try {
-      await _drafts.remove('math', sessionId: _sessionId);
-    } catch (_) {
-      _draftDisabled = false;
-      rethrow;
-    }
+      );
+      _draftDisabled = true;
+      try {
+        await _drafts.remove('math', sessionId: _sessionId);
+      } catch (_) {
+        _draftDisabled = false;
+        rethrow;
+      }
+    });
 
     // addStars 会同步重算等级；页面仅负责展示升级反馈。
     final updatedStats = statsRepo.get();

@@ -252,9 +252,11 @@ class _WordProblemPracticePageState
 
   /// 按固定题组和题序写入检查点，恢复后允许幂等重放。
   Future<void> _persistProgress() async {
-    final answered = _problemRecords.length;
+    final records = List<ProblemRecord>.of(_problemRecords);
+    final answered = records.length;
     final duration = _clock.elapsedSeconds;
-    final first = _problems.first;
+    final sessionProblems = List<LlmProblem>.of(_problems);
+    final first = sessionProblems.first;
     final sessions = ref.read(mathSessionRepositoryProvider);
     final stats = ref.read(userStatsRepositoryProvider);
     final problems = ref.read(llmProblemRepositoryProvider);
@@ -274,31 +276,28 @@ class _WordProblemPracticePageState
       isComplete: false,
       semester: first.semester,
       difficulty: _difficultyLabel(first.difficulty),
-      problemsJson: jsonEncode(_problemRecords.map((r) => r.toJson()).toList()),
+      problemsJson: jsonEncode(records.map((r) => r.toJson()).toList()),
     );
-    if (_completedAt == null) await _drafts.guard(() => sessions.save(session));
+    // 恢复必须排空整个检查点，不能在会话与统计/题库之间截断。
+    await _drafts.guard(() async {
+      if (_completedAt == null) await sessions.save(session);
 
-    // 增量更新用户统计（每题 +1），与口算练习页共用同一仓储写入路径。
-    for (var i = 0; i < _problemRecords.length; i++) {
-      await _drafts.guard(
-        () => stats.recordMathAttempt(
-          isCorrect: _problemRecords[i].isCorrect,
+      // 增量更新用户统计（每题 +1），与口算练习页共用同一仓储写入路径。
+      for (var i = 0; i < records.length; i++) {
+        await stats.recordMathAttempt(
+          isCorrect: records[i].isCorrect,
           bestStreak: 0,
           activityId: 'word_attempt:$_sessionId:$i',
-        ),
-      );
-      await _drafts.guard(
-        () => problems.recordAttempt(
-          _problems[i].id,
-          correct: _problemRecords[i].isCorrect,
+        );
+        await problems.recordAttempt(
+          sessionProblems[i].id,
+          correct: records[i].isCorrect,
           activityId: 'word_library_attempt:$_sessionId:$i',
-        ),
-      );
-      final record = _problemRecords[i];
-      if (!record.isCorrect) {
-        final problem = _problems[i];
-        await _drafts.guard(
-          () => mistakes.recordWrong(
+        );
+        final record = records[i];
+        if (!record.isCorrect) {
+          final problem = sessionProblems[i];
+          await mistakes.recordWrong(
             problemText: problem.questionText,
             correctAnswer: problem.answer.toString(),
             userAnswer: record.userAnswer,
@@ -309,10 +308,10 @@ class _WordProblemPracticePageState
                 ? null
                 : problem.explanation,
             activityId: 'word_mistake_attempt:$_sessionId:$i',
-          ),
-        );
+          );
+        }
       }
-    }
+    });
 
     if (mounted) {
       ref.invalidate(userStatsProvider);
@@ -429,7 +428,6 @@ class _WordProblemPracticePageState
     final completedAt = _completedAt ??= DateTime.now();
     _clock.finish();
     final duration = _clock.elapsedSeconds;
-    final draftWrite = _saveDraft();
     final first = problems.first;
 
     final stars = LearningRewardCalculator.calculateStars(
@@ -458,11 +456,13 @@ class _WordProblemPracticePageState
     final activityRepo = ref.read(learningActivityRepositoryProvider);
     final statsRepo = ref.read(userStatsRepoProvider);
     final checkInRepo = ref.read(checkInRepoProvider);
-    await draftWrite;
-    await _drafts.guard(() => repo.save(session));
-    final activityId = 'llm_word_practice:${session.id}';
-    await _drafts.guard(
-      () => activityRepo.record(
+    late final int levelBeforeReward;
+    // 关联结算共用一次登记；动画与导航留在屏障外。
+    await _drafts.guard(() async {
+      await _saveDraft();
+      await repo.save(session);
+      final activityId = 'llm_word_practice:${session.id}';
+      await activityRepo.record(
         id: activityId,
         activityType: LearningActivityType.wordProblem,
         totalItems: problems.length,
@@ -470,34 +470,31 @@ class _WordProblemPracticePageState
         starsEarned: stars,
         durationSeconds: duration,
         completedAt: completedAt,
-      ),
-    );
-
-    // 做题数已在 _persistProgress() 中逐题更新，只需添加星星。
-    final levelBeforeReward = statsRepo.get().level;
-    if (stars > 0) {
-      await _drafts.guard(
-        () => statsRepo.addStars(stars, activityId: activityId),
       );
-    }
-    await _drafts.guard(
-      () => checkInRepo.updateForDate(
+
+      // 做题数已在 _persistProgress() 中逐题更新，只需添加星星。
+      levelBeforeReward = statsRepo.get().level;
+      if (stars > 0) {
+        await statsRepo.addStars(stars, activityId: activityId);
+      }
+      await checkInRepo.updateForDate(
         completedAt,
         activityId: activityId,
         addMathTotal: problems.length,
         addMathCorrect: correctCount,
         addStars: stars,
         addDuration: duration,
-      ),
-    );
-    _draftDisabled = true;
-    try {
-      await _drafts.remove('word', sessionId: _sessionId);
-    } catch (_) {
-      _draftDisabled = false;
-      rethrow;
-    }
+      );
+      _draftDisabled = true;
+      try {
+        await _drafts.remove('word', sessionId: _sessionId);
+      } catch (_) {
+        _draftDisabled = false;
+        rethrow;
+      }
+    });
 
+    // addStars 会同步重算等级；页面仅负责展示升级反馈。
     final updatedStats = statsRepo.get();
     if (updatedStats.level > levelBeforeReward && mounted) {
       showCelebration(
