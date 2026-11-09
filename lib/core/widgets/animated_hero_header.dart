@@ -383,6 +383,175 @@ class HeroAvatarHalo extends StatelessWidget {
   }
 }
 
+/// 星空区域的信息徽章；流光只重绘边缘，与顶部背景共用动画时钟。
+class HeroStatusTag extends StatelessWidget {
+  const HeroStatusTag({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.accent,
+    required this.secondaryAccent,
+    this.phaseOffset = 0,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color accent;
+  final Color secondaryAccent;
+  final double phaseOffset;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AnimatedHeroColors(
+      theme,
+      style: AnimatedHeroStyle.starlight,
+    );
+    final motion = context.dependOnInheritedWidgetOfExactType<_HeroMotion>()!;
+    return RepaintBoundary(
+      child: CustomPaint(
+        foregroundPainter: _HeroTagEdgePainter(
+          accent: accent,
+          secondaryAccent: secondaryAccent,
+          foreground: colors.foreground,
+          motion: motion.animation,
+          phaseOffset: phaseOffset,
+        ),
+        child: ColoredCard(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color.lerp(colors.depth, accent, .24)!,
+              Color.lerp(colors.depth, secondaryAccent, .08)!,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(SpacingTokens.radiusPill),
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.sm + SpacingTokens.xs,
+            vertical: SpacingTokens.sm,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ExcludeSemantics(
+                child: Icon(icon, size: SpacingTokens.md, color: accent),
+              ),
+              const SizedBox(width: SpacingTokens.xs),
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colors.foreground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 光线和星芒沿胶囊边缘移动，不扫过文字，也不改变标签几何尺寸。
+class _HeroTagEdgePainter extends CustomPainter {
+  _HeroTagEdgePainter({
+    required this.accent,
+    required this.secondaryAccent,
+    required this.foreground,
+    required this.motion,
+    required this.phaseOffset,
+  }) : super(repaint: motion);
+
+  final Color accent;
+  final Color secondaryAccent;
+  final Color foreground;
+  final Animation<double> motion;
+  final double phaseOffset;
+  Size? _size;
+  ui.PathMetric? _edge;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final rect = (Offset.zero & size).deflate(1);
+    final rim = RRect.fromRectAndRadius(rect, Radius.circular(rect.height / 2));
+    if (_size != size) {
+      _size = size;
+      _edge = (Path()..addRRect(rim)).computeMetrics().first;
+    }
+    final edge = _edge!;
+    final phase = (motion.value * 4 + phaseOffset) % 1;
+    canvas.drawRRect(
+      rim,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withValues(alpha: .7),
+            secondaryAccent.withValues(alpha: .2),
+            accent.withValues(alpha: .45),
+          ],
+        ).createShader(rect),
+    );
+
+    // 分段渐亮的短光尾可连续跨过闭合路径起点，不出现整圈闪烁。
+    for (var step = 0; step < 12; step++) {
+      final start = ((phase + step * .014) % 1) * edge.length;
+      final end = math.min(edge.length, start + edge.length * .017);
+      final segment = edge.extractPath(start, end);
+      final strength = (step + 1) / 12;
+      final light = Color.lerp(secondaryAccent, foreground, strength * .8)!;
+      canvas.drawPath(
+        segment,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4
+          ..color = accent.withValues(alpha: strength * .28)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+      );
+      canvas.drawPath(
+        segment,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4
+          ..strokeCap = StrokeCap.round
+          ..color = light.withValues(alpha: strength * .95),
+      );
+    }
+
+    final head = edge.getTangentForOffset(((phase + .168) % 1) * edge.length)!;
+    final pulse = .65 + .35 * math.sin(phase * math.pi * 2).abs();
+    final reach = SpacingTokens.xs * pulse;
+    final point = head.position;
+    final sparkle = Path()
+      ..moveTo(point.dx, point.dy - reach)
+      ..quadraticBezierTo(point.dx, point.dy, point.dx + reach, point.dy)
+      ..quadraticBezierTo(point.dx, point.dy, point.dx, point.dy + reach)
+      ..quadraticBezierTo(point.dx, point.dy, point.dx - reach, point.dy)
+      ..quadraticBezierTo(point.dx, point.dy, point.dx, point.dy - reach)
+      ..close();
+    canvas.drawPath(
+      sparkle,
+      Paint()..color = foreground.withValues(alpha: .85),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HeroTagEdgePainter oldDelegate) =>
+      oldDelegate.accent != accent ||
+      oldDelegate.secondaryAccent != secondaryAccent ||
+      oldDelegate.foreground != foreground ||
+      oldDelegate.motion != motion ||
+      oldDelegate.phaseOffset != phaseOffset;
+}
+
 /// 每六秒轻呼吸一次，间隔四秒；与背景一起启停。
 class HeroActionReminder extends StatelessWidget {
   const HeroActionReminder({super.key, required this.child});

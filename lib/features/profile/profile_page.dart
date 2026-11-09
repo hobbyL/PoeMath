@@ -191,22 +191,28 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                   child: ProfileAvatarButton(colors: colors),
                                 ),
                                 const SizedBox(height: SpacingTokens.sm),
-                                Text(
-                                  stats.levelName,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.headlineSmall
-                                      ?.copyWith(
-                                        color: colors.foreground,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                                const SizedBox(height: SpacingTokens.xs),
-                                Text(
-                                  '${stats.totalStars} 颗星星',
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: colors.foreground,
-                                  ),
+                                Wrap(
+                                  key: const ValueKey('profile-user-tags'),
+                                  alignment: WrapAlignment.center,
+                                  spacing: SpacingTokens.sm,
+                                  runSpacing: SpacingTokens.sm,
+                                  children: [
+                                    HeroStatusTag(
+                                      key: const ValueKey('profile-level-tag'),
+                                      label: stats.levelName,
+                                      icon: Icons.workspace_premium_rounded,
+                                      accent: ColorTokens.mathPurple,
+                                      secondaryAccent: ColorTokens.mathBlue,
+                                    ),
+                                    HeroStatusTag(
+                                      key: const ValueKey('profile-stars-tag'),
+                                      label: '${stats.totalStars} 颗星星',
+                                      icon: Icons.star_rounded,
+                                      accent: ColorTokens.mathYellow,
+                                      secondaryAccent: ColorTokens.poemGold,
+                                      phaseOffset: .45,
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

@@ -165,8 +165,13 @@ void main() {
       }
 
       final orbits = find.byKey(const ValueKey('hero-avatar-orbits'));
+      final levelTag = find.byKey(const ValueKey('profile-level-tag'));
+      final starsTag = find.byKey(const ValueKey('profile-stars-tag'));
       final first = await pixels(background);
       final firstOrbits = await pixels(orbits);
+      final firstLevelTag = await pixels(levelTag);
+      final firstStarsTag = await pixels(starsTag);
+      final tagBounds = tester.getRect(starsTag);
       final avatarBounds = tester.getRect(find.byType(CircleAvatar));
       await tester.pump(const Duration(milliseconds: 1500));
       final second = await pixels(background);
@@ -187,6 +192,9 @@ void main() {
         );
       }
       expect(listEquals(firstOrbits, await pixels(orbits)), reduceMotion);
+      expect(listEquals(firstLevelTag, await pixels(levelTag)), reduceMotion);
+      expect(listEquals(firstStarsTag, await pixels(starsTag)), reduceMotion);
+      expect(tester.getRect(starsTag), tagBounds);
       expect(tester.getRect(find.byType(CircleAvatar)), avatarBounds);
       final before = tester.getRect(background);
       final gesture = await tester.startGesture(before.center);
@@ -279,7 +287,7 @@ void main() {
     }
   }
 
-  testWidgets('个人页横竖屏及大字号完整展示等级和星星', (tester) async {
+  testWidgets('头像下方等级和星星标签居中并排，窄屏大字号自动换行', (tester) async {
     for (final (size, scale, brightness) in [
       (const Size(411, 914), 1.0, Brightness.light),
       (const Size(320, 640), 2.0, Brightness.light),
@@ -297,14 +305,32 @@ void main() {
       expect(identity.center.dx, closeTo(background.center.dx, .01));
       final avatar = tester.getRect(find.byType(CircleAvatar));
       expect(avatar.center.dx, closeTo(background.center.dx, .01));
-      var previousBottom = avatar.bottom;
+      final tags = tester.getRect(
+        find.byKey(const ValueKey('profile-user-tags')),
+      );
+      expect(tags.center.dx, closeTo(avatar.center.dx, .01));
+      expect(tags.top, greaterThan(avatar.bottom));
+      final level = tester.getRect(
+        find.byKey(const ValueKey('profile-level-tag')),
+      );
+      final stars = tester.getRect(
+        find.byKey(const ValueKey('profile-stars-tag')),
+      );
+      if (size.width == 320) {
+        expect(stars.top, greaterThan(level.bottom));
+        expect(level.center.dx, closeTo(avatar.center.dx, .01));
+        expect(stars.center.dx, closeTo(avatar.center.dx, .01));
+      } else {
+        expect(level.center.dy, closeTo(stars.center.dy, .01));
+        expect(stars.left, greaterThan(level.right));
+      }
       for (final label in ['诗仙', '12345 颗星星']) {
         final bounds = tester.getRect(find.text(label));
-        expect(bounds.center.dx, closeTo(background.center.dx, .01));
-        expect(bounds.top, greaterThan(previousBottom));
-        previousBottom = bounds.bottom;
+        expect(bounds.top, greaterThan(avatar.bottom));
         expect(background.contains(bounds.topLeft), isTrue);
         expect(background.contains(bounds.bottomRight), isTrue);
+        expect(tags.contains(bounds.topLeft), isTrue);
+        expect(tags.contains(bounds.bottomRight), isTrue);
       }
       expect(find.byTooltip('设置').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
