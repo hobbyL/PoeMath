@@ -384,6 +384,7 @@ void main() {
   });
 
   testWidgets('场景规划失败后重新进入仍显示原要求，并可重试生成同一草稿', (tester) async {
+    var planningAvailable = false;
     var planningRequests = 0;
     var captionRequests = 0;
     var imageRequests = 0;
@@ -419,7 +420,7 @@ void main() {
           if (content is String) {
             planningRequests++;
             planningMessages.add(content);
-            result = planningRequests == 1
+            result = !planningAvailable
                 ? <Object>[]
                 : [
                     {'imagePrompt': '两只小动物在雨天共撑一把伞'},
@@ -471,13 +472,16 @@ void main() {
     await tester.ensureVisible(find.text('生成图文题目'));
     await tester.pumpAndSettle();
     await tester.runAsync(() => tester.tap(find.text('生成图文题目')));
-    await _until(tester, () => find.text('模型内容未通过格式校验').evaluate().isNotEmpty);
+    await _until(
+      tester,
+      () => find.textContaining('场景规划数量不完整').evaluate().isNotEmpty,
+    );
     final failed = service.readDraft('default')!;
     expect(failed.candidates, isEmpty);
     expect(failed.options.count, 2);
     expect(failed.options.themes, ['动物朋友']);
     expect(failed.options.requirements, '雨天互相帮助');
-    expect(planningRequests, 1);
+    expect(planningRequests, 2);
     expect(imageRequests, 0);
 
     router.pop();
@@ -494,10 +498,11 @@ void main() {
     );
     expect(find.text('确认入库（0 道）'), findsNothing);
     expect(service.readDraft('default')!.toJson(), failed.toJson());
-    expect(planningRequests, 1);
+    expect(planningRequests, 2);
     final retry = find.text('重试生成图文题目');
     await tester.ensureVisible(retry);
     await tester.pumpAndSettle();
+    planningAvailable = true;
     await tester.runAsync(() => tester.tap(retry));
     final publish = find.widgetWithText(FilledButton, '确认入库（2 道）');
     await _until(
@@ -510,8 +515,8 @@ void main() {
     expect(ready.id, failed.id);
     expect(ready.options.toJson(), failed.options.toJson());
     expect(ready.candidates.first.edit.toPrompt().title, '雨天共撑一把伞');
-    expect(planningRequests, 2);
-    expect(planningMessages[1], planningMessages[0]);
+    expect(planningRequests, 3);
+    expect(planningMessages[2], planningMessages[0]);
     expect(captionRequests, 2);
     expect(imageRequests, 2);
     expect(repository.catalogState().versions, isEmpty);

@@ -439,36 +439,90 @@ class PictureStoryGenerationService {
       ];
     }
     final timer = Stopwatch()..start();
-    late List<PictureStoryGenerationCandidate> items;
-    final response = await client.chatComplete(
-      config: config,
-      systemPrompt: systemPrompt,
-      stream: true,
-      messages: [
-        ChatMessage(
-          role: ChatRole.user,
-          content:
-              '难度：${draft.options.level.label}\n'
-              '主题：${draft.options.themes.join('、')}\n'
-              '补充要求：${draft.options.requirements}\n'
-              '严格生成 ${draft.options.count} 个不同的单图场景。',
-        ),
-      ],
-      maxTokens: 3000,
-      onAttempt: onAttempt,
-      validate: (response) {
-        final data = _json(response.content);
-        if (data is! List || data.length != draft.options.count) {
-          throw const FormatException('场景规划数量不完整，请重新生成');
+    final items = <PictureStoryGenerationCandidate>[];
+    var attempt = 0;
+    // 多题回复可能缺项或包裹在 scenes 中；仅允许一次有界补全，不重复生图。
+    for (var round = 0; round < 2; round++) {
+      String? problem;
+      Never invalidPlan(String message) {
+        problem = message;
+        throw FormatException(message);
+      }
+
+      final remaining = draft.options.count - items.length;
+      late List<PictureStoryGenerationCandidate> planned;
+      try {
+        final response = await client.chatComplete(
+          config: config,
+          systemPrompt: systemPrompt,
+          stream: true,
+          messages: [
+            ChatMessage(
+              role: ChatRole.user,
+              content:
+                  '难度：${draft.options.level.label}\n'
+                  '主题：${draft.options.themes.join('、')}\n'
+                  '补充要求：${draft.options.requirements}\n'
+                  '严格生成 $remaining 个不同的单图场景。\n'
+                  '${items.isEmpty ? '' : '已规划的场景（请勿重复）：${jsonEncode(items.map((item) => item.imagePrompt).toList())}\n'}'
+                  '${round == 0 ? '' : '请补全上一次规划，确保数量、JSON 格式与字段符合要求。\n'}'
+                  '示例格式：[{"imagePrompt":"具体场景描述"}]，不要添加解释。',
+            ),
+          ],
+          maxTokens: min(8192, 512 + remaining * 2200),
+          onAttempt: (_) => onAttempt?.call(++attempt),
+          validate: (response) {
+            final Object? decoded;
+            try {
+              decoded = _json(response.content);
+            } on FormatException {
+              invalidPlan('场景规划未返回完整 JSON');
+            }
+            final data = decoded is Map ? decoded['scenes'] : decoded;
+            if (data is! List || data.isEmpty || data.length > remaining) {
+              invalidPlan('场景规划数量不完整，需要 $remaining 个场景');
+            }
+            try {
+              planned = [
+                for (final value in data) _plannedCandidate(value, draft),
+              ];
+            } on FormatException {
+              invalidPlan('场景描述缺失或过长');
+            }
+            final descriptions = <String>{
+              for (final item in items) item.imagePrompt.trim(),
+            };
+            for (final item in planned) {
+              if (!descriptions.add(item.imagePrompt.trim())) {
+                invalidPlan('场景规划存在重复，请生成不同场景');
+              }
+            }
+          },
+        );
+        items.addAll(planned);
+        if (items.length != draft.options.count) continue;
+        await client.acceptCompletion(
+          response,
+          onSelectionSaved: onSelectionSaved,
+        );
+        break;
+      } on LlmResponseFormatError catch (error) {
+        // 传输层已完成模型回退；保留截断或请求限制的明确错误。
+        if (problem == null || !error.retryable) rethrow;
+        if (round == 1) {
+          throw LlmResponseFormatError('$problem，请重试或切换模型');
         }
-        items = [for (final value in data) _plannedCandidate(value, draft)];
-      },
-    );
+      }
+    }
+    if (items.length != draft.options.count) {
+      throw LlmResponseFormatError(
+        '场景规划只完成 ${items.length}/${draft.options.count} 题，请重试',
+      );
+    }
     AppLogger.d(
       '场景规划完成：${timer.elapsedMilliseconds}ms，${items.length} 道',
       tag: 'PictureStory',
     );
-    await client.acceptCompletion(response, onSelectionSaved: onSelectionSaved);
     return items;
   }
 

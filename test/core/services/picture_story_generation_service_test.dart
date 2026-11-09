@@ -174,10 +174,12 @@ void main() {
   var imageCalls = 0;
   var imageClients = 0;
   var failCaption = 0;
+  var incompleteSsePlans = false;
   var incompleteSseCaptions = false;
   int? captionStatus;
   String? captionLimitNotice;
   String? plannedImagePrompt;
+  final planningResponses = <Object>[];
   final captionRequests = <Map<String, dynamic>>[];
   final planRequests = <Map<String, dynamic>>[];
   final imageRequests = <Map<String, dynamic>>[];
@@ -205,10 +207,13 @@ void main() {
               planCalls++;
               requestOrder.add('规划');
               final saved = service.readDraft('default')!;
+              if (planningResponses.isNotEmpty) {
+                return _completion(planningResponses.removeAt(0), sse: sse);
+              }
               return _completion([
                 for (var i = 0; i < saved.options.count; i++)
                   {'imagePrompt': plannedImagePrompt ?? '场景 $i：公园里的孩子观察花朵。'},
-              ], sse: sse);
+              ], sse: sse, complete: !incompleteSsePlans);
             }
             captionCalls++;
             requestOrder.add('看图 $captionCalls');
@@ -297,10 +302,12 @@ void main() {
     imageCalls = 0;
     imageClients = 0;
     failCaption = 0;
+    incompleteSsePlans = false;
     incompleteSseCaptions = false;
     captionStatus = null;
     captionLimitNotice = null;
     plannedImagePrompt = null;
+    planningResponses.clear();
     captionRequests.clear();
     planRequests.clear();
     imageRequests.clear();
@@ -496,6 +503,10 @@ void main() {
 
   test('生图提示词和规划场景均达长度上限时仍可实际请求，出题提示独立生效', () async {
     plannedImagePrompt = '场' * kPictureStorySceneDescriptionMaxLength;
+    planningResponses.add([
+      {'imagePrompt': plannedImagePrompt},
+      {'imagePrompt': '景' * kPictureStorySceneDescriptionMaxLength},
+    ]);
     final draft = await start(
       count: 2,
       imagePromptOverride: '图' * kPictureStoryImagePromptMaxLength,
@@ -540,11 +551,80 @@ void main() {
   test('规划场景超长不进入生图，保留草稿且不使用图片额度', () async {
     plannedImagePrompt = '场' * (kPictureStorySceneDescriptionMaxLength + 1);
     await expectLater(start(count: 2), throwsA(isA<LlmResponseFormatError>()));
-    expect(requestOrder, ['规划']);
+    expect(requestOrder, ['规划', '规划']);
     expect(service.readDraft('default')!.candidates, isEmpty);
     expect(imageCalls, 0);
     expect(captionCalls, 0);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 0);
+  });
+
+  for (final count in [2, 3, 4, 5]) {
+    test('多题规划接受 scenes 对象，$count 题均完整生成并保留顺序', () async {
+      service = createService(sse: true);
+      planningResponses.add({
+        'scenes': [
+          for (var i = 0; i < count; i++) {'imagePrompt': '场景 $i：孩子在不同地点帮助伙伴。'},
+        ],
+      });
+      final draft = await start(count: count);
+      expect(draft.candidates.length, count);
+      expect(draft.candidates.every((item) => item.isReady), isTrue);
+      expect(draft.candidates.map((item) => item.imagePrompt), [
+        for (var i = 0; i < count; i++) '场景 $i：孩子在不同地点帮助伙伴。',
+      ]);
+      expect(planCalls, 1);
+      expect(imageCalls, count);
+      expect(captionCalls, count);
+    });
+  }
+
+  test('规划数量不足只补缺项，完整规划之前不发起生图', () async {
+    planningResponses.addAll([
+      [
+        {'imagePrompt': '孩子在公园观察蝴蝶。'},
+      ],
+      [
+        {'imagePrompt': '孩子在教室帮助同学。'},
+        {'imagePrompt': '孩子在家整理玩具。'},
+      ],
+    ]);
+    final draft = await start(count: 3);
+    expect(draft.candidates.length, 3);
+    expect(draft.candidates.every((item) => item.isReady), isTrue);
+    expect(requestOrder.take(3), ['规划', '规划', '生图 1']);
+    final repair =
+        ((planRequests.last['messages'] as List).last as Map)['content']
+            as String;
+    expect(repair, contains('严格生成 2 个'));
+    expect(repair, contains('孩子在公园观察蝴蝶。'));
+    expect(imageCalls, 3);
+  });
+
+  test('规划流被截断时保留传输错误，不当作缺题重复请求', () async {
+    incompleteSsePlans = true;
+    service = createService(sse: true);
+    await expectLater(
+      start(count: 2),
+      throwsA(isA<LlmResponseFormatError>().having(
+        (error) => error.message,
+        'message',
+        contains('流式响应未完成'),
+      )),
+    );
+    expect(planCalls, 1);
+    expect(imageCalls, 0);
+    expect(service.readDraft('default')!.candidates, isEmpty);
+  });
+
+  test('规划格式修复有界，重复失败保留草稿且不消耗生图额度', () async {
+    planningResponses.addAll([
+      '不完整 JSON',
+      {'scenes': <Object>[]},
+    ]);
+    await expectLater(start(count: 5), throwsA(isA<LlmResponseFormatError>()));
+    expect(planCalls, 2);
+    expect(imageCalls, 0);
+    expect(service.readDraft('default')!.candidates, isEmpty);
   });
 
   for (final status in [200, 429]) {

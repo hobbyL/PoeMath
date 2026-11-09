@@ -49,7 +49,7 @@ String buildPictureStoryPlanningPrompt(String? override) =>
     '当前任务仅规划适合儿童的单图场景，每题一幅图，场景要有差异。'
     '只描述一个可见时刻，不拼图、不分镜，不含暴力、成人、危险动作或可识别的真实孩子信息。\n'
     '只输出严格 JSON 数组，每项包含 imagePrompt（中文画面描述，'
-    '最多 $kPictureStorySceneDescriptionMaxLength 字）。'
+    '建议 150–300 字，最多 $kPictureStorySceneDescriptionMaxLength 字）。'
     '描述具体可见的人物、环境、动作和物体关系。不要先编题目或答案。';
 
 /// 将具体场景转为题图请求，保留单图叙事和教材插图的画面要求。
