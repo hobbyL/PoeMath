@@ -361,6 +361,7 @@ class HeroAvatarHalo extends StatelessWidget {
                     painter: HeroAvatarHaloPainter(
                       base: colors.base,
                       foreground: colors.foreground,
+                      glow: colors.glow,
                       motion: motion.animation,
                     ),
                     child: const SizedBox.expand(),

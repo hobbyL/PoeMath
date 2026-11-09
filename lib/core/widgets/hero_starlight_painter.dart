@@ -36,6 +36,17 @@ class HeroStarlightPainter extends CustomPainter {
   // 只生成一次，不在每帧取随机数，避免闪烁变成整片星图跳动。
   static final _stars = _createStars();
 
+  static const _meteorPaths = [
+    (from: Offset(.32, .12), to: Offset(.04, .62)),
+    (from: Offset(.95, .42), to: Offset(.74, .8)),
+    (from: Offset(.24, .45), to: Offset(.035, .82)),
+    (from: Offset(.82, .13), to: Offset(.64, .45)),
+    (from: Offset(.3, .25), to: Offset(.04, .7)),
+    (from: Offset(.95, .59), to: Offset(.76, .94)),
+    (from: Offset(.27, .62), to: Offset(.08, .94)),
+    (from: Offset(.86, .28), to: Offset(.69, .56)),
+  ];
+
   static List<({double x, double y, double seed, double radius})>
   _createStars() {
     final random = math.Random(37);
@@ -67,7 +78,7 @@ class HeroStarlightPainter extends CustomPainter {
         ).createShader(bounds),
     );
 
-    // 星云八秒流动一轮，卫星十六秒环绕一周；渐变代替离屏模糊。
+    // 星云八秒流动一轮，光轨十六秒环绕一周；渐变代替离屏模糊。
     for (var layer = 0; layer < 2; layer++) {
       final travel = phase * 2 + layer * math.pi;
       final center = Offset(
@@ -155,29 +166,18 @@ class HeroStarlightPainter extends CustomPainter {
       }
     }
 
-    // 每轮三颗流星，路径留在头像和文字两侧；相位零点无流星，
+    // 每轮八颗流星交错划过两侧，约两秒一颗；相位零点无流星，
     // 系统减少动态效果时呈现完整静态星空，不留半条悬停的拖尾。
-    _paintMeteor(
-      canvas,
-      size,
-      start: .035,
-      from: const Offset(.32, .12),
-      to: const Offset(.04, .62),
-    );
-    _paintMeteor(
-      canvas,
-      size,
-      start: .385,
-      from: const Offset(.95, .42),
-      to: const Offset(.74, .8),
-    );
-    _paintMeteor(
-      canvas,
-      size,
-      start: .73,
-      from: const Offset(.95, .59),
-      to: const Offset(.76, .94),
-    );
+    for (var i = 0; i < _meteorPaths.length; i++) {
+      final path = _meteorPaths[i];
+      _paintMeteor(
+        canvas,
+        size,
+        start: .025 + i / _meteorPaths.length,
+        from: path.from,
+        to: path.to,
+      );
+    }
     canvas.restore();
   }
 
@@ -250,15 +250,22 @@ class HeroAvatarHaloPainter extends CustomPainter {
   HeroAvatarHaloPainter({
     required this.base,
     required this.foreground,
+    required this.glow,
     required this.motion,
   }) : super(repaint: motion);
 
   final Color base;
   final Color foreground;
+  final Color glow;
   final Animation<double> motion;
 
   // 光轨可能经过文字后方；限制色值而不是仅限制透明度。
   late final _light = _readableHeroLight(base, foreground, foreground);
+  late final _haloLight = _readableHeroLight(
+    base,
+    foreground,
+    Color.lerp(glow, foreground, .25)!,
+  );
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -268,6 +275,33 @@ class HeroAvatarHaloPainter extends CustomPainter {
     final reach = math.min(size.width * .46, SpacingTokens.xxl * 4);
     canvas.save();
     canvas.clipRect(Offset.zero & size);
+
+    // 四秒一轮的呼吸光，只有光晕的亮度与扩散范围变化，头像保持稳定。
+    final pulse = (1 - math.cos(phase * 4)) / 2;
+    final haloRadius =
+        SpacingTokens.xl + SpacingTokens.md + SpacingTokens.xs * pulse;
+    canvas.drawCircle(
+      center,
+      haloRadius,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            _haloLight.withValues(alpha: 0),
+            _haloLight.withValues(alpha: .12 + pulse * .65),
+            _haloLight.withValues(alpha: 0),
+          ],
+          stops: const [.5, .69, 1],
+        ).createShader(Rect.fromCircle(center: center, radius: haloRadius)),
+    );
+    canvas.drawCircle(
+      center,
+      SpacingTokens.xl + SpacingTokens.xs / 2,
+      Paint()
+        ..color = _haloLight.withValues(alpha: .18 + pulse * .78)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1 + pulse * .8,
+    );
+
     canvas.translate(center.dx, center.dy);
     canvas.rotate(-.2);
     for (var orbit = 0; orbit < 2; orbit++) {
@@ -329,6 +363,7 @@ class HeroAvatarHaloPainter extends CustomPainter {
   bool shouldRepaint(HeroAvatarHaloPainter oldDelegate) =>
       oldDelegate.base != base ||
       oldDelegate.foreground != foreground ||
+      oldDelegate.glow != glow ||
       oldDelegate.motion != motion;
 }
 
