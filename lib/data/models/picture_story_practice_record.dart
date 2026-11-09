@@ -149,19 +149,19 @@ class PictureStoryPracticeRecord extends HiveObject {
     try {
       final raw = jsonDecode(segmentsJson);
       if (raw is! List) return const [];
-      return raw
-          .whereType<Map<String, dynamic>>()
-          .map(PictureStorySegment.fromJson)
-          .toList()
-        ..sort((a, b) => a.position.compareTo(b.position));
+      return _orderedSegments(
+        raw.whereType<Map<String, dynamic>>().map(PictureStorySegment.fromJson),
+      );
     } on Object {
       return const [];
     }
   }
 
   void setSegments(Iterable<PictureStorySegment> value) {
-    final ordered = value.toList()
-      ..sort((a, b) => a.position.compareTo(b.position));
+    final ordered = [
+      for (final (index, segment) in _orderedSegments(value).indexed)
+        segment.copyWith(position: index),
+    ];
     segmentsJson = jsonEncode(
       ordered.map((segment) => segment.toJson()).toList(),
     );
@@ -173,6 +173,18 @@ class PictureStoryPracticeRecord extends HiveObject {
       0,
       (total, segment) => total + segment.durationSeconds,
     );
+  }
+
+  static List<PictureStorySegment> _orderedSegments(
+    Iterable<PictureStorySegment> value,
+  ) {
+    // Legacy duplicate positions retain their stored order.
+    final indexed = value.indexed.toList()
+      ..sort((a, b) {
+        final order = a.$2.position.compareTo(b.$2.position);
+        return order == 0 ? a.$1.compareTo(b.$1) : order;
+      });
+    return [for (final (_, segment) in indexed) segment];
   }
 }
 

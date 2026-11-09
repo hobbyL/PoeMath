@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:poemath/data/models/picture_story_practice_record.dart';
@@ -68,5 +70,37 @@ void main() {
           .answerText,
       isEmpty,
     );
+  });
+  test('旧片段位置有缺口和重复时稳定排序，保存后连续且保留内容', () {
+    final record = PictureStoryPracticeRecord(
+      id: 'legacy',
+      profileId: 'default',
+      promptId: 'kite-in-the-park',
+      promptVersion: 1,
+      startedAt: DateTime(2026, 11, 9),
+      status: 'draft',
+      segmentsJson: '[]',
+    );
+    final input = [
+      for (var i = 0; i < 40; i++)
+        PictureStorySegment(
+          id: '$i',
+          position: 5,
+          audioPath: '/$i.wav',
+          durationSeconds: 1,
+          transcript: '文字$i',
+        ),
+    ];
+    record.segmentsJson = jsonEncode(input.map((s) => s.toJson()).toList());
+    final decoded = record.segments;
+    expect(decoded.map((s) => s.id), input.map((s) => s.id));
+    record.setSegments(decoded);
+    expect(record.segments.map((s) => s.position), List.generate(40, (i) => i));
+    expect(
+      record.segments.map((s) => s.audioPath),
+      input.map((s) => s.audioPath),
+    );
+    expect(record.answerText, input.map((s) => s.answerText).join('\n'));
+    expect(record.totalDurationSeconds, 40);
   });
 }

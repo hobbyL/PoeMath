@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -121,6 +123,7 @@ class _Audio extends PictureStoryAudioService {
   final held = <Completer<String>>[];
   final deleted = <String>[];
   int saves = 0;
+  bool failDelete = false;
   @override
   Future<String> savePcm16({required String id, required Uint8List pcm}) async {
     expect(pcm, Uint8List(64));
@@ -135,7 +138,10 @@ class _Audio extends PictureStoryAudioService {
   }
 
   @override
-  Future<void> delete(String path) async => deleted.add(path);
+  Future<void> delete(String path) async {
+    if (failDelete) throw StateError('synthetic delete failure');
+    deleted.add(path);
+  }
 }
 
 class _Repository extends PictureStoryRepository {
@@ -182,6 +188,8 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   final channels = <String>{};
+  final playerCalls = <String>[];
+  Completer<void>? prepareAudio;
   late _Repository repository;
   late _Audio audio;
   late List<_Speech> speeches;
@@ -224,17 +232,31 @@ void main() {
     messenger.setMockMethodCallHandler(MethodChannel(name), (_) async => null);
   }
 
-  setUpAll(() {
+  setUpAll(() async {
     mockChannel('xyz.luan/audioplayers.global');
     mockChannel('xyz.luan/audioplayers.global/events');
     channels.add('xyz.luan/audioplayers');
     messenger.setMockMethodCallHandler(
       const MethodChannel('xyz.luan/audioplayers'),
       (call) async {
+        playerCalls.add(call.method);
         if (call.method == 'create') {
           final id =
               (call.arguments as Map<dynamic, dynamic>)['playerId'] as String;
           mockChannel('xyz.luan/audioplayers/events/$id');
+        }
+        if (call.method == 'setSourceUrl') {
+          await prepareAudio?.future;
+          final id =
+              (call.arguments as Map<dynamic, dynamic>)['playerId'] as String;
+          ServicesBinding.instance.channelBuffers.push(
+            'xyz.luan/audioplayers/events/$id',
+            const StandardMethodCodec().encodeSuccessEnvelope({
+              'event': 'audio.onPrepared',
+              'value': true,
+            }),
+            (_) {},
+          );
         }
         if (call.method == 'getCurrentPosition' ||
             call.method == 'getDuration') {
@@ -243,6 +265,8 @@ void main() {
         return null;
       },
     );
+    // 全局初始化不能绑定首个用例的 FakeAsync，否则后续播放会等待旧域。
+    await AudioPlayer.global.ensureInitialized();
   });
   tearDownAll(() {
     for (final channel in channels) {
@@ -250,6 +274,8 @@ void main() {
     }
   });
   setUp(() async {
+    playerCalls.clear();
+    prepareAudio = null;
     changeLifecycle(AppLifecycleState.resumed);
     await setUpHiveForTesting();
     await unlockParentForTesting();
@@ -827,4 +853,166 @@ void main() {
       }
     });
   }
+  testWidgets('删除片段保存失败保留文本和音频，重试成功才删除', (tester) async {
+    await recordSegment(tester);
+    final before = HiveBoxes.pictureStoryPractice.values.single.copy();
+    final held = Completer<void>();
+    repository.nextSave = held;
+    repository.failHeldSave = true;
+    final button = find.byTooltip('删除这段');
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pump();
+    expect(
+      tester
+          .widget<IconButton>(
+            find.ancestor(of: button, matching: find.byType(IconButton)),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    expect(audio.deleted, isEmpty);
+    held.complete();
+    await waitUntil(
+      tester,
+      () =>
+          tester
+              .widget<IconButton>(
+                find.ancestor(of: button, matching: find.byType(IconButton)),
+              )
+              .onPressed !=
+          null,
+    );
+    expect(
+      HiveBoxes.pictureStoryPractice.values.single.segmentsJson,
+      before.segmentsJson,
+    );
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      '孩子的表达',
+    );
+    expect(audio.deleted, isEmpty);
+    expect(find.text('已删除这一段录音'), findsNothing);
+    expect(find.text('练习暂时没有保存，请检查设备空间后重试'), findsOneWidget);
+    await tester.tap(button);
+    await waitUntil(tester, () => audio.deleted.isNotEmpty);
+    expect(HiveBoxes.pictureStoryPractice.values.single.segments, isEmpty);
+    expect(audio.deleted, [before.segments.single.audioPath]);
+    expect(find.text('已删除这一段录音'), findsOneWidget);
+  });
+
+  for (final preparing in [false, true]) {
+    testWidgets('删除${preparing ? '准备播放' : '播放中'}的录音后停止，迟到回调不重播', (
+      tester,
+    ) async {
+      final directory = await tester.runAsync(
+        () => Directory.systemTemp.createTemp('poemath-record-delete-'),
+      );
+      final file = File('${directory!.path}/record.wav');
+      await tester.runAsync(() => file.writeAsBytes([0, 1]));
+      addTearDown(() => directory.delete(recursive: true));
+      audio.nextSave = Completer<String>()..complete(file.path);
+      await recordSegment(tester);
+      if (preparing) prepareAudio = Completer<void>();
+      addTearDown(() {
+        if (prepareAudio != null && !prepareAudio!.isCompleted) {
+          prepareAudio!.complete();
+        }
+      });
+      await tester.ensureVisible(find.byIcon(Icons.play_circle_outline));
+      await tester.tap(find.byIcon(Icons.play_circle_outline));
+      await waitUntil(
+        tester,
+        () => playerCalls.contains(preparing ? 'setSourceUrl' : 'resume'),
+      );
+      final stops = playerCalls.where((call) => call == 'stop').length;
+      await tester.tap(find.byTooltip('删除这段'));
+      await waitUntil(tester, () => audio.deleted.isNotEmpty);
+      expect(
+        playerCalls.where((call) => call == 'stop').length,
+        greaterThan(stops),
+      );
+      if (preparing) {
+        prepareAudio!.complete();
+        await waitUntil(
+          tester,
+          () => playerCalls.where((call) => call == 'stop').length > stops + 1,
+        );
+        expect(playerCalls, isNot(contains('resume')));
+      }
+      expect(HiveBoxes.pictureStoryPractice.values.single.segments, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final removedIndex in [0, 1, 2]) {
+    testWidgets('删除第 $removedIndex 段后追加，保留顺序且编号连续', (tester) async {
+      await recordSegment(tester);
+      for (var count = 2; count <= 3; count++) {
+        await tester.ensureVisible(find.widgetWithText(FilledButton, '说一说'));
+        await tap(tester, '说一说');
+        await tap(tester, '说好了');
+        await waitUntil(
+          tester,
+          () =>
+              HiveBoxes.pictureStoryPractice.values.single.segments.length ==
+              count,
+        );
+      }
+      final original = HiveBoxes.pictureStoryPractice.values.single.segments;
+      final button = find.byTooltip('删除这段').at(removedIndex);
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await waitUntil(tester, () => audio.deleted.length == 1);
+      await tester.ensureVisible(find.widgetWithText(FilledButton, '说一说'));
+      await tap(tester, '说一说');
+      await tap(tester, '说好了');
+      await waitUntil(
+        tester,
+        () => HiveBoxes.pictureStoryPractice.values.single.segments.length == 3,
+      );
+      final saved = HiveBoxes.pictureStoryPractice.values.single;
+      expect(saved.segments.map((s) => s.position), [0, 1, 2]);
+      expect(saved.segments.take(2).map((s) => s.id), [
+        for (var i = 0; i < 3; i++)
+          if (i != removedIndex) original[i].id,
+      ]);
+      expect(audio.deleted, [original[removedIndex].audioPath]);
+    });
+  }
+
+  testWidgets('删除保存等待时退到后台不回写旧片段，离页后可完成清理', (tester) async {
+    await recordSegment(tester);
+    final path =
+        HiveBoxes.pictureStoryPractice.values.single.segments.single.audioPath;
+    final held = Completer<void>();
+    repository.nextSave = held;
+    await tester.ensureVisible(find.byTooltip('删除这段'));
+    await tester.tap(find.byTooltip('删除这段'));
+    await tester.pump();
+    await background(tester);
+    await tester.pumpWidget(const SizedBox.shrink());
+    held.complete();
+    await waitUntil(tester, () => audio.deleted.isNotEmpty);
+    expect(HiveBoxes.pictureStoryPractice.values.single.segments, isEmpty);
+    expect(audio.deleted, [path]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('记录删除成功但音频清理失败时不恢复错误引用', (tester) async {
+    await recordSegment(tester);
+    audio.failDelete = true;
+    await tester.ensureVisible(find.byTooltip('删除这段'));
+    await tester.tap(find.byTooltip('删除这段'));
+    await waitUntil(
+      tester,
+      () => find.text('片段已删除，但录音文件清理失败').evaluate().isNotEmpty,
+    );
+    expect(HiveBoxes.pictureStoryPractice.values.single.segments, isEmpty);
+    expect(find.text('已删除这一段录音'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

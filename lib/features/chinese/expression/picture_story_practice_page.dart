@@ -52,6 +52,7 @@ class _PictureStoryPracticePageState
   final _textControllers = <String, TextEditingController>{};
   Timer? _timer;
   StreamSubscription<String>? _transcriptSubscription;
+  StreamSubscription<void>? _playbackSubscription;
   SpeechRecognitionService? _speech;
   PictureStoryFeedbackService? _feedbackService;
   PictureStoryPracticeRecord? _record;
@@ -63,12 +64,14 @@ class _PictureStoryPracticePageState
   String? _playingId;
   int _elapsedSeconds = 0;
   int _generation = 0;
+  int _playRequest = 0;
   int _draftRevision = 0;
   bool _foreground = false;
   bool _starting = false;
   bool _recording = false;
   bool _processing = false;
   bool _finishing = false;
+  bool _deleting = false;
   bool _showHints = false;
   bool _usedHints = false;
   late final PictureStoryRepository _repository;
@@ -84,6 +87,7 @@ class _PictureStoryPracticePageState
       !_recording &&
       !_processing &&
       !_finishing &&
+      !_deleting &&
       !_completed &&
       _record != null;
 
@@ -122,6 +126,7 @@ class _PictureStoryPracticePageState
   @override
   void dispose() {
     unawaited(_profileChanges?.cancel());
+    unawaited(_playbackSubscription?.cancel());
     WidgetsBinding.instance.removeObserver(this);
     _invalidateRecording();
     for (final controller in _textControllers.values) {
@@ -180,7 +185,7 @@ class _PictureStoryPracticePageState
       _invalidateRecording();
       unawaited(_player.stop());
       // Persist only the segments already accepted while the page was active.
-      if (!_finishing && !_completed) unawaited(_saveDraft());
+      if (!_finishing && !_deleting && !_completed) unawaited(_saveDraft());
       if (mounted) {
         setState(() {
           _starting = false;
@@ -204,6 +209,7 @@ class _PictureStoryPracticePageState
         _recording ||
         _processing ||
         _finishing ||
+        _deleting ||
         _completed) {
       return;
     }
@@ -377,25 +383,58 @@ class _PictureStoryPracticePageState
   }
 
   Future<void> _deleteSegment(PictureStorySegment segment) async {
-    if (_record == null || _finishing || _completed) return;
-    final removedIndex = _segments.indexOf(segment);
+    if (!_canComplete || !_segments.any((item) => item.id == segment.id)) {
+      return;
+    }
+    final next = _record!.copy()
+      ..setSegments(_segments.where((item) => item.id != segment.id));
     setState(() {
-      _segments = [
-        for (var i = 0; i < _segments.length; i++)
-          if (i != removedIndex) _segments[i].copyWith(position: i),
-      ];
+      _deleting = true;
+      _message = null;
     });
-    _record!.setSegments(_segments);
-    await _saveDraft();
-    await _audio.delete(segment.audioPath);
-    _textControllers.remove(segment.id)?.dispose();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('已删除这一段录音'),
-        action: SnackBarAction(label: '知道了', onPressed: () {}),
-      ),
-    );
+    try {
+      // Do not remove the only audio copy until its reference is durably removed.
+      if (!await _saveDraft(snapshot: next)) return;
+      _record = next;
+      _segments = next.segments;
+      if (mounted) {
+        final controller = _textControllers.remove(segment.id);
+        setState(() {});
+        // 等旧 TextField 从树上移除，再释放它使用的控制器。
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => controller?.dispose(),
+        );
+      }
+      try {
+        if (mounted && _playingId == segment.id) {
+          _playingId = null;
+          await _playbackSubscription?.cancel();
+          await _player.stop();
+        }
+        await _audio.delete(segment.audioPath);
+      } on Object catch (error, stackTrace) {
+        AppLogger.e(
+          '录音片段已删除，音频文件清理失败',
+          tag: 'PictureStory',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        if (mounted) {
+          setState(() => _message = '片段已删除，但录音文件清理失败');
+        }
+        return;
+      }
+      if (!mounted || !_foreground) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('已删除这一段录音'),
+          action: SnackBarAction(label: '知道了', onPressed: () {}),
+        ),
+      );
+    } finally {
+      _deleting = false;
+      if (mounted) setState(() {});
+    }
   }
 
   void _showCompletionHint(String message) {
@@ -567,27 +606,52 @@ class _PictureStoryPracticePageState
 
   Future<void> _play(PictureStorySegment segment) async {
     final generation = _generation;
-    if (!_current(generation)) return;
-    if (!await File(segment.audioPath).exists()) {
-      if (_current(generation)) {
+    final request = ++_playRequest;
+    bool canPlay() =>
+        _current(generation) &&
+        !_deleting &&
+        request == _playRequest &&
+        _segments.any((item) => item.id == segment.id);
+    if (!canPlay()) return;
+    try {
+      final exists = await File(segment.audioPath).exists();
+      if (!canPlay()) return;
+      if (!exists) {
         setState(() => _message = '录音文件已清理，文字记录仍然保留');
+        return;
       }
-      return;
-    }
-    if (!_current(generation)) return;
-    await _player.stop();
-    if (!_current(generation)) return;
-    if (_playingId == segment.id) {
-      setState(() => _playingId = null);
-      return;
-    }
-    setState(() => _playingId = segment.id);
-    await _player.play(DeviceFileSource(segment.audioPath));
-    _player.onPlayerComplete.first.then((_) {
-      if (_current(generation) && _playingId == segment.id) {
+      await _playbackSubscription?.cancel();
+      await _player.stop();
+      if (!canPlay()) return;
+      if (_playingId == segment.id) {
         setState(() => _playingId = null);
+        return;
       }
-    });
+      setState(() => _playingId = segment.id);
+      _playbackSubscription = _player.onPlayerComplete.listen((_) {
+        if (canPlay() && _playingId == segment.id) {
+          setState(() => _playingId = null);
+        }
+      });
+      await _player.play(DeviceFileSource(segment.audioPath));
+      // 准备播放期间可能已删除此片段；迟到结果不能重新播放它。
+      if (!canPlay() && mounted && request == _playRequest) {
+        await _player.stop();
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '录音播放失败',
+        tag: 'PictureStory',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (canPlay()) {
+        setState(() {
+          _playingId = null;
+          _message = '录音暂时无法播放，请重试';
+        });
+      }
+    }
   }
 
   @override
@@ -793,7 +857,7 @@ class _PictureStoryPracticePageState
                   style: bodyStyle?.copyWith(color: theme.colorScheme.primary),
                 ),
               ),
-            if (_starting || _processing || _finishing)
+            if (_starting || _processing || _finishing || _deleting)
               const LinearProgressIndicator(),
             if (_finishing) const Text('正在整理本次反馈…'),
             if (_message != null) ...[
@@ -809,7 +873,11 @@ class _PictureStoryPracticePageState
                 Expanded(
                   child: FilledButton.icon(
                     onPressed:
-                        !_foreground || _starting || _processing || _finishing
+                        !_foreground ||
+                            _starting ||
+                            _processing ||
+                            _finishing ||
+                            _deleting
                         ? null
                         : (_recording ? _finishSegment : _startRecording),
                     icon: Icon(
@@ -850,7 +918,7 @@ class _PictureStoryPracticePageState
           Row(
             children: [
               IconButton(
-                onPressed: () => _play(segment),
+                onPressed: _deleting ? null : () => _play(segment),
                 icon: Icon(
                   _playingId == segment.id
                       ? Icons.stop_circle_outlined
@@ -865,9 +933,7 @@ class _PictureStoryPracticePageState
                 ),
               ),
               IconButton(
-                onPressed: _processing || _finishing
-                    ? null
-                    : () => _deleteSegment(segment),
+                onPressed: _canComplete ? () => _deleteSegment(segment) : null,
                 icon: const Icon(Icons.delete_outline),
                 tooltip: '删除这段',
               ),
@@ -875,12 +941,13 @@ class _PictureStoryPracticePageState
           ),
           TextField(
             controller: controller,
-            readOnly: _finishing,
+            readOnly: _finishing || _deleting,
             style: bodyStyle,
             minLines: 1,
             maxLines: 4,
             decoration: const InputDecoration(labelText: '识别文字（可修改）'),
             onChanged: (value) {
+              if (_deleting || _finishing) return;
               final index = _segments.indexWhere(
                 (item) => item.id == segment.id,
               );
