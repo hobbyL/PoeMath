@@ -56,7 +56,10 @@ jobs:
       - name: Test calendar boundaries across daylight saving changes
         env:
           TZ: America/New_York
-        run: flutter test --no-pub test/data/repositories/calendar_boundaries_test.dart
+        run: >-
+          flutter test --no-pub
+          test/data/repositories/calendar_boundaries_test.dart
+          test/data/repositories/today_window_repository_test.dart
 
   unit-tests:
     name: Flutter tests (${{ matrix.shard }})

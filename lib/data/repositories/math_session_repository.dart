@@ -4,10 +4,16 @@
 // 职责：口算练习会话仓储。Profile-scoped。
 
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/utils/calendar_dates.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_session.dart';
 
 class MathSessionRepository {
+  MathSessionRepository({DateTime Function()? now})
+    : _now = now ?? DateTime.now;
+
+  final DateTime Function() _now;
+
   /// 保存会话
   Future<void> save(MathSession session) async {
     final key = ProfileScope.key(session.id);
@@ -56,12 +62,13 @@ class MathSessionRepository {
 
   /// 今日做题总数
   int get todayProblems {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
+    final today = localDayBounds(_now());
     return getAll()
         .where(
           (s) =>
-              s.finishedAt != null && s.finishedAt!.isAfter(todayStart),
+              s.finishedAt != null &&
+              !s.finishedAt!.isBefore(today.start) &&
+              s.finishedAt!.isBefore(today.end),
         )
         .fold<int>(0, (sum, s) => sum + s.totalProblems);
   }

@@ -6,10 +6,16 @@
 import 'package:poemath/data/poem_identity.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
+import 'package:poemath/core/utils/calendar_dates.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 
 class PoemProgressRepository {
+  PoemProgressRepository({DateTime Function()? now})
+    : _now = now ?? DateTime.now;
+
+  final DateTime Function() _now;
+
   /// 获取某首诗的进度
   PoemProgress? get(String poemId) {
     return HiveBoxes.poemProgress.get(
@@ -56,12 +62,13 @@ class PoemProgressRepository {
 
   /// 今日学习的诗词数（按 lastStudiedAt 日期判断）
   int get todayStudiedCount {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
+    final today = localDayBounds(_now());
     return getAll()
         .where(
           (p) =>
-              p.lastStudiedAt != null && p.lastStudiedAt!.isAfter(todayStart),
+              p.lastStudiedAt != null &&
+              !p.lastStudiedAt!.isBefore(today.start) &&
+              p.lastStudiedAt!.isBefore(today.end),
         )
         .length;
   }

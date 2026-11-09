@@ -4,6 +4,7 @@
 // 职责：挑战记录仓储。Profile-scoped。
 
 import 'package:poemath/core/utils/profile_scope.dart';
+import 'package:poemath/core/utils/calendar_dates.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/challenge_record.dart';
 
@@ -14,7 +15,7 @@ class ChallengeRecordRepository {
   /// `DateTime.now`，生产路径不受影响。测试若硬编码「今天」的日期，
   /// 会在真实日期跨过那一天的零点后必然失败 —— 这正是本参数要消除的脆弱性。
   ChallengeRecordRepository({DateTime Function()? now})
-      : _now = now ?? DateTime.now;
+    : _now = now ?? DateTime.now;
 
   final DateTime Function() _now;
 
@@ -63,10 +64,13 @@ class ChallengeRecordRepository {
 
   /// 今日挑战完成的题数
   int get todayProblems {
-    final now = _now();
-    final todayStart = DateTime(now.year, now.month, now.day);
+    final today = localDayBounds(_now());
     return getAll()
-        .where((r) => !r.createdAt.isBefore(todayStart))
+        .where(
+          (r) =>
+              !r.createdAt.isBefore(today.start) &&
+              r.createdAt.isBefore(today.end),
+        )
         .fold<int>(0, (sum, r) => sum + r.totalAnswered);
   }
 
