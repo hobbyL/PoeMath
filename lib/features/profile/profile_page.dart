@@ -64,7 +64,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       (_) => _updateSettingsContrast(),
     );
     final reduceMotion = media.disableAnimations || media.accessibleNavigation;
-    final colors = AnimatedHeroColors(theme);
+    final colors = AnimatedHeroColors(
+      theme,
+      style: AnimatedHeroStyle.starlight,
+    );
     final pageStyle = theme.brightness == Brightness.dark
         ? SystemUiOverlayStyle.light
         : SystemUiOverlayStyle.dark;
@@ -158,6 +161,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   children: [
                     AnimatedHeroHeader(
                       key: _headerKey,
+                      style: AnimatedHeroStyle.starlight,
                       scrollController: _scroll,
                       backgroundKey: const ValueKey(
                         'profile-header-background',
@@ -181,16 +185,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               key: const ValueKey('profile-user-info'),
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                CircleAvatar(
-                                  radius: SpacingTokens.xl,
-                                  backgroundColor: colors.foreground,
-                                  child: Icon(
-                                    Icons.person_rounded,
-                                    color: colors.base,
-                                    size: SpacingTokens.xl,
+                                HeroAvatarHalo(
+                                  key: const ValueKey('profile-avatar-halo'),
+                                  child: CircleAvatar(
+                                    radius: SpacingTokens.xl,
+                                    backgroundColor: Color.lerp(
+                                      colors.base,
+                                      colors.glow,
+                                      .16,
+                                    ),
+                                    child: Icon(
+                                      Icons.person_rounded,
+                                      color: colors.foreground,
+                                      size: SpacingTokens.xl,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: SpacingTokens.md),
+                                const SizedBox(height: SpacingTokens.sm),
                                 Text(
                                   stats.levelName,
                                   textAlign: TextAlign.center,

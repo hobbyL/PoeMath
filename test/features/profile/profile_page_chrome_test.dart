@@ -41,6 +41,7 @@ Future<void> _pump(
   double textScale = 1,
   bool reduceMotion = false,
   Brightness brightness = Brightness.light,
+  AppSubject subject = AppSubject.poem,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -54,10 +55,7 @@ Future<void> _pump(
         ),
       ],
       child: MaterialApp(
-        theme: AppTheme.resolve(
-          subject: AppSubject.poem,
-          brightness: brightness,
-        ),
+        theme: AppTheme.resolve(subject: subject, brightness: brightness),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
             padding: const EdgeInsets.only(top: 32),
@@ -115,7 +113,7 @@ void main() {
           .style!
           .foregroundColor!
           .resolve({}),
-      AnimatedHeroColors(theme).foreground,
+      AnimatedHeroColors(theme, style: AnimatedHeroStyle.starlight).foreground,
     );
 
     final before = tester.getTopRight(settingsButton);
@@ -147,13 +145,13 @@ void main() {
   });
 
   for (final reduceMotion in [false, true]) {
-    testWidgets('个人页流光与下拉放大遵循系统减少动态效果：$reduceMotion', (tester) async {
+    testWidgets('个人页星光与下拉放大遵循系统减少动态效果：$reduceMotion', (tester) async {
       await _pump(tester, reduceMotion: reduceMotion);
       final background = find.byKey(
         const ValueKey('profile-header-background'),
       );
-      Future<Uint8List> pixels() async {
-        final boundary = tester.renderObject<RenderRepaintBoundary>(background);
+      Future<Uint8List> pixels(Finder target) async {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(target);
         return (await tester.runAsync(() async {
           final image = await boundary.toImage();
           try {
@@ -166,10 +164,30 @@ void main() {
         }))!;
       }
 
-      final first = await pixels();
+      final orbits = find.byKey(const ValueKey('hero-avatar-orbits'));
+      final first = await pixels(background);
+      final firstOrbits = await pixels(orbits);
+      final avatarBounds = tester.getRect(find.byType(CircleAvatar));
       await tester.pump(const Duration(milliseconds: 1500));
-      final second = await pixels();
+      final second = await pixels(background);
       expect(listEquals(first, second), reduceMotion);
+      if (!reduceMotion) {
+        var visiblyChanged = 0;
+        for (var offset = 0; offset < first.length; offset += 4) {
+          if ((first[offset] - second[offset]).abs() >= 10 ||
+              (first[offset + 1] - second[offset + 1]).abs() >= 10 ||
+              (first[offset + 2] - second[offset + 2]).abs() >= 10) {
+            visiblyChanged++;
+          }
+        }
+        expect(
+          visiblyChanged / (first.length / 4),
+          greaterThan(.15),
+          reason: '1.5 秒内至少 15% 背景像素有可辨识变化，不能仅凭少量像素变化认定动效可见',
+        );
+      }
+      expect(listEquals(firstOrbits, await pixels(orbits)), reduceMotion);
+      expect(tester.getRect(find.byType(CircleAvatar)), avatarBounds);
       final before = tester.getRect(background);
       final gesture = await tester.startGesture(before.center);
       await gesture.moveBy(const Offset(0, 60));
@@ -178,6 +196,10 @@ void main() {
       await tester.pump();
       final pulled = tester.getRect(background);
       expect(pulled.top, closeTo(0, .01));
+      expect(
+        tester.getCenter(orbits),
+        tester.getCenter(find.byType(CircleAvatar)),
+      );
       if (reduceMotion) {
         expect(pulled, before);
       } else {
@@ -194,6 +216,67 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('个人页星光完整周期保持文字对比度：$subject/$brightness', (tester) async {
+        await _pump(tester, subject: subject, brightness: brightness);
+        final foreground = tester
+            .widget<Text>(find.text('12345 颗星星'))
+            .style!
+            .color!
+            .computeLuminance();
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(const ValueKey('profile-header-background')),
+        );
+        final orbitBoundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(const ValueKey('hero-avatar-orbits')),
+        );
+        final orbitOffset =
+            orbitBoundary.localToGlobal(Offset.zero) -
+            boundary.localToGlobal(Offset.zero);
+        for (var step = 0; step < 9; step++) {
+          final pixels = (await tester.runAsync(() async {
+            final background = await boundary.toImage();
+            final orbits = await orbitBoundary.toImage();
+            final recorder = ui.PictureRecorder();
+            Canvas(recorder)
+              ..drawImage(background, Offset.zero, Paint())
+              ..drawImage(orbits, orbitOffset, Paint());
+            final picture = recorder.endRecording();
+            final image = await picture.toImage(
+              background.width,
+              background.height,
+            );
+            try {
+              return await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+            } finally {
+              image.dispose();
+              picture.dispose();
+              orbits.dispose();
+              background.dispose();
+            }
+          }))!;
+          var brightest = 0.0;
+          for (var i = 0; i < pixels.lengthInBytes; i += 4) {
+            final color = Color.fromARGB(
+              pixels.getUint8(i + 3),
+              pixels.getUint8(i),
+              pixels.getUint8(i + 1),
+              pixels.getUint8(i + 2),
+            );
+            final luminance = color.computeLuminance();
+            if (luminance > brightest) brightest = luminance;
+          }
+          expect(
+            (foreground + .05) / (brightest + .05),
+            greaterThanOrEqualTo(4.5),
+          );
+          await tester.pump(const Duration(seconds: 2));
+        }
+      });
+    }
   }
 
   testWidgets('个人页横竖屏及大字号完整展示等级和星星', (tester) async {
