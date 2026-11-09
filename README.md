@@ -235,10 +235,26 @@ flutter build apk --release --target-platform android-arm64
 每次 push 到 `main` 或提交 PR 时自动触发：
 
 ```
-Android 最低版本一致性检查 → analyze → test
+规范、内容校验与 analyze ─┐
+Flutter 全量测试（4 批并行）─┴→ test 汇总检查
+Android 模拟器集成测试（独立任务）
 ```
 
-在 GitHub 仓库的 **Actions** 页面查看运行状态。
+在 GitHub 仓库的 **Actions** 页面查看运行状态。Flutter 测试按文件排序后均分成
+4 批，每个文件只运行一次，每批最多并发 2 个测试进程；任意一批失败都会使
+`test` 汇总检查失败。每批的 Summary 会列出最慢、失败和已开始但未结束的用例，
+原始 JSON 与测试文件清单保留在 `flutter-test-results-0` 至 `-3` 附件中。
+日历边界测试还会在 `America/New_York` 时区额外运行，覆盖夏令时变化。
+
+本地复现某一批（将 `0` 替换为失败批次编号）：
+
+```bash
+python3 tools/run_flutter_test_shard.py --total-shards 4 --shard-index 0 \
+  --flutter .fvm/flutter_sdk/bin/flutter
+python3 tools/summarize_flutter_tests.py build/test-results/flutter-tests.json
+```
+
+本地多个批次须依次执行，避免同时运行的 Flutter 命令争用原生构建产物。
 
 ### 自动构建发版（tag）
 

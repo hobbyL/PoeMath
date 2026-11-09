@@ -10,7 +10,7 @@ jobs:
   android-integration:
     uses: ./.github/workflows/android-integration.yml
 
-  test:
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -53,22 +53,73 @@ jobs:
       - name: Run analyze
         run: flutter analyze
 
-      - name: Run tests
-        timeout-minutes: 20
-        run: |
-          mkdir -p build/test-results
-          flutter test --no-pub --file-reporter json:build/test-results/flutter-tests.json
-
       - name: Test calendar boundaries across daylight saving changes
         env:
           TZ: America/New_York
         run: flutter test --no-pub test/data/repositories/calendar_boundaries_test.dart
 
+  unit-tests:
+    name: Flutter tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.8'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        timeout-minutes: 20
+        run: >-
+          python3 tools/run_flutter_test_shard.py
+          --total-shards 4 --shard-index ${{ matrix.shard }} --concurrency 2
+
+      - name: Summarize test results
+        if: always()
+        run: >-
+          python3 tools/summarize_flutter_tests.py
+          build/test-results/flutter-tests.json
+          --title 'Flutter tests (${{ matrix.shard }})'
+          --summary "$GITHUB_STEP_SUMMARY"
+
       - name: Archive test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: flutter-test-results
-          path: build/test-results/flutter-tests.json
+          name: flutter-test-results-${{ matrix.shard }}
+          path: build/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Preserve the existing required check name; every shard must succeed.
+  test:
+    if: always()
+    needs: [checks, unit-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check all test jobs
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          TESTS_RESULT: ${{ needs.unit-tests.result }}
+        run: |
+          test "$CHECKS_RESULT" = success
+          test "$TESTS_RESULT" = success
