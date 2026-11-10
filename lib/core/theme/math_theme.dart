@@ -27,7 +27,7 @@ class MathTheme {
       secondary: ColorTokens.mathYellow,
       onSecondary: ColorTokens.mathTextDark,
       secondaryContainer: primary.withValues(alpha: 0.15),
-      onSecondaryContainer: primary,
+      onSecondaryContainer: ColorTokens.mathTextDark,
       tertiary: ColorTokens.mathPinkDeep,
       onTertiary: Colors.white,
       surface: ColorTokens.mathSurface,

@@ -24,7 +24,7 @@ class AiActionTag extends StatelessWidget {
   /// 点击回调；为空表示禁用态（无点击态、无水波纹）。
   final VoidCallback? onTap;
 
-  /// 主题色，默认 `colorScheme.tertiary`（与 AI 讲解卡片同色系）。
+  /// 主题色，默认 `colorScheme.primary`（与 AI 讲解卡片同色系）。
   final Color? color;
 
   /// 加载中：label 前置小转圈，通常与 `onTap == null` 同时出现。
@@ -33,7 +33,7 @@ class AiActionTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tagColor = color ?? theme.colorScheme.tertiary;
+    final tagColor = color ?? theme.colorScheme.primary;
 
     final content = Container(
       padding: const EdgeInsets.symmetric(
@@ -41,7 +41,7 @@ class AiActionTag extends StatelessWidget {
         vertical: 1,
       ),
       decoration: BoxDecoration(
-        color: tagColor.withValues(alpha: 0.14),
+        color: tagColor.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
       ),
       child: Row(
@@ -51,10 +51,7 @@ class AiActionTag extends StatelessWidget {
             SizedBox(
               width: 12,
               height: 12,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: tagColor,
-              ),
+              child: CircularProgressIndicator(strokeWidth: 2, color: tagColor),
             ),
             const SizedBox(width: SpacingTokens.xs),
           ],
