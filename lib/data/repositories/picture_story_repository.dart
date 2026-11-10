@@ -326,14 +326,11 @@ class PictureStoryRepository {
 
   /// AI 候选仅在家长确认后一次性发布；失败补偿目录及当前孩子启用选择。
   /// 固定的新题 id 允许暂存清理失败后的同内容重试，不生成重复题。
+  /// 本地入库只校验当前题目和题图，不受整包备份容量限制。
   Future<List<PictureStoryPrompt>> saveGeneratedPrompts({
     required List<PictureStoryPrompt> prompts,
     required String profileId,
     required void Function() check,
-    required Future<void> Function(
-      PictureStoryCatalogState catalog,
-      Map<String, List<String>> enabled,
-    ) beforeCommit,
   }) {
     final revision = ProfileScope.revision;
     void verify() {
@@ -379,12 +376,10 @@ class PictureStoryRepository {
         ...?_savedEnabledIds(profileId),
         ...saved.map((p) => p.id),
       }.toList();
-      final enabled = {...enabledByProfile(), profileId: ids};
       for (final prompt in saved) {
         await _images.ensureStored(prompt.image);
         verify();
       }
-      await beforeCommit(merged, enabled);
       verify();
       await _writeSettingsWithRollback(
         {

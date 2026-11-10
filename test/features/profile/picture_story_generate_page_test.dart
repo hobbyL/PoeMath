@@ -9,7 +9,6 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/image_generation_client.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
@@ -45,14 +44,7 @@ class _GenerationFlow extends PictureStoryGenerationService {
     required this.image,
     required PictureStoryRepository repository,
     required PictureStoryImageService images,
-  }) : super(
-         repository: repository,
-         images: images,
-         backup: BackupService(
-           pictureStoryImages: images,
-           pictureStoryRepository: repository,
-         ),
-       );
+  }) : super(repository: repository, images: images);
   final PictureStoryImage image;
   String? capturedImagePrompt;
   String? capturedQuestionPrompt;

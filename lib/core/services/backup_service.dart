@@ -372,24 +372,6 @@ class BackupService {
         : json;
   }
 
-  /// 调用者持有题库 exclusive；不再进入公开导出队列，避免嵌套等待。
-  Future<void> validatePictureStoryPublication(
-    PictureStoryCatalogState catalog,
-    Map<String, List<String>> enabled,
-  ) async {
-    final base = await _exportToJson(
-      includeCredentials: false,
-      includePictureStoryCatalog: false,
-    );
-    await PictureStoryCatalogBackup.validateBudget(
-      catalog: catalog,
-      enabledByProfile: enabled,
-      images: _pictureStoryImages,
-      parentPayload: jsonDecode(base) as Map<String, dynamic>,
-      reserveBytes: 128 * 1024,
-    );
-  }
-
   /// 读取安全存储凭据并加密。
   ///
   /// 两种「没有凭据」是合法的，返回 `null` 让调用方省略 `credentials` 节：

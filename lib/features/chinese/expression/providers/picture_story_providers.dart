@@ -45,7 +45,6 @@ final pictureStoryGenerationServiceProvider =
       return PictureStoryGenerationService(
         images: ref.watch(pictureStoryImageServiceProvider),
         repository: ref.watch(pictureStoryRepositoryProvider),
-        backup: ref.watch(backupServiceProvider),
         llmFactory: (active) => createRuntimeLlmClient(
           chatTimeout: PictureStoryGenerationService.requestTimeout,
           httpClient: httpClient,

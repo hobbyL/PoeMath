@@ -5,7 +5,6 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/image_generation_client.dart';
 import 'package:poemath/core/services/picture_story_generation_service.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
@@ -61,10 +60,6 @@ class PictureStoryGenerationHarness {
   late final service = PictureStoryGenerationService(
     images: images,
     repository: repository,
-    backup: BackupService(
-      pictureStoryImages: images,
-      pictureStoryRepository: repository,
-    ),
     llmFactory: (active) => createRuntimeLlmClient(
       chatTimeout: PictureStoryGenerationService.requestTimeout,
       httpClient: chat,

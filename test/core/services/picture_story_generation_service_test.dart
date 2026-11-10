@@ -23,6 +23,7 @@ import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/services/secure_credential_store.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/assistant_message.dart';
 import 'package:poemath/data/models/image_generation_config.dart';
 import 'package:poemath/data/models/picture_story_editor_draft.dart';
 import 'package:poemath/data/models/picture_story_generation_draft.dart';
@@ -134,18 +135,20 @@ class _PartialWriteBox extends Fake implements Box<dynamic> {
   }
 }
 
-class _BudgetImages extends PictureStoryImageService {
-  int reads = 0;
-  @override
-  Future<void> ensureStored(PictureStoryImage image) async {}
-  @override
-  Future<int> storedImageSize(String id) async =>
-      PictureStoryImageService.maxStoredBytes;
+class _TrackedImages extends PictureStoryImageService {
+  _TrackedImages({required super.directoryProvider});
+  final reads = <String>[];
+
   @override
   Future<Uint8List> readImage(String id) async {
-    reads++;
-    throw StateError('预算拒绝前不应读取题图');
+    reads.add(id);
+    return super.readImage(id);
   }
+}
+
+class _UnreadableMessages extends Fake implements Box<Message> {
+  @override
+  Iterable<Message> get values => throw StateError('聊天历史暂时无法读取');
 }
 
 class _PausedGeneratedImages extends PictureStoryImageService {
@@ -193,10 +196,6 @@ void main() {
       PictureStoryGenerationService(
         images: imageService ?? images,
         repository: repository,
-        backup: BackupService(
-          pictureStoryImages: imageService ?? images,
-          pictureStoryRepository: repository,
-        ),
         llmFactory: (active) => LlmClient(
           isActive: active,
           httpClient: MockClient((request) async {
@@ -1157,10 +1156,6 @@ void main() {
     final publisher = PictureStoryGenerationService(
       images: images,
       repository: faulty,
-      backup: BackupService(
-        pictureStoryImages: images,
-        pictureStoryRepository: faulty,
-      ),
     );
     await expectLater(publisher.publish(draft, check: () {}), throwsStateError);
     expect(
@@ -1177,10 +1172,13 @@ void main() {
     expect(await publisher.publish(draft, check: () {}), 2);
   });
 
-  test('AI 批量入库先检查全部历史题图的备份预算，超限零写入且零读图', () async {
-    final budgetImages = _BudgetImages();
+  test('确认入库只校验当前题图，不扫描历史题图，并清理已发布草稿', () async {
+    final draft = await start(count: 2);
+    final trackedImages = _TrackedImages(
+      directoryProvider: () async => directory,
+    );
     final entries = [
-      for (var i = 0; i < 11; i++)
+      for (var i = 0; i < 13; i++)
         pictureStoryFixture(
           id: 'local-history-$i',
           image: PictureStoryImage.local(i.toRadixString(16).padLeft(64, '0')),
@@ -1188,36 +1186,59 @@ void main() {
     ];
     final raw = jsonEncode(PictureStoryCatalogState(entries).toJson());
     await HiveBoxes.settings.put(PictureStoryRepository.catalogKey, raw);
-    final budgetRepository = PictureStoryRepository(images: budgetImages);
-    final backup = BackupService(
-      pictureStoryImages: budgetImages,
-      pictureStoryRepository: budgetRepository,
+    final trackedRepository = PictureStoryRepository(images: trackedImages);
+    final publisher = PictureStoryGenerationService(
+      images: trackedImages,
+      repository: trackedRepository,
+    );
+    expect(await publisher.publish(draft, check: () {}), 2);
+    expect(trackedRepository.catalogState().versions.length, 15);
+    expect(
+      trackedRepository.enabledByProfile()['default'],
+      draft.candidates.map((item) => item.id).toList(),
+    );
+    for (final item in draft.candidates) {
+      expect(
+        trackedRepository.findPrompt(item.id)!.sameContent(item.edit.toPrompt()),
+        isTrue,
+      );
+    }
+    expect(
+      trackedImages.reads,
+      draft.candidates.map((item) => item.edit.image!.value).toList(),
+    );
+    expect(service.readDraft('default'), isNull);
+  });
+
+  test('确认入库不读取聊天历史，不会被无关备份数据阻断', () async {
+    final draft = await start(count: 1);
+    final original = HiveBoxes.messages;
+    HiveBoxes.messages = _UnreadableMessages();
+    try {
+      expect(await service.publish(draft, check: () {}), 1);
+      expect(
+        repository.findPrompt(draft.candidates.single.id)!.title,
+        '观察花朵 1',
+      );
+      expect(service.readDraft('default'), isNull);
+    } finally {
+      HiveBoxes.messages = original;
+    }
+  });
+
+  test('确认入库仍拒绝当前题图缺失，保留草稿可重试', () async {
+    final draft = await start(count: 1);
+    await images.removeUnreferenced(
+      {},
+      authorize: ParentAccessService.instance.assertAllowed,
     );
     await expectLater(
-      budgetRepository.saveGeneratedPrompts(
-        prompts: [
-          for (var i = 11; i < 13; i++)
-            pictureStoryFixture(
-              id: 'local-new-$i',
-              image: PictureStoryImage.local(
-                i.toRadixString(16).padLeft(64, '0'),
-              ),
-            ),
-        ],
-        profileId: 'default',
-        check: () {},
-        beforeCommit: backup.validatePictureStoryPublication,
-      ),
-      throwsFormatException,
+      service.publish(draft, check: () {}),
+      throwsA(isA<PictureStoryImageException>()),
     );
-    expect(HiveBoxes.settings.get(PictureStoryRepository.catalogKey), raw);
-    expect(
-      HiveBoxes.settings.containsKey(
-        PictureStoryRepository.enabledKeyFor('default'),
-      ),
-      isFalse,
-    );
-    expect(budgetImages.reads, 0);
+    expect(repository.catalogState().versions, isEmpty);
+    expect(repository.enabledByProfile(), isEmpty);
+    expect(service.readDraft('default')!.encode(), draft.encode());
   });
 
   test('生成题图、出题场景、生图设置及加密密钥在新目录完整恢复，草稿和已用额度不搬运', () async {

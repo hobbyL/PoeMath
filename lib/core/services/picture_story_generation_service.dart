@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:hive/hive.dart';
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
-import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/image_generation_client.dart';
@@ -55,14 +54,12 @@ class PictureStoryGenerationService {
     Box<dynamic>? settings,
     PictureStoryImageService? images,
     PictureStoryRepository? repository,
-    BackupService? backup,
     LlmClient Function(bool Function() isActive)? llmFactory,
     ImageGenerationClient Function(bool Function() isActive)? imageFactory,
     void Function()? authorize,
   }) : _settingsOverride = settings,
        _images = images ?? PictureStoryImageService.instance,
        _repositoryOverride = repository,
-       _backupOverride = backup,
        _llmFactory =
            llmFactory ??
            ((active) =>
@@ -81,15 +78,12 @@ class PictureStoryGenerationService {
   final Box<dynamic>? _settingsOverride;
   final PictureStoryImageService _images;
   final PictureStoryRepository? _repositoryOverride;
-  final BackupService? _backupOverride;
   final LlmClient Function(bool Function()) _llmFactory;
   final ImageGenerationClient Function(bool Function()) _imageFactory;
   final void Function() _authorize;
   Box<dynamic> get _settings => _settingsOverride ?? HiveBoxes.settings;
   PictureStoryRepository get _repository =>
       _repositoryOverride ?? PictureStoryRepository(images: _images);
-  BackupService get _backup =>
-      _backupOverride ?? BackupService(pictureStoryImages: _images);
   static String keyFor(String profileId) => '$profileId$draftSuffix';
   static String _id(String prefix) =>
       '$prefix-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32).toRadixString(16)}';
@@ -796,7 +790,6 @@ class PictureStoryGenerationService {
       prompts: prompts,
       profileId: draft.profileId,
       check: verify,
-      beforeCommit: _backup.validatePictureStoryPublication,
     );
     try {
       await _serial(() async {
