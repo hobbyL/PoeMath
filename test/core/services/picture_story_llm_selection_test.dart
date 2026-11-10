@@ -59,20 +59,34 @@ class _DelayedSelectionBox extends Fake implements Box<dynamic> {
 }
 
 String _event(Object value) => 'data: ${jsonEncode(value)}\n\n';
-http.Response _completion(Object value) => http.Response.bytes(
-  utf8.encode(
-    '${_event({
-      'choices': [
-        {
-          'delta': {'content': jsonEncode(value)},
-        },
-      ],
-    })}'
-    'data: [DONE]\n\n',
-  ),
-  200,
-  headers: const {'content-type': 'text/event-stream; charset=utf-8'},
-);
+http.Response _completion(Object value, {required bool streaming}) =>
+    http.Response.bytes(
+      utf8.encode(
+        streaming
+            ? '${_event({
+                    'choices': [
+                      {
+                        'delta': {'content': jsonEncode(value)},
+                      },
+                    ],
+                  })}'
+                  'data: [DONE]\n\n'
+            : jsonEncode({
+                'choices': [
+                  {
+                    'message': {'content': jsonEncode(value)},
+                    'finish_reason': 'stop',
+                  },
+                ],
+              }),
+      ),
+      200,
+      headers: {
+        'content-type': streaming
+            ? 'text/event-stream; charset=utf-8'
+            : 'application/json; charset=utf-8',
+      },
+    );
 
 const _image = ImageGenerationConfig(
   provider: ImageGenerationProviderConfig(
@@ -94,13 +108,16 @@ void main() {
   late ProviderContainer container;
   late http.Client transport;
   late PictureStoryGenerationService service;
-  final requests = <(String, String, String)>[];
+  // 同模型的 SSE 与普通 JSON 是不同尝试，必须一起核对模式和回退顺序。
+  final requests = <(String, String, String, bool)>[];
   var imageRequests = 0;
   var changeCaptionModel = false;
   var invalidPlan = false;
   var invalidCaption = false;
   var invalidFirstCaption = false;
   var singleQuestion = false;
+  var goodProviderRequiresNonStreaming = false;
+  var primaryHttpFailure = false;
   Future<void> Function()? beforeGoodPlan;
 
   setUp(() async {
@@ -135,14 +152,36 @@ void main() {
     invalidCaption = false;
     invalidFirstCaption = false;
     singleQuestion = false;
+    goodProviderRequiresNonStreaming = false;
+    primaryHttpFailure = false;
     beforeGoodPlan = null;
     transport = MockClient((request) async {
       final body = jsonDecode(request.body) as Map<String, dynamic>;
       final content = (body['messages'] as List).last['content'];
       final planning = content is String;
       final model = body['model'] as String;
-      requests.add((request.url.host, model, planning ? 'plan' : 'caption'));
+      final streaming = body['stream'] == true;
+      requests.add((
+        request.url.host,
+        model,
+        planning ? 'plan' : 'caption',
+        streaming,
+      ));
       if (request.url.host == 'bad.example.com') {
+        expect(request.headers['Authorization'], 'Bearer synthetic-key-p1');
+        expect(settings.llmActiveProviderId, 'p1');
+        expect(container.read(llmSelectionVersionProvider), 0);
+        if (primaryHttpFailure) return http.Response('', 503);
+        if (!streaming) {
+          // 普通模式同样失败，才应切换到下一供应商。
+          return http.Response(
+            jsonEncode({
+              'error': {'message': 'synthetic-key-p1 provider-private-detail'},
+            }),
+            200,
+            headers: const {'content-type': 'application/json'},
+          );
+        }
         // 即使片段已是有效规划，后续服务错误也不能确认此模型成功。
         return http.Response.bytes(
           utf8.encode(
@@ -162,6 +201,16 @@ void main() {
           headers: const {'content-type': 'text/event-stream'},
         );
       }
+      expect(request.headers['Authorization'], 'Bearer synthetic-key-p2');
+      if (goodProviderRequiresNonStreaming && streaming) {
+        return http.Response(
+          _event({
+            'error': {'type': 'server_error'},
+          }),
+          200,
+          headers: const {'content-type': 'text/event-stream'},
+        );
+      }
       if (planning) {
         await beforeGoodPlan?.call();
         return _completion(
@@ -171,6 +220,7 @@ void main() {
                   {'imagePrompt': '小朋友在雨中分享雨伞。'},
                   {'imagePrompt': '小朋友在教室帮同学捡起书本。'},
                 ],
+          streaming: streaming,
         );
       }
       if (changeCaptionModel && model == 'gpt-4o-mini') {
@@ -183,6 +233,7 @@ void main() {
                 'title': '雨中互助',
                 'questions': ['小朋友正在做什么？'],
               },
+        streaming: streaming,
       );
     });
     container = ProviderContainer(
@@ -262,10 +313,12 @@ void main() {
     final draft = await generate();
     expect(draft.readyCount, 1);
     expect(requests, [
-      ('bad.example.com', 'gpt-4o-bad', 'caption'),
-      ('good.example.com', 'gpt-4o-mini', 'caption'),
-      ('good.example.com', 'gpt-4o', 'caption'),
+      ('bad.example.com', 'gpt-4o-bad', 'caption', true),
+      ('bad.example.com', 'gpt-4o-bad', 'caption', false),
+      ('good.example.com', 'gpt-4o-mini', 'caption', true),
+      ('good.example.com', 'gpt-4o', 'caption', true),
     ]);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 4);
     expect(imageRequests, 1);
     expect(settings.llmActiveProviderId, 'p2');
     expect(settings.llmProviders.last.model, 'gpt-4o');
@@ -292,12 +345,14 @@ void main() {
       final draft = await generate();
       expect(draft.readyCount, 2);
       expect(requests, [
-        ('bad.example.com', 'gpt-4o-bad', 'plan'),
-        ('good.example.com', 'gpt-4o-mini', 'plan'),
-        ('good.example.com', 'gpt-4o-mini', 'caption'),
-        ('good.example.com', 'gpt-4o', 'caption'),
-        ('good.example.com', 'gpt-4o', 'caption'),
+        ('bad.example.com', 'gpt-4o-bad', 'plan', true),
+        ('bad.example.com', 'gpt-4o-bad', 'plan', false),
+        ('good.example.com', 'gpt-4o-mini', 'plan', true),
+        ('good.example.com', 'gpt-4o-mini', 'caption', true),
+        ('good.example.com', 'gpt-4o', 'caption', true),
+        ('good.example.com', 'gpt-4o', 'caption', true),
       ]);
+      expect(CloudUsageService.instance.used(CloudUsageKind.llm), 6);
       expect(settings.llmActiveProviderId, explicit ? 'p1' : 'p2');
       expect(
         settings.providerIdForScenario(LlmScenario.pictureStory),
@@ -319,13 +374,53 @@ void main() {
       final next = await generate();
       expect(next.readyCount, 2);
       expect(requests, [
-        ('good.example.com', 'gpt-4o', 'plan'),
-        ('good.example.com', 'gpt-4o', 'caption'),
-        ('good.example.com', 'gpt-4o', 'caption'),
+        ('good.example.com', 'gpt-4o', 'plan', true),
+        ('good.example.com', 'gpt-4o', 'caption', true),
+        ('good.example.com', 'gpt-4o', 'caption', true),
       ]);
       expect(container.read(llmSelectionVersionProvider), 2);
     });
   }
+
+  test('备用模型普通响应恢复后回写成功选择，同批看图沿用普通模式', () async {
+    goodProviderRequiresNonStreaming = true;
+    final draft = await generate();
+    expect(draft.readyCount, 2);
+    expect(requests, [
+      ('bad.example.com', 'gpt-4o-bad', 'plan', true),
+      ('bad.example.com', 'gpt-4o-bad', 'plan', false),
+      ('good.example.com', 'gpt-4o-mini', 'plan', true),
+      ('good.example.com', 'gpt-4o-mini', 'plan', false),
+      ('good.example.com', 'gpt-4o-mini', 'caption', false),
+      ('good.example.com', 'gpt-4o-mini', 'caption', false),
+    ]);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 6);
+    expect(imageRequests, 2);
+    expect(settings.llmActiveProviderId, 'p2');
+    expect(settings.llmProviders.last.model, 'gpt-4o-mini');
+    expect(container.read(llmSelectionVersionProvider), 1);
+    for (final candidate in draft.candidates) {
+      expect(candidate.edit.toPrompt().questions, ['小朋友正在做什么？']);
+    }
+    expect(repository.catalogState().versions, isEmpty);
+  });
+
+  test('HTTP 服务失败直接切换供应商，不触发普通响应兼容重试', () async {
+    singleQuestion = true;
+    primaryHttpFailure = true;
+    final draft = await generate();
+    expect(draft.readyCount, 1);
+    expect(requests, [
+      ('bad.example.com', 'gpt-4o-bad', 'caption', true),
+      ('good.example.com', 'gpt-4o-mini', 'caption', true),
+    ]);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
+    expect(imageRequests, 1);
+    expect(settings.llmActiveProviderId, 'p2');
+    expect(settings.llmProviders.last.model, 'gpt-4o-mini');
+    expect(container.read(llmSelectionVersionProvider), 1);
+    expect(repository.catalogState().versions, isEmpty);
+  });
 
   test('生产 Provider 接线在规划成功后立即回写，后续生图失败仍保留成功模型', () async {
     // 阻止实际图片 HTTP，但保留生产服务与其大模型工厂的真实接线。
@@ -340,9 +435,11 @@ void main() {
     expect(settings.llmProviders.last.model, 'gpt-4o-mini');
     expect(container.read(llmSelectionVersionProvider), 1);
     expect(requests, [
-      ('bad.example.com', 'gpt-4o-bad', 'plan'),
-      ('good.example.com', 'gpt-4o-mini', 'plan'),
+      ('bad.example.com', 'gpt-4o-bad', 'plan', true),
+      ('bad.example.com', 'gpt-4o-bad', 'plan', false),
+      ('good.example.com', 'gpt-4o-mini', 'plan', true),
     ]);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 0);
   });
 
@@ -361,10 +458,12 @@ void main() {
     final draft = await generate();
     expect(draft.readyCount, 1);
     expect(requests, [
-      ('bad.example.com', 'gpt-4o-bad', 'caption'),
-      ('good.example.com', 'gpt-4o-mini', 'caption'),
-      ('good.example.com', 'gpt-4o', 'caption'),
+      ('bad.example.com', 'gpt-4o-bad', 'caption', true),
+      ('bad.example.com', 'gpt-4o-bad', 'caption', false),
+      ('good.example.com', 'gpt-4o-mini', 'caption', true),
+      ('good.example.com', 'gpt-4o', 'caption', true),
     ]);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 4);
     expect(imageRequests, 1);
     expect(settings.llmActiveProviderId, 'p2');
     expect(settings.llmProviders.last.model, 'gpt-4o');
