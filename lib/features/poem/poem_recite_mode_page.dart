@@ -103,7 +103,8 @@ class PoemReciteModePage extends ConsumerWidget {
 
             _ModeCard(
               icon: Icons.edit_note,
-              iconColor: theme.colorScheme.secondary,
+              iconColor: theme.semantic.secondaryForeground,
+              backgroundColor: theme.colorScheme.secondary,
               title: '填空测试',
               subtitle: '补全诗句中缺失的文字',
               onTap: () {
@@ -125,7 +126,8 @@ class PoemReciteModePage extends ConsumerWidget {
 
             _ModeCard(
               icon: Icons.hearing_outlined,
-              iconColor: theme.colorScheme.secondary,
+              iconColor: theme.semantic.secondaryForeground,
+              backgroundColor: theme.colorScheme.secondary,
               title: '诗词听写',
               subtitle: '听一句，写一句',
               onTap: () {
@@ -191,7 +193,7 @@ class PoemReciteModePage extends ConsumerWidget {
                   Icon(
                     Icons.lightbulb_outline,
                     size: 20,
-                    color: theme.colorScheme.secondary,
+                    color: theme.semantic.secondaryForeground,
                   ),
                   const SizedBox(width: SpacingTokens.sm),
                   Expanded(
@@ -238,6 +240,7 @@ class _ModeCard extends StatelessWidget {
   const _ModeCard({
     required this.icon,
     required this.iconColor,
+    this.backgroundColor,
     required this.title,
     required this.subtitle,
     required this.onTap,
@@ -245,6 +248,7 @@ class _ModeCard extends StatelessWidget {
 
   final IconData icon;
   final Color iconColor;
+  final Color? backgroundColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
@@ -254,6 +258,7 @@ class _ModeCard extends StatelessWidget {
     return AppTile(
       icon: icon,
       iconColor: iconColor,
+      backgroundColor: backgroundColor,
       title: title,
       subtitle: subtitle,
       onTap: onTap,

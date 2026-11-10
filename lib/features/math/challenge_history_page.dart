@@ -146,14 +146,14 @@ class ChallengeHistoryPage extends ConsumerWidget {
                     Icon(
                       Icons.hourglass_top_rounded,
                       size: 20,
-                      color: theme.colorScheme.secondary,
+                      color: theme.semantic.secondaryForeground,
                     ),
                     const SizedBox(height: SpacingTokens.xs),
                     Text(
                       '$fixedBest',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.secondary,
+                        color: theme.semantic.secondaryForeground,
                       ),
                     ),
                     Text(
@@ -223,7 +223,7 @@ class _RecordCard extends StatelessWidget {
 
     // 模式颜色
     final modeColor = record.mode == 'fixed'
-        ? theme.colorScheme.secondary
+        ? theme.semantic.secondaryForeground
         : theme.colorScheme.primary;
 
     // 难度标签
@@ -354,7 +354,7 @@ class _RecordCard extends StatelessWidget {
               _StatItem(
                 label: '用时',
                 value: durStr,
-                color: theme.colorScheme.secondary,
+                color: theme.semantic.secondaryForeground,
               ),
 
               // 最佳连击

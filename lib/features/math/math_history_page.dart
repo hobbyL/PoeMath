@@ -73,17 +73,13 @@ class MathHistoryPage extends ConsumerWidget {
                               final session = sessions[idx];
                               rowWidgets.add(
                                 Expanded(
-                                  child:
-                                      GestureDetector(
-                                            onTap: () => context.push(
-                                              AppRoutes.mathSessionDetail,
-                                              extra: session,
-                                            ),
-                                            child: _SessionCard(
-                                              session: session,
-                                            ),
-                                          )
-                                          .animateListItem(context, index: idx),
+                                  child: GestureDetector(
+                                    onTap: () => context.push(
+                                      AppRoutes.mathSessionDetail,
+                                      extra: session,
+                                    ),
+                                    child: _SessionCard(session: session),
+                                  ).animateListItem(context, index: idx),
                                 ),
                               );
                             } else {
@@ -233,7 +229,7 @@ class _SessionCard extends StatelessWidget {
               _StatItem(
                 label: '用时',
                 value: durStr,
-                color: theme.colorScheme.secondary,
+                color: theme.semantic.secondaryForeground,
               ),
 
               const Spacer(),

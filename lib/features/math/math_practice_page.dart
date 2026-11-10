@@ -1109,8 +1109,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                         child: Text(
                           '${i + 1}',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            // 圆形底恒为 `primary`（见上方 decoration），
-                            // 四主题的 onPrimary 均显式固定为白，等价替换。
+                            // 实色主色底与 onPrimary 前景配对，跟随亮暗主题。
                             color: theme.colorScheme.onPrimary,
                             fontWeight: FontWeight.bold,
                           ),

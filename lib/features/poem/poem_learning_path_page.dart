@@ -227,6 +227,9 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
           : Icons.menu_book_outlined,
       iconColor: required
           ? theme.colorScheme.primary
+          : theme.semantic.secondaryForeground,
+      backgroundColor: required
+          ? theme.colorScheme.primary
           : theme.colorScheme.secondary,
       title: poem.title,
       subtitle: '${poem.author} · ${required ? '本册必背' : '拓展'} · $label',

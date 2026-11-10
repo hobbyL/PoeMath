@@ -301,6 +301,7 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
                     context,
                     '${formula.grade}年级',
                     theme.colorScheme.secondary,
+                    foreground: theme.semantic.secondaryForeground,
                   ),
                 ],
               ),
@@ -483,7 +484,12 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
     );
   }
 
-  Widget _buildTag(BuildContext context, String text, Color color) {
+  Widget _buildTag(
+    BuildContext context,
+    String text,
+    Color color, {
+    Color? foreground,
+  }) {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -497,7 +503,7 @@ class _FormulaDetailPageState extends ConsumerState<FormulaDetailPage> {
       child: Text(
         text,
         style: theme.textTheme.labelSmall?.copyWith(
-          color: color,
+          color: foreground ?? color,
           fontWeight: FontWeight.w600,
         ),
       ),

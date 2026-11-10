@@ -122,71 +122,64 @@ class StudyHubPage extends ConsumerWidget {
                       );
 
                       return InkWell(
-                            onTap: () {
-                              context.push(
-                                AppRoutes.formulaDetailOf(formula.id),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(
-                              SpacingTokens.radiusMedium,
-                            ),
-                            child: ColoredCard(
-                              color: theme.colorScheme.primary,
-                              backgroundOpacity: 0.06,
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: theme.colorScheme.primary
-                                        .withValues(alpha: 0.15),
-                                    child: Icon(
-                                      Icons.functions,
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: SpacingTokens.md),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          formula.name,
-                                          style: theme.textTheme.titleSmall
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          formula.formulaText,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                                color: theme
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Icon(
-                                    isFav
-                                        ? Icons.bookmark
-                                        : Icons.bookmark_border,
-                                    color: isFav
-                                        ? theme.colorScheme.secondary
-                                        : theme.colorScheme.onSurfaceVariant,
-                                    size: 20,
-                                  ),
-                                ],
+                        onTap: () {
+                          context.push(AppRoutes.formulaDetailOf(formula.id));
+                        },
+                        borderRadius: BorderRadius.circular(
+                          SpacingTokens.radiusMedium,
+                        ),
+                        child: ColoredCard(
+                          color: theme.colorScheme.primary,
+                          backgroundOpacity: 0.06,
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: theme.colorScheme.primary
+                                    .withValues(alpha: 0.15),
+                                child: Icon(
+                                  Icons.functions,
+                                  color: theme.colorScheme.primary,
+                                ),
                               ),
-                            ),
-                          )
-                          .animateListItem(context, index: index);
+                              const SizedBox(width: SpacingTokens.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      formula.name,
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      formula.formulaText,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                isFav ? Icons.bookmark : Icons.bookmark_border,
+                                color: isFav
+                                    ? theme.semantic.secondaryForeground
+                                    : theme.colorScheme.onSurfaceVariant,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ).animateListItem(context, index: index);
                     }, childCount: formulas.length),
                   ),
                 ),

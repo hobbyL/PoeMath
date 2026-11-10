@@ -542,7 +542,7 @@ class _MistakeCard extends StatelessWidget {
                       // 未收录键回退显示英文原键（守卫内 errorType 非空）。
                       errorCauseLabel(mistake.errorType)!,
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.secondary,
+                        color: theme.semantic.secondaryForeground,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

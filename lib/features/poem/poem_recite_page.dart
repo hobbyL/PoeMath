@@ -1119,7 +1119,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                 _lines[_currentLineIndex - 1],
                 maxLines: 1,
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  color: theme.colorScheme.onSurfaceVariant,
                   letterSpacing: 2,
                   fontFamilyFallback: TypographyTokens.serifFallback,
                 ),
@@ -1207,13 +1207,13 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
             Icon(
               Icons.star_rounded,
               size: 16,
-              color: theme.colorScheme.secondary,
+              color: theme.semantic.secondaryForeground,
             ),
             const SizedBox(width: 2),
             Text(
               '$_totalStars',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.secondary,
+                color: theme.semantic.secondaryForeground,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1592,7 +1592,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
             color = theme.colorScheme.primary;
             display = origCh;
           } else if (isMissing) {
-            color = theme.colorScheme.onSurface.withValues(alpha: 0.3);
+            color = theme.colorScheme.onSurfaceVariant;
             display = origCh;
           } else {
             color = theme.colorScheme.error;
@@ -1647,7 +1647,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                             : Icons.star_outline_rounded,
                         size: 48,
                         color: filled
-                            ? theme.colorScheme.secondary
+                            ? theme.semantic.secondaryForeground
                             : theme.colorScheme.onSurface.withValues(
                                 alpha: 0.2,
                               ),
@@ -1683,7 +1683,7 @@ class _PoemRecitePageState extends ConsumerState<PoemRecitePage> {
                       label: '得分',
                       value: '$_totalStars/$maxStars',
                       icon: Icons.star_rounded,
-                      color: theme.colorScheme.secondary,
+                      color: theme.semantic.secondaryForeground,
                     ),
                     _StatItem(
                       label: '用时',

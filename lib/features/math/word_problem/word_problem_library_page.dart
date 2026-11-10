@@ -477,6 +477,9 @@ class _WordProblemLibraryPageState
                       backgroundColor: Theme.of(dialogContext)
                           .colorScheme
                           .error,
+                      foregroundColor: Theme.of(dialogContext)
+                          .colorScheme
+                          .onError,
                     )
                   : null,
               onPressed: () => Navigator.pop(dialogContext, true),

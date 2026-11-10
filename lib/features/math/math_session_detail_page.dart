@@ -121,7 +121,7 @@ class _MathSessionDetailPageState extends ConsumerState<MathSessionDetailPage> {
                                 _SummaryItem(
                                   label: '用时',
                                   value: durStr,
-                                  color: theme.colorScheme.secondary,
+                                  color: theme.semantic.secondaryForeground,
                                 ),
                                 _SummaryItem(
                                   label: '时间',
@@ -205,13 +205,11 @@ class _MathSessionDetailPageState extends ConsumerState<MathSessionDetailPage> {
                           final (originalIndex, record) = visibleRecords[idx];
                           rowWidgets.add(
                             Expanded(
-                              child:
-                                  _ProblemRow(
-                                        index: originalIndex,
-                                        record: record,
-                                        sessionId: session.id,
-                                      )
-                                      .animateListItem(context, index: idx),
+                              child: _ProblemRow(
+                                index: originalIndex,
+                                record: record,
+                                sessionId: session.id,
+                              ).animateListItem(context, index: idx),
                             ),
                           );
                         } else {

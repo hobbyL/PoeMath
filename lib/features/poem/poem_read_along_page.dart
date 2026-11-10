@@ -394,7 +394,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   }
 
   void _showSpeechUnavailableDialog(String reason) {
-    final theme = Theme.of(context);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -405,7 +404,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
           children: [
             Icon(
               Icons.mic_off_rounded,
-              color: theme.colorScheme.error,
+              color: Theme.of(ctx).colorScheme.error,
               size: 24,
             ),
             const SizedBox(width: SpacingTokens.sm),
@@ -414,8 +413,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         ),
         content: Text(
           '$reason\n\n请检查麦克风权限后重试。',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(ctx).colorScheme.onSurfaceVariant,
             height: 1.6,
           ),
         ),
@@ -431,7 +430,6 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
 
   /// 未配置腾讯云时的引导弹窗：说明 + 跳转语音识别设置。
   void _showTencentConfigDialog() {
-    final theme = Theme.of(context);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -442,7 +440,7 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
           children: [
             Icon(
               Icons.cloud_off_outlined,
-              color: theme.colorScheme.primary,
+              color: Theme.of(ctx).colorScheme.primary,
               size: 24,
             ),
             const SizedBox(width: SpacingTokens.sm),
@@ -452,8 +450,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
         content: Text(
           '跟读评分使用腾讯云语音识别。请家长在「设置 → AI 与语音 → 语音识别设置」'
           '中填写密钥，并通过真实录音测试后即可使用。',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(ctx).colorScheme.onSurfaceVariant,
             height: 1.6,
           ),
         ),

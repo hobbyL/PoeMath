@@ -849,7 +849,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     } else {
       ratingText = '还需努力，多多复习哦';
       ratingIcon = Icons.auto_stories;
-      ratingColor = theme.colorScheme.secondary;
+      ratingColor = theme.semantic.secondaryForeground;
     }
 
     final minutes = (_settledDuration ?? _draft!.clock.elapsedSeconds) ~/ 60;
@@ -937,7 +937,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
                         Icon(
                           Icons.star_rounded,
                           size: 18,
-                          color: theme.colorScheme.secondary,
+                          color: theme.semantic.secondaryForeground,
                         ),
                         const SizedBox(width: SpacingTokens.xs),
                         Text(

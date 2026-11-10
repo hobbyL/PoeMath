@@ -874,9 +874,7 @@ class _WordProblemPracticePageState
                       fontSize: TypographyTokens.fsTitle,
                       fontWeight: FontWeight.bold,
                       color: _answerController.text.isEmpty
-                          ? theme.colorScheme.onSurfaceVariant.withValues(
-                              alpha: 0.5,
-                            )
+                          ? theme.colorScheme.onSurfaceVariant
                           : theme.colorScheme.onSurface,
                     ),
                   ),

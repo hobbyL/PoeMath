@@ -83,9 +83,12 @@ class PoemReviewPage extends ConsumerWidget {
                         .slideX(begin: -0.1, end: 0, duration: 300.ms),
                     const SizedBox(height: SpacingTokens.sm),
                     ...dueToday.asMap().entries.map(
-                      (e) =>
-                          _buildReviewItem(context, ref, e.value, isDue: true)
-                              .animateListItem(context, index: e.key),
+                      (e) => _buildReviewItem(
+                        context,
+                        ref,
+                        e.value,
+                        isDue: true,
+                      ).animateListItem(context, index: e.key),
                     ),
                     const SizedBox(height: SpacingTokens.lg),
                   ],
@@ -96,16 +99,19 @@ class PoemReviewPage extends ConsumerWidget {
                           context,
                           '即将复习',
                           '${upcoming.length} 首',
-                          theme.colorScheme.secondary,
+                          theme.semantic.secondaryForeground,
                         )
                         .animatePage(context)
                         .fadeIn(duration: 300.ms)
                         .slideX(begin: -0.1, end: 0, duration: 300.ms),
                     const SizedBox(height: SpacingTokens.sm),
                     ...upcoming.asMap().entries.map(
-                      (e) =>
-                          _buildReviewItem(context, ref, e.value, isDue: false)
-                              .animateListItem(context, index: e.key),
+                      (e) => _buildReviewItem(
+                        context,
+                        ref,
+                        e.value,
+                        isDue: false,
+                      ).animateListItem(context, index: e.key),
                     ),
                   ],
                 ],
@@ -221,6 +227,9 @@ class PoemReviewPage extends ConsumerWidget {
       child: AppTile(
         icon: isDue ? Icons.notifications_active : Icons.schedule,
         iconColor: isDue
+            ? theme.colorScheme.primary
+            : theme.semantic.secondaryForeground,
+        backgroundColor: isDue
             ? theme.colorScheme.primary
             : theme.colorScheme.secondary,
         title: poem.title,

@@ -656,6 +656,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                   description: '$_initialSeconds 秒倒计时，比拼速度与准确率',
                   mode: 'fixed',
                   color: theme.colorScheme.secondary,
+                  foreground: theme.semantic.secondaryForeground,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 _buildModeCard(
@@ -734,6 +735,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
     required String description,
     required String mode,
     required Color color,
+    Color? foreground,
   }) {
     final isSelected = _challengeMode == mode;
     // 不用 `AppTile`：它在 `trailing` 非空时会把整行的 onTap 置空
@@ -762,7 +764,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
             ),
             child: Icon(
               icon,
-              color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+              color: isSelected
+                  ? (foreground ?? color)
+                  : theme.colorScheme.onSurfaceVariant,
               size: 22,
             ),
           ),
@@ -794,7 +798,9 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
             isSelected
                 ? Icons.radio_button_checked
                 : Icons.radio_button_unchecked,
-            color: isSelected ? color : theme.colorScheme.outline,
+            color: isSelected
+                ? (foreground ?? color)
+                : theme.colorScheme.outline,
           ),
         ],
       ),
@@ -1115,7 +1121,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                       theme,
                       '$accuracy%',
                       '正确率',
-                      theme.colorScheme.secondary,
+                      theme.semantic.secondaryForeground,
                     ),
                     _buildResultStat(
                       theme,
