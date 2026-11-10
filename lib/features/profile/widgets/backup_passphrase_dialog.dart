@@ -11,8 +11,10 @@ import 'package:poemath/core/theme/design_tokens.dart';
 /// 恢复备份时的口令输入对话框（可留空跳过凭据）。
 ///
 /// 返回约定：`null` = 用户取消；`''` = 留空跳过凭据恢复；非空 = 口令。
-Future<String?> showBackupPassphraseInputDialog(BuildContext context,
-    {bool requiredForPayload = false,}) {
+Future<String?> showBackupPassphraseInputDialog(
+  BuildContext context, {
+  bool requiredForPayload = false,
+}) {
   return showDialog<String>(
     context: context,
     builder: (_) =>
@@ -75,13 +77,13 @@ class _PassphraseInputDialogState extends State<_PassphraseInputDialog> {
               widget.requiredForPayload
                   ? '该备份的全部学习记录和聊天内容均已加密，需要口令才能预览和恢复。'
                   : '该备份包含加密的凭据\n'
-                      '（腾讯云 AK/SK、TTS API Key、LLM API Key）。\n'
-                      'TTS/大模型服务地址等配置不随备份同步，'
-                      '新设备需重新填写。\n'
-                      '留空将跳过凭据恢复，其余数据正常恢复。',
+                        '（腾讯云 AK/SK、TTS API Key、LLM API Key）。\n'
+                        'TTS/大模型服务地址等配置不随备份同步，'
+                        '新设备需重新填写。\n'
+                        '留空将跳过凭据恢复，其余数据正常恢复。',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -156,6 +158,7 @@ class _PassphraseSetupDialogState extends State<_PassphraseSetupDialog> {
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
             ),
             child: const Text('清除'),
           ),
@@ -201,8 +204,8 @@ class _PassphraseSetupDialogState extends State<_PassphraseSetupDialog> {
               '新设备需重新填写。\n'
               '请妥善保存口令；忘记口令将无法恢复该加密备份。',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -220,10 +223,7 @@ class _PassphraseSetupDialogState extends State<_PassphraseSetupDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('取消'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('保存'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('保存')),
       ],
     );
   }

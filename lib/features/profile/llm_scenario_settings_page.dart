@@ -314,7 +314,8 @@ class _LlmScenarioSettingsPageState
             for (final scenario in LlmScenario.values) ...[
               AppTile(
                 icon: _scenarioIcons[scenario]!,
-                iconColor: theme.colorScheme.secondary,
+                iconColor: theme.semantic.secondaryForeground,
+                backgroundColor: theme.colorScheme.secondary,
                 title: scenario.label,
                 subtitle: _scenarioSummary(
                   providers,

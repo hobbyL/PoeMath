@@ -70,9 +70,9 @@ class _SyncConflictDialog extends StatelessWidget {
             Text(
               _isDownload
                   ? '云端备份由其他设备更新过，比本机上次同步的时间更晚。'
-                      '继续下载会用云端数据覆盖本机，本机上的学习记录将丢失。'
+                        '继续下载会用云端数据覆盖本机，本机上的学习记录将丢失。'
                   : '本机数据比云端备份更新。继续上传会用本机数据覆盖云端，'
-                      '其他设备上次同步的内容将丢失。',
+                        '其他设备上次同步的内容将丢失。',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: SpacingTokens.lg),
@@ -106,6 +106,7 @@ class _SyncConflictDialog extends StatelessWidget {
           onPressed: () => Navigator.pop(context, true),
           style: FilledButton.styleFrom(
             backgroundColor: theme.colorScheme.error,
+            foregroundColor: theme.colorScheme.onError,
           ),
           child: Text(_isDownload ? '仍然下载覆盖' : '仍然上传覆盖'),
         ),

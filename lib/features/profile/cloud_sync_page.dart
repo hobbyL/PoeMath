@@ -85,6 +85,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
             ),
             child: const Text('删除'),
           ),
@@ -481,84 +482,78 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                               final selected = _selectedId == config.id;
 
                               return ColoredCard(
-                                    color: selected
-                                        ? theme.colorScheme.primary
-                                        : theme.colorScheme.outline,
-                                    backgroundOpacity: selected ? 0.12 : 0.04,
-                                    onTap: () =>
-                                        setState(() => _selectedId = config.id),
-                                    child: Row(
-                                      children: [
-                                        // 选中标记
-                                        Icon(
-                                          selected
-                                              ? Icons.radio_button_checked
-                                              : Icons.radio_button_unchecked,
-                                          color: selected
-                                              ? theme.colorScheme.primary
-                                              : theme
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
-                                          size: 22,
-                                        ),
-                                        const SizedBox(width: SpacingTokens.md),
-                                        // 配置信息
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                config.name,
-                                                style: theme
-                                                    .textTheme
-                                                    .titleSmall
-                                                    ?.copyWith(
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                              ),
-                                              const SizedBox(
-                                                height: SpacingTokens.xs,
-                                              ),
-                                              Text(
-                                                config.url,
-                                                style: theme.textTheme.bodySmall
-                                                    ?.copyWith(
-                                                      color: theme
-                                                          .colorScheme
-                                                          .onSurfaceVariant,
-                                                    ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
+                                color: selected
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.outline,
+                                backgroundOpacity: selected ? 0.12 : 0.04,
+                                onTap: () =>
+                                    setState(() => _selectedId = config.id),
+                                child: Row(
+                                  children: [
+                                    // 选中标记
+                                    Icon(
+                                      selected
+                                          ? Icons.radio_button_checked
+                                          : Icons.radio_button_unchecked,
+                                      color: selected
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.onSurfaceVariant,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: SpacingTokens.md),
+                                    // 配置信息
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            config.name,
+                                            style: theme.textTheme.titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                           ),
+                                          const SizedBox(
+                                            height: SpacingTokens.xs,
+                                          ),
+                                          Text(
+                                            config.url,
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // 操作按钮
+                                    PopupMenuButton<String>(
+                                      onSelected: (action) {
+                                        if (action == 'edit') {
+                                          _editConfig(config);
+                                        } else if (action == 'delete') {
+                                          _deleteConfig(config);
+                                        }
+                                      },
+                                      itemBuilder: (_) => [
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Text('编辑'),
                                         ),
-                                        // 操作按钮
-                                        PopupMenuButton<String>(
-                                          onSelected: (action) {
-                                            if (action == 'edit') {
-                                              _editConfig(config);
-                                            } else if (action == 'delete') {
-                                              _deleteConfig(config);
-                                            }
-                                          },
-                                          itemBuilder: (_) => [
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: Text('编辑'),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              child: Text('删除'),
-                                            ),
-                                          ],
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text('删除'),
                                         ),
                                       ],
                                     ),
-                                  )
-                                  .animateListItem(context, index: index);
+                                  ],
+                                ),
+                              ).animateListItem(context, index: index);
                             },
                           ),
                         ),
@@ -593,7 +588,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
                                   child: FilledButton.icon(
                                     onPressed: busy ? null : _download,
                                     icon: _downloading
-                                        ? const _SmallSpinner(light: true)
+                                        ? const _SmallSpinner()
                                         : const Icon(
                                             Icons.cloud_download_outlined,
                                           ),
@@ -629,9 +624,7 @@ class _CloudSyncPageState extends ConsumerState<CloudSyncPage> {
 }
 
 class _SmallSpinner extends StatelessWidget {
-  const _SmallSpinner({this.light = false});
-
-  final bool light;
+  const _SmallSpinner();
 
   @override
   Widget build(BuildContext context) {
@@ -640,10 +633,8 @@ class _SmallSpinner extends StatelessWidget {
       height: 16,
       child: CircularProgressIndicator(
         strokeWidth: 2,
-        // 中性白属语义明确用法：`light = true` 表示本指示器置于主色
-        // （primary）实底之上，需要用与底恒定对比的白，而非随主题派生的
-        // 令牌色。另一分支已显式用 primary，此处与之对称。
-        color: light ? Colors.white : Theme.of(context).colorScheme.primary,
+        // 上传/下载期间按钮禁用，底色回到 surface，进度仍需清晰可见。
+        color: Theme.of(context).colorScheme.onSurface,
       ),
     );
   }

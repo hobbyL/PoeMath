@@ -587,7 +587,7 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
                 Icon(
                   Icons.record_voice_over_outlined,
                   size: 20,
-                  color: theme.colorScheme.secondary,
+                  color: theme.semantic.secondaryForeground,
                 ),
                 const SizedBox(width: SpacingTokens.sm),
                 Expanded(

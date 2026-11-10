@@ -122,6 +122,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
                     title: '从备份恢复',
                     subtitle: '选择备份文件',
                     color: theme.colorScheme.secondary,
+                    foreground: theme.semantic.secondaryForeground,
                     onTap: () => _importBackup(context, ref),
                   ),
                 ),
@@ -517,6 +518,7 @@ class _ActionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.color,
+    this.foreground,
     required this.onTap,
   });
 
@@ -524,6 +526,7 @@ class _ActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color color;
+  final Color? foreground;
   final VoidCallback onTap;
 
   @override
@@ -536,7 +539,7 @@ class _ActionCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 40),
+          Icon(icon, color: foreground ?? color, size: 40),
           const SizedBox(height: SpacingTokens.sm),
           Text(
             title,

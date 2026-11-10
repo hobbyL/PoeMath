@@ -12,10 +12,7 @@ import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
-  const NotificationSettingsPage({
-    super.key,
-    this.notificationService,
-  });
+  const NotificationSettingsPage({super.key, this.notificationService});
 
   final NotificationService? notificationService;
 
@@ -58,14 +55,15 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       final granted = await svc.requestPermission();
       if (!granted) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('需要通知权限才能设置提醒')),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('需要通知权限才能设置提醒')));
         }
         return;
       }
-      final scheduled =
-          await svc.scheduleDailyReminder(_reminderHour, _reminderMinute);
+      final scheduled = await svc.scheduleDailyReminder(
+        _reminderHour,
+        _reminderMinute,
+      );
       if (!scheduled) {
         _showScheduleFailure('每日提醒设置失败，请稍后重试');
         return;
@@ -114,9 +112,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       final granted = await svc.requestPermission();
       if (!granted) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('需要通知权限才能开启周报推送')),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('需要通知权限才能开启周报推送')));
         }
         return;
       }
@@ -158,7 +155,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     children: [
                       Icon(
                         Icons.notifications_outlined,
-                        color: theme.colorScheme.secondary,
+                        color: theme.semantic.secondaryForeground,
                         size: 20,
                       ),
                       const SizedBox(width: SpacingTokens.sm),
@@ -210,8 +207,9 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                   if (_reminderEnabled) ...[
                     const SizedBox(height: SpacingTokens.md),
                     InkWell(
-                      borderRadius:
-                          BorderRadius.circular(SpacingTokens.radiusMedium),
+                      borderRadius: BorderRadius.circular(
+                        SpacingTokens.radiusMedium,
+                      ),
                       onTap: _pickTime,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -219,8 +217,9 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                           vertical: SpacingTokens.sm,
                         ),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.secondary
-                              .withValues(alpha: 0.08),
+                          color: theme.colorScheme.secondary.withValues(
+                            alpha: 0.08,
+                          ),
                           borderRadius: BorderRadius.circular(
                             SpacingTokens.radiusSmall,
                           ),
@@ -230,7 +229,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                             Icon(
                               Icons.access_time,
                               size: 18,
-                              color: theme.colorScheme.secondary,
+                              color: theme.semantic.secondaryForeground,
                             ),
                             const SizedBox(width: SpacingTokens.sm),
                             Text(
@@ -241,7 +240,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                             Icon(
                               Icons.edit_outlined,
                               size: 16,
-                              color: theme.colorScheme.secondary,
+                              color: theme.semantic.secondaryForeground,
                             ),
                           ],
                         ),
@@ -275,10 +274,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                           ),
                         ),
                       ),
-                      Switch(
-                        value: _weeklyEnabled,
-                        onChanged: _toggleWeekly,
-                      ),
+                      Switch(value: _weeklyEnabled, onChanged: _toggleWeekly),
                     ],
                   ),
                   Text(
@@ -290,8 +286,9 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                   const SizedBox(height: SpacingTokens.md),
                   // 查看周报入口
                   InkWell(
-                    borderRadius:
-                        BorderRadius.circular(SpacingTokens.radiusMedium),
+                    borderRadius: BorderRadius.circular(
+                      SpacingTokens.radiusMedium,
+                    ),
                     onTap: () => context.push(AppRoutes.weeklyReport),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -299,8 +296,9 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         vertical: SpacingTokens.sm,
                       ),
                       decoration: BoxDecoration(
-                        color:
-                            theme.colorScheme.tertiary.withValues(alpha: 0.08),
+                        color: theme.colorScheme.tertiary.withValues(
+                          alpha: 0.08,
+                        ),
                         borderRadius: BorderRadius.circular(
                           SpacingTokens.radiusSmall,
                         ),

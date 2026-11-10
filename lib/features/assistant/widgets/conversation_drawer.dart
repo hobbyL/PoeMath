@@ -109,6 +109,9 @@ class ConversationDrawer extends ConsumerWidget {
           icon: isCurrent ? Icons.chat_bubble : Icons.chat_bubble_outline,
           iconColor: isCurrent
               ? theme.colorScheme.primary
+              : theme.semantic.secondaryForeground,
+          backgroundColor: isCurrent
+              ? theme.colorScheme.primary
               : theme.colorScheme.secondary,
           title: c.title,
           subtitle: _formatTime(c.updatedAt),
@@ -119,7 +122,7 @@ class ConversationDrawer extends ConsumerWidget {
               if (value == 'rename') {
                 _showRenameDialog(context, ref, c);
               } else if (value == 'delete') {
-                _confirmDelete(context, ref, theme, c);
+                _confirmDelete(context, ref, c);
               }
             },
             itemBuilder: (_) => const <PopupMenuEntry<String>>[
@@ -172,7 +175,6 @@ class ConversationDrawer extends ConsumerWidget {
   Future<void> _confirmDelete(
     BuildContext context,
     WidgetRef ref,
-    ThemeData theme,
     Conversation c,
   ) async {
     final ok = await showDialog<bool>(
@@ -187,8 +189,8 @@ class ConversationDrawer extends ConsumerWidget {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.error,
-              foregroundColor: theme.colorScheme.onError,
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('删除'),

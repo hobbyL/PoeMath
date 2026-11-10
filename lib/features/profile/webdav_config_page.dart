@@ -43,9 +43,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
     _urlController = TextEditingController(text: e?.url ?? '');
     _usernameController = TextEditingController(text: e?.username ?? '');
     _passwordController = TextEditingController(text: e?.password ?? '');
-    _pathController = TextEditingController(
-      text: e?.remotePath ?? '/poemath/',
-    );
+    _pathController = TextEditingController(text: e?.remotePath ?? '/poemath/');
 
     // 编辑已有配置且凭据为空时，从安全存储加载
     if (e != null && e.username.isEmpty && e.password.isEmpty) {
@@ -105,9 +103,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
     } on Object catch (error) {
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          SnackBar(content: Text('连接失败: $error')),
-        );
+        scaffold.showSnackBar(SnackBar(content: Text('连接失败: $error')));
       }
     } finally {
       if (mounted) setState(() => _testing = false);
@@ -129,9 +125,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
     } on Object catch (error) {
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          SnackBar(content: Text('保存失败: $error')),
-        );
+        scaffold.showSnackBar(SnackBar(content: Text('保存失败: $error')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -140,7 +134,8 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
 
   WebDavConfig _buildConfig() {
     return WebDavConfig(
-      id: widget.existing?.id ??
+      id:
+          widget.existing?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       name: _nameController.text.trim(),
       url: _urlController.text.trim(),
@@ -156,9 +151,7 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
     final isEditing = widget.existing != null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? '编辑配置' : '添加 WebDAV'),
-      ),
+      appBar: AppBar(title: Text(isEditing ? '编辑配置' : '添加 WebDAV')),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -274,9 +267,8 @@ class _WebDavConfigPageState extends ConsumerState<WebDavConfigPage> {
                               height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                // 落在 FilledButton 的 primary 底上，
-                                // 与按钮文字的 onPrimary 同色。
-                                color: Theme.of(context).colorScheme.onPrimary,
+                                // 保存期间按钮禁用，进度使用禁用底上的可读前景。
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             )
                           : const Icon(Icons.save_outlined),

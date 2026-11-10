@@ -42,8 +42,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                 ImageGenerationProviderConfig.activeProviderSettingsKey,
       )
       .listen((_) {
-    if (mounted) setState(() {});
-  });
+        if (mounted) setState(() {});
+      });
 
   @override
   void initState() {
@@ -113,7 +113,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
           const SizedBox(height: SpacingTokens.sm),
           AppTile(
             icon: Icons.image_outlined,
-            iconColor: theme.colorScheme.secondary,
+            iconColor: theme.semantic.secondaryForeground,
+            backgroundColor: theme.colorScheme.secondary,
             title: '图片生成设置',
             subtitle:
                 settingsRepo.imageGenerationProvider?.model ?? '为看图说话单独配置生图服务',
@@ -122,7 +123,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
           const SizedBox(height: SpacingTokens.sm),
           AppTile(
             icon: Icons.edit_note_outlined,
-            iconColor: theme.colorScheme.secondary,
+            iconColor: theme.semantic.secondaryForeground,
+            backgroundColor: theme.colorScheme.secondary,
             title: '提示词设置',
             subtitle: '生图、出题、讲解与助手人设的提示词',
             onTap: () => Navigator.push<void>(

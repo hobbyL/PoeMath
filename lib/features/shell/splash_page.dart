@@ -27,11 +27,7 @@ typedef SplashDataInitializer = Future<bool> Function(
 typedef SplashIndexBuilder = Future<void> Function();
 
 class SplashPage extends ConsumerStatefulWidget {
-  const SplashPage({
-    super.key,
-    this.dataInitializer,
-    this.indexBuilder,
-  });
+  const SplashPage({super.key, this.dataInitializer, this.indexBuilder});
 
   final SplashDataInitializer? dataInitializer;
   final SplashIndexBuilder? indexBuilder;
@@ -109,9 +105,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
     try {
       final didImport = widget.dataInitializer != null
           ? await widget.dataInitializer!(_updateProgress)
-          : await DataBootstrap.ensureInitialized(
-              onProgress: _updateProgress,
-            );
+          : await DataBootstrap.ensureInitialized(onProgress: _updateProgress);
 
       if (widget.indexBuilder != null) {
         await widget.indexBuilder!();
@@ -130,11 +124,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       if (!mounted) return;
       _goHome();
     } catch (error) {
-      AppLogger.e(
-        '静态数据初始化失败',
-        tag: 'Startup',
-        error: error,
-      );
+      AppLogger.e('静态数据初始化失败', tag: 'Startup', error: error);
       if (!mounted) return;
       setState(() {
         _initializationError = error;
@@ -200,10 +190,10 @@ class _SplashPageState extends ConsumerState<SplashPage> {
             children: <Widget>[
               // 品牌图标动画
               Icon(
-                Icons.auto_stories_rounded,
-                size: 80,
-                color: theme.colorScheme.primary,
-              )
+                    Icons.auto_stories_rounded,
+                    size: 80,
+                    color: theme.colorScheme.primary,
+                  )
                   .animate(onPlay: (c) => c.repeat(reverse: true))
                   .scaleXY(begin: 0.9, end: 1.1, duration: 1200.ms)
                   .shimmer(
@@ -212,11 +202,14 @@ class _SplashPageState extends ConsumerState<SplashPage> {
                   ),
               const SizedBox(height: SpacingTokens.lg),
               Text(
-                AppConstants.appName,
-                style: theme.textTheme.displayLarge?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
-              ).animatePage(context).fadeIn(duration: 600.ms).slideY(
+                    AppConstants.appName,
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  )
+                  .animatePage(context)
+                  .fadeIn(duration: 600.ms)
+                  .slideY(
                     begin: 0.3,
                     end: 0,
                     duration: 600.ms,
@@ -251,8 +244,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
                       Text(
                         _statusText,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.5),
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],

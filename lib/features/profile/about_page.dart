@@ -104,18 +104,14 @@ class _AboutPageState extends State<AboutPage> {
                       Text(
                         AppConstants.slogan,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: SpacingTokens.xs),
                       Text(
                         version,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.4,
-                          ),
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -162,7 +158,8 @@ class _AboutPageState extends State<AboutPage> {
                 const SizedBox(height: SpacingTokens.sm),
                 AppTile(
                   icon: Icons.calculate_outlined,
-                  iconColor: theme.colorScheme.secondary,
+                  iconColor: theme.semantic.secondaryForeground,
+                  backgroundColor: theme.colorScheme.secondary,
                   title: '数学练习',
                   subtitle: '分级口算、应用题与错题回练',
                   onTap: () => context.go(AppRoutes.mathTab),
@@ -228,7 +225,8 @@ class _AboutPageState extends State<AboutPage> {
                 const SizedBox(height: SpacingTokens.sm),
                 AppTile(
                   icon: Icons.description_outlined,
-                  iconColor: theme.colorScheme.secondary,
+                  iconColor: theme.semantic.secondaryForeground,
+                  backgroundColor: theme.colorScheme.secondary,
                   title: '开源许可',
                   subtitle: '查看第三方库、音效及许可',
                   onTap: () => showLicensePage(
@@ -254,7 +252,7 @@ class _AboutPageState extends State<AboutPage> {
                     '学习记录主要保存本机，不向开发者收集个人信息',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      color: theme.colorScheme.onSurfaceVariant,
                       height: 1.8,
                     ),
                   ),
@@ -395,12 +393,12 @@ class _AboutPageState extends State<AboutPage> {
   }
 
   void _showPrivacyPolicy(BuildContext context) {
-    final theme = Theme.of(context);
     _privacyPolicyFuture ??= _loadPrivacyPolicyText();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
+        final theme = Theme.of(ctx);
         return DraggableScrollableSheet(
           expand: false,
           initialChildSize: 0.75,

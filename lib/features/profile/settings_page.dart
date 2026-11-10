@@ -89,8 +89,9 @@ class SettingsPage extends ConsumerWidget {
     // 音频设置 subtitle
     final rawVoiceName = settingsRepo.ttsVoice?['name'];
     // 如果 voiceName 是纯 locale code（如 "zh"），映射为友好名称
-    final voiceLabel =
-        rawVoiceName != null ? _friendlyVoiceName(rawVoiceName) : null;
+    final voiceLabel = rawVoiceName != null
+        ? _friendlyVoiceName(rawVoiceName)
+        : null;
     final audioSubtitle = voiceLabel != null
         ? '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)} · $voiceLabel'
         : '语速 ${settingsRepo.ttsSpeed.toStringAsFixed(1)}';
@@ -114,6 +115,7 @@ class SettingsPage extends ConsumerWidget {
           ),
           // 首页按外观反馈、学习内容、智能语音、家长数据、应用提醒排列。
           children: <Widget>[
+            // 一级入口统一跟随主题主色；具体设置项再使用各自的语义色。
             // ==================== hub：分组入口 ====================
             if (_section == _SettingsSection.hub) ...[
               AppTile(
@@ -134,7 +136,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.smart_toy_outlined,
-                iconColor: theme.colorScheme.tertiary,
+                iconColor: theme.colorScheme.primary,
                 title: 'AI 与语音',
                 subtitle: '模型服务、朗读音色与语音识别',
                 onTap: () =>
@@ -143,7 +145,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.lock_outline,
-                iconColor: theme.colorScheme.tertiary,
+                iconColor: theme.colorScheme.primary,
                 title: '家长与数据',
                 subtitle: '家长密码、存储、备份与同步',
                 onTap: () => _openSection(context, _SettingsSection.data),
@@ -151,7 +153,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.settings_suggest_outlined,
-                iconColor: theme.colorScheme.onSurfaceVariant,
+                iconColor: theme.colorScheme.primary,
                 title: '应用与提醒',
                 subtitle: '学习提醒、周报、版本与隐私',
                 onTap: () =>
@@ -196,7 +198,8 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.image_outlined,
-                iconColor: theme.colorScheme.secondary,
+                iconColor: theme.semantic.secondaryForeground,
+                backgroundColor: theme.colorScheme.secondary,
                 title: '看图说话题库',
                 subtitle: '管理题目与启用状态',
                 onTap: () => context.push(AppRoutes.pictureStoryManagement),
@@ -270,7 +273,8 @@ class SettingsPage extends ConsumerWidget {
                 icon: isDark
                     ? Icons.dark_mode_outlined
                     : Icons.light_mode_outlined,
-                iconColor: theme.colorScheme.secondary,
+                iconColor: theme.semantic.secondaryForeground,
+                backgroundColor: theme.colorScheme.secondary,
                 title: '外观模式',
                 subtitle: modeLabel,
                 onTap: () => _showThemeModePicker(context, ref, mode),
@@ -278,7 +282,8 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.animation,
-                iconColor: theme.colorScheme.secondary,
+                iconColor: theme.semantic.secondaryForeground,
+                backgroundColor: theme.colorScheme.secondary,
                 title: '页面动画',
                 subtitle: settingsRepo.pageAnimationsEnabled
                     ? '已开启 · 页面转场与内容入场'
@@ -287,8 +292,8 @@ class SettingsPage extends ConsumerWidget {
                   value: settingsRepo.pageAnimationsEnabled,
                   onChanged: (v) =>
                       _writeSetting(context, ref, '页面动画', () async {
-                    await settingsRepo.setPageAnimationsEnabled(v);
-                  }),
+                        await settingsRepo.setPageAnimationsEnabled(v);
+                      }),
                 ),
               ),
               const SizedBox(height: SpacingTokens.sm),
@@ -330,12 +335,12 @@ class SettingsPage extends ConsumerWidget {
                   value: settingsRepo.hapticEnabled,
                   onChanged: (v) =>
                       _writeSetting(context, ref, '触觉反馈', () async {
-                    await settingsRepo.setHapticEnabled(v);
-                    // 开启时触发一次测试震动
-                    if (v) {
-                      await HapticFeedback.mediumImpact();
-                    }
-                  }),
+                        await settingsRepo.setHapticEnabled(v);
+                        // 开启时触发一次测试震动
+                        if (v) {
+                          await HapticFeedback.mediumImpact();
+                        }
+                      }),
                 ),
               ),
               const SizedBox(height: SpacingTokens.md),
@@ -400,7 +405,8 @@ class SettingsPage extends ConsumerWidget {
             if (_section == _SettingsSection.application) ...[
               AppTile(
                 icon: Icons.notifications_outlined,
-                iconColor: theme.colorScheme.secondary,
+                iconColor: theme.semantic.secondaryForeground,
+                backgroundColor: theme.colorScheme.secondary,
                 title: '通知提醒',
                 subtitle: '学习提醒与每周报告',
                 onTap: () => Navigator.push<void>(
@@ -501,9 +507,8 @@ class SettingsPage extends ConsumerWidget {
                 const SizedBox(height: SpacingTokens.md),
                 Text(
                   '主题风格',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(ctx).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 Flexible(
@@ -560,9 +565,8 @@ class SettingsPage extends ConsumerWidget {
                 const SizedBox(height: SpacingTokens.md),
                 Text(
                   '外观模式',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(ctx).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 Flexible(
@@ -606,10 +610,7 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildPracticeSettings(
-    BuildContext context,
-    WidgetRef ref,
-  ) {
+  Widget _buildPracticeSettings(BuildContext context, WidgetRef ref) {
     final settingsRepo = ref.watch(settingsRepositoryProvider);
     final poemGoal = ref.watch(dailyPoemGoalProvider);
     final mathGoal = ref.watch(dailyMathGoalProvider);

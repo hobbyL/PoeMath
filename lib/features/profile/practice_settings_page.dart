@@ -139,7 +139,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                     children: [
                       Icon(
                         Icons.speed_rounded,
-                        color: theme.colorScheme.secondary,
+                        color: theme.semantic.secondaryForeground,
                         size: 20,
                       ),
                       const SizedBox(width: SpacingTokens.sm),
@@ -226,7 +226,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                     children: [
                       Icon(
                         Icons.calculate_rounded,
-                        color: theme.colorScheme.secondary,
+                        color: theme.semantic.secondaryForeground,
                         size: 20,
                       ),
                       const SizedBox(width: SpacingTokens.sm),
@@ -246,7 +246,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                     max: _mathMax,
                     step: _mathStep,
                     unit: '题',
-                    color: theme.colorScheme.secondary,
+                    color: theme.semantic.secondaryForeground,
                     onChanged: (v) => setState(() => _mathGoal = v),
                   ),
                 ],
@@ -329,10 +329,10 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
   }
 
   Set<ProblemMode> get _supportedModes => MathEngine.supportedModes(
-        grade: ref.read(mathGradeProvider),
-        semester: ref.read(mathSemesterProvider),
-        difficulty: _difficulty,
-      );
+    grade: ref.read(mathGradeProvider),
+    semester: ref.read(mathSemesterProvider),
+    difficulty: _difficulty,
+  );
 
   IconData _difficultyIcon(DifficultyLevel d) {
     return switch (d) {
@@ -363,8 +363,9 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
           style: IconButton.styleFrom(
             backgroundColor: color.withValues(alpha: 0.12),
             foregroundColor: color,
-            disabledBackgroundColor:
-                theme.colorScheme.onSurface.withValues(alpha: 0.05),
+            disabledBackgroundColor: theme.colorScheme.onSurface.withValues(
+              alpha: 0.05,
+            ),
           ),
         ),
         const SizedBox(width: SpacingTokens.lg),
@@ -386,8 +387,9 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
           style: IconButton.styleFrom(
             backgroundColor: color.withValues(alpha: 0.12),
             foregroundColor: color,
-            disabledBackgroundColor:
-                theme.colorScheme.onSurface.withValues(alpha: 0.05),
+            disabledBackgroundColor: theme.colorScheme.onSurface.withValues(
+              alpha: 0.05,
+            ),
           ),
         ),
       ],
