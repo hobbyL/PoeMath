@@ -540,7 +540,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                     );
                     return AppTile(
                       icon: Icons.restart_alt,
-                      iconColor: theme.colorScheme.tertiary,
+                      iconColor: theme.colorScheme.primary,
                       title: '开启新一轮复习',
                       subtitle:
                           '已完成五轮；保留历史，重新安排复习${history == null ? '' : '（历史 ${history.cycles.length + 1} 个周期）'}',
@@ -1000,7 +1000,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
     };
 
     return ColoredCard(
-      color: theme.colorScheme.tertiary,
+      color: theme.colorScheme.primary,
       backgroundOpacity: 0.06,
       width: double.infinity,
       child: Column(
@@ -1011,7 +1011,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
               Icon(
                 Icons.auto_awesome_outlined,
                 size: 18,
-                color: theme.colorScheme.tertiary,
+                color: theme.colorScheme.primary,
               ),
               const SizedBox(width: SpacingTokens.sm),
               Text(
@@ -1025,7 +1025,7 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                 Icon(
                   Icons.graphic_eq,
                   size: 16,
-                  color: theme.colorScheme.tertiary,
+                  color: theme.colorScheme.primary,
                 ),
               ],
               const Spacer(),

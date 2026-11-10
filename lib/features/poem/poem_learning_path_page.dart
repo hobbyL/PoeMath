@@ -225,12 +225,7 @@ class _PoemLearningPathPageState extends ConsumerState<PoemLearningPathPage> {
       icon: status == LearningStatus.mastered
           ? Icons.verified_outlined
           : Icons.menu_book_outlined,
-      iconColor: required
-          ? theme.colorScheme.primary
-          : theme.semantic.secondaryForeground,
-      backgroundColor: required
-          ? theme.colorScheme.primary
-          : theme.colorScheme.secondary,
+      iconColor: theme.colorScheme.primary,
       title: poem.title,
       subtitle: '${poem.author} · ${required ? '本册必背' : '拓展'} · $label',
       onTap: () async {
