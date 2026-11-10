@@ -119,6 +119,7 @@ class TextbookExerciseRepository {
   Future<TextbookExerciseProgress> change({
     required String lessonId,
     required String exerciseId,
+    required String fingerprint,
     required String operationId,
     required int expectedRevision,
     required TextbookExerciseProgress Function(
@@ -138,7 +139,7 @@ class TextbookExerciseRepository {
           final exercise = _approvedExercises(pack, lesson)
               .where((item) => item.id == exerciseId)
               .firstOrNull;
-          if (exercise == null) {
+          if (exercise == null || exercise.contentDigest != fingerprint) {
             throw StateError('习题尚未审核或已更新，请重新进入');
           }
           var progress = _currentContent(_read(), pack);
@@ -164,6 +165,7 @@ class TextbookExerciseRepository {
   Future<TextbookExerciseProgress> recordAttempt({
     required String lessonId,
     required String exerciseId,
+    required String fingerprint,
     required TextbookExerciseAnswer answer,
     required String day,
     required String operationId,
@@ -172,6 +174,7 @@ class TextbookExerciseRepository {
       change(
         lessonId: lessonId,
         exerciseId: exerciseId,
+        fingerprint: fingerprint,
         operationId: operationId,
         expectedRevision: expectedRevision,
         reduce: (progress, exercise) {
@@ -204,6 +207,7 @@ class TextbookExerciseRepository {
   Future<TextbookExerciseProgress> recordParentCheck({
     required String lessonId,
     required String exerciseId,
+    required String fingerprint,
     required bool passed,
     required String day,
     required String operationId,
@@ -212,6 +216,7 @@ class TextbookExerciseRepository {
       change(
         lessonId: lessonId,
         exerciseId: exerciseId,
+        fingerprint: fingerprint,
         operationId: operationId,
         expectedRevision: expectedRevision,
         reduce: (progress, exercise) {

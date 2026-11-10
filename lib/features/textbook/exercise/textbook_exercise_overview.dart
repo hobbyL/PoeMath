@@ -32,6 +32,10 @@ class _TextbookExerciseOverviewState
   final Map<String, Set<String>> _selectedChoices = {};
   final Map<String, List<TextEditingController>> _blankControllers = {};
   String? _busyExerciseId;
+  bool _parentDialogOpen = false;
+  TextbookExerciseProgress? _savedProgress;
+  int _contentGeneration = 0;
+  bool get _busy => _busyExerciseId != null || _parentDialogOpen;
 
   @override
   void initState() {
@@ -42,7 +46,9 @@ class _TextbookExerciseOverviewState
   @override
   void didUpdateWidget(covariant TextbookExerciseOverview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final changed = oldWidget.lesson.id != widget.lesson.id ||
+    final changed =
+        oldWidget.bookId != widget.bookId ||
+        oldWidget.lesson.id != widget.lesson.id ||
         oldWidget.exercises.length != widget.exercises.length ||
         oldWidget.exercises.indexed.any(
           (entry) =>
@@ -50,6 +56,8 @@ class _TextbookExerciseOverviewState
               widget.exercises[entry.$1].contentDigest,
         );
     if (!changed) return;
+    _contentGeneration++;
+    _savedProgress = null;
     for (final controllers in _blankControllers.values) {
       for (final controller in controllers) {
         controller.dispose();
@@ -83,6 +91,9 @@ class _TextbookExerciseOverviewState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final progress = ref.watch(textbookExerciseProgressProvider(widget.bookId));
+    // The local revision only bridges the interval before the provider reloads.
+    // A new loaded snapshot (including a restore) becomes authoritative again.
+    if (progress.hasValue && !progress.isLoading) _savedProgress = null;
     return progress.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Text('习题进度加载失败：$error'),
@@ -129,7 +140,7 @@ class _TextbookExerciseOverviewState
     final theme = Theme.of(context);
     final choiceMode = exercise.choiceMode;
     final answerHint = _answerHint(exercise);
-    final busy = _busyExerciseId == exercise.id;
+    final busy = _busy;
     final oral = exercise.questionType == TextbookExerciseQuestionType.oral;
     final prompt = TextbookExercisePrompt(
       exercise: exercise,
@@ -138,15 +149,12 @@ class _TextbookExerciseOverviewState
     final heading = oral ? prompt.heading : null;
     final title = oral
         ? heading == null
-            ? TextbookExercisePrompt(exercise: exercise)
-            : SelectableText(
-                heading.replaceFirst(RegExp(r'。\s*$'), ''),
-                style: theme.textTheme.titleMedium,
-              )
-        : Text(
-            exercise.questionType.label,
-            style: theme.textTheme.titleMedium,
-          );
+              ? TextbookExercisePrompt(exercise: exercise)
+              : SelectableText(
+                  heading.replaceFirst(RegExp(r'。\s*$'), ''),
+                  style: theme.textTheme.titleMedium,
+                )
+        : Text(exercise.questionType.label, style: theme.textTheme.titleMedium);
     const oralButtonStyle = ButtonStyle(
       minimumSize: WidgetStatePropertyAll(
         Size(SpacingTokens.minTapTarget, SpacingTokens.minTapTarget),
@@ -199,10 +207,7 @@ class _TextbookExerciseOverviewState
         ],
         if (answerHint != null) ...[
           const SizedBox(height: SpacingTokens.xs),
-          Text(
-            answerHint,
-            style: theme.textTheme.bodySmall,
-          ),
+          Text(answerHint, style: theme.textTheme.bodySmall),
         ],
         if (!oral) const SizedBox(height: SpacingTokens.sm),
         if (exercise.questionType == TextbookExerciseQuestionType.choice &&
@@ -347,9 +352,10 @@ class _TextbookExerciseOverviewState
 
   String? _answerHint(TextbookCourseExercise exercise) =>
       switch (exercise.answerType) {
-        TextbookAnswerType.exact => exercise.answerOrigin == 'textbook'
-            ? '原书标准答案，提交后自动核对。'
-            : '标准答案，提交后自动核对。',
+        TextbookAnswerType.exact =>
+          exercise.answerOrigin == 'textbook'
+              ? '原书标准答案，提交后自动核对。'
+              : '标准答案，提交后自动核对。',
         TextbookAnswerType.reference => '审核者整理的参考要点，请提交后由家长核对。',
         TextbookAnswerType.parentCheck => '这道题需要家长核对完成情况。',
         TextbookAnswerType.none => null,
@@ -361,15 +367,13 @@ class _TextbookExerciseOverviewState
   ) async {
     final answer = switch (exercise.questionType) {
       TextbookExerciseQuestionType.choice => TextbookExerciseAnswer.choice(
-          _selectedChoices[exercise.id]!.toList(),
-        ),
+        _selectedChoices[exercise.id]!.toList(),
+      ),
       TextbookExerciseQuestionType.fillBlank =>
-        TextbookExerciseAnswer.fillBlank(
-          [
-            for (final controller in _blankControllers[exercise.id]!)
-              controller.text,
-          ],
-        ),
+        TextbookExerciseAnswer.fillBlank([
+          for (final controller in _blankControllers[exercise.id]!)
+            controller.text,
+        ]),
       TextbookExerciseQuestionType.oral => const TextbookExerciseAnswer.oral(),
     };
     await _runChange(
@@ -378,6 +382,7 @@ class _TextbookExerciseOverviewState
       (repository, revision, operationId) => repository.recordAttempt(
         lessonId: widget.lesson.id,
         exerciseId: exercise.id,
+        fingerprint: exercise.contentDigest,
         answer: answer,
         day: _today(),
         operationId: operationId,
@@ -391,32 +396,43 @@ class _TextbookExerciseOverviewState
     TextbookExerciseProgress? progress,
     TextbookExerciseRecord? record,
   ) async {
-    if (record?.lastResult != TextbookExerciseResult.parentPending) return;
-    final passed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('家长核对'),
-        content: Text('请确认“${exercise.prompt}”是否完成。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('还要练习'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('确认完成'),
-          ),
-        ],
-      ),
-    );
-    if (passed == null || !mounted) return;
+    if (_busy || record?.lastResult != TextbookExerciseResult.parentPending) {
+      return;
+    }
+    final generation = _contentGeneration;
+    setState(() => _parentDialogOpen = true);
+    bool? passed;
+    try {
+      passed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('家长核对'),
+          content: Text('请确认“${exercise.prompt}”是否完成。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('还要练习'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('确认完成'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _parentDialogOpen = false);
+    }
+    if (passed == null || !mounted || generation != _contentGeneration) return;
+    final confirmed = passed;
     await _runChange(
       exercise,
       progress,
       (repository, revision, operationId) => repository.recordParentCheck(
         lessonId: widget.lesson.id,
         exerciseId: exercise.id,
-        passed: passed,
+        fingerprint: exercise.contentDigest,
+        passed: confirmed,
         day: _today(),
         operationId: operationId,
         expectedRevision: revision,
@@ -431,34 +447,42 @@ class _TextbookExerciseOverviewState
       TextbookExerciseRepository repository,
       int revision,
       String operationId,
-    ) change,
+    )
+    change,
   ) async {
+    if (_busy) return;
+    final bookId = widget.bookId;
+    final generation = _contentGeneration;
     final book = ref
         .read(textbookListProvider)
-        .where(
-          (item) => item.pdfSha256 == widget.bookId,
-        )
+        .where((item) => item.pdfSha256 == widget.bookId)
         .firstOrNull;
     final pack = ref.read(textbookCourseProvider(widget.bookId)).valueOrNull;
     if (book == null || pack == null) return;
     setState(() => _busyExerciseId = exercise.id);
     try {
-      await change(
+      final saved = _savedProgress;
+      final revision =
+          saved != null && saved.revision > (progress?.revision ?? 0)
+          ? saved.revision
+          : progress?.revision ?? 0;
+      final updated = await change(
         TextbookExerciseRepository(
           book: book,
           editionId: pack.edition.id,
           courses: ref.read(textbookCourseRepositoryProvider),
           box: ref.read(textbookExerciseBoxProvider),
         ),
-        progress?.revision ?? 0,
+        revision,
         '${DateTime.now().microsecondsSinceEpoch}-${exercise.id}',
       );
-      ref.invalidate(textbookExerciseProgressProvider(widget.bookId));
+      if (!mounted) return;
+      if (generation == _contentGeneration) _savedProgress = updated;
+      ref.invalidate(textbookExerciseProgressProvider(bookId));
     } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存习题记录失败：$error')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('保存习题记录失败：$error')));
       }
     } finally {
       if (mounted) setState(() => _busyExerciseId = null);
@@ -475,8 +499,8 @@ class _TextbookExerciseOverviewState
 
 extension on TextbookExerciseQuestionType {
   String get label => switch (this) {
-        TextbookExerciseQuestionType.choice => '选择题',
-        TextbookExerciseQuestionType.fillBlank => '填空题',
-        TextbookExerciseQuestionType.oral => '口答题',
-      };
+    TextbookExerciseQuestionType.choice => '选择题',
+    TextbookExerciseQuestionType.fillBlank => '填空题',
+    TextbookExerciseQuestionType.oral => '口答题',
+  };
 }
