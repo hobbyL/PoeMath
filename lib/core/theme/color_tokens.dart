@@ -95,6 +95,11 @@ class ColorTokens {
   static const Color successText = Color(0xFF256735);
   static const Color cautionText = Color(0xFF795517);
 
+  /// 庆祝光晕/插画的原始装饰色；标题使用主题语义前景。
+  static const Color celebrationCheckIn = Color(0xFF4CAF50);
+  static const Color celebrationAchievement = Color(0xFFFFC107);
+  static const Color celebrationLevelUp = Color(0xFF2196F3);
+
   /// 提示灯亮起时的琥珀色，在浅色图片上保留清晰轮廓。
   static const Color hintAmber = Color(0xFF9A6700);
 

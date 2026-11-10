@@ -8,6 +8,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/theme/semantic_colors_ext.dart';
 
 /// 带弹跳 + 粒子爆发动画的收藏按钮。
 ///
@@ -36,7 +37,7 @@ class AnimatedFavoriteButton extends StatefulWidget {
   /// 未收藏状态图标，默认空心爱心。
   final IconData inactiveIcon;
 
-  /// 收藏时的图标颜色，默认 `colorScheme.secondary`。
+  /// 收藏时的图标颜色，默认 `semantic.secondaryForeground`。
   final Color? activeColor;
 
   /// 按钮 tooltip。
@@ -72,18 +73,24 @@ class _AnimatedFavoriteButtonState extends State<AnimatedFavoriteButton>
     );
     _scaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 1.4)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween(
+          begin: 1.0,
+          end: 1.4,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 35,
       ),
       TweenSequenceItem(
-        tween: Tween(begin: 1.4, end: 0.9)
-            .chain(CurveTween(curve: Curves.easeInOut)),
+        tween: Tween(
+          begin: 1.4,
+          end: 0.9,
+        ).chain(CurveTween(curve: Curves.easeInOut)),
         weight: 30,
       ),
       TweenSequenceItem(
-        tween: Tween(begin: 0.9, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween(
+          begin: 0.9,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 35,
       ),
     ]).animate(_scaleController);
@@ -129,7 +136,7 @@ class _AnimatedFavoriteButtonState extends State<AnimatedFavoriteButton>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = widget.isFavorite
-        ? (widget.activeColor ?? theme.colorScheme.secondary)
+        ? (widget.activeColor ?? theme.semantic.secondaryForeground)
         : null;
 
     return SizedBox(
@@ -151,8 +158,7 @@ class _AnimatedFavoriteButtonState extends State<AnimatedFavoriteButton>
                 return CustomPaint(
                   painter: _ParticleBurstPainter(
                     progress: _particleController.value,
-                    color: widget.activeColor ??
-                        theme.colorScheme.secondary,
+                    color: widget.activeColor ?? theme.colorScheme.secondary,
                     particles: _particles,
                   ),
                 );
@@ -178,9 +184,7 @@ class _AnimatedFavoriteButtonState extends State<AnimatedFavoriteButton>
                   return FadeTransition(opacity: animation, child: child);
                 },
                 child: Icon(
-                  widget.isFavorite
-                      ? widget.activeIcon
-                      : widget.inactiveIcon,
+                  widget.isFavorite ? widget.activeIcon : widget.inactiveIcon,
                   key: ValueKey(widget.isFavorite),
                   color: color,
                 ),
@@ -256,8 +260,7 @@ class _ParticleBurstPainter extends CustomPainter {
         color,
         color.withValues(alpha: 0.6),
         progress * 0.5,
-      )!
-          .withValues(alpha: opacity);
+      )!.withValues(alpha: opacity);
 
       final paint = Paint()
         ..color = particleColor
