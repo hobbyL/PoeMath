@@ -27,7 +27,7 @@ LlmClient createRuntimeLlmClient({
     var target = successful;
     final accepted = acceptedSelections[request];
     if (accepted != null) {
-      if (settings.pictureStoryGenerationSignature != accepted.signature) {
+      if (settings.pictureStoryLlmSelectionSignature != accepted.signature) {
         return;
       }
       if (accepted.providerId == successful.selection?.providerId &&
@@ -40,7 +40,7 @@ LlmClient createRuntimeLlmClient({
       );
       if (latest == null ||
           !isActive() ||
-          settings.pictureStoryGenerationSignature != accepted.signature) {
+          settings.pictureStoryLlmSelectionSignature != accepted.signature) {
         return;
       }
       final matches = [latest, ...latest.fallbacks].where(
@@ -61,7 +61,9 @@ LlmClient createRuntimeLlmClient({
       target,
       isActive: isActive,
       onSelectionSaved: (signature) {
-        savedSignature = signature;
+        savedSignature = SettingsRepository.llmSelectionSignatureFrom(
+          signature,
+        );
         onSelectionSaved?.call(signature);
       },
     );

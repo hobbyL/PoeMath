@@ -81,6 +81,41 @@ void main() {
     return task;
   }
 
+  test('生图跨模型厂商恢复后整批继续，自动回写不打断后续看图模型切换', () async {
+    await harness.settings.saveImageGenerationProviderConfig(
+      id: 'backup',
+      name: '备用生图',
+      baseUrl: 'https://backup.example.com/v1',
+      model: 'backup-bad',
+      models: ['backup-bad', 'backup-good'],
+      apiKey: '',
+    );
+    harness.imageFallback = true;
+    harness.fallbackTwice = true;
+    final progress = <String>[];
+    controller.addListener(
+      () => progress.add(controller.stateFor('default').progress),
+    );
+    await start(count: 3);
+    expect(harness.service.readDraft('default')!.readyCount, 3);
+    expect(harness.imageModels, [
+      'image',
+      'backup-bad',
+      'backup-good',
+      'backup-good',
+      'backup-good',
+    ]);
+    expect(harness.settings.imageGenerationActiveProviderId, 'backup');
+    expect(harness.settings.imageGenerationProvider!.model, 'backup-good');
+    expect(harness.settings.llmProviders.single.model, 'gpt-4.1');
+    expect(controller.stateFor('default').phase, PictureStoryRunPhase.finished);
+    expect(progress, contains('第 1 道题正在切换生图模型重试（第 2 次）…'));
+    expect(progress, contains('第 1 道题正在重试看图出题（第 2 次）…'));
+    expect(progress, contains('正在根据第 3 张图片出题…'));
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 5);
+    expect(harness.repository.catalogState().versions, isEmpty);
+  });
+
   for (final step in ['config', 'plan', 'image:1', 'caption:1']) {
     test('没有页面监听时继续完成，$step 期间重复启动不会重复请求', () async {
       final gate = harness.hold(step);

@@ -39,18 +39,48 @@ class SettingsRepository {
   String get pictureStoryGenerationSignature =>
       _pictureStoryGenerationSignature();
 
+  /// 模型自动切换的快照不包含独立的生图选择；生命周期仍由调用方校验。
+  String get pictureStoryLlmSelectionSignature =>
+      llmSelectionSignatureFrom(pictureStoryGenerationSignature);
+
+  /// 从写入前捕获的完整快照提取，不能在 await 落盘后重新读取当前设置。
+  static String llmSelectionSignatureFrom(String generationSignature) {
+    final snapshot = jsonDecode(generationSignature) as Map<String, dynamic>;
+    return jsonEncode({
+      for (final key in ['llmVersions', 'llm', 'active', 'provider', 'model'])
+        key: snapshot[key],
+    });
+  }
+
   String _pictureStoryGenerationSignature([
     Map<String, Object?> changes = const {},
   ]) {
     Object? setting(String key) =>
         changes.containsKey(key) ? changes[key] : HiveBoxes.settings.get(key);
+    final imageProviders =
+        changes.containsKey(ImageGenerationProviderConfig.providersSettingsKey)
+        ? ImageGenerationProviderConfig.decodeProviders(
+            changes[ImageGenerationProviderConfig.providersSettingsKey],
+          )
+        : imageGenerationProviders;
+    final storedImageId = setting(
+      ImageGenerationProviderConfig.activeProviderSettingsKey,
+    );
+    final imageId = imageProviders.any((p) => p.id == storedImageId)
+        ? storedImageId as String
+        : imageProviders.firstOrNull?.id;
+    final imageProvider = imageProviders
+        .where((p) => p.id == imageId)
+        .firstOrNull;
     return jsonEncode({
       'imageRevision': _imageGenerationRevision,
-      'image': imageGenerationProvider?.toJson(),
+      'image': imageProvider == null
+          ? null
+          : ImageGenerationProviderConfig.fromProvider(imageProvider).toJson(),
       'imageProviders': ImageGenerationProviderConfig.encodeProviders(
-        imageGenerationProviders,
+        imageProviders,
       ),
-      'imageActive': imageGenerationActiveProviderId,
+      'imageActive': imageId,
       'imagePrompt': pictureStoryImageGenerationPromptOverride,
       'questionPrompt': pictureStoryQuestionGenerationPromptOverride,
       'llmVersions': _llmProviderVersions,
@@ -127,20 +157,128 @@ class SettingsRepository {
   Future<String?> readImageGenerationApiKeyFor(String id) =>
       _credentialStore.readImageGenerationApiKeyFor(id);
 
+  String _imageSelectionSignature() => jsonEncode({
+    'revision': _imageGenerationRevision,
+    'providers': ImageGenerationProviderConfig.encodeProviders(
+      imageGenerationProviders,
+    ),
+    'active': imageGenerationActiveProviderId,
+  });
+
   Future<ImageGenerationConfig?> readImageGenerationConfig() =>
       PictureStoryRepository.exclusive(() async {
-        final revision = _imageGenerationRevision;
+        final signature = _imageSelectionSignature();
         final id = imageGenerationActiveProviderId;
-        final provider = imageGenerationProvider;
-        if (provider == null || id == null) return null;
-        final key = await readImageGenerationApiKeyFor(id) ?? '';
-        if (revision != _imageGenerationRevision ||
-            id != imageGenerationActiveProviderId ||
-            provider.encode() != imageGenerationProvider?.encode()) {
+        if (id == null) return null;
+        final providers = imageGenerationProviders;
+        final candidates = <ImageGenerationConfig>[];
+        for (final provider in [
+          providers.firstWhere((p) => p.id == id),
+          ...providers.where((p) => p.id != id),
+        ]) {
+          try {
+            final key = await readImageGenerationApiKeyFor(provider.id) ?? '';
+            candidates.add(
+              ImageGenerationConfig(
+                provider: ImageGenerationProviderConfig.fromProvider(provider),
+                apiKey: key,
+                providerId: provider.id,
+                models: List.unmodifiable(provider.models),
+                selectionSignature: signature,
+              ),
+            );
+          } on Object {
+            if (provider.id == id) rethrow;
+            AppLogger.w('备用生图配置暂时无法读取', tag: 'PictureStory');
+          }
+        }
+        if (signature != _imageSelectionSignature()) {
           throw const FormatException('生图配置已变化，请重新开始');
         }
-        return ImageGenerationConfig(provider: provider, apiKey: key);
+        final primary = candidates.first;
+        return ImageGenerationConfig(
+          provider: primary.provider,
+          apiKey: primary.apiKey,
+          providerId: primary.providerId,
+          models: primary.models,
+          fallbacks: List.unmodifiable(candidates.skip(1)),
+          selectionSignature: signature,
+        );
       });
+
+  /// 只回写本次捕获的候选，不修改凭据；手动改动、暂停或撤销授权后旧结果失效。
+  Future<String?> promoteSuccessfulImageSelection(
+    ImageGenerationConfig request,
+    ImageGenerationConfig successful, {
+    required bool Function() isActive,
+    String? expectedSignature,
+    void Function(String signature)? onSelectionSaved,
+  }) => PictureStoryRepository.exclusive(() async {
+    final expected = expectedSignature ?? request.selectionSignature;
+    final approved = [
+      request,
+      ...request.fallbacks,
+    ].where((p) => p.providerId == successful.providerId).firstOrNull;
+    bool current() =>
+        expected != null &&
+        isActive() &&
+        expected == _imageSelectionSignature();
+    if (!current() ||
+        approved?.providerId == null ||
+        approved!.apiKey != successful.apiKey ||
+        approved.provider.endpoint != successful.provider.endpoint ||
+        !approved.candidateModels.contains(successful.provider.model)) {
+      return null;
+    }
+    final key = await readImageGenerationApiKeyFor(approved.providerId!);
+    if (!current() || (key ?? '') != successful.apiKey) return null;
+    final providers = imageGenerationProviders.toList();
+    final index = providers.indexWhere((p) => p.id == successful.providerId);
+    if (index < 0) return null;
+    final target = providers[index];
+    if (imageGenerationActiveProviderId == target.id &&
+        target.model == successful.provider.model) {
+      return expected;
+    }
+    providers[index] = LlmProviderConfig(
+      id: target.id,
+      name: target.name,
+      baseUrl: target.baseUrl,
+      model: successful.provider.model,
+      models: LlmProviderConfig.normalizeModels(
+        target.models,
+        successful.provider.model,
+      ),
+    );
+    final changes = <String, Object?>{
+      ImageGenerationProviderConfig.providersSettingsKey:
+          ImageGenerationProviderConfig.encodeProviders(providers),
+      ImageGenerationProviderConfig.activeProviderSettingsKey: target.id,
+    };
+    final previous = {
+      for (final key in changes.keys)
+        key: (
+          exists: HiveBoxes.settings.containsKey(key),
+          value: HiveBoxes.settings.get(key),
+        ),
+    };
+    final signature = _pictureStoryGenerationSignature(changes);
+    try {
+      await HiveBoxes.settings.putAll(changes);
+      onSelectionSaved?.call(signature);
+      if (!isActive()) throw const FormatException('生图默认选择已过期');
+    } on Object {
+      for (final entry in previous.entries) {
+        if (entry.value.exists) {
+          await HiveBoxes.settings.put(entry.key, entry.value.value);
+        } else {
+          await HiveBoxes.settings.delete(entry.key);
+        }
+      }
+      rethrow;
+    }
+    return _imageSelectionSignature();
+  });
 
   Future<void> saveImageGenerationConfig({
     required ImageGenerationProviderConfig provider,

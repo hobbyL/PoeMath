@@ -82,6 +82,8 @@ class PictureStoryGenerationHarness {
   int promotions = 0;
   bool invalidPlan = false;
   bool fallbackTwice = false;
+  bool imageFallback = false;
+  final imageModels = <String>[];
 
   GenerationGate hold(String step) => settings.gates[step] = GenerationGate();
 
@@ -153,7 +155,10 @@ class PictureStoryGenerationHarness {
   Future<http.Response> _image(http.Request request) async {
     imageCalls++;
     order.add('image:$imageCalls');
+    final model = (jsonDecode(request.body) as Map)['model'] as String;
+    imageModels.add(model);
     await settings.gates['image:$imageCalls']?.wait();
+    if (imageFallback && model != 'backup-good') return http.Response('', 503);
     return http.Response(
       jsonEncode({
         'data': [

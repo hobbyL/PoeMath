@@ -9,8 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/services/image_generation_client.dart';
 import 'package:poemath/core/services/backup_service.dart';
+import 'package:poemath/core/services/image_generation_client.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
@@ -65,6 +65,9 @@ class _GenerationFlow extends PictureStoryGenerationService {
     void Function()? onChanged,
     void Function(int attempt)? onPlanningAttempt,
     void Function(String signature)? onLlmSelectionSaved,
+    void Function(int index, int attempt)? onImageAttempt,
+    void Function(int index, int attempt)? onCaptionAttempt,
+    Future<void> Function(ImageGenerationConfig successful)? onImageSuccess,
     String? candidateId,
     String? reuseImageId,
     bool regenerateImage = false,

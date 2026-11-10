@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 import 'package:poemath/core/services/backup_credentials_cipher.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/parent_access_service.dart';
@@ -103,6 +104,31 @@ class _Store extends SecureCredentialStore {
   }
 }
 
+class _DelayedSelectionBox extends Fake implements Box<dynamic> {
+  _DelayedSelectionBox(this.delegate, {this.fail = false});
+  final Box<dynamic> delegate;
+  final bool fail;
+  final entered = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  dynamic get(dynamic key, {dynamic defaultValue}) =>
+      delegate.get(key, defaultValue: defaultValue);
+  @override
+  bool containsKey(dynamic key) => delegate.containsKey(key);
+  @override
+  Future<void> put(dynamic key, dynamic value) => delegate.put(key, value);
+  @override
+  Future<void> delete(dynamic key) => delegate.delete(key);
+  @override
+  Future<void> putAll(Map<dynamic, dynamic> entries) async {
+    await delegate.putAll(entries);
+    entered.complete();
+    await release.future;
+    if (fail) throw StateError('synthetic selection write failure');
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late _Store store;
@@ -117,6 +143,128 @@ void main() {
     lockParentForTesting();
     await tearDownHiveForTesting();
   });
+
+  Future<void> providers() async {
+    for (final id in ['a', 'b']) {
+      await settings.saveImageGenerationProviderConfig(
+        id: id,
+        name: id,
+        baseUrl: 'https://$id.example.com/v1',
+        model: '${id}1',
+        models: ['${id}1', '${id}2'],
+        apiKey: '$id-key',
+      );
+    }
+  }
+
+  test('读取全部生图候选，成功后默认厂商和模型一起更新并可再次切换', () async {
+    await providers();
+    final request = (await settings.readImageGenerationConfig())!;
+    expect(request.providerId, 'a');
+    expect(request.candidateModels, ['a1', 'a2']);
+    expect(request.fallbacks.single.providerId, 'b');
+    expect(request.fallbacks.single.apiKey, 'b-key');
+    var signature = settings.pictureStoryGenerationSignature;
+    final selected = request.fallbacks.single.withModel('b2');
+    final saved = await settings.promoteSuccessfulImageSelection(
+      request,
+      selected,
+      isActive: () => signature == settings.pictureStoryGenerationSignature,
+      onSelectionSaved: (value) => signature = value,
+    );
+    expect(saved, isNotNull);
+    expect(signature, settings.pictureStoryGenerationSignature);
+    expect(settings.imageGenerationActiveProviderId, 'b');
+    expect(settings.imageGenerationProvider!.model, 'b2');
+    final boxName = HiveBoxes.settings.name;
+    await HiveBoxes.settings.close();
+    HiveBoxes.settings = await Hive.openBox<dynamic>(boxName);
+    final fresh = (await SettingsRepository(credentialStore: store)
+        .readImageGenerationConfig())!;
+    expect(fresh.providerId, 'b');
+    expect(fresh.provider.model, 'b2');
+    final again = await settings.promoteSuccessfulImageSelection(
+      request,
+      request.withModel('a2'),
+      expectedSignature: saved,
+      isActive: () => signature == settings.pictureStoryGenerationSignature,
+      onSelectionSaved: (value) => signature = value,
+    );
+    expect(again, isNotNull);
+    expect(settings.imageGenerationActiveProviderId, 'a');
+    expect(settings.imageGenerationProvider!.model, 'a2');
+    expect(store.providerKeys, {'a': 'a-key', 'b': 'b-key'});
+    expect(HiveBoxes.settings.values.toString(), isNot(contains('b-key')));
+  });
+
+  for (final action in ['manual', 'cancel', 'unconfigured']) {
+    test('生图成功晚到时 $action 不覆盖默认选择', () async {
+      await providers();
+      final request = (await settings.readImageGenerationConfig())!;
+      if (action == 'manual') {
+        await settings.setImageGenerationActiveProvider('b');
+      }
+      final before = settings.pictureStoryGenerationSignature;
+      final selected = action == 'unconfigured'
+          ? request.fallbacks.single.withModel('unconfigured')
+          : request.fallbacks.single;
+      final saved = await settings.promoteSuccessfulImageSelection(
+        request,
+        selected,
+        isActive: () => action != 'cancel',
+      );
+      expect(saved, isNull);
+      expect(settings.pictureStoryGenerationSignature, before);
+    });
+  }
+
+  for (final action in ['cancel', 'prompt', 'writeError']) {
+    test('生图默认选择落盘时 $action 撤销自动选择且保留手动提示词', () async {
+      await providers();
+      final request = (await settings.readImageGenerationConfig())!;
+      var signature = settings.pictureStoryGenerationSignature;
+      var active = true;
+      final original = HiveBoxes.settings;
+      final delayed = _DelayedSelectionBox(
+        original,
+        fail: action == 'writeError',
+      );
+      HiveBoxes.settings = delayed;
+      Future<void>? stopped;
+      try {
+        stopped = expectLater(
+          settings.promoteSuccessfulImageSelection(
+            request,
+            request.fallbacks.single.withModel('b2'),
+            isActive: () =>
+                active && signature == settings.pictureStoryGenerationSignature,
+            onSelectionSaved: (value) => signature = value,
+          ),
+          throwsA(
+            action == 'writeError' ? isA<StateError>() : isA<FormatException>(),
+          ),
+        );
+        await delayed.entered.future.timeout(const Duration(seconds: 5));
+        if (action == 'cancel') active = false;
+        if (action == 'prompt') {
+          await original.put('llm_picture_story_image_prompt', '手动的新要求');
+        }
+        delayed.release.complete();
+        await stopped;
+        expect(settings.imageGenerationActiveProviderId, 'a');
+        expect(settings.imageGenerationProvider!.model, 'a1');
+        expect(settings.imageGenerationProviders.last.model, 'b1');
+        expect(store.providerKeys, {'a': 'a-key', 'b': 'b-key'});
+        if (action == 'prompt') {
+          expect(settings.pictureStoryImageGenerationPromptOverride, '手动的新要求');
+        }
+      } finally {
+        if (!delayed.release.isCompleted) delayed.release.complete();
+        await stopped;
+        HiveBoxes.settings = original;
+      }
+    });
+  }
 
   test('保存配置与密钥，留空沿用，明确清除；密钥从不进入 Hive 或普通导出', () async {
     await settings.saveImageGenerationConfig(

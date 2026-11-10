@@ -154,9 +154,38 @@ class ImageGenerationProviderConfig {
 }
 
 class ImageGenerationConfig {
-  const ImageGenerationConfig({required this.provider, required this.apiKey});
+  const ImageGenerationConfig({
+    required this.provider,
+    required this.apiKey,
+    this.providerId,
+    this.models = const [],
+    this.fallbacks = const [],
+    this.selectionSignature,
+  });
   final ImageGenerationProviderConfig provider;
   final String apiKey;
+  final String? providerId;
+  final List<String> models;
+  final List<ImageGenerationConfig> fallbacks;
+
+  /// 只含配置与手动编辑版本，用于拒绝旧请求覆盖新选择；不含密钥。
+  final String? selectionSignature;
+
+  List<String> get candidateModels =>
+      LlmProviderConfig.normalizeModels(models, provider.model);
+
+  ImageGenerationConfig withModel(String model) => ImageGenerationConfig(
+    provider: ImageGenerationProviderConfig(
+      name: provider.name,
+      baseUrl: provider.baseUrl,
+      model: model,
+    ),
+    apiKey: apiKey,
+    providerId: providerId,
+    models: models,
+    fallbacks: fallbacks,
+    selectionSignature: selectionSignature,
+  );
   @override
   String toString() => 'ImageGenerationConfig(model: ${provider.model}, '
       'apiKey: <不回显>)';

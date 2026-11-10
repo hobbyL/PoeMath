@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:poemath/core/services/bounded_http_client.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
+import 'package:poemath/core/services/network_errors.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/models/image_generation_config.dart';
 
 class ImageGenerationException implements Exception {
-  const ImageGenerationException(this.message);
+  const ImageGenerationException(this.message, {this.skipProvider = false});
   final String message;
+  final bool skipProvider;
   @override
   String toString() => message;
 }
@@ -20,16 +23,16 @@ class ImageGenerationCancelled extends ImageGenerationException {
   const ImageGenerationCancelled() : super('生成已暂停，可稍后继续');
 }
 
-/// 同步 OpenAI Images 兼容接口；每次只生成一张，不自动重试计费请求。
+/// 每次只请求一张；失败时顺序尝试已配置候选，每个候选在本批次最多失败一次。
 class ImageGenerationClient {
   ImageGenerationClient({
     http.Client? httpClient,
     CloudUsageService? usage,
     this._isActive,
     Duration timeout = const Duration(seconds: 180),
-  })  : _inner = httpClient ?? http.Client(),
-        _ownsClient = httpClient == null,
-        _usage = usage ?? CloudUsageService.instance {
+  }) : _inner = httpClient ?? http.Client(),
+       _ownsClient = httpClient == null,
+       _usage = usage ?? CloudUsageService.instance {
     _http = BoundedHttpClient(
       _inner,
       timeout: timeout,
@@ -43,6 +46,18 @@ class ImageGenerationClient {
   final bool Function()? _isActive;
   late final BoundedHttpClient _http;
   bool _closed = false;
+  final _failed = <(String?, String, String)>{};
+  final _unavailable = <(String?, String)>{};
+  final _preferred = <ImageGenerationConfig, ImageGenerationConfig>{};
+  ImageGenerationException? _lastFailure;
+
+  (String?, String) _providerKey(ImageGenerationConfig config) =>
+      (config.providerId, config.provider.endpoint.toString());
+  (String?, String, String) _modelKey(ImageGenerationConfig config) => (
+    config.providerId,
+    config.provider.endpoint.toString(),
+    config.provider.model,
+  );
 
   void _check() {
     if (_closed || !(_isActive?.call() ?? true)) {
@@ -54,7 +69,8 @@ class ImageGenerationClient {
   Future<Uint8List> testConnection(ImageGenerationConfig config) async {
     final bytes = await generate(
       config: config,
-      prompt: '生成一张简单的儿童绘本插画：一只小猫坐在花园里看一朵花。'
+      prompt:
+          '生成一张简单的儿童绘本插画：一只小猫坐在花园里看一朵花。'
           '画面清晰、温暖，不要文字。',
     );
     _check();
@@ -66,12 +82,79 @@ class ImageGenerationClient {
   Future<Uint8List> generate({
     required ImageGenerationConfig config,
     required String prompt,
+    Future<void> Function(Uint8List bytes)? validate,
+    void Function(int attempt)? onAttempt,
+    Future<void> Function(ImageGenerationConfig successful)? onSuccess,
   }) async {
     _check();
-    final endpoint = config.provider.normalized().endpoint;
     if (prompt.trim().isEmpty || prompt.runes.length > 4000) {
       throw const ImageGenerationException('画面描述为空或过长，请修改后重试');
     }
+    final seen = <(String?, String, String)>{};
+    final candidates = [
+      if (_preferred[config] case final preferred?) preferred,
+      for (final provider in [config, ...config.fallbacks])
+        for (final model in provider.candidateModels) provider.withModel(model),
+    ];
+    var attempt = 0;
+    for (final candidate in candidates) {
+      _check();
+      final key = _modelKey(candidate);
+      if (!seen.add(key) ||
+          _failed.contains(key) ||
+          _unavailable.contains(_providerKey(candidate))) {
+        continue;
+      }
+      onAttempt?.call(++attempt);
+      _check();
+      late Uint8List bytes;
+      try {
+        bytes = await _generateSingle(config: candidate, prompt: prompt);
+        _check();
+        await validate?.call(bytes);
+        _check();
+      } on ImageGenerationCancelled {
+        rethrow;
+      } on CloudQuotaExceededException {
+        rethrow;
+      } on Object catch (error) {
+        _check();
+        // 只转换本步骤的网络/图片错误；本地存储与默认设置写入在重试范围外。
+        if (error is! ImageGenerationException &&
+            error is! PictureStoryImageException) {
+          rethrow;
+        }
+        final failure = error is ImageGenerationException
+            ? error
+            : const ImageGenerationException('服务没有返回可以读取的图片');
+        _lastFailure = failure;
+        _failed.add(key);
+        if (failure.skipProvider) _unavailable.add(_providerKey(candidate));
+        AppLogger.w('生图候选失败：${failure.message}', tag: 'PictureStory');
+        continue;
+      }
+      _preferred[config] = candidate;
+      if (onSuccess != null) {
+        try {
+          await onSuccess(candidate);
+        } on Object {
+          _check();
+          AppLogger.w('生图已成功，默认配置暂未保存', tag: 'PictureStory');
+        }
+      }
+      _check();
+      return bytes;
+    }
+    throw _lastFailure ?? const ImageGenerationException('没有可用的生图模型，请检查配置');
+  }
+
+  Future<Uint8List> _generateSingle({
+    required ImageGenerationConfig config,
+    required String prompt,
+  }) async {
+    _check();
+    final endpoint = config.provider.normalized().endpoint;
+    var downloading = false;
     final request = http.Request('POST', endpoint)
       ..followRedirects = false
       ..headers['Content-Type'] = 'application/json; charset=utf-8'
@@ -124,10 +207,11 @@ class ImageGenerationClient {
       }
       // 图片地址可能是另一个域名；不得传递生图密钥。
       final download = http.Request('GET', uri)..followRedirects = false;
+      downloading = true;
       final downloaded = await http.Response.fromStream(
         await _http.sendBounded(download),
       );
-      _checkStatus(downloaded.statusCode);
+      _checkStatus(downloaded.statusCode, fromProvider: false);
       return _checkedBytes(downloaded.bodyBytes);
     } on ImageGenerationException {
       rethrow;
@@ -137,6 +221,15 @@ class ImageGenerationClient {
       throw const ImageGenerationException('生图响应超时，请稍后重试');
     } on FormatException {
       throw const ImageGenerationException('服务没有返回有效图片，请检查生图接口和模型');
+    } on SocketException catch (error) {
+      _check();
+      if (isHostLookupFailure(error)) {
+        throw ImageGenerationException(
+          '无法解析图片服务地址，请检查网络或 DNS 后重试',
+          skipProvider: !downloading,
+        );
+      }
+      throw const ImageGenerationException('图片请求失败，请检查网络后重试');
     } on Object {
       if (_closed || !(_isActive?.call() ?? true)) {
         throw const ImageGenerationCancelled();
@@ -153,17 +246,16 @@ class ImageGenerationClient {
     return bytes;
   }
 
-  static void _checkStatus(int status) {
+  static void _checkStatus(int status, {bool fromProvider = true}) {
     if (status == 200) return;
-    throw ImageGenerationException(
-      switch (status) {
-        401 => '生图密钥无效，请检查 API Key',
-        403 => '生图服务拒绝访问，请检查模型权限',
-        429 => '生图服务暂时限流或额度不足，请稍后重试',
-        >= 500 => '生图服务暂时不可用，请稍后重试',
-        _ => '生图请求失败（HTTP $status），请检查接口和模型',
-      },
-    );
+    throw ImageGenerationException(switch (status) {
+      401 => '生图密钥无效，请检查 API Key',
+      403 => '生图服务拒绝访问，请检查模型权限',
+      408 || 504 => '生图服务请求超时，请稍后重试',
+      429 => '生图服务暂时限流或额度不足，请稍后重试',
+      >= 500 => '生图服务暂时不可用，请稍后重试',
+      _ => '生图请求失败（HTTP $status），请检查接口和模型',
+    }, skipProvider: fromProvider && status == 401);
   }
 
   void close() {

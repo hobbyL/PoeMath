@@ -33,7 +33,6 @@ class PictureStoryRunState {
   final PictureStoryGenerationOptions? options;
   final String progress;
   final String? message;
-
   bool get isBusy => switch (phase) {
     PictureStoryRunPhase.preparing ||
     PictureStoryRunPhase.generating ||
@@ -158,6 +157,7 @@ class PictureStoryGenerationController extends ChangeNotifier
       final images = await settings.readImageGenerationConfig();
       if (!_allowed(operation)) throw const ImageGenerationCancelled();
       if (images == null) throw const FormatException('请先配置图片生成服务');
+      var imageSignature = images.selectionSignature;
       final llm = await settings.readLlmConfigForScenario(
         LlmScenario.pictureStory,
       );
@@ -183,6 +183,36 @@ class PictureStoryGenerationController extends ChangeNotifier
           }
         },
         onLlmSelectionSaved: (signature) => operation.signature = signature,
+        onImageAttempt: (index, attempt) {
+          if (!_allowed(operation)) return;
+          _setState(
+            operation,
+            PictureStoryRunPhase.generating,
+            progress: attempt == 1
+                ? '正在生成第 ${index + 1} 道题的图片…'
+                : '第 ${index + 1} 道题正在切换生图模型重试（第 $attempt 次）…',
+          );
+        },
+        onImageSuccess: (successful) async {
+          final saved = await settings.promoteSuccessfulImageSelection(
+            images,
+            successful,
+            expectedSignature: imageSignature,
+            isActive: () => _allowed(operation),
+            onSelectionSaved: (signature) => operation.signature = signature,
+          );
+          if (saved != null) imageSignature = saved;
+        },
+        onCaptionAttempt: (index, attempt) {
+          if (!_allowed(operation)) return;
+          _setState(
+            operation,
+            PictureStoryRunPhase.generating,
+            progress: attempt == 1
+                ? '正在根据第 ${index + 1} 张图片出题…'
+                : '第 ${index + 1} 道题正在重试看图出题（第 $attempt 次）…',
+          );
+        },
         candidateId: candidateId,
         reuseImageId: reuseImageId,
         regenerateImage: regenerateImage,

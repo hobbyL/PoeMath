@@ -184,6 +184,9 @@ class PictureStoryGenerationService {
     void Function()? onChanged,
     void Function(int attempt)? onPlanningAttempt,
     void Function(String signature)? onLlmSelectionSaved,
+    void Function(int index, int attempt)? onImageAttempt,
+    void Function(int index, int attempt)? onCaptionAttempt,
+    Future<void> Function(ImageGenerationConfig successful)? onImageSuccess,
     String? candidateId,
     String? reuseImageId,
     bool regenerateImage = false,
@@ -322,6 +325,14 @@ class PictureStoryGenerationService {
             check();
             final bytes = await run.images!.generate(
               config: imageConfig,
+              validate: (bytes) async {
+                await PictureStoryImageService.normalizePreview(bytes);
+              },
+              onAttempt: (attempt) => onImageAttempt?.call(
+                saved.candidates.indexWhere((c) => c.id == item.id),
+                attempt,
+              ),
+              onSuccess: onImageSuccess,
               prompt: buildPictureStoryImagePrompt(
                 item.imagePrompt,
                 promptOverride: imagePromptOverride,
@@ -359,6 +370,10 @@ class PictureStoryGenerationService {
             config,
             run.llm,
             questionPrompt,
+            onAttempt: (attempt) => onCaptionAttempt?.call(
+              saved.candidates.indexWhere((c) => c.id == item.id),
+              attempt,
+            ),
             onSelectionSaved: onLlmSelectionSaved,
           );
           check();
@@ -558,6 +573,7 @@ class PictureStoryGenerationService {
     LlmConfig config,
     LlmClient client,
     String systemPrompt, {
+    void Function(int attempt)? onAttempt,
     void Function(String signature)? onSelectionSaved,
   }) async {
     final timer = Stopwatch()..start();
@@ -592,6 +608,7 @@ class PictureStoryGenerationService {
         ),
       ],
       maxTokens: 3000,
+      onAttempt: onAttempt,
       validate: (response) {
         edit = _parseDescription(item, level, response.content);
       },
