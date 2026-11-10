@@ -9,7 +9,7 @@
 //   切换窗口期连点仅启动一次新朗读
 // - 二轮审查修复（任务 10-07-tts-session-token）：stop 失败保留播放态、
 //   同区停止重入守卫、`_isPreparing` 代码守卫真覆盖（绕过遮罩的等价时序）、
-//   云端全跳句页面级联提示
+//   云端播放失败及系统回调的页面级联恢复
 
 import 'dart:async';
 
@@ -122,8 +122,7 @@ _SpeakScript _stubSpeakLines(
     // thenAnswer 体的同步段等价于真服务入口同步段：在首个 await 之前
     // 递增令牌，页面随后读 currentSessionId 即得本次会话 id。
     final sessionId = sessions.next();
-    final onReady =
-        invocation.namedArguments[#onReady] as void Function(int)?;
+    final onReady = invocation.namedArguments[#onReady] as void Function(int)?;
     final onLineStart =
         invocation.namedArguments[#onLineStart] as void Function(int, int)?;
     await script.run(onReady, sessionId, onLineStart: onLineStart);
@@ -144,14 +143,10 @@ _SpeakScript _stubSpeakSentences(
 }) {
   final script = _SpeakScript();
   when(
-    () => tts.speakSentences(
-      any<String>(),
-      onReady: any(named: 'onReady'),
-    ),
+    () => tts.speakSentences(any<String>(), onReady: any(named: 'onReady')),
   ).thenAnswer((invocation) async {
     final sessionId = sessions.next();
-    final onReady =
-        invocation.namedArguments[#onReady] as void Function(int)?;
+    final onReady = invocation.namedArguments[#onReady] as void Function(int)?;
     await script.run(onReady, sessionId);
   });
   if (autoComplete) {
@@ -194,9 +189,7 @@ Future<void> _pumpPage(WidgetTester tester, TtsService tts) async {
         isFavoriteProvider(_poemId).overrideWith((ref) => false),
         poemProgressProvider(_poemId).overrideWith((ref) => null),
       ],
-      child: const MaterialApp(
-        home: PoemDetailPage(poemId: _poemId),
-      ),
+      child: const MaterialApp(home: PoemDetailPage(poemId: _poemId)),
     ),
   );
   // 等待 AnimatedPageBody 入场动画完成。
@@ -250,6 +243,13 @@ class _ThrowingCloudPlayer implements CloudAudioPlayer {
 /// AC4 页面级联：记录系统朗读的最小假引擎（验证不回退双读）。
 class _RecordingFlutterTts extends Fake implements FlutterTts {
   final List<String> spokenTexts = <String>[];
+  Completer<dynamic>? pending;
+
+  @override
+  ErrorHandler? errorHandler;
+
+  @override
+  VoidCallback? cancelHandler;
 
   @override
   Future<dynamic> setLanguage(String language) async => 1;
@@ -267,15 +267,15 @@ class _RecordingFlutterTts extends Fake implements FlutterTts {
   Future<dynamic> awaitSpeakCompletion(bool awaitCompletion) async => 1;
 
   @override
-  void setCancelHandler(VoidCallback callback) {}
+  void setCancelHandler(VoidCallback callback) => cancelHandler = callback;
 
   @override
-  void setErrorHandler(ErrorHandler handler) {}
+  void setErrorHandler(ErrorHandler handler) => errorHandler = handler;
 
   @override
   Future<dynamic> speak(String text, {bool focus = false}) async {
     spokenTexts.add(text);
-    return 1;
+    return pending == null ? 1 : pending!.future;
   }
 
   @override
@@ -388,8 +388,11 @@ void main() {
 
   testWidgets('播放中点击展开的译文内容：停止当前并播放译文', (tester) async {
     final contentScript = _stubSpeakLines(tts, sessions, autoComplete: false);
-    final translationScript =
-        _stubSpeakSentences(tts, sessions, autoComplete: false);
+    final translationScript = _stubSpeakSentences(
+      tts,
+      sessions,
+      autoComplete: false,
+    );
 
     await _pumpPage(tester, tts);
 
@@ -413,10 +416,7 @@ void main() {
 
     verify(() => tts.stop()).called(1);
     final captured = verify(
-      () => tts.speakSentences(
-        captureAny(),
-        onReady: any(named: 'onReady'),
-      ),
+      () => tts.speakSentences(captureAny(), onReady: any(named: 'onReady')),
     ).captured;
     expect(captured.first, _poem.translation);
 
@@ -478,8 +478,11 @@ void main() {
 
   testWidgets('切换窗口期连点两次仅启动一次新朗读', (tester) async {
     final contentScript = _stubSpeakLines(tts, sessions, autoComplete: false);
-    final translationScript =
-        _stubSpeakSentences(tts, sessions, autoComplete: false);
+    final translationScript = _stubSpeakSentences(
+      tts,
+      sessions,
+      autoComplete: false,
+    );
     // stop 挂起：制造「先置遮罩 → await stop」的切换窗口期（R3）。
     final stopGate = Completer<void>();
     when(() => tts.stop()).thenAnswer((_) => stopGate.future);
@@ -653,9 +656,9 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('云端播放全程失败：页面显示朗读失败提示而非静默（AC4 级联）', (tester) async {
+  testWidgets('云端首行播放失败立即提示，恢复页面且不跳行', (tester) async {
     // 真实 TtsService 级联：HTTP 恒成功（合成成功）+ 播放器恒抛错
-    // → 两行均 skippedCloudPlay → 全跳句上抛 → 页面现有 catch 走 SnackBar。
+    // → 首行失败立即上抛 → 页面现有 catch 走 SnackBar。
     final settings = _MockSettingsRepository();
     when(() => settings.ttsCloudEnabled).thenReturn(true);
     when(() => settings.ttsCloudVoice).thenReturn(kDefaultWorkerVoice);
@@ -684,17 +687,53 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    // 两行均「合成成功但播放失败」→ 不再是遮罩闪一下的静默会话。
-    expect(player.playFailures, 2);
+    expect(player.playFailures, 1);
     expect(engine.spokenTexts, isEmpty); // 不回退系统双读
     // R2：服务文案（云端音频播放失败）透传到 SnackBar，不再被硬编码
     // 「请检查系统语音服务」误导排查方向。
     expect(find.text('朗读失败：云端音频播放失败，请稍后重试'), findsOneWidget);
     expect(find.text('语音合成中…'), findsNothing);
+    expect(_highlightedLines(tester), isEmpty);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 5));
   });
+
+  for (final callback in ['error', 'cancel']) {
+    testWidgets('系统 $callback 回调后即使插件 Future 未返回，页面仍恢复并可重试', (tester) async {
+      final settings = _MockSettingsRepository();
+      when(() => settings.ttsSpeed).thenReturn(0.5);
+      when(() => settings.ttsVoice).thenReturn(null);
+      final pending = Completer<dynamic>();
+      final engine = _RecordingFlutterTts()..pending = pending;
+      final service = TtsService(settings, flutterTts: engine);
+      await _pumpPage(tester, service);
+      await tester.tap(find.text('床前明月光，'));
+      await tester.pump();
+      expect(_highlightedLines(tester), [_contentLines.first]);
+
+      if (callback == 'error') {
+        engine.errorHandler!('engine failed');
+      } else {
+        engine.cancelHandler!();
+      }
+      await tester.pump();
+      expect(pending.isCompleted, isFalse);
+      expect(_highlightedLines(tester), isEmpty);
+      expect(find.text('语音合成中…'), findsNothing);
+      if (callback == 'error') {
+        expect(find.text('朗读失败：语音引擎异常：engine failed'), findsOneWidget);
+      }
+
+      engine.pending = null;
+      await tester.tap(find.text('床前明月光，'));
+      await tester.pump();
+      expect(engine.spokenTexts, [_contentLines.first, ..._contentLines]);
+      pending.complete(1);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 5));
+    });
+  }
 
   testWidgets('折叠态点击译文标题仅展开不触发任何朗读', (tester) async {
     _stubSpeakLines(tts, sessions);
@@ -730,10 +769,7 @@ void main() {
     await tester.pump();
 
     final captured = verify(
-      () => tts.speakSentences(
-        captureAny(),
-        onReady: any(named: 'onReady'),
-      ),
+      () => tts.speakSentences(captureAny(), onReady: any(named: 'onReady')),
     ).captured;
     expect(captured.first, _poem.translation);
     verifyNever(() => tts.stop());
@@ -748,8 +784,11 @@ void main() {
     // 把 `_isCurrentSession` 改成恒真时此用例必须红：旧会话的行索引会
     // 把正文行高亮点亮，而当前播放的是译文区。
     final contentScript = _stubSpeakLines(tts, sessions, autoComplete: false);
-    final translationScript =
-        _stubSpeakSentences(tts, sessions, autoComplete: false);
+    final translationScript = _stubSpeakSentences(
+      tts,
+      sessions,
+      autoComplete: false,
+    );
 
     await _pumpPage(tester, tts);
 
@@ -788,8 +827,11 @@ void main() {
 
   testWidgets('过期会话的晚到 finally 不复位新会话播放态（R3 身份判定）', (tester) async {
     final contentScript = _stubSpeakLines(tts, sessions, autoComplete: false);
-    final translationScript =
-        _stubSpeakSentences(tts, sessions, autoComplete: false);
+    final translationScript = _stubSpeakSentences(
+      tts,
+      sessions,
+      autoComplete: false,
+    );
 
     await _pumpPage(tester, tts);
 

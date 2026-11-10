@@ -251,10 +251,10 @@ void main() {
     engine.controlledSpeaks.add(first);
     var completed = false;
 
-    final speaking = service.speakLines(
-      const <String>['第一行', '第二行'],
-      onComplete: (_) => completed = true,
-    );
+    final speaking = service.speakLines(const <String>[
+      '第一行',
+      '第二行',
+    ], onComplete: (_) => completed = true);
     await _flushMicrotasks();
     expect(engine.spokenTexts, const <String>['第一行']);
 
@@ -271,10 +271,10 @@ void main() {
     engine.controlledSpeaks.add(first);
     var readyCount = 0;
 
-    final speaking = service.speakLines(
-      const <String>['第一行', '第二行'],
-      onReady: (_) => readyCount++,
-    );
+    final speaking = service.speakLines(const <String>[
+      '第一行',
+      '第二行',
+    ], onReady: (_) => readyCount++);
     await _flushMicrotasks();
 
     // 首行 speak 仍挂起（音频未播完），onReady 已在播放动作发起时触发。
@@ -306,10 +306,7 @@ void main() {
 
   test('speakSentences 的 onReady 在首句播放动作发起时触发一次', () async {
     var readyCount = 0;
-    await service.speakSentences(
-      '第一句。第二句！',
-      onReady: (_) => readyCount++,
-    );
+    await service.speakSentences('第一句。第二句！', onReady: (_) => readyCount++);
 
     expect(engine.spokenTexts, const <String>['第一句', '第二句']);
     expect(readyCount, 1);
@@ -320,10 +317,10 @@ void main() {
     var readyCount = 0;
 
     await expectLater(
-      service.speakLines(
-        const <String>['第一行', '第二行'],
-        onReady: (_) => readyCount++,
-      ),
+      service.speakLines(const <String>[
+        '第一行',
+        '第二行',
+      ], onReady: (_) => readyCount++),
       throwsA(isA<TtsException>()),
     );
 
@@ -338,10 +335,10 @@ void main() {
     engine.controlledSpeaks.add(first);
     var readyCount = 0;
 
-    final speaking = service.speakLines(
-      const <String>['第一行', '第二行'],
-      onReady: (_) => readyCount++,
-    );
+    final speaking = service.speakLines(const <String>[
+      '第一行',
+      '第二行',
+    ], onReady: (_) => readyCount++);
     await _flushMicrotasks();
     expect(engine.spokenTexts, const <String>['第一行']);
     // 旧缺陷：onReady 等整句播完才触发，出声期间遮罩锁死且无法停止。
@@ -505,9 +502,7 @@ void main() {
       line1Gate,
       line2Gate,
     ]);
-    final newSession = cloudService.speakLines(
-      const <String>['新行一', '新行二'],
-    );
+    final newSession = cloudService.speakLines(const <String>['新行一', '新行二']);
     await _flushMicrotasks();
     expect(engine.spokenTexts, const <String>['预热', '新行一']);
 
@@ -573,10 +568,10 @@ void main() {
       final oldLineSessions = <int>[];
 
       // 旧会话首行挂起中。
-      final oldSession = service.speakLines(
-        const <String>['旧行一', '旧行二'],
-        onLineStart: (_, sessionId) => oldLineSessions.add(sessionId),
-      );
+      final oldSession = service.speakLines(const <String>[
+        '旧行一',
+        '旧行二',
+      ], onLineStart: (_, sessionId) => oldLineSessions.add(sessionId));
       await _flushMicrotasks();
       final oldId = service.currentSessionId;
       expect(oldLineSessions, <int>[oldId]);
@@ -600,10 +595,10 @@ void main() {
       engine.controlledSpeaks.add(first);
       int? readySession;
 
-      final task = service.speakLines(
-        const <String>['第一行', '第二行'],
-        onReady: (sessionId) => readySession = sessionId,
-      );
+      final task = service.speakLines(const <String>[
+        '第一行',
+        '第二行',
+      ], onReady: (sessionId) => readySession = sessionId);
       await _flushMicrotasks();
       expect(readySession, isNotNull);
       expect(readySession, service.currentSessionId);
@@ -618,7 +613,56 @@ void main() {
     });
   });
 
-  group('引擎层停止源递增会话令牌（挂账 R2）', () {
+  group('系统回调只结束当前系统播放，保留页面错误恢复所需身份', () {
+    for (final callback in ['cancel', 'error']) {
+      test('$callback 回调独立结束等待，不依赖插件 speak Future 返回', () async {
+        final pending = Completer<dynamic>();
+        engine.controlledSpeaks.add(pending);
+        var finished = false;
+        Object? failure;
+        final task = service
+            .speakLines(['第一行', '第二行'])
+            .then<void>(
+              (_) => finished = true,
+              onError: (Object error) {
+                failure = error;
+                finished = true;
+              },
+            );
+        final session = service.currentSessionId;
+        await _flushMicrotasks();
+
+        if (callback == 'cancel') {
+          engine.cancelHandler!();
+        } else {
+          engine.errorHandler!('engine failed');
+        }
+        await _flushMicrotasks();
+        final finishedFromCallback = finished;
+        // 清理假插件；此时没有完成 speak Future 才能证明回调解除等待。
+        pending.complete(1);
+        await task;
+
+        expect(finishedFromCallback, isTrue);
+        expect(service.currentSessionId, session);
+        expect(service.isSpeaking, isFalse);
+        expect(engine.spokenTexts, ['第一行']);
+        expect(failure, callback == 'error' ? isA<TtsException>() : isNull);
+      });
+    }
+
+    test('系统拒绝播放返回 0 时报告失败，不伪装成朗读完成', () async {
+      engine.controlledSpeaks.add(Completer<dynamic>()..complete(0));
+      var completed = false;
+      await expectLater(
+        service.speakLines(['第一行', '第二行'], onComplete: (_) => completed = true),
+        throwsA(isA<TtsException>()),
+      );
+      expect(engine.spokenTexts, ['第一行']);
+      expect(completed, isFalse);
+      expect(service.isSpeaking, isFalse);
+    });
+
     test('播放中 errorHandler 触发：在途会话终止且不再播后续行', () async {
       final first = Completer<dynamic>();
       engine.controlledSpeaks.add(first);
@@ -634,17 +678,16 @@ void main() {
       expect(engine.spokenTexts, const <String>['第一行']);
       expect(service.isSpeaking, isTrue);
 
-      // 引擎上报错误（播放中）：令牌递增使在途会话失效。
+      // 引擎上报错误后终止当前系统播放，但保留页面清理所需的身份。
       engine.errorHandler!('engine blew up');
       first.complete(1);
       await task.then<void>((_) {}, onError: (Object _) {});
 
-      // 循环按代际退出：后续行不播、不触发完成回调。
+      // 后续行不播、不触发完成回调。
       expect(engine.spokenTexts, const <String>['第一行']);
       expect(lineStarts, const <int>[0]);
       expect(completeCount, 0);
-      // handler 直接置位兜底：被杀会话的 finally 因代际失配不清位，
-      // 播放态仍必须回到空闲（不允许卡死在「朗读中」）。
+      // 播放态必须回到空闲。
       expect(service.isSpeaking, isFalse);
     });
 
@@ -672,7 +715,7 @@ void main() {
       expect(service.isSpeaking, isFalse);
     });
 
-    test('引擎停止源递增后新会话仍可正常朗读（停止标志不粘滞）', () async {
+    test('系统取消后新会话仍可正常朗读（停止标志不粘滞）', () async {
       final first = Completer<dynamic>();
       engine.controlledSpeaks.add(first);
 
@@ -748,17 +791,11 @@ void main() {
 
     test('引擎初始化读 Hive 失败时，包装为 TtsException 而非裸 Error', () async {
       // getChineseVoices 先走 _ensureInitialized（读 ttsSpeed）。
-      expect(
-        () => service.getChineseVoices(),
-        throwsA(isA<TtsException>()),
-      );
+      expect(() => service.getChineseVoices(), throwsA(isA<TtsException>()));
     });
 
     test('speak 初始化失败同样包装为 TtsException', () async {
-      expect(
-        () => service.speak('第一句'),
-        throwsA(isA<TtsException>()),
-      );
+      expect(() => service.speak('第一句'), throwsA(isA<TtsException>()));
     });
   });
 }

@@ -72,6 +72,15 @@ class _FakeFlutterTts extends Fake implements FlutterTts {
   final List<String> spokenTexts = <String>[];
 
   @override
+  VoidCallback? cancelHandler;
+
+  @override
+  ErrorHandler? errorHandler;
+
+  @override
+  Future<dynamic> get getVoices async => <Object>[];
+
+  @override
   Future<dynamic> setLanguage(String language) async => 1;
 
   @override
@@ -87,10 +96,10 @@ class _FakeFlutterTts extends Fake implements FlutterTts {
   Future<dynamic> awaitSpeakCompletion(bool awaitCompletion) async => 1;
 
   @override
-  void setCancelHandler(VoidCallback callback) {}
+  void setCancelHandler(VoidCallback callback) => cancelHandler = callback;
 
   @override
-  void setErrorHandler(ErrorHandler handler) {}
+  void setErrorHandler(ErrorHandler handler) => errorHandler = handler;
 
   @override
   Future<dynamic> speak(String text, {bool focus = false}) async {
@@ -237,6 +246,63 @@ SettingsRepository _stubSettings({
 }
 
 void main() {
+  test('系统音色试听在开启云端时仍只调用系统引擎', () async {
+    final engine = _FakeFlutterTts();
+    final player = _FakeCloudAudioPlayer();
+    final counter = _RequestCounter();
+    final service = TtsService(
+      _stubSettings(cloudEnabled: true),
+      flutterTts: engine,
+      cloudClient: _client(counter),
+      cloudPlayer: player,
+    );
+    addTearDown(service.dispose);
+
+    await service.preview('试听系统声音');
+
+    expect(engine.spokenTexts, ['试听系统声音']);
+    expect(counter.value, 0);
+    expect(player.played, isEmpty);
+  });
+
+  for (final callback in ['cancel', 'error']) {
+    test('云端合成期间旧系统 $callback 回调不能取消新会话', () async {
+      final engine = _FakeFlutterTts();
+      final player = _FakeCloudAudioPlayer();
+      final gate = Completer<void>();
+      final started = Completer<void>();
+      final counter = _RequestCounter();
+      final service = TtsService(
+        _stubSettings(cloudEnabled: true),
+        flutterTts: engine,
+        cloudClient: _client(counter, synthGate: gate, started: started),
+        cloudPlayer: player,
+      );
+      addTearDown(service.dispose);
+      // 打开音色设置会初始化系统引擎，随后云端朗读仍可能收到旧回调。
+      await service.getChineseVoices();
+      var completed = false;
+      final speaking = service.speakLines([
+        '第一行',
+        '第二行',
+      ], onComplete: (_) => completed = true);
+      final session = service.currentSessionId;
+      await started.future;
+      if (callback == 'cancel') {
+        engine.cancelHandler!();
+      } else {
+        engine.errorHandler!('old system error');
+      }
+      gate.complete();
+      await speaking;
+
+      expect(service.currentSessionId, session);
+      expect(player.played, hasLength(2));
+      expect(engine.spokenTexts, isEmpty);
+      expect(completed, isTrue);
+    });
+  }
+
   test('云朗读不依赖本机系统语音引擎初始化，全文和逐句均可播放', () async {
     await setUpHiveForTesting();
     addTearDown(tearDownHiveForTesting);
@@ -293,8 +359,10 @@ void main() {
     await CloudUsageService.instance.setLimit(CloudUsageKind.tts, null);
     final counter = _RequestCounter();
     final client = WorkerTtsClient(
-      httpClient:
-          _ScriptedHttpClient(counter: counter, audioSize: 5 * 1024 * 1024),
+      httpClient: _ScriptedHttpClient(
+        counter: counter,
+        audioSize: 5 * 1024 * 1024,
+      ),
     );
     addTearDown(client.close);
     final service = TtsService(
@@ -311,8 +379,9 @@ void main() {
 
     final sent = Completer<void>();
     final aborted = Completer<void>();
-    final blocked =
-        WorkerTtsClient(httpClient: _BlockingHttpClient(sent, aborted));
+    final blocked = WorkerTtsClient(
+      httpClient: _BlockingHttpClient(sent, aborted),
+    );
     addTearDown(blocked.close);
     final stopped = TtsService(
       _stubSettings(cloudEnabled: true),
@@ -402,10 +471,11 @@ void main() {
     );
     final lineStarts = <int>[];
 
-    await service.speakLines(
-      ['床前明月光', '疑是地上霜', '举头望明月'],
-      onLineStart: (index, _) => lineStarts.add(index),
-    );
+    await service.speakLines([
+      '床前明月光',
+      '疑是地上霜',
+      '举头望明月',
+    ], onLineStart: (index, _) => lineStarts.add(index));
 
     expect(lineStarts, [0, 1, 2]);
     expect(player.played.length, 3);
@@ -426,10 +496,10 @@ void main() {
     );
     var readyCount = 0;
 
-    final task = service.speakLines(
-      ['床前明月光', '疑是地上霜'],
-      onReady: (_) => readyCount++,
-    );
+    final task = service.speakLines([
+      '床前明月光',
+      '疑是地上霜',
+    ], onReady: (_) => readyCount++);
     // 等第一行播放挂起。
     await Future<void>.delayed(Duration.zero);
 
@@ -491,7 +561,7 @@ void main() {
     expect(tts.spokenTexts, isEmpty);
   });
 
-  test('云端播放抛错跳过该句时 onReady 仍触发且会话上抛（AC4）', () async {
+  test('云端播放失败时 onReady 已触发且会话上抛', () async {
     final counter = _RequestCounter();
     final player = _FakeCloudAudioPlayer()..throwOnPlay = true;
     final service = TtsService(
@@ -502,8 +572,7 @@ void main() {
     );
     var readyCount = 0;
 
-    // R3：单段会话「合成成功但播放失败」= 全跳句 → 上抛 TtsException，
-    // 页面按朗读失败提示，不再静默会话。
+    // 页面收到播放错误，可以恢复按钮并提示重试。
     await expectLater(
       service.speak('床前明月光', onReady: (_) => readyCount++),
       throwsA(
@@ -515,13 +584,12 @@ void main() {
       ),
     );
 
-    // 旧缺陷一：play 抛错走「跳过该句」return，onReady 永不触发 → 遮罩
-    // 锁死整个会话。新契约：发起前已触发。
+    // onReady 仍代表发起播放，错误由页面 catch/finally 恢复。
     expect(player.playFailures, 1);
     expect(readyCount, 1);
   });
 
-  test('云端首段 play 抛错跳句后：onReady 已触发且后续行继续播放', () async {
+  test('云端首段播放失败立即停止，解除准备态且不漏行续播', () async {
     final counter = _RequestCounter();
     final tts = _FakeFlutterTts();
     final player = _FakeCloudAudioPlayer()..throwOnPlayLimit = 1;
@@ -533,16 +601,15 @@ void main() {
     );
     var readyCount = 0;
 
-    await service.speakLines(
-      ['床前明月光', '疑是地上霜'],
-      onReady: (_) => readyCount++,
+    await expectLater(
+      service.speakLines(['床前明月光', '疑是地上霜'], onReady: (_) => readyCount++),
+      throwsA(isA<TtsException>()),
     );
 
-    // 第一行 play 抛错被跳过，第二行正常播放；系统引擎不补读（无双读）。
     expect(player.playFailures, 1);
-    expect(player.played.length, 2);
+    expect(player.played.length, 1);
     expect(tts.spokenTexts, isEmpty);
-    // 回归：跳句分支 onReady 已触发，整个会话不锁遮罩。
+    expect(service.isSpeaking, isFalse);
     expect(readyCount, 1);
   });
 
@@ -608,8 +675,10 @@ void main() {
     final service = TtsService(
       _stubSettings(cloudEnabled: true),
       flutterTts: tts,
-      cloudClient:
-          _client(counter, failKind: WorkerTtsErrorKind.authentication),
+      cloudClient: _client(
+        counter,
+        failKind: WorkerTtsErrorKind.authentication,
+      ),
       cloudPlayer: _FakeCloudAudioPlayer(),
     );
 
@@ -619,7 +688,7 @@ void main() {
     expect(tts.spokenTexts, ['床前明月光', '疑是地上霜', '举头望明月']);
   });
 
-  test('云端播放抛错时跳过该行且不回退系统朗读，全跳句上抛（AC4）', () async {
+  test('云端播放失败保留错误，不自动补读或继续请求后续行', () async {
     final counter = _RequestCounter();
     final tts = _FakeFlutterTts();
     final player = _FakeCloudAudioPlayer()..throwOnPlay = true;
@@ -630,23 +699,21 @@ void main() {
       cloudPlayer: player,
     );
 
-    // 两行均合成并尝试播放，播放失败仅跳过该行；所有段全跳句 →
-    // R3：会话结束上抛（静默会话缺陷修复）。
     await expectLater(
       service.speakLines(['床前明月光', '疑是地上霜']),
       throwsA(isA<TtsException>()),
     );
 
-    expect(counter.value, 2);
-    expect(player.playFailures, 2);
+    expect(counter.value, 1);
+    expect(player.playFailures, 1);
     // 系统引擎不得补读，避免同一句被读两遍。
     expect(tts.spokenTexts, isEmpty);
   });
 
-  test('云端部分行播放成功：跳句保持静默续播不上抛（AC4）', () async {
+  test('逐句朗读中途播放失败不能被首句成功掩盖，也不能报告全文完成', () async {
     final counter = _RequestCounter();
     final tts = _FakeFlutterTts();
-    final player = _FakeCloudAudioPlayer()..throwOnPlayLimit = 1;
+    final player = _FakeCloudAudioPlayer();
     final service = TtsService(
       _stubSettings(cloudEnabled: true),
       flutterTts: tts,
@@ -655,15 +722,20 @@ void main() {
     );
     var completed = false;
 
-    await service.speakLines(
-      ['床前明月光', '疑是地上霜'],
-      onComplete: (_) => completed = true,
+    await expectLater(
+      service.speakSentences(
+        '第一句。第二句。第三句。',
+        onSentenceStart: (index, _) => player.throwOnPlay = index == 1,
+        onComplete: (_) => completed = true,
+      ),
+      throwsA(isA<TtsException>()),
     );
 
-    // 第一行跳句、第二行播成：部分成功 → 不上抛、完成回调正常。
     expect(player.playFailures, 1);
     expect(player.played.length, 2);
-    expect(completed, isTrue);
+    expect(counter.value, 2);
+    expect(completed, isFalse);
+    expect(service.isSpeaking, isFalse);
   });
 
   test('同一句重复朗读命中缓存不重复请求', () async {
@@ -744,10 +816,10 @@ void main() {
     );
 
     var completed = false;
-    final task = service.speakLines(
-      ['床前明月光', '疑是地上霜'],
-      onComplete: (_) => completed = true,
-    );
+    final task = service.speakLines([
+      '床前明月光',
+      '疑是地上霜',
+    ], onComplete: (_) => completed = true);
     // 等第一行播放挂起。
     await Future<void>.delayed(Duration.zero);
     expect(player.played.length, 1);
@@ -800,11 +872,7 @@ void main() {
               'kind',
               WorkerTtsErrorKind.authentication,
             )
-            .having(
-              (error) => error.message,
-              'message',
-              contains('保存并验证'),
-            ),
+            .having((error) => error.message, 'message', contains('保存并验证')),
       ),
     );
     expect(counter.value, 0);
@@ -815,8 +883,10 @@ void main() {
     final service = TtsService(
       _stubSettings(cloudEnabled: true),
       flutterTts: _FakeFlutterTts(),
-      cloudClient:
-          _client(counter, failKind: WorkerTtsErrorKind.authentication),
+      cloudClient: _client(
+        counter,
+        failKind: WorkerTtsErrorKind.authentication,
+      ),
       cloudPlayer: _FakeCloudAudioPlayer(),
     );
 
@@ -857,9 +927,9 @@ class _BlockingHttpClient extends http.BaseClient {
   final Completer<void> aborted;
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) {
-    (request as http.AbortableRequest)
-        .abortTrigger!
-        .then((_) => aborted.complete());
+    (request as http.AbortableRequest).abortTrigger!.then(
+      (_) => aborted.complete(),
+    );
     sent.complete();
     return Completer<http.StreamedResponse>().future;
   }
