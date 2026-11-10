@@ -97,9 +97,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       const SizedBox(height: 100),
     ];
     var contentIndex = 0;
-    final pageOverlayStyle = theme.brightness == Brightness.dark
-        ? SystemUiOverlayStyle.light
-        : SystemUiOverlayStyle.dark;
+    final pageOverlayStyle =
+        (theme.brightness == Brightness.dark
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark)
+            .copyWith(
+              statusBarColor: Colors.transparent,
+              systemStatusBarContrastEnforced: false,
+            );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: pageOverlayStyle,

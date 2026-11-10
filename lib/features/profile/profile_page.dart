@@ -71,9 +71,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       theme,
       style: AnimatedHeroStyle.starlight,
     );
-    final pageStyle = theme.brightness == Brightness.dark
-        ? SystemUiOverlayStyle.light
-        : SystemUiOverlayStyle.dark;
+    final pageStyle =
+        (theme.brightness == Brightness.dark
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark)
+            .copyWith(
+              statusBarColor: Colors.transparent,
+              systemStatusBarContrastEnforced: false,
+            );
     final content = <Widget>[
       // 统计面板
       _buildStatsPanel(context, stats, streak),

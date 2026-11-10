@@ -21,6 +21,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -87,6 +88,53 @@ void main() {
   tearDown(() async {
     await tearDownHiveForTesting();
   });
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('个人页状态栏透明衔接星空，滚动后图标适配正文：$subject/$brightness', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          size: const Size(411, 320),
+          subject: subject,
+          brightness: brightness,
+        );
+        void expectStatusBar(Brightness icons) {
+          final style = tester.binding.renderViews.first.debugLayer!
+              .find<SystemUiOverlayStyle>(const Offset(205, 16));
+          expect(style?.statusBarColor, Colors.transparent);
+          expect(style?.systemStatusBarContrastEnforced, isFalse);
+          expect(style?.statusBarIconBrightness, icons);
+          expect(
+            style?.statusBarBrightness,
+            icons == Brightness.light ? Brightness.dark : Brightness.light,
+          );
+        }
+
+        final background = find.byKey(
+          const ValueKey('profile-header-background'),
+        );
+        expect(tester.getTopLeft(background), Offset.zero);
+        expectStatusBar(Brightness.light);
+        final scroll = tester.state<ScrollableState>(
+          find.byType(Scrollable).first,
+        );
+        expect(
+          scroll.position.maxScrollExtent,
+          greaterThanOrEqualTo(tester.getSize(background).height),
+        );
+        scroll.position.jumpTo(tester.getSize(background).height);
+        await tester.pump();
+        expectStatusBar(
+          brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+        );
+        scroll.position.jumpTo(0);
+        await tester.pump();
+        expectStatusBar(Brightness.light);
+      });
+    }
+  }
 
   testWidgets('顶部无 AppBar，「我的」不再作为标题显示', (tester) async {
     await _pump(tester);

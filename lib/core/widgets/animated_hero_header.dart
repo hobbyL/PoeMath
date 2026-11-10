@@ -170,6 +170,15 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final colors = AnimatedHeroColors(Theme.of(context), style: widget.style);
+    // 背景已绘制到屏幕顶边，系统栏只保留图标，不能叠加底色或对比度遮罩。
+    final overlayStyle =
+        (colors.foreground.computeLuminance() > .5
+                ? SystemUiOverlayStyle.light
+                : SystemUiOverlayStyle.dark)
+            .copyWith(
+              statusBarColor: Colors.transparent,
+              systemStatusBarContrastEnforced: false,
+            );
     // 辅助导航并不表示用户要求减少动态效果，两种系统偏好不能混用。
     final reduceMotion = media.disableAnimations;
     // 顶部是独立的动态区域，按产品约定直接展示动效；
@@ -210,10 +219,7 @@ class _AnimatedHeroHeaderState extends State<AnimatedHeroHeader>
                                 scale: 1 + stretch / height,
                                 alignment: Alignment.bottomCenter,
                                 child: AnnotatedRegion<SystemUiOverlayStyle>(
-                                  value:
-                                      colors.foreground.computeLuminance() > .5
-                                      ? SystemUiOverlayStyle.light
-                                      : SystemUiOverlayStyle.dark,
+                                  value: overlayStyle,
                                   child: RepaintBoundary(
                                     key: widget.backgroundKey,
                                     child: ColoredCard(

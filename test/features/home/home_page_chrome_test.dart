@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/features/home/home_page.dart';
@@ -27,6 +28,7 @@ Future<void> _pump(
   int streak = 0,
   UserStats? stats,
   int learnedPoems = 0,
+  ThemeData? theme,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -41,6 +43,7 @@ Future<void> _pump(
         poem.learnedCountProvider.overrideWithValue(learnedPoems),
       ],
       child: MaterialApp(
+        theme: theme,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
             padding: safeInsets,
@@ -71,6 +74,43 @@ void main() {
   tearDown(() async {
     await tearDownHiveForTesting();
   });
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('首页状态栏透明衔接卡片，滚动后图标适配正文：$subject/$brightness', (tester) async {
+        await _pump(
+          tester,
+          size: const Size(411, 400),
+          theme: AppTheme.resolve(subject: subject, brightness: brightness),
+        );
+        void expectStatusBar(Brightness icons) {
+          final style = tester.binding.renderViews.first.debugLayer!
+              .find<SystemUiOverlayStyle>(const Offset(205, 16));
+          expect(style?.statusBarColor, Colors.transparent);
+          expect(style?.systemStatusBarContrastEnforced, isFalse);
+          expect(style?.statusBarIconBrightness, icons);
+          expect(
+            style?.statusBarBrightness,
+            icons == Brightness.light ? Brightness.dark : Brightness.light,
+          );
+        }
+
+        expect(tester.getTopLeft(_background), Offset.zero);
+        expectStatusBar(Brightness.light);
+        final scroll = tester.state<ScrollableState>(
+          find.byType(Scrollable).first,
+        );
+        scroll.position.jumpTo(tester.getSize(_background).height);
+        await tester.pump();
+        expectStatusBar(
+          brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+        );
+        scroll.position.jumpTo(0);
+        await tester.pump();
+        expectStatusBar(Brightness.light);
+      });
+    }
+  }
 
   testWidgets('顶部背景贴边、前景避开状态栏，不重复应用名', (tester) async {
     await _pump(tester);
@@ -269,9 +309,7 @@ void main() {
         accessibleNavigation: true,
       );
       final before = tester.getRect(_background);
-      final gesture = await tester.startGesture(
-        tester.getCenter(_background),
-      );
+      final gesture = await tester.startGesture(tester.getCenter(_background));
       await gesture.moveBy(const Offset(0, 180));
       await tester.pump();
       if (reduceMotion) {
