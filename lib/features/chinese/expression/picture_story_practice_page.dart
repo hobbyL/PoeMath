@@ -837,7 +837,7 @@ class _PictureStoryPracticePageState
         ),
       ),
       ColoredCard(
-        color: theme.colorScheme.secondary,
+        color: theme.colorScheme.primary,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -311,7 +311,7 @@ class _PictureStoryReviewPageState extends ConsumerState<PictureStoryReviewPage>
                 if (previous.isNotEmpty) ...[
                   const SizedBox(height: SpacingTokens.md),
                   ColoredCard(
-                    color: theme.colorScheme.secondary,
+                    color: theme.colorScheme.primary,
                     child: Material(
                       type: MaterialType.transparency,
                       child: ExpansionTile(

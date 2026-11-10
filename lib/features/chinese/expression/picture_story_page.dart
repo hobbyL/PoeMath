@@ -148,7 +148,7 @@ class _PromptCardState extends ConsumerState<_PromptCard> {
         context.push(AppRoutes.pictureStoryPracticeOf(prompt.id));
 
     return ColoredCard(
-      color: theme.colorScheme.secondary,
+      color: theme.colorScheme.primary,
       padding: EdgeInsets.zero,
       child: Stack(
         children: [
