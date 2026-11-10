@@ -25,7 +25,9 @@ class MathHistoryPage extends ConsumerWidget {
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = ResponsiveLayout.columns(constraints.maxWidth);
+          final columns = ResponsiveLayout.columns(
+            constraints.maxWidth / MediaQuery.textScalerOf(context).scale(1),
+          );
 
           return sessions.isEmpty
               ? const CustomScrollView(
@@ -73,13 +75,8 @@ class MathHistoryPage extends ConsumerWidget {
                               final session = sessions[idx];
                               rowWidgets.add(
                                 Expanded(
-                                  child: GestureDetector(
-                                    onTap: () => context.push(
-                                      AppRoutes.mathSessionDetail,
-                                      extra: session,
-                                    ),
-                                    child: _SessionCard(session: session),
-                                  ).animateListItem(context, index: idx),
+                                  child: _SessionCard(session: session)
+                                      .animateListItem(context, index: idx),
                                 ),
                               );
                             } else {
@@ -149,12 +146,16 @@ class _SessionCard extends StatelessWidget {
     final durStr = dur >= 60 ? '${dur ~/ 60}分${dur % 60}秒' : '$dur秒';
 
     return ColoredCard(
+      onTap: () => context.push(AppRoutes.mathSessionDetail, extra: session),
       color: theme.colorScheme.primary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 标题行：年级 + 时间
-          Row(
+          Wrap(
+            spacing: SpacingTokens.sm,
+            runSpacing: SpacingTokens.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -175,7 +176,6 @@ class _SessionCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: SpacingTokens.xs),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: SpacingTokens.sm,
@@ -195,7 +195,6 @@ class _SessionCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const Spacer(),
               Text(
                 timeStr,
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -207,7 +206,10 @@ class _SessionCard extends StatelessWidget {
           const SizedBox(height: SpacingTokens.sm),
 
           // 统计行
-          Row(
+          Wrap(
+            spacing: SpacingTokens.sm,
+            runSpacing: SpacingTokens.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               // 正确率
               _StatItem(
@@ -215,7 +217,6 @@ class _SessionCard extends StatelessWidget {
                 value: '$accuracyPct%',
                 color: accuracyColor,
               ),
-              const SizedBox(width: SpacingTokens.lg),
 
               // 做题数
               _StatItem(
@@ -223,7 +224,6 @@ class _SessionCard extends StatelessWidget {
                 value: '${session.correctCount}/${session.totalProblems}',
                 color: theme.colorScheme.primary,
               ),
-              const SizedBox(width: SpacingTokens.lg),
 
               // 用时
               _StatItem(
@@ -231,8 +231,6 @@ class _SessionCard extends StatelessWidget {
                 value: durStr,
                 color: theme.semantic.secondaryForeground,
               ),
-
-              const Spacer(),
 
               // 星星
               if (stars > 0)
