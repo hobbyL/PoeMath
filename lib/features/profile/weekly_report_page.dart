@@ -24,8 +24,9 @@ class WeeklyReportPage extends ConsumerWidget {
     final lastWeek = ref.watch(dailyStatsProvider(14));
 
     // 上周数据 = 14天数据的前7天
-    final lastWeekStats =
-        lastWeek.length >= 14 ? lastWeek.sublist(0, 7) : <DailyStat>[];
+    final lastWeekStats = lastWeek.length >= 14
+        ? lastWeek.sublist(0, 7)
+        : <DailyStat>[];
 
     // 聚合本周
     final tw = _aggregate(thisWeek);
@@ -34,8 +35,9 @@ class WeeklyReportPage extends ConsumerWidget {
 
     // 日期范围
     final endDate = thisWeek.isNotEmpty ? thisWeek.last.date : DateTime.now();
-    final startDate =
-        thisWeek.isNotEmpty ? thisWeek.first.date : DateTime.now();
+    final startDate = thisWeek.isNotEmpty
+        ? thisWeek.first.date
+        : DateTime.now();
     final dateRange =
         '${startDate.month}/${startDate.day} - ${endDate.month}/${endDate.day}';
 
@@ -97,12 +99,11 @@ class WeeklyReportPage extends ConsumerWidget {
       (sum, s) => sum + s.durationMinutes,
     );
     final activeDays = stats
-        .where(
-          (s) => s.poemCount > 0 || s.mathTotal > 0,
-        )
+        .where((s) => s.poemCount > 0 || s.mathTotal > 0)
         .length;
-    final avgAccuracy =
-        totalMath > 0 ? (totalCorrect / totalMath * 100).round() : 0;
+    final avgAccuracy = totalMath > 0
+        ? (totalCorrect / totalMath * 100).round()
+        : 0;
 
     return _WeekAggregate(
       poems: totalPoems,
@@ -162,7 +163,7 @@ class WeeklyReportPage extends ConsumerWidget {
                   Icons.calculate_rounded,
                   '${tw.math}',
                   '口算题',
-                  theme.colorScheme.secondary,
+                  theme.semantic.secondaryForeground,
                   _diff(tw.math, lw.math),
                 ),
                 _buildStatItem(
@@ -263,8 +264,9 @@ class WeeklyReportPage extends ConsumerWidget {
               Icon(
                 diff > 0 ? Icons.arrow_upward : Icons.arrow_downward,
                 size: 12,
-                color:
-                    diff > 0 ? theme.semantic.success : theme.colorScheme.error,
+                color: diff > 0
+                    ? theme.semantic.success
+                    : theme.colorScheme.error,
               ),
               Text(
                 '${diff.abs()}',
@@ -289,8 +291,8 @@ class WeeklyReportPage extends ConsumerWidget {
   Widget _buildPracticeChart(BuildContext context, List<DailyStat> stats) {
     final theme = Theme.of(context);
     final maxY = stats.fold<double>(0, (prev, s) {
-      final m =
-          (s.mathTotal > s.poemCount ? s.mathTotal : s.poemCount).toDouble();
+      final m = (s.mathTotal > s.poemCount ? s.mathTotal : s.poemCount)
+          .toDouble();
       return m > prev ? m : prev;
     });
 
@@ -310,7 +312,7 @@ class WeeklyReportPage extends ConsumerWidget {
               const Spacer(),
               _buildLegend(theme, '口算', theme.colorScheme.primary),
               const SizedBox(width: SpacingTokens.sm),
-              _buildLegend(theme, '诗词', theme.colorScheme.secondary),
+              _buildLegend(theme, '诗词', theme.semantic.secondaryForeground),
             ],
           ),
           const SizedBox(height: SpacingTokens.md),
@@ -321,6 +323,7 @@ class WeeklyReportPage extends ConsumerWidget {
                 maxY: (maxY * 1.2).ceilToDouble().clamp(5, double.infinity),
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => theme.colorScheme.primary,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       return BarTooltipItem(
                         rod.toY.toInt().toString(),
@@ -384,7 +387,7 @@ class WeeklyReportPage extends ConsumerWidget {
                       ),
                       BarChartRodData(
                         toY: s.poemCount.toDouble(),
-                        color: theme.colorScheme.secondary,
+                        color: theme.semantic.secondaryForeground,
                         width: 12,
                         borderRadius: BorderRadius.circular(
                           SpacingTokens.radiusSmall,
@@ -439,90 +442,72 @@ class WeeklyReportPage extends ConsumerWidget {
     final mathDiff = tw.math - lw.math;
 
     if (poemDiff > 0) {
-      items.add(
-        (
-          text: '比上周多学了 $poemDiff 首诗词',
-          icon: Icons.menu_book_rounded,
-          color: theme.colorScheme.primary,
-        ),
-      );
+      items.add((
+        text: '比上周多学了 $poemDiff 首诗词',
+        icon: Icons.menu_book_rounded,
+        color: theme.colorScheme.primary,
+      ));
     }
     if (mathDiff > 0) {
-      items.add(
-        (
-          text: '比上周多做了 $mathDiff 道口算',
-          icon: Icons.calculate_rounded,
-          color: theme.colorScheme.secondary,
-        ),
-      );
+      items.add((
+        text: '比上周多做了 $mathDiff 道口算',
+        icon: Icons.calculate_rounded,
+        color: theme.semantic.secondaryForeground,
+      ));
     }
 
     // 活跃天数
     if (tw.activeDays >= 7) {
-      items.add(
-        (
-          text: '连续 7 天坚持学习，太棒了！',
-          icon: Icons.star_rounded,
-          color: theme.semantic.caution,
-        ),
-      );
+      items.add((
+        text: '连续 7 天坚持学习，太棒了！',
+        icon: Icons.star_rounded,
+        color: theme.semantic.caution,
+      ));
     } else if (tw.activeDays >= 5) {
-      items.add(
-        (
-          text: '本周学习了 ${tw.activeDays} 天，非常勤奋！',
-          icon: Icons.local_fire_department_rounded,
-          color: theme.colorScheme.error,
-        ),
-      );
+      items.add((
+        text: '本周学习了 ${tw.activeDays} 天，非常勤奋！',
+        icon: Icons.local_fire_department_rounded,
+        color: theme.colorScheme.error,
+      ));
     } else if (tw.activeDays >= 3) {
-      items.add(
-        (
-          text: '本周学习了 ${tw.activeDays} 天，继续加油',
-          icon: Icons.flag_rounded,
-          color: theme.colorScheme.tertiary,
-        ),
-      );
+      items.add((
+        text: '本周学习了 ${tw.activeDays} 天，继续加油',
+        icon: Icons.flag_rounded,
+        color: theme.colorScheme.tertiary,
+      ));
     }
 
     // 正确率
     if (tw.accuracy >= 95 && tw.math > 0) {
-      items.add(
-        (
-          text: '口算正确率 ${tw.accuracy}%，准确率超高！',
-          icon: Icons.auto_awesome_rounded,
-          color: theme.semantic.caution,
-        ),
-      );
+      items.add((
+        text: '口算正确率 ${tw.accuracy}%，准确率超高！',
+        icon: Icons.auto_awesome_rounded,
+        color: theme.semantic.caution,
+      ));
     } else if (tw.accuracy >= 80 && tw.math > 0) {
-      items.add(
-        (
-          text: '口算正确率 ${tw.accuracy}%，继续保持',
-          icon: Icons.thumb_up_rounded,
-          color: theme.semantic.success,
-        ),
-      );
+      items.add((
+        text: '口算正确率 ${tw.accuracy}%，继续保持',
+        icon: Icons.thumb_up_rounded,
+        color: theme.semantic.success,
+      ));
     }
 
     // 没有数据
     if (tw.poems == 0 && tw.math == 0) {
-      items.add(
-        (
-          text: '本周还没有学习记录，快来开始吧！',
-          icon: Icons.book_outlined,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      );
+      items.add((
+        text: '本周还没有学习记录，快来开始吧！',
+        icon: Icons.book_outlined,
+        color: theme.colorScheme.onSurfaceVariant,
+      ));
     }
 
     // 默认鼓励
     if (items.isEmpty) {
-      items.add(
-        (
-          text: '每天进步一点点，坚持就是胜利！',
-          icon: Icons.celebration_rounded,
-          color: theme.colorScheme.primary,
-        ),
-      );
+      items.add((
+        text: '每天进步一点点，坚持就是胜利！',
+        icon: Icons.celebration_rounded,
+        color: theme.colorScheme.primary,
+      ));
     }
 
     return ColoredCard(
@@ -557,9 +542,7 @@ class WeeklyReportPage extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       item.text,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        height: 1.6,
-                      ),
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
                     ),
                   ),
                 ],

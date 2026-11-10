@@ -35,18 +35,18 @@ class CloudUsageHistoryPage extends StatelessWidget {
     CloudUsageKind.imageGeneration: Icons.image_outlined,
   };
 
-  static const Map<CloudUsageKind, Color Function(ColorScheme)> _colors = {
+  static const Map<CloudUsageKind, Color Function(ThemeData)> _colors = {
     CloudUsageKind.llm: _llmColor,
     CloudUsageKind.asr: _asrColor,
     CloudUsageKind.tts: _ttsColor,
     CloudUsageKind.imageGeneration: _imageColor,
   };
 
-  // 三类固定用主题的三个色位，与柱、图例、图标保持一致。
-  static Color _llmColor(ColorScheme s) => s.primary;
-  static Color _asrColor(ColorScheme s) => s.secondary;
-  static Color _ttsColor(ColorScheme s) => s.tertiary;
-  static Color _imageColor(ColorScheme s) => s.outline;
+  // 柱、图例、图标共用可读的主题信息色。
+  static Color _llmColor(ThemeData t) => t.colorScheme.primary;
+  static Color _asrColor(ThemeData t) => t.semantic.secondaryForeground;
+  static Color _ttsColor(ThemeData t) => t.colorScheme.tertiary;
+  static Color _imageColor(ThemeData t) => t.colorScheme.outline;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +100,7 @@ class CloudUsageHistoryPage extends StatelessWidget {
     CloudUsageKind kind,
     List<DailyCloudUsage> daily,
   ) {
-    final color = _colors[kind]!(theme.colorScheme);
+    final color = _colors[kind]!(theme);
     final values = daily.map((d) => d.of(kind)).toList();
     final maxY = values.fold<int>(0, (a, b) => a > b ? a : b);
     final todayCount = daily.isEmpty ? 0 : daily.last.of(kind);
@@ -140,6 +140,7 @@ class CloudUsageHistoryPage extends StatelessWidget {
                 maxY: (maxY * 1.25).ceilToDouble().clamp(5, double.infinity),
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => theme.colorScheme.primary,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final d = daily[groupIndex].date;
                       return BarTooltipItem(

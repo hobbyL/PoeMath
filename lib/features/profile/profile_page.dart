@@ -312,7 +312,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   context,
                   '$streak',
                   '连续打卡',
-                  theme.colorScheme.secondary,
+                  theme.semantic.secondaryForeground,
                 ),
               ),
             ],
@@ -325,7 +325,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   context,
                   '${stats.mathTotalProblems}',
                   '口算总题',
-                  theme.colorScheme.secondary,
+                  theme.semantic.secondaryForeground,
                 ),
               ),
               Expanded(

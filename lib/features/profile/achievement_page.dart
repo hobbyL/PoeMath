@@ -41,49 +41,49 @@ class AchievementPage extends ConsumerWidget {
           children: [
             // 总览卡片
             ColoredCard(
-              color: theme.semantic.caution,
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.emoji_events_rounded,
-                    size: 40,
-                    color: theme.semantic.caution,
-                  ),
-                  const SizedBox(width: SpacingTokens.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '已解锁 $unlockedCount / $totalCount',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                  color: theme.semantic.caution,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.emoji_events_rounded,
+                        size: 40,
+                        color: theme.semantic.caution,
+                      ),
+                      const SizedBox(width: SpacingTokens.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '已解锁 $unlockedCount / $totalCount',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: SpacingTokens.xs),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                SpacingTokens.radiusSmall,
+                              ),
+                              child: LinearProgressIndicator(
+                                value: totalCount > 0
+                                    ? unlockedCount / totalCount
+                                    : 0,
+                                minHeight: 8,
+                                backgroundColor:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                color: theme.semantic.caution,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: SpacingTokens.xs),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            SpacingTokens.radiusSmall,
-                          ),
-                          child: LinearProgressIndicator(
-                            value:
-                                totalCount > 0 ? unlockedCount / totalCount : 0,
-                            minHeight: 8,
-                            backgroundColor:
-                                theme.colorScheme.surfaceContainerHighest,
-                            color: theme.semantic.caution,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ).animatePage(context).fadeIn(duration: 400.ms).slideY(
-                  begin: 0.1,
-                  end: 0,
-                  duration: 400.ms,
-                ),
+                )
+                .animatePage(context)
+                .fadeIn(duration: 400.ms)
+                .slideY(begin: 0.1, end: 0, duration: 400.ms),
             const SizedBox(height: SpacingTokens.lg),
 
             // 按类别展示
@@ -93,11 +93,7 @@ class AchievementPage extends ConsumerWidget {
               final defs = mapEntry.value;
               return [
                 if (idx > 0) const SizedBox(height: SpacingTokens.md),
-                _CategorySection(
-                  category: category,
-                  defs: defs,
-                  repo: repo,
-                ),
+                _CategorySection(category: category, defs: defs, repo: repo),
               ];
             }),
           ],
@@ -142,7 +138,7 @@ class _CategorySection extends StatelessWidget {
   Color _colorFor(String category, ThemeData theme) {
     return switch (_categoryColors[category]) {
       'tertiary' => theme.colorScheme.tertiary,
-      'secondary' => theme.colorScheme.secondary,
+      'secondary' => theme.semantic.secondaryForeground,
       _ => theme.colorScheme.primary,
     };
   }
@@ -193,8 +189,7 @@ class _CategorySection extends StatelessWidget {
             def: def,
             achievement: achievement,
             color: color,
-          )
-              .animateListItem(context, index: idx, begin: const Offset(0.08, 0));
+          ).animateListItem(context, index: idx, begin: const Offset(0.08, 0));
         }),
       ],
     );
@@ -253,9 +248,7 @@ class _AchievementTile extends StatelessWidget {
                 color: isUnlocked
                     ? color.withValues(alpha: 0.15)
                     : theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(
-                  SpacingTokens.radiusMedium,
-                ),
+                borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
               ),
               alignment: Alignment.center,
               child: Icon(
@@ -287,11 +280,7 @@ class _AchievementTile extends StatelessWidget {
                         ),
                       ),
                       if (isUnlocked)
-                        Icon(
-                          Icons.check_circle_rounded,
-                          size: 18,
-                          color: color,
-                        )
+                        Icon(Icons.check_circle_rounded, size: 18, color: color)
                       else
                         Text(
                           '$progressPct%',
@@ -329,7 +318,7 @@ class _AchievementTile extends StatelessWidget {
                     Text(
                       _formatDate(achievement!.unlockedAt!),
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: color.withValues(alpha: 0.7),
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],

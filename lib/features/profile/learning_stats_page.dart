@@ -153,7 +153,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
                   Icons.calculate_rounded,
                   '$totalMath',
                   '口算题',
-                  theme.colorScheme.secondary,
+                  theme.semantic.secondaryForeground,
                 ),
                 _buildSummaryItem(
                   theme,
@@ -315,7 +315,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
                       e.value ??
                       (i == 0
                           ? theme.colorScheme.primary
-                          : theme.colorScheme.secondary);
+                          : theme.semantic.secondaryForeground);
                   return Padding(
                     padding: const EdgeInsets.only(left: SpacingTokens.sm),
                     child: Row(
@@ -410,7 +410,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
                 ),
                 BarChartRodData(
                   toY: s.poemCount.toDouble(),
-                  color: theme.colorScheme.secondary,
+                  color: theme.semantic.secondaryForeground,
                   width: _barWidth,
                   borderRadius: _barRadius,
                 ),
@@ -448,6 +448,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
           maxY: 100,
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
+              getTooltipColor: (_) => theme.colorScheme.primary,
               getTooltipItems: (spots) => spots
                   .map(
                     (s) => LineTooltipItem(
@@ -603,6 +604,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
   BarTouchData _barTouchData(ThemeData theme) {
     return BarTouchData(
       touchTooltipData: BarTouchTooltipData(
+        getTooltipColor: (_) => theme.colorScheme.primary,
         getTooltipItem: (group, groupIndex, rod, rodIndex) {
           return BarTooltipItem(
             rod.toY.toInt().toString(),

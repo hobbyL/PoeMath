@@ -140,19 +140,13 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
 
   void _previousMonth() {
     setState(() {
-      _currentMonth = DateTime(
-        _currentMonth.year,
-        _currentMonth.month - 1,
-      );
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
     });
   }
 
   void _nextMonth() {
     setState(() {
-      _currentMonth = DateTime(
-        _currentMonth.year,
-        _currentMonth.month + 1,
-      );
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
     });
   }
 
@@ -229,7 +223,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
     final bgColor = _levelColor(theme, level);
 
     return GestureDetector(
-      onTap: checkIn != null ? () => _showDayDetail(theme, day, checkIn) : null,
+      onTap: checkIn != null ? () => _showDayDetail(day, checkIn) : null,
       child: Container(
         height: 44,
         margin: const EdgeInsets.all(2),
@@ -245,9 +239,9 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
           '$day',
           style: theme.textTheme.bodySmall?.copyWith(
             fontWeight: isToday ? FontWeight.bold : null,
-            color: level > 0
+            color: level >= 3
                 ? theme.colorScheme.onPrimary
-                : theme.colorScheme.onSurfaceVariant,
+                : theme.colorScheme.onSurface,
           ),
         ),
       ),
@@ -271,7 +265,8 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
       0 => theme.colorScheme.surfaceContainerHighest,
       1 => primary.withValues(alpha: 0.2),
       2 => primary.withValues(alpha: 0.4),
-      3 => primary.withValues(alpha: 0.7),
+      // 中高活跃度需要足够实的底色，才能承载 onPrimary 日期文字。
+      3 => primary.withValues(alpha: 0.92),
       _ => primary,
     };
   }
@@ -309,10 +304,11 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
     );
   }
 
-  void _showDayDetail(ThemeData theme, int day, CheckIn checkIn) {
+  void _showDayDetail(int day, CheckIn checkIn) {
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) {
+        final theme = Theme.of(ctx);
         final minutes = checkIn.durationSeconds ~/ 60;
         return SafeArea(
           child: Padding(
@@ -342,7 +338,7 @@ class _LearningCalendarPageState extends ConsumerState<LearningCalendarPage> {
                   '口算答题',
                   '${checkIn.mathCorrectCount}/'
                       '${checkIn.legacyCompatibleMathTotalCount} 题',
-                  theme.colorScheme.secondary,
+                  theme.semantic.secondaryForeground,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 _buildDetailRow(

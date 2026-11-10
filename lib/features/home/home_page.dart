@@ -446,6 +446,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             icon: Icons.calculate_rounded,
             label: '做口算',
             color: secondary,
+            foreground: theme.semantic.secondaryForeground,
             onTap: () => context.go(AppRoutes.mathTab),
           ),
         ),
@@ -454,7 +455,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: _QuickActionButton(
             icon: Icons.functions_rounded,
             label: '查公式',
-            color: primary.withValues(alpha: 0.7),
+            color: primary,
             onTap: () => context.push(AppRoutes.studyHub),
           ),
         ),
@@ -484,13 +485,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                     child: Text(
                       '$mistakeCount',
-                      style: const TextStyle(
-                        // 刻意保留白色，不用 `colorScheme.onError`：
-                        // 亮色主题下二者同为白，但**暗色主题下 onError 派生为
-                        // 深红**（实测 ~#690005），落在同样是红色的 error 圆形
-                        // 背景上几乎不可读。徽章背景恒为 `error`（见上方
-                        // decoration），故此处用与之恒有对比的白。
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: theme.colorScheme.onError,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -641,7 +637,8 @@ class _HomePageState extends ConsumerState<HomePage> {
               icon: mathDone
                   ? Icons.check_circle_outline
                   : Icons.calculate_outlined,
-              iconColor: theme.colorScheme.secondary,
+              iconColor: theme.semantic.secondaryForeground,
+              backgroundColor: theme.colorScheme.secondary,
               title: '口算 $todayMath/$mathGoal 题',
               subtitle: mathDone
                   ? '目标已完成'
@@ -701,12 +698,14 @@ class _QuickActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.color,
+    this.foreground,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
   final Color color;
+  final Color? foreground;
   final VoidCallback onTap;
 
   @override
@@ -719,12 +718,12 @@ class _QuickActionButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 28),
+          Icon(icon, color: foreground ?? color, size: 28),
           const SizedBox(height: SpacingTokens.xs),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: color,
+              color: foreground ?? color,
               fontWeight: FontWeight.w600,
             ),
           ),
