@@ -29,7 +29,8 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
   @override
   void initState() {
     super.initState();
-    _preview = widget.previewService ??
+    _preview =
+        widget.previewService ??
         SoundService(ref.read(settingsRepositoryProvider));
   }
 
@@ -112,8 +113,9 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
             if (_error != null) ...[
               Text(
                 _error!,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
               const SizedBox(height: SpacingTokens.md),
             ],
@@ -126,7 +128,7 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
                 children: [
                   for (final sound in AnswerFeedbackSound.values) ...[
                     AppTile(
-                      iconColor: theme.colorScheme.tertiary,
+                      iconColor: theme.colorScheme.primary,
                       title: sound.label,
                       subtitle: sound.description,
                       trailing: Row(
@@ -144,9 +146,8 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
                             onPressed: _startingPreview
                                 ? null
                                 : () => _listen(
-                                      () =>
-                                          _preview.previewAnswerFeedback(sound),
-                                    ),
+                                    () => _preview.previewAnswerFeedback(sound),
+                                  ),
                             icon: const Icon(Icons.play_arrow_rounded),
                           ),
                         ],
@@ -167,7 +168,7 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
                 children: [
                   for (final sound in CompletionSound.values) ...[
                     AppTile(
-                      iconColor: theme.colorScheme.tertiary,
+                      iconColor: theme.colorScheme.primary,
                       title: sound.label,
                       subtitle: sound.description,
                       trailing: Row(
@@ -185,8 +186,8 @@ class _CompletionSoundPickerState extends ConsumerState<CompletionSoundPicker> {
                             onPressed: _startingPreview
                                 ? null
                                 : () => _listen(
-                                      () => _preview.previewCompletion(sound),
-                                    ),
+                                    () => _preview.previewCompletion(sound),
+                                  ),
                             icon: const Icon(Icons.play_arrow_rounded),
                           ),
                         ],

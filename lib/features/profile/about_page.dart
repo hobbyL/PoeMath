@@ -158,8 +158,7 @@ class _AboutPageState extends State<AboutPage> {
                 const SizedBox(height: SpacingTokens.sm),
                 AppTile(
                   icon: Icons.calculate_outlined,
-                  iconColor: theme.semantic.secondaryForeground,
-                  backgroundColor: theme.colorScheme.secondary,
+                  iconColor: theme.colorScheme.primary,
                   title: '数学练习',
                   subtitle: '分级口算、应用题与错题回练',
                   onTap: () => context.go(AppRoutes.mathTab),
@@ -167,7 +166,7 @@ class _AboutPageState extends State<AboutPage> {
                 const SizedBox(height: SpacingTokens.sm),
                 AppTile(
                   icon: Icons.emoji_events_outlined,
-                  iconColor: theme.colorScheme.tertiary,
+                  iconColor: theme.colorScheme.primary,
                   title: '成就体系',
                   subtitle: '44枚成就勋章，记录成长足迹',
                   onTap: () => context.push(AppRoutes.achievements),
@@ -184,7 +183,7 @@ class _AboutPageState extends State<AboutPage> {
                 // 处理有意不同。
                 AppTile(
                   icon: Icons.bug_report_outlined,
-                  iconColor: theme.colorScheme.onSurfaceVariant,
+                  iconColor: theme.colorScheme.primary,
                   title: '导出诊断日志',
                   subtitle: _diagnosticCount == 0
                       ? '暂无可导出的日志'
@@ -207,7 +206,7 @@ class _AboutPageState extends State<AboutPage> {
                 // 点上去毫无反应，用户无法区分「坏了」与「没配」。
                 AppTile(
                   icon: Icons.system_update_outlined,
-                  iconColor: theme.colorScheme.onSurfaceVariant,
+                  iconColor: theme.colorScheme.primary,
                   title: '检查更新',
                   subtitle: '查看新版本并下载安装',
                   onTap: () => context.push(AppRoutes.update),
@@ -225,8 +224,7 @@ class _AboutPageState extends State<AboutPage> {
                 const SizedBox(height: SpacingTokens.sm),
                 AppTile(
                   icon: Icons.description_outlined,
-                  iconColor: theme.semantic.secondaryForeground,
-                  backgroundColor: theme.colorScheme.secondary,
+                  iconColor: theme.colorScheme.primary,
                   title: '开源许可',
                   subtitle: '查看第三方库、音效及许可',
                   onTap: () => showLicensePage(

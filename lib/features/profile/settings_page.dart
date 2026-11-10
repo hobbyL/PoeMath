@@ -198,8 +198,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.image_outlined,
-                iconColor: theme.semantic.secondaryForeground,
-                backgroundColor: theme.colorScheme.secondary,
+                iconColor: theme.colorScheme.primary,
                 title: '看图说话题库',
                 subtitle: '管理题目与启用状态',
                 onTap: () => context.push(AppRoutes.pictureStoryManagement),
@@ -212,7 +211,7 @@ class SettingsPage extends ConsumerWidget {
             if (_section == _SettingsSection.intelligence) ...[
               AppTile(
                 icon: Icons.smart_toy_outlined,
-                iconColor: theme.colorScheme.tertiary,
+                iconColor: theme.colorScheme.primary,
                 title: 'AI 设置',
                 subtitle: settingsRepo.llmProviders.isEmpty
                     ? '未配置'
@@ -228,7 +227,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.volume_up_outlined,
-                iconColor: theme.semantic.caution,
+                iconColor: theme.colorScheme.primary,
                 title: '音频设置',
                 subtitle: audioSubtitle,
                 onTap: () => Navigator.push<void>(
@@ -273,8 +272,7 @@ class SettingsPage extends ConsumerWidget {
                 icon: isDark
                     ? Icons.dark_mode_outlined
                     : Icons.light_mode_outlined,
-                iconColor: theme.semantic.secondaryForeground,
-                backgroundColor: theme.colorScheme.secondary,
+                iconColor: theme.colorScheme.primary,
                 title: '外观模式',
                 subtitle: modeLabel,
                 onTap: () => _showThemeModePicker(context, ref, mode),
@@ -282,8 +280,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.animation,
-                iconColor: theme.semantic.secondaryForeground,
-                backgroundColor: theme.colorScheme.secondary,
+                iconColor: theme.colorScheme.primary,
                 title: '页面动画',
                 subtitle: settingsRepo.pageAnimationsEnabled
                     ? '已开启 · 页面转场与内容入场'
@@ -299,7 +296,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.music_note_outlined,
-                iconColor: theme.colorScheme.tertiary,
+                iconColor: theme.colorScheme.primary,
                 title: '音效',
                 subtitle: settingsRepo.soundEnabled ? '已开启' : '已关闭',
                 trailing: Switch(
@@ -312,7 +309,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.celebration_outlined,
-                iconColor: theme.colorScheme.tertiary,
+                iconColor: theme.colorScheme.primary,
                 title: '练习音效',
                 subtitle:
                     '${settingsRepo.answerFeedbackSound.label} · ${settingsRepo.completionSound.label}',
@@ -328,7 +325,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.vibration_outlined,
-                iconColor: theme.colorScheme.error,
+                iconColor: theme.colorScheme.primary,
                 title: '触觉反馈',
                 subtitle: settingsRepo.hapticEnabled ? '已开启（需真机体验）' : '已关闭',
                 trailing: Switch(
@@ -387,7 +384,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.cloud_sync_outlined,
-                iconColor: theme.colorScheme.tertiary,
+                iconColor: theme.colorScheme.primary,
                 title: '云端同步',
                 subtitle: '通过 WebDAV 同步数据',
                 onTap: () => Navigator.push<void>(
@@ -405,8 +402,7 @@ class SettingsPage extends ConsumerWidget {
             if (_section == _SettingsSection.application) ...[
               AppTile(
                 icon: Icons.notifications_outlined,
-                iconColor: theme.semantic.secondaryForeground,
-                backgroundColor: theme.colorScheme.secondary,
+                iconColor: theme.colorScheme.primary,
                 title: '通知提醒',
                 subtitle: '学习提醒与每周报告',
                 onTap: () => Navigator.push<void>(
@@ -421,7 +417,7 @@ class SettingsPage extends ConsumerWidget {
               const SizedBox(height: SpacingTokens.sm),
               AppTile(
                 icon: Icons.info_outline,
-                iconColor: theme.colorScheme.onSurfaceVariant,
+                iconColor: theme.colorScheme.primary,
                 title: '关于韵算',
                 subtitle: '版本信息、更新与隐私政策',
                 onTap: () => context.push(AppRoutes.about),
@@ -619,7 +615,7 @@ class SettingsPage extends ConsumerWidget {
 
     return AppTile(
       icon: Icons.tune_outlined,
-      iconColor: theme.semantic.caution,
+      iconColor: theme.colorScheme.primary,
       title: '练习设置',
       subtitle: '每组 $batchSize 题 · 诗词 $poemGoal 首 · 口算 $mathGoal 题',
       onTap: () => Navigator.push<void>(

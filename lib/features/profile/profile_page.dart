@@ -107,14 +107,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           const SizedBox(width: SpacingTokens.sm),
           Expanded(
             child: ColoredCard(
-              color: theme.semantic.caution,
+              color: theme.colorScheme.primary,
               onTap: () => context.push(AppRoutes.learningCalendar),
               child: Column(
                 children: [
                   Icon(
                     Icons.calendar_month_rounded,
                     size: 32,
-                    color: theme.semantic.caution,
+                    color: theme.colorScheme.primary,
                   ),
                   const SizedBox(height: SpacingTokens.sm),
                   Text(
@@ -136,7 +136,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       // 本周学习周报
       AppTile(
         icon: Icons.insert_chart_outlined,
-        iconColor: theme.colorScheme.tertiary,
+        iconColor: theme.colorScheme.primary,
         title: '本周学习周报',
         subtitle: '查看本周学习汇总与趋势',
         onTap: () => context.push(AppRoutes.weeklyReport),
@@ -386,14 +386,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     int unlockedCount,
   ) {
     return ColoredCard(
-      color: theme.semantic.caution,
+      color: theme.colorScheme.primary,
       onTap: () => context.push(AppRoutes.achievements),
       child: Column(
         children: [
           Icon(
             Icons.emoji_events_rounded,
             size: 32,
-            color: theme.semantic.caution,
+            color: theme.colorScheme.primary,
           ),
           const SizedBox(height: SpacingTokens.sm),
           Text(

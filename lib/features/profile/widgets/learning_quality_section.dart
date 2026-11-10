@@ -84,8 +84,7 @@ class _LearningQualitySectionState
         for (final quality in report.skills) ...[
           AppTile(
             icon: Icons.analytics_outlined,
-            iconColor: theme.semantic.secondaryForeground,
-            backgroundColor: theme.colorScheme.secondary,
+            iconColor: theme.colorScheme.primary,
             title:
                 '${quality.skill.label} · ${quality.grade}年级${quality.semester ?? '学期未知'}',
             subtitle:

@@ -98,7 +98,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
           const SizedBox(height: SpacingTokens.sm),
           AppTile(
             icon: Icons.alt_route_outlined,
-            iconColor: theme.colorScheme.tertiary,
+            iconColor: theme.colorScheme.primary,
             title: '使用场景设置',
             subtitle: providerCount == 0 ? '请先配置供应商' : '为各功能指定厂商',
             onTap: () => Navigator.push<void>(
@@ -113,8 +113,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
           const SizedBox(height: SpacingTokens.sm),
           AppTile(
             icon: Icons.image_outlined,
-            iconColor: theme.semantic.secondaryForeground,
-            backgroundColor: theme.colorScheme.secondary,
+            iconColor: theme.colorScheme.primary,
             title: '图片生成设置',
             subtitle:
                 settingsRepo.imageGenerationProvider?.model ?? '为看图说话单独配置生图服务',
@@ -123,8 +122,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
           const SizedBox(height: SpacingTokens.sm),
           AppTile(
             icon: Icons.edit_note_outlined,
-            iconColor: theme.semantic.secondaryForeground,
-            backgroundColor: theme.colorScheme.secondary,
+            iconColor: theme.colorScheme.primary,
             title: '提示词设置',
             subtitle: '生图、出题、讲解与助手人设的提示词',
             onTap: () => Navigator.push<void>(

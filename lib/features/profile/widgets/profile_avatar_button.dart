@@ -87,7 +87,7 @@ class ProfileAvatarButton extends ConsumerWidget {
                         AppTile(
                           flat: true,
                           icon: Icons.photo_camera_outlined,
-                          iconColor: theme.colorScheme.onSurfaceVariant,
+                          iconColor: theme.colorScheme.primary,
                           title: '拍照',
                           subtitle: '',
                           onTap: () => Navigator.pop(
@@ -98,7 +98,7 @@ class ProfileAvatarButton extends ConsumerWidget {
                       AppTile(
                         flat: true,
                         icon: Icons.photo_library_outlined,
-                        iconColor: theme.colorScheme.onSurfaceVariant,
+                        iconColor: theme.colorScheme.primary,
                         title: '从相册选择',
                         subtitle: '',
                         onTap: () => Navigator.pop(

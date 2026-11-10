@@ -147,7 +147,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
           children: [
             // ============ 学习提醒 ============
             ColoredCard(
-              color: theme.colorScheme.secondary,
+              color: theme.colorScheme.primary,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -155,7 +155,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     children: [
                       Icon(
                         Icons.notifications_outlined,
-                        color: theme.semantic.secondaryForeground,
+                        color: theme.colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: SpacingTokens.sm),
@@ -217,7 +217,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                           vertical: SpacingTokens.sm,
                         ),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.secondary.withValues(
+                          color: theme.colorScheme.primary.withValues(
                             alpha: 0.08,
                           ),
                           borderRadius: BorderRadius.circular(
@@ -229,7 +229,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                             Icon(
                               Icons.access_time,
                               size: 18,
-                              color: theme.semantic.secondaryForeground,
+                              color: theme.colorScheme.primary,
                             ),
                             const SizedBox(width: SpacingTokens.sm),
                             Text(
@@ -240,7 +240,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                             Icon(
                               Icons.edit_outlined,
                               size: 16,
-                              color: theme.semantic.secondaryForeground,
+                              color: theme.colorScheme.primary,
                             ),
                           ],
                         ),
@@ -254,7 +254,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
 
             // ============ 学习周报 ============
             ColoredCard(
-              color: theme.colorScheme.tertiary,
+              color: theme.colorScheme.primary,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -262,7 +262,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     children: [
                       Icon(
                         Icons.insert_chart_outlined,
-                        color: theme.colorScheme.tertiary,
+                        color: theme.colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: SpacingTokens.sm),
@@ -296,7 +296,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         vertical: SpacingTokens.sm,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.tertiary.withValues(
+                        color: theme.colorScheme.primary.withValues(
                           alpha: 0.08,
                         ),
                         borderRadius: BorderRadius.circular(
@@ -308,13 +308,13 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                           Icon(
                             Icons.assessment_outlined,
                             size: 18,
-                            color: theme.colorScheme.tertiary,
+                            color: theme.colorScheme.primary,
                           ),
                           const SizedBox(width: SpacingTokens.sm),
                           Text(
                             '查看本周学习周报',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.tertiary,
+                              color: theme.colorScheme.primary,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -322,7 +322,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                           Icon(
                             Icons.chevron_right,
                             size: 18,
-                            color: theme.colorScheme.tertiary,
+                            color: theme.colorScheme.primary,
                           ),
                         ],
                       ),

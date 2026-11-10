@@ -75,9 +75,8 @@ class _UpdatePageState extends State<UpdatePage> {
             AnimatedPageBody(
               // 顶部与首页一致：返回按钮是浮动层、不占流，故顶部只需
               // md —— 与首页「今日待打卡」卡到状态栏的距离相同。
-              padding: const EdgeInsets.all(SpacingTokens.lg).copyWith(
-                top: SpacingTokens.md,
-              ),
+              padding: const EdgeInsets.all(SpacingTokens.lg)
+                  .copyWith(top: SpacingTokens.md),
               children: [
                 _buildStatusCard(context),
                 if ((_latest?.notes ?? '').isNotEmpty) ...[
@@ -171,7 +170,7 @@ class _UpdatePageState extends State<UpdatePage> {
     final theme = Theme.of(context);
 
     return ColoredCard(
-      color: theme.colorScheme.secondary,
+      color: theme.colorScheme.primary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -213,7 +212,7 @@ class _UpdatePageState extends State<UpdatePage> {
         : _history.take(_historyCollapsedCount).toList();
 
     return ColoredCard(
-      color: theme.colorScheme.tertiary,
+      color: theme.colorScheme.primary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -236,9 +235,7 @@ class _UpdatePageState extends State<UpdatePage> {
               child: TextButton(
                 onPressed: () =>
                     setState(() => _historyExpanded = !_historyExpanded),
-                child: Text(
-                  _historyExpanded ? '收起' : '查看全部 $total 个版本',
-                ),
+                child: Text(_historyExpanded ? '收起' : '查看全部 $total 个版本'),
               ),
             ),
           ],
@@ -263,7 +260,7 @@ class _UpdatePageState extends State<UpdatePage> {
                 'V${entry.versionName}',
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.tertiary,
+                  color: theme.colorScheme.primary,
                 ),
               ),
             ),
@@ -506,8 +503,8 @@ class _UpdatePageState extends State<UpdatePage> {
     final token = ++_requestToken;
 
     try {
-      final canInstall =
-          await widget.updateInstaller.canRequestPackageInstalls();
+      final canInstall = await widget.updateInstaller
+          .canRequestPackageInstalls();
       if (!mounted || token != _requestToken) return;
       if (!canInstall) {
         setState(() {
@@ -557,8 +554,8 @@ class _UpdatePageState extends State<UpdatePage> {
   /// 比对已安装应用与待装 APK 的签名指纹；返回 null 表示通过。
   Future<String?> _verifyApkSignature(String path, int token) async {
     try {
-      final installed =
-          await widget.updateInstaller.getInstalledSignatureSha256();
+      final installed = await widget.updateInstaller
+          .getInstalledSignatureSha256();
       if (!mounted || token != _requestToken) return null;
       final incoming = await widget.updateInstaller.inspectApkSignature(path);
       if (!mounted || token != _requestToken) return null;
@@ -606,42 +603,41 @@ class _UpdatePageState extends State<UpdatePage> {
   }
 
   String get _phaseTitle => switch (_phase) {
-        _UpdatePhase.checking => '正在检查',
-        _UpdatePhase.noUpdate => '已是最新',
-        _UpdatePhase.available => '发现更新',
-        _UpdatePhase.downloading => '正在下载',
-        _UpdatePhase.verifying => '正在校验',
-        _UpdatePhase.ready => '可以安装',
-        _UpdatePhase.permissionRequired => '需要安装权限',
-        _UpdatePhase.installing => '正在安装',
-        _UpdatePhase.error => '更新失败',
-      };
+    _UpdatePhase.checking => '正在检查',
+    _UpdatePhase.noUpdate => '已是最新',
+    _UpdatePhase.available => '发现更新',
+    _UpdatePhase.downloading => '正在下载',
+    _UpdatePhase.verifying => '正在校验',
+    _UpdatePhase.ready => '可以安装',
+    _UpdatePhase.permissionRequired => '需要安装权限',
+    _UpdatePhase.installing => '正在安装',
+    _UpdatePhase.error => '更新失败',
+  };
 
   IconData get _phaseIcon => switch (_phase) {
-        _UpdatePhase.checking ||
-        _UpdatePhase.downloading ||
-        _UpdatePhase.verifying ||
-        _UpdatePhase.installing =>
-          Icons.sync,
-        _UpdatePhase.noUpdate => Icons.verified,
-        _UpdatePhase.available => Icons.system_update_alt,
-        _UpdatePhase.ready => Icons.check_circle,
-        _UpdatePhase.permissionRequired => Icons.security,
-        _UpdatePhase.error => Icons.error_outline,
-      };
+    _UpdatePhase.checking ||
+    _UpdatePhase.downloading ||
+    _UpdatePhase.verifying ||
+    _UpdatePhase.installing => Icons.sync,
+    _UpdatePhase.noUpdate => Icons.verified,
+    _UpdatePhase.available => Icons.system_update_alt,
+    _UpdatePhase.ready => Icons.check_circle,
+    _UpdatePhase.permissionRequired => Icons.security,
+    _UpdatePhase.error => Icons.error_outline,
+  };
 
   Color _phaseColor(ThemeData theme) => switch (_phase) {
-        _UpdatePhase.error => theme.colorScheme.error,
-        _UpdatePhase.noUpdate || _UpdatePhase.ready => theme.semantic.success,
-        _ => theme.colorScheme.primary,
-      };
+    _UpdatePhase.error => theme.colorScheme.error,
+    _UpdatePhase.noUpdate || _UpdatePhase.ready => theme.semantic.success,
+    _ => theme.colorScheme.primary,
+  };
 
   String get _busyButtonText => switch (_phase) {
-        _UpdatePhase.checking => '检查中',
-        _UpdatePhase.verifying => '校验中',
-        _UpdatePhase.installing => '打开中',
-        _ => '处理中',
-      };
+    _UpdatePhase.checking => '检查中',
+    _UpdatePhase.verifying => '校验中',
+    _UpdatePhase.installing => '打开中',
+    _ => '处理中',
+  };
 
   String get _downloadProgressText {
     final total = _downloadTotal;

@@ -89,7 +89,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
           children: [
             // ============ 每组题数 ============
             ColoredCard(
-              color: theme.colorScheme.tertiary,
+              color: theme.colorScheme.primary,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -97,7 +97,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                     children: [
                       Icon(
                         Icons.format_list_numbered_rounded,
-                        color: theme.colorScheme.tertiary,
+                        color: theme.colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: SpacingTokens.sm),
@@ -131,7 +131,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
 
             // ============ 练习难度 ============
             ColoredCard(
-              color: theme.colorScheme.secondary,
+              color: theme.colorScheme.primary,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -139,7 +139,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                     children: [
                       Icon(
                         Icons.speed_rounded,
-                        color: theme.semantic.secondaryForeground,
+                        color: theme.colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: SpacingTokens.sm),
@@ -219,14 +219,14 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
 
             // ============ 每日口算目标 ============
             ColoredCard(
-              color: theme.colorScheme.secondary,
+              color: theme.colorScheme.primary,
               child: Column(
                 children: [
                   Row(
                     children: [
                       Icon(
                         Icons.calculate_rounded,
-                        color: theme.semantic.secondaryForeground,
+                        color: theme.colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: SpacingTokens.sm),
@@ -246,7 +246,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                     max: _mathMax,
                     step: _mathStep,
                     unit: '题',
-                    color: theme.semantic.secondaryForeground,
+                    color: theme.colorScheme.primary,
                     onChanged: (v) => setState(() => _mathGoal = v),
                   ),
                 ],
