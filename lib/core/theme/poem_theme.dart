@@ -46,11 +46,15 @@ class PoemTheme {
         centerTitle: true,
       ),
       chipTheme: _chipTheme(primary),
-      extensions: const <ThemeExtension<dynamic>>[
-        PoemThemeExt(),
-        SemanticColorsExt(
+      extensions: <ThemeExtension<dynamic>>[
+        PoemThemeExt(
+          contentColor: scheme.onSurface,
+          pinyinColor: scheme.onSurfaceVariant,
+        ),
+        const SemanticColorsExt(
           success: ColorTokens.successText,
           caution: ColorTokens.cautionText,
+          secondaryForeground: ColorTokens.poemSeal,
         ),
       ],
     );
@@ -87,11 +91,15 @@ class PoemTheme {
         centerTitle: true,
       ),
       chipTheme: _chipTheme(primary),
-      extensions: const <ThemeExtension<dynamic>>[
-        PoemThemeExt(),
-        SemanticColorsExt(
+      extensions: <ThemeExtension<dynamic>>[
+        PoemThemeExt(
+          contentColor: scheme.onSurface,
+          pinyinColor: scheme.onSurfaceVariant,
+        ),
+        const SemanticColorsExt(
           success: ColorTokens.mathMint,
           caution: ColorTokens.poemGold,
+          secondaryForeground: ColorTokens.poemCinnabarLight,
         ),
       ],
     );
@@ -166,18 +174,33 @@ class PoemTheme {
 ///
 /// 使用：`Theme.of(context).extension<PoemThemeExt>()!.poemContent`
 class PoemThemeExt extends ThemeExtension<PoemThemeExt> {
-  const PoemThemeExt();
+  const PoemThemeExt({
+    this.contentColor = ColorTokens.poemInk,
+    this.pinyinColor = ColorTokens.poemInkLight,
+  });
 
-  TextStyle get poemContent => TypographyTokens.poemContentStyle();
+  final Color contentColor;
+  final Color pinyinColor;
 
-  TextStyle get pinyin => const TextStyle(
-    fontSize: TypographyTokens.fsPinyin,
-    color: ColorTokens.poemInkLight,
-  );
+  TextStyle get poemContent =>
+      TypographyTokens.poemContentStyle(color: contentColor);
+
+  TextStyle get pinyin =>
+      TextStyle(fontSize: TypographyTokens.fsPinyin, color: pinyinColor);
 
   @override
-  PoemThemeExt copyWith() => const PoemThemeExt();
+  PoemThemeExt copyWith({Color? contentColor, Color? pinyinColor}) =>
+      PoemThemeExt(
+        contentColor: contentColor ?? this.contentColor,
+        pinyinColor: pinyinColor ?? this.pinyinColor,
+      );
 
   @override
-  PoemThemeExt lerp(ThemeExtension<PoemThemeExt>? other, double t) => this;
+  PoemThemeExt lerp(ThemeExtension<PoemThemeExt>? other, double t) {
+    if (other is! PoemThemeExt) return this;
+    return PoemThemeExt(
+      contentColor: Color.lerp(contentColor, other.contentColor, t)!,
+      pinyinColor: Color.lerp(pinyinColor, other.pinyinColor, t)!,
+    );
+  }
 }

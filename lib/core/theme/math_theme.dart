@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/color_tokens.dart';
+import 'package:poemath/core/theme/poem_theme.dart';
 import 'package:poemath/core/theme/semantic_colors_ext.dart';
 import 'package:poemath/core/theme/typography_tokens.dart';
 
@@ -47,11 +48,16 @@ class MathTheme {
         centerTitle: true,
       ),
       chipTheme: _chipTheme(primary),
-      extensions: const <ThemeExtension<dynamic>>[
-        MathThemeExt(),
-        SemanticColorsExt(
+      extensions: <ThemeExtension<dynamic>>[
+        const MathThemeExt(),
+        PoemThemeExt(
+          contentColor: scheme.onSurface,
+          pinyinColor: scheme.onSurfaceVariant,
+        ),
+        const SemanticColorsExt(
           success: ColorTokens.successText,
           caution: ColorTokens.cautionText,
+          secondaryForeground: ColorTokens.cautionText,
         ),
       ],
     );
@@ -89,11 +95,16 @@ class MathTheme {
         centerTitle: true,
       ),
       chipTheme: _chipTheme(primary),
-      extensions: const <ThemeExtension<dynamic>>[
-        MathThemeExt(),
-        SemanticColorsExt(
+      extensions: <ThemeExtension<dynamic>>[
+        const MathThemeExt(),
+        PoemThemeExt(
+          contentColor: scheme.onSurface,
+          pinyinColor: scheme.onSurfaceVariant,
+        ),
+        const SemanticColorsExt(
           success: ColorTokens.mathMint,
           caution: ColorTokens.mathYellow,
+          secondaryForeground: ColorTokens.mathYellow,
         ),
       ],
     );

@@ -43,7 +43,11 @@ final _longLinePoem = Poem(
 RenderBox _lineBox(WidgetTester tester, String line) =>
     tester.renderObject<RenderBox>(find.text(line));
 
-Future<void> _pumpDetailPage(WidgetTester tester) async {
+Future<void> _pumpDetailPage(
+  WidgetTester tester, {
+  ThemeData? theme,
+  double textScale = 1,
+}) async {
   final tts = _MockTtsService();
   final settings = _MockSettingsRepository();
   when(() => tts.stop()).thenAnswer((_) async {});
@@ -59,9 +63,16 @@ Future<void> _pumpDetailPage(WidgetTester tester) async {
       ],
       child: MaterialApp(
         // 挂应用真实主题，诗句走 PoemThemeExt.poemContent（24/1.8）。
-        theme: AppTheme.resolve(
-          subject: AppSubject.poem,
-          brightness: Brightness.light,
+        theme:
+            theme ??
+            AppTheme.resolve(
+              subject: AppSubject.poem,
+              brightness: Brightness.light,
+            ),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
         ),
         home: const PoemDetailPage(poemId: _poemId),
       ),
@@ -73,6 +84,33 @@ Future<void> _pumpDetailPage(WidgetTester tester) async {
 void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
+
+  for (final brightness in Brightness.values) {
+    for (final width in [320.0, 800.0]) {
+      testWidgets('马卡龙 $brightness/$width：大字号诗句完整换行且不溢出', (tester) async {
+        tester.view.physicalSize = Size(width, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await _pumpDetailPage(
+          tester,
+          theme: AppTheme.resolve(
+            subject: AppSubject.math,
+            brightness: brightness,
+          ),
+          textScale: 2,
+        );
+        const line = '春江潮水连海平，海上明月共潮生。';
+        final text = tester.widget<Text>(find.text(line));
+        expect(text.style!.fontSize, greaterThanOrEqualTo(16));
+        if (width == 320) expect(text.maxLines, isNull);
+        expect(text.overflow, isNot(TextOverflow.ellipsis));
+        expect(_lineBox(tester, line).size.width, lessThan(width));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(seconds: 1));
+      });
+    }
+  }
 
   testWidgets('详情页窄屏：长句缩到字号下限后换行，字号不低于下限', (tester) async {
     tester.view.physicalSize = const Size(320, 800);

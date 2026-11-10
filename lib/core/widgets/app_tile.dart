@@ -33,6 +33,7 @@ class AppTile extends StatelessWidget {
     this.leading,
     this.leadingEdgeWidth,
     required this.iconColor,
+    this.backgroundColor,
     required this.title,
     this.titleMaxLines,
     this.titleSuffix,
@@ -75,8 +76,11 @@ class AppTile extends StatelessWidget {
   /// 仅适用于提供 [leading] 的卡片列表行，文字和尾部操作保留默认内边距。
   final double? leadingEdgeWidth;
 
-  /// 图标主色调，同时决定卡片背景色。
+  /// 图标前景；未指定 [backgroundColor] 时也决定卡片的背景色调。
   final Color iconColor;
+
+  /// 可选背景色调（由 ColoredCard 应用透明度），用于浅色背景搭配深色图标。
+  final Color? backgroundColor;
 
   /// 标题文本；为空时省略标题行，仅显示副标题内容。
   final String title;
@@ -395,7 +399,7 @@ class AppTile extends StatelessWidget {
             ),
           );
     return ColoredCard(
-      color: iconColor,
+      color: backgroundColor ?? iconColor,
       onTap: trailing == null || allowTapWithTrailing ? onTap : null,
       constraints: const BoxConstraints(
         minHeight: SpacingTokens.minTapTarget + SpacingTokens.md,

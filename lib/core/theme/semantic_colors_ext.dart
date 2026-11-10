@@ -17,7 +17,11 @@ import 'package:poemath/core/theme/color_tokens.dart';
 /// color: theme.semantic.success,
 /// ```
 class SemanticColorsExt extends ThemeExtension<SemanticColorsExt> {
-  const SemanticColorsExt({required this.success, required this.caution});
+  const SemanticColorsExt({
+    required this.success,
+    required this.caution,
+    required this.secondaryForeground,
+  });
 
   /// 正确 / 成功 / 已解决。
   /// 按亮暗主题校准的信息前景，也可低透明度用于提示区域背景。
@@ -27,11 +31,20 @@ class SemanticColorsExt extends ThemeExtension<SemanticColorsExt> {
   /// 浅色主题使用深金色，深色主题使用明亮金色/奶油黄。
   final Color caution;
 
+  /// 次级强调文字/图标的可读前景。secondary 本身仍可用作浅色背景。
+  /// 不用于 secondary 实色底；实色底应搭配 colorScheme.onSecondary。
+  final Color secondaryForeground;
+
   @override
-  SemanticColorsExt copyWith({Color? success, Color? caution}) {
+  SemanticColorsExt copyWith({
+    Color? success,
+    Color? caution,
+    Color? secondaryForeground,
+  }) {
     return SemanticColorsExt(
       success: success ?? this.success,
       caution: caution ?? this.caution,
+      secondaryForeground: secondaryForeground ?? this.secondaryForeground,
     );
   }
 
@@ -41,6 +54,11 @@ class SemanticColorsExt extends ThemeExtension<SemanticColorsExt> {
     return SemanticColorsExt(
       success: Color.lerp(success, other.success, t)!,
       caution: Color.lerp(caution, other.caution, t)!,
+      secondaryForeground: Color.lerp(
+        secondaryForeground,
+        other.secondaryForeground,
+        t,
+      )!,
     );
   }
 }
@@ -56,9 +74,11 @@ extension ThemeDataSemanticX on ThemeData {
           ? const SemanticColorsExt(
               success: ColorTokens.mathMint,
               caution: ColorTokens.poemGold,
+              secondaryForeground: ColorTokens.poemCinnabarLight,
             )
           : const SemanticColorsExt(
               success: ColorTokens.successText,
               caution: ColorTokens.cautionText,
+              secondaryForeground: ColorTokens.poemSeal,
             ));
 }

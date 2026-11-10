@@ -13,12 +13,7 @@ import 'package:poemath/features/home/home_page.dart';
 
 import '../helpers/day_key_override.dart';
 import '../helpers/hive_test_helper.dart';
-
-double _contrast(Color foreground, Color background) {
-  final front = Color.alphaBlend(foreground, background).computeLuminance();
-  final back = background.computeLuminance();
-  return (math.max(front, back) + .05) / (math.min(front, back) + .05);
-}
+import '../helpers/theme_contrast.dart';
 
 // 读取真实绘制的背景（含光晕和光带），避免只检查渐变端点而漏掉叠色。
 Future<void> _expectRenderedHeaderContrast(WidgetTester tester) async {
@@ -99,6 +94,7 @@ void main() {
         );
         for (final (name, color) in [
           ('主色', scheme.primary),
+          ('次级信息', theme.semantic.secondaryForeground),
           ('成功', theme.semantic.success),
           ('提醒', theme.semantic.caution),
           ('错误', scheme.error),
@@ -112,7 +108,7 @@ void main() {
         }
         for (final entry in pairs.entries) {
           expect(
-            _contrast(entry.value.$1, entry.value.$2),
+            contrastRatio(entry.value.$1, entry.value.$2),
             greaterThanOrEqualTo(4.5),
             reason: entry.key,
           );
@@ -148,7 +144,7 @@ void main() {
           for (final label in ['今日待打卡', '天连续', '已学诗词', '口算做题', '总星星']) {
             final text = tester.widget<Text>(find.text(label));
             expect(
-              _contrast(text.style!.color!, background),
+              contrastRatio(text.style!.color!, background),
               greaterThanOrEqualTo(4.5),
               reason: label,
             );
@@ -158,7 +154,7 @@ void main() {
           find.widgetWithText(FilledButton, '打卡'),
         );
         expect(
-          _contrast(
+          contrastRatio(
             button.style!.foregroundColor!.resolve({})!,
             button.style!.backgroundColor!.resolve({})!,
           ),
