@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -64,6 +65,18 @@ void main() {
     expect(HiveBoxes.settings.get('theme_mode'), 'dark');
     await BackupService().restoreFromJson(encrypted, passphrase: '合成测试口令');
     expect(HiveBoxes.settings.get('theme_mode'), 'light');
+  });
+
+  test('备份加解密期间主 isolate 继续处理事件', () async {
+    final large = jsonEncode({'version': 1, 'payload': '合成内容' * 65536});
+    var encryptionYielded = false;
+    Timer.run(() => encryptionYielded = true);
+    final encrypted = await encryptBackupPayload(large, deviceKey: key);
+    expect(encryptionYielded, isTrue);
+    var decryptionYielded = false;
+    Timer.run(() => decryptionYielded = true);
+    expect(await decryptBackupPayload(encrypted, deviceKey: key), large);
+    expect(decryptionYielded, isTrue);
   });
 
   test('整包解密后跳过未来版本凭据仍可恢复学习数据', () async {

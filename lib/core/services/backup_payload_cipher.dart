@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:cryptography/cryptography.dart';
 
@@ -17,15 +18,38 @@ bool isEncryptedBackup(String json) {
 }
 
 List<int> _aad(Map<String, dynamic> node) => utf8.encode(
-      jsonEncode([
-        node['format'],
-        node['version'],
-        node['exportedAt'],
-        node['kdf'],
-      ]),
-    );
+  jsonEncode([
+    node['format'],
+    node['version'],
+    node['exportedAt'],
+    node['kdf'],
+  ]),
+);
 
 Future<String> encryptBackupPayload(
+  String json, {
+  String? passphrase,
+  SecretKey? deviceKey,
+}) async {
+  final keyBytes = await deviceKey?.extractBytes();
+  return _runEncryption(json, passphrase, keyBytes);
+}
+
+// Only immutable input crosses this boundary; no storage/plugin objects or
+// caller closures are captured. JSON/Base64 and crypto all run off the UI loop.
+Future<String> _runEncryption(
+  String json,
+  String? passphrase,
+  List<int>? keyBytes,
+) => Isolate.run(
+  () => _encryptBackupPayload(
+    json,
+    passphrase: passphrase,
+    deviceKey: keyBytes == null ? null : SecretKey(keyBytes),
+  ),
+);
+
+Future<String> _encryptBackupPayload(
   String json, {
   String? passphrase,
   SecretKey? deviceKey,
@@ -53,13 +77,37 @@ Future<String> encryptBackupPayload(
     };
     key = await _derive(passphrase.trim(), salt);
   }
-  final box = await AesGcm.with256bits()
-      .encrypt(utf8.encode(json), secretKey: key, aad: _aad(node));
+  final box = await AesGcm.with256bits().encrypt(
+    utf8.encode(json),
+    secretKey: key,
+    aad: _aad(node),
+  );
   node['ciphertext'] = base64Encode(box.concatenation());
   return jsonEncode(node);
 }
 
 Future<String> decryptBackupPayload(
+  String json, {
+  String? passphrase,
+  SecretKey? deviceKey,
+}) async {
+  final keyBytes = await deviceKey?.extractBytes();
+  return _runDecryption(json, passphrase, keyBytes);
+}
+
+Future<String> _runDecryption(
+  String json,
+  String? passphrase,
+  List<int>? keyBytes,
+) => Isolate.run(
+  () => _decryptBackupPayload(
+    json,
+    passphrase: passphrase,
+    deviceKey: keyBytes == null ? null : SecretKey(keyBytes),
+  ),
+);
+
+Future<String> _decryptBackupPayload(
   String json, {
   String? passphrase,
   SecretKey? deviceKey,
@@ -108,7 +156,7 @@ Future<String> decryptBackupPayload(
 }
 
 Future<SecretKey> _derive(String passphrase, List<int> salt) => Pbkdf2(
-      macAlgorithm: Hmac.sha256(),
-      iterations: _iterations,
-      bits: 256,
-    ).deriveKey(secretKey: SecretKey(utf8.encode(passphrase)), nonce: salt);
+  macAlgorithm: Hmac.sha256(),
+  iterations: _iterations,
+  bits: 256,
+).deriveKey(secretKey: SecretKey(utf8.encode(passphrase)), nonce: salt);
