@@ -120,8 +120,7 @@ class PracticeResumeSection extends ConsumerWidget {
           icon: draft['kind'] == 'math'
               ? Icons.calculate_outlined
               : Icons.auto_awesome_outlined,
-          iconColor: theme.semantic.secondaryForeground,
-          backgroundColor: theme.colorScheme.secondary,
+          iconColor: theme.colorScheme.primary,
           title: PracticeDraftRepository.poemKinds.contains(draft['kind'])
               ? '继续${draft['label'] ?? '诗词练习'}'
               : draft['kind'] == 'math'

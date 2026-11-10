@@ -428,7 +428,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildQuickActions(BuildContext context, int mistakeCount) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
-    final secondary = theme.colorScheme.secondary;
 
     return Row(
       children: [
@@ -445,8 +444,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: _QuickActionButton(
             icon: Icons.calculate_rounded,
             label: '做口算',
-            color: secondary,
-            foreground: theme.semantic.secondaryForeground,
+            color: primary,
             onTap: () => context.go(AppRoutes.mathTab),
           ),
         ),
@@ -469,7 +467,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: _QuickActionButton(
                   icon: Icons.error_outline_rounded,
                   label: '错题本',
-                  color: theme.colorScheme.error,
+                  color: primary,
                   onTap: () => context.push(AppRoutes.mathMistake),
                 ),
               ),
@@ -637,8 +635,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               icon: mathDone
                   ? Icons.check_circle_outline
                   : Icons.calculate_outlined,
-              iconColor: theme.semantic.secondaryForeground,
-              backgroundColor: theme.colorScheme.secondary,
+              iconColor: theme.colorScheme.primary,
               title: '口算 $todayMath/$mathGoal 题',
               subtitle: mathDone
                   ? '目标已完成'
@@ -698,14 +695,12 @@ class _QuickActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.color,
-    this.foreground,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
   final Color color;
-  final Color? foreground;
   final VoidCallback onTap;
 
   @override
@@ -718,12 +713,12 @@ class _QuickActionButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: foreground ?? color, size: 28),
+          Icon(icon, color: color, size: 28),
           const SizedBox(height: SpacingTokens.xs),
           Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: foreground ?? color,
+              color: color,
               fontWeight: FontWeight.w600,
             ),
           ),
