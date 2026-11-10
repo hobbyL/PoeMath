@@ -590,13 +590,15 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
                   color: theme.colorScheme.secondary,
                 ),
                 const SizedBox(width: SpacingTokens.sm),
-                Text(
-                  '系统音色（离线可用）',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    '系统音色（离线可用）',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: SpacingTokens.sm),
                 Text(
                   '点击试听',
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -641,41 +643,42 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
                 ),
               )
             else ...[
-              // 系统默认
-              _buildVoiceTile(
-                theme: theme,
-                title: '系统默认',
-                subtitle: '使用系统默认中文语音',
-                icon: Icons.auto_awesome,
-                isSelected: _selectedVoice == null,
-                onTap: () => _selectVoice(null),
+              ResponsiveCardGrid(
+                children: [
+                  _buildVoiceTile(
+                    theme: theme,
+                    title: '系统默认',
+                    subtitle: '使用系统默认中文语音',
+                    icon: Icons.auto_awesome,
+                    isSelected: _selectedVoice == null,
+                    onTap: () => _selectVoice(null),
+                  ),
+                  ..._voices!.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final voice = entry.value;
+                    final isSelected =
+                        _selectedVoice != null &&
+                        _selectedVoice!['name'] == voice['name'] &&
+                        _selectedVoice!['locale'] == voice['locale'];
+                    final name = voice['name'] ?? '';
+                    final locale = voice['locale'] ?? '';
+                    return _buildVoiceTile(
+                      theme: theme,
+                      title: _voiceDisplayName(name, locale, index),
+                      subtitle: _localeLabel(locale),
+                      icon: Icons.record_voice_over,
+                      isSelected: isSelected,
+                      onTap: () => _selectVoice(voice),
+                    );
+                  }),
+                ],
               ),
-
               if (_voices!.isEmpty)
                 const AppEmptyState(
                   icon: Icons.record_voice_over_outlined,
                   title: '未找到中文语音',
                   description: '请在系统设置中下载中文语音包',
-                )
-              else
-                ..._voices!.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final voice = entry.value;
-                  final isSelected =
-                      _selectedVoice != null &&
-                      _selectedVoice!['name'] == voice['name'] &&
-                      _selectedVoice!['locale'] == voice['locale'];
-                  final name = voice['name'] ?? '';
-                  final locale = voice['locale'] ?? '';
-                  return _buildVoiceTile(
-                    theme: theme,
-                    title: _voiceDisplayName(name, locale, index),
-                    subtitle: _localeLabel(locale),
-                    icon: Icons.record_voice_over,
-                    isSelected: isSelected,
-                    onTap: () => _selectVoice(voice),
-                  );
-                }),
+                ),
             ],
           ],
         ),
@@ -871,7 +874,12 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
           color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
-      ...standard.map((voice) => _buildCloudVoiceTile(theme, voice)),
+      const SizedBox(height: SpacingTokens.sm),
+      ResponsiveCardGrid(
+        children: [
+          for (final voice in standard) _buildCloudVoiceTile(theme, voice),
+        ],
+      ),
       if (dragonHd.isNotEmpty) ...[
         const SizedBox(height: SpacingTokens.sm),
         Text(
@@ -880,7 +888,12 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        ...dragonHd.map((voice) => _buildCloudVoiceTile(theme, voice)),
+        const SizedBox(height: SpacingTokens.sm),
+        ResponsiveCardGrid(
+          children: [
+            for (final voice in dragonHd) _buildCloudVoiceTile(theme, voice),
+          ],
+        ),
       ],
     ];
   }
@@ -889,31 +902,28 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     final isSelected = voice.shortName == _cloudVoice;
     final subtitle =
         '${workerGenderLabel(voice.gender)} · ${workerStyleLabel(voice.bestStyle)}';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-      child: AppTile(
-        icon: isSelected ? Icons.check_circle : Icons.graphic_eq,
-        iconColor: isSelected
-            ? theme.colorScheme.primary
-            : theme.colorScheme.outline,
-        title: voice.localName,
-        subtitle: subtitle,
-        // AppTile 在 trailing 非空时忽略 onTap，交互由试听按钮承担。
-        trailing: _cloudBusy && isSelected
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : IconButton(
-                icon: Icon(
-                  Icons.play_circle_outline,
-                  color: theme.colorScheme.primary,
-                ),
-                tooltip: '试听',
-                onPressed: _cloudBusy ? null : () => _selectCloudVoice(voice),
+    return AppTile(
+      icon: isSelected ? Icons.check_circle : Icons.graphic_eq,
+      iconColor: isSelected
+          ? theme.colorScheme.primary
+          : theme.colorScheme.outline,
+      title: voice.localName,
+      subtitle: subtitle,
+      // AppTile 在 trailing 非空时忽略 onTap，交互由试听按钮承担。
+      trailing: _cloudBusy && isSelected
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : IconButton(
+              icon: Icon(
+                Icons.play_circle_outline,
+                color: theme.colorScheme.primary,
               ),
-      ),
+              tooltip: '试听',
+              onPressed: _cloudBusy ? null : () => _selectCloudVoice(voice),
+            ),
     );
   }
 
@@ -925,25 +935,19 @@ class _TtsSettingsPageState extends ConsumerState<TtsSettingsPage> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-      child: AppTile(
-        icon: isSelected ? Icons.check_circle : icon,
-        iconColor: isSelected
-            ? theme.colorScheme.primary
-            : theme.colorScheme.outline,
-        title: title,
-        subtitle: subtitle,
-        trailing: IconButton(
-          icon: Icon(
-            Icons.play_circle_outline,
-            color: theme.colorScheme.primary,
-          ),
-          tooltip: '试听',
-          onPressed: onTap,
-        ),
-        onTap: onTap,
+    return AppTile(
+      icon: isSelected ? Icons.check_circle : icon,
+      iconColor: isSelected
+          ? theme.colorScheme.primary
+          : theme.colorScheme.outline,
+      title: title,
+      subtitle: subtitle,
+      trailing: IconButton(
+        icon: Icon(Icons.play_circle_outline, color: theme.colorScheme.primary),
+        tooltip: '试听',
+        onPressed: onTap,
       ),
+      onTap: onTap,
     );
   }
 }
