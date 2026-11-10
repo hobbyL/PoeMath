@@ -203,6 +203,11 @@ cd PoeMath
 # 安装依赖
 flutter pub get
 
+# 本地 Android 模拟器：使用当前网络 DNS 冷启动，保留应用数据
+python3 tools/start_android_emulator.py
+# 切换 Wi-Fi / VPN 后遇到域名解析失败，可加 --restart 重新读取 DNS
+# 可用 --avd 指定设备，或 --dns 指定当前网络可用的 DNS IP
+
 # 运行
 flutter run
 
