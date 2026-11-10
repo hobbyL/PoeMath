@@ -8,10 +8,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
+import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/theme_providers.dart';
 import 'package:poemath/core/widgets/app_tile.dart';
+import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/challenge_record.dart';
@@ -23,6 +25,8 @@ import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/formula/formula_detail_page.dart';
+import 'package:poemath/features/chinese/expression/picture_story_page.dart';
+import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/home/learning_calendar_page.dart';
 import 'package:poemath/features/profile/cloud_sync_page.dart';
@@ -34,8 +38,11 @@ import 'package:poemath/features/poem/poem_detail_page.dart';
 import 'package:poemath/features/poem/poem_recite_mode_page.dart';
 import 'package:poemath/features/profile/achievement_page.dart';
 import 'package:poemath/features/profile/about_page.dart';
+import 'package:poemath/features/profile/ai_settings_page.dart';
+import 'package:poemath/features/profile/backup_restore_page.dart';
 import 'package:poemath/features/profile/cloud_usage_history_page.dart';
 import 'package:poemath/features/profile/learning_stats_page.dart';
+import 'package:poemath/features/profile/notification_settings_page.dart';
 import 'package:poemath/features/profile/practice_settings_page.dart';
 import 'package:poemath/features/profile/profile_page.dart';
 import 'package:poemath/features/profile/providers/stats_chart_providers.dart';
@@ -45,9 +52,12 @@ import 'package:poemath/features/profile/weekly_report_page.dart';
 import '../helpers/day_key_override.dart';
 import '../helpers/hive_test_helper.dart';
 import '../helpers/parent_access_test_helper.dart';
+import '../helpers/picture_story_fixture.dart';
 import '../helpers/theme_contrast.dart';
 
 class _Tts extends Mock implements TtsService {}
+
+class _Notifications extends Mock implements NotificationService {}
 
 class _BlockedCredentials extends SettingsRepository {
   final loading = Completer<WebDavConfig>();
@@ -90,6 +100,7 @@ Future<void> _pump(
   ThemeData theme,
   Widget page, {
   SettingsRepository? settings,
+  List<Override> overrides = const [],
 }) async {
   final tts = _Tts();
   when(() => tts.stop()).thenAnswer((_) async {});
@@ -115,6 +126,7 @@ Future<void> _pump(
             ),
           ],
         ),
+        ...overrides,
       ],
       child: MaterialApp(
         theme: theme,
@@ -141,6 +153,20 @@ void _expectTileIcons(WidgetTester tester) {
       ),
     );
   }
+}
+
+void _expectPrimaryTiles(WidgetTester tester, ThemeData theme) {
+  final tiles = tester.widgetList<AppTile>(find.byType(AppTile));
+  expect(tiles, isNotEmpty);
+  for (final tile in tiles) {
+    expect(tile.iconColor, theme.colorScheme.primary, reason: tile.title);
+    expect(
+      tile.backgroundColor ?? tile.iconColor,
+      theme.colorScheme.primary,
+      reason: tile.title,
+    );
+  }
+  _expectTileIcons(tester);
 }
 
 void _expectBarTooltips(WidgetTester tester) {
@@ -241,7 +267,7 @@ void main() {
           await tester.tap(find.text(title));
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 500));
-          _expectTileIcons(tester);
+          _expectPrimaryTiles(tester, theme);
           await tester.pageBack();
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 500));
@@ -256,6 +282,7 @@ void main() {
       testWidgets('$label 关于页版本、版权及隐私政策正文清晰', (tester) async {
         addTearDown(tester.view.reset);
         await _pump(tester, theme, const AboutPage());
+        _expectPrimaryTiles(tester, theme);
         expectReadableText(tester, find.text('v1.0 (1)'));
         expectReadableText(tester, find.textContaining('©'));
         await tester.runAsync(() async {
@@ -287,14 +314,14 @@ void main() {
         for (final name in ['做口算', '查公式', '错题本', '7']) {
           expectReadableText(tester, find.text(name));
         }
-        _expectTileIcons(tester);
+        _expectPrimaryTiles(tester, theme);
         await _unmount(tester);
         await _pump(tester, theme, const SettingsPage());
         await tester.tap(find.text('外观与反馈'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 500));
         expect(find.text('外观模式'), findsOneWidget);
-        _expectTileIcons(tester);
+        _expectPrimaryTiles(tester, theme);
         await _unmount(tester);
       });
 
@@ -303,6 +330,7 @@ void main() {
         await _pump(tester, theme, const PoemDetailPage(poemId: 'theme-poem'));
         final line = find.text('床前明月光，');
         expectReadableText(tester, line);
+        expectReadableText(tester, find.text('生成讲解'));
         expect(
           tester.widget<Text>(line).style!.fontSize,
           greaterThanOrEqualTo(20),
@@ -313,7 +341,7 @@ void main() {
           theme,
           const PoemReciteModePage(poemId: 'theme-poem'),
         );
-        _expectTileIcons(tester);
+        _expectPrimaryTiles(tester, theme);
         await tester.tap(find.text('诗文预览'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
@@ -340,10 +368,12 @@ void main() {
         await _unmount(tester);
         await _pump(tester, theme, const ChallengeHistoryPage());
         expectReadableText(tester, find.text('37'));
+        expectReadableText(tester, find.text('1年级上学期'));
         expectReadableIcon(tester, find.byIcon(Icons.hourglass_top_rounded));
         await _unmount(tester);
         await _pump(tester, theme, const MathChallengePage());
         expect(find.text('固定时间'), findsOneWidget);
+        expectReadableText(tester, find.text('普通'));
         expectReadableIcon(tester, find.byIcon(Icons.radio_button_checked));
         await _unmount(tester);
       });
@@ -351,6 +381,17 @@ void main() {
       testWidgets('$label 我的、成就、练习设置中的统计与必要图标可读', (tester) async {
         addTearDown(tester.view.reset);
         await _pump(tester, theme, const ProfilePage());
+        _expectPrimaryTiles(tester, theme);
+        for (final icon in [
+          Icons.bar_chart_rounded,
+          Icons.calendar_month_rounded,
+          Icons.emoji_events_rounded,
+        ]) {
+          expect(
+            tester.widget<Icon>(find.byIcon(icon)).color,
+            theme.colorScheme.primary,
+          );
+        }
         final stat = find
             .ancestor(of: find.text('连续打卡'), matching: find.byType(Column))
             .first;
@@ -366,8 +407,74 @@ void main() {
         }
         await _unmount(tester);
         await _pump(tester, theme, const PracticeSettingsPage());
+        for (final card in tester.widgetList<ColoredCard>(
+          find.byType(ColoredCard),
+        )) {
+          expect(card.color, theme.colorScheme.primary);
+        }
         expectReadableIcon(tester, find.byIcon(Icons.speed_rounded));
         expectReadableIcon(tester, find.byIcon(Icons.calculate_rounded));
+        await _unmount(tester);
+      });
+
+      testWidgets('$label AI 设置与备份操作使用主题主色', (tester) async {
+        addTearDown(tester.view.reset);
+        await _pump(tester, theme, const AiSettingsPage());
+        _expectPrimaryTiles(tester, theme);
+        await _unmount(tester);
+        await _pump(tester, theme, const BackupRestorePage());
+        _expectPrimaryTiles(tester, theme);
+        for (final title in ['导出备份', '从备份恢复']) {
+          final card = tester.widget<ColoredCard>(
+            find.ancestor(
+              of: find.text(title),
+              matching: find.byType(ColoredCard),
+            ),
+          );
+          expect(card.color, theme.colorScheme.primary);
+          expectReadableText(tester, find.text(title));
+        }
+        await _unmount(tester);
+      });
+
+      testWidgets('$label 提醒设置与表达题目卡片跟随主色', (tester) async {
+        addTearDown(tester.view.reset);
+        final notifications = _Notifications();
+        when(() => notifications.isReminderEnabled).thenReturn(true);
+        when(() => notifications.reminderHour).thenReturn(18);
+        when(() => notifications.reminderMinute).thenReturn(30);
+        when(() => notifications.isWeeklyReportEnabled).thenReturn(false);
+        when(() => notifications.isReminderDegraded).thenReturn(false);
+        await _pump(
+          tester,
+          theme,
+          NotificationSettingsPage(notificationService: notifications),
+        );
+        expectReadableText(tester, find.text('查看本周学习周报'));
+        for (final card in tester.widgetList<ColoredCard>(
+          find.byType(ColoredCard),
+        )) {
+          expect(card.color, theme.colorScheme.primary);
+        }
+        await _unmount(tester);
+        await _pump(
+          tester,
+          theme,
+          const PictureStoryPage(),
+          overrides: [
+            pictureStoryPromptProvider.overrideWithValue([
+              pictureStoryFixture(),
+            ]),
+          ],
+        );
+        final card = tester.widget<ColoredCard>(
+          find.ancestor(
+            of: find.text('窗前的小猫'),
+            matching: find.byType(ColoredCard),
+          ),
+        );
+        expect(card.color, theme.colorScheme.primary);
+        expectReadableText(tester, find.text('窗前的小猫'));
         await _unmount(tester);
       });
 
