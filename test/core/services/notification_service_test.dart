@@ -152,12 +152,18 @@ void main() {
     );
     await service.initialize();
 
+    await HiveBoxes.settings.put('reminder_degraded', true);
     final scheduled = await service.scheduleDailyReminder(7, 30);
 
     expect(scheduled, isTrue);
     expect(service.isReminderEnabled, isTrue);
     expect(service.reminderHour, 7);
     expect(service.reminderMinute, 30);
+    expect(service.isReminderDegraded, isFalse);
+    await HiveBoxes.settings.put('reminder_degraded', true);
+    await service.cancelDailyReminder();
+    expect(service.isReminderEnabled, isFalse);
+    expect(service.isReminderDegraded, isFalse);
   });
 
   test('周报调度失败时返回 false 且不写入开启状态', () async {
@@ -297,6 +303,21 @@ void main() {
 
     expect(service.isWeeklyReportEnabled, isTrue);
     expect(HiveBoxes.settings.get('weekly_report_degraded'), isTrue);
+    expect(service.isWeeklyReportDegraded, isTrue);
+    when(
+      () => plugin.zonedSchedule(
+        any(), any(), any(), any(), any(),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: any(named: 'payload'),
+      ),
+    ).thenAnswer((_) async {});
+    expect(await service.scheduleWeeklyReport(), isTrue);
+    expect(service.isWeeklyReportDegraded, isFalse);
+    await HiveBoxes.settings.put('weekly_report_degraded', true);
+    await service.cancelWeeklyReport();
+    expect(service.isWeeklyReportEnabled, isFalse);
+    expect(service.isWeeklyReportDegraded, isFalse);
   });
 
   test('重复初始化只初始化一次通知插件', () async {

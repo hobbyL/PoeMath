@@ -298,6 +298,9 @@ class NotificationService {
   bool get isReminderDegraded =>
       HiveBoxes.settings.get(_keyReminderDegraded, defaultValue: false) as bool;
 
+  bool get isWeeklyReportDegraded =>
+      HiveBoxes.settings.get(_keyWeeklyDegraded, defaultValue: false) as bool;
+
   // ============ 权限请求 ============
 
   /// 请求通知权限（Android 13+ / iOS）。
@@ -374,16 +377,22 @@ class NotificationService {
       return false;
     }
 
-    await HiveBoxes.settings.put(_keyReminderHour, hour);
-    await HiveBoxes.settings.put(_keyReminderMinute, minute);
-    await HiveBoxes.settings.put(_keyReminderEnabled, true);
+    await HiveBoxes.settings.putAll({
+      _keyReminderHour: hour,
+      _keyReminderMinute: minute,
+      _keyReminderEnabled: true,
+      _keyReminderDegraded: false,
+    });
     return true;
   }
 
   /// 关闭每日提醒。
   Future<void> cancelDailyReminder() async {
     await _plugin.cancel(_notificationId);
-    await HiveBoxes.settings.put(_keyReminderEnabled, false);
+    await HiveBoxes.settings.putAll({
+      _keyReminderEnabled: false,
+      _keyReminderDegraded: false,
+    });
   }
 
   /// 计算指定时间的下一次触发 TZDateTime。
@@ -451,14 +460,20 @@ class NotificationService {
       return false;
     }
 
-    await HiveBoxes.settings.put(_keyWeeklyEnabled, true);
+    await HiveBoxes.settings.putAll({
+      _keyWeeklyEnabled: true,
+      _keyWeeklyDegraded: false,
+    });
     return true;
   }
 
   /// 关闭周报推送。
   Future<void> cancelWeeklyReport() async {
     await _plugin.cancel(_weeklyReportId);
-    await HiveBoxes.settings.put(_keyWeeklyEnabled, false);
+    await HiveBoxes.settings.putAll({
+      _keyWeeklyEnabled: false,
+      _keyWeeklyDegraded: false,
+    });
   }
 
   /// 计算下一个周日指定时间的 TZDateTime。

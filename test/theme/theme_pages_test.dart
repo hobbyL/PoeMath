@@ -445,6 +445,7 @@ void main() {
         when(() => notifications.reminderMinute).thenReturn(30);
         when(() => notifications.isWeeklyReportEnabled).thenReturn(false);
         when(() => notifications.isReminderDegraded).thenReturn(false);
+        when(() => notifications.isWeeklyReportDegraded).thenReturn(false);
         await _pump(
           tester,
           theme,

@@ -14,6 +14,7 @@ void main() {
     when(() => service.reminderMinute).thenReturn(0);
     when(() => service.isWeeklyReportEnabled).thenReturn(false);
     when(() => service.isReminderDegraded).thenReturn(false);
+    when(() => service.isWeeklyReportDegraded).thenReturn(false);
     when(() => service.requestPermission()).thenAnswer((_) async => true);
     when(
       () => service.scheduleDailyReminder(18, 0),
@@ -51,6 +52,7 @@ void main() {
     when(() => service.reminderMinute).thenReturn(0);
     when(() => service.isWeeklyReportEnabled).thenReturn(false);
     when(() => service.isReminderDegraded).thenReturn(true);
+    when(() => service.isWeeklyReportDegraded).thenReturn(false);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -72,6 +74,7 @@ void main() {
     when(() => service.reminderMinute).thenReturn(0);
     when(() => service.isWeeklyReportEnabled).thenReturn(false);
     when(() => service.isReminderDegraded).thenReturn(false);
+    when(() => service.isWeeklyReportDegraded).thenReturn(false);
 
     await tester.pumpWidget(
       MaterialApp(

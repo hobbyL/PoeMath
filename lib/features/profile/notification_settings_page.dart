@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
@@ -26,6 +27,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   late int _reminderHour;
   late int _reminderMinute;
   late bool _weeklyEnabled;
+  late bool _weeklyDegraded;
+  bool _busy = false;
 
   /// 上次启动恢复时系统未能排上提醒（用户开关仍然是「开」）。
   late bool _reminderDegraded;
@@ -42,6 +45,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     _reminderMinute = svc.reminderMinute;
     _weeklyEnabled = svc.isWeeklyReportEnabled;
     _reminderDegraded = svc.isReminderDegraded;
+    _weeklyDegraded = svc.isWeeklyReportDegraded;
   }
 
   String get _timeLabel =>
@@ -49,15 +53,26 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
 
   // ============ 学习提醒 ============
 
-  Future<void> _toggleReminder(bool value) async {
+  Future<void> _save(Future<void> Function() action, String failure) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } on Object catch (error, stack) {
+      AppLogger.e('更新通知设置失败', tag: 'Notify', error: error, stackTrace: stack);
+      _showScheduleFailure(failure);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _toggleReminder(bool value) => _save(() async {
     final svc = _notificationService;
     if (value) {
       final granted = await svc.requestPermission();
+      if (!mounted) return;
       if (!granted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('需要通知权限才能设置提醒')));
-        }
+        _showScheduleFailure('需要通知权限才能设置提醒');
         return;
       }
       final scheduled = await svc.scheduleDailyReminder(
@@ -68,65 +83,64 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         _showScheduleFailure('每日提醒设置失败，请稍后重试');
         return;
       }
-      // 本次手动调度成功，之前的降级状态随之解除。
-      _reminderDegraded = false;
     } else {
       await svc.cancelDailyReminder();
-      _reminderDegraded = false;
     }
-    if (mounted) setState(() => _reminderEnabled = value);
-  }
+    if (mounted) {
+      setState(() {
+        _reminderEnabled = value;
+        _reminderDegraded = false;
+      });
+    }
+  }, '每日提醒设置失败，请稍后重试');
 
-  Future<void> _pickTime() async {
+  Future<void> _pickTime() => _save(() async {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: _reminderHour, minute: _reminderMinute),
       helpText: '选择提醒时间',
     );
     if (picked == null || !mounted) return;
-
-    if (_reminderEnabled) {
-      final scheduled = await _notificationService.scheduleDailyReminder(
-        picked.hour,
-        picked.minute,
-      );
-      if (!scheduled) {
-        _showScheduleFailure('提醒时间更新失败，请稍后重试');
-        return;
-      }
+    final scheduled = await _notificationService.scheduleDailyReminder(
+      picked.hour,
+      picked.minute,
+    );
+    if (!scheduled) {
+      _showScheduleFailure('提醒时间更新失败，请稍后重试');
+      return;
     }
-
     if (mounted) {
       setState(() {
         _reminderHour = picked.hour;
         _reminderMinute = picked.minute;
+        _reminderDegraded = false;
       });
     }
-  }
+  }, '提醒时间更新失败，请稍后重试');
 
-  // ============ 学习周报 ============
-
-  Future<void> _toggleWeekly(bool value) async {
+  Future<void> _toggleWeekly(bool value) => _save(() async {
     final svc = _notificationService;
     if (value) {
       final granted = await svc.requestPermission();
+      if (!mounted) return;
       if (!granted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('需要通知权限才能开启周报推送')));
-        }
+        _showScheduleFailure('需要通知权限才能开启周报推送');
         return;
       }
-      final scheduled = await svc.scheduleWeeklyReport();
-      if (!scheduled) {
+      if (!await svc.scheduleWeeklyReport()) {
         _showScheduleFailure('周报推送设置失败，请稍后重试');
         return;
       }
     } else {
       await svc.cancelWeeklyReport();
     }
-    if (mounted) setState(() => _weeklyEnabled = value);
-  }
+    if (mounted) {
+      setState(() {
+        _weeklyEnabled = value;
+        _weeklyDegraded = false;
+      });
+    }
+  }, '周报推送设置失败，请稍后重试');
 
   void _showScheduleFailure(String message) {
     if (!mounted) return;
@@ -145,192 +159,92 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         child: AnimatedPageBody(
           padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
-            // ============ 学习提醒 ============
             ColoredCard(
               color: theme.colorScheme.primary,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.notifications_outlined,
-                        color: theme.colorScheme.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: SpacingTokens.sm),
-                      Expanded(
-                        child: Text(
-                          '每日学习提醒',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Switch(
+                  AppTile(
+                    flat: true,
+                    icon: Icons.notifications_outlined,
+                    iconColor: theme.colorScheme.primary,
+                    title: '每日学习提醒',
+                    subtitle: '每天定时推送通知，提醒孩子学习诗词和口算',
+                    trailingInTitle: true,
+                    trailing: Semantics(
+                      label: '每日学习提醒',
+                      child: Switch(
                         value: _reminderEnabled,
-                        onChanged: _toggleReminder,
+                        onChanged: _busy ? null : _toggleReminder,
                       ),
-                    ],
-                  ),
-                  Text(
-                    '每天定时推送通知，提醒孩子学习诗词和口算',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  if (_reminderEnabled && _reminderDegraded) ...[
-                    const SizedBox(height: SpacingTokens.sm),
-                    // 开关还是「开」，但这台设备没能排上；不提示的话用户
-                    // 会以为提醒已生效，静默漏掉每日任务。
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 16,
-                          color: theme.colorScheme.error,
-                        ),
-                        const SizedBox(width: SpacingTokens.xs),
-                        Expanded(
-                          child: Text(
-                            '提醒未能生效：请检查系统通知权限或电池优化设置，'
-                            '再来这里重新打开一次。',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.error,
-                            ),
-                          ),
-                        ),
-                      ],
+                  if (_reminderEnabled && _reminderDegraded)
+                    Text(
+                      '提醒未能生效：请检查系统通知权限或电池优化设置，再来这里重新打开一次。',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
                     ),
-                  ],
                   if (_reminderEnabled) ...[
-                    const SizedBox(height: SpacingTokens.md),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(
-                        SpacingTokens.radiusMedium,
-                      ),
-                      onTap: _pickTime,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: SpacingTokens.md,
-                          vertical: SpacingTokens.sm,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(
-                            alpha: 0.08,
-                          ),
-                          borderRadius: BorderRadius.circular(
-                            SpacingTokens.radiusSmall,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              size: 18,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: SpacingTokens.sm),
-                            Text(
-                              '提醒时间：$_timeLabel',
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                            const Spacer(),
-                            Icon(
-                              Icons.edit_outlined,
-                              size: 16,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ],
-                        ),
-                      ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    AppTile(
+                      flat: true,
+                      icon: Icons.access_time,
+                      iconColor: theme.colorScheme.primary,
+                      title: '提醒时间：$_timeLabel',
+                      subtitle: '',
+                      trailingIcon: Icons.edit_outlined,
+                      onTap: _busy ? null : _pickTime,
                     ),
                   ],
                 ],
               ),
             ),
             const SizedBox(height: SpacingTokens.md),
-
-            // ============ 学习周报 ============
             ColoredCard(
               color: theme.colorScheme.primary,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.insert_chart_outlined,
-                        color: theme.colorScheme.primary,
-                        size: 20,
+                  AppTile(
+                    flat: true,
+                    icon: Icons.insert_chart_outlined,
+                    iconColor: theme.colorScheme.primary,
+                    title: '学习周报推送',
+                    subtitle: '每周日 18:00 推送本周学习数据汇总通知',
+                    trailingInTitle: true,
+                    trailing: Semantics(
+                      label: '学习周报推送',
+                      child: Switch(
+                        value: _weeklyEnabled,
+                        onChanged: _busy ? null : _toggleWeekly,
                       ),
-                      const SizedBox(width: SpacingTokens.sm),
-                      Expanded(
-                        child: Text(
-                          '学习周报推送',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Switch(value: _weeklyEnabled, onChanged: _toggleWeekly),
-                    ],
-                  ),
-                  Text(
-                    '每周日 18:00 推送本周学习数据汇总通知',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: SpacingTokens.md),
-                  // 查看周报入口
-                  InkWell(
-                    borderRadius: BorderRadius.circular(
-                      SpacingTokens.radiusMedium,
+                  if (_weeklyEnabled && _weeklyDegraded)
+                    Text(
+                      '周报未能生效：请检查系统通知权限或电池优化设置，再来这里重新打开一次。',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
                     ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  AppTile(
+                    flat: true,
+                    icon: Icons.assessment_outlined,
+                    iconColor: theme.colorScheme.primary,
+                    title: '查看本周学习周报',
+                    subtitle: '',
                     onTap: () => context.push(AppRoutes.weeklyReport),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SpacingTokens.md,
-                        vertical: SpacingTokens.sm,
-                      ),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(
-                          alpha: 0.08,
-                        ),
-                        borderRadius: BorderRadius.circular(
-                          SpacingTokens.radiusSmall,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.assessment_outlined,
-                            size: 18,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: SpacingTokens.sm),
-                          Text(
-                            '查看本周学习周报',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const Spacer(),
-                          Icon(
-                            Icons.chevron_right,
-                            size: 18,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                 ],
               ),
             ),
+            if (_busy) ...[
+              const SizedBox(height: SpacingTokens.md),
+              const LinearProgressIndicator(semanticsLabel: '正在更新通知设置'),
+            ],
             const SizedBox(height: SpacingTokens.xl),
 
             // ============ 说明 ============
