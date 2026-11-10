@@ -73,7 +73,6 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
     String? warning,
     bool danger = false,
   }) async {
-    final theme = Theme.of(context);
     final verb = danger ? '删除' : '清理';
     final confirmed = await showDialog<bool>(
       context: context,
@@ -88,7 +87,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
           FilledButton(
             style: danger
                 ? FilledButton.styleFrom(
-                    backgroundColor: theme.colorScheme.error,
+                    backgroundColor: Theme.of(dialog).colorScheme.error,
+                    foregroundColor: Theme.of(dialog).colorScheme.onError,
                   )
                 : null,
             onPressed: () => Navigator.pop(dialog, true),
@@ -156,7 +156,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: Theme.of(dialog).colorScheme.error,
+              foregroundColor: Theme.of(dialog).colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(dialog, true),
             child: const Text('删除本书'),

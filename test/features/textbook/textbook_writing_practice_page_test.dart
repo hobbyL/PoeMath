@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/services/tts_service.dart';
+import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
@@ -17,10 +18,12 @@ import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 import 'package:poemath/features/textbook/writing/writing_canvas.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
 import 'package:poemath/features/textbook/writing/writing_practice_page.dart';
+
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/narration_fakes.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/writing_fixture.dart';
+import '../../helpers/theme_contrast.dart';
 
 class MemoryBox extends Fake implements Box<dynamic> {
   final data = <String, dynamic>{};
@@ -41,8 +44,7 @@ class MemoryCourses extends TextbookCourseRepository {
   Future<T> withCurrentPack<T>(
     Textbook book,
     Future<T> Function(TextbookCoursePack?) action,
-  ) =>
-      action(current);
+  ) => action(current);
 }
 
 void main() {
@@ -78,7 +80,11 @@ void main() {
     await tearDownHiveForWidgetTesting();
   });
 
-  Future<void> pump(WidgetTester tester, {String targetId = 'writing-001'}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    String targetId = 'writing-001',
+    ThemeData? theme,
+  }) async {
     tester.view.physicalSize = const Size(1200, 2400);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -95,6 +101,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          theme: theme,
           home: WritingPracticePage(
             bookId: courseFixtureBook().pdfSha256,
             lessonId: courses.current.lessons.single.id,
@@ -104,6 +111,19 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  for (final subject in AppSubject.values) {
+    for (final brightness in Brightness.values) {
+      testWidgets('$subject/$brightness 写字阶段导航的未选中文字也应清晰', (tester) async {
+        await pump(
+          tester,
+          theme: AppTheme.resolve(subject: subject, brightness: brightness),
+        );
+        expectReadableText(tester, find.text('自己写'));
+        expectReadableText(tester, find.text('看一看'));
+      });
+    }
   }
 
   testWidgets('无笔顺数据时降级：直接进入自由书写，显示提示', (tester) async {
@@ -126,10 +146,7 @@ void main() {
     expect(find.text('我写的'), findsOneWidget);
     expect(find.text('参考'), findsOneWidget);
     // 无数据时显示家长核对提示。
-    expect(
-      find.text('这个字暂时没有笔顺数据，请家长看一看写得对不对。'),
-      findsOneWidget,
-    );
+    expect(find.text('这个字暂时没有笔顺数据，请家长看一看写得对不对。'), findsOneWidget);
     // 写入成功时不应出现内容失效提示。
     expect(find.textContaining('写字内容已更新'), findsNothing);
 

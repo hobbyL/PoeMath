@@ -29,11 +29,11 @@ enum WritingStage { demonstrate, trace, free, check }
 
 extension on WritingStage {
   String get label => switch (this) {
-        WritingStage.demonstrate => '看笔顺',
-        WritingStage.trace => '描红',
-        WritingStage.free => '自己写',
-        WritingStage.check => '看一看',
-      };
+    WritingStage.demonstrate => '看笔顺',
+    WritingStage.trace => '描红',
+    WritingStage.free => '自己写',
+    WritingStage.check => '看一看',
+  };
 }
 
 /// 单字书写练习页。
@@ -146,8 +146,9 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
       final book = books.where((b) => b.pdfSha256 == widget.bookId).firstOrNull;
       if (book == null) throw StateError('找不到这本教材');
       final pack = await courses.load(book);
-      final lesson =
-          pack?.lessons.where((l) => l.id == widget.lessonId).firstOrNull;
+      final lesson = pack?.lessons
+          .where((l) => l.id == widget.lessonId)
+          .firstOrNull;
       if (pack == null || lesson == null) throw StateError('找不到这课的会写字');
       final asset = await ref.read(writingStrokeDataProvider.future);
       final targets = writingTargets(
@@ -197,30 +198,31 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     _reveal?.dispose();
     _revealedStrokes = 0;
     _playing = false;
-    _reveal = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    )..addStatusListener((status) {
-        if (status != AnimationStatus.completed) return;
-        final total = strokes.strokeCount;
-        if (!_current) return;
-        if (_revealedStrokes + 1 >= total) {
-          setState(() {
-            _revealedStrokes = total;
-            _playing = false;
-          });
-        } else {
-          setState(() => _revealedStrokes++);
-          _reveal?.forward(from: 0);
-        }
-      });
+    _reveal =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 700),
+        )..addStatusListener((status) {
+          if (status != AnimationStatus.completed) return;
+          final total = strokes.strokeCount;
+          if (!_current) return;
+          if (_revealedStrokes + 1 >= total) {
+            setState(() {
+              _revealedStrokes = total;
+              _playing = false;
+            });
+          } else {
+            setState(() => _revealedStrokes++);
+            _reveal?.forward(from: 0);
+          }
+        });
   }
 
   String _message(Object error) => error is FormatException
       ? error.message
       : error is StateError
-          ? error.message.toString()
-          : '保存或读取失败，请重试';
+      ? error.message.toString()
+      : '保存或读取失败，请重试';
 
   Future<void> _runWrite(
     Future<WritingProgress> Function() action, {
@@ -258,12 +260,12 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
   /// 早期实现只把"当前字"当成有数据，导致页面算出的指纹与仓库不一致，
   /// 每次写入都被判为「写字内容已更新」。
   String get _fingerprint => writingLessonFingerprint(
-        writingTargets(
-          _pack!,
-          _lesson!,
-          hasStrokeData: _strokeAsset!.hasStrokeDataSync,
-        ),
-      );
+    writingTargets(
+      _pack!,
+      _lesson!,
+      hasStrokeData: _strokeAsset!.hasStrokeDataSync,
+    ),
+  );
 
   WritingRecord? get _record {
     final p = _progress;
@@ -288,7 +290,9 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
       _check = null;
     });
     // 进入核对阶段即自动比对，孩子不用再点一次「核对笔顺」。
-    if (stage == WritingStage.check && _strokeData != null && _free.isNotEmpty) {
+    if (stage == WritingStage.check &&
+        _strokeData != null &&
+        _free.isNotEmpty) {
       unawaited(_runCheck());
     }
   }
@@ -334,7 +338,8 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         fingerprint: _fingerprint,
         targetId: target.id,
         stage: stage,
-        operationId: 'stage-${stage.name}-${DateTime.now().microsecondsSinceEpoch}',
+        operationId:
+            'stage-${stage.name}-${DateTime.now().microsecondsSinceEpoch}',
         expectedRevision: expected.revision,
       ),
     );
@@ -346,10 +351,11 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     if (data == null) return;
     final userStrokes = _free
         .where((stroke) => stroke.length > 1)
-        .map((stroke) => [
-              for (final point in stroke)
-                math.Point<double>(point.dx, point.dy),
-            ],)
+        .map(
+          (stroke) => [
+            for (final point in stroke) math.Point<double>(point.dx, point.dy),
+          ],
+        )
         .toList();
     // 参考 medians 用同一画布尺寸换算：把 1024 画布坐标映射到格内像素坐标。
     final scale = side / 1024;
@@ -410,15 +416,13 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         targetId: target.id,
         passed: passed,
         day: _today,
-        operationId:
-            'parent-${DateTime.now().microsecondsSinceEpoch}',
+        operationId: 'parent-${DateTime.now().microsecondsSinceEpoch}',
         expectedRevision: _progress!.revision,
       ),
       success: () {
         if (passed && _current) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('已记录，做得好！')),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('已记录，做得好！')));
         }
       },
     );
@@ -470,9 +474,8 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
       setState(() => _audioStatus = NarrationStatus.preparing);
     } on Object {
       if (_current) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('语音暂时不可用')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('语音暂时不可用')));
       }
     }
   }
@@ -561,24 +564,21 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
   }
 
   Widget _errorView() => ListView(
-        padding: const EdgeInsets.all(SpacingTokens.md),
-        children: [
-          ColoredCard(
-            color: Theme.of(context).colorScheme.error,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_error ?? '加载失败'),
-                if (_retry != null)
-                  TextButton(
-                    onPressed: _retry,
-                    child: const Text('重试'),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      );
+    padding: const EdgeInsets.all(SpacingTokens.md),
+    children: [
+      ColoredCard(
+        color: Theme.of(context).colorScheme.error,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_error ?? '加载失败'),
+            if (_retry != null)
+              TextButton(onPressed: _retry, child: const Text('重试')),
+          ],
+        ),
+      ),
+    ],
+  );
 
   /// 时间轴式步骤条：当前步与已完成步用深色，未到达的用浅色。
   ///
@@ -586,8 +586,9 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
   Widget _stepper() {
     final theme = Theme.of(context);
     final hasData = _strokeData != null;
-    final stages =
-        hasData ? WritingStage.values : [WritingStage.free, WritingStage.check];
+    final stages = hasData
+        ? WritingStage.values
+        : [WritingStage.free, WritingStage.check];
     final current = stages.indexOf(_stage);
     return Row(
       children: [
@@ -596,7 +597,9 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
             Expanded(
               child: Container(
                 height: 2,
-                margin: const EdgeInsets.symmetric(horizontal: SpacingTokens.xs),
+                margin: const EdgeInsets.symmetric(
+                  horizontal: SpacingTokens.xs,
+                ),
                 color: i <= current
                     ? theme.colorScheme.primary
                     : theme.colorScheme.outlineVariant,
@@ -617,7 +620,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     final reached = done || active;
     final color = reached
         ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45);
+        : theme.colorScheme.onSurfaceVariant;
     return InkWell(
       onTap: _busy ? null : () => _goTo(stage),
       borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
@@ -653,11 +656,11 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
   }
 
   List<Widget> _stageContent() => switch (_stage) {
-        WritingStage.demonstrate => _demonstrateStage(),
-        WritingStage.trace => _traceStage(),
-        WritingStage.free => _freeStage(),
-        WritingStage.check => _checkStage(),
-      };
+    WritingStage.demonstrate => _demonstrateStage(),
+    WritingStage.trace => _traceStage(),
+    WritingStage.free => _freeStage(),
+    WritingStage.check => _checkStage(),
+  };
 
   List<Widget> _demonstrateStage() {
     final data = _strokeData;
@@ -678,8 +681,8 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
                       medians: data.medians,
                       revealed: _playing
                           ? (_revealedStrokes < data.strokeCount
-                              ? _revealedStrokes
-                              : data.strokeCount)
+                                ? _revealedStrokes
+                                : data.strokeCount)
                           : _revealedStrokes,
                       progress: _playing ? _reveal!.value : 1,
                       color: theme.colorScheme.onSurface,
