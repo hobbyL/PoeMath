@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:poemath/core/services/backup_payload_cipher.dart';
 import 'package:poemath/core/services/picture_story_image_service.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 
@@ -80,7 +79,6 @@ class PictureStoryCatalogBackup {
   static Future<Map<String, Object>> export({
     required PictureStoryRepository repository,
     required PictureStoryImageService images,
-    required Map<String, dynamic> parentPayload,
   }) async {
     final catalog = repository.catalogState();
     final encodedImages = <String, String>{};
@@ -89,53 +87,11 @@ class PictureStoryCatalogBackup {
       'enabledByProfile': _checkedEnabled(repository.enabledByProfile()),
       'images': encodedImages,
     };
-    await validateBudget(
-      catalog: catalog,
-      enabledByProfile: repository.enabledByProfile(),
-      images: images,
-      parentPayload: parentPayload,
-    );
     for (final id in catalog.imageIds) {
       final bytes = await images.readImage(id);
       await images.validateImageBytes(id, bytes);
       encodedImages[id] = base64Encode(bytes);
     }
     return result;
-  }
-
-  /// 在读取和 Base64 分配之前校验完整目录（包括历史图片）的备份预算。
-  static Future<void> validateBudget({
-    required PictureStoryCatalogState catalog,
-    required Map<String, List<String>> enabledByProfile,
-    required PictureStoryImageService images,
-    required Map<String, dynamic> parentPayload,
-    int reserveBytes = 0,
-  }) async {
-    final result = <String, Object>{
-      ...catalog.toJson(),
-      'enabledByProfile': _checkedEnabled(enabledByProfile),
-      'images': <String, String>{},
-    };
-    const encoder = JsonEncoder.withIndent('  ');
-    var estimated = utf8
-            .encode(
-              encoder.convert({
-                ...parentPayload,
-                jsonKey: result,
-              }),
-            )
-            .length +
-        reserveBytes;
-    if (estimated > maxBackupBytes) {
-      throw const FormatException('备份超过 32 MiB，请减少题目图片或聊天历史后再导出');
-    }
-    // 在读取和 Base64 分配之前算完图片预算，每张预留键、缩进和标点空间。
-    for (final id in catalog.imageIds) {
-      final size = await images.storedImageSize(id);
-      estimated += ((size + 2) ~/ 3) * 4 + id.length + 128;
-      if (estimated > maxBackupBytes) {
-        throw const FormatException('备份超过 32 MiB，请减少题目图片或聊天历史后再导出');
-      }
-    }
   }
 }

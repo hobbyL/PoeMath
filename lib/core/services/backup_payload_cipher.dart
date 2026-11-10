@@ -1,41 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 
-const int maxBackupBytes = 32 * 1024 * 1024;
 const String _format = 'poemath-encrypted-backup';
 const int _iterations = 120000;
 
-void validateBackupSize(String json) {
-  if (json.length > maxBackupBytes ||
-      utf8.encode(json).length > maxBackupBytes) {
-    throw const FormatException('备份超过 32 MiB，请减少题目图片或聊天历史后再导出');
-  }
-}
-
-Object? decodeBackupJson(String json) {
-  validateBackupSize(json);
-  return jsonDecode(json);
-}
-
-Future<String> readBackupFile(File file) async {
-  if (await file.length() > maxBackupBytes) {
-    throw const FormatException('备份超过允许大小');
-  }
-  var count = 0;
-  final bytes = BytesBuilder(copy: false);
-  await for (final chunk in file.openRead()) {
-    count += chunk.length;
-    if (count > maxBackupBytes) throw const FormatException('备份超过允许大小');
-    bytes.add(chunk);
-  }
-  return utf8.decode(bytes.takeBytes());
-}
+/// 逐块解码完整备份，避免先累积整份字节再复制为字符串。
+Future<String> readBackupFile(File file) =>
+    file.openRead().transform(utf8.decoder).join();
 
 bool isEncryptedBackup(String json) {
-  validateBackupSize(json);
   final value = jsonDecode(json);
   // A damaged envelope must never fall back to destructive legacy restore.
   return value is Map && ['format', 'kdf', 'ciphertext'].any(value.containsKey);
@@ -55,7 +30,6 @@ Future<String> encryptBackupPayload(
   String? passphrase,
   SecretKey? deviceKey,
 }) async {
-  validateBackupSize(json);
   final value = jsonDecode(json) as Map<String, dynamic>;
   final node = <String, dynamic>{
     'format': _format,
@@ -82,9 +56,7 @@ Future<String> encryptBackupPayload(
   final box = await AesGcm.with256bits()
       .encrypt(utf8.encode(json), secretKey: key, aad: _aad(node));
   node['ciphertext'] = base64Encode(box.concatenation());
-  final encrypted = jsonEncode(node);
-  validateBackupSize(encrypted);
-  return encrypted;
+  return jsonEncode(node);
 }
 
 Future<String> decryptBackupPayload(
@@ -92,7 +64,6 @@ Future<String> decryptBackupPayload(
   String? passphrase,
   SecretKey? deviceKey,
 }) async {
-  validateBackupSize(json);
   final node = jsonDecode(json);
   if (node is! Map<String, dynamic> ||
       node['format'] != _format ||
@@ -130,9 +101,7 @@ Future<String> decryptBackupPayload(
       secretKey: key,
       aad: _aad(node),
     );
-    final result = utf8.decode(clear);
-    validateBackupSize(result);
-    return result;
+    return utf8.decode(clear);
   } on SecretBoxAuthenticationError {
     throw const FormatException('备份加密口令错误或备份已损坏');
   }

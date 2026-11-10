@@ -213,8 +213,6 @@ class PictureStoryImageService {
     return bytes;
   }
 
-  Future<int> storedImageSize(String id) async => _storedSize(await _file(id));
-
   Future<int> _storedSize(File file) async {
     if (!await file.exists()) {
       throw const PictureStoryImageException('题目图片缺失，请在编辑页面重新选择图片');

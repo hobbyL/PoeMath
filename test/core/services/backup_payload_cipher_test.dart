@@ -133,7 +133,7 @@ void main() {
     }
   });
 
-  test('恶意 KDF 和超大文件在解析或派生前拒绝', () async {
+  test('恶意 KDF 在派生前拒绝', () async {
     final node = jsonDecode(
       await encryptBackupPayload(plain, deviceKey: key),
     ) as Map<String, dynamic>;
@@ -146,10 +146,11 @@ void main() {
       decryptBackupPayload(jsonEncode(node), passphrase: '合成测试'),
       throwsFormatException,
     );
-    final file = File('${root.path}/large.json');
-    final handle = await file.open(mode: FileMode.write);
-    await handle.truncate(maxBackupBytes + 1);
-    await handle.close();
+  });
+
+  test('备份文件读取仍拒绝损坏的 UTF-8', () async {
+    final file = File('${root.path}/invalid-utf8.json');
+    await file.writeAsBytes([0xff, 0xfe]);
     await expectLater(readBackupFile(file), throwsFormatException);
   });
 

@@ -30,7 +30,7 @@ class WebDavService {
   })  : _client = BoundedHttpClient(
           client ?? http.Client(),
           timeout: timeout,
-          maxResponseBytes: 32 * 1024 * 1024,
+          maxResponseBytes: null,
         ),
         _ownsClient = client == null;
 
@@ -162,13 +162,14 @@ class WebDavService {
   Future<String> _downloadFile(WebDavConfig config, String fileName) async {
     _validateConfig(config);
     final uri = _remoteUri(config, fileName: fileName);
-    final response = await _client.request(
-      'GET',
-      uri,
-      headers: _authHeaders(config),
-      deadline: _deadline(30),
-    );
+    final request = http.Request('GET', uri)
+      ..headers.addAll(_authHeaders(config));
+    final response =
+        await _client.sendBounded(request, deadline: _deadline(30));
 
+    if (response.statusCode != 200) {
+      await response.stream.listen((_) {}).cancel();
+    }
     if (response.statusCode == 404) {
       throw const WebDavException('云端暂无备份文件', 404);
     }
@@ -179,7 +180,7 @@ class WebDavService {
       );
     }
 
-    return utf8.decode(response.bodyBytes);
+    return response.stream.transform(utf8.decoder).join();
   }
 
   Future<List<WebDavBackupVersion>> listVersions(WebDavConfig config) async {

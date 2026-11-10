@@ -13,7 +13,8 @@ class BoundedHttpClient extends http.BaseClient {
 
   final http.Client inner;
   final Duration timeout;
-  final int maxResponseBytes;
+  /// null 用于完整备份等不限制总大小的响应；超时和取消仍然生效。
+  final int? maxResponseBytes;
   final Set<void Function()> _cancel = {};
   bool _closed = false;
 
@@ -75,7 +76,8 @@ class BoundedHttpClient extends http.BaseClient {
         }),
         stopped.future.then((_) => throw failure!),
       ]);
-      if ((response.contentLength ?? 0) > maxResponseBytes) {
+      final byteLimit = maxResponseBytes;
+      if (byteLimit != null && (response.contentLength ?? 0) > byteLimit) {
         cancel(const FormatException('响应内容超过允许大小'));
         // Cancel the response subscription even for clients without Abortable support.
         await response.stream.listen((_) {}).cancel();
@@ -104,7 +106,7 @@ class BoundedHttpClient extends http.BaseClient {
           subscription = response.stream.listen(
             (chunk) {
               bytes += chunk.length;
-              if (bytes > maxResponseBytes) {
+              if (byteLimit != null && bytes > byteLimit) {
                 cancel(const FormatException('响应内容超过允许大小'));
                 finish(failure);
                 return;

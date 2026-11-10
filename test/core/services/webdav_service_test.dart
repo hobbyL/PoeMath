@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -24,6 +26,58 @@ WebDavConfig _config({
 }
 
 void main() {
+  test('超过 32 MiB 的备份可上传并通过 latest 与历史版本完整下载', () async {
+    final content = jsonEncode({
+      '备注': '题图备份',
+      'data': 'a' * (33 * 1024 * 1024),
+      '结尾': '练习✓',
+    });
+    final bytes = utf8.encode(content);
+    final uploaded = <String>[];
+    final downloaded = <String>[];
+    final client = MockClient.streaming((request, body) async {
+      if (request.method == 'PUT') {
+        final received = await body.transform(utf8.decoder).join();
+        expect(received == content, isTrue, reason: '上传内容必须完整');
+        uploaded.add(request.url.pathSegments.last);
+        return http.StreamedResponse(const Stream.empty(), 201);
+      }
+      await body.drain<void>();
+      if (request.method == 'PROPFIND') {
+        return http.StreamedResponse(const Stream.empty(), 207);
+      }
+      expect(request.method, 'GET');
+      final name = request.url.pathSegments.last;
+      expect(uploaded, contains(name));
+      downloaded.add(name);
+      return http.StreamedResponse(
+        Stream.fromIterable([
+          for (var start = 0; start < bytes.length; start += 65535)
+            Uint8List.sublistView(
+              bytes,
+              start,
+              (start + 65535).clamp(0, bytes.length),
+            ),
+        ]),
+        200,
+        // 覆盖声明大长度与没有 Content-Length 的分块响应。
+        contentLength: name == 'poemath_backup.json' ? bytes.length : null,
+      );
+    });
+    final service = WebDavService(client: client);
+    addTearDown(client.close);
+    addTearDown(service.dispose);
+    await service.upload(_config(), content);
+    expect(uploaded, hasLength(2));
+    expect(uploaded.last, 'poemath_backup.json');
+    expect(await service.download(_config()) == content, isTrue);
+    expect(
+      await service.downloadVersion(_config(), uploaded.first) == content,
+      isTrue,
+    );
+    expect(downloaded, [uploaded.last, uploaded.first]);
+  });
+
   test('历史版本写失败时不会发布latest，历史列表拒绝外部目录与来源', () async {
     final puts = <Uri>[];
     final failed = WebDavService(client: MockClient((request) async {
@@ -50,6 +104,36 @@ void main() {
     expect((await service.listVersions(_config())).map((e) => e.id), [name]);
     expect(() => service.downloadVersion(_config(), '../escape.json'),
         throwsA(isA<WebDavException>()),);
+  });
+
+  test('下载失败立即报告状态并取消未结束的响应正文', () async {
+    for (final status in [404, 500]) {
+      final canceled = Completer<void>();
+      final body = StreamController<List<int>>(
+        onCancel: canceled.complete,
+      );
+      final client = MockClient.streaming(
+        (_, requestBody) async {
+          await requestBody.drain<void>();
+          return http.StreamedResponse(body.stream, status);
+        },
+      );
+      final service = WebDavService(client: client);
+      addTearDown(client.close);
+      addTearDown(service.dispose);
+      addTearDown(body.close);
+      await expectLater(
+        service.download(_config()),
+        throwsA(
+          isA<WebDavException>().having(
+            (error) => error.statusCode,
+            'statusCode',
+            status,
+          ),
+        ),
+      );
+      await canceled.future;
+    }
   });
 
   test('URL 校验只允许 HTTPS 且拒绝凭据和 query', () {

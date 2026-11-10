@@ -362,11 +362,9 @@ class BackupService {
           await PictureStoryCatalogBackup.export(
             repository: _pictureStories,
             images: _pictureStoryImages,
-            parentPayload: data,
           );
     }
     final json = const JsonEncoder.withIndent('  ').convert(data);
-    validateBackupSize(json);
     return encryptPayload
         ? encryptBackupPayload(json, passphrase: passphrase)
         : json;
@@ -473,7 +471,7 @@ class BackupService {
   /// 探测备份 JSON 是否含 `credentials` 节（决定导入/下载前是否弹口令框）。
   static bool jsonHasCredentials(String jsonString) {
     try {
-      final decoded = decodeBackupJson(jsonString);
+      final decoded = jsonDecode(jsonString);
       return decoded is Map && decoded.containsKey('credentials');
     } on FormatException {
       return false;
@@ -489,7 +487,7 @@ class BackupService {
   static DateTime? exportedAt(String jsonString) {
     final Object? decoded;
     try {
-      decoded = decodeBackupJson(jsonString);
+      decoded = jsonDecode(jsonString);
     } on FormatException {
       return null;
     }
@@ -518,7 +516,7 @@ class BackupService {
   static LlmEndpointChangeSet? detectLlmEndpointChanges(String jsonString) {
     final Object? decoded;
     try {
-      decoded = decodeBackupJson(jsonString);
+      decoded = jsonDecode(jsonString);
     } on FormatException {
       return null;
     }
@@ -1984,7 +1982,7 @@ class BackupService {
   Map<String, dynamic> _decodeAndValidate(String jsonString) {
     final Object? decoded;
     try {
-      decoded = decodeBackupJson(jsonString);
+      decoded = jsonDecode(jsonString);
     } on FormatException {
       throw const FormatException('无效的备份文件格式');
     }

@@ -45,20 +45,6 @@ class _FailingFavorites extends Fake implements Box<PoemFavorite> {
   }
 }
 
-class _BudgetImages extends PictureStoryImageService {
-  var readCalls = 0;
-  @override
-  Future<void> ensureStored(PictureStoryImage image) async {}
-  @override
-  Future<int> storedImageSize(String id) async =>
-      PictureStoryImageService.maxStoredBytes;
-  @override
-  Future<Uint8List> readImage(String id) async {
-    readCalls++;
-    throw StateError('超限导出不应先读取图片');
-  }
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
@@ -512,28 +498,64 @@ void main() {
     );
   });
 
-  test('超过总图片预算在读取与 Base64 分配前拒绝，缺失图片也不静默省略', () async {
-    final budgetImages = _BudgetImages();
-    final repository = PictureStoryRepository(images: budgetImages);
-    for (var index = 0; index < 13; index++) {
-      final id = sha256.convert([index]).toString();
+  test('超过 32 MiB 的题图备份可导出、保存加密快照并完整恢复', () async {
+    const formerLimit = 32 * 1024 * 1024;
+    final repository = PictureStoryRepository(images: images);
+    for (var index = 0; index < 15; index++) {
+      final image = await images.importBytes(
+        await pictureStoryNoisePng(width: 768 + index, height: 768),
+      );
       await repository.savePrompt(
         prompt: pictureStoryFixture(
-          id: 'local-budget-$index',
-          image: PictureStoryImage.local(id),
+          id: 'local-large-backup-$index',
+          image: image,
         ),
         profileId: 'default',
       );
     }
-    await expectLater(
-      backup(imageService: budgetImages).exportToJson(),
-      throwsA(
-        isA<FormatException>()
-            .having((error) => error.message, 'message', contains('32 MiB')),
-      ),
+    final catalog = repository.catalogState().toJson();
+    final enabled = repository.enabledByProfile();
+    final service = backup();
+    final json = await service.exportToJson(includeCredentials: false);
+    final file = File('${directory.path}/large-backup.json');
+    await file.writeAsString(json);
+    expect(await file.length(), greaterThan(formerLimit));
+    expect(service.inspectJson(json).counts['题目图片'], 15);
+
+    final history = BackupHistoryService(
+      backup: service,
+      directoryProvider: () async => directory,
+      keyProvider: () async => List.generate(32, (index) => index),
     );
-    expect(budgetImages.readCalls, 0);
+    final snapshot = await history.create();
+    final protected = File('${directory.path}/backup_history/${snapshot.id}');
+    expect(await protected.length(), greaterThan(formerLimit));
+    expect(isEncryptedBackup(await readBackupFile(protected)), isTrue);
+    final recovered = await history.read(snapshot.id);
+    expect(service.inspectJson(recovered).counts['题目图片'], 15);
+    await file.writeAsString(recovered);
+
+    // 恢复到全新的图片目录，避免已有图片让恢复测试假通过。
+    final target = Directory('${directory.path}/restored');
+    final restoredImages = PictureStoryImageService(
+      directoryProvider: () async => target,
+    );
+    await backup(imageService: restoredImages).restoreFromFile(file.path);
+    final restored = PictureStoryRepository(images: restoredImages);
+    expect(restored.catalogState().toJson(), catalog);
+    expect(restored.enabledByProfile(), enabled);
+    for (final id in restored.catalogState().imageIds) {
+      final bytes = await restoredImages.readImage(id);
+      expect(sha256.convert(bytes).toString(), id);
+    }
+  });
+
+  test('备份遇到缺失图片明确失败，不静默省略或修改题库', () async {
+    await populatedBackup();
+    final repository = PictureStoryRepository(images: images);
     final before = repository.storageSnapshot();
+    final id = repository.catalogState().imageIds.first;
+    await File('${directory.path}/picture_story/images/$id.png').delete();
     await expectLater(
       backup().exportToJson(),
       throwsA(
