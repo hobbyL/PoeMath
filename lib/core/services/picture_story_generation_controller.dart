@@ -27,12 +27,20 @@ class PictureStoryRunState {
     this.options,
     this.progress = '正在读取生成配置…',
     this.message,
+    this.elapsed = Duration.zero,
   });
 
   final PictureStoryRunPhase phase;
   final PictureStoryGenerationOptions? options;
   final String progress;
   final String? message;
+  final Duration elapsed;
+
+  String? get waitMessage => elapsed.inSeconds < 10
+      ? null
+      : '本次请求已等待 ${elapsed.inSeconds} 秒'
+            '${elapsed.inSeconds >= 30 ? '，仍在等待服务响应，可随时暂停' : ''}';
+
   bool get isBusy => switch (phase) {
     PictureStoryRunPhase.preparing ||
     PictureStoryRunPhase.generating ||
@@ -51,6 +59,7 @@ class _Operation {
   String? signature;
   String? stopReason;
   bool pipelineStarted = false;
+  Timer? progressTimer;
 }
 
 /// 由应用 ProviderScope 持有。页面离开只取消 UI 订阅，不取消生成。
@@ -178,7 +187,7 @@ class PictureStoryGenerationController extends ChangeNotifier
             _setState(
               operation,
               PictureStoryRunPhase.generating,
-              progress: attempt == 1 ? '正在规划场景…' : '正在切换模型，重试场景规划…',
+              progress: attempt == 1 ? '正在规划场景…' : '正在重试场景规划（第 $attempt 次）…',
             );
           }
         },
@@ -236,6 +245,7 @@ class PictureStoryGenerationController extends ChangeNotifier
         };
       }
     } finally {
+      operation.progressTimer?.cancel();
       // 回调、停止和终态都属于本次操作，不能覆盖后续任务。
       _setState(operation, phase, message: message);
       if (identical(_operations[operation.profileId], operation)) {
@@ -260,6 +270,7 @@ class PictureStoryGenerationController extends ChangeNotifier
     if (_disposed || !identical(_operations[operation.profileId], operation)) {
       return;
     }
+    operation.progressTimer?.cancel();
     _states[operation.profileId] = PictureStoryRunState(
       phase: phase,
       options: operation.options,
@@ -267,12 +278,30 @@ class PictureStoryGenerationController extends ChangeNotifier
       message: message,
     );
     notifyListeners();
+    if (phase == PictureStoryRunPhase.generating && _allowed(operation)) {
+      operation.progressTimer = Timer.periodic(const Duration(seconds: 1), (
+        timer,
+      ) {
+        if (!_allowed(operation)) {
+          timer.cancel();
+          return;
+        }
+        _states[operation.profileId] = PictureStoryRunState(
+          phase: phase,
+          options: operation.options,
+          progress: progress,
+          elapsed: Duration(seconds: timer.tick),
+        );
+        notifyListeners();
+      });
+    }
   }
 
   void pause(String profileId, {String reason = '生成已暂停，可重试未完成的步骤'}) {
     final operation = _operations[profileId];
     if (operation == null || operation.stopReason != null) return;
     operation.stopReason = reason;
+    operation.progressTimer?.cancel();
     if (operation.pipelineStarted) service.pause(profileId);
     _setState(
       operation,

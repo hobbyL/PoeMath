@@ -63,13 +63,19 @@ class PictureStoryGenerationService {
        _images = images ?? PictureStoryImageService.instance,
        _repositoryOverride = repository,
        _backupOverride = backup,
-       _llmFactory = llmFactory ?? ((active) => LlmClient(isActive: active)),
+       _llmFactory =
+           llmFactory ??
+           ((active) =>
+               LlmClient(isActive: active, chatTimeout: requestTimeout)),
        _imageFactory =
            imageFactory ??
            ((active) => ImageGenerationClient(isActive: active)),
        _authorize = authorize ?? ParentAccessService.instance.assertAllowed;
 
   static const draftSuffix = PictureStoryGenerationDraft.storageSuffix;
+  // 实测场景规划常需 80 秒以上，普通对话的 90 秒预算容易提前截断。
+  // 仅用于出题，保持整次请求有上限，暂停仍通过 client.close 立即取消。
+  static const requestTimeout = Duration(seconds: 180);
   static Future<void> _operations = Future<void>.value();
   static final Map<String, _GenerationRun> _runs = {};
   final Box<dynamic>? _settingsOverride;
@@ -408,6 +414,7 @@ class PictureStoryGenerationService {
           // 本机额度和服务限流不应继续消耗其余题的请求。
           if (error is CloudQuotaExceededException ||
               error is ImageGenerationException ||
+              error is LlmHostLookupError ||
               error is LlmRateLimitError ||
               error is LlmAuthError) {
             break;
@@ -471,6 +478,7 @@ class PictureStoryGenerationService {
           config: config,
           systemPrompt: systemPrompt,
           stream: true,
+          retryWithoutStreaming: true,
           messages: [
             ChatMessage(
               role: ChatRole.user,
@@ -592,6 +600,7 @@ class PictureStoryGenerationService {
       requiresVision: true,
       systemPrompt: systemPrompt,
       stream: true,
+      retryWithoutStreaming: true,
       messages: [
         ChatMessage(
           role: ChatRole.user,
@@ -825,6 +834,7 @@ class PictureStoryGenerationService {
     CloudQuotaExceededException() => error.message,
     PictureStoryImageException() => error.message,
     LlmAuthError() => '大模型访问失败，请检查密钥和模型权限',
+    LlmHostLookupError() => '无法解析看图服务地址，请检查网络或 DNS；图片已保留，可稍后重试',
     LlmNetworkError() => '看图出题请求超时或网络不可用，可保留图片重试',
     LlmRateLimitError() => '看图模型额度已用尽或请求受限，请切换模型或稍后保留图片重试',
     LlmServerError() => '看图模型服务请求失败，请检查服务或稍后重试',

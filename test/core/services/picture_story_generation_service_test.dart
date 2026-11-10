@@ -176,6 +176,7 @@ void main() {
   var failCaption = 0;
   var incompleteSsePlans = false;
   var incompleteSseCaptions = false;
+  var streamingUnavailable = false;
   int? captionStatus;
   String? captionLimitNotice;
   String? plannedImagePrompt;
@@ -200,32 +201,45 @@ void main() {
           isActive: active,
           httpClient: MockClient((request) async {
             final body = jsonDecode(request.body) as Map<String, dynamic>;
+            final useSse = sse && body['stream'] == true;
             final messages = body['messages'] as List<dynamic>;
             final content = (messages.last as Map<String, dynamic>)['content'];
             if (content is String) {
               planRequests.add(body);
               planCalls++;
               requestOrder.add('规划');
+              if (streamingUnavailable && useSse) {
+                return http.Response(
+                  'data: {"error":{"type":"server_error"}}\n\n',
+                  200,
+                );
+              }
+              if (incompleteSsePlans && !useSse) {
+                return http.Response('', 503);
+              }
               final saved = service.readDraft('default')!;
               if (planningResponses.isNotEmpty) {
-                return _completion(planningResponses.removeAt(0), sse: sse);
+                return _completion(planningResponses.removeAt(0), sse: useSse);
               }
               return _completion([
                 for (var i = 0; i < saved.options.count; i++)
                   {'imagePrompt': plannedImagePrompt ?? '场景 $i：公园里的孩子观察花朵。'},
-              ], sse: sse, complete: !incompleteSsePlans);
+              ], sse: useSse, complete: !incompleteSsePlans);
             }
             captionCalls++;
             requestOrder.add('看图 $captionCalls');
             captionRequests.add(body);
+            if (incompleteSseCaptions && !useSse) {
+              return _completion({'title': '不完整内容'});
+            }
             if (captionStatus != null) {
               return http.Response('private provider response', captionStatus!);
             }
             if (captionLimitNotice != null) {
-              return _completion(captionLimitNotice!, sse: sse);
+              return _completion(captionLimitNotice!, sse: useSse);
             }
             if (captionCalls == failCaption) {
-              return _completion({'title': '不完整内容'}, sse: sse);
+              return _completion({'title': '不完整内容'}, sse: useSse);
             }
             return _completion(
               {
@@ -236,7 +250,7 @@ void main() {
                 'goals': <String>[],
                 'reference': '',
               },
-              sse: sse,
+              sse: useSse,
               complete: !incompleteSseCaptions,
             );
           }),
@@ -304,6 +318,7 @@ void main() {
     failCaption = 0;
     incompleteSsePlans = false;
     incompleteSseCaptions = false;
+    streamingUnavailable = false;
     captionStatus = null;
     captionLimitNotice = null;
     plannedImagePrompt = null;
@@ -424,7 +439,32 @@ void main() {
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 2);
   });
 
-  test('SSE 中断即使 JSON 已闭合也不入库，重试复用原图只发看图请求', () async {
+  test('三题规划 SSE 服务错误后改用普通响应，后续三题沿用并完整生成', () async {
+    streamingUnavailable = true;
+    service = createService(sse: true);
+    final draft = await start(count: 3);
+    expect(draft.readyCount, 3);
+    expect(
+      draft.candidates.map((item) => item.imagePrompt).toSet(),
+      hasLength(3),
+    );
+    expect(requestOrder, [
+      '规划', '规划',
+      '生图 1', '看图 1',
+      '生图 2', '看图 2',
+      '生图 3', '看图 3',
+    ]);
+    expect(planRequests.map((request) => request['stream']), [true, null]);
+    expect(captionRequests.map((request) => request['stream']), [
+      null, null, null,
+    ]);
+    expect(draft.candidates.every((item) => item.edit.image != null), isTrue);
+    expect(repository.catalogState().versions, isEmpty);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 5);
+    expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 3);
+  });
+
+  test('SSE 中断且普通响应不完整也不入库，手动重试复用原图', () async {
     service = createService(sse: true);
     incompleteSseCaptions = true;
     var draft = await start(count: 1);
@@ -450,14 +490,14 @@ void main() {
     expect(draft.readyCount, 1);
     expect(draft.candidates.single.id, failed.id);
     expect(draft.candidates.single.edit.image, image);
-    expect(draft.candidates.single.edit.toPrompt().title, '观察花朵 2');
+    expect(draft.candidates.single.edit.toPrompt().title, '观察花朵 3');
     expect(await images.readImage(image.value), stored);
-    expect(requestOrder, ['生图 1', '看图 1', '看图 2']);
+    expect(requestOrder, ['生图 1', '看图 1', '看图 2', '看图 3']);
     expect(planCalls, 0);
     expect(imageCalls, 1);
     expect(imageClients, 1);
-    expect(captionCalls, 2);
-    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 2);
+    expect(captionCalls, 3);
+    expect(CloudUsageService.instance.used(CloudUsageKind.llm), 3);
     expect(CloudUsageService.instance.used(CloudUsageKind.imageGeneration), 1);
     expect(repository.catalogState().versions, isEmpty);
   });
@@ -600,18 +640,18 @@ void main() {
     expect(imageCalls, 3);
   });
 
-  test('规划流被截断时保留传输错误，不当作缺题重复请求', () async {
+  test('规划流中断且普通响应失败后停止，不当作缺题重复请求', () async {
     incompleteSsePlans = true;
     service = createService(sse: true);
     await expectLater(
       start(count: 2),
-      throwsA(isA<LlmResponseFormatError>().having(
+      throwsA(isA<LlmServerError>().having(
         (error) => error.message,
         'message',
-        contains('流式响应未完成'),
+        contains('HTTP 503'),
       )),
     );
-    expect(planCalls, 1);
+    expect(planCalls, 2);
     expect(imageCalls, 0);
     expect(service.readDraft('default')!.candidates, isEmpty);
   });

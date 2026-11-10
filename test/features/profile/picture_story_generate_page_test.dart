@@ -346,7 +346,7 @@ void main() {
         firstReply.complete(http.Response('', 503));
       });
       await _until(tester, () => fallbackEntered.isCompleted, settle: false);
-      expect(find.text('正在切换模型，重试场景规划…'), findsOneWidget);
+      expect(find.text('正在重试场景规划（第 2 次）…'), findsOneWidget);
       expect(settings.llmActiveProviderId, 'bad');
       await tester.runAsync(() async {
         fallbackReply.complete(

@@ -85,6 +85,11 @@ class LlmNetworkError extends LlmException {
   const LlmNetworkError(super.message, {super.retryable = true});
 }
 
+/// 同一服务地址下切模型不能修复 DNS，调用方可直接尝试其他已配置服务。
+class LlmHostLookupError extends LlmNetworkError {
+  const LlmHostLookupError() : super('无法解析模型服务地址，请检查网络或 DNS 后重试');
+}
+
 /// 鉴权失败（401 / 403）。
 class LlmAuthError extends LlmException {
   const LlmAuthError(super.message, {super.retryable = false});
@@ -104,6 +109,12 @@ class LlmRateLimitError extends LlmException {
 /// 响应格式错误（JSON 解析失败、结构非法）。
 class LlmResponseFormatError extends LlmException {
   const LlmResponseFormatError(super.message, {super.retryable = true});
+}
+
+/// SSE 传输或协议未完整结束；完整文本调用可选择用普通响应重试。
+/// 正常结束后的业务 JSON 校验失败、输出截断与内容过滤不属于此类。
+class LlmStreamResponseError extends LlmResponseFormatError {
+  const LlmStreamResponseError(super.message);
 }
 
 /// `GET /v1/models` 不可用（接口不支持 / 网络错误）。UI 退化手填。

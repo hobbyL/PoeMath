@@ -13,6 +13,7 @@ LlmClient createRuntimeLlmClient({
   required SettingsRepository settings,
   required bool Function() isActive,
   required void Function() onSelectionChanged,
+  Duration chatTimeout = const Duration(seconds: 90),
 }) {
   final acceptedSelections =
       <LlmConfig, ({String signature, String providerId, String model})>{};
@@ -79,6 +80,7 @@ LlmClient createRuntimeLlmClient({
 
   return LlmClient(
     httpClient: httpClient,
+    chatTimeout: chatTimeout,
     isActive: isActive,
     onSelectionSucceeded: (request, successful) async {
       final changed = await settings.promoteSuccessfulLlmSelection(

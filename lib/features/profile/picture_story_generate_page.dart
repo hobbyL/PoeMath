@@ -347,11 +347,19 @@ class _PictureStoryGeneratePageState
                   ),
                 if (_busy) const SizedBox(height: SpacingTokens.md),
               ],
+              if (_generating && _run.waitMessage != null) ...[
+                Text(_run.waitMessage!, style: theme.textTheme.bodySmall),
+                const SizedBox(height: SpacingTokens.sm),
+              ],
               if (_generating || !hasCandidates) ...[
                 const Text('离开此页仍会继续生成；切到后台或锁屏会暂停。'),
                 const SizedBox(height: SpacingTokens.md),
               ],
               if (!hasCandidates && !_loadFailed) _options(theme, canOperate),
+              if (hasCandidates && _generating) ...[
+                Text(_generationStatus),
+                const SizedBox(height: SpacingTokens.md),
+              ],
               if (draft != null && hasCandidates)
                 MasonryLayout(
                   key: const ValueKey('picture-story-generation-masonry'),

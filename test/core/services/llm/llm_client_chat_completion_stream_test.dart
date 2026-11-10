@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:http/testing.dart';
+import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
 import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_client.dart';
@@ -72,22 +73,308 @@ http.StreamedResponse _response(
 }
 
 void main() {
-  for (final mode in ['complete', 'streamed complete', 'explain']) {
+  for (final failure in ['error', 'eof']) {
+    test('完整文本 SSE $failure 后普通响应恢复，同批记住传输方式且不拼接片段', () async {
+      final bodies = <Map<String, dynamic>>[];
+      final attempts = <int>[];
+      var accepted = 0;
+      final client = LlmClient(
+        httpClient: MockClient((request) async {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          bodies.add(body);
+          expect(request.headers['Authorization'], 'Bearer ${_config.apiKey}');
+          return http.Response(
+            body['stream'] == true
+                ? _delta('不应保留的片段') +
+                      (failure == 'error'
+                          ? _event({
+                              'error': {'type': 'server_error'},
+                            })
+                          : '')
+                : jsonEncode({
+                    'choices': [
+                      {
+                        'message': {'content': '{"title":"完整题目"}'},
+                        'finish_reason': 'stop',
+                      },
+                    ],
+                  }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }),
+        onCompletionAccepted: (_, _, {onSelectionSaved}) async => accepted++,
+      );
+      addTearDown(client.close);
+      Future<ChatCompletion> complete() => client.chatComplete(
+        config: _config,
+        systemPrompt: '测试',
+        messages: _messages,
+        stream: true,
+        retryWithoutStreaming: true,
+        onAttempt: attempts.add,
+        validate: (response) {
+          expect(jsonDecode(response.content!), {'title': '完整题目'});
+        },
+      );
+      final first = await complete();
+      expect(accepted, 0);
+      await client.acceptCompletion(first);
+      expect(accepted, 1);
+      final second = await complete();
+      expect(second.content, first.content);
+      expect(bodies.map((body) => body['stream']), [true, null, null]);
+      expect({...bodies.first}..remove('stream'), bodies[1]);
+      expect(bodies[1], bodies[2]);
+      expect(attempts, [1, 2, 1]);
+      await expectLater(
+        client.chatComplete(
+          config: _config,
+          systemPrompt: '测试',
+          messages: _messages,
+          stream: true,
+          retryWithoutStreaming: true,
+          tools: const [
+            {'type': 'function'},
+          ],
+        ),
+        throwsArgumentError,
+      );
+      expect(bodies, hasLength(3));
+    });
+  }
+
+  test('流式和普通响应均失败后继续其他厂商，成功后才回写', () async {
+    const config = LlmConfig(
+      baseUrl: 'https://first.example.com/v1',
+      apiKey: 'first-key',
+      model: 'gpt-4o-mini',
+      fallbacks: [_config],
+    );
+    final calls = <String>[];
+    final accepted = <String>[];
+    final client = LlmClient(
+      httpClient: MockClient((request) async {
+        final body = jsonDecode(request.body) as Map;
+        final streaming = body['stream'] == true;
+        calls.add('${request.url.host}:$streaming');
+        if (request.url.host == 'first.example.com') {
+          expect(request.headers['Authorization'], 'Bearer first-key');
+          return http.Response(
+            _event({
+              'error': {'type': 'server_error'},
+            }),
+            streaming ? 200 : 503,
+          );
+        }
+        expect(request.headers['Authorization'], 'Bearer ${_config.apiKey}');
+        return http.Response(
+          _delta('完整回答') + _finish('stop'),
+          200,
+          headers: {'content-type': 'text/event-stream; charset=utf-8'},
+        );
+      }),
+      onSelectionSucceeded: (_, successful) async {
+        accepted.add(successful.baseUrl);
+      },
+    );
+    addTearDown(client.close);
+    final attempts = <int>[];
+    final result = await client.chatComplete(
+      config: config,
+      systemPrompt: '测试',
+      messages: _messages,
+      stream: true,
+      retryWithoutStreaming: true,
+      onAttempt: attempts.add,
+    );
+    expect(result.content, '完整回答');
+    expect(calls, [
+      'first.example.com:true',
+      'first.example.com:false',
+      'vision.example.com:true',
+    ]);
+    expect(attempts, [1, 2, 3]);
+    expect(accepted, isEmpty);
+    await client.acceptCompletion(result);
+    expect(accepted, [_config.baseUrl]);
+  });
+
+  test('兼容重试开始前取消，不发送第二次请求', () async {
+    var calls = 0;
+    final client = LlmClient(
+      httpClient: MockClient((_) async {
+        calls++;
+        return http.Response(
+          _event({
+            'error': {'type': 'server_error'},
+          }),
+          200,
+        );
+      }),
+    );
+    addTearDown(client.close);
+    await expectLater(
+      client.chatComplete(
+        config: _config,
+        systemPrompt: '测试',
+        messages: _messages,
+        stream: true,
+        retryWithoutStreaming: true,
+        onAttempt: (attempt) {
+          if (attempt == 2) client.close();
+        },
+      ),
+      throwsA(isA<LlmGenerationCancelled>()),
+    );
+    expect(calls, 1);
+  });
+
+  for (final reason in ['length', 'content_filter']) {
+    for (final streaming in [true, false]) {
+      test('明确未完整结束不触发兼容重试或接受部分回答：$reason/$streaming', () async {
+        var calls = 0;
+        final client = LlmClient(
+          httpClient: MockClient((_) async {
+            calls++;
+            return http.Response(
+              streaming
+                  ? _delta('{"title":"部分回答"}') + _finish(reason)
+                  : jsonEncode({
+                      'choices': [
+                        {
+                          'message': {'content': '{"title":"部分回答"}'},
+                          'finish_reason': reason,
+                        },
+                      ],
+                    }),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }),
+        );
+        addTearDown(client.close);
+        await expectLater(
+          client.chatComplete(
+            config: _config,
+            systemPrompt: '测试',
+            messages: _messages,
+            stream: streaming,
+            retryWithoutStreaming: true,
+          ),
+          throwsA(isA<LlmResponseFormatError>()),
+        );
+        expect(calls, 1);
+      });
+    }
+  }
+
+  for (final streaming in [false, true]) {
+    test('DNS 失败跳过同厂商其他模型，备用成功后才回写：$streaming', () async {
+      const config = LlmConfig(
+        baseUrl: 'https://unreachable.example.com/v1',
+        apiKey: 'synthetic-vision-key',
+        model: 'gpt-4o',
+        models: ['gpt-4o', 'gpt-4.1'],
+        fallbacks: [
+          LlmConfig(
+            baseUrl: 'https://backup.example.com/v1',
+            apiKey: 'backup-key',
+            model: 'gpt-4o-mini',
+          ),
+        ],
+      );
+      DiagnosticBuffer.instance.clear();
+      final calls = <String>[];
+      final accepted = <String>[];
+      final client = LlmClient(
+        httpClient: MockClient((request) async {
+          calls.add((jsonDecode(request.body) as Map)['model'] as String);
+          if (request.url.host == 'unreachable.example.com') {
+            throw const SocketException("Failed host lookup: 'private-host'");
+          }
+          return http.Response(
+            streaming
+                ? _delta('有效回答') + _finish('stop')
+                : jsonEncode({
+                    'choices': [
+                      {
+                        'message': {'content': '有效回答'},
+                      },
+                    ],
+                  }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }),
+        onSelectionSucceeded: (_, successful) async {
+          accepted.add(successful.baseUrl);
+        },
+      );
+      addTearDown(client.close);
+      final result = await client.chatComplete(
+        config: config,
+        systemPrompt: '测试',
+        messages: _messages,
+        stream: streaming,
+      );
+      expect(result.content, '有效回答');
+      expect(calls, ['gpt-4o', 'gpt-4o-mini']);
+      expect(accepted, isEmpty);
+      await client.acceptCompletion(result);
+      expect(accepted, ['https://backup.example.com/v1']);
+      final diagnostics = DiagnosticBuffer.instance.exportAsText();
+      expect(diagnostics, contains('无法解析模型服务地址'));
+      expect(diagnostics, isNot(contains('private-host')));
+      expect(diagnostics, isNot(contains(config.apiKey)));
+    });
+
+    test('全部 DNS 失败保留明确且安全的错误类型：$streaming', () async {
+      final client = LlmClient(
+        httpClient: MockClient((_) async {
+          throw const SocketException("Failed host lookup: 'private-host'");
+        }),
+      );
+      addTearDown(client.close);
+      await expectLater(
+        client.chatComplete(
+          config: _config,
+          systemPrompt: '测试',
+          messages: _messages,
+          stream: streaming,
+        ),
+        throwsA(
+          isA<LlmHostLookupError>().having(
+            (error) => error.message,
+            'message',
+            '无法解析模型服务地址，请检查网络或 DNS 后重试',
+          ),
+        ),
+      );
+    });
+  }
+
+  for (final mode in [
+    'complete',
+    'streamed complete',
+    'SSE complete',
+    'explain',
+  ]) {
     test(
       'HTTP 200 JSON error in $mode never exposes upstream secrets',
       () async {
+        DiagnosticBuffer.instance.clear();
         final client = LlmClient(
           httpClient: MockClient((request) async {
             expect(
               request.headers['Authorization'],
               'Bearer ${_config.apiKey}',
             );
+            final error = {
+              'error': {'message': '${_config.apiKey} provider-private-detail'},
+            };
             return http.Response(
-              jsonEncode({
-                'error': {
-                  'message': '${_config.apiKey} provider-private-detail',
-                },
-              }),
+              mode == 'SSE complete' ? _event(error) : jsonEncode(error),
               200,
               headers: {'content-type': 'application/json'},
             );
@@ -104,7 +391,7 @@ void main() {
                 config: _config,
                 systemPrompt: '测试',
                 messages: _messages,
-                stream: mode == 'streamed complete',
+                stream: mode != 'complete',
               );
         await expectLater(
           response,
@@ -116,6 +403,10 @@ void main() {
             ),
           ),
         );
+        final diagnostics = DiagnosticBuffer.instance.exportAsText();
+        expect(diagnostics, contains('模型服务返回错误'));
+        expect(diagnostics, isNot(contains(_config.apiKey)));
+        expect(diagnostics, isNot(contains('provider-private-detail')));
       },
     );
   }

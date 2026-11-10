@@ -16,6 +16,7 @@ import 'package:http/http.dart' as http;
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/bounded_http_client.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
+import 'package:poemath/core/services/network_errors.dart';
 
 import 'package:poemath/core/services/llm/chat_completion.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
@@ -74,6 +75,7 @@ final class LlmClient {
   final Map<LlmConfig, LlmException> _lastErrors = {};
   final Map<LlmConfig, LlmConfig> _preferredProviders = {};
   final Set<LlmConfig> _unavailableProviders = {};
+  final Set<({String baseUrl, String model})> _nonStreamingModels = {};
 
   void _checkActive() {
     if (_closed || !(_isActive?.call() ?? true)) {
@@ -128,11 +130,12 @@ final class LlmClient {
     LlmException error,
   ) {
     if (!error.retryable && error is! LlmAuthError) throw error;
-    AppLogger.w('模型请求未通过：${error.runtimeType}', tag: 'LLM');
+    AppLogger.w('模型请求未通过：${error.runtimeType}，${error.message}', tag: 'LLM');
     _recordFailure(provider, model, error);
     _lastErrors[request] = error;
-    // 401 是整家供应商的凭据失败；403 仍可能只限制当前模型。
-    if (error is LlmAuthError && !error.retryable) {
+    // DNS 和 401 属于整个服务；403 仍可能只限制当前模型。
+    if (error is LlmHostLookupError ||
+        (error is LlmAuthError && !error.retryable)) {
       _unavailableProviders.add(provider);
     }
   }
@@ -912,6 +915,8 @@ final class LlmClient {
   /// [stream] 用于完整文本生成：汇总 SSE 后返回完整结果，也接受普通 JSON
   /// 响应。流式文本没有对外逐片展示，可在失败时丢弃片段并尝试下一模型。
   /// 工具探测保留默认非流式方式；流式模式不接受 [tools]。
+  /// [retryWithoutStreaming] 只用于尚未展示正文的完整文本生成。SSE 协议
+  /// 错误时，同一模型改用普通响应重试一次；成功后本客户端记住该传输方式。
   /// [validate] 在当前模型被记为成功前检查业务结构；格式错误会尝试下一候选。
   /// 校验只应解析响应，不应保存数据或修改设置。
   Future<ChatCompletion> chatComplete({
@@ -923,31 +928,59 @@ final class LlmClient {
     int maxTokens = 1024,
     bool requiresVision = false,
     bool stream = false,
+    bool retryWithoutStreaming = false,
     void Function(int attempt)? onAttempt,
     void Function(ChatCompletion completion)? validate,
-  }) => _withModels(
-    config,
-    (candidate) async {
-      final completion = await _chatComplete(
-        config: candidate,
-        systemPrompt: systemPrompt,
-        messages: messages,
-        tools: tools,
-        toolChoice: toolChoice,
-        maxTokens: maxTokens,
-        requiresVision: requiresVision,
-        stream: stream,
-      );
-      _checkActive();
-      _checkCompletionLimit(completion);
-      return completion;
-    },
-    // 工具探测并非最终回答，只有后续流完整成功才持久化。
-    reportSuccess: false,
-    requiresVision: requiresVision,
-    onAttempt: onAttempt,
-    validate: validate,
-  );
+  }) {
+    var attempt = 0;
+    void started() => onAttempt?.call(++attempt);
+    return _withModels(
+      config,
+      (candidate) async {
+        if (stream && tools.isNotEmpty) {
+          throw ArgumentError('流式文本生成不能同时配置工具调用');
+        }
+        final selection = (
+          baseUrl: normalizeBaseUrl(candidate.baseUrl).toString(),
+          model: candidate.model,
+        );
+        final useStream =
+            stream &&
+            !(retryWithoutStreaming && _nonStreamingModels.contains(selection));
+        Future<ChatCompletion> complete(bool streaming) => _chatComplete(
+          config: candidate,
+          systemPrompt: systemPrompt,
+          messages: messages,
+          tools: tools,
+          toolChoice: toolChoice,
+          maxTokens: maxTokens,
+          requiresVision: requiresVision,
+          stream: streaming,
+        );
+        late final ChatCompletion completion;
+        try {
+          completion = await complete(useStream);
+        } on LlmStreamResponseError {
+          _checkActive();
+          if (!useStream || !retryWithoutStreaming) rethrow;
+          AppLogger.w('流式响应未完成，改用普通响应重试', tag: 'LLM');
+          started();
+          _checkActive();
+          completion = await complete(false);
+          _checkActive();
+          _nonStreamingModels.add(selection);
+        }
+        _checkActive();
+        _checkCompletionLimit(completion);
+        return completion;
+      },
+      // 工具探测并非最终回答，只有后续流完整成功才持久化。
+      reportSuccess: false,
+      requiresVision: requiresVision,
+      onAttempt: (_) => started(),
+      validate: validate,
+    );
+  }
 
   static void _checkCompletionLimit(ChatCompletion completion) {
     if (completion.toolCalls.isNotEmpty) return;
@@ -975,9 +1008,6 @@ final class LlmClient {
     required bool requiresVision,
     required bool stream,
   }) async {
-    if (stream && tools.isNotEmpty) {
-      throw ArgumentError('流式文本生成不能同时配置工具调用');
-    }
     final base = normalizeBaseUrl(config.baseUrl);
     final body = jsonEncode(<String, Object?>{
       'model': config.model,
@@ -1037,17 +1067,20 @@ final class LlmClient {
       try {
         decoded = jsonDecode(payload);
       } on FormatException {
-        throw const LlmResponseFormatError('模型流式响应不是有效 JSON');
+        throw const LlmStreamResponseError('模型流式响应不是有效 JSON');
       }
-      if (decoded is! Map<String, dynamic> || decoded['error'] != null) {
-        throw const LlmResponseFormatError('模型流式响应结构无效');
+      if (decoded is! Map<String, dynamic>) {
+        throw const LlmStreamResponseError('模型流式响应结构无效');
+      }
+      if (decoded['error'] != null) {
+        throw const LlmStreamResponseError('模型服务返回错误，请稍后重试或请家长检查配置');
       }
       final choices = decoded['choices'];
       // include_usage 的末尾统计帧没有文本。
       if (choices is List && choices.isEmpty) return false;
       final delta = _extractStreamDelta(decoded);
       if (delta == null) {
-        throw const LlmResponseFormatError('模型流式响应缺少 delta');
+        throw const LlmStreamResponseError('模型流式响应缺少 delta');
       }
       final text = delta.content;
       if (text != null && text.isNotEmpty) {
@@ -1092,8 +1125,9 @@ final class LlmClient {
     } on TimeoutException {
       _checkActive();
       throw const LlmNetworkError('AI 助手响应超时，请稍后重试');
-    } on SocketException {
+    } on SocketException catch (error) {
       _checkActive();
+      if (isHostLookupFailure(error)) throw const LlmHostLookupError();
       throw const LlmNetworkError('网络不可用，请检查网络后重试');
     } on http.ClientException {
       _checkActive();
@@ -1104,7 +1138,7 @@ final class LlmClient {
     // 兼容末帧后直接 EOF 的服务；缺少任何结束信号的流不能返回部分题目。
     if (eventData.isNotEmpty) consumeEvent();
     if (!finished) {
-      throw const LlmResponseFormatError('模型流式响应未完成，请重试');
+      throw const LlmStreamResponseError('模型流式响应未完成，请重试');
     }
     if (content.toString().trim().isEmpty) {
       throw const LlmResponseFormatError('模型输出内容为空');
@@ -1224,7 +1258,8 @@ final class LlmClient {
       );
     } on TimeoutException {
       throw LlmNetworkError(timeoutMessage);
-    } on SocketException {
+    } on SocketException catch (error) {
+      if (isHostLookupFailure(error)) throw const LlmHostLookupError();
       throw const LlmNetworkError('网络不可用，请检查网络后重试');
     } on http.ClientException {
       throw const LlmNetworkError('网络请求失败');
@@ -1273,7 +1308,8 @@ final class LlmClient {
       response = await _httpClient.sendBounded(request, deadline: timeout);
     } on TimeoutException {
       throw LlmNetworkError(timeoutMessage);
-    } on SocketException {
+    } on SocketException catch (error) {
+      if (isHostLookupFailure(error)) throw const LlmHostLookupError();
       throw const LlmNetworkError('网络不可用，请检查网络后重试');
     } on http.ClientException {
       throw const LlmNetworkError('网络请求失败');
@@ -1421,6 +1457,10 @@ final class LlmClient {
     }
     if ((content == null || content.trim().isEmpty) && toolCalls.isEmpty) {
       throw const LlmResponseFormatError('模型输出内容为空');
+    }
+    final finishReason = choice['finish_reason'];
+    if (toolCalls.isEmpty && finishReason != null && finishReason != 'stop') {
+      throw const LlmResponseFormatError('模型输出未完整结束，请重试');
     }
     return ChatCompletion(content: content, toolCalls: toolCalls);
   }

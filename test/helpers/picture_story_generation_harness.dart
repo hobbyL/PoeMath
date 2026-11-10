@@ -66,6 +66,7 @@ class PictureStoryGenerationHarness {
       pictureStoryRepository: repository,
     ),
     llmFactory: (active) => createRuntimeLlmClient(
+      chatTimeout: PictureStoryGenerationService.requestTimeout,
       httpClient: chat,
       settings: settings,
       isActive: active,
@@ -83,6 +84,7 @@ class PictureStoryGenerationHarness {
   bool invalidPlan = false;
   bool fallbackTwice = false;
   bool imageFallback = false;
+  bool captionDnsFailure = false;
   final imageModels = <String>[];
 
   GenerationGate hold(String step) => settings.gates[step] = GenerationGate();
@@ -143,6 +145,11 @@ class PictureStoryGenerationHarness {
     captionCalls++;
     order.add('caption:$captionCalls');
     await settings.gates['caption:$captionCalls']?.wait();
+    if (captionDnsFailure) {
+      throw const SocketException(
+        "Failed host lookup: 'unreachable.example.com'",
+      );
+    }
     if (fallbackTwice && model != 'gpt-4.1') return http.Response('', 503);
     return completion({
       'title': '观察花朵 $captionCalls',
