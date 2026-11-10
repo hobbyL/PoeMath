@@ -666,7 +666,7 @@ class _DifferenceSummary extends StatelessWidget {
     );
     final changed = difference.categories.where((c) => !c.isSame).toList();
     return ColoredCard(
-      color: theme.colorScheme.tertiary,
+      color: theme.colorScheme.primary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
