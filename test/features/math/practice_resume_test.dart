@@ -578,9 +578,17 @@ void main() {
         await tester.tap(find.byIcon(Icons.check_rounded));
         await Future<void>.delayed(const Duration(milliseconds: 300));
       });
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 2));
+      // The answer label precedes the persisted checkpoint. Drive real IO and
+      // frames until the actual record exists before reading or closing Hive.
+      for (var i = 0; i < 100 && HiveBoxes.mathSessions.isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await drainHiveWritesForTesting(tester);
       expect(find.text('回答正确！'), findsOneWidget);
+      expect(HiveBoxes.mathSessions.values, hasLength(1));
       final record = HiveBoxes.mathSessions.values.single.problemRecords.single;
       expect(record.userAnswer, '2565');
       expect(record.isCorrect, isTrue);
