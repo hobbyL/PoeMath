@@ -655,8 +655,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                   title: '固定时间',
                   description: '$_initialSeconds 秒倒计时，比拼速度与准确率',
                   mode: 'fixed',
-                  color: theme.colorScheme.secondary,
-                  foreground: theme.semantic.secondaryForeground,
+                  color: theme.colorScheme.primary,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 _buildModeCard(
@@ -671,7 +670,7 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
 
                 // 规则说明
                 ColoredCard(
-                  color: theme.colorScheme.tertiary,
+                  color: theme.colorScheme.primary,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -680,14 +679,14 @@ class _MathChallengePageState extends ConsumerState<MathChallengePage>
                           Icon(
                             Icons.info_outline,
                             size: 16,
-                            color: theme.colorScheme.tertiary,
+                            color: theme.colorScheme.primary,
                           ),
                           const SizedBox(width: SpacingTokens.xs),
                           Text(
                             '规则说明',
                             style: theme.textTheme.labelMedium?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.tertiary,
+                              color: theme.colorScheme.primary,
                             ),
                           ),
                         ],

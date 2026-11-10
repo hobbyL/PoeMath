@@ -281,7 +281,7 @@ class _RecordCard extends StatelessWidget {
                   vertical: SpacingTokens.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(
                     SpacingTokens.radiusSmall,
                   ),

@@ -108,13 +108,13 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
     // 在途朗读的晚到回调天然失配。
     unawaited(
       _tts.stop().onError(
-            (error, stackTrace) => AppLogger.e(
-              '关闭 AI 解析弹层时停止朗读失败',
-              tag: 'MathAiExplain',
-              error: error,
-              stackTrace: stackTrace,
-            ),
-          ),
+        (error, stackTrace) => AppLogger.e(
+          '关闭 AI 解析弹层时停止朗读失败',
+          tag: 'MathAiExplain',
+          error: error,
+          stackTrace: stackTrace,
+        ),
+      ),
     );
     super.dispose();
   }
@@ -139,23 +139,19 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
     final actionTag = switch (state.status) {
       MathExplainStatus.idle ||
       MathExplainStatus.loading ||
-      MathExplainStatus.streaming =>
-        const AiActionTag(label: '生成中…', busy: true),
-      MathExplainStatus.ready => AiActionTag(
-          label: '重新生成',
-          onTap: _generate,
-        ),
-      MathExplainStatus.error => AiActionTag(
-          label: '重新生成',
-          onTap: _generate,
-        ),
+      MathExplainStatus.streaming => const AiActionTag(
+        label: '生成中…',
+        busy: true,
+      ),
+      MathExplainStatus.ready => AiActionTag(label: '重新生成', onTap: _generate),
+      MathExplainStatus.error => AiActionTag(label: '重新生成', onTap: _generate),
       MathExplainStatus.unconfigured => AiActionTag(
-          label: '去设置',
-          onTap: () {
-            Navigator.of(context).pop();
-            context.push(AppRoutes.llmSettings);
-          },
-        ),
+        label: '去设置',
+        onTap: () {
+          Navigator.of(context).pop();
+          context.push(AppRoutes.llmSettings);
+        },
+      ),
     };
 
     return SafeArea(
@@ -181,14 +177,14 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
                       Icon(
                         Icons.auto_awesome_outlined,
                         size: 18,
-                        color: theme.colorScheme.tertiary,
+                        color: theme.colorScheme.primary,
                       ),
                       if (playing) ...[
                         const SizedBox(width: SpacingTokens.xs),
                         Icon(
                           Icons.graphic_eq,
                           size: 16,
-                          color: theme.colorScheme.tertiary,
+                          color: theme.colorScheme.primary,
                         ),
                       ],
                     ],
@@ -208,7 +204,7 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
               Flexible(
                 child: SingleChildScrollView(
                   child: ColoredCard(
-                    color: theme.colorScheme.tertiary,
+                    color: theme.colorScheme.primary,
                     backgroundOpacity: 0.06,
                     width: double.infinity,
                     child: Column(
@@ -225,19 +221,14 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
     );
   }
 
-  List<Widget> _buildBody(
-    ThemeData theme,
-    MathExplainState state,
-  ) {
+  List<Widget> _buildBody(ThemeData theme, MathExplainState state) {
     final hintStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
     switch (state.status) {
       case MathExplainStatus.idle:
       case MathExplainStatus.loading:
-        return [
-          Text('AI 正在准备解析，请稍候…', style: hintStyle),
-        ];
+        return [Text('AI 正在准备解析，请稍候…', style: hintStyle)];
       case MathExplainStatus.streaming:
         // 流式接收中：实时渲染已到达段落，不含朗读入口（半截文本不朗读）。
         return [
@@ -288,10 +279,7 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
         ];
       case MathExplainStatus.unconfigured:
         return [
-          Text(
-            state.message ?? '还没有配置 AI 服务，配置后即可使用 AI 解析。',
-            style: hintStyle,
-          ),
+          Text(state.message ?? '还没有配置 AI 服务，配置后即可使用 AI 解析。', style: hintStyle),
         ];
     }
   }
@@ -326,9 +314,7 @@ class _MathAiExplainSheetState extends ConsumerState<MathAiExplainSheet> {
       );
       if (mounted) {
         scaffold.clearSnackBars();
-        scaffold.showSnackBar(
-          const SnackBar(content: Text('停止朗读失败，请稍后重试')),
-        );
+        scaffold.showSnackBar(const SnackBar(content: Text('停止朗读失败，请稍后重试')));
       }
       return false;
     }
