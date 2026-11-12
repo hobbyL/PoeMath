@@ -62,7 +62,7 @@ void main() {
     // 标题承诺的「均可切换」完全没被验证。现在逐个断言高亮下标。
     expect(_selectedTab(tester), 0, reason: '启动应停在首页 tab');
 
-    const expectedIndex = <String, int>{'语文': 1, '口算': 2, '我的': 3, '首页': 0};
+    const expectedIndex = <String, int>{'语文': 1, '数学': 2, '我的': 3, '首页': 0};
     const pages = [HomePage, ChineseTabPage, MathTabPage, ProfilePage];
     for (final entry in expectedIndex.entries) {
       if (entry.key == '语文') {
@@ -88,7 +88,7 @@ void main() {
         entry.value,
         reason: '点击「${entry.key}」后应切到下标 ${entry.value}',
       );
-      for (final label in ['首页', '语文', '口算', '我的']) {
+      for (final label in ['首页', '语文', '数学', '我的']) {
         final labelContext = tester.element(_bottomBarItem(label));
         final style = DefaultTextStyle.of(labelContext).style
             .merge(tester.widget<Text>(_bottomBarItem(label)).style);
@@ -134,7 +134,7 @@ void main() {
     await drainHiveWritesForTesting(tester);
   });
 
-  testWidgets('首页先显示打卡目标，滚动后显示快捷入口', (tester) async {
+  testWidgets('首页显示目标入口，滚动后显示快捷入口', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: App()));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 200));
@@ -142,8 +142,8 @@ void main() {
     // 消耗 MainShell IndexedStack 中所有 tab 的 flutter_animate 入场动画
     await tester.pump(const Duration(seconds: 3));
 
-    expect(find.text('打卡目标 · 诗词与口算'), findsOneWidget);
-    expect(find.text('打卡'), findsOneWidget);
+    expect(find.text('今日学习目标 · 完成后可打卡'), findsOneWidget);
+    expect(find.text('去学诗词'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('背诗词'),

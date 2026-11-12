@@ -9,6 +9,7 @@ import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
+import 'package:poemath/core/widgets/stat_overview_card.dart';
 import 'package:poemath/features/home/home_page.dart';
 
 import '../helpers/day_key_override.dart';
@@ -42,7 +43,7 @@ Future<void> _expectRenderedHeaderContrast(WidgetTester tester) async {
     darkest = math.min(darkest, luminance);
     lightest = math.max(lightest, luminance);
   }
-  for (final label in ['今日待打卡', '天连续', '已学诗词', '口算做题', '总星星']) {
+  for (final label in ['今日待打卡', '天连续']) {
     final text = tester.widget<Text>(find.text(label));
     final foreground = text.style!.color!.computeLuminance();
     // 前景必须完全高于或低于所有背景亮度，再检查最接近的像素。
@@ -115,7 +116,7 @@ void main() {
         }
       });
 
-      testWidgets('$subject/$brightness 首页渐变上的实际文字可读', (tester) async {
+      testWidgets('$subject/$brightness 首页渐变与累计统计卡文字可读', (tester) async {
         tester.view.physicalSize = const Size(411, 914);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
@@ -141,7 +142,7 @@ void main() {
             color,
             theme.scaffoldBackgroundColor,
           );
-          for (final label in ['今日待打卡', '天连续', '已学诗词', '口算做题', '总星星']) {
+          for (final label in ['今日待打卡', '天连续']) {
             final text = tester.widget<Text>(find.text(label));
             expect(
               contrastRatio(text.style!.color!, background),
@@ -150,9 +151,39 @@ void main() {
             );
           }
         }
-        final button = tester.widget<FilledButton>(
-          find.widgetWithText(FilledButton, '打卡'),
+        final overview = find.byType(StatOverviewCard);
+        final overviewContainer = tester.widget<Container>(
+          find.descendant(of: overview, matching: find.byType(Container)).first,
         );
+        final overviewGradient =
+            (overviewContainer.decoration! as BoxDecoration).gradient!
+                as LinearGradient;
+        for (final label in ['已学诗词', '数学做题', '总星星']) {
+          final labelFinder = find.text(label);
+          final statColumn = find
+              .ancestor(of: labelFinder, matching: find.byType(Column))
+              .first;
+          final texts = tester
+              .widgetList<Text>(
+                find.descendant(of: statColumn, matching: find.byType(Text)),
+              )
+              .toList();
+          expect(texts, hasLength(2));
+          for (final tint in overviewGradient.colors) {
+            final background = Color.alphaBlend(
+              tint,
+              theme.scaffoldBackgroundColor,
+            );
+            for (final text in texts) {
+              expect(
+                contrastRatio(text.style!.color!, background),
+                greaterThanOrEqualTo(4.5),
+                reason: label,
+              );
+            }
+          }
+        }
+        final button = tester.widget<FilledButton>(find.byType(FilledButton));
         expect(
           contrastRatio(
             button.style!.foregroundColor!.resolve({})!,

@@ -33,11 +33,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   static const _pages = <_OnboardingData>[
     _OnboardingData(
       icon: Icons.auto_stories_rounded,
-      title: '读诗',
-      subtitle: '小学必背古诗文',
+      title: '学语文',
+      subtitle: '课本、表达与诗词',
       description:
-          '精选教材古诗词，配合朗读、背诵、测验三步学习法，'
-          '搭配科学复习算法，让背诵更高效。',
+          '诗词可以直接开始学习。课本和看图说话由家长添加内容，'
+          '核对后即可阅读、认字、写字和练习表达。',
     ),
     _OnboardingData(
       icon: Icons.calculate_rounded,
@@ -52,8 +52,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       title: '成长',
       subtitle: '记录每一步进步',
       description:
-          '打卡激励、星星等级、成就勋章，'
-          '让学习像闯关一样有趣，每一次努力都被看见。',
+          '完成诗词和数学每日目标后可以打卡。'
+          '学习报告记录练习过程与进步，按自己的节奏坚持学习。',
     ),
   ];
 

@@ -30,4 +30,45 @@ void main() {
       expect(find.text(label), findsOneWidget);
     }
   });
+
+  testWidgets('窄屏双倍字号保留长数值和标签且不横向溢出', (tester) async {
+    const size = Size(320, 640);
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: size,
+            textScaler: TextScaler.linear(2),
+          ),
+          child: Scaffold(
+            body: Padding(
+              padding: EdgeInsets.all(16),
+              child: StatOverviewCard(
+                items: [
+                  StatOverviewItem(value: '12345', label: '已学诗词'),
+                  StatOverviewItem(value: '23456', label: '数学做题'),
+                  StatOverviewItem(value: '7890', label: '总星星'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    for (final text in ['12345', '23456', '7890', '已学诗词', '数学做题', '总星星']) {
+      expect(find.text(text), findsOneWidget);
+    }
+    expect(
+      tester.getRect(find.byType(StatOverviewCard)).right,
+      lessThanOrEqualTo(size.width - 16),
+    );
+  });
 }

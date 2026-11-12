@@ -37,8 +37,8 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
       style: TextButton.styleFrom(
         padding: EdgeInsets.zero,
         minimumSize: const Size(
-          SpacingTokens.minTapTarget,
-          SpacingTokens.minTapTarget,
+          kMinInteractiveDimension,
+          kMinInteractiveDimension,
         ),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         textStyle: theme.textTheme.bodySmall?.copyWith(height: 1.2),

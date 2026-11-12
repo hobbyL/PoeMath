@@ -74,12 +74,12 @@ void main() {
     // 记录初始主题
     final initialSubject = container.read(activeSubjectProvider);
 
-    // 点击"口算" — 切换到口算页，但主题不变
-    await tester.tap(find.text('口算'));
+    // 点击"数学" — 切换到数学页，但主题不变
+    await tester.tap(find.text('数学'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
-    expect(_selectedTab(tester), 2, reason: '应切到口算 tab');
+    expect(_selectedTab(tester), 2, reason: '应切到数学 tab');
     expect(container.read(activeSubjectProvider), initialSubject);
 
     // 点击“语文”切换到课本与诗词入口，主题仍不变。

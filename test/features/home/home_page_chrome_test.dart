@@ -129,7 +129,7 @@ void main() {
     expect(card.borderRadius, BorderRadius.zero);
     expect(card.boxShadow, isNull);
     expect(
-      tester.getCenter(find.widgetWithText(FilledButton, '打卡')).dy,
+      tester.getCenter(find.byType(FilledButton)).dy,
       closeTo(
         tester
             .getCenter(find.byKey(const ValueKey('home-check-in-summary')))
@@ -139,7 +139,7 @@ void main() {
     );
   });
 
-  testWidgets('三项累计统计位于顶部，不再显示独立统计卡片', (tester) async {
+  testWidgets('三项累计统计位于今日目标之后，独立于顶部打卡区', (tester) async {
     await _pump(
       tester,
       learnedPoems: 12,
@@ -152,7 +152,7 @@ void main() {
     );
     for (final (label, value) in [
       ('已学诗词', '12'),
-      ('口算做题', '456'),
+      ('数学做题', '456'),
       ('总星星', '789'),
     ]) {
       expect(find.text(label), findsOneWidget);
@@ -160,19 +160,22 @@ void main() {
       expect(
         find.ancestor(
           of: find.text(label),
-          matching: find.byType(HomeCheckInHeader),
+          matching: find.byType(StatOverviewCard),
         ),
         findsOneWidget,
       );
       expect(
-        find.ancestor(of: find.text(label), matching: find.byType(ColoredCard)),
+        find.ancestor(
+          of: find.text(label),
+          matching: find.byType(HomeCheckInHeader),
+        ),
         findsNothing,
       );
       expect(
         tester
             .getRect(_background)
             .contains(tester.getCenter(find.text(label))),
-        isTrue,
+        isFalse,
       );
     }
   });
@@ -206,7 +209,7 @@ void main() {
       await _pump(tester, pageAnimations: pageAnimations);
       final before = tester.getRect(_background);
       final statusSize = tester.getSize(find.text('今日待打卡'));
-      final button = find.widgetWithText(FilledButton, '打卡');
+      final button = find.byType(FilledButton);
       final buttonSize = tester.getSize(button);
       final summary = find.byKey(const ValueKey('home-check-in-summary'));
       final summaryRect = tester.getRect(summary);
@@ -278,7 +281,7 @@ void main() {
     final before = tester.getRect(_background);
     final summary = find.byKey(const ValueKey('home-check-in-summary'));
     final summaryBefore = tester.getTopLeft(summary);
-    final goalBefore = tester.getTopLeft(find.text('打卡目标 · 诗词与口算'));
+    final goalBefore = tester.getTopLeft(find.text('今日学习目标 · 完成后可打卡'));
     final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
     scroll.position.jumpTo(120);
     await tester.pump();
@@ -287,7 +290,7 @@ void main() {
     expect(before.top - after.top, lessThan(120));
     expect(summaryBefore.dy - tester.getTopLeft(summary).dy, closeTo(120, .01));
     expect(
-      goalBefore.dy - tester.getTopLeft(find.text('打卡目标 · 诗词与口算')).dy,
+      goalBefore.dy - tester.getTopLeft(find.text('今日学习目标 · 完成后可打卡')).dy,
       closeTo(120, .01),
     );
     // 内容已抵达状态栏，视差背景仍在其后方：前方的浅底必须接管图标颜色。
@@ -360,9 +363,10 @@ void main() {
             totalStars: 7890,
           ),
         );
+        expect(tester.takeException(), isNull, reason: '首页初始布局不应溢出');
         final status = tester.getRect(find.text('今日待打卡'));
         final streak = tester.getRect(find.text('3650'));
-        final button = find.widgetWithText(FilledButton, '打卡');
+        final button = find.byType(FilledButton);
         final rect = tester.getRect(button);
         for (final area in [status, streak, rect]) {
           expect(area.left, greaterThanOrEqualTo(safe.left));
@@ -372,15 +376,28 @@ void main() {
         expect(rect.width, greaterThanOrEqualTo(44));
         expect(rect.height, greaterThanOrEqualTo(44));
         expect(button.hitTestable(), findsOneWidget);
-        expect(
-          rect.center.dy,
-          closeTo(
-            tester
-                .getCenter(find.byKey(const ValueKey('home-check-in-summary')))
-                .dy,
-            .01,
-          ),
-        );
+        if (scale == 1) {
+          expect(
+            rect.center.dy,
+            closeTo(
+              tester
+                  .getCenter(
+                    find.byKey(const ValueKey('home-check-in-summary')),
+                  )
+                  .dy,
+              .01,
+            ),
+          );
+        } else {
+          expect(
+            rect.top,
+            greaterThanOrEqualTo(
+              tester
+                  .getRect(find.byKey(const ValueKey('home-check-in-summary')))
+                  .bottom,
+            ),
+          );
+        }
         expect(tester.getRect(_background).width, size.width);
         await tester.ensureVisible(find.text('快捷入口'));
         await tester.pump(const Duration(milliseconds: 400));

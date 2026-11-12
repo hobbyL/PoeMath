@@ -107,7 +107,7 @@ void defineAppJourneyTests({
     });
 
     await _startApp(tester, directoryProvider: directoryProvider);
-    await _tapTab(tester, '口算');
+    await _tapTab(tester, '数学');
     await _pumpUntil(tester, find.text('口算练习'));
     await _tap(tester, find.text('口算练习').first);
     await _pumpUntil(tester, find.byType(NumberKeypad));
@@ -360,7 +360,7 @@ Future<void> _startApp(
     ),
   );
   await _pumpUntil(tester, find.byType(MainShell));
-  await _pumpUntil(tester, find.text('打卡目标 · 诗词与口算'));
+  await _pumpUntil(tester, find.text('今日学习目标 · 完成后可打卡'));
 }
 
 Future<void> _showHomeAction(WidgetTester tester, String label) async {

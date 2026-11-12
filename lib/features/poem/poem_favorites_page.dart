@@ -51,14 +51,10 @@ class PoemFavoritesPage extends ConsumerWidget {
                     horizontal: SpacingTokens.md,
                     vertical: SpacingTokens.sm,
                   ),
-                  sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      mainAxisSpacing: SpacingTokens.sm,
-                      crossAxisSpacing: SpacingTokens.sm,
-                      mainAxisExtent: 120,
-                    ),
-                    delegate: SliverChildBuilderDelegate((context, index) {
+                  sliver: SliverCardGrid(
+                    columnCount: columns,
+                    itemCount: favorites.length,
+                    itemBuilder: (context, index) {
                       final fav = favorites[index];
                       final poem = poemRepo.getById(fav.poemId);
                       if (poem == null) return const SizedBox.shrink();
@@ -69,18 +65,17 @@ class PoemFavoritesPage extends ConsumerWidget {
                       final isFav = true; // 在收藏列表里一定是收藏的
 
                       return PoemCard(
-                            poem: poem,
-                            isFavorite: isFav,
-                            learningStatus: status,
-                            onTap: () =>
-                                context.push(AppRoutes.poemDetailOf(poem.id)),
-                          )
-                          .animateListItem(
-                            context,
-                            index: index,
-                            begin: const Offset(0, 0.05),
-                          );
-                    }, childCount: favorites.length),
+                        poem: poem,
+                        isFavorite: isFav,
+                        learningStatus: status,
+                        onTap: () =>
+                            context.push(AppRoutes.poemDetailOf(poem.id)),
+                      ).animateListItem(
+                        context,
+                        index: index,
+                        begin: const Offset(0, 0.05),
+                      );
+                    },
                   ),
                 ),
             ],

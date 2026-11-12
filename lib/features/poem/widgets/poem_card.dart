@@ -1,9 +1,3 @@
-// lib/features/poem/widgets/poem_card.dart
-//
-// 诗词列表卡片：无边框、纯色背景、圆角，与首页卡片风格一致。
-
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import 'package:poemath/core/theme/design_tokens.dart';
@@ -11,6 +5,7 @@ import 'package:poemath/core/widgets/colored_card.dart';
 import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/poem_progress.dart';
 
+/// 自然高度的诗词预览，标题、作者和学习状态均可随系统字号换行。
 class PoemCard extends StatelessWidget {
   const PoemCard({
     super.key,
@@ -28,38 +23,18 @@ class PoemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final secondary = theme.colorScheme.secondary;
-
-    // 层级标签颜色
     final layerColor = switch (poem.layer) {
-      'core' => secondary,
-      'extended' => primary,
+      'core' => theme.colorScheme.secondary,
+      'extended' => theme.colorScheme.primary,
       _ => theme.colorScheme.tertiary,
     };
-
-    // 收集标签
-    final tags = <Widget>[
-      _buildTag(
-        poem.layerLabel,
-        layerColor,
-        foreground: poem.layer == 'core'
-            ? theme.semantic.secondaryForeground
-            : layerColor,
-      ),
-      ...poem.tags.take(3).map((tag) => _buildTag(tag, primary)),
-    ];
-
-    // 判断是否显示已背诵丝带
-    final showRibbon =
-        learningStatus != null && learningStatus != LearningStatus.notStarted;
-    final ribbonLabel = switch (learningStatus) {
+    final status = switch (learningStatus) {
       LearningStatus.mastered => '已掌握',
       LearningStatus.reviewing => '复习中',
       LearningStatus.learning => '学习中',
-      _ => '',
+      _ => null,
     };
-    final (ribbonColor, ribbonForeground) = switch (learningStatus) {
+    final (statusColor, statusForeground) = switch (learningStatus) {
       LearningStatus.mastered => (
         theme.colorScheme.primary,
         theme.colorScheme.onPrimary,
@@ -68,193 +43,114 @@ class PoemCard extends StatelessWidget {
         theme.colorScheme.secondary,
         theme.colorScheme.onSecondary,
       ),
-      _ => (theme.colorScheme.tertiary, theme.colorScheme.onTertiary),
+      LearningStatus.learning => (
+        theme.colorScheme.tertiary,
+        theme.colorScheme.onTertiary,
+      ),
+      _ => (theme.colorScheme.primary, theme.colorScheme.onPrimary),
     };
-
-    return InkWell(
+    return ColoredCard(
+      width: double.infinity,
+      color: theme.colorScheme.primary,
+      backgroundOpacity: 0.06,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-        child: Stack(
-          children: [
-            ColoredCard(
-              width: double.infinity,
-              color: primary,
-              backgroundOpacity: 0.06,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // 第一行：标题 + 朝代·作者（baseline 对齐）
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.ideographic,
-                    children: [
-                      Flexible(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              if (isFavorite)
-                                WidgetSpan(
-                                  alignment: PlaceholderAlignment.middle,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(
-                                      right: SpacingTokens.xs,
-                                    ),
-                                    child: Icon(
-                                      Icons.favorite,
-                                      color: theme.semantic.secondaryForeground,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              TextSpan(
-                                text: poem.title,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text.rich(
+            TextSpan(
+              children: [
+                if (isFavorite)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: SpacingTokens.xs),
+                      child: Icon(
+                        Icons.favorite,
+                        semanticLabel: '已收藏',
+                        color: theme.semantic.secondaryForeground,
+                        size: theme.textTheme.titleMedium?.fontSize,
                       ),
-                      const SizedBox(width: SpacingTokens.sm),
-                      Text(
-                        '${poem.dynasty} · ${poem.author}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // 第二行：标签
-                  if (tags.isNotEmpty) ...[
-                    const SizedBox(height: SpacingTokens.xs),
-                    Wrap(
-                      spacing: SpacingTokens.xs,
-                      runSpacing: SpacingTokens.xs,
-                      alignment: WrapAlignment.center,
-                      children: tags,
                     ),
-                  ],
-
-                  // 第三行：诗词内容
-                  const SizedBox(height: SpacingTokens.sm),
-                  Text(
-                    _firstLine(poem.content),
-                    style: theme.textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
+                TextSpan(text: poem.title),
+              ],
             ),
-
-            // 右上角斜向丝带
-            if (showRibbon)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: _RibbonBadge(
-                  label: ribbonLabel,
-                  color: ribbonColor,
-                  foreground: ribbonForeground,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 小标签：与「必背」同款样式。
-  Widget _buildTag(String text, Color color, {Color? foreground}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: SpacingTokens.xs,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11,
-          color: foreground ?? color,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  String _firstLine(String content) {
-    final lines = content.split('\n');
-    if (lines.length >= 2) return '${lines[0]}\n${lines[1]}';
-    return lines.first;
-  }
-}
-
-/// 右上角斜向丝带标签。
-class _RibbonBadge extends StatelessWidget {
-  const _RibbonBadge({
-    required this.label,
-    required this.color,
-    required this.foreground,
-  });
-
-  final String label;
-  final Color color;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _RibbonPainter(color: color),
-      child: SizedBox(
-        width: 64,
-        height: 64,
-        child: Transform.rotate(
-          angle: math.pi / 4, // 45°
-          child: Align(
-            alignment: const Alignment(0.1, -0.82),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: foreground,
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-              ),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ),
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            '${poem.dynasty} · ${poem.author}',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          Wrap(
+            spacing: SpacingTokens.xs,
+            runSpacing: SpacingTokens.xs,
+            alignment: WrapAlignment.center,
+            children: [
+              _tag(
+                context,
+                poem.layerLabel,
+                color: layerColor,
+                foreground: poem.layer == 'core'
+                    ? theme.semantic.secondaryForeground
+                    : layerColor,
+              ),
+              for (final tag in poem.tags.take(3))
+                _tag(context, tag, color: theme.colorScheme.primary),
+              if (status != null)
+                _tag(
+                  context,
+                  status,
+                  color: statusColor,
+                  foreground: statusForeground,
+                  filled: true,
+                ),
+            ],
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          Text(
+            poem.content.split('\n').take(2).join('\n'),
+            style: theme.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
-}
 
-/// 绘制右上角三角丝带背景。
-class _RibbonPainter extends CustomPainter {
-  _RibbonPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = Path()
-      ..moveTo(size.width * 0.2, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width, size.height * 0.8)
-      ..close();
-    canvas.drawPath(path, paint);
+  Widget _tag(
+    BuildContext context,
+    String label, {
+    required Color color,
+    Color? foreground,
+    bool filled = false,
+  }) {
+    final theme = Theme.of(context);
+    return Chip(
+      label: Text(
+        label,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: foreground ?? (filled ? theme.colorScheme.onPrimary : color),
+        ),
+      ),
+      padding: EdgeInsets.zero,
+      labelPadding: const EdgeInsets.symmetric(horizontal: SpacingTokens.xs),
+      visualDensity: VisualDensity.compact,
+      side: BorderSide.none,
+      backgroundColor: filled ? color : color.withValues(alpha: 0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(_RibbonPainter oldDelegate) => color != oldDelegate.color;
 }

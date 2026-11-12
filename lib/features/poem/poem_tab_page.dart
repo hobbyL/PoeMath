@@ -202,27 +202,22 @@ class _PoemTabPageState extends ConsumerState<PoemTabPage> {
                     horizontal: SpacingTokens.md,
                     vertical: SpacingTokens.sm,
                   ).copyWith(bottom: 100),
-                  sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      crossAxisSpacing: SpacingTokens.sm,
-                      mainAxisSpacing: SpacingTokens.sm,
-                      mainAxisExtent: 140,
-                    ),
-                    delegate: SliverChildBuilderDelegate((context, index) {
+                  sliver: SliverCardGrid(
+                    columnCount: columns,
+                    itemCount: poems.length,
+                    itemBuilder: (context, index) {
                       final poem = poems[index];
                       final isFav = ref.watch(isFavoriteProvider(poem.id));
                       final progress = ref.watch(poemProgressProvider(poem.id));
                       return PoemCard(
-                            poem: poem,
-                            isFavorite: isFav,
-                            learningStatus: progress?.status,
-                            onTap: () {
-                              context.push(AppRoutes.poemDetailOf(poem.id));
-                            },
-                          )
-                          .animateListItem(context, index: index);
-                    }, childCount: poems.length),
+                        poem: poem,
+                        isFavorite: isFav,
+                        learningStatus: progress?.status,
+                        onTap: () {
+                          context.push(AppRoutes.poemDetailOf(poem.id));
+                        },
+                      ).animateListItem(context, index: index);
+                    },
                   ),
                 ),
             ],

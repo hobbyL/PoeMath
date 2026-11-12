@@ -24,7 +24,7 @@ class StatOverviewItem {
   final String label;
 }
 
-/// 统计概览卡：渐变底 + 等距分布的多项统计，项间以竖分隔线分隔。
+/// 统计概览卡：渐变底 + 等宽统计项，项间以竖分隔线分隔。
 ///
 /// 视觉与口算练习页统计卡一致（主色→次色渐变、圆角、淡入上滑动画）。
 class StatOverviewCard extends StatelessWidget {
@@ -37,55 +37,59 @@ class StatOverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final children = <Widget>[];
-    for (var i = 0; i < items.length; i++) {
-      if (i > 0) {
-        children.add(
-          Container(
-            width: 1,
-            height: 30,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
-          ),
-        );
-      }
-      children.add(_buildStat(theme, items[i]));
-    }
-
     return Container(
-      // 不自带外边距：嵌入方（页面/列表）的 padding 已统一为 md，
-      // 自带 margin 会与页面 padding **叠加**，让本卡比同页其他卡
-      // 左右各多缩进 16（口算练习页顶部统计卡与下方练习卡的错位即此）。
-      // 需要留白的调用方自行包 Padding。
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary.withValues(alpha: 0.15),
-            theme.colorScheme.secondary.withValues(alpha: 0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: children,
-      ),
-    ).animatePage(context).fadeIn(duration: 400.ms).slideY(
-          begin: 0.1,
-          end: 0,
-          duration: 400.ms,
-        );
+          // 不自带外边距：嵌入方（页面/列表）的 padding 已统一为 md，
+          // 自带 margin 会与页面 padding **叠加**，让本卡比同页其他卡
+          // 左右各多缩进 16（口算练习页顶部统计卡与下方练习卡的错位即此）。
+          // 需要留白的调用方自行包 Padding。
+          padding: const EdgeInsets.all(SpacingTokens.md),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.colorScheme.primary.withValues(alpha: 0.15),
+                theme.colorScheme.secondary.withValues(alpha: 0.1),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
+          ),
+          child: Row(
+            children: [
+              for (var i = 0; i < items.length; i++) ...[
+                if (i > 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SpacingTokens.sm,
+                    ),
+                    child: Container(
+                      width: 1,
+                      height: 30,
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.2,
+                      ),
+                    ),
+                  ),
+                Expanded(child: _buildStat(theme, items[i])),
+              ],
+            ],
+          ),
+        )
+        .animatePage(context)
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.1, end: 0, duration: 400.ms);
   }
 
   Widget _buildStat(ThemeData theme, StatOverviewItem item) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          item.value,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            item.value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
           ),
         ),
         const SizedBox(height: SpacingTokens.xs),
@@ -94,6 +98,7 @@ class StatOverviewCard extends StatelessWidget {
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
+          textAlign: TextAlign.center,
         ),
       ],
     );

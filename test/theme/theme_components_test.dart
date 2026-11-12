@@ -56,7 +56,7 @@ void main() {
         expect(reading.copyWith().pinyin.color, reading.pinyin.color);
       });
 
-      testWidgets('$label 诗词标签、收藏与三类状态丝带保持实际对比度', (tester) async {
+      testWidgets('$label 诗词标签、收藏与三类状态标签保持实际对比度', (tester) async {
         final poem = Poem(
           id: 'theme',
           title: '静夜思',
@@ -125,10 +125,10 @@ void main() {
             ),
             greaterThanOrEqualTo(4.5),
           );
-          expect(
-            find.ancestor(of: ribbon, matching: find.byType(CustomPaint)).first,
-            paints..path(color: background),
+          final statusChip = tester.widget<Chip>(
+            find.ancestor(of: ribbon, matching: find.byType(Chip)).first,
           );
+          expect(statusChip.backgroundColor, background);
         }
         await tester.pumpWidget(
           MaterialApp(

@@ -12,6 +12,7 @@ import 'package:poemath/features/chinese/expression/widgets/picture_story_image_
 import 'package:poemath/features/chinese/expression/widgets/picture_story_image_action.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_contrast.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
+import 'package:poemath/features/chinese/expression/widgets/content_preparation_actions.dart';
 
 class PictureStoryPage extends ConsumerWidget {
   const PictureStoryPage({
@@ -57,6 +58,11 @@ class PictureStoryPage extends ConsumerWidget {
                 icon: Icons.image_outlined,
                 title: '暂时没有可练习的题目',
                 description: '请家长在设置中添加或启用看图说话题目。',
+                actions: [
+                  ContentPreparationActions(
+                    managementRoute: AppRoutes.pictureStoryManagement,
+                  ),
+                ],
               )
             : LayoutBuilder(
                 builder: (context, constraints) {

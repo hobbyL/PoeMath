@@ -71,7 +71,7 @@ class _MainShellState extends ConsumerState<MainShell>
     (
       icon: Icons.calculate_outlined,
       selectedIcon: Icons.calculate_rounded,
-      label: '口算',
+      label: '数学',
     ),
     (
       icon: Icons.person_outlined,

@@ -188,7 +188,7 @@ void main() {
           )
           .map((item) => item.data)
           .toList(),
-      ['首页', '语文', '口算', '我的'],
+      ['首页', '语文', '数学', '我的'],
     );
     await tester.tap(_bookCard(current));
     await tester.pumpAndSettle();

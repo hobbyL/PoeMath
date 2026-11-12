@@ -11,6 +11,7 @@ import 'package:poemath/features/textbook/providers/textbook_learning_providers.
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_cover_grid.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_cover.dart';
+import 'package:poemath/features/chinese/expression/widgets/content_preparation_actions.dart';
 
 /// 孩子的课本学习入口；全量书目配置继续由设置中的书籍管理负责。
 class TextbookLearningPage extends ConsumerStatefulWidget {
@@ -68,6 +69,11 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
                   icon: Icons.menu_book_outlined,
                   title: '暂无$volume课本',
                   description: '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
+                  actions: const [
+                    ContentPreparationActions(
+                      managementRoute: AppRoutes.textbookManagement,
+                    ),
+                  ],
                 ),
               )
             else

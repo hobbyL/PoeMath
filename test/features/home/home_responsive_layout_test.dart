@@ -182,11 +182,11 @@ void main() {
     container.read(readingState.notifier).state = null;
     await tester.pumpAndSettle();
     expect(find.text('继续练习'), findsNothing);
+    const goalNote = '今日练习清单提供额外复习建议，不影响打卡目标。';
     expect(
       tester.getTopLeft(find.byType(TodayPlanSection)).dy,
       closeTo(
-        goals.map(cardRect).map((rect) => rect.bottom).reduce(math.max) +
-            SpacingTokens.lg,
+        tester.getRect(find.text(goalNote)).bottom + SpacingTokens.lg,
         .01,
       ),
     );
