@@ -22,6 +22,7 @@ import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/models/user_stats.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
+import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/home/home_check_in_header.dart';
 import 'package:poemath/features/home/practice_resume_section.dart';
@@ -63,6 +64,22 @@ class _HomePageState extends ConsumerState<HomePage> {
       const SizedBox(height: SpacingTokens.lg),
       const PracticeResumeSection(),
       const TodayPlanSection(),
+
+      Text(
+        '累计进步',
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: SpacingTokens.sm),
+      StatOverviewCard(
+        items: [
+          StatOverviewItem(value: '$learnedPoems', label: '已学诗词'),
+          StatOverviewItem(value: '${stats.mathTotalProblems}', label: '数学做题'),
+          StatOverviewItem(value: '${stats.totalStars}', label: '总星星'),
+        ],
+      ),
+      const SizedBox(height: SpacingTokens.lg),
 
       Text(
         '快捷入口',
@@ -177,6 +194,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   ) {
     final theme = Theme.of(context);
     final colors = HomeCheckInColors(theme);
+    final selectedGoals = ref.watch(dailyGoalTypesProvider);
+    final pendingGoal = [
+      for (final type in DailyGoalActivity.values)
+        if (selectedGoals.contains(type)) _dailyGoalStatus(ref, type),
+    ].where((goal) => !goal.isComplete).firstOrNull;
     final action = isCheckedIn
         ? Icon(
             Icons.check_circle_rounded,
@@ -185,36 +207,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           )
         : FilledButton.tonal(
             onPressed: () async {
-              // 读取今日实际完成量
-              final todayPoems = ref.read(todayPoemCountProvider);
-              final todayMath = ref.read(todayMathCountProvider);
-
-              // 读取每日目标
-              final poemGoal = ref.read(dailyPoemGoalProvider);
-              final mathGoal = ref.read(dailyMathGoalProvider);
-
-              // 检查是否所有目标都已完成
-              final poemDone = todayPoems >= poemGoal;
-              final mathDone = todayMath >= mathGoal;
-
-              if (!poemDone || !mathDone) {
-                if (context.mounted) {
-                  final missing = <String>[];
-                  if (!poemDone) {
-                    missing.add('诗词 $todayPoems/$poemGoal 首');
-                  }
-                  if (!mathDone) {
-                    missing.add('口算 $todayMath/$mathGoal 题');
-                  }
-                  // 先清除已有提示，避免叠加
-                  ScaffoldMessenger.of(context).clearSnackBars();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('每日目标未完成：${missing.join("、")}'),
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                }
+              if (pendingGoal != null) {
+                context.go(pendingGoal.route);
                 return;
               }
 
@@ -298,7 +292,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               backgroundColor: colors.foreground,
               foregroundColor: colors.base,
             ),
-            child: const Text('打卡'),
+            child: Text(pendingGoal?.action ?? '打卡'),
           );
 
     final summary = Column(
@@ -346,20 +340,20 @@ class _HomePageState extends ConsumerState<HomePage> {
       ],
     );
     final reminder = isCheckedIn ? action : HomeCheckInReminder(child: action);
-    final overview = _buildHeaderStats(context, stats, learnedPoems, colors);
     // 顶部始终铺满页面，前景宽度扣除安全区和共享背景的左右留白。
     // 不在前景放 LayoutBuilder，避免手势帧重新布局时钳制滚动偏移。
     final media = MediaQuery.of(context);
     final contentWidth =
         media.size.width - media.padding.horizontal - SpacingTokens.lg * 2;
-    if (contentWidth >= ResponsiveLayout.mediumBreakpoint) {
+    final textScale = media.textScaler.scale(16) / 16;
+    final effectiveWidth = contentWidth / textScale;
+    if (effectiveWidth >= ResponsiveLayout.mediumBreakpoint ||
+        textScale <= 1.25) {
       return Row(
         key: const ValueKey('home-check-in-content'),
         children: [
           Expanded(child: summary),
           const SizedBox(width: SpacingTokens.lg),
-          Expanded(flex: 2, child: overview),
-          const SizedBox(width: SpacingTokens.md),
           reminder,
         ],
       );
@@ -367,65 +361,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Column(
       key: const ValueKey('home-check-in-content'),
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(child: summary),
-            const SizedBox(width: SpacingTokens.md),
-            reminder,
-          ],
-        ),
+        summary,
         const SizedBox(height: SpacingTokens.md),
-        overview,
-      ],
-    );
-  }
-
-  Widget _buildHeaderStats(
-    BuildContext context,
-    UserStats stats,
-    int learnedPoems,
-    HomeCheckInColors colors,
-  ) {
-    final theme = Theme.of(context);
-    return Row(
-      key: const ValueKey('home-check-in-stats'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final (index, (label, value)) in [
-          ('已学诗词', learnedPoems),
-          ('口算做题', stats.mathTotalProblems),
-          ('总星星', stats.totalStars),
-        ].indexed) ...[
-          if (index > 0) const SizedBox(width: SpacingTokens.sm),
-          Expanded(
-            child: Semantics(
-              label: '$label $value',
-              excludeSemantics: true,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$value',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: colors.foreground,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: SpacingTokens.xs),
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colors.foreground,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        Align(alignment: Alignment.center, child: reminder),
       ],
     );
   }
@@ -605,18 +545,17 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Widget _buildDailyGoal(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final poemGoal = ref.watch(dailyPoemGoalProvider);
-    final mathGoal = ref.watch(dailyMathGoalProvider);
-    final todayPoems = ref.watch(todayPoemCountProvider);
-    final todayMath = ref.watch(todayMathCountProvider);
-    final poemDone = todayPoems >= poemGoal;
-    final mathDone = todayMath >= mathGoal;
+    final selectedGoals = ref.watch(dailyGoalTypesProvider);
+    final goals = [
+      for (final type in DailyGoalActivity.values)
+        if (selectedGoals.contains(type)) _dailyGoalStatus(ref, type),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '打卡目标 · 诗词与口算',
+          '今日学习目标 · 完成后可打卡',
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -624,35 +563,108 @@ class _HomePageState extends ConsumerState<HomePage> {
         const SizedBox(height: SpacingTokens.sm),
         ResponsiveCardGrid(
           children: [
-            AppTile(
-              icon: poemDone
-                  ? Icons.check_circle_outline
-                  : Icons.menu_book_outlined,
-              iconColor: theme.colorScheme.primary,
-              title: '诗词 $todayPoems/$poemGoal 首',
-              subtitle: poemDone
-                  ? '目标已完成'
-                  : '还差 ${poemGoal - todayPoems} 首 · 去学诗词',
-              onTap: poemDone ? null : () => context.go(AppRoutes.poemTab),
-              trailing: poemDone ? const SizedBox.shrink() : null,
-            ),
-            AppTile(
-              icon: mathDone
-                  ? Icons.check_circle_outline
-                  : Icons.calculate_outlined,
-              iconColor: theme.colorScheme.primary,
-              title: '口算 $todayMath/$mathGoal 题',
-              subtitle: mathDone
-                  ? '目标已完成'
-                  : '还差 ${mathGoal - todayMath} 题 · 去练口算',
-              onTap: mathDone ? null : () => context.go(AppRoutes.mathTab),
-              trailing: mathDone ? const SizedBox.shrink() : null,
-            ),
+            for (final goal in goals)
+              AppTile(
+                icon: goal.isComplete ? Icons.check_circle_outline : goal.icon,
+                iconColor: theme.colorScheme.primary,
+                title: goal.title,
+                subtitle: goal.isComplete
+                    ? '目标已完成'
+                    : '还差 ${goal.goal - goal.count} ${goal.unit} · ${goal.action}',
+                onTap: goal.isComplete ? null : () => context.go(goal.route),
+                trailing: goal.isComplete ? const SizedBox.shrink() : null,
+              ),
           ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: SpacingTokens.xs),
+          child: Text(
+            '今日练习清单提供额外复习建议，不影响打卡目标。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
       ],
     );
   }
+
+  _DailyGoalStatus _dailyGoalStatus(WidgetRef ref, DailyGoalActivity type) {
+    return switch (type) {
+      DailyGoalActivity.poem => _DailyGoalStatus(
+        type: type,
+        count: ref.watch(todayPoemCountProvider),
+        goal: ref.watch(dailyPoemGoalProvider),
+        unit: '首',
+        icon: Icons.menu_book_outlined,
+        action: '去学诗词',
+        route: AppRoutes.poemTab,
+      ),
+      DailyGoalActivity.math => _DailyGoalStatus(
+        type: type,
+        count: ref.watch(todayMathCountProvider),
+        goal: ref.watch(dailyMathGoalProvider),
+        unit: '题',
+        icon: Icons.calculate_outlined,
+        action: '去练口算',
+        route: AppRoutes.mathTab,
+      ),
+      DailyGoalActivity.textbookRecognition => _DailyGoalStatus(
+        type: type,
+        count: ref
+            .watch(todayLearningActivityCountsProvider)
+            .textbookRecognition,
+        goal: 1,
+        unit: '次',
+        icon: Icons.spellcheck_rounded,
+        action: '去认一认',
+        route: AppRoutes.chineseSectionOf('textbook'),
+      ),
+      DailyGoalActivity.textbookWriting => _DailyGoalStatus(
+        type: type,
+        count: ref.watch(todayLearningActivityCountsProvider).textbookWriting,
+        goal: 1,
+        unit: '次',
+        icon: Icons.gesture_rounded,
+        action: '去写一写',
+        route: AppRoutes.chineseSectionOf('textbook'),
+      ),
+      DailyGoalActivity.pictureStoryExpression => _DailyGoalStatus(
+        type: type,
+        count: ref
+            .watch(todayLearningActivityCountsProvider)
+            .pictureStoryExpression,
+        goal: 1,
+        unit: '次',
+        icon: Icons.record_voice_over_outlined,
+        action: '去看图表达',
+        route: AppRoutes.chineseSectionOf('expression'),
+      ),
+    };
+  }
+}
+
+class _DailyGoalStatus {
+  const _DailyGoalStatus({
+    required this.type,
+    required this.count,
+    required this.goal,
+    required this.unit,
+    required this.icon,
+    required this.action,
+    required this.route,
+  });
+
+  final DailyGoalActivity type;
+  final int count;
+  final int goal;
+  final String unit;
+  final IconData icon;
+  final String action;
+  final String route;
+
+  bool get isComplete => count >= goal;
+  String get title => '${type.label} $count/$goal $unit';
 }
 
 /// 等级徽章：`⭐ 童生`。

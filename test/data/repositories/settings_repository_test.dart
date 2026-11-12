@@ -5,6 +5,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
+import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
 
@@ -26,6 +27,29 @@ void main() {
   });
 
   group('SettingsRepository', () {
+    group('dailyGoalTypes', () {
+      test('旧设置默认只要求诗词和口算，选择可保存并拒绝空集合', () async {
+        expect(repo.dailyGoalTypes, DailyGoalActivity.defaults);
+
+        await repo.setDailyGoalTypes({
+          DailyGoalActivity.textbookRecognition,
+          DailyGoalActivity.pictureStoryExpression,
+        });
+        expect(repo.dailyGoalTypes, {
+          DailyGoalActivity.textbookRecognition,
+          DailyGoalActivity.pictureStoryExpression,
+        });
+        await expectLater(repo.setDailyGoalTypes({}), throwsArgumentError);
+      });
+
+      test('损坏设置回落默认且读取不改写存储', () async {
+        await HiveBoxes.settings.put('daily_goal_types', 'poem,unknown');
+
+        expect(repo.dailyGoalTypes, DailyGoalActivity.defaults);
+        expect(HiveBoxes.settings.get('daily_goal_types'), 'poem,unknown');
+      });
+    });
+
     group('chineseSection', () {
       test('首次课本，每个档案独立，关闭重开后记住栏目', () async {
         expect(repo.chineseSection, 'textbook');
@@ -133,8 +157,10 @@ void main() {
 
       test('未知或错误类型只读回落，不改写数据', () async {
         for (final badValue in <Object>['future', '', 42, true]) {
-          await HiveBoxes.settings
-              .put(AnswerFeedbackSound.settingsKey, badValue);
+          await HiveBoxes.settings.put(
+            AnswerFeedbackSound.settingsKey,
+            badValue,
+          );
           expect(repo.answerFeedbackSound, AnswerFeedbackSound.classic);
           expect(
             HiveBoxes.settings.get(AnswerFeedbackSound.settingsKey),
@@ -194,19 +220,13 @@ void main() {
       test('setPoemExplainPrompt 保存后读取 roundtrip（trim 保留）', () async {
         await repo.setPoemExplainPrompt('  自定义诗词提示  ');
         expect(repo.poemExplainPromptOverride, '自定义诗词提示');
-        expect(
-          HiveBoxes.settings.get('llm_poem_explain_prompt'),
-          '自定义诗词提示',
-        );
+        expect(HiveBoxes.settings.get('llm_poem_explain_prompt'), '自定义诗词提示');
       });
 
       test('setMathExplainPrompt 保存后读取 roundtrip（trim 保留）', () async {
         await repo.setMathExplainPrompt('自定义口算提示');
         expect(repo.mathExplainPromptOverride, '自定义口算提示');
-        expect(
-          HiveBoxes.settings.get('llm_math_explain_prompt'),
-          '自定义口算提示',
-        );
+        expect(HiveBoxes.settings.get('llm_math_explain_prompt'), '自定义口算提示');
       });
 
       test('set 空串 / 纯空白 = 删 key（恢复默认）', () async {
@@ -236,10 +256,7 @@ void main() {
       test('setAssistantPrompt 保存后读取 roundtrip（trim 保留）', () async {
         await repo.setAssistantPrompt('  我的助手人设  ');
         expect(repo.assistantPromptOverride, '我的助手人设');
-        expect(
-          HiveBoxes.settings.get('llm_assistant_prompt'),
-          '我的助手人设',
-        );
+        expect(HiveBoxes.settings.get('llm_assistant_prompt'), '我的助手人设');
       });
 
       test('setAssistantPrompt 空串 / 纯空白 = 删 key（恢复默认）', () async {
@@ -297,10 +314,10 @@ void main() {
           MathEntryKind.arithmetic,
           MathEntryKind.challenge,
         });
-        expect(
-          repo.mathEntryKinds,
-          {MathEntryKind.arithmetic, MathEntryKind.challenge},
-        );
+        expect(repo.mathEntryKinds, {
+          MathEntryKind.arithmetic,
+          MathEntryKind.challenge,
+        });
       });
 
       test('序列化按枚举顺序输出，与集合插入顺序无关', () async {
@@ -328,8 +345,10 @@ void main() {
       });
 
       test('连续逗号（含空项）视为脏数据，回落默认', () async {
-        await HiveBoxes.settings
-            .put('math_entry_kinds', 'arithmetic,,challenge');
+        await HiveBoxes.settings.put(
+          'math_entry_kinds',
+          'arithmetic,,challenge',
+        );
         expect(repo.mathEntryKinds, kDefaultMathEntryKinds);
       });
 

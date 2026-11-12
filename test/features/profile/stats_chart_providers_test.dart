@@ -295,6 +295,49 @@ void main() {
     expect(stat.starsEarned, 0);
     expect(stat.durationSeconds, 0);
   });
+
+  test('课本和表达按能力独立统计次数与时长，不混入数学正确率', () async {
+    final now = DateTime(2026, 7, 20, 12);
+    await _putActivity(
+      id: 'recognition-1',
+      type: LearningActivityType.textbookRecognition,
+      completedAt: now,
+      total: 1,
+      successful: 1,
+      stars: 0,
+      duration: 15,
+    );
+    await _putActivity(
+      id: 'writing-1',
+      type: LearningActivityType.textbookWriting,
+      completedAt: now,
+      total: 1,
+      successful: 1,
+      stars: 0,
+      duration: 25,
+    );
+    await _putActivity(
+      id: 'expression-1',
+      type: LearningActivityType.pictureStoryExpression,
+      completedAt: now,
+      total: 1,
+      successful: 1,
+      stars: 0,
+      duration: 40,
+    );
+
+    final stat = buildDailyStats(days: 1, now: now).single;
+
+    expect(stat.textbookRecognitionCount, 1);
+    expect(stat.textbookRecognitionDurationSeconds, 15);
+    expect(stat.textbookWritingCount, 1);
+    expect(stat.textbookWritingDurationSeconds, 25);
+    expect(stat.pictureStoryExpressionCount, 1);
+    expect(stat.pictureStoryExpressionDurationSeconds, 40);
+    expect(stat.durationSeconds, 80);
+    expect(stat.mathTotal, 0);
+    expect(stat.accuracy, 0);
+  });
 }
 
 Future<void> _putActivity({

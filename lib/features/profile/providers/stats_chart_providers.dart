@@ -8,12 +8,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
 
 /// 单日聚合数据。
 class DailyStat {
   final DateTime date;
   final int poemCount;
+  final int textbookRecognitionCount;
+  final int textbookWritingCount;
+  final int pictureStoryExpressionCount;
+  final int textbookRecognitionDurationSeconds;
+  final int textbookWritingDurationSeconds;
+  final int pictureStoryExpressionDurationSeconds;
   final int mathTotal;
   final int mathCorrect;
   final int starsEarned;
@@ -23,6 +30,12 @@ class DailyStat {
   const DailyStat({
     required this.date,
     this.poemCount = 0,
+    this.textbookRecognitionCount = 0,
+    this.textbookWritingCount = 0,
+    this.pictureStoryExpressionCount = 0,
+    this.textbookRecognitionDurationSeconds = 0,
+    this.textbookWritingDurationSeconds = 0,
+    this.pictureStoryExpressionDurationSeconds = 0,
     this.mathTotal = 0,
     this.mathCorrect = 0,
     this.starsEarned = 0,
@@ -32,12 +45,69 @@ class DailyStat {
 
   double get accuracy => mathTotal > 0 ? mathCorrect / mathTotal : 0.0;
   int get durationMinutes => (durationSeconds / 60).ceil();
+  bool get hasActivity =>
+      poemCount > 0 ||
+      mathTotal > 0 ||
+      textbookRecognitionCount > 0 ||
+      textbookWritingCount > 0 ||
+      pictureStoryExpressionCount > 0;
+}
+
+class _DailyActivityAggregate {
+  int poemCount = 0;
+  int poemStars = 0;
+  int poemDuration = 0;
+  int mathTotal = 0;
+  int mathCorrect = 0;
+  int mathStars = 0;
+  int mathDuration = 0;
+  int textbookRecognitionCount = 0;
+  int textbookRecognitionDuration = 0;
+  int textbookWritingCount = 0;
+  int textbookWritingDuration = 0;
+  int pictureStoryExpressionCount = 0;
+  int pictureStoryExpressionDuration = 0;
+  bool hasPoem = false;
+  bool hasMath = false;
+
+  void add(LearningActivity activity) {
+    switch (activity.typeOrNull) {
+      case LearningActivityType.poemRecitation ||
+          LearningActivityType.poemQuiz ||
+          LearningActivityType.poemDictation:
+        poemCount++;
+        poemStars += activity.starsEarned;
+        poemDuration += activity.durationSeconds;
+        hasPoem = true;
+      case LearningActivityType.mathPractice ||
+          LearningActivityType.mathChallenge ||
+          LearningActivityType.wordProblem:
+        mathTotal += activity.totalItems;
+        mathCorrect += activity.successfulItems;
+        mathStars += activity.starsEarned;
+        mathDuration += activity.durationSeconds;
+        hasMath = true;
+      case LearningActivityType.textbookRecognition:
+        textbookRecognitionCount++;
+        textbookRecognitionDuration += activity.durationSeconds;
+      case LearningActivityType.textbookWriting:
+        textbookWritingCount++;
+        textbookWritingDuration += activity.durationSeconds;
+      case LearningActivityType.pictureStoryExpression:
+        pictureStoryExpressionCount++;
+        pictureStoryExpressionDuration += activity.durationSeconds;
+      default:
+        break;
+    }
+  }
 }
 
 /// 最近 N 天的每日统计。
 /// 使用 autoDispose 确保每次进入页面都重新读取最新数据。
-final dailyStatsProvider =
-    Provider.autoDispose.family<List<DailyStat>, int>((ref, days) {
+final dailyStatsProvider = Provider.autoDispose.family<List<DailyStat>, int>((
+  ref,
+  days,
+) {
   return buildDailyStats(days: days);
 });
 
@@ -73,7 +143,7 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
       partialMap[key] = (
         total: prev.total + s.totalProblems,
         correct: prev.correct + s.correctCount,
-        duration: prev.duration + s.durationSeconds
+        duration: prev.duration + s.durationSeconds,
       );
       continue;
     }
@@ -109,66 +179,11 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
   };
 
   // 新版逐次活动事件。日报汇总缺失时优先使用事件，再回退旧明细。
-  final activityMap = <String,
-      ({
-    int poemCount,
-    int poemStars,
-    int poemDuration,
-    int mathTotal,
-    int mathCorrect,
-    int mathStars,
-    int mathDuration,
-    bool hasPoem,
-    bool hasMath,
-  })>{};
+  final activityMap = <String, _DailyActivityAggregate>{};
   for (final activity in HiveBoxes.learningActivities.values) {
     if (activity.profileId != ProfileScope.currentId) continue;
-    final activityType = activity.typeOrNull;
-    if (activityType == null) continue;
     final key = _dateKey(activity.completedAt);
-    final previous = activityMap[key] ??
-        (
-          poemCount: 0,
-          poemStars: 0,
-          poemDuration: 0,
-          mathTotal: 0,
-          mathCorrect: 0,
-          mathStars: 0,
-          mathDuration: 0,
-          hasPoem: false,
-          hasMath: false,
-        );
-    activityMap[key] = switch (activityType) {
-      LearningActivityType.poemRecitation ||
-      LearningActivityType.poemQuiz ||
-      LearningActivityType.poemDictation =>
-        (
-          poemCount: previous.poemCount + 1,
-          poemStars: previous.poemStars + activity.starsEarned,
-          poemDuration: previous.poemDuration + activity.durationSeconds,
-          mathTotal: previous.mathTotal,
-          mathCorrect: previous.mathCorrect,
-          mathStars: previous.mathStars,
-          mathDuration: previous.mathDuration,
-          hasPoem: true,
-          hasMath: previous.hasMath,
-        ),
-      LearningActivityType.mathPractice ||
-      LearningActivityType.mathChallenge ||
-      LearningActivityType.wordProblem =>
-        (
-          poemCount: previous.poemCount,
-          poemStars: previous.poemStars,
-          poemDuration: previous.poemDuration,
-          mathTotal: previous.mathTotal + activity.totalItems,
-          mathCorrect: previous.mathCorrect + activity.successfulItems,
-          mathStars: previous.mathStars + activity.starsEarned,
-          mathDuration: previous.mathDuration + activity.durationSeconds,
-          hasPoem: previous.hasPoem,
-          hasMath: true,
-        ),
-      _ => previous,
-    };
+    activityMap.putIfAbsent(key, _DailyActivityAggregate.new).add(activity);
   }
 
   // 从 mathMistakes 按日统计新增错题
@@ -199,21 +214,27 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
         (session?.correct ?? 0) + (challenge?.correct ?? 0);
     final legacyDuration =
         (session?.duration ?? 0) + (challenge?.duration ?? 0);
-    final fallbackMathTotal =
-        activity?.hasMath ?? false ? activity!.mathTotal : legacyMathTotal;
-    final fallbackMathCorrect =
-        activity?.hasMath ?? false ? activity!.mathCorrect : legacyMathCorrect;
+    final fallbackMathTotal = activity?.hasMath ?? false
+        ? activity!.mathTotal
+        : legacyMathTotal;
+    final fallbackMathCorrect = activity?.hasMath ?? false
+        ? activity!.mathCorrect
+        : legacyMathCorrect;
     final fallbackMathStars = activity?.hasMath ?? false
         ? activity!.mathStars
         : (session?.stars ?? 0) + (challenge?.stars ?? 0);
-    final fallbackMathDuration =
-        activity?.hasMath ?? false ? activity!.mathDuration : legacyDuration;
-    final fallbackPoemCount =
-        activity?.hasPoem ?? false ? activity!.poemCount : poemMap[key] ?? 0;
-    final fallbackPoemStars =
-        activity?.hasPoem ?? false ? activity!.poemStars : 0;
-    final fallbackPoemDuration =
-        activity?.hasPoem ?? false ? activity!.poemDuration : 0;
+    final fallbackMathDuration = activity?.hasMath ?? false
+        ? activity!.mathDuration
+        : legacyDuration;
+    final fallbackPoemCount = activity?.hasPoem ?? false
+        ? activity!.poemCount
+        : poemMap[key] ?? 0;
+    final fallbackPoemStars = activity?.hasPoem ?? false
+        ? activity!.poemStars
+        : 0;
+    final fallbackPoemDuration = activity?.hasPoem ?? false
+        ? activity!.poemDuration
+        : 0;
 
     result.add(
       DailyStat(
@@ -221,17 +242,30 @@ List<DailyStat> buildDailyStats({required int days, DateTime? now}) {
         poemCount: hasPoemSummary ? summary!.poemCount : fallbackPoemCount,
         mathTotal:
             (hasMathSummary ? summary!.mathTotalCount : fallbackMathTotal) +
-                (partial?.total ?? 0),
+            (partial?.total ?? 0),
         mathCorrect:
             (hasMathSummary ? summary!.mathCorrectCount : fallbackMathCorrect) +
-                (partial?.correct ?? 0),
-        starsEarned: (summary?.starsEarned ?? 0) +
+            (partial?.correct ?? 0),
+        starsEarned:
+            (summary?.starsEarned ?? 0) +
             (hasPoemSummary ? 0 : fallbackPoemStars) +
             (hasMathSummary ? 0 : fallbackMathStars),
-        durationSeconds: (summary?.durationSeconds ?? 0) +
+        durationSeconds:
+            (summary?.durationSeconds ?? 0) +
             (hasPoemSummary ? 0 : fallbackPoemDuration) +
             (hasMathSummary ? 0 : fallbackMathDuration) +
-            (partial?.duration ?? 0),
+            (partial?.duration ?? 0) +
+            (activity?.textbookRecognitionDuration ?? 0) +
+            (activity?.textbookWritingDuration ?? 0) +
+            (activity?.pictureStoryExpressionDuration ?? 0),
+        textbookRecognitionCount: activity?.textbookRecognitionCount ?? 0,
+        textbookWritingCount: activity?.textbookWritingCount ?? 0,
+        pictureStoryExpressionCount: activity?.pictureStoryExpressionCount ?? 0,
+        textbookRecognitionDurationSeconds:
+            activity?.textbookRecognitionDuration ?? 0,
+        textbookWritingDurationSeconds: activity?.textbookWritingDuration ?? 0,
+        pictureStoryExpressionDurationSeconds:
+            activity?.pictureStoryExpressionDuration ?? 0,
         mistakeCount: mistakes,
       ),
     );

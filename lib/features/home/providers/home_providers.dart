@@ -13,6 +13,8 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/achievement_repository.dart';
 import 'package:poemath/data/repositories/check_in_repository.dart';
 import 'package:poemath/data/repositories/user_stats_repository.dart';
+import 'package:poemath/domain/daily_goal_activity.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 
 // ============ Repositories ============
 //
@@ -117,6 +119,49 @@ final todayMathCountProvider = Provider<int>((ref) {
   return sessionRepo.todayProblems + challengeRepo.todayProblems;
 });
 
+class TodayLearningActivityCounts {
+  const TodayLearningActivityCounts({
+    this.textbookRecognition = 0,
+    this.textbookWriting = 0,
+    this.pictureStoryExpression = 0,
+  });
+
+  final int textbookRecognition;
+  final int textbookWriting;
+  final int pictureStoryExpression;
+}
+
+final todayLearningActivityCountsProvider =
+    Provider<TodayLearningActivityCounts>((ref) {
+      final today = DateTime.parse(ref.watch(dayKeyProvider));
+      final activities = ref
+          .watch(learningActivityRepositoryProvider)
+          .completedBetween(
+            today,
+            DateTime(today.year, today.month, today.day + 1),
+          );
+      var recognition = 0;
+      var writing = 0;
+      var expression = 0;
+      for (final activity in activities) {
+        switch (activity.typeOrNull) {
+          case LearningActivityType.textbookRecognition:
+            recognition++;
+          case LearningActivityType.textbookWriting:
+            writing++;
+          case LearningActivityType.pictureStoryExpression:
+            expression++;
+          default:
+            break;
+        }
+      }
+      return TodayLearningActivityCounts(
+        textbookRecognition: recognition,
+        textbookWriting: writing,
+        pictureStoryExpression: expression,
+      );
+    });
+
 // ============ 每日目标 ============
 
 /// 每日诗词目标
@@ -129,6 +174,11 @@ final dailyPoemGoalProvider = Provider<int>((ref) {
 final dailyMathGoalProvider = Provider<int>((ref) {
   final settings = ref.watch(settingsRepositoryProvider);
   return settings.dailyMathGoal;
+});
+
+final dailyGoalTypesProvider = Provider<Set<DailyGoalActivity>>((ref) {
+  final settings = ref.watch(settingsRepositoryProvider);
+  return settings.dailyGoalTypes;
 });
 
 // ============ 成就 ============
@@ -166,11 +216,7 @@ final dailyRecommendedPoemProvider = Provider<Poem?>((ref) {
   }).toList();
 
   // 基于日期做伪随机，确保同一天推荐同一首
-  final daysSinceEpoch = DateTime.now()
-      .difference(
-        DateTime(2024),
-      )
-      .inDays;
+  final daysSinceEpoch = DateTime.now().difference(DateTime(2024)).inDays;
 
   if (unlearned.isNotEmpty) {
     return unlearned[daysSinceEpoch % unlearned.length];

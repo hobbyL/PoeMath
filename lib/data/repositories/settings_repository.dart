@@ -28,6 +28,7 @@ import 'package:poemath/data/models/image_generation_config.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/data/models/webdav_config.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
+import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
 
@@ -113,8 +114,9 @@ class SettingsRepository {
   static List<LlmProviderConfig>? imageProvidersFromSettings(
     Map<String, Object?> values,
   ) {
-    if (values
-        .containsKey(ImageGenerationProviderConfig.providersSettingsKey)) {
+    if (values.containsKey(
+      ImageGenerationProviderConfig.providersSettingsKey,
+    )) {
       return ImageGenerationProviderConfig.decodeProviders(
         values[ImageGenerationProviderConfig.providersSettingsKey],
       );
@@ -137,8 +139,9 @@ class SettingsRepository {
   String? get imageGenerationActiveProviderId {
     final providers = imageGenerationProviders;
     if (providers.isEmpty) return null;
-    final raw = HiveBoxes.settings
-        .get(ImageGenerationProviderConfig.activeProviderSettingsKey);
+    final raw = HiveBoxes.settings.get(
+      ImageGenerationProviderConfig.activeProviderSettingsKey,
+    );
     return providers.any((provider) => provider.id == raw)
         ? raw as String
         : providers.first.id;
@@ -285,10 +288,12 @@ class SettingsRepository {
     required String apiKey,
     bool clearApiKey = false,
   }) {
-    final id = imageGenerationActiveProviderId ??
+    final id =
+        imageGenerationActiveProviderId ??
         SecureCredentialStore.legacyImageGenerationProviderId;
-    final previous =
-        imageGenerationProviders.where((config) => config.id == id).firstOrNull;
+    final previous = imageGenerationProviders
+        .where((config) => config.id == id)
+        .firstOrNull;
     return _saveImageGenerationProvider(
       provider: LlmProviderConfig(
         id: id,
@@ -309,17 +314,16 @@ class SettingsRepository {
     required String model,
     required String apiKey,
     List<String> models = const [],
-  }) =>
-      _saveImageGenerationProvider(
-        provider: LlmProviderConfig(
-          id: id,
-          name: name,
-          baseUrl: baseUrl,
-          model: model,
-          models: models,
-        ),
-        apiKey: apiKey,
-      );
+  }) => _saveImageGenerationProvider(
+    provider: LlmProviderConfig(
+      id: id,
+      name: name,
+      baseUrl: baseUrl,
+      model: model,
+      models: models,
+    ),
+    apiKey: apiKey,
+  );
 
   Future<void> _saveImageGenerationProvider({
     required LlmProviderConfig provider,
@@ -534,7 +538,8 @@ class SettingsRepository {
     required Future<void> Function(
       List<Future<void> Function()> undo,
       void Function() authorize,
-    ) work,
+    )
+    work,
     bool requireParent = true,
     bool replacesCredentials = true,
   }) {
@@ -632,12 +637,12 @@ class SettingsRepository {
     authorize();
     Future<void> write(({String username, String password})? value) =>
         value == null
-            ? _credentialStore.deleteWebDavCredentials(id)
-            : _credentialStore.saveWebDavCredentials(
-                configId: id,
-                username: value.username,
-                password: value.password,
-              );
+        ? _credentialStore.deleteWebDavCredentials(id)
+        : _credentialStore.saveWebDavCredentials(
+            configId: id,
+            username: value.username,
+            password: value.password,
+          );
     undo.add(() => write(previous));
     await write(credentials);
     authorize();
@@ -651,7 +656,7 @@ class SettingsRepository {
   }
 
   SettingsRepository({SecureCredentialStore? credentialStore})
-      : _credentialStore = credentialStore ?? SecureCredentialStore();
+    : _credentialStore = credentialStore ?? SecureCredentialStore();
 
   /// 迁移并发去重的 in-flight Future（R5）；repo 由 Provider 缓存为
   /// 单例，实例级去重覆盖全部并发面。失败时 whenComplete 清空，
@@ -675,6 +680,7 @@ class SettingsRepository {
       'tts_voice'; // JSON: {"name":"...", "locale":"..."}
   static const String _keyDailyPoemGoal = 'daily_poem_goal';
   static const String _keyDailyMathGoal = 'daily_math_goal';
+  static const String _keyDailyGoalTypes = 'daily_goal_types';
   static const String _keyWebDavConfigs = 'webdav_configs';
   static const String _keyMathBatchSize = 'math_batch_size';
   static const String _keyMathDifficulty = 'math_difficulty';
@@ -923,9 +929,9 @@ class SettingsRepository {
 
   /// 云端朗读服务地址（Hive 非敏感存储），默认自建 Worker 地址。
   String get ttsCloudBaseUrl => HiveBoxes.settings.get(
-        _keyTtsCloudBaseUrl,
-        defaultValue: kDefaultWorkerBaseUrl,
-      ) as String;
+    _keyTtsCloudBaseUrl,
+    defaultValue: kDefaultWorkerBaseUrl,
+  ) as String;
 
   Future<void> setTtsCloudBaseUrl(String baseUrl) async {
     ParentAccessService.instance.assertAllowed();
@@ -934,9 +940,9 @@ class SettingsRepository {
 
   /// 云端朗读音色（Worker shortName），默认晓晓。
   String get ttsCloudVoice => HiveBoxes.settings.get(
-        _keyTtsCloudVoice,
-        defaultValue: kDefaultWorkerVoice,
-      ) as String;
+    _keyTtsCloudVoice,
+    defaultValue: kDefaultWorkerVoice,
+  ) as String;
 
   Future<void> setTtsCloudVoice(String voice) async {
     ParentAccessService.instance.assertAllowed();
@@ -1142,8 +1148,9 @@ class SettingsRepository {
     final targetId = scenarioId ?? llmActiveProviderId;
     if (targetId == null) return null;
     // 仅当场景确有绑定配置时，场景选中 model 才适用（回落默认配置时忽略）。
-    final modelOverride =
-        scenarioId != null ? modelForScenario(scenario) : null;
+    final modelOverride = scenarioId != null
+        ? modelForScenario(scenario)
+        : null;
     final primary = await _assembleLlmConfig(
       targetId,
       scenario: scenario,
@@ -1154,8 +1161,10 @@ class SettingsRepository {
     for (final provider in llmProviders) {
       if (provider.id == targetId) continue;
       try {
-        final config =
-            await _assembleLlmConfig(provider.id, scenario: scenario);
+        final config = await _assembleLlmConfig(
+          provider.id,
+          scenario: scenario,
+        );
         if (config != null) fallbacks.add(config);
       } on Object {
         // 额外凭据不可读不能阻断原供应商；不泄漏平台异常中的凭据信息。
@@ -1260,8 +1269,8 @@ class SettingsRepository {
     // 覆盖 model 须 ∈ 该配置候选模型，否则回落默认 model（防删/改名悬空）。
     final model =
         (modelOverride != null && target.models.contains(modelOverride))
-            ? modelOverride.trim()
-            : target.model.trim();
+        ? modelOverride.trim()
+        : target.model.trim();
     if (base.isEmpty || model.isEmpty) return null;
     final snapshot = LlmSelectionSnapshot(
       providerId: id,
@@ -1288,12 +1297,11 @@ class SettingsRepository {
     LlmConfig request,
     String model, {
     required bool Function() isActive,
-  }) =>
-      promoteSuccessfulLlmSelection(
-        request,
-        request.withModel(model),
-        isActive: isActive,
-      );
+  }) => promoteSuccessfulLlmSelection(
+    request,
+    request.withModel(model),
+    isActive: isActive,
+  );
 
   /// 仅在请求捕获的已配置供应商/候选内恢复，不改地址或凭据。
   Future<bool> promoteSuccessfulLlmSelection(
@@ -1336,8 +1344,9 @@ class SettingsRepository {
       return current.baseUrl.trim() == config.baseUrl &&
           current.model == snapshot.defaultModel &&
           current.models.length == snapshot.models.length &&
-          current.models.indexed
-              .every((entry) => entry.$2 == snapshot.models[entry.$1]);
+          current.models.indexed.every(
+            (entry) => entry.$2 == snapshot.models[entry.$1],
+          );
     }
 
     if (!unchanged(request) ||
@@ -1567,8 +1576,10 @@ class SettingsRepository {
         }
         final config = LlmProviderConfig(
           id: id,
-          name: HiveBoxes.settings.get(_keyLlmProviderName, defaultValue: '')
-              as String,
+          name: HiveBoxes.settings.get(
+            _keyLlmProviderName,
+            defaultValue: '',
+          ) as String,
           baseUrl: legacyBase.trim(),
           model:
               HiveBoxes.settings.get(_keyLlmModel, defaultValue: '') as String,
@@ -1633,9 +1644,7 @@ class SettingsRepository {
         scenario.settingsKey: provider?.id ?? '',
         scenario.modelKey: provider == null
             ? ''
-            : (provider.models.contains(selected)
-                  ? selected!
-                  : provider.model),
+            : (provider.models.contains(selected) ? selected! : provider.model),
       });
     });
   }
@@ -1652,8 +1661,8 @@ class SettingsRepository {
   /// 根据实际图片出题，独立于生图设置。
   String? get pictureStoryQuestionGenerationPromptOverride =>
       HiveBoxes.settings.containsKey(_keyPictureStoryQuestionGenerationPrompt)
-          ? _generationPromptOverride(_keyPictureStoryQuestionGenerationPrompt)
-          : pictureStoryGenerationPromptOverride;
+      ? _generationPromptOverride(_keyPictureStoryQuestionGenerationPrompt)
+      : pictureStoryGenerationPromptOverride;
 
   String? _generationPromptOverride(String key) {
     final raw = HiveBoxes.settings.get(key);
@@ -1801,6 +1810,25 @@ class SettingsRepository {
     await _putValidated(_keyDailyMathGoal, count);
   }
 
+  Set<DailyGoalActivity> get dailyGoalTypes {
+    final raw = _boundedString(
+      _keyDailyGoalTypes,
+      DailyGoalActivity.encode(DailyGoalActivity.defaults),
+    );
+    try {
+      return DailyGoalActivity.decode(raw);
+    } on FormatException {
+      return DailyGoalActivity.defaults;
+    }
+  }
+
+  Future<void> setDailyGoalTypes(Iterable<DailyGoalActivity> activities) async {
+    await _putValidated(
+      _keyDailyGoalTypes,
+      DailyGoalActivity.encode(activities),
+    );
+  }
+
   // ============ 口算练习设置 ============
 
   /// 每组题目数量（默认 10 题）
@@ -1852,10 +1880,7 @@ class SettingsRepository {
   }
 
   Future<void> setLastSyncedAt(DateTime value) async {
-    await HiveBoxes.settings.put(
-      _keyLastSyncedAt,
-      value.toIso8601String(),
-    );
+    await HiveBoxes.settings.put(_keyLastSyncedAt, value.toIso8601String());
   }
 
   // ============ AI 助手悬浮球位置（设备绑定，不入备份白名单） ============
@@ -1899,7 +1924,7 @@ class SettingsRepository {
   }
 
   Future<SpeechRecognitionSettingsSnapshot>
-      loadSpeechRecognitionSettingsSnapshot() async {
+  loadSpeechRecognitionSettingsSnapshot() async {
     final credentials = await readTencentAsrCredentials();
     final settings = await _resolveSpeechRecognitionSettings(credentials);
     return SpeechRecognitionSettingsSnapshot(
@@ -1919,7 +1944,8 @@ class SettingsRepository {
     final storedFingerprint =
         HiveBoxes.settings.get(_keyTencentAsrCredentialFingerprint) as String?;
     final verifiedAt = tencentAsrVerifiedAt;
-    final isVerified = credentials != null &&
+    final isVerified =
+        credentials != null &&
         storedFingerprint == _credentialFingerprint(credentials) &&
         verifiedAt != null;
 
@@ -1941,14 +1967,16 @@ class SettingsRepository {
       throw ArgumentError('SecretId 和 SecretKey 不能为空');
     }
     final existing = await readTencentAsrCredentials();
-    final keysUnchanged = existing?.secretId == normalizedId &&
+    final keysUnchanged =
+        existing?.secretId == normalizedId &&
         existing?.secretKey == normalizedKey;
     final credentials = TencentAsrCredentials(
       secretId: normalizedId,
       secretKey: normalizedKey,
       appId: keysUnchanged ? existing!.appId : '',
     );
-    final changed = existing == null ||
+    final changed =
+        existing == null ||
         _credentialFingerprint(existing) != _credentialFingerprint(credentials);
     if (changed) {
       await invalidateTencentAsrVerification();
@@ -2070,10 +2098,7 @@ class SettingsRepository {
       try {
         await _migrateWebDavConfig(config);
       } on Object {
-        AppLogger.e(
-          'WebDAV 凭据迁移失败，保留 Hive 原值',
-          tag: 'Startup',
-        );
+        AppLogger.e('WebDAV 凭据迁移失败，保留 Hive 原值', tag: 'Startup');
       }
     }
   }
@@ -2110,9 +2135,7 @@ class SettingsRepository {
   /// 加载完整的 WebDAV 配置（含凭据）。
   ///
   /// 若安全存储中无凭据，尝试从 Hive 迁移旧明文凭据。
-  Future<WebDavConfig> loadWebDavConfigWithCredentials(
-    WebDavConfig config,
-  ) =>
+  Future<WebDavConfig> loadWebDavConfigWithCredentials(WebDavConfig config) =>
       CredentialConfigurationAccess.exclusive(
         () => _loadWebDavConfigWithCredentials(config),
       );

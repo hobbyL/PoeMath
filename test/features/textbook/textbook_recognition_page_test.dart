@@ -36,6 +36,7 @@ import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/narration_fakes.dart';
 import '../../helpers/recognition_fixture.dart';
+import '../../helpers/recording_learning_activity_repository.dart';
 import '../../helpers/textbook_course_fixture.dart';
 
 class MemoryBox extends Fake implements Box<dynamic> {
@@ -158,6 +159,7 @@ void main() {
   late MemoryNarrationCache audioCache;
   late OralSettings oralSettings;
   late FakeOralService oral;
+  late RecordingLearningActivityRepository activityRepository;
   setUp(() async {
     ProfileScope.reset();
     await setUpHiveForTesting();
@@ -172,6 +174,7 @@ void main() {
     audioCache = MemoryNarrationCache();
     oralSettings = OralSettings()..enabled = false;
     oral = FakeOralService();
+    activityRepository = RecordingLearningActivityRepository();
     tts = TtsService(
       settings,
       flutterTts: NarrationEngine(),
@@ -215,6 +218,9 @@ void main() {
       ProviderScope(
         overrides: [
           ttsServiceProvider.overrideWithValue(tts),
+          learningActivityRepositoryProvider.overrideWithValue(
+            activityRepository,
+          ),
           settingsRepositoryProvider.overrideWithValue(oralSettings),
           speechRecognitionServiceFactoryProvider.overrideWithValue(() => oral),
           textbookListProvider.overrideWithValue([courseFixtureBook()]),
@@ -514,6 +520,7 @@ void main() {
     await tester.pumpAndSettle();
     expect((await repo().load()).records.values.single.oralCorrect, 1);
     await tap(tester, '看看这一轮');
+    expect(activityRepository.records.values.single.activityType, 'textbookRecognition');
     await tap(tester, '回到本课');
     await openCard(tester, 'moon');
     expect(find.text('月'), findsOneWidget);

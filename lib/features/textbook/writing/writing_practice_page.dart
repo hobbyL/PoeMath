@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 import 'package:poemath/core/services/tts/narration_session.dart';
 import 'package:poemath/core/services/tts_service.dart';
@@ -14,6 +15,8 @@ import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/textbook_writing_repository.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/domain/textbook_recognition_review.dart';
 import 'package:poemath/domain/textbook_writing_content.dart';
 import 'package:poemath/domain/textbook_writing_review.dart';
@@ -79,6 +82,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
   List<List<Offset>> _free = [];
   WritingCheckResult? _check;
   DateTime? _freeStartedAt;
+  DateTime _stageStartedAt = DateTime.now();
 
   AnimationController? _reveal;
   int _revealedStrokes = 0;
@@ -278,6 +282,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
 
   void _goTo(WritingStage stage) {
     if (!_current) return;
+    _stageStartedAt = DateTime.now();
     unawaited(_stopAudio());
     if (stage == WritingStage.demonstrate) {
       _restartReveal();
@@ -332,17 +337,45 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     if (repo == null || target == null) return;
     final expected = _progress;
     if (expected == null) return;
+    final operationId =
+        'stage-${stage.name}-${DateTime.now().microsecondsSinceEpoch}';
     await _runWrite(
       () => repo.recordStage(
         lessonId: widget.lessonId,
         fingerprint: _fingerprint,
         targetId: target.id,
         stage: stage,
-        operationId:
-            'stage-${stage.name}-${DateTime.now().microsecondsSinceEpoch}',
+        operationId: operationId,
         expectedRevision: expected.revision,
       ),
+      success: () => unawaited(_recordWritingActivity(operationId)),
     );
+  }
+
+  Future<void> _recordWritingActivity(String operationId) async {
+    final completedAt = DateTime.now();
+    final elapsed = completedAt.difference(_stageStartedAt).inSeconds;
+    try {
+      await ref
+          .read(learningActivityRepositoryProvider)
+          .record(
+            id: 'textbook-writing:$operationId',
+            activityType: LearningActivityType.textbookWriting,
+            totalItems: 1,
+            successfulItems: 1,
+            starsEarned: 0,
+            durationSeconds: elapsed < 0 ? 0 : elapsed,
+            completedAt: completedAt,
+          );
+      ref.invalidate(todayLearningActivityCountsProvider);
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '写一写完成活动保存失败',
+        tag: 'TextbookWriting',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   Future<void> _runCheck() async {

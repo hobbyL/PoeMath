@@ -15,6 +15,9 @@ enum LearningActivityType {
   /// 但 `typeOrNull` 之外的代码若按 `index` 取值，插入中间会错位。
   wordProblem,
   poemDictation,
+  textbookRecognition,
+  textbookWriting,
+  pictureStoryExpression,
 }
 
 class LearningRewardCalculator {
@@ -29,28 +32,29 @@ class LearningRewardCalculator {
       throw RangeError.range(totalItems, 0, null, 'totalItems');
     }
     if (successfulItems < 0 || successfulItems > totalItems) {
-      throw RangeError.range(
-        successfulItems,
-        0,
-        totalItems,
-        'successfulItems',
-      );
+      throw RangeError.range(successfulItems, 0, totalItems, 'successfulItems');
     }
 
     return switch (activityType) {
-      LearningActivityType.poemRecitation =>
-        _calculateRecitationStars(totalItems, successfulItems),
+      LearningActivityType.poemRecitation => _calculateRecitationStars(
+        totalItems,
+        successfulItems,
+      ),
       LearningActivityType.poemQuiz ||
       LearningActivityType.poemDictation ||
       LearningActivityType.mathPractice ||
       LearningActivityType.mathChallenge ||
       // 应用题与口算同口径：题量少但正确率标准不应特殊对待。
-      LearningActivityType.wordProblem =>
-        _calculateAccuracyStars(totalItems, successfulItems),
+      LearningActivityType.wordProblem => _calculateAccuracyStars(
+        totalItems,
+        successfulItems,
+      ),
       LearningActivityType.mistakeReview ||
       LearningActivityType.readAlong ||
-      LearningActivityType.manualCheckIn =>
-        0,
+      LearningActivityType.manualCheckIn ||
+      LearningActivityType.textbookRecognition ||
+      LearningActivityType.textbookWriting ||
+      LearningActivityType.pictureStoryExpression => 0,
     };
   }
 

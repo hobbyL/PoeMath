@@ -12,6 +12,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/profile/providers/stats_chart_providers.dart';
+import 'package:poemath/features/profile/widgets/learning_activity_breakdown.dart';
 import 'package:poemath/features/profile/widgets/learning_quality_section.dart';
 
 class WeeklyReportPage extends ConsumerWidget {
@@ -71,6 +72,11 @@ class WeeklyReportPage extends ConsumerWidget {
             _buildSummaryCard(context, tw, lw),
             const SizedBox(height: SpacingTokens.md),
 
+            if (LearningActivityBreakdown(stats: thisWeek).hasData) ...[
+              LearningActivityBreakdown(stats: thisWeek),
+              const SizedBox(height: SpacingTokens.md),
+            ],
+
             const LearningQualitySection(days: 7),
             const SizedBox(height: SpacingTokens.md),
 
@@ -98,9 +104,7 @@ class WeeklyReportPage extends ConsumerWidget {
       0,
       (sum, s) => sum + s.durationMinutes,
     );
-    final activeDays = stats
-        .where((s) => s.poemCount > 0 || s.mathTotal > 0)
-        .length;
+    final activeDays = stats.where((day) => day.hasActivity).length;
     final avgAccuracy = totalMath > 0
         ? (totalCorrect / totalMath * 100).round()
         : 0;

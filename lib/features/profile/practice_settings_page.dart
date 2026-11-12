@@ -12,6 +12,7 @@ import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
+import 'package:poemath/domain/daily_goal_activity.dart';
 
 class PracticeSettingsPage extends ConsumerStatefulWidget {
   const PracticeSettingsPage({super.key});
@@ -24,6 +25,7 @@ class PracticeSettingsPage extends ConsumerStatefulWidget {
 class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
   late int _poemGoal;
   late int _mathGoal;
+  late Set<DailyGoalActivity> _dailyGoalTypes;
   late int _batchSize;
   late DifficultyLevel _difficulty;
   late ProblemMode? _practiceMode;
@@ -43,6 +45,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
       final settings = ref.read(settingsRepositoryProvider);
       _poemGoal = ref.read(dailyPoemGoalProvider);
       _mathGoal = ref.read(dailyMathGoalProvider);
+      _dailyGoalTypes = Set.of(ref.read(dailyGoalTypesProvider));
       _batchSize = settings.mathBatchSize;
       _difficulty = _parseDifficulty(settings.mathDifficulty);
       _practiceMode = ref.read(mathPracticeModeProvider);
@@ -63,6 +66,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
     final settings = ref.read(settingsRepositoryProvider);
     await settings.setDailyPoemGoal(_poemGoal);
     await settings.setDailyMathGoal(_mathGoal);
+    await settings.setDailyGoalTypes(_dailyGoalTypes);
     await settings.setMathBatchSize(_batchSize);
     await settings.setMathDifficulty(_difficulty.name);
     await settings.setMathPracticeMode(_practiceMode?.name);
@@ -74,6 +78,7 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
     ref.invalidate(settingsRepositoryProvider);
     ref.invalidate(dailyPoemGoalProvider);
     ref.invalidate(dailyMathGoalProvider);
+    ref.invalidate(dailyGoalTypesProvider);
     if (mounted) Navigator.pop(context);
   }
 
@@ -174,6 +179,43 @@ class _PracticeSettingsPageState extends ConsumerState<PracticeSettingsPage> {
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.md),
+
+            ColoredCard(
+              color: theme.colorScheme.primary,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '每日参与目标',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: SpacingTokens.md),
+                  Wrap(
+                    spacing: SpacingTokens.sm,
+                    runSpacing: SpacingTokens.xs,
+                    children: [
+                      for (final activity in DailyGoalActivity.values)
+                        FilterChip(
+                          label: Text(activity.label),
+                          selected: _dailyGoalTypes.contains(activity),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _dailyGoalTypes.add(activity);
+                              } else if (_dailyGoalTypes.length > 1) {
+                                _dailyGoalTypes.remove(activity);
+                              }
+                            });
+                          },
+                        ),
+                    ],
                   ),
                 ],
               ),

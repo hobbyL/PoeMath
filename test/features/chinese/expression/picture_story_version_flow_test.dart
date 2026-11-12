@@ -19,6 +19,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/models/picture_story_evaluation.dart';
+import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_history_page.dart';
 import 'package:poemath/features/chinese/expression/picture_story_record_detail_page.dart';
@@ -33,6 +34,7 @@ import '../../../helpers/hive_test_helper.dart';
 import '../../../helpers/parent_access_test_helper.dart';
 import '../../../helpers/picture_story_fixture.dart';
 import '../../../helpers/picture_story_feedback_fixture.dart';
+import '../../../helpers/recording_learning_activity_repository.dart';
 
 /// 页面自动创建草稿时仍走真实仓储，I/O 固定在测试 setUp 的真实异步域。
 class _Repository extends PictureStoryRepository {
@@ -51,6 +53,7 @@ class _Repository extends PictureStoryRepository {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late _Repository repository;
+  late RecordingLearningActivityRepository activityRepository;
   final channels = <String>{};
   final audioCalls = <String>[];
   final messenger =
@@ -106,6 +109,7 @@ void main() {
     await setUpHiveForTesting();
     await unlockParentForTesting();
     repository = _Repository(Zone.current);
+    activityRepository = RecordingLearningActivityRepository();
     audioCalls.clear();
   });
   tearDown(() async {
@@ -125,7 +129,10 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final container = ProviderContainer(
-      overrides: [pictureStoryRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        pictureStoryRepositoryProvider.overrideWithValue(repository),
+        learningActivityRepositoryProvider.overrideWithValue(activityRepository),
+      ],
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(

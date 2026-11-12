@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/profile/providers/stats_chart_providers.dart';
+import 'package:poemath/features/profile/widgets/learning_activity_breakdown.dart';
 import 'package:poemath/features/profile/widgets/learning_quality_section.dart';
 
 class LearningStatsPage extends ConsumerStatefulWidget {
@@ -47,6 +48,11 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
             // 周期汇总卡片
             _buildSummaryCard(theme, stats),
             const SizedBox(height: SpacingTokens.md),
+
+            if (LearningActivityBreakdown(stats: stats).hasData) ...[
+              LearningActivityBreakdown(stats: stats),
+              const SizedBox(height: SpacingTokens.md),
+            ],
 
             LearningQualitySection(days: _days),
             const SizedBox(height: SpacingTokens.md),
@@ -111,9 +117,7 @@ class _LearningStatsPageState extends ConsumerState<LearningStatsPage> {
     final avgAccuracy = totalMath > 0
         ? (totalCorrect / totalMath * 100).round()
         : 0;
-    final activeDays = stats
-        .where((s) => s.poemCount > 0 || s.mathTotal > 0)
-        .length;
+    final activeDays = stats.where((day) => day.hasActivity).length;
 
     return ColoredCard(
       color: theme.colorScheme.primary,

@@ -30,6 +30,7 @@ import '../../../helpers/hive_test_helper.dart';
 import '../../../helpers/parent_access_test_helper.dart';
 import '../../../helpers/picture_story_fixture.dart';
 import '../../../helpers/picture_story_feedback_fixture.dart';
+import '../../../helpers/recording_learning_activity_repository.dart';
 
 class _VisionSettings extends SettingsRepository {
   @override
@@ -191,6 +192,7 @@ void main() {
   final playerCalls = <String>[];
   Completer<void>? prepareAudio;
   late _Repository repository;
+  late RecordingLearningActivityRepository activityRepository;
   late _Audio audio;
   late List<_Speech> speeches;
   late List<_Speech> queued;
@@ -281,6 +283,7 @@ void main() {
     await unlockParentForTesting();
     await SettingsRepository().migratePictureStoryFeedbackSelection();
     repository = _Repository(Zone.current);
+    activityRepository = RecordingLearningActivityRepository();
     promptId = (await repository.savePrompt(
       prompt: pictureStoryFixture(),
       profileId: 'default',
@@ -340,6 +343,9 @@ void main() {
               settings ?? _VisionSettings(),
             ),
           pictureStoryRepositoryProvider.overrideWithValue(repository),
+          learningActivityRepositoryProvider.overrideWithValue(
+            activityRepository,
+          ),
           pictureStoryAudioServiceProvider.overrideWithValue(audio),
           speechRecognitionServiceFactoryProvider.overrideWithValue(() {
             final speech = queued.isEmpty ? _Speech() : queued.removeAt(0);
@@ -662,6 +668,10 @@ void main() {
     final feedback = jsonDecode(saved.feedbackJson) as Map<String, dynamic>;
     expect(saved.status, 'completed');
     expect(repository.completedSaves, 2);
+    expect(
+      activityRepository.records.values.single.activityType,
+      'pictureStoryExpression',
+    );
     expect(feedback['source'], 'unavailable');
     expect(find.text('本次未获得 AI 点评'), findsOneWidget);
     expect(find.text(feedback['suggestion'] as String), findsOneWidget);

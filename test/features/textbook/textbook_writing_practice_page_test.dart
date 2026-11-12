@@ -21,6 +21,7 @@ import 'package:poemath/features/textbook/writing/writing_practice_page.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/narration_fakes.dart';
+import '../../helpers/recording_learning_activity_repository.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/writing_fixture.dart';
 import '../../helpers/theme_contrast.dart';
@@ -55,6 +56,7 @@ void main() {
   late NarrationSynth synth;
   late MemoryNarrationCache audioCache;
   late WritingStrokeAsset asset;
+  late RecordingLearningActivityRepository activityRepository;
 
   setUp(() async {
     ProfileScope.reset();
@@ -72,6 +74,7 @@ void main() {
     );
     // 只让「星」有笔顺数据，以同时覆盖降级路径。
     asset = const WritingStrokeAsset({});
+    activityRepository = RecordingLearningActivityRepository();
   });
 
   tearDown(() async {
@@ -92,6 +95,9 @@ void main() {
       ProviderScope(
         overrides: [
           ttsServiceProvider.overrideWithValue(tts),
+          learningActivityRepositoryProvider.overrideWithValue(
+            activityRepository,
+          ),
           textbookListProvider.overrideWithValue([courseFixtureBook()]),
           textbookCourseRepositoryProvider.overrideWithValue(courses),
           textbookWritingBoxProvider.overrideWithValue(box),
@@ -143,6 +149,7 @@ void main() {
 
     await tester.tap(find.text('写好了，看一看'));
     await tester.pumpAndSettle();
+    expect(activityRepository.records.values.single.activityType, 'textbookWriting');
     expect(find.text('我写的'), findsOneWidget);
     expect(find.text('参考'), findsOneWidget);
     // 无数据时显示家长核对提示。
@@ -195,6 +202,9 @@ void main() {
       ProviderScope(
         overrides: [
           ttsServiceProvider.overrideWithValue(tts),
+          learningActivityRepositoryProvider.overrideWithValue(
+            activityRepository,
+          ),
           textbookListProvider.overrideWithValue([courseFixtureBook()]),
           textbookCourseRepositoryProvider.overrideWithValue(courses),
           textbookWritingBoxProvider.overrideWithValue(box),

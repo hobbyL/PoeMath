@@ -22,6 +22,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/providers/llm_runtime_providers.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
@@ -32,6 +33,7 @@ import 'package:poemath/features/chinese/expression/widgets/picture_story_illust
 import 'package:poemath/features/chinese/expression/widgets/picture_story_feedback.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 
 class PictureStoryPracticePage extends ConsumerStatefulWidget {
   const PictureStoryPracticePage({super.key, required this.promptId});
@@ -476,6 +478,8 @@ class _PictureStoryPracticePageState
       }
       if (!_current(generation)) return;
       _record = completed;
+      await _recordExpressionActivity(completed);
+      if (!_current(generation)) return;
       final aiFeedback = await _generateAiFeedback(
         prompt: _prompt!,
         generation: generation,
@@ -499,6 +503,34 @@ class _PictureStoryPracticePageState
       }
     } finally {
       if (_current(generation)) setState(() => _finishing = false);
+    }
+  }
+
+  Future<void> _recordExpressionActivity(
+    PictureStoryPracticeRecord record,
+  ) async {
+    final completedAt = record.completedAt;
+    if (completedAt == null) return;
+    try {
+      await ref
+          .read(learningActivityRepositoryProvider)
+          .record(
+            id: 'picture-story:${record.id}',
+            activityType: LearningActivityType.pictureStoryExpression,
+            totalItems: 1,
+            successfulItems: 1,
+            starsEarned: 0,
+            durationSeconds: record.totalDurationSeconds,
+            completedAt: completedAt,
+          );
+      ref.invalidate(todayLearningActivityCountsProvider);
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '看图表达完成活动保存失败',
+        tag: 'PictureStoryPractice',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 

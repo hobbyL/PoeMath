@@ -34,6 +34,17 @@ void main() {
       }
     });
 
+    test('教材识字、写字和表达完成事件不按正确率发星', () {
+      for (final type in [
+        LearningActivityType.textbookRecognition,
+        LearningActivityType.textbookWriting,
+        LearningActivityType.pictureStoryExpression,
+      ]) {
+        expect(_stars(type, 1, 1), 0);
+        expect(_stars(type, 10, 0), 0);
+      }
+    });
+
     test('拒绝非法题数和成功数', () {
       expect(
         () => _stars(LearningActivityType.poemQuiz, -1, 0),

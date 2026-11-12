@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/domain/today_plan.dart';
 import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
@@ -30,7 +31,7 @@ void main() {
           ),
           GoRoute(
             path: AppRoutes.mathTab,
-            builder: (_, __) => const Scaffold(body: Text('口算学习入口')),
+            builder: (_, __) => const Scaffold(body: Text('数学学习入口')),
           ),
         ],
       );
@@ -76,14 +77,83 @@ void main() {
       expect(find.text('今日练习清单 1/1'), findsOneWidget);
       expect(find.text('还差 1 首 · 去学诗词'), findsOneWidget);
       expect(find.text('还差 5 题 · 去练口算'), findsOneWidget);
-      await tester.tap(find.text('打卡'));
-      await tester.pump();
-      expect(find.text('每日目标未完成：诗词 1/2 首、口算 5/10 题'), findsOneWidget);
+      expect(find.text('今日学习目标 · 完成后可打卡'), findsOneWidget);
       final target = find.text(poem ? '还差 1 首 · 去学诗词' : '还差 5 题 · 去练口算');
-      await tester.ensureVisible(target);
-      await tester.tap(target);
+      if (poem) {
+        await tester.tap(find.text('去学诗词'));
+        await tester.pumpAndSettle();
+        expect(find.text('诗词学习入口'), findsOneWidget);
+      } else {
+        await tester.ensureVisible(target);
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+        expect(find.text('数学学习入口'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await drainHiveWritesForTesting(tester);
+    });
+  }
+
+  for (final scenario in [
+    (
+      activity: DailyGoalActivity.textbookWriting,
+      title: '写一写 0/1 次',
+      action: '去写一写',
+      section: 'textbook',
+    ),
+    (
+      activity: DailyGoalActivity.pictureStoryExpression,
+      title: '看图表达 0/1 次',
+      action: '去看图表达',
+      section: 'expression',
+    ),
+  ]) {
+    testWidgets('${scenario.activity.label}目标进入对应语文分区', (tester) async {
+      tester.view.physicalSize = const Size(390, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final router = GoRouter(
+        routes: [
+          GoRoute(path: '/', builder: (_, __) => const HomePage()),
+          GoRoute(
+            path: AppRoutes.chineseTab,
+            builder: (_, state) => Scaffold(
+              body: Text('语文分区 ${state.uri.queryParameters['section']}'),
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            staticDayKeyOverride(),
+            dailyGoalTypesProvider.overrideWithValue({scenario.activity}),
+            todayLearningActivityCountsProvider.overrideWithValue(
+              const TodayLearningActivityCounts(),
+            ),
+            todayPlanProvider.overrideWith(
+              (ref) async => const TodayPlan(
+                dateKey: '2026-11-04',
+                profileId: 'default',
+                grade: 1,
+                semester: '上',
+                tasks: [],
+              ),
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text(scenario.title), findsOneWidget);
+      await tester.ensureVisible(find.text(scenario.action));
+      await tester.tap(find.text(scenario.action));
       await tester.pumpAndSettle();
-      expect(find.text(poem ? '诗词学习入口' : '口算学习入口'), findsOneWidget);
+      expect(find.text('语文分区 ${scenario.section}'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await drainHiveWritesForTesting(tester);

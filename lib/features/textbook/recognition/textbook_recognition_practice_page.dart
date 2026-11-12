@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/tts/narration_session.dart';
 import 'package:poemath/core/services/tts/narration_audio_identity.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
@@ -15,7 +16,9 @@ import 'package:poemath/domain/textbook_recognition_content.dart';
 import 'package:poemath/domain/textbook_recognition_reading.dart';
 import 'package:poemath/domain/textbook_recognition_review.dart';
 import 'package:poemath/domain/textbook_recognition_session.dart';
+import 'package:poemath/domain/learning_reward_calculator.dart';
 import 'package:poemath/features/textbook/recognition/recognition_page_state.dart';
+import 'package:poemath/features/home/providers/home_providers.dart';
 
 class TextbookRecognitionPracticePage extends RecognitionPage {
   const TextbookRecognitionPracticePage({
@@ -73,6 +76,10 @@ class _PracticeState
     if (!sameEntry()) return;
     final p = progress!;
     final saved = p.session;
+    if (saved?.finished == true) {
+      await _recordCompletedSession(saved!);
+      if (!sameEntry()) return;
+    }
     if (saved?.lessonId == widget.lessonId &&
         !saved!.finished &&
         saved.recognitionFirst == readingFirst &&
@@ -155,6 +162,9 @@ class _PracticeState
   }
 
   void _next() {
+    final session = progress!.session!;
+    final finishesRound = session.index + 1 >= session.questions.length;
+    final finishedAt = DateTime.now();
     _writeSession(
       'next',
       (p, _) => p.copy(
@@ -162,13 +172,52 @@ class _PracticeState
           index: p.session!.index + 1,
           hinted: false,
           clearFeedback: true,
+          completedAt: finishesRound ? finishedAt.toIso8601String() : null,
         ),
       ),
       success: () {
         _oralMessage = null;
         unawaited(stopAudio());
+        if (finishesRound) {
+          unawaited(
+            _recordCompletedSession(
+              session.copy(
+                index: session.questions.length,
+                completedAt: finishedAt.toIso8601String(),
+              ),
+            ),
+          );
+        }
       },
     );
+  }
+
+  Future<void> _recordCompletedSession(RecognitionSession session) async {
+    final completedAt =
+        DateTime.tryParse(session.completedAt ?? '') ?? DateTime.now();
+    final startedAt = DateTime.tryParse(session.startedAt);
+    final elapsed = completedAt.difference(startedAt ?? completedAt).inSeconds;
+    try {
+      await ref
+          .read(learningActivityRepositoryProvider)
+          .record(
+            id: 'textbook-recognition:${session.id}',
+            activityType: LearningActivityType.textbookRecognition,
+            totalItems: 1,
+            successfulItems: 1,
+            starsEarned: 0,
+            durationSeconds: elapsed < 0 ? 0 : elapsed,
+            completedAt: completedAt,
+          );
+      ref.invalidate(todayLearningActivityCountsProvider);
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '认一认完成活动保存失败',
+        tag: 'TextbookRecognition',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   void _playDemonstration() {

@@ -1,6 +1,7 @@
 import 'package:poemath/domain/math_entry_kind.dart';
 import 'package:poemath/domain/completion_sound.dart';
 import 'package:poemath/domain/answer_feedback_sound.dart';
+import 'package:poemath/domain/daily_goal_activity.dart';
 import 'package:poemath/data/models/profile_avatar.dart';
 import 'package:poemath/data/models/profile_nickname.dart';
 
@@ -53,7 +54,20 @@ class SettingsConstraints {
               parseMathEntryKinds(raw).isNotEmpty,
         _ => false,
       },
+      'daily_goal_types' => switch (value) {
+        final String raw => _validDailyGoalTypes(raw),
+        _ => false,
+      },
       _ => true,
     };
+  }
+
+  static bool _validDailyGoalTypes(String raw) {
+    try {
+      DailyGoalActivity.decode(raw);
+      return true;
+    } on FormatException {
+      return false;
+    }
   }
 }

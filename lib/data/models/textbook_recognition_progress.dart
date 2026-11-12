@@ -65,23 +65,23 @@ class RecognitionRecord {
   final String? lastDay, nextDay, advancedDay, parentDay, checkedDay;
   final bool? parentPassed;
   Map<String, dynamic> toJson() => {
-        'fingerprint': fingerprint,
-        'studies': studies,
-        'correct': correct,
-        'incorrect': incorrect,
-        'selfCorrect': selfCorrect,
-        'selfAgain': selfAgain,
-        'hints': hints,
-        'oralCorrect': oralCorrect,
-        'oralAgain': oralAgain,
-        'stage': stage,
-        'lastDay': lastDay,
-        'nextDay': nextDay,
-        'advancedDay': advancedDay,
-        'parentDay': parentDay,
-        'parentPassed': parentPassed,
-        'checkedDay': checkedDay,
-      };
+    'fingerprint': fingerprint,
+    'studies': studies,
+    'correct': correct,
+    'incorrect': incorrect,
+    'selfCorrect': selfCorrect,
+    'selfAgain': selfAgain,
+    'hints': hints,
+    'oralCorrect': oralCorrect,
+    'oralAgain': oralAgain,
+    'stage': stage,
+    'lastDay': lastDay,
+    'nextDay': nextDay,
+    'advancedDay': advancedDay,
+    'parentDay': parentDay,
+    'parentPassed': parentPassed,
+    'checkedDay': checkedDay,
+  };
   factory RecognitionRecord.fromJson(Map<String, dynamic> j) =>
       RecognitionRecord(
         fingerprint: _string(j, 'fingerprint'),
@@ -91,8 +91,9 @@ class RecognitionRecord {
         selfCorrect: _integer(j, 'selfCorrect'),
         selfAgain: _integer(j, 'selfAgain'),
         hints: _integer(j, 'hints'),
-        oralCorrect:
-            j.containsKey('oralCorrect') ? _integer(j, 'oralCorrect') : 0,
+        oralCorrect: j.containsKey('oralCorrect')
+            ? _integer(j, 'oralCorrect')
+            : 0,
         oralAgain: j.containsKey('oralAgain') ? _integer(j, 'oralAgain') : 0,
         stage: _integer(j, 'stage', 4),
         lastDay: _day(j['lastDay']),
@@ -134,14 +135,14 @@ class RecognitionQuestion {
   final List<int> positions;
   final bool repeat;
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'targetId': targetId,
-        'kind': kind.name,
-        'cueKey': cueKey,
-        'options': options,
-        'positions': positions,
-        'repeat': repeat,
-      };
+    'id': id,
+    'targetId': targetId,
+    'kind': kind.name,
+    'cueKey': cueKey,
+    'options': options,
+    'positions': positions,
+    'repeat': repeat,
+  };
   factory RecognitionQuestion.fromJson(Map<String, dynamic> j) =>
       RecognitionQuestion(
         id: _string(j, 'id'),
@@ -172,8 +173,10 @@ class RecognitionSession {
     this.feedback,
     this.repeated = const [],
     this.recognitionFirst = false,
+    this.completedAt,
   });
   final String id, lessonId, fingerprint, startedAt;
+  final String? completedAt;
   final int epoch, index;
   final List<RecognitionQuestion> questions;
   final bool hinted;
@@ -189,41 +192,48 @@ class RecognitionSession {
     RecognitionEvidence? feedback,
     bool clearFeedback = false,
     List<String>? repeated,
-  }) =>
-      RecognitionSession(
-        id: id,
-        lessonId: lessonId,
-        fingerprint: fingerprint,
-        epoch: epoch,
-        startedAt: startedAt,
-        questions: questions ?? this.questions,
-        index: index ?? this.index,
-        hinted: hinted ?? this.hinted,
-        feedback: clearFeedback ? null : feedback ?? this.feedback,
-        repeated: repeated ?? this.repeated,
-        recognitionFirst: recognitionFirst,
-      );
+    String? completedAt,
+  }) => RecognitionSession(
+    id: id,
+    lessonId: lessonId,
+    fingerprint: fingerprint,
+    epoch: epoch,
+    startedAt: startedAt,
+    questions: questions ?? this.questions,
+    index: index ?? this.index,
+    hinted: hinted ?? this.hinted,
+    feedback: clearFeedback ? null : feedback ?? this.feedback,
+    repeated: repeated ?? this.repeated,
+    recognitionFirst: recognitionFirst,
+    completedAt: completedAt ?? this.completedAt,
+  );
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'lessonId': lessonId,
-        'fingerprint': fingerprint,
-        'epoch': epoch,
-        'startedAt': startedAt,
-        'questions': questions.map((q) => q.toJson()).toList(),
-        'index': index,
-        'hinted': hinted,
-        'feedback': feedback?.name,
-        'repeated': repeated,
-        'recognitionFirst': recognitionFirst,
-      };
+    'id': id,
+    'lessonId': lessonId,
+    'fingerprint': fingerprint,
+    'epoch': epoch,
+    'startedAt': startedAt,
+    'questions': questions.map((q) => q.toJson()).toList(),
+    'index': index,
+    'hinted': hinted,
+    'feedback': feedback?.name,
+    'repeated': repeated,
+    'recognitionFirst': recognitionFirst,
+    'completedAt': completedAt,
+  };
   factory RecognitionSession.fromJson(Map<String, dynamic> j) {
-    final questions =
-        _list(j['questions'], (v) => RecognitionQuestion.fromJson(_map(v)));
+    final questions = _list(
+      j['questions'],
+      (v) => RecognitionQuestion.fromJson(_map(v)),
+    );
     final index = _integer(j, 'index', questions.length);
     if (questions.isEmpty ||
         questions.length > 40 ||
         questions.map((q) => q.id).toSet().length != questions.length ||
-        DateTime.tryParse(_string(j, 'startedAt')) == null) {
+        DateTime.tryParse(_string(j, 'startedAt')) == null ||
+        (j['completedAt'] != null &&
+            (j['completedAt'] is! String ||
+                DateTime.tryParse(j['completedAt'] as String) == null))) {
       throw const FormatException('认字轮次损坏');
     }
     return RecognitionSession(
@@ -240,6 +250,7 @@ class RecognitionSession {
           : RecognitionEvidence.values.byName(j['feedback'] as String),
       repeated: _list(j['repeated'], (v) => v as String),
       recognitionFirst: j['recognitionFirst'] as bool? ?? false,
+      completedAt: j['completedAt'] as String?,
     );
   }
 }
@@ -253,10 +264,10 @@ class RecognitionAudioApproval {
   final String fingerprint, cueKey;
   final NarrationAudioIdentity identity;
   Map<String, dynamic> toJson() => {
-        'fingerprint': fingerprint,
-        'cueKey': cueKey,
-        'identity': identity.toJson(),
-      };
+    'fingerprint': fingerprint,
+    'cueKey': cueKey,
+    'identity': identity.toJson(),
+  };
   factory RecognitionAudioApproval.fromJson(Map<String, dynamic> j) =>
       RecognitionAudioApproval(
         fingerprint: _string(j, 'fingerprint'),
@@ -292,28 +303,27 @@ class RecognitionProgress {
     bool clearSession = false,
     int? revision,
     List<String>? operations,
-  }) =>
-      RecognitionProgress(
-        profileId: profileId,
-        bookId: bookId,
-        editionId: editionId,
-        revision: revision ?? this.revision,
-        records: records ?? this.records,
-        audio: audio ?? this.audio,
-        session: clearSession ? null : session ?? this.session,
-        operations: operations ?? this.operations,
-      );
+  }) => RecognitionProgress(
+    profileId: profileId,
+    bookId: bookId,
+    editionId: editionId,
+    revision: revision ?? this.revision,
+    records: records ?? this.records,
+    audio: audio ?? this.audio,
+    session: clearSession ? null : session ?? this.session,
+    operations: operations ?? this.operations,
+  );
   Map<String, dynamic> toJson() => {
-        'v': 1,
-        'profileId': profileId,
-        'bookId': bookId,
-        'editionId': editionId,
-        'revision': revision,
-        'records': records.map((k, v) => MapEntry(k, v.toJson())),
-        'audio': audio.map((k, v) => MapEntry(k, v.toJson())),
-        'session': session?.toJson(),
-        'operations': operations,
-      };
+    'v': 1,
+    'profileId': profileId,
+    'bookId': bookId,
+    'editionId': editionId,
+    'revision': revision,
+    'records': records.map((k, v) => MapEntry(k, v.toJson())),
+    'audio': audio.map((k, v) => MapEntry(k, v.toJson())),
+    'session': session?.toJson(),
+    'operations': operations,
+  };
   factory RecognitionProgress.fromJson(Map<String, dynamic> j) {
     if (j['v'] != 1) throw const FormatException('认字记录版本不支持');
     if (_map(j['records']).length > 20000 ||
@@ -341,9 +351,9 @@ class RecognitionProgress {
       revision: _integer(j, 'revision'),
       records: _map(j['records'])
           .map((k, v) => MapEntry(k, RecognitionRecord.fromJson(_map(v)))),
-      audio: _map(j['audio']).map(
-        (k, v) => MapEntry(k, RecognitionAudioApproval.fromJson(_map(v))),
-      ),
+      audio: _map(
+        j['audio'],
+      ).map((k, v) => MapEntry(k, RecognitionAudioApproval.fromJson(_map(v)))),
       session: j['session'] == null
           ? null
           : RecognitionSession.fromJson(_map(j['session'])),
