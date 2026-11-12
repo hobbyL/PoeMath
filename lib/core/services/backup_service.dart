@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:hive/hive.dart';
 
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
 import 'package:poemath/core/services/cache_activity.dart';
@@ -28,6 +29,12 @@ import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
 import 'package:poemath/data/models/learning_activity.dart';
+import 'package:poemath/data/models/picture_story_practice_record.dart';
+import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_exercise_progress.dart';
+import 'package:poemath/data/models/textbook_recognition_progress.dart';
+import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/models/llm_problem.dart';
 import 'package:poemath/data/models/llm_provider_config.dart';
 import 'package:poemath/data/models/image_generation_config.dart';
@@ -62,6 +69,11 @@ import 'package:poemath/math_engine/validators/expression_evaluator.dart';
 
 /// 备份数据版本号，用于兼容性检查。
 const int _backupVersion = 1;
+
+const String _textbookReadingPrefix = 'textbook_reading_v1:';
+const String _textbookRecognitionPrefix = 'textbook_recognition_v1:';
+const String _textbookWritingPrefix = 'textbook_writing_v1:';
+const String _textbookExercisePrefix = 'textbook_exercise_v1:';
 
 /// 允许随备份迁移的 settings key 及其类型契约（key → 期望类型标签）。
 ///
@@ -117,6 +129,7 @@ const Map<String, String> _settingsValueType = <String, String>{
   'tts_voice': 'string', // TTS 音色 JSON 字符串
   'daily_poem_goal': 'int', // 每日诗词背诵目标
   'daily_math_goal': 'int', // 每日口算做题目标
+  'daily_goal_types': 'string', // 每日目标参与类型
   'math_batch_size': 'int', // 每组题目数量
   'math_difficulty': 'string', // 练习难度 easy/medium/hard
   'math_practice_mode': 'string', // 练习模式（综合或 ProblemMode.name）
@@ -238,7 +251,9 @@ class BackupService {
       'llmProblems': '应用题',
       'conversations': '助手会话',
       'messages': '助手消息',
+      'pictureStoryPractice': '看图表达记录',
     };
+    final textbookLearning = data['textbookLearning'];
     return BackupPreview(
       json: jsonString,
       exportedAt: exportedAt(jsonString),
@@ -250,6 +265,8 @@ class BackupService {
             final List<dynamic> list => list.length,
             _ => 0,
           },
+        if (textbookLearning is Map<String, dynamic>)
+          '教材学习进度': _textbookLearningCount(textbookLearning),
         if (pictureStories != null) ...{
           '看图说话题目': pictureStories.promptCount,
           '题目图片': pictureStories.images.length,
@@ -323,6 +340,8 @@ class BackupService {
       'userStats': _exportUserStats(),
       'challengeRecords': _exportChallengeRecords(),
       'learningActivities': _exportLearningActivities(),
+      'textbookLearning': _exportTextbookLearning(),
+      'pictureStoryPractice': _exportPictureStoryPractice(),
       'llmProblems': _exportLlmProblems(),
       'conversations': [
         for (final c in HiveBoxes.conversations.values)
@@ -716,6 +735,11 @@ class BackupService {
     // 恢复前先快照当前数据（不含凭据节），失败时用于回滚
     // 题库补偿保留原始键和值，不能依赖旧图片可读或目录 JSON 有效。
     final snapshot = await _exportToJson(includePictureStoryCatalog: false);
+    final picturePracticeSnapshot = <dynamic, PictureStoryPracticeRecord>{
+      for (final key in HiveBoxes.pictureStoryPractice.keys)
+        if (HiveBoxes.pictureStoryPractice.get(key) case final record?)
+          key: record.copy(),
+    };
     final pictureSnapshot = pictureRepository.storageSnapshot();
     final settingsSnapshot = <String, dynamic>{
       for (final key in _settingsValueType.keys)
@@ -786,6 +810,14 @@ class BackupService {
       try {
         final rollback = _decodeAndValidate(snapshot);
         await _doRestore(rollback, canonicalize: false);
+      } on Object catch (rollbackError) {
+        rollbackErrors.add(rollbackError);
+      }
+      try {
+        await HiveBoxes.pictureStoryPractice.clear();
+        for (final entry in picturePracticeSnapshot.entries) {
+          await HiveBoxes.pictureStoryPractice.put(entry.key, entry.value);
+        }
       } on Object catch (rollbackError) {
         rollbackErrors.add(rollbackError);
       }
@@ -1147,6 +1179,14 @@ class BackupService {
       data['learningActivities'] as List<dynamic>? ?? [],
       canonicalize: canonicalize,
     );
+    if (data.containsKey('textbookLearning')) {
+      count += await _restoreTextbookLearning(
+        data['textbookLearning'] as Map<String, dynamic>,
+      );
+    }
+    if (data.containsKey('pictureStoryPractice')) {
+      count += await _restorePictureStoryPractice(data);
+    }
     count += await _restoreLlmProblems(
       data['llmProblems'] as List<dynamic>? ?? [],
     );
@@ -1295,8 +1335,71 @@ class BackupService {
         'semester': m.semester,
         'problemJson': m.problemJson,
         'attemptJson': m.attemptJson,
+        'repracticeHistoryJson': m.repracticeHistoryJson,
       };
     }).toList();
+  }
+
+  Map<String, String> _exportTextbookLearning() =>
+      _exportTextbookProgressValues(HiveBoxes.settings, const [
+        _textbookReadingPrefix,
+        _textbookRecognitionPrefix,
+        _textbookWritingPrefix,
+        _textbookExercisePrefix,
+      ]);
+
+  Map<String, String> _exportTextbookProgressValues(
+    Box<dynamic> box,
+    List<String> prefixes,
+  ) => {
+    for (final key in box.keys)
+      if (key is String &&
+          prefixes.any(key.startsWith) &&
+          box.get(key) is String)
+        key: box.get(key) as String,
+  };
+
+  int _textbookLearningCount(Map<String, dynamic> learning) => learning.length;
+
+  List<Map<String, dynamic>> _exportPictureStoryPractice() => [
+    for (final record in HiveBoxes.pictureStoryPractice.values)
+      if (record.status == 'completed') _pictureStoryPracticeToJson(record),
+  ];
+
+  Map<String, dynamic> _pictureStoryPracticeToJson(
+    PictureStoryPracticeRecord record,
+  ) {
+    final decoded = jsonDecode(record.segmentsJson);
+    if (decoded is! List) {
+      throw const FormatException('看图表达分段记录无法备份');
+    }
+    final segments = <Map<String, dynamic>>[];
+    for (final raw in decoded) {
+      if (raw is! Map<String, dynamic>) {
+        throw const FormatException('看图表达分段记录无法备份');
+      }
+      final segment = Map<String, dynamic>.from(raw)
+        ..remove('audioPath')
+        ..remove('recognitionError');
+      segments.add(segment);
+    }
+    return {
+      'id': record.id,
+      'profileId': record.profileId,
+      'promptId': record.promptId,
+      'promptVersion': record.promptVersion,
+      'startedAt': record.startedAt.toIso8601String(),
+      'completedAt': (record.completedAt ?? record.startedAt).toIso8601String(),
+      'status': record.status,
+      'segmentsJson': jsonEncode(segments),
+      'answerText': record.answerText,
+      'feedbackJson': record.feedbackJson,
+      'totalDurationSeconds': record.totalDurationSeconds,
+      'usedHints': record.usedHints,
+      'revisionsJson': record.revisionsJson,
+      'revisionDraft': record.revisionDraft,
+      'feedbackRevision': record.feedbackRevision,
+    };
   }
 
   List<Map<String, dynamic>> _exportMathSessions() {
@@ -1579,6 +1682,7 @@ class BackupService {
         attemptJson: m['attemptJson'] as String?,
         appliedActivityIds: (m['appliedActivityIds'] as List<dynamic>? ?? [])
             .cast<String>(),
+        repracticeHistoryJson: m['repracticeHistoryJson'] as String? ?? '[]',
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -1745,6 +1849,87 @@ class BackupService {
         detailsJson: m['detailsJson'] as String?,
       );
       await box.put('${activity.profileId}_${activity.id}', activity);
+    }
+    return items.length;
+  }
+
+  Future<int> _restoreTextbookLearning(Map<String, dynamic> data) async {
+    final settings = data.cast<String, String>();
+    final progressPrefixes = const [
+      _textbookReadingPrefix,
+      _textbookRecognitionPrefix,
+      _textbookWritingPrefix,
+      _textbookExercisePrefix,
+    ];
+    final oldSettingsKeys = HiveBoxes.settings.keys
+        .whereType<String>()
+        .where((key) => progressPrefixes.any(key.startsWith))
+        .toList();
+    await HiveBoxes.settings.deleteAll(oldSettingsKeys);
+    await HiveBoxes.settings.putAll(settings);
+    return settings.length;
+  }
+
+  Future<int> _restorePictureStoryPractice(Map<String, dynamic> data) async {
+    final items = data['pictureStoryPractice'] as List<dynamic>;
+    final box = HiveBoxes.pictureStoryPractice;
+    final previous = <String, PictureStoryPracticeRecord>{
+      for (final record in box.values)
+        '${record.profileId}_${record.id}': record,
+    };
+    await box.clear();
+    for (final raw in items) {
+      final item = raw as Map<String, dynamic>;
+      final id = item['id'] as String;
+      final profileId = item['profileId'] as String;
+      final promptId = item['promptId'] as String;
+      final promptVersion = item['promptVersion'] as int;
+      final old = previous['${profileId}_$id'];
+      final sourceSegments = (jsonDecode(
+        item['segmentsJson'] as String,
+      ) as List).cast<Map<String, dynamic>>();
+      final segments = <Map<String, dynamic>>[];
+      for (final segment in sourceSegments) {
+        final local =
+            old != null &&
+                old.promptId == promptId &&
+                old.promptVersion == promptVersion
+            ? old.segments
+                  .where((value) => value.id == segment['id'])
+                  .firstOrNull
+            : null;
+        var audioPath = '';
+        if (local != null &&
+            local.durationSeconds == segment['durationSeconds'] &&
+            local.transcript == segment['transcript'] &&
+            local.audioPath.isNotEmpty &&
+            await File(local.audioPath).exists()) {
+          audioPath = local.audioPath;
+        }
+        segments.add(
+          Map<String, dynamic>.from(segment)
+            ..remove('recognitionError')
+            ..['audioPath'] = audioPath,
+        );
+      }
+      final record = PictureStoryPracticeRecord(
+        id: id,
+        profileId: profileId,
+        promptId: promptId,
+        promptVersion: promptVersion,
+        startedAt: DateTime.parse(item['startedAt'] as String),
+        completedAt: DateTime.parse(item['completedAt'] as String),
+        status: item['status'] as String,
+        segmentsJson: jsonEncode(segments),
+        answerText: item['answerText'] as String,
+        feedbackJson: item['feedbackJson'] as String,
+        totalDurationSeconds: item['totalDurationSeconds'] as int,
+        usedHints: item['usedHints'] as bool,
+        revisionsJson: item['revisionsJson'] as String,
+        revisionDraft: item['revisionDraft'] as String?,
+        feedbackRevision: item['feedbackRevision'] as int,
+      );
+      await box.put('${record.profileId}_picture_story:${record.id}', record);
     }
     return items.length;
   }
@@ -2022,6 +2207,8 @@ class BackupService {
     _validateList(data, 'userStats', _validateUserStats);
     _validateList(data, 'challengeRecords', _validateChallengeRecord);
     _validateList(data, 'learningActivities', _validateLearningActivity);
+    _validateTextbookLearning(data);
+    _validatePictureStoryPractice(data);
     _validateList(data, 'llmProblems', _validateLlmProblem);
     _validateAssistantData(data);
     _validateUniqueLearningActivityIds(data);
@@ -2278,6 +2465,20 @@ class BackupService {
     for (final key in ['skillId', 'semester', 'problemJson', 'attemptJson']) {
       _optionalNullableString(item, key, path);
     }
+    _optionalNullableString(item, 'repracticeHistoryJson', path);
+    try {
+      final rawHistory = jsonDecode(
+        item['repracticeHistoryJson'] as String? ?? '[]',
+      );
+      if (rawHistory is! List || rawHistory.length > 20000) {
+        _invalidField('$path.repracticeHistoryJson', '重练历史必须是有限数组');
+      }
+      for (final result in rawHistory) {
+        MathRepracticeResult.fromJson(result);
+      }
+    } on Object {
+      _invalidField('$path.repracticeHistoryJson', '重练历史格式无效');
+    }
     if (item['semester'] != null) {
       _optionalEnumString(item, 'semester', path, const {'上', '下'});
     }
@@ -2486,6 +2687,174 @@ class BackupService {
     if (completedAt is! String || DateTime.tryParse(completedAt) == null) {
       _invalidField('$path.completedAt', '必须是有效的 ISO 日期字符串');
     }
+  }
+
+  void _validateTextbookLearning(Map<String, dynamic> data) {
+    if (!data.containsKey('textbookLearning')) return;
+    final learning = data['textbookLearning'];
+    if (learning is! Map<String, dynamic>) {
+      _invalidField('textbookLearning', '必须是 JSON 对象');
+    }
+    if (learning.length > 10000) {
+      _invalidField('textbookLearning', '教材进度条目超过范围');
+    }
+    for (final entry in learning.entries) {
+      _validateTextbookProgressEntry(entry.key, entry.value);
+    }
+  }
+
+  void _validateTextbookProgressEntry(String key, Object? value) {
+    final path = 'textbookLearning.$key';
+    if (value is! String || value.length > 4 * 1024 * 1024) {
+      _invalidField(path, '进度必须是有效的 JSON 字符串');
+    }
+    final parsed = jsonDecode(value);
+    if (parsed is! Map<String, dynamic>) {
+      _invalidField(path, '进度必须是 JSON 对象');
+    }
+    try {
+      if (key.startsWith(_textbookReadingPrefix)) {
+        final match = RegExp(r'^textbook_reading_v1:([^:]+):([a-f0-9]{64})$')
+            .firstMatch(key);
+        if (match == null || Uri.decodeComponent(match.group(1)!).isEmpty) {
+          _invalidField(path, '阅读进度键无效');
+        }
+        final page = parsed['page'];
+        final matchValue = parsed['match'];
+        if (page is! int ||
+            page < 1 ||
+            matchValue is! String ||
+            !TextbookMatch.values.any((item) => item.name == matchValue)) {
+          _invalidField(path, '阅读进度内容无效');
+        }
+        TextbookReading.fromJson(parsed);
+        return;
+      }
+
+      final prefix = <String>[
+        _textbookRecognitionPrefix,
+        _textbookWritingPrefix,
+        _textbookExercisePrefix,
+      ].where(key.startsWith).firstOrNull;
+      if (prefix == null ||
+          !RegExp(r'^[a-f0-9]{64}$').hasMatch(key.substring(prefix.length))) {
+        _invalidField(path, '教材学习进度键无效');
+      }
+      final profileId = parsed['profileId'];
+      final bookId = parsed['bookId'];
+      final editionId = parsed['editionId'];
+      if (profileId is! String ||
+          profileId.isEmpty ||
+          bookId is! String ||
+          !Textbook.isValidId(bookId) ||
+          editionId is! String ||
+          editionId.isEmpty ||
+          key !=
+              '$prefix${textbookTextDigest(jsonEncode([profileId, bookId, editionId]))}') {
+        _invalidField(path, '进度与教材或档案标识不匹配');
+      }
+      switch (prefix) {
+        case _textbookRecognitionPrefix:
+          RecognitionProgress.fromJson(parsed);
+        case _textbookWritingPrefix:
+          WritingProgress.fromJson(parsed);
+        case _textbookExercisePrefix:
+          TextbookExerciseProgress.fromJson(parsed);
+      }
+    } on Object {
+      _invalidField(path, '教材学习进度内容无效');
+    }
+  }
+
+  void _validatePictureStoryPractice(Map<String, dynamic> data) {
+    if (!data.containsKey('pictureStoryPractice')) return;
+    final ids = <String>{};
+    _validateList(data, 'pictureStoryPractice', (item, path) {
+      for (final key in ['id', 'profileId', 'promptId', 'status']) {
+        _requiredString(item, key, path);
+      }
+      if (item['status'] != 'completed') {
+        _invalidField('$path.status', '只允许已完成的表达记录');
+      }
+      final identity = '${item['profileId']}_${item['id']}';
+      if (!ids.add(identity)) _invalidField(path, '表达记录 ID 重复');
+      final promptVersion = _requiredInt(item, 'promptVersion', path);
+      if (promptVersion < 1) _invalidField('$path.promptVersion', '题目版本无效');
+      final startedAt = item['startedAt'];
+      if (startedAt is! String || DateTime.tryParse(startedAt) == null) {
+        _invalidField('$path.startedAt', '必须是有效的 ISO 日期字符串');
+      }
+      final completedAt = item['completedAt'];
+      if (completedAt is! String || DateTime.tryParse(completedAt) == null) {
+        _invalidField('$path.completedAt', '必须是有效的 ISO 日期字符串');
+      }
+      for (final key in [
+        'segmentsJson',
+        'answerText',
+        'feedbackJson',
+        'revisionsJson',
+      ]) {
+        if (item[key] is! String) _invalidField('$path.$key', '必须是字符串');
+      }
+      _requiredNonNegativeInt(item, 'totalDurationSeconds', path);
+      _requiredNonNegativeInt(item, 'feedbackRevision', path);
+      if (item['usedHints'] is! bool) {
+        _invalidField('$path.usedHints', '必须是布尔值');
+      }
+      _optionalNullableString(item, 'revisionDraft', path);
+
+      final rawSegments = jsonDecode(item['segmentsJson'] as String);
+      if (rawSegments is! List || rawSegments.length > 2000) {
+        _invalidField('$path.segmentsJson', '分段必须是有限数组');
+      }
+      for (var index = 0; index < rawSegments.length; index++) {
+        final segment = rawSegments[index];
+        final segmentPath = '$path.segmentsJson[$index]';
+        if (segment is! Map<String, dynamic>) {
+          _invalidField(segmentPath, '分段必须是 JSON 对象');
+        }
+        _requiredString(segment, 'id', segmentPath);
+        _optionalNonNegativeInt(segment, 'position', segmentPath);
+        _optionalNonNegativeInt(segment, 'durationSeconds', segmentPath);
+        for (final key in ['transcript', 'recognitionMode']) {
+          if (segment[key] != null && segment[key] is! String) {
+            _invalidField('$segmentPath.$key', '必须是字符串');
+          }
+        }
+        _optionalNullableString(segment, 'editedText', segmentPath);
+        if (segment.containsKey('audioPath') && segment['audioPath'] != '') {
+          _invalidField('$segmentPath.audioPath', '备份不得包含录音路径');
+        }
+      }
+      final feedbackJson = item['feedbackJson'] as String;
+      if (feedbackJson.isNotEmpty && jsonDecode(feedbackJson) is! Map) {
+        _invalidField('$path.feedbackJson', '反馈必须是 JSON 对象');
+      }
+      final revisions = jsonDecode(item['revisionsJson'] as String);
+      if (revisions is! List || revisions.length > 2000) {
+        _invalidField('$path.revisionsJson', '表达修改记录必须是有限数组');
+      }
+      for (var index = 0; index < revisions.length; index++) {
+        final revision = revisions[index];
+        final revisionPath = '$path.revisionsJson[$index]';
+        if (revision is! Map<String, dynamic>) {
+          _invalidField(revisionPath, '表达修改记录必须是 JSON 对象');
+        }
+        if (revision['answer'] is! String ||
+            revision['feedbackJson'] is! String) {
+          _invalidField(revisionPath, '表达修改记录内容无效');
+        }
+        final revisionFeedback = revision['feedbackJson'] as String;
+        if (revisionFeedback.isNotEmpty &&
+            jsonDecode(revisionFeedback) is! Map) {
+          _invalidField('$revisionPath.feedbackJson', '反馈必须是 JSON 对象');
+        }
+        final createdAt = revision['createdAt'];
+        if (createdAt is! String || DateTime.tryParse(createdAt) == null) {
+          _invalidField('$revisionPath.createdAt', '必须是有效的 ISO 日期字符串');
+        }
+      }
+    });
   }
 
   void _validateLlmProblem(Map<String, dynamic> item, String path) {

@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/backup_service.dart';
 import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/math_mistake.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
@@ -33,6 +34,8 @@ const Set<String> _travelingFields = {
   'userStats',
   'challengeRecords',
   'learningActivities',
+  'textbookLearning',
+  'pictureStoryPractice',
   'llmProblems',
   'conversations',
   'messages',
@@ -57,14 +60,16 @@ void main() {
   });
 
   test('导出的顶层字段与契约清单逐项一致', () async {
-    final data = jsonDecode(await BackupService().exportToJson())
-        as Map<String, dynamic>;
+    final data = jsonDecode(
+      await BackupService().exportToJson(),
+    ) as Map<String, dynamic>;
     final actual = data.keys.toSet();
 
     expect(
       actual.difference(_travelingFields).difference(_nonTravelingFields),
       isEmpty,
-      reason: '导出里出现了契约未登记的新字段 —— 请更新本测试的 '
+      reason:
+          '导出里出现了契约未登记的新字段 —— 请更新本测试的 '
           '_travelingFields 与 backup-service.md 的同步清单',
     );
     expect(
@@ -77,12 +82,15 @@ void main() {
   test('每个动态数据 box 要么随备份走，要么在清单里显式排除', () async {
     // 空数据下导出，只校验「字段名存在与否」这一层契约。
     // 具体内容正确性由各 collection 的专项测试负责。
-    final data = jsonDecode(await BackupService().exportToJson())
-        as Map<String, dynamic>;
+    final data = jsonDecode(
+      await BackupService().exportToJson(),
+    ) as Map<String, dynamic>;
 
     expect(data['poemProgress'], isEmpty);
     expect(data['mathMistakes'], isEmpty);
     expect(data['learningActivities'], isEmpty);
+    expect(data['pictureStoryPractice'], isEmpty);
+    expect(data['textbookLearning'], isEmpty);
     expect(data['conversations'], isEmpty);
     expect(data['messages'], isEmpty);
     expect(
@@ -92,12 +100,58 @@ void main() {
     );
   });
 
+  test('错题重练逐次结果随备份往返，旧格式缺省为空历史', () async {
+    final mistake =
+        MathMistake(
+            id: 'retry-history',
+            profileId: 'default',
+            problemText: '8 + 7 = ?',
+            correctAnswer: '15',
+            userAnswer: '14',
+            problemType: 'arithmetic',
+            grade: 1,
+          )
+          ..appendRepracticeResult(
+            isCorrect: false,
+            completedAt: DateTime(2026, 11, 1, 9),
+          )
+          ..appendRepracticeResult(
+            isCorrect: true,
+            completedAt: DateTime(2026, 11, 2, 9),
+          );
+    await HiveBoxes.mathMistakes.put('default_retry-history', mistake);
+
+    final service = BackupService();
+    final data =
+        jsonDecode(await service.exportToJson()) as Map<String, dynamic>;
+    final exported = (data['mathMistakes'] as List).single as Map;
+    expect(jsonDecode(exported['repracticeHistoryJson'] as String), [
+      {'isCorrect': false, 'completedAt': '2026-11-01T09:00:00.000'},
+      {'isCorrect': true, 'completedAt': '2026-11-02T09:00:00.000'},
+    ]);
+
+    await HiveBoxes.mathMistakes.clear();
+    await service.restoreFromJson(jsonEncode(data));
+    expect(
+      HiveBoxes.mathMistakes.values.single.repracticeHistory.map(
+        (result) => result.isCorrect,
+      ),
+      [false, true],
+    );
+
+    final legacy = Map<String, dynamic>.from(exported)
+      ..remove('repracticeHistoryJson');
+    final legacyBackup = <String, dynamic>{
+      'version': 1,
+      'mathMistakes': [legacy],
+    };
+    await service.restoreFromJson(jsonEncode(legacyBackup));
+    expect(HiveBoxes.mathMistakes.values.single.repracticeHistory, isEmpty);
+  });
+
   test('meta box 里只有结算标记随备份走，其余本机状态不外泄', () async {
     // 往 meta 写入三类「本机状态」，都不应出现在导出里。
-    await HiveBoxes.meta.put(
-      'practice_draft:word',
-      jsonEncode({'schema': 1}),
-    );
+    await HiveBoxes.meta.put('practice_draft:word', jsonEncode({'schema': 1}));
     await HiveBoxes.meta.put(
       'today_plan_config_v1:default',
       jsonEncode({'dailyPoemGoal': 3}),
@@ -121,10 +175,7 @@ void main() {
       decoded['activitySettlements'],
       contains('default_activity_settlement:user_stats:act-1'),
     );
-    expect(
-      decoded.containsKey('cloudUsage'),
-      isFalse,
-    );
+    expect(decoded.containsKey('cloudUsage'), isFalse);
   });
 
   test('恢复同日旧备份保留本机今日和历史用量', () async {

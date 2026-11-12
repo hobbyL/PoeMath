@@ -126,8 +126,9 @@ void main() {
     await setUpHiveForTesting();
     await unlockParentForTesting();
     final target = Directory('${directory.path}/new-device');
-    final targetImages =
-        PictureStoryImageService(directoryProvider: () async => target);
+    final targetImages = PictureStoryImageService(
+      directoryProvider: () async => target,
+    );
     await backup(imageService: targetImages).restoreFromJson(text);
     await HiveBoxes.close();
     await HiveBoxes.init();
@@ -153,10 +154,10 @@ void main() {
     expect(reopened.isEnabled('local-fixture'), isTrue);
     ProfileScope.switchTo('child-b');
     expect(reopened.isEnabled('kite-in-the-park'), isFalse);
-    expect(
-      reopened.listPrompts().map((prompt) => prompt.id),
-      ['kite-in-the-park', 'local-fixture'],
-    );
+    expect(reopened.listPrompts().map((prompt) => prompt.id), [
+      'kite-in-the-park',
+      'local-fixture',
+    ]);
   });
 
   test('已删除题目及历史图片在真实备份和新目录恢复后仍保留删除状态', () async {
@@ -169,6 +170,7 @@ void main() {
         promptId: 'local-fixture',
         promptVersion: 1,
         startedAt: DateTime(2026),
+        completedAt: DateTime(2026, 1, 1, 0, 5),
         status: 'completed',
         segmentsJson: '[]',
       ),
@@ -180,6 +182,7 @@ void main() {
         promptId: 'kite-in-the-park',
         promptVersion: 2,
         startedAt: DateTime(2026),
+        completedAt: DateTime(2026, 1, 1, 0, 5),
         status: 'completed',
         segmentsJson: '[]',
       ),
@@ -200,10 +203,10 @@ void main() {
     final node = jsonDecode(text)['pictureStoryCatalog'] as Map;
     expect(node['schemaVersion'], 3);
     expect(await images.imagePath(discardedId), isNull);
-    expect(
-      (node['deletedIds'] as List).toSet(),
-      {'local-fixture', 'kite-in-the-park'},
-    );
+    expect((node['deletedIds'] as List).toSet(), {
+      'local-fixture',
+      'kite-in-the-park',
+    });
     final preview = backup().inspectJson(text);
     expect(preview.counts['看图说话题目'], 0);
     expect(preview.counts['已删除题目'], 2);
@@ -287,8 +290,10 @@ void main() {
     );
     expect(isEncryptedBackup(text), isTrue);
     await HiveBoxes.settings.delete(PictureStoryRepository.catalogKey);
-    await backup()
-        .restoreFromJson(text, passphrase: 'picture-delete-passphrase');
+    await backup().restoreFromJson(
+      text,
+      passphrase: 'picture-delete-passphrase',
+    );
     expect(repository.listPrompts(), isEmpty);
     expect(repository.listPrompts(enabledOnly: true), isEmpty);
     expect(repository.catalogState().deletedIds.length, 3);
@@ -303,7 +308,7 @@ void main() {
     }
   });
 
-  test('整包加密和本机保护快照共用完整题库段，临时表单与录音历史不迁移', () async {
+  test('题库、表达文字历史进入备份，临时表单和录音文件不迁移', () async {
     await populatedBackup();
     final repository = PictureStoryRepository(images: images);
     final expected = repository.catalogState().toJson();
@@ -311,8 +316,10 @@ void main() {
       id: 'local-unsaved',
       profileId: 'default',
     );
-    await HiveBoxes.settings
-        .put(PictureStoryEditorService.draftKey, jsonEncode(draft.toJson()));
+    await HiveBoxes.settings.put(
+      PictureStoryEditorService.draftKey,
+      jsonEncode(draft.toJson()),
+    );
     await repository.save(
       PictureStoryPracticeRecord(
         id: 'keep-record-on-device',
@@ -320,10 +327,21 @@ void main() {
         promptId: 'local-fixture',
         promptVersion: 1,
         startedAt: DateTime(2026),
+        completedAt: DateTime(2026, 1, 1, 0, 5),
         status: 'completed',
         segmentsJson: jsonEncode([
-          {'audioPath': '/private/device-only.m4a'},
+          {
+            'answerVersion': 2,
+            'id': 'segment-1',
+            'position': 0,
+            'durationSeconds': 5,
+            'audioPath': '/private/device-only.m4a',
+            'transcript': '小猫走到窗边。',
+            'editedText': '小猫走到窗边看看小鸟。',
+            'recognitionMode': 'online',
+          },
         ]),
+        answerText: '小猫走到窗边看看小鸟。',
       ),
     );
     final plain =
@@ -331,8 +349,13 @@ void main() {
     final settings = plain['settings'] as Map;
     expect(settings.containsKey(PictureStoryRepository.catalogKey), isFalse);
     expect(settings.containsKey(PictureStoryEditorService.draftKey), isFalse);
-    expect(plain.containsKey('pictureStoryPractice'), isFalse);
-    expect(jsonEncode(plain), isNot(contains('keep-record-on-device')));
+    final practice = (plain['pictureStoryPractice'] as List).single as Map;
+    expect(practice['id'], 'keep-record-on-device');
+    expect(backup().inspectJson(jsonEncode(plain)).counts['看图表达记录'], 1);
+    expect(
+      jsonDecode(practice['segmentsJson'] as String),
+      everyElement(isNot(contains('audioPath'))),
+    );
     expect(jsonEncode(plain), isNot(contains('/private/device-only.m4a')));
     final encrypted = await backup().exportToJson(
       passphrase: 'picture-test-passphrase',
@@ -351,27 +374,94 @@ void main() {
       jsonDecode(saved)['pictureStoryCatalog'],
       plain['pictureStoryCatalog'],
     );
-    final fileText =
-        await File('${directory.path}/backup_history/${snapshot.id}')
-            .readAsString();
+    final fileText = await File(
+      '${directory.path}/backup_history/${snapshot.id}',
+    ).readAsString();
     expect(isEncryptedBackup(fileText), isTrue);
     await HiveBoxes.settings.delete(PictureStoryRepository.catalogKey);
-    await backup()
-        .restoreFromJson(encrypted, passphrase: 'picture-test-passphrase');
+    await backup().restoreFromJson(
+      encrypted,
+      passphrase: 'picture-test-passphrase',
+    );
     expect(
       PictureStoryRepository(images: images).catalogState().toJson(),
       expected,
     );
+    expect(
+      PictureStoryRepository(images: images)
+          .find('keep-record-on-device')
+          ?.answerText,
+      '小猫走到窗边看看小鸟。',
+    );
+    final restored = PictureStoryRepository(images: images)
+        .find('keep-record-on-device')!;
+    expect(restored.answerText, '小猫走到窗边看看小鸟。');
+    expect(restored.segments.single.transcript, '小猫走到窗边。');
+    expect(restored.segments.single.audioPath, isEmpty);
+    final legacy = Map<String, dynamic>.from(plain)
+      ..remove('pictureStoryPractice');
+    await backup().restoreFromJson(jsonEncode(legacy));
     expect(
       PictureStoryRepository(images: images).find('keep-record-on-device'),
       isNotNull,
     );
   });
 
+  test('表达备份拒绝录音路径且校验失败前不改本机历史', () async {
+    await populatedBackup();
+    final repository = PictureStoryRepository(images: images);
+    await repository.save(
+      PictureStoryPracticeRecord(
+        id: 'protected-history',
+        profileId: 'default',
+        promptId: 'local-fixture',
+        promptVersion: 1,
+        startedAt: DateTime(2026),
+        completedAt: DateTime(2026, 1, 1, 0, 5),
+        status: 'completed',
+        segmentsJson: jsonEncode([
+          {
+            'answerVersion': 2,
+            'id': 'segment-1',
+            'position': 0,
+            'durationSeconds': 5,
+            'audioPath': '',
+            'transcript': '旧的表达内容。',
+            'editedText': null,
+            'recognitionMode': 'pending',
+          },
+        ]),
+        answerText: '旧的表达内容。',
+      ),
+    );
+    final data =
+        jsonDecode(await backup().exportToJson()) as Map<String, dynamic>;
+    final practice =
+        (data['pictureStoryPractice'] as List).single as Map<String, dynamic>;
+    practice['segmentsJson'] = jsonEncode([
+      {
+        'id': 'segment-1',
+        'position': 0,
+        'durationSeconds': 5,
+        'audioPath': '/private/injected.wav',
+        'transcript': '新的表达内容。',
+        'editedText': null,
+        'recognitionMode': 'pending',
+      },
+    ]);
+    await expectLater(
+      backup().restoreFromJson(jsonEncode(data)),
+      throwsFormatException,
+    );
+    expect(repository.find('protected-history')!.answerText, '旧的表达内容。');
+  });
+
   test('旧备份缺少题库段保留原始键值，坏旧目录也不要求读取图片', () async {
     await HiveBoxes.settings.put(PictureStoryRepository.catalogKey, '损坏的旧目录原值');
-    await HiveBoxes.settings
-        .put(PictureStoryRepository.enabledKeyFor('child-a'), ['原始旧类型']);
+    await HiveBoxes.settings.put(
+      PictureStoryRepository.enabledKeyFor('child-a'),
+      ['原始旧类型'],
+    );
     final repository = PictureStoryRepository(images: images);
     final before = repository.storageSnapshot();
     var calls = 0;
@@ -392,8 +482,10 @@ void main() {
     final repository = PictureStoryRepository(images: images);
     final id = repository.catalogState().imageIds.first;
     final beforeBytes = await images.readImage(id);
-    await HiveBoxes.settings
-        .put(PictureStoryEditorService.draftKey, '本机尚未发布的表单');
+    await HiveBoxes.settings.put(
+      PictureStoryEditorService.draftKey,
+      '本机尚未发布的表单',
+    );
     await backup().restoreFromJson(
       jsonEncode({
         'version': 1,
@@ -419,8 +511,10 @@ void main() {
     final text = await populatedBackup();
     final before = PictureStoryRepository(images: images).storageSnapshot();
     final key = 'default_keep-favorite';
-    await HiveBoxes.poemFavorites
-        .put(key, PoemFavorite(poemId: 'keep-favorite', profileId: 'default'));
+    await HiveBoxes.poemFavorites.put(
+      key,
+      PoemFavorite(poemId: 'keep-favorite', profileId: 'default'),
+    );
     final changes = <void Function(Map<String, dynamic>)>[
       (node) => node['schemaVersion'] = 99,
       (node) =>
@@ -430,8 +524,8 @@ void main() {
       (node) => (node['versions'] as List).first['title'] = ' ',
       (node) => (node['versions'] as List).first['questions'] = <String>[],
       (node) => node['enabledByProfile'] = {
-            'child-a': <bool>[true],
-          },
+        'child-a': <bool>[true],
+      },
       (node) => node['enabledByProfile'] = {'': <String>[]},
       (node) {
         node['schemaVersion'] = 2;
@@ -482,8 +576,10 @@ void main() {
       'images': {id: base64Encode(broken)},
     };
     PictureStoryCatalogBackup.fromJson(node);
-    await HiveBoxes.settings
-        .put(PictureStoryRepository.enabledKeyFor('default'), '[]');
+    await HiveBoxes.settings.put(
+      PictureStoryRepository.enabledKeyFor('default'),
+      '[]',
+    );
     final before = PictureStoryRepository(images: images).storageSnapshot();
     final text = jsonEncode({'version': 1, 'pictureStoryCatalog': node});
     await expectLater(
@@ -559,8 +655,11 @@ void main() {
     await expectLater(
       backup().exportToJson(),
       throwsA(
-        isA<PictureStoryImageException>()
-            .having((error) => error.message, 'message', contains('图片缺失')),
+        isA<PictureStoryImageException>().having(
+          (error) => error.message,
+          'message',
+          contains('图片缺失'),
+        ),
       ),
     );
     expect(repository.storageSnapshot(), before);
@@ -570,10 +669,13 @@ void main() {
     test('后续 Hive 恢复失败，题库原值与不存在状态独立补偿（持续失败=$alwaysFail）', () async {
       final text = await populatedBackup();
       await HiveBoxes.settings.delete(PictureStoryRepository.catalogKey);
-      await HiveBoxes.settings
-          .put(PictureStoryRepository.enabledKeyFor('child-a'), 7);
-      await HiveBoxes.settings
-          .delete(PictureStoryRepository.enabledKeyFor('child-b'));
+      await HiveBoxes.settings.put(
+        PictureStoryRepository.enabledKeyFor('child-a'),
+        7,
+      );
+      await HiveBoxes.settings.delete(
+        PictureStoryRepository.enabledKeyFor('child-b'),
+      );
       final repository = PictureStoryRepository(images: images);
       final before = repository.storageSnapshot();
       await HiveBoxes.poemFavorites.put(
@@ -606,8 +708,9 @@ void main() {
         isFalse,
       );
       expect(
-        HiveBoxes.settings
-            .containsKey(PictureStoryRepository.enabledKeyFor('child-b')),
+        HiveBoxes.settings.containsKey(
+          PictureStoryRepository.enabledKeyFor('child-b'),
+        ),
         isFalse,
       );
       expect(HiveBoxes.meta.containsKey('practice_draft_epoch'), isFalse);
@@ -621,13 +724,13 @@ void main() {
     final bytes = await pictureStoryPng(width: 19, height: 7);
     final id = sha256.convert(bytes).toString();
     final container = ProviderContainer(
-      overrides: [
-        pictureStoryImageServiceProvider.overrideWithValue(images),
-      ],
+      overrides: [pictureStoryImageServiceProvider.overrideWithValue(images)],
     );
     addTearDown(container.dispose);
-    final subscription =
-        container.listen(pictureStoryImageBytesProvider(id), (_, __) {});
+    final subscription = container.listen(
+      pictureStoryImageBytesProvider(id),
+      (_, __) {},
+    );
     addTearDown(subscription.close);
     await expectLater(
       container.read(pictureStoryImageBytesProvider(id).future),

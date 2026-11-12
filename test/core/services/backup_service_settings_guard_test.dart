@@ -35,97 +35,98 @@ final class _UnreadableCredentialStore extends SecureCredentialStore {
 ///
 /// 本机预置同名 key 时，恢复后必须原样保留（这些仍是排除项）。
 Map<String, dynamic> _maliciousSettings() => <String, dynamic>{
-      'theme_mode': 'dark',
-      // 仍被排除：不应落盘。
-      'webdav_configs': jsonEncode([
-        <String, dynamic>{
-          'id': 'evil-1',
-          'name': '攻击者云盘',
-          'url': 'https://attacker.example.com',
-          'username': 'user',
-          'password': 'injected-password',
-          'remotePath': '/steal',
-        },
-      ]),
-      'tts_cloud_base_url': 'http://attacker-tts.example.com',
-      'tts_cloud_enabled': true,
-      'tencent_asr_verified_at': DateTime(2030, 1, 1).toIso8601String(),
-      'worker_tts_verified_fingerprint': 'evil-fingerprint',
-      'tencent_oral_app_id': '123456789',
-      'tencent_oral_enabled': true,
-      'tencent_oral_verified_fingerprint': 'evil-fingerprint',
-    };
+  'theme_mode': 'dark',
+  // 仍被排除：不应落盘。
+  'webdav_configs': jsonEncode([
+    <String, dynamic>{
+      'id': 'evil-1',
+      'name': '攻击者云盘',
+      'url': 'https://attacker.example.com',
+      'username': 'user',
+      'password': 'injected-password',
+      'remotePath': '/steal',
+    },
+  ]),
+  'tts_cloud_base_url': 'http://attacker-tts.example.com',
+  'tts_cloud_enabled': true,
+  'tencent_asr_verified_at': DateTime(2030, 1, 1).toIso8601String(),
+  'worker_tts_verified_fingerprint': 'evil-fingerprint',
+  'tencent_oral_app_id': '123456789',
+  'tencent_oral_enabled': true,
+  'tencent_oral_verified_fingerprint': 'evil-fingerprint',
+};
 
 /// 备份中的 LLM 端点 key（现纳入白名单）。
 ///
 /// 恢复后会覆盖本机值 —— 这正是「恢复前确认框」要拦截的场景，
 /// 服务层本身照写（确认发生在 UI 层调用 recover 之前）。
 Map<String, dynamic> _llmEndpointSettings() => <String, dynamic>{
-      'llm_base_url': 'https://attacker-llm.example.com',
-      'llm_model': 'evil-model',
-      'llm_providers': jsonEncode([
-        <String, dynamic>{
-          'id': 'evil-p1',
-          'name': '攻击者LLM',
-          'baseUrl': 'https://attacker-llm.example.com',
-          'model': 'evil-model',
-        },
-      ]),
-      'llm_active_provider_id': 'evil-p1',
-      'llm_provider_word_problem': 'evil-p1',
-      'llm_provider_poem_explain': 'evil-p1',
-      'llm_provider_math_explain': 'evil-p1',
-    };
+  'llm_base_url': 'https://attacker-llm.example.com',
+  'llm_model': 'evil-model',
+  'llm_providers': jsonEncode([
+    <String, dynamic>{
+      'id': 'evil-p1',
+      'name': '攻击者LLM',
+      'baseUrl': 'https://attacker-llm.example.com',
+      'model': 'evil-model',
+    },
+  ]),
+  'llm_active_provider_id': 'evil-p1',
+  'llm_provider_word_problem': 'evil-p1',
+  'llm_provider_poem_explain': 'evil-p1',
+  'llm_provider_math_explain': 'evil-p1',
+};
 
 /// 全量白名单 key 的合法 settings 节（正常旧备份）。
 Map<String, dynamic> _fullWhitelistSettings() => <String, dynamic>{
-      ProfileAvatar.settingsKey: '{}',
-      ProfileNickname.settingsKey: '{}',
-      'theme_mode': 'light',
-      'active_subject': 'math',
-      'page_animations_enabled': false,
-      'sound_enabled': false,
-      'completion_sound': 'pizzicato',
-      'answer_feedback_sound': 'child_voice',
-      'haptic_enabled': true,
-      'selected_grade': 3,
-      'tts_speed': 0.8,
-      'tts_voice': '{"name":"Xiaoxiao","locale":"zh-CN"}',
-      'daily_poem_goal': 5,
-      'daily_math_goal': 30,
-      'math_batch_size': 20,
-      'math_difficulty': 'hard',
-      'math_practice_mode': 'findResult',
-      'llm_provider_name': 'DeepSeek', // LLM 供应商名称（纯展示，非敏感）
-      'has_onboarded': true,
-      // 通知设置（notification_service 直读写，随备份迁移）。
-      'reminder_enabled': true,
-      'reminder_hour': 7,
-      'reminder_minute': 30,
-      'weekly_report_enabled': true,
-      // AI 讲解提示词覆盖（随备份迁移的个性化内容）。
-      'llm_poem_explain_prompt': '自定义诗词讲解提示词',
-      'llm_math_explain_prompt': '自定义口算解析提示词',
-      'llm_word_problem_prompt': '优先选择自然观察情境',
-      'llm_picture_story_prompt': '引导先观察再表达',
-      'llm_picture_story_image_prompt': '儿童水彩插图，突出人物互动',
-      'llm_picture_story_question_prompt': '每题三个简短观察问题',
-      // AI 助手开关与悬浮球位置（坐标消费端会按当前屏幕夹取）。
-      'assistant_enabled': true,
-      'assistant_bubble_dx': 240.0,
-      'assistant_bubble_dy': 520.0,
-      // 家长保护开关（经确认：随备份迁移，不加恢复前确认框）。
-      'parent_protection_enabled': true,
-      'parent_protection_reset_notice': false,
-      // 云每日额度上限（家长设定；与 meta 里的 cloud_usage 计数分开搬运）。
-      'cloud_daily_limit_llm': 25,
-      'cloud_daily_limit_asr': 40,
-      'cloud_daily_limit_tts': 80,
-      'cloud_daily_limit_image': 8,
-      // 备份策略偏好。
-      'daily_snapshot_enabled': true,
-      'external_backup_reminder': false,
-    };
+  ProfileAvatar.settingsKey: '{}',
+  ProfileNickname.settingsKey: '{}',
+  'theme_mode': 'light',
+  'active_subject': 'math',
+  'page_animations_enabled': false,
+  'sound_enabled': false,
+  'completion_sound': 'pizzicato',
+  'answer_feedback_sound': 'child_voice',
+  'haptic_enabled': true,
+  'selected_grade': 3,
+  'tts_speed': 0.8,
+  'tts_voice': '{"name":"Xiaoxiao","locale":"zh-CN"}',
+  'daily_poem_goal': 5,
+  'daily_math_goal': 30,
+  'daily_goal_types': 'poem,math',
+  'math_batch_size': 20,
+  'math_difficulty': 'hard',
+  'math_practice_mode': 'findResult',
+  'llm_provider_name': 'DeepSeek', // LLM 供应商名称（纯展示，非敏感）
+  'has_onboarded': true,
+  // 通知设置（notification_service 直读写，随备份迁移）。
+  'reminder_enabled': true,
+  'reminder_hour': 7,
+  'reminder_minute': 30,
+  'weekly_report_enabled': true,
+  // AI 讲解提示词覆盖（随备份迁移的个性化内容）。
+  'llm_poem_explain_prompt': '自定义诗词讲解提示词',
+  'llm_math_explain_prompt': '自定义口算解析提示词',
+  'llm_word_problem_prompt': '优先选择自然观察情境',
+  'llm_picture_story_prompt': '引导先观察再表达',
+  'llm_picture_story_image_prompt': '儿童水彩插图，突出人物互动',
+  'llm_picture_story_question_prompt': '每题三个简短观察问题',
+  // AI 助手开关与悬浮球位置（坐标消费端会按当前屏幕夹取）。
+  'assistant_enabled': true,
+  'assistant_bubble_dx': 240.0,
+  'assistant_bubble_dy': 520.0,
+  // 家长保护开关（经确认：随备份迁移，不加恢复前确认框）。
+  'parent_protection_enabled': true,
+  'parent_protection_reset_notice': false,
+  // 云每日额度上限（家长设定；与 meta 里的 cloud_usage 计数分开搬运）。
+  'cloud_daily_limit_llm': 25,
+  'cloud_daily_limit_asr': 40,
+  'cloud_daily_limit_tts': 80,
+  'cloud_daily_limit_image': 8,
+  // 备份策略偏好。
+  'daily_snapshot_enabled': true,
+  'external_backup_reminder': false,
+};
 
 void main() {
   late BackupService backupService;
@@ -142,10 +143,7 @@ void main() {
   });
 
   Future<String> backupWithSettings(Map<String, dynamic> settings) async {
-    return jsonEncode(<String, dynamic>{
-      'version': 1,
-      'settings': settings,
-    });
+    return jsonEncode(<String, dynamic>{'version': 1, 'settings': settings});
   }
 
   test('页面动画偏好真实导出恢复，旧备份缺失或类型损坏时保留本机选择', () async {
@@ -164,9 +162,7 @@ void main() {
     expect(settings.pageAnimationsEnabled, isTrue);
     for (final invalid in <Object?>[null, 'false', 0]) {
       await backupService.restoreFromJson(
-        await backupWithSettings({
-          'page_animations_enabled': invalid,
-        }),
+        await backupWithSettings({'page_animations_enabled': invalid}),
       );
       expect(settings.pageAnimationsEnabled, isTrue);
     }
@@ -187,17 +183,15 @@ void main() {
         },
       ]),
     );
-    await HiveBoxes.settings.put(
-      'tts_cloud_base_url',
-      'https://tts.cloudm.cc',
-    );
+    await HiveBoxes.settings.put('tts_cloud_base_url', 'https://tts.cloudm.cc');
     await HiveBoxes.settings.put('tencent_asr_verified_at', '2026-01-01');
 
     final before = {
       'webdav_configs': HiveBoxes.settings.get('webdav_configs'),
       'tts_cloud_base_url': HiveBoxes.settings.get('tts_cloud_base_url'),
-      'tencent_asr_verified_at':
-          HiveBoxes.settings.get('tencent_asr_verified_at'),
+      'tencent_asr_verified_at': HiveBoxes.settings.get(
+        'tencent_asr_verified_at',
+      ),
     };
 
     await backupService.restoreFromJson(
@@ -222,10 +216,7 @@ void main() {
       HiveBoxes.settings.get('tencent_asr_verified_at'),
       before['tencent_asr_verified_at'],
     );
-    expect(
-      HiveBoxes.settings.get('tts_cloud_enabled'),
-      isNull,
-    );
+    expect(HiveBoxes.settings.get('tts_cloud_enabled'), isNull);
     expect(HiveBoxes.settings.get('tencent_oral_app_id'), isNull);
     expect(HiveBoxes.settings.get('tencent_oral_enabled'), isNull);
     expect(HiveBoxes.settings.get('tencent_oral_verified_fingerprint'), isNull);
@@ -267,10 +258,7 @@ void main() {
       contains('attacker-llm.example.com'),
     );
     expect(HiveBoxes.settings.get('llm_active_provider_id'), 'evil-p1');
-    expect(
-      HiveBoxes.settings.get('llm_provider_word_problem'),
-      'evil-p1',
-    );
+    expect(HiveBoxes.settings.get('llm_provider_word_problem'), 'evil-p1');
     // legacy 字段仅在校验通过时落盘（合法 https）。
     expect(
       HiveBoxes.settings.get('llm_base_url'),
@@ -297,11 +285,7 @@ void main() {
     // tts_speed int 1 规范化为 double 1.0。
     expect(
       HiveBoxes.settings.get('tts_speed'),
-      isA<double>().having(
-        (v) => v,
-        'value',
-        1.0,
-      ),
+      isA<double>().having((v) => v, 'value', 1.0),
     );
     expect(HiveBoxes.settings.get('sound_enabled'), isFalse);
   });
@@ -334,18 +318,24 @@ void main() {
         },
       ]),
     );
-    await HiveBoxes.settings
-        .put('llm_base_url', 'https://llm.local.example.com');
+    await HiveBoxes.settings.put(
+      'llm_base_url',
+      'https://llm.local.example.com',
+    );
     await HiveBoxes.settings.put('llm_model', 'gpt-test');
     await HiveBoxes.settings.put('tts_cloud_base_url', 'https://tts.cloudm.cc');
     await HiveBoxes.settings.put('tts_cloud_enabled', true);
     await HiveBoxes.settings.put('tts_cloud_voice', 'zh-CN-XiaoxiaoNeural');
     await HiveBoxes.settings.put('tts_cloud_style', 'poetry-reading');
-    await HiveBoxes.settings
-        .put('tencent_asr_credential_fingerprint', 'fp-local');
+    await HiveBoxes.settings.put(
+      'tencent_asr_credential_fingerprint',
+      'fp-local',
+    );
     await HiveBoxes.settings.put('tencent_asr_verified_at', '2026-01-01');
-    await HiveBoxes.settings
-        .put('worker_tts_verified_fingerprint', 'fp-worker');
+    await HiveBoxes.settings.put(
+      'worker_tts_verified_fingerprint',
+      'fp-worker',
+    );
     await HiveBoxes.settings.put('tencent_oral_app_id', '123456789');
     await HiveBoxes.settings.put('tencent_oral_enabled', true);
     await HiveBoxes.settings.put('tencent_oral_verified_fingerprint', 'fp-soe');
@@ -367,8 +357,9 @@ void main() {
     await HiveBoxes.settings.put('llm_provider_math_explain', 'p1');
 
     final json = await backupService.exportToJson();
-    final settings = (jsonDecode(json) as Map<String, dynamic>)['settings']
-        as Map<String, dynamic>;
+    final settings =
+        (jsonDecode(json) as Map<String, dynamic>)['settings']
+            as Map<String, dynamic>;
     expect(settings, isNot(contains('tencent_oral_app_id')));
     expect(settings, isNot(contains('tencent_oral_enabled')));
     expect(settings, isNot(contains('tencent_oral_verified_fingerprint')));
@@ -451,8 +442,9 @@ void main() {
     await HiveBoxes.settings.put('theme_mode', 'light');
 
     final json = await backupService.exportToJson();
-    final settings = (jsonDecode(json) as Map<String, dynamic>)['settings']
-        as Map<String, dynamic>;
+    final settings =
+        (jsonDecode(json) as Map<String, dynamic>)['settings']
+            as Map<String, dynamic>;
     expect(
       settings.containsKey('last_synced_at'),
       isFalse,
@@ -587,9 +579,7 @@ void main() {
       // reminder_enabled 期望 bool，字符串应跳过。
       ..['reminder_enabled'] = 'yes';
 
-    await backupService.restoreFromJson(
-      await backupWithSettings(poisoned),
-    );
+    await backupService.restoreFromJson(await backupWithSettings(poisoned));
 
     expect(HiveBoxes.settings.get('reminder_hour'), isNull);
     expect(HiveBoxes.settings.get('reminder_minute'), isNull);
