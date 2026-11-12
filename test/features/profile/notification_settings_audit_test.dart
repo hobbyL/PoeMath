@@ -5,11 +5,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:poemath/core/services/notification_service.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/profile/notification_settings_page.dart';
 
 class _Service extends Mock implements NotificationService {}
 
-_Service _service({bool enabled = false}) {
+_Service _service({
+  bool enabled = false,
+  NotificationDeliveryStatus status = const NotificationDeliveryStatus(
+    exactAlarmsEnabled: false,
+  ),
+}) {
   final service = _Service();
   when(() => service.isReminderEnabled).thenReturn(enabled);
   when(() => service.reminderHour).thenReturn(18);
@@ -17,6 +23,7 @@ _Service _service({bool enabled = false}) {
   when(() => service.isWeeklyReportEnabled).thenReturn(false);
   when(() => service.isReminderDegraded).thenReturn(false);
   when(() => service.isWeeklyReportDegraded).thenReturn(false);
+  when(() => service.getDeliveryStatus()).thenAnswer((_) async => status);
   when(() => service.scheduleDailyReminder(18, 0))
       .thenAnswer((_) async => true);
   return service;
@@ -115,9 +122,124 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await tester.ensureVisible(find.text('查看本周学习周报'));
+    expect(find.text('发送测试通知'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('查看本周学习周报'),
+      250,
+      scrollable: find.byType(Scrollable),
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+    expect(find.text('查看本周学习周报'), findsOneWidget);
     expect(find.textContaining('18:00'), findsWidgets);
+  });
+
+  testWidgets('系统实际通知关闭时提示原因，系统设置入口可用', (tester) async {
+    final service = _service(
+      enabled: true,
+      status: const NotificationDeliveryStatus(
+        notificationsEnabled: false,
+        exactAlarmsEnabled: false,
+      ),
+    );
+    when(() => service.openSystemNotificationSettings())
+        .thenAnswer((_) async => true);
+    await _pump(tester, service);
+
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
+    expect(find.text('未开启，点击开启通知和角标'), findsOneWidget);
+    expect(find.textContaining('系统通知未开启'), findsOneWidget);
+    await tester.tap(find.text('系统通知'));
+    await tester.pumpAndSettle();
+    verify(() => service.openSystemNotificationSettings()).called(1);
+  });
+
+  testWidgets('准时提醒授权成功后重新应用通知，页面显示已开启', (tester) async {
+    final service = _service(enabled: true);
+    var status = const NotificationDeliveryStatus(exactAlarmsEnabled: false);
+    when(() => service.getDeliveryStatus()).thenAnswer((_) async => status);
+    when(() => service.requestExactAlarmPermission()).thenAnswer((_) async {
+      status = const NotificationDeliveryStatus(exactAlarmsEnabled: true);
+      return true;
+    });
+    when(() => service.reconcileWithStoredSettings())
+        .thenAnswer((_) async => true);
+    await _pump(tester, service);
+    expect(find.text('未开启，系统可能延后通知，点击开启'), findsOneWidget);
+
+    await tester.tap(find.text('准时提醒'));
+    await tester.pumpAndSettle();
+
+    verify(() => service.requestExactAlarmPermission()).called(1);
+    verify(() => service.reconcileWithStoredSettings()).called(1);
+    expect(find.text('已开启，按设置时间提醒'), findsOneWidget);
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
+  });
+
+  testWidgets('不授予准时提醒权限时保留已有提醒并提示可能延后', (tester) async {
+    final service = _service(enabled: true);
+    when(() => service.requestExactAlarmPermission())
+        .thenAnswer((_) async => false);
+    await _pump(tester, service);
+
+    await tester.tap(find.text('准时提醒'));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
+    expect(find.text('准时提醒未开启，系统可能延后通知'), findsOneWidget);
+    verifyNever(() => service.reconcileWithStoredSettings());
+  });
+
+  testWidgets('测试通知等待授权时禁用重复发送，授权后只发一条', (tester) async {
+    final service = _service();
+    final permission = Completer<bool>();
+    when(() => service.requestPermission())
+        .thenAnswer((_) => permission.future);
+    when(() => service.sendTestNotification()).thenAnswer((_) async => true);
+    await _pump(tester, service);
+    final testTile = find.ancestor(
+      of: find.text('发送测试通知'),
+      matching: find.byType(AppTile),
+    );
+    final callback = tester.widget<AppTile>(testTile).onTap!;
+    callback();
+    callback();
+    await tester.pump();
+    expect(tester.widget<AppTile>(testTile).onTap, isNull);
+    expect(tester.widget<Switch>(find.byType(Switch).first).onChanged, isNull);
+
+    permission.complete(true);
+    await tester.pumpAndSettle();
+
+    verify(() => service.requestPermission()).called(1);
+    verify(() => service.sendTestNotification()).called(1);
+    verifyNever(() => service.scheduleDailyReminder(18, 0));
+    expect(find.text('测试通知已发送，请返回桌面查看通知和角标'), findsOneWidget);
+  });
+
+  testWidgets('从系统设置返回后重新读取权限并恢复原有提醒', (tester) async {
+    final service = _service(enabled: true);
+    var status = const NotificationDeliveryStatus(
+      notificationsEnabled: false,
+      exactAlarmsEnabled: false,
+    );
+    when(() => service.getDeliveryStatus()).thenAnswer((_) async => status);
+    when(() => service.isReminderDegraded).thenReturn(true);
+    when(() => service.reconcileWithStoredSettings()).thenAnswer((_) async {
+      when(() => service.isReminderDegraded).thenReturn(false);
+      return true;
+    });
+    await _pump(tester, service);
+    expect(find.textContaining('系统通知未开启'), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    status = const NotificationDeliveryStatus(exactAlarmsEnabled: true);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    verify(() => service.reconcileWithStoredSettings()).called(1);
+    expect(find.text('已允许，点击检查通知和角标设置'), findsOneWidget);
+    expect(find.textContaining('提醒未能生效'), findsNothing);
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
   });
 }

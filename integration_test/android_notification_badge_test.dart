@@ -10,7 +10,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../test/helpers/hive_test_helper.dart';
 
-const _fixtureNotificationIds = {1001, 1002, 1003};
+const _fixtureNotificationIds = {1001, 1002, 1003, 1004};
 
 Future<Set<int>> _waitForActiveIds(
   FlutterLocalNotificationsPlugin plugin,
@@ -51,19 +51,22 @@ void main() {
       try {
         final service = NotificationService.instance;
         await service.initialize();
-        final android = plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()!;
+        final android = plugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >()!;
         debugPrint('POEMATH_BADGE_WAITING_FOR_PERMISSION');
-        final permissionDeadline =
-            DateTime.now().add(const Duration(seconds: 60));
+        final permissionDeadline = DateTime.now().add(
+          const Duration(seconds: 60),
+        );
         while (!(await android.areNotificationsEnabled() ?? false) &&
             DateTime.now().isBefore(permissionDeadline)) {
           await Future<void>.delayed(const Duration(milliseconds: 200));
         }
         expect(await android.areNotificationsEnabled(), isTrue);
 
-        final reminderTime =
-            tz.TZDateTime.now(tz.local).add(const Duration(hours: 2));
+        final reminderTime = tz.TZDateTime.now(tz.local)
+            .add(const Duration(hours: 2));
         expect(
           await service.scheduleDailyReminder(
             reminderTime.hour,
@@ -74,10 +77,10 @@ void main() {
         expect(await service.scheduleWeeklyReport(), isTrue);
         final settingsBefore = HiveBoxes.settings.toMap();
         final pendingBefore = await plugin.pendingNotificationRequests();
-        expect(
-          pendingBefore.map((request) => request.id).toSet(),
-          {1001, 1002},
-        );
+        expect(pendingBefore.map((request) => request.id).toSet(), {
+          1001,
+          1002,
+        });
 
         const dailyDetails = NotificationDetails(
           android: AndroidNotificationDetails(
@@ -123,19 +126,29 @@ void main() {
             ),
           ),
         );
-        expect(await _waitForActiveIds(plugin, {1001, 1002, 1003}), {
+        expect(await service.sendTestNotification(), isTrue);
+        expect(
+          (await plugin.getActiveNotifications())
+              .singleWhere((notification) => notification.id == 1004)
+              .channelId,
+          'daily_reminder',
+        );
+        expect(await _waitForActiveIds(plugin, {1001, 1002, 1003, 1004}), {
           1001,
           1002,
           1003,
+          1004,
         });
+        expect(HiveBoxes.settings.toMap(), settingsBefore);
 
         // 系统设置返回只触发 onResume，独立覆盖恢复前台而无新 intent 的场景。
         const settingsChannel = MethodChannel('com.poemath.app/app_update');
         await settingsChannel.invokeMethod<void>(
           'openInstallPermissionSettings',
         );
-        final backgroundDeadline =
-            DateTime.now().add(const Duration(seconds: 5));
+        final backgroundDeadline = DateTime.now().add(
+          const Duration(seconds: 5),
+        );
         while (WidgetsBinding.instance.lifecycleState !=
                 AppLifecycleState.paused &&
             DateTime.now().isBefore(backgroundDeadline)) {
@@ -147,11 +160,9 @@ void main() {
         );
         debugPrint('POEMATH_BADGE_READY_FOR_RESUME');
         expect(
-          await _waitForActiveIds(
-            plugin,
-            {1003},
-            timeout: const Duration(seconds: 60),
-          ),
+          await _waitForActiveIds(plugin, {
+            1003,
+          }, timeout: const Duration(seconds: 60)),
           {1003},
         );
         final pendingAfter = await plugin.pendingNotificationRequests();
@@ -160,8 +171,9 @@ void main() {
         debugPrint('POEMATH_BADGE_RESUME_VERIFIED');
 
         // 先等窗口完全回到前台，再投递“已经打开应用时”的新提醒。
-        final foregroundDeadline =
-            DateTime.now().add(const Duration(seconds: 5));
+        final foregroundDeadline = DateTime.now().add(
+          const Duration(seconds: 5),
+        );
         while (WidgetsBinding.instance.lifecycleState !=
                 AppLifecycleState.resumed &&
             DateTime.now().isBefore(foregroundDeadline)) {
@@ -183,11 +195,9 @@ void main() {
         expect(await _waitForActiveIds(plugin, {1001, 1003}), {1001, 1003});
         debugPrint('POEMATH_BADGE_READY_FOR_NEW_INTENT');
         expect(
-          await _waitForActiveIds(
-            plugin,
-            {1003},
-            timeout: const Duration(seconds: 60),
-          ),
+          await _waitForActiveIds(plugin, {
+            1003,
+          }, timeout: const Duration(seconds: 60)),
           {1003},
         );
         expect(
@@ -204,4 +214,95 @@ void main() {
       }
     });
   });
+
+  testWidgets('准时提醒在后台到时投递，打开应用清除角标但保留下一次提醒', (tester) async {
+    expect(const bool.fromEnvironment('POEMATH_INTEGRATION_TEST'), isTrue);
+    final version = await AndroidUpdateInstaller().getCurrentVersion();
+    expect(version.packageName, 'com.poemath.app.integration');
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+
+    await tester.runAsync(() async {
+      await setUpHiveForTesting();
+      final plugin = FlutterLocalNotificationsPlugin();
+      try {
+        final service = NotificationService.instance;
+        await service.initialize();
+        final android = plugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >()!;
+        expect(await android.areNotificationsEnabled(), isTrue);
+        if (!(await android.canScheduleExactNotifications() ?? false)) {
+          debugPrint('POEMATH_SCHEDULE_READY_FOR_EXACT_PERMISSION');
+          expect(await service.requestExactAlarmPermission(), isTrue);
+        }
+        expect((await service.getDeliveryStatus()).exactAlarmsEnabled, isTrue);
+
+        // 留出至少 15 秒准备后台状态，最多等 75 秒到下一分钟边界。
+        final target = tz.TZDateTime.now(tz.local)
+            .add(const Duration(seconds: 75));
+        expect(
+          await service.scheduleDailyReminder(target.hour, target.minute),
+          isTrue,
+        );
+        final settingsBefore = HiveBoxes.settings.toMap();
+        expect(
+          (await plugin.pendingNotificationRequests())
+              .map((request) => request.id)
+              .toSet(),
+          {1001},
+        );
+
+        expect(await service.openSystemNotificationSettings(), isTrue);
+        final backgroundDeadline = DateTime.now().add(
+          const Duration(seconds: 5),
+        );
+        while (WidgetsBinding.instance.lifecycleState !=
+                AppLifecycleState.paused &&
+            DateTime.now().isBefore(backgroundDeadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        }
+        expect(
+          WidgetsBinding.instance.lifecycleState,
+          AppLifecycleState.paused,
+        );
+        debugPrint('POEMATH_SCHEDULE_WAITING_FOR_DELIVERY');
+        expect(
+          await _waitForActiveIds(plugin, {
+            1001,
+          }, timeout: const Duration(seconds: 105)),
+          {1001},
+        );
+        expect(HiveBoxes.settings.toMap(), settingsBefore);
+        expect(
+          (await plugin.pendingNotificationRequests())
+              .map((request) => request.id)
+              .toSet(),
+          {1001},
+        );
+
+        // 可先返回桌面检查角标，再打开独立测试应用。
+        debugPrint('POEMATH_SCHEDULE_READY_FOR_RESUME');
+        expect(
+          await _waitForActiveIds(
+            plugin,
+            {},
+            timeout: const Duration(seconds: 60),
+          ),
+          isEmpty,
+        );
+        expect(
+          (await plugin.pendingNotificationRequests())
+              .map((request) => request.id)
+              .toSet(),
+          {1001},
+        );
+        expect(HiveBoxes.settings.toMap(), settingsBefore);
+        debugPrint('POEMATH_SCHEDULE_DELIVERY_VERIFIED');
+      } finally {
+        await plugin.cancelAll();
+        await tearDownHiveForTesting();
+      }
+    });
+  }, timeout: const Timeout(Duration(minutes: 4)));
 }

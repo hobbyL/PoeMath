@@ -2,9 +2,10 @@
 //
 // 层级：core/services
 // 职责：本地通知服务 — 初始化通知插件、调度每日学习提醒。
-//       仅使用 inexactAllowWhileIdle 模式，不需要 SCHEDULE_EXACT_ALARM 权限。
+//       获得准时提醒权限时使用精确调度，否则保留系统允许延后的提醒。
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -22,6 +23,34 @@ typedef NotificationTapCallback = void Function(String payload);
 Future<String> _resolveLocalTimeZoneIdentifier() async {
   final timeZone = await FlutterTimezone.getLocalTimezone();
   return timeZone.identifier;
+}
+
+/// 当前设备的通知投递能力。排定闹钟成功不等于系统允许显示通知。
+@immutable
+class NotificationDeliveryStatus {
+  const NotificationDeliveryStatus({
+    this.notificationsEnabled = true,
+    this.dailyReminderChannelEnabled = true,
+    this.weeklyReportChannelEnabled = true,
+    this.dailyReminderBadgeEnabled = true,
+    this.weeklyReportBadgeEnabled = true,
+    this.exactAlarmsEnabled,
+  });
+
+  final bool notificationsEnabled;
+  final bool dailyReminderChannelEnabled;
+  final bool weeklyReportChannelEnabled;
+  final bool dailyReminderBadgeEnabled;
+  final bool weeklyReportBadgeEnabled;
+
+  /// 非 Android 平台为 null；Android 12 以下无需特殊授权，插件返回 true。
+  final bool? exactAlarmsEnabled;
+
+  bool get canDeliverDailyReminder =>
+      notificationsEnabled && dailyReminderChannelEnabled;
+
+  bool get canDeliverWeeklyReport =>
+      notificationsEnabled && weeklyReportChannelEnabled;
 }
 
 /// 每日学习提醒通知服务。
@@ -47,6 +76,7 @@ class NotificationService {
   Future<void>? _initializeFuture;
   bool _initialized = false;
   bool _lastReconciliationSucceeded = true;
+  bool? _lastExactAlarmCapability;
 
   /// 冷启动（terminated 状态点击通知拉起应用）时捕获的通知载荷。
   ///
@@ -78,6 +108,10 @@ class NotificationService {
 
   static const int _notificationId = 1001;
   static const int _weeklyReportId = 1002;
+  static const int _testNotificationId = 1004;
+  static const _settingsChannel = MethodChannel(
+    'com.poemath.app/notifications',
+  );
   static const String _channelId = 'daily_reminder';
   static const String _channelName = '每日学习提醒';
   static const String _channelDescription = '每天定时提醒学习诗词和口算';
@@ -87,6 +121,34 @@ class NotificationService {
   static const String _weeklyChannelDescription = '每周日推送本周学习数据汇总';
 
   static const String _keyWeeklyEnabled = 'weekly_report_enabled';
+
+  static const _dailyNotificationDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      icon: '@mipmap/ic_launcher',
+      channelShowBadge: true,
+      number: 1,
+    ),
+    iOS: DarwinNotificationDetails(),
+  );
+
+  static const _weeklyNotificationDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      _weeklyChannelId,
+      _weeklyChannelName,
+      channelDescription: _weeklyChannelDescription,
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      icon: '@mipmap/ic_launcher',
+      channelShowBadge: true,
+      number: 1,
+    ),
+    iOS: DarwinNotificationDetails(),
+  );
 
   // ============ 通知载荷契约 ============
 
@@ -224,7 +286,7 @@ class NotificationService {
     // 厂商 ROM 限制），却被静默改写成「用户关掉了」，且不再重试。
     // 现在只记录一个独立的降级标记供设置页提示，用户开关保持不变。
     if (isReminderEnabled) {
-      final scheduled = await scheduleDailyReminder(
+      final scheduled = await _scheduleDailyReminder(
         reminderHour,
         reminderMinute,
       );
@@ -244,7 +306,7 @@ class NotificationService {
     }
 
     if (isWeeklyReportEnabled) {
-      final scheduled = await scheduleWeeklyReport();
+      final scheduled = await _scheduleWeeklyReport();
       if (!scheduled) {
         await _markWeeklyDegraded(true);
         succeeded = false;
@@ -303,9 +365,65 @@ class NotificationService {
 
   // ============ 权限请求 ============
 
+  /// 读取系统实际权限与已有通知通道，进入设置页及从系统设置返回时调用。
+  Future<NotificationDeliveryStatus> getDeliveryStatus() async {
+    await initialize();
+    final status = await _readDeliveryStatus();
+    final precisionChanged =
+        _lastExactAlarmCapability != status.exactAlarmsEnabled &&
+        (isReminderEnabled || isWeeklyReportEnabled);
+    final deliveryRecovered =
+        (isReminderEnabled && isReminderDegraded && status.canDeliverDailyReminder) ||
+        (isWeeklyReportEnabled && isWeeklyReportDegraded && status.canDeliverWeeklyReport);
+    _lastExactAlarmCapability = status.exactAlarmsEnabled;
+    // 系统授权会让家长区锁定并销毁旧页面；重新进入时也能恢复已有提醒。
+    if (status.exactAlarmsEnabled != null &&
+        (precisionChanged || deliveryRecovered)) {
+      await _reconcileStoredSchedules();
+    }
+    return status;
+  }
+
+  Future<NotificationDeliveryStatus> _readDeliveryStatus() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android != null) {
+      final enabled = await android.areNotificationsEnabled() ?? true;
+      final channels = await android.getNotificationChannels() ?? [];
+      var dailyEnabled = true;
+      var weeklyEnabled = true;
+      var dailyBadgeEnabled = true;
+      var weeklyBadgeEnabled = true;
+      // 通道尚未创建时使用应用的默认配置；已有通道须尊重用户的系统设置。
+      for (final channel in channels) {
+        if (channel.id == _channelId) {
+          dailyEnabled = channel.importance != Importance.none;
+          dailyBadgeEnabled = channel.showBadge;
+        } else if (channel.id == _weeklyChannelId) {
+          weeklyEnabled = channel.importance != Importance.none;
+          weeklyBadgeEnabled = channel.showBadge;
+        }
+      }
+      return NotificationDeliveryStatus(
+        notificationsEnabled: enabled,
+        dailyReminderChannelEnabled: dailyEnabled,
+        weeklyReportChannelEnabled: weeklyEnabled,
+        dailyReminderBadgeEnabled: dailyBadgeEnabled,
+        weeklyReportBadgeEnabled: weeklyBadgeEnabled,
+        exactAlarmsEnabled:
+            await android.canScheduleExactNotifications() ?? false,
+      );
+    }
+
+    return const NotificationDeliveryStatus();
+  }
+
   /// 请求通知权限（Android 13+ / iOS）。
   /// 返回是否已授权。
   Future<bool> requestPermission() async {
+    await initialize();
     // Android
     final android = _plugin
         .resolvePlatformSpecificImplementation<
@@ -337,10 +455,87 @@ class NotificationService {
     return true;
   }
 
+  /// 仅在用户点击「准时提醒」时请求 Android 闹钟权限，不在启动时弹出。
+  Future<bool> requestExactAlarmPermission() async {
+    await initialize();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) return true;
+    final granted = await android.requestExactAlarmsPermission() ??
+        await android.canScheduleExactNotifications() ??
+        false;
+    // 只重放已保存的用户开关，不依赖授权返回时页面仍然存活。
+    if (granted) await reconcileWithStoredSettings();
+    return granted;
+  }
+
+  /// 打开本应用的系统通知设置，由用户检查通知开关与角标。
+  Future<bool> openSystemNotificationSettings() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) return false;
+    return await _settingsChannel.invokeMethod<bool>(
+          'openNotificationSettings',
+        ) ??
+        false;
+  }
+
+  /// 立即投递到每日提醒的同一通道，不修改提醒设置或后续定时通知。
+  Future<bool> sendTestNotification() async {
+    try {
+      await initialize();
+      if (!(await _readDeliveryStatus()).canDeliverDailyReminder) return false;
+      await _plugin.show(
+        _testNotificationId,
+        '🔔 韵算通知测试',
+        '通知已送达。返回桌面可查看应用角标，打开韵算后自动清除。',
+        _dailyNotificationDetails,
+      );
+      if (_plugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >() !=
+          null) {
+        // notify() 可空成功；确认系统中实际存在这条通知后再反馈已发送。
+        for (var attempt = 0; attempt < 5; attempt++) {
+          final active = await _plugin.getActiveNotifications();
+          if (active.any(
+            (notification) => notification.id == _testNotificationId,
+          )) {
+            return true;
+          }
+          if (attempt < 4) {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+          }
+        }
+        return false;
+      }
+      return true;
+    } on Exception catch (error) {
+      AppLogger.e('发送测试通知失败', tag: 'Notify', error: error);
+      return false;
+    }
+  }
+
   // ============ 调度 ============
 
   /// 开启并调度每日提醒。只有系统调度成功后才持久化设置。
   Future<bool> scheduleDailyReminder(int hour, int minute) async {
+    try {
+      await initialize();
+    } on Exception catch (error) {
+      AppLogger.e('初始化通知服务失败，无法设置每日提醒', tag: 'Notify', error: error);
+      return false;
+    }
+    return _scheduleDailyReminder(hour, minute);
+  }
+
+  // 初始化恢复直接调用已初始化插件的内部调度，避免等待自身 initialize。
+  Future<bool> _scheduleDailyReminder(int hour, int minute) async {
     // 选一条随机文案（基于日期做伪随机，每天不同）
     final dayIndex = DateTime.now().day;
     final title = _titles[dayIndex % _titles.length];
@@ -350,25 +545,16 @@ class NotificationService {
     final scheduledDate = _nextInstanceOfTime(hour, minute);
 
     try {
-      await _plugin.zonedSchedule(
-        _notificationId,
-        title,
-        body,
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
-            icon: '@mipmap/ic_launcher',
-            channelShowBadge: true,
-            number: 1,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      final status = await _readDeliveryStatus();
+      _lastExactAlarmCapability = status.exactAlarmsEnabled;
+      if (!status.canDeliverDailyReminder) return false;
+      await _zonedSchedule(
+        id: _notificationId,
+        title: title,
+        body: body,
+        scheduledDate: scheduledDate,
+        details: _dailyNotificationDetails,
+        exactAlarmsEnabled: status.exactAlarmsEnabled == true,
         matchDateTimeComponents: DateTimeComponents.time,
         payload: payloadDailyReminder,
       );
@@ -430,28 +616,29 @@ class NotificationService {
 
   /// 开启周报推送（每周日 18:00）。只有系统调度成功后才持久化设置。
   Future<bool> scheduleWeeklyReport() async {
+    try {
+      await initialize();
+    } on Exception catch (error) {
+      AppLogger.e('初始化通知服务失败，无法设置周报', tag: 'Notify', error: error);
+      return false;
+    }
+    return _scheduleWeeklyReport();
+  }
+
+  Future<bool> _scheduleWeeklyReport() async {
     final scheduledDate = _nextSunday(18, 0);
 
     try {
-      await _plugin.zonedSchedule(
-        _weeklyReportId,
-        '📊 本周学习周报',
-        '来看看这周学了多少诗词、做了多少口算吧！',
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _weeklyChannelId,
-            _weeklyChannelName,
-            channelDescription: _weeklyChannelDescription,
-            importance: Importance.defaultImportance,
-            priority: Priority.defaultPriority,
-            icon: '@mipmap/ic_launcher',
-            channelShowBadge: true,
-            number: 1,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      final status = await _readDeliveryStatus();
+      _lastExactAlarmCapability = status.exactAlarmsEnabled;
+      if (!status.canDeliverWeeklyReport) return false;
+      await _zonedSchedule(
+        id: _weeklyReportId,
+        title: '📊 本周学习周报',
+        body: '来看看这周学了多少诗词、做了多少口算吧！',
+        scheduledDate: scheduledDate,
+        details: _weeklyNotificationDetails,
+        exactAlarmsEnabled: status.exactAlarmsEnabled == true,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         payload: payloadWeeklyReport,
       );
@@ -465,6 +652,47 @@ class NotificationService {
       _keyWeeklyDegraded: false,
     });
     return true;
+  }
+
+  Future<void> _zonedSchedule({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime scheduledDate,
+    required NotificationDetails details,
+    required bool exactAlarmsEnabled,
+    required DateTimeComponents matchDateTimeComponents,
+    required String payload,
+  }) async {
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        details,
+        androidScheduleMode: exactAlarmsEnabled
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: matchDateTimeComponents,
+        payload: payload,
+      );
+    } on PlatformException catch (error) {
+      // 权限可能在查询后、提交前被系统回收；只对此错误降级重试。
+      if (!exactAlarmsEnabled || error.code != 'exact_alarms_not_permitted') {
+        rethrow;
+      }
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: matchDateTimeComponents,
+        payload: payload,
+      );
+    }
   }
 
   /// 关闭周报推送。

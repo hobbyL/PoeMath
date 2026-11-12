@@ -18,6 +18,7 @@ import java.security.MessageDigest
 class MainActivity : FlutterActivity() {
 
     private val channelName = "com.poemath.app/app_update"
+    private val notificationSettingsChannelName = "com.poemath.app/notifications"
     private val textbookTtsChannelName = "com.poemath.app/textbook_tts"
     private var textbookTts: TextbookTtsFileSynthesizer? = null
 
@@ -52,6 +53,15 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
+            notificationSettingsChannelName).setMethodCallHandler { call, result ->
+            if (call.method == "openNotificationSettings") {
+                openNotificationSettings(result)
+            } else {
+                result.notImplemented()
+            }
+        }
+
         textbookTts = TextbookTtsFileSynthesizer(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger,
             textbookTtsChannelName).setMethodCallHandler(textbookTts)
@@ -61,6 +71,23 @@ class MainActivity : FlutterActivity() {
             channelName,
         ).setMethodCallHandler { call, result ->
             handleMethodCall(call, result)
+        }
+    }
+
+    private fun openNotificationSettings(result: MethodChannel.Result) {
+        try {
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                }
+            } else {
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:$packageName"))
+            }
+            startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("NOTIFICATION_SETTINGS_ERROR", e.message, null)
         }
     }
 

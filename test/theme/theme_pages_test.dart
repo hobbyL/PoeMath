@@ -446,6 +446,10 @@ void main() {
         when(() => notifications.isWeeklyReportEnabled).thenReturn(false);
         when(() => notifications.isReminderDegraded).thenReturn(false);
         when(() => notifications.isWeeklyReportDegraded).thenReturn(false);
+        when(() => notifications.getDeliveryStatus()).thenAnswer(
+          (_) async =>
+              const NotificationDeliveryStatus(exactAlarmsEnabled: false),
+        );
         await _pump(
           tester,
           theme,

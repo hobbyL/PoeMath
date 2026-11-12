@@ -4,7 +4,13 @@ import 'package:mocktail/mocktail.dart';
 import 'package:poemath/core/services/notification_service.dart';
 import 'package:poemath/features/profile/notification_settings_page.dart';
 
-class _MockNotificationService extends Mock implements NotificationService {}
+class _MockNotificationService extends Mock implements NotificationService {
+  _MockNotificationService() {
+    when(() => getDeliveryStatus()).thenAnswer(
+      (_) async => const NotificationDeliveryStatus(exactAlarmsEnabled: false),
+    );
+  }
+}
 
 void main() {
   testWidgets('每日提醒调度失败时开关保持关闭并提示失败', (tester) async {
@@ -16,14 +22,11 @@ void main() {
     when(() => service.isReminderDegraded).thenReturn(false);
     when(() => service.isWeeklyReportDegraded).thenReturn(false);
     when(() => service.requestPermission()).thenAnswer((_) async => true);
-    when(
-      () => service.scheduleDailyReminder(18, 0),
-    ).thenAnswer((_) async => false);
+    when(() => service.scheduleDailyReminder(18, 0))
+        .thenAnswer((_) async => false);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: NotificationSettingsPage(notificationService: service),
-      ),
+      MaterialApp(home: NotificationSettingsPage(notificationService: service)),
     );
     await tester.pump(const Duration(seconds: 2));
 
@@ -55,9 +58,7 @@ void main() {
     when(() => service.isWeeklyReportDegraded).thenReturn(false);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: NotificationSettingsPage(notificationService: service),
-      ),
+      MaterialApp(home: NotificationSettingsPage(notificationService: service)),
     );
     await tester.pump(const Duration(seconds: 2));
 
@@ -77,9 +78,7 @@ void main() {
     when(() => service.isWeeklyReportDegraded).thenReturn(false);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: NotificationSettingsPage(notificationService: service),
-      ),
+      MaterialApp(home: NotificationSettingsPage(notificationService: service)),
     );
     await tester.pump(const Duration(seconds: 2));
 

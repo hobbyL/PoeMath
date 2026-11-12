@@ -3,6 +3,8 @@
 // 层级：features/profile
 // 职责：通知设置子页面 — 学习提醒开关 + 时间选择、周报推送开关。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -22,13 +24,16 @@ class NotificationSettingsPage extends StatefulWidget {
       _NotificationSettingsPageState();
 }
 
-class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
+class _NotificationSettingsPageState extends State<NotificationSettingsPage>
+    with WidgetsBindingObserver {
   late bool _reminderEnabled;
   late int _reminderHour;
   late int _reminderMinute;
   late bool _weeklyEnabled;
   late bool _weeklyDegraded;
   bool _busy = false;
+  NotificationDeliveryStatus? _deliveryStatus;
+  bool _statusError = false;
 
   /// 上次启动恢复时系统未能排上提醒（用户开关仍然是「开」）。
   late bool _reminderDegraded;
@@ -46,25 +51,96 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     _weeklyEnabled = svc.isWeeklyReportEnabled;
     _reminderDegraded = svc.isReminderDegraded;
     _weeklyDegraded = svc.isWeeklyReportDegraded;
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_refreshDeliveryStatus());
   }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_busy) {
+      unawaited(_refreshDeliveryStatus());
+    }
+  }
+
+  Future<void> _refreshDeliveryStatus() => _save(() async {
+    try {
+      final status = await _notificationService.getDeliveryStatus();
+      if (!mounted) return;
+      setState(() {
+        _deliveryStatus = status;
+        _statusError = false;
+        _reminderDegraded = _notificationService.isReminderDegraded;
+        _weeklyDegraded = _notificationService.isWeeklyReportDegraded;
+      });
+    } on Object catch (error, stack) {
+      AppLogger.e('读取通知状态失败', tag: 'Notify', error: error, stackTrace: stack);
+      if (!mounted) return;
+      setState(() => _statusError = true);
+    }
+  }, '读取通知状态失败，请稍后重试', refreshStatus: false);
 
   String get _timeLabel =>
       '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
 
   // ============ 学习提醒 ============
 
-  Future<void> _save(Future<void> Function() action, String failure) async {
+  Future<void> _save(
+    Future<void> Function() action,
+    String failure, {
+    bool refreshStatus = true,
+  }) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       await action();
     } on Object catch (error, stack) {
       AppLogger.e('更新通知设置失败', tag: 'Notify', error: error, stackTrace: stack);
-      _showScheduleFailure(failure);
+      _showMessage(failure);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        if (refreshStatus) unawaited(_refreshDeliveryStatus());
+      }
     }
   }
+
+  Future<void> _openSystemNotificationSettings() => _save(() async {
+    if (!await _notificationService.openSystemNotificationSettings()) {
+      _showMessage('请前往系统设置 → 韵算 → 通知，开启通知和角标');
+    }
+  }, '打开系统通知设置失败，请手动前往系统设置');
+
+  Future<void> _requestExactAlarmPermission() => _save(() async {
+    final svc = _notificationService;
+    final granted = await svc.requestExactAlarmPermission();
+    if (!mounted) return;
+    if (!granted) {
+      _showMessage('准时提醒未开启，系统可能延后通知');
+      return;
+    }
+    final degraded = (svc.isReminderEnabled && svc.isReminderDegraded) ||
+        (svc.isWeeklyReportEnabled && svc.isWeeklyReportDegraded);
+    _showMessage(degraded
+        ? '准时提醒权限已开启，但提醒未能生效，请检查系统通知设置'
+        : '已开启准时提醒');
+  }, '开启准时提醒失败，请稍后重试');
+
+  Future<void> _sendTestNotification() => _save(() async {
+    final granted = await _notificationService.requestPermission();
+    if (!mounted) return;
+    if (!granted) {
+      _showMessage('需要通知权限才能发送测试通知');
+      return;
+    }
+    final sent = await _notificationService.sendTestNotification();
+    _showMessage(sent ? '测试通知已发送，请返回桌面查看通知和角标' : '测试通知未能发送，请检查系统通知与每日提醒通道');
+  }, '发送测试通知失败，请稍后重试');
 
   Future<void> _toggleReminder(bool value) => _save(() async {
     final svc = _notificationService;
@@ -72,7 +148,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       final granted = await svc.requestPermission();
       if (!mounted) return;
       if (!granted) {
-        _showScheduleFailure('需要通知权限才能设置提醒');
+        _showMessage('需要通知权限才能设置提醒');
         return;
       }
       final scheduled = await svc.scheduleDailyReminder(
@@ -80,7 +156,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         _reminderMinute,
       );
       if (!scheduled) {
-        _showScheduleFailure('每日提醒设置失败，请稍后重试');
+        _showMessage('每日提醒设置失败，请稍后重试');
         return;
       }
     } else {
@@ -106,7 +182,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       picked.minute,
     );
     if (!scheduled) {
-      _showScheduleFailure('提醒时间更新失败，请稍后重试');
+      _showMessage('提醒时间更新失败，请稍后重试');
       return;
     }
     if (mounted) {
@@ -124,11 +200,11 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       final granted = await svc.requestPermission();
       if (!mounted) return;
       if (!granted) {
-        _showScheduleFailure('需要通知权限才能开启周报推送');
+        _showMessage('需要通知权限才能开启周报推送');
         return;
       }
       if (!await svc.scheduleWeeklyReport()) {
-        _showScheduleFailure('周报推送设置失败，请稍后重试');
+        _showMessage('周报推送设置失败，请稍后重试');
         return;
       }
     } else {
@@ -142,11 +218,43 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     }
   }, '周报推送设置失败，请稍后重试');
 
-  void _showScheduleFailure(String message) {
+  void _showMessage(String message) {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.clearSnackBars();
     messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String? get _reminderWarning {
+    final status = _deliveryStatus;
+    if (status != null) {
+      if (!status.notificationsEnabled) {
+        return '提醒未能生效：系统通知未开启，请点击「系统通知」开启。';
+      }
+      if (!status.dailyReminderChannelEnabled) {
+        return '提醒未能生效：每日学习提醒通道已关闭，请在系统通知设置中开启。';
+      }
+      if (!status.dailyReminderBadgeEnabled) {
+        return '每日提醒角标已关闭，请在系统通知设置中开启角标。';
+      }
+    }
+    return _reminderDegraded ? '提醒未能生效：请检查系统通知权限或电池优化设置，再来这里重新打开一次。' : null;
+  }
+
+  String? get _weeklyWarning {
+    final status = _deliveryStatus;
+    if (status != null) {
+      if (!status.notificationsEnabled) {
+        return '周报未能生效：系统通知未开启，请点击「系统通知」开启。';
+      }
+      if (!status.weeklyReportChannelEnabled) {
+        return '周报未能生效：学习周报通道已关闭，请在系统通知设置中开启。';
+      }
+      if (!status.weeklyReportBadgeEnabled) {
+        return '学习周报角标已关闭，请在系统通知设置中开启角标。';
+      }
+    }
+    return _weeklyDegraded ? '周报未能生效：请检查系统通知权限或电池优化设置，再来这里重新打开一次。' : null;
   }
 
   @override
@@ -159,6 +267,52 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         child: AnimatedPageBody(
           padding: const EdgeInsets.all(SpacingTokens.lg),
           children: [
+            ColoredCard(
+              color: theme.colorScheme.primary,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AppTile(
+                    flat: true,
+                    icon: Icons.settings_outlined,
+                    iconColor: theme.colorScheme.primary,
+                    title: '系统通知',
+                    subtitle: _statusError
+                        ? '暂时无法读取通知状态，点击重试'
+                        : _deliveryStatus == null
+                        ? '正在检查通知权限'
+                        : _deliveryStatus!.notificationsEnabled
+                        ? '已允许，点击检查通知和角标设置'
+                        : '未开启，点击开启通知和角标',
+                    onTap: _busy
+                        ? null
+                        : _statusError
+                        ? _refreshDeliveryStatus
+                        : _openSystemNotificationSettings,
+                  ),
+                  if (_deliveryStatus?.exactAlarmsEnabled != null)
+                    AppTile(
+                      flat: true,
+                      icon: Icons.alarm_outlined,
+                      iconColor: theme.colorScheme.primary,
+                      title: '准时提醒',
+                      subtitle: _deliveryStatus!.exactAlarmsEnabled!
+                          ? '已开启，按设置时间提醒'
+                          : '未开启，系统可能延后通知，点击开启',
+                      onTap: _busy ? null : _requestExactAlarmPermission,
+                    ),
+                  AppTile(
+                    flat: true,
+                    icon: Icons.notification_add_outlined,
+                    iconColor: theme.colorScheme.primary,
+                    title: '发送测试通知',
+                    subtitle: '立即发送一条提醒，返回桌面查看角标',
+                    onTap: _busy ? null : _sendTestNotification,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: SpacingTokens.md),
             ColoredCard(
               color: theme.colorScheme.primary,
               child: Column(
@@ -179,9 +333,9 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                       ),
                     ),
                   ),
-                  if (_reminderEnabled && _reminderDegraded)
+                  if (_reminderEnabled && _reminderWarning != null)
                     Text(
-                      '提醒未能生效：请检查系统通知权限或电池优化设置，再来这里重新打开一次。',
+                      _reminderWarning!,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.error,
                       ),
@@ -222,9 +376,9 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                       ),
                     ),
                   ),
-                  if (_weeklyEnabled && _weeklyDegraded)
+                  if (_weeklyEnabled && _weeklyWarning != null)
                     Text(
-                      '周报未能生效：请检查系统通知权限或电池优化设置，再来这里重新打开一次。',
+                      _weeklyWarning!,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.error,
                       ),
@@ -251,9 +405,10 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
               child: Text(
-                '未查看的提醒会显示应用图标角标，打开应用后自动清除通知和角标。'
-                '数字角标需系统桌面支持，部分桌面只显示圆点。\n\n'
-                '如果通知无法开启，请前往系统设置 → 应用 → 韵算 → 通知，手动开启通知权限。',
+                '应用角标随未查看的通知显示，打开应用后自动清除通知和角标。'
+                '角标需在系统设置中开启，并由桌面支持；部分桌面只显示圆点。\n\n'
+                '收不到提醒时，先发送测试通知；若测试也收不到，请点击「系统通知」检查。'
+                '定时提醒仍未收到时，请检查手机的电池优化或后台运行限制。',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   height: 1.6,
