@@ -333,10 +333,37 @@ class MathTabPage extends ConsumerWidget {
     ThemeData theme,
   ) {
     final appearance = _appearance(kind);
+    var description = appearance.subtitle;
+    if (kind == MathEntryKind.vertical) {
+      final difficulty = DifficultyLevel.values.byName(
+        ref.read(settingsRepositoryProvider).mathDifficulty,
+      );
+      final grade = ref.read(mathGradeProvider);
+      final semester = ref.read(mathSemesterProvider);
+      final supported = MathEngine.supportedModes(
+        grade: grade,
+        semester: semester,
+        difficulty: difficulty,
+      );
+      if (!supported.contains(ProblemMode.vertical)) {
+        final availableAtAnotherDifficulty = DifficultyLevel.values.any(
+          (level) =>
+              level != difficulty &&
+              MathEngine.supportedModes(
+                grade: grade,
+                semester: semester,
+                difficulty: level,
+              ).contains(ProblemMode.vertical),
+        );
+        description = availableAtAnotherDifficulty
+            ? '当前难度暂不支持，可在设置中调整'
+            : '${GradePresets.get(grade, semester).label}暂未开放';
+      }
+    }
     return PracticeEntryCard(
       icon: appearance.icon,
       title: appearance.title,
-      description: appearance.subtitle,
+      description: description,
       onTap: () => _open(context, ref, kind),
     );
   }

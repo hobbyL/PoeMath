@@ -59,6 +59,49 @@ Future<void> _pumpDialog(
 }
 
 void main() {
+  for (final size in [const Size(320, 640), const Size(800, 600)]) {
+    testWidgets('结算弹窗在 $size 双倍字号可滚动并完成操作', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      String? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  result = await showDialog<String>(
+                    context: context,
+                    builder: (_) => const SessionResultDialog(
+                      totalProblems: 10,
+                      correctCount: 3,
+                      durationSeconds: 75,
+                      starsEarned: 0,
+                    ),
+                  );
+                },
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('再练一组'));
+      await tester.tap(find.text('再练一组'));
+      await tester.pumpAndSettle();
+      expect(result, 'retry');
+    });
+  }
   group('SessionResultDialog 返回值契约', () {
     testWidgets('右上角关闭图标返回 null', (tester) async {
       String? result;

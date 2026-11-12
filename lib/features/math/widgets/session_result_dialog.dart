@@ -51,21 +51,21 @@ class SessionResultDialog extends StatelessWidget {
     final theme = Theme.of(context);
 
     return AlertDialog(
+      scrollable: true,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(SpacingTokens.radiusLarge),
       ),
-      title: Stack(
+      title: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 标题居中：两侧的关闭按钮未参与布局（Positioned），
-          // 标题行必须独占整宽才能保持视觉居中。
-          Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+          Expanded(
+            child: Column(
               children: [
                 Icon(_grade.icon, color: theme.colorScheme.primary, size: 28),
-                const SizedBox(width: SpacingTokens.sm),
+                const SizedBox(height: SpacingTokens.sm),
                 Text(
                   _grade.text,
+                  textAlign: TextAlign.center,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -73,17 +73,12 @@ class SessionResultDialog extends StatelessWidget {
               ],
             ),
           ),
-          // 右上角关闭：返回 null，由调用方按「返回上一页」处理。
-          Positioned(
-            top: -SpacingTokens.sm,
-            right: -SpacingTokens.sm,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close_rounded),
-              tooltip: '关闭',
-              visualDensity: VisualDensity.compact,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close_rounded),
+            tooltip: '关闭',
+            visualDensity: VisualDensity.compact,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ],
       ),
@@ -120,23 +115,21 @@ class SessionResultDialog extends StatelessWidget {
 
           const SizedBox(height: SpacingTokens.lg),
 
-          // 按钮行
-          Row(
+          // OverflowBar switches to a vertical layout when labels do not fit.
+          OverflowBar(
+            alignment: MainAxisAlignment.center,
+            overflowAlignment: OverflowBarAlignment.center,
+            spacing: SpacingTokens.sm,
+            overflowSpacing: SpacingTokens.sm,
             children: [
-              if (!_allCorrect) ...[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop('review'),
-                    child: Text(reviewLabel),
-                  ),
+              if (!_allCorrect)
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop('review'),
+                  child: Text(reviewLabel, textAlign: TextAlign.center),
                 ),
-                const SizedBox(width: SpacingTokens.sm),
-              ],
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop('retry'),
-                  child: const Text('再练一组'),
-                ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop('retry'),
+                child: const Text('再练一组', textAlign: TextAlign.center),
               ),
             ],
           ),
@@ -147,8 +140,10 @@ class SessionResultDialog extends StatelessWidget {
 
   Widget _buildStatRow(BuildContext context, String label, String value) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      spacing: SpacingTokens.sm,
+      runSpacing: SpacingTokens.xs,
       children: [
         Text(label, style: theme.textTheme.bodyMedium),
         Text(

@@ -37,15 +37,17 @@ class MathMistakeAdapter extends TypeAdapter<MathMistake> {
       semester: fields[17] as String?,
       problemJson: fields[18] as String?,
       attemptJson: fields[19] as String?,
-      appliedActivityIds:
-          fields[20] == null ? [] : (fields[20] as List).cast<String>(),
+      appliedActivityIds: fields[20] == null
+          ? []
+          : (fields[20] as List).cast<String>(),
+      repracticeHistoryJson: fields[21] as String? ?? '[]',
     );
   }
 
   @override
   void write(BinaryWriter writer, MathMistake obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -87,7 +89,9 @@ class MathMistakeAdapter extends TypeAdapter<MathMistake> {
       ..writeByte(19)
       ..write(obj.attemptJson)
       ..writeByte(20)
-      ..write(obj.appliedActivityIds);
+      ..write(obj.appliedActivityIds)
+      ..writeByte(21)
+      ..write(obj.repracticeHistoryJson);
   }
 
   @override

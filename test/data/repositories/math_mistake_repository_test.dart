@@ -122,6 +122,36 @@ void main() {
       expect(m.nextConsolidationDate, isNull);
     });
 
+    test('每次重练结果按时间保存且保留原始错题答案', () async {
+      final original = makeMistake(id: 'm1');
+      original.attemptJson = '{"answer":"3"}';
+      await repo.add(original);
+      final firstAt = DateTime(2026, 11, 12, 9, 10);
+      final secondAt = DateTime(2026, 11, 13, 10, 20);
+
+      await repo.recordRepracticeResult(
+        'm1',
+        isCorrect: false,
+        completedAt: firstAt,
+      );
+      await repo.recordRepracticeResult(
+        'm1',
+        isCorrect: true,
+        completedAt: secondAt,
+      );
+
+      final saved = repo.getById('m1')!;
+      expect(saved.retryCount, 2);
+      expect(saved.userAnswer, '3');
+      expect(saved.attemptJson, '{"answer":"3"}');
+      expect(
+        saved.repracticeHistory
+            .map((result) => (result.isCorrect, result.completedAt))
+            .toList(),
+        [(false, firstAt), (true, secondAt)],
+      );
+    });
+
     test('recordRepracticeResult 首次答对进入巩固队列而非直接掌握', () async {
       await repo.add(makeMistake(id: 'm1'));
       final outcome = await repo.recordRepracticeResult('m1', isCorrect: true);
@@ -133,10 +163,7 @@ void main() {
       expect(m.isResolved, isFalse);
       expect(m.consolidationRound, 1);
       expect(m.isConsolidating, isTrue);
-      expect(
-        m.nextConsolidationDate,
-        _today().add(const Duration(days: 1)),
-      );
+      expect(m.nextConsolidationDate, _today().add(const Duration(days: 1)));
     });
 
     test('totalCount 和 unresolvedCount', () async {

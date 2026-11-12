@@ -58,9 +58,7 @@ Future<void> _pumpDetail(WidgetTester tester, MathMistake mistake) async {
       overrides: [
         mathMistakeRepoProvider.overrideWithValue(_FakeMistakeRepo([mistake])),
       ],
-      child: const MaterialApp(
-        home: MathMistakeDetailPage(mistakeId: 'm1'),
-      ),
+      child: const MaterialApp(home: MathMistakeDetailPage(mistakeId: 'm1')),
     ),
   );
   await tester.pumpAndSettle();
@@ -113,5 +111,29 @@ void main() {
     expect(find.text('累计答错 3 次'), findsOneWidget);
     expect(find.text('重练 2 次'), findsOneWidget);
     expect(find.text('已掌握'), findsOneWidget);
+  });
+
+  testWidgets('详情页展示各次重练的答对答错结果', (tester) async {
+    final mistake = _mistakeOf(retryCount: 2, isResolved: true)
+      ..repracticeHistoryJson = jsonEncode([
+        {
+          'isCorrect': false,
+          'completedAt': DateTime(2026, 11, 11, 9).toIso8601String(),
+        },
+        {
+          'isCorrect': true,
+          'completedAt': DateTime(2026, 11, 12, 10).toIso8601String(),
+        },
+      ]);
+
+    await _pumpDetail(tester, mistake);
+    expect(find.text('重练记录（2 次）'), findsOneWidget);
+    await tester.tap(find.text('重练记录（2 次）'));
+    await tester.pumpAndSettle();
+
+    final first = tester.widget<Text>(find.textContaining('第1次'));
+    final second = tester.widget<Text>(find.textContaining('第2次'));
+    expect(first.data, contains('答错'));
+    expect(second.data, contains('答对'));
   });
 }

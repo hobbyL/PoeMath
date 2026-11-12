@@ -3,6 +3,8 @@
 // 层级：data/models
 // 职责：口算错题模型。Profile-scoped。
 
+import 'dart:convert';
+
 import 'package:hive/hive.dart';
 
 part 'math_mistake.g.dart';
@@ -87,6 +89,10 @@ class MathMistake extends HiveObject {
   @HiveField(20, defaultValue: <String>[])
   List<String> appliedActivityIds;
 
+  /// 本版本起的逐次重练结果；旧记录没有可恢复的历史，默认空列表。
+  @HiveField(21, defaultValue: '[]')
+  String repracticeHistoryJson;
+
   MathMistake({
     required this.id,
     required this.profileId,
@@ -109,32 +115,53 @@ class MathMistake extends HiveObject {
     this.problemJson,
     this.attemptJson,
     List<String> appliedActivityIds = const [],
-  })  : createdAt = createdAt ?? DateTime.now(),
-        appliedActivityIds = List.of(appliedActivityIds);
+    this.repracticeHistoryJson = '[]',
+  }) : createdAt = createdAt ?? DateTime.now(),
+       appliedActivityIds = List.of(appliedActivityIds);
+
+  List<MathRepracticeResult> get repracticeHistory {
+    final decoded = jsonDecode(repracticeHistoryJson);
+    if (decoded is! List) throw const FormatException('错题重练记录格式无效');
+    return List.unmodifiable(decoded.map(MathRepracticeResult.fromJson));
+  }
+
+  void appendRepracticeResult({
+    required bool isCorrect,
+    required DateTime completedAt,
+  }) {
+    final history = repracticeHistory.toList()
+      ..add(
+        MathRepracticeResult(isCorrect: isCorrect, completedAt: completedAt),
+      );
+    repracticeHistoryJson = jsonEncode(
+      history.map((result) => result.toJson()).toList(),
+    );
+  }
 
   MathMistake copy() => MathMistake(
-        id: id,
-        profileId: profileId,
-        problemText: problemText,
-        correctAnswer: correctAnswer,
-        userAnswer: userAnswer,
-        problemType: problemType,
-        grade: grade,
-        errorType: errorType,
-        solutionStepsJson: solutionStepsJson,
-        createdAt: createdAt,
-        isResolved: isResolved,
-        retryCount: retryCount,
-        wrongCount: wrongCount,
-        lastWrongAt: lastWrongAt,
-        consolidationRound: consolidationRound,
-        nextConsolidationDate: nextConsolidationDate,
-        skillId: skillId,
-        semester: semester,
-        problemJson: problemJson,
-        attemptJson: attemptJson,
-        appliedActivityIds: List.of(appliedActivityIds),
-      );
+    id: id,
+    profileId: profileId,
+    problemText: problemText,
+    correctAnswer: correctAnswer,
+    userAnswer: userAnswer,
+    problemType: problemType,
+    grade: grade,
+    errorType: errorType,
+    solutionStepsJson: solutionStepsJson,
+    createdAt: createdAt,
+    isResolved: isResolved,
+    retryCount: retryCount,
+    wrongCount: wrongCount,
+    lastWrongAt: lastWrongAt,
+    consolidationRound: consolidationRound,
+    nextConsolidationDate: nextConsolidationDate,
+    skillId: skillId,
+    semester: semester,
+    problemJson: problemJson,
+    attemptJson: attemptJson,
+    appliedActivityIds: List.of(appliedActivityIds),
+    repracticeHistoryJson: repracticeHistoryJson,
+  );
 
   // ============ 派生状态（单一真相源：isResolved + consolidationRound）============
 
@@ -150,7 +177,39 @@ class MathMistake extends HiveObject {
     final due = nextConsolidationDate;
     if (due == null) return true;
     final now = DateTime.now();
-    return !DateTime(due.year, due.month, due.day)
-        .isAfter(DateTime(now.year, now.month, now.day));
+    return !DateTime(
+      due.year,
+      due.month,
+      due.day,
+    ).isAfter(DateTime(now.year, now.month, now.day));
+  }
+}
+
+class MathRepracticeResult {
+  const MathRepracticeResult({
+    required this.isCorrect,
+    required this.completedAt,
+  });
+
+  final bool isCorrect;
+  final DateTime completedAt;
+
+  Map<String, Object> toJson() => {
+    'isCorrect': isCorrect,
+    'completedAt': completedAt.toIso8601String(),
+  };
+
+  factory MathRepracticeResult.fromJson(Object? value) {
+    if (value is! Map<String, dynamic> ||
+        value['isCorrect'] is! bool ||
+        value['completedAt'] is! String) {
+      throw const FormatException('错题重练记录内容无效');
+    }
+    final completedAt = DateTime.tryParse(value['completedAt'] as String);
+    if (completedAt == null) throw const FormatException('错题重练时间无效');
+    return MathRepracticeResult(
+      isCorrect: value['isCorrect'] as bool,
+      completedAt: completedAt,
+    );
   }
 }

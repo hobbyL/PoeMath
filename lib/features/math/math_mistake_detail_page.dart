@@ -28,6 +28,19 @@ import 'package:poemath/features/math/math_practice_request.dart';
 import 'package:poemath/features/math/math_mistake_snapshot.dart';
 import 'package:poemath/math_engine/models/vertical_attempt.dart';
 
+String _repracticeLabel(
+  BuildContext context,
+  int index,
+  MathRepracticeResult result,
+) {
+  final localizations = MaterialLocalizations.of(context);
+  final date = localizations.formatShortDate(result.completedAt);
+  final time = localizations.formatTimeOfDay(
+    TimeOfDay.fromDateTime(result.completedAt),
+  );
+  return '第${index + 1}次 · $date $time · ${result.isCorrect ? '答对' : '答错'}';
+}
+
 class MathMistakeDetailPage extends ConsumerWidget {
   const MathMistakeDetailPage({super.key, required this.mistakeId});
 
@@ -191,6 +204,39 @@ class MathMistakeDetailPage extends ConsumerWidget {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
+                      if (mistake.repracticeHistory.isNotEmpty) ...[
+                        const SizedBox(height: SpacingTokens.xs),
+                        Material(
+                          color: Colors.transparent,
+                          child: ExpansionTile(
+                            tilePadding: EdgeInsets.zero,
+                            childrenPadding: const EdgeInsets.only(
+                              left: SpacingTokens.md,
+                              bottom: SpacingTokens.xs,
+                            ),
+                            title: Text(
+                              '重练记录（${mistake.repracticeHistory.length} 次）',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            children: [
+                              for (final (index, result)
+                                  in mistake.repracticeHistory.indexed)
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: SpacingTokens.xs,
+                                    ),
+                                    child: Text(
+                                      _repracticeLabel(context, index, result),
+                                      style: theme.textTheme.bodySmall,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 )

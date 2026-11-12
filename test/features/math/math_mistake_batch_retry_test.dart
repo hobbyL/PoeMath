@@ -60,6 +60,7 @@ class _FailingRepo extends _FakeMistakeRepo {
   Future<RepracticeOutcome?> recordRepracticeResult(
     String id, {
     required bool isCorrect,
+    DateTime? completedAt,
   }) async {
     attempts++;
     answers.add(isCorrect);

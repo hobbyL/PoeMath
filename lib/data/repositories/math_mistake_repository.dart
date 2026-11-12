@@ -37,8 +37,10 @@ class MathMistakeRepository {
     required String problemText,
     required String correctAnswer,
   }) {
-    final normalized =
-        problemText.replaceAll('−', '-').replaceAll(RegExp(r'\s+'), ' ').trim();
+    final normalized = problemText
+        .replaceAll('−', '-')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
     final digest = md5.convert(utf8.encode('$normalized|$correctAnswer'));
     return 'm_$digest';
   }
@@ -60,8 +62,9 @@ class MathMistakeRepository {
         .where((m) => m.profileId == ProfileScope.currentId)
         .toList()
       ..sort(
-        (a, b) => (b.lastWrongAt ?? b.createdAt)
-            .compareTo(a.lastWrongAt ?? a.createdAt),
+        (a, b) => (b.lastWrongAt ?? b.createdAt).compareTo(
+          a.lastWrongAt ?? a.createdAt,
+        ),
       );
   }
 
@@ -82,8 +85,10 @@ class MathMistakeRepository {
     String? attemptJson,
     String? activityId,
   }) async {
-    final id =
-        problemKey(problemText: problemText, correctAnswer: correctAnswer);
+    final id = problemKey(
+      problemText: problemText,
+      correctAnswer: correctAnswer,
+    );
     Future<void> record() async {
       final existing = getById(id)?.copy();
       final now = DateTime.now();
@@ -195,11 +200,17 @@ class MathMistakeRepository {
   Future<RepracticeOutcome?> recordRepracticeResult(
     String id, {
     required bool isCorrect,
+    DateTime? completedAt,
   }) async {
     final mistake = getById(id)?.copy();
     if (mistake == null) return null;
 
+    final recordedAt = completedAt ?? DateTime.now();
     mistake.retryCount++;
+    mistake.appendRepracticeResult(
+      isCorrect: isCorrect,
+      completedAt: recordedAt,
+    );
 
     if (!isCorrect) {
       mistake
@@ -219,11 +230,13 @@ class MathMistakeRepository {
       outcome = RepracticeOutcome.mastered;
     } else {
       final nextRound = mistake.consolidationRound + 1;
-      final now = DateTime.now();
+      final now = recordedAt;
       mistake
         ..consolidationRound = nextRound
         ..nextConsolidationDate = DateTime(
-          now.year, now.month, now.day + consolidationIntervals[nextRound - 1],
+          now.year,
+          now.month,
+          now.day + consolidationIntervals[nextRound - 1],
         );
       outcome = nextRound == 1
           ? RepracticeOutcome.enteredConsolidation
