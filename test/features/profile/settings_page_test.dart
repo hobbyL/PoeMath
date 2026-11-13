@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -49,9 +51,9 @@ class _FailingSettingsRepository extends SettingsRepository {
 /// 反馈」含页面动画、音效和触觉反馈），裸 byType 会 ambiguous 失败。按标题定位对
 /// 分组变动免疫。
 Finder _switchOf(String title) => find.descendant(
-      of: find.ancestor(of: find.text(title), matching: find.byType(AppTile)),
-      matching: find.byType(Switch),
-    );
+  of: find.ancestor(of: find.text(title), matching: find.byType(AppTile)),
+  matching: find.byType(Switch),
+);
 
 void main() {
   setUp(() async {
@@ -95,6 +97,32 @@ void main() {
   });
 
   testWidgets('五个分类展示对应设置项并能进入AI与提醒子页', (tester) async {
+    const timeZoneChannel = MethodChannel('flutter_timezone');
+    const notificationsChannel = MethodChannel(
+      'dexterous.com/flutter/local_notifications',
+    );
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(timeZoneChannel, (call) async {
+      if (call.method == 'getLocalTimezone') return 'Asia/Shanghai';
+      throw UnsupportedError('未预期的时区调用：${call.method}');
+    });
+    messenger.setMockMethodCallHandler(notificationsChannel, (call) async {
+      return switch (call.method) {
+        'initialize' ||
+        'areNotificationsEnabled' ||
+        'canScheduleExactNotifications' => true,
+        'getNotificationChannels' => <Map<String, Object?>>[],
+        'getNotificationAppLaunchDetails' => {'notificationLaunchedApp': false},
+        'cancel' => null,
+        _ => throw UnsupportedError('未预期的通知调用：${call.method}'),
+      };
+    });
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(timeZoneChannel, null);
+      messenger.setMockMethodCallHandler(notificationsChannel, null);
+    });
+    AndroidFlutterLocalNotificationsPlugin.registerWith();
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -155,7 +183,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('通知提醒'), findsOneWidget);
     expect(find.text('关于韵算'), findsOneWidget);
-    await tester.tap(find.text('通知提醒'));
+    // 通知页初始化会恢复 Hive 调度设置，导航帧和状态读取须推进真实异步。
+    await tester.runAsync(() async {
+      await tester.tap(find.text('通知提醒'));
+      await tester.pump();
+    });
+    final statusLabel = find.text('已允许，点击检查通知和角标设置');
+    final statusWait = Stopwatch()..start();
+    while (statusLabel.evaluate().isEmpty &&
+        statusWait.elapsed < const Duration(seconds: 5)) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    expect(statusLabel, findsOneWidget);
     await tester.pumpAndSettle();
     expect(find.text('通知设置'), findsOneWidget);
     await tester.pageBack();
@@ -276,9 +318,7 @@ void main() {
   testWidgets('动画保存期间离开分类页不访问销毁的ref，保存结果仍刷新全局偏好', (tester) async {
     final settings = _DelayedSettingsRepository();
     final container = ProviderContainer(
-      overrides: [
-        settingsRepositoryProvider.overrideWithValue(settings),
-      ],
+      overrides: [settingsRepositoryProvider.overrideWithValue(settings)],
     );
     addTearDown(container.dispose);
 
@@ -321,9 +361,7 @@ void main() {
     // 现在统一由 `_writeSetting` 捕获并提示。
     final settings = _FailingSettingsRepository();
     final container = ProviderContainer(
-      overrides: [
-        settingsRepositoryProvider.overrideWithValue(settings),
-      ],
+      overrides: [settingsRepositoryProvider.overrideWithValue(settings)],
     );
     addTearDown(container.dispose);
 
