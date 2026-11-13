@@ -118,6 +118,13 @@ class TextbookCurlPageImage extends StatelessWidget {
     );
     final colors = Theme.of(context).colorScheme;
     return CustomPaint(
+      painter: scope.incoming
+          ? null
+          : _CurlPaperPainter(
+              curl: curl,
+              source: source,
+              paper: colors.surface,
+            ),
       foregroundPainter: _CurlImagePainter(
         curl: curl,
         incoming: scope.incoming,
@@ -134,6 +141,33 @@ class TextbookCurlPageImage extends StatelessWidget {
   }
 }
 
+class _CurlPaperPainter extends CustomPainter {
+  const _CurlPaperPainter({
+    required this.curl,
+    required this.source,
+    required this.paper,
+  });
+
+  final TextbookPageCurl curl;
+  final Rect source;
+  final Color paper;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (!curl.active || source.right <= curl.spine) return;
+    canvas.save();
+    canvas.translate(-source.left, -source.top);
+    canvas.drawPath(curl.leafCoverage, Paint()..color = paper);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_CurlPaperPainter oldDelegate) =>
+      oldDelegate.curl != curl ||
+      oldDelegate.source != source ||
+      oldDelegate.paper != paper;
+}
+
 class _FlatPageClipper extends CustomClipper<Path> {
   const _FlatPageClipper(this.curl, this.incoming, this.source);
 
@@ -145,10 +179,10 @@ class _FlatPageClipper extends CustomClipper<Path> {
   Path getClip(Size size) {
     if (!curl.active) return Path()..addRect(Offset.zero & size);
     final path = incoming
-        ? curl.revealed
+        ? Path()
         : source.right <= curl.spine
-            ? (Path()..addRect(source))
-            : curl.flatClip(source);
+        ? (Path()..addRect(source))
+        : curl.flatClip(source);
     return path.shift(-source.topLeft);
   }
 
@@ -179,6 +213,26 @@ class _CurlImagePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (!curl.active) return;
+    if (incoming) {
+      // 保留 RawImage 子树，借用原位图绘制底页，再在同一层擦除纸张遮挡。
+      canvas.saveLayer(Offset.zero & size, Paint());
+      canvas.drawImageRect(
+        image,
+        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+        Offset.zero & size,
+        Paint()..filterQuality = FilterQuality.low,
+      );
+      canvas.save();
+      canvas.translate(-source.left, -source.top);
+      canvas.drawPath(
+        curl.coverage,
+        Paint()
+          ..blendMode = BlendMode.dstOut
+          ..isAntiAlias = false,
+      );
+      canvas.restore();
+      canvas.restore();
+    }
     final backTexture =
         incoming && curl.doublePage && source.right <= curl.spine;
     if (incoming && !backTexture || !incoming && source.right <= curl.spine) {
@@ -269,25 +323,30 @@ class _CurlShadowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (!incoming || !curl.active) return;
     final edge = curl
-        .project(
-          Offset(curl.fold + curl.radius * math.pi / 2, size.height / 2),
-        )
+        .project(Offset(curl.fold + curl.radius * math.pi / 2, size.height / 2))
         .position;
     final width = curl.radius * 1.4;
     if (width <= 0) return;
-    final bounds = Rect.fromLTWH(edge.dx - width * 0.1, 0, width, size.height);
+    canvas.saveLayer(Offset.zero & size, Paint());
     canvas.save();
-    canvas.clipPath(curl.revealed);
+    // 卷边沿倾斜轴延伸，阴影须使用同一方向；竖直投影会在底边留出白三角。
+    canvas.translate(edge.dx, edge.dy);
+    canvas.rotate(curl.tilt);
+    final bounds = Rect.fromLTWH(
+      -width * 0.1,
+      -size.height,
+      width,
+      size.height * 2,
+    );
     canvas.drawRect(
       bounds,
       Paint()
         ..shader = LinearGradient(
-          colors: [
-            shadow.withValues(alpha: 0.24),
-            shadow.withValues(alpha: 0),
-          ],
+          colors: [shadow.withValues(alpha: 0.24), shadow.withValues(alpha: 0)],
         ).createShader(bounds),
     );
+    canvas.restore();
+    canvas.drawPath(curl.coverage, Paint()..blendMode = BlendMode.dstOut);
     canvas.restore();
   }
 

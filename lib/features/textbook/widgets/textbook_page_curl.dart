@@ -55,28 +55,38 @@ class TextbookPageCurl {
 
   Path flatClip(Rect source) {
     if (!active) return Path()..addRect(source);
-    double edge(double y) => fold - (y - size.height / 2) * math.tan(tilt);
-    return Path()
-      ..moveTo(source.left, source.top)
-      ..lineTo(edge(source.top).clamp(source.left, source.right), source.top)
-      ..lineTo(
-        edge(source.bottom).clamp(source.left, source.right),
-        source.bottom,
-      )
-      ..lineTo(source.left, source.bottom)
-      ..close();
+    double distance(Offset point) =>
+        point.dx - fold + (point.dy - size.height / 2) * math.tan(tilt);
+    final corners = [
+      source.topLeft,
+      source.topRight,
+      source.bottomRight,
+      source.bottomLeft,
+    ];
+    final clipped = <Offset>[];
+    var previous = corners.last;
+    var previousDistance = distance(previous);
+    for (final current in corners) {
+      final currentDistance = distance(current);
+      if ((previousDistance <= 0) != (currentDistance <= 0)) {
+        final fraction =
+            previousDistance / (previousDistance - currentDistance);
+        clipped.add(previous + (current - previous) * fraction);
+      }
+      if (currentDistance <= 0) clipped.add(current);
+      previous = current;
+      previousDistance = currentDistance;
+    }
+    // 折线可能从纸张侧边穿出，不能把顶/底交点直接截到两个角上。
+    return Path()..addPolygon(clipped, true);
   }
 
-  late final mesh = meshFor(
-    Rect.fromLTRB(spine, 0, size.width, size.height),
-  );
+  late final mesh = meshFor(Rect.fromLTRB(spine, 0, size.width, size.height));
 
-  /// 统一绕向，重叠的正面、纸背共同构成遮挡轮廓，不能用 evenOdd 抵消。
-  late final coverage = () {
+  /// 只包含翻动纸张，不能覆盖对开模式中保持静止的左页。
+  late final leafCoverage = () {
     final path = Path();
-    if (doublePage) {
-      path.addRect(Rect.fromLTWH(0, 0, spine, size.height));
-    }
+    // 统一绕向，重叠的正面、纸背不能用 evenOdd 抵消。
     for (var i = 0; i < mesh.indices.length; i += 3) {
       final a = mesh.positions[mesh.indices[i]];
       final b = mesh.positions[mesh.indices[i + 1]];
@@ -92,20 +102,12 @@ class TextbookPageCurl {
     return path;
   }();
 
-  late final revealed = () {
-    final page = Path()..addRect(Offset.zero & size);
-    if (!active || progress >= 0.999) return page;
-    if (progress < 0.001) {
-      double edge(double y) => (fold - (y - size.height / 2) * math.tan(tilt))
-          .clamp(0.0, size.width);
-      return Path()
-        ..moveTo(edge(0), 0)
-        ..lineTo(size.width, 0)
-        ..lineTo(size.width, size.height)
-        ..lineTo(edge(size.height), size.height)
-        ..close();
+  late final coverage = () {
+    final path = Path();
+    if (doublePage) {
+      path.addRect(Rect.fromLTWH(0, 0, spine, size.height));
     }
-    return Path.combine(PathOperation.difference, page, coverage);
+    return path..addPath(leafCoverage, Offset.zero);
   }();
 
   /// 弯曲区密集采样，平面区域只需端点；随倾斜逐行对齐圆柱。
@@ -125,14 +127,14 @@ class TextbookPageCurl {
         final u = column == 0
             ? start
             : column == columns - 1
-                ? end
-                : (edge +
-                        radius *
-                            math.pi *
-                            (column - 1) /
-                            segments /
-                            math.cos(tilt))
-                    .clamp(start, end);
+            ? end
+            : (edge +
+                      radius *
+                          math.pi *
+                          (column - 1) /
+                          segments /
+                          math.cos(tilt))
+                  .clamp(start, end);
         final point = project(Offset(u, v));
         positions.add(point.position);
         texture.add(Offset(reverse ? size.width - u : u, v));

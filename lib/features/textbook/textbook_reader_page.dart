@@ -293,7 +293,7 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
             key: ValueKey(_viewerRevision),
             child:
                 widget.viewerBuilder?.call(context, options) ??
-                TextbookPdfView(options: options),
+                TextbookPdfView(options: options, horizontalPaging: true),
           );
         },
       ),

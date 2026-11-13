@@ -242,6 +242,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: TextbookPdfView(
+              horizontalPaging: true,
               options: TextbookViewerOptions(
                 path: file.path,
                 initialPage: 3,
@@ -300,6 +301,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: TextbookPdfView(
+              horizontalPaging: true,
               options: TextbookViewerOptions(
                 path: file.path,
                 initialPage: 3,
