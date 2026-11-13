@@ -373,8 +373,12 @@ class NotificationService {
         _lastExactAlarmCapability != status.exactAlarmsEnabled &&
         (isReminderEnabled || isWeeklyReportEnabled);
     final deliveryRecovered =
-        (isReminderEnabled && isReminderDegraded && status.canDeliverDailyReminder) ||
-        (isWeeklyReportEnabled && isWeeklyReportDegraded && status.canDeliverWeeklyReport);
+        (isReminderEnabled &&
+            isReminderDegraded &&
+            status.canDeliverDailyReminder) ||
+        (isWeeklyReportEnabled &&
+            isWeeklyReportDegraded &&
+            status.canDeliverWeeklyReport);
     _lastExactAlarmCapability = status.exactAlarmsEnabled;
     // 系统授权会让家长区锁定并销毁旧页面；重新进入时也能恢复已有提醒。
     if (status.exactAlarmsEnabled != null &&
@@ -463,7 +467,8 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     if (android == null) return true;
-    final granted = await android.requestExactAlarmsPermission() ??
+    final granted =
+        await android.requestExactAlarmsPermission() ??
         await android.canScheduleExactNotifications() ??
         false;
     // 只重放已保存的用户开关，不依赖授权返回时页面仍然存活。

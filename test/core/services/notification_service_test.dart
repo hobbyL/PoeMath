@@ -14,9 +14,8 @@ _MockNotificationsPlugin _createPlugin() {
   final plugin = _MockNotificationsPlugin();
   when(() => plugin.cancel(any())).thenAnswer((_) async {});
   // 默认无冷启动通知拉起；需要冷启动场景的测试单独覆盖此 stub。
-  when(
-    () => plugin.getNotificationAppLaunchDetails(),
-  ).thenAnswer((_) async => null);
+  when(() => plugin.getNotificationAppLaunchDetails())
+      .thenAnswer((_) async => null);
   return plugin;
 }
 
@@ -43,8 +42,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async {
       localTimeZoneWasConfigured = tz.local.name == 'Asia/Shanghai';
@@ -62,8 +62,9 @@ void main() {
     verify(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).called(1);
   });
@@ -82,8 +83,9 @@ void main() {
     verifyNever(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     );
   });
@@ -93,8 +95,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     when(
@@ -130,8 +133,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     when(
@@ -171,8 +175,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     when(
@@ -209,8 +214,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     when(
@@ -245,8 +251,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     when(
@@ -278,8 +285,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     when(
@@ -306,7 +314,11 @@ void main() {
     expect(service.isWeeklyReportDegraded, isTrue);
     when(
       () => plugin.zonedSchedule(
-        any(), any(), any(), any(), any(),
+        any(),
+        any(),
+        any(),
+        any(),
+        any(),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         payload: any(named: 'payload'),
@@ -325,8 +337,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     final service = NotificationService.forTesting(
@@ -339,8 +352,9 @@ void main() {
     verify(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).called(1);
   });
@@ -350,8 +364,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     final service = NotificationService.forTesting(
@@ -373,8 +388,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     when(
@@ -448,8 +464,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
 
@@ -462,13 +479,16 @@ void main() {
     await service.initialize();
 
     // 取出 initialize 注册的通知点击回调（payload 透传通道）。
-    final handler = verify(
-      () => plugin.initialize(
-        any(),
-        onDidReceiveNotificationResponse:
-            captureAny(named: 'onDidReceiveNotificationResponse'),
-      ),
-    ).captured.single as DidReceiveNotificationResponseCallback;
+    final handler =
+        verify(
+              () => plugin.initialize(
+                any(),
+                onDidReceiveNotificationResponse: captureAny(
+                  named: 'onDidReceiveNotificationResponse',
+                ),
+              ),
+            ).captured.single
+            as DidReceiveNotificationResponseCallback;
 
     handler(
       const NotificationResponse(
@@ -500,8 +520,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     when(() => plugin.getNotificationAppLaunchDetails()).thenAnswer(
@@ -533,13 +554,13 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
-    when(() => plugin.getNotificationAppLaunchDetails()).thenAnswer(
-      (_) async => const NotificationAppLaunchDetails(false),
-    );
+    when(() => plugin.getNotificationAppLaunchDetails())
+        .thenAnswer((_) async => const NotificationAppLaunchDetails(false));
 
     final service = NotificationService.forTesting(
       plugin: plugin,
@@ -555,8 +576,9 @@ void main() {
     when(
       () => plugin.initialize(
         any(),
-        onDidReceiveNotificationResponse:
-            any(named: 'onDidReceiveNotificationResponse'),
+        onDidReceiveNotificationResponse: any(
+          named: 'onDidReceiveNotificationResponse',
+        ),
       ),
     ).thenAnswer((_) async => true);
     when(
@@ -593,30 +615,34 @@ void main() {
     await HiveBoxes.settings.put('weekly_report_enabled', true);
     await service.reconcileWithStoredSettings();
 
-    final dailyDetails = verify(
-      () => plugin.zonedSchedule(
-        1001,
-        any(),
-        any(),
-        any(),
-        captureAny(),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.time,
-        payload: NotificationService.payloadDailyReminder,
-      ),
-    ).captured.single as NotificationDetails;
-    final weeklyDetails = verify(
-      () => plugin.zonedSchedule(
-        1002,
-        any(),
-        any(),
-        any(),
-        captureAny(),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        payload: NotificationService.payloadWeeklyReport,
-      ),
-    ).captured.single as NotificationDetails;
+    final dailyDetails =
+        verify(
+              () => plugin.zonedSchedule(
+                1001,
+                any(),
+                any(),
+                any(),
+                captureAny(),
+                androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+                matchDateTimeComponents: DateTimeComponents.time,
+                payload: NotificationService.payloadDailyReminder,
+              ),
+            ).captured.single
+            as NotificationDetails;
+    final weeklyDetails =
+        verify(
+              () => plugin.zonedSchedule(
+                1002,
+                any(),
+                any(),
+                any(),
+                captureAny(),
+                androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+                matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+                payload: NotificationService.payloadWeeklyReport,
+              ),
+            ).captured.single
+            as NotificationDetails;
     for (final details in [dailyDetails, weeklyDetails]) {
       expect(details.android!.channelShowBadge, isTrue);
       expect(details.android!.number, 1);

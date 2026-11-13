@@ -341,24 +341,101 @@ void main() {
     final fixture = _fixture();
     await fixture.service.initialize();
     clearInteractions(fixture.plugin);
-    when(() => fixture.android.requestExactAlarmsPermission()).thenAnswer((_) async {
-      when(() => fixture.android.canScheduleExactNotifications())
-          .thenAnswer((_) async => true);
-      return true;
-    });
+    when(() => fixture.android.requestExactAlarmsPermission())
+        .thenAnswer((_) async {
+          when(() => fixture.android.canScheduleExactNotifications())
+              .thenAnswer((_) async => true);
+          return true;
+        });
 
     expect(await fixture.service.requestExactAlarmPermission(), isTrue);
 
     for (final id in [1001, 1002]) {
-      verify(() => fixture.plugin.zonedSchedule(
-        id, any(), any(), any(), any(),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        matchDateTimeComponents: any(named: 'matchDateTimeComponents'),
-        payload: any(named: 'payload'),
-      )).called(1);
+      verify(
+        () => fixture.plugin.zonedSchedule(
+          id,
+          any(),
+          any(),
+          any(),
+          any(),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: id == 1001
+              ? DateTimeComponents.time
+              : DateTimeComponents.dayOfWeekAndTime,
+          payload: id == 1001
+              ? NotificationService.payloadDailyReminder
+              : NotificationService.payloadWeeklyReport,
+        ),
+      ).called(1);
     }
     expect(fixture.service.isReminderEnabled, isTrue);
     expect(fixture.service.isWeeklyReportEnabled, isTrue);
+  });
+
+  test('拒绝准时权限时保留提醒设置且不重复调度', () async {
+    await HiveBoxes.settings.putAll({
+      'reminder_enabled': true,
+      'weekly_report_enabled': true,
+      'reminder_hour': 7,
+      'reminder_minute': 30,
+    });
+    final fixture = _fixture();
+    await fixture.service.initialize();
+    final settingsBefore = HiveBoxes.settings.toMap();
+    clearInteractions(fixture.plugin);
+    when(() => fixture.android.requestExactAlarmsPermission())
+        .thenAnswer((_) async => false);
+
+    expect(await fixture.service.requestExactAlarmPermission(), isFalse);
+
+    expect(HiveBoxes.settings.toMap(), settingsBefore);
+    verifyNever(
+      () => fixture.plugin.zonedSchedule(
+        any(),
+        any(),
+        any(),
+        any(),
+        any(),
+        androidScheduleMode: any(named: 'androidScheduleMode'),
+        matchDateTimeComponents: any(named: 'matchDateTimeComponents'),
+        payload: any(named: 'payload'),
+      ),
+    );
+  });
+
+  test('准时授权成功但系统通知仍关闭时保留开关和降级标记', () async {
+    await HiveBoxes.settings.putAll({
+      'reminder_enabled': true,
+      'weekly_report_enabled': true,
+    });
+    final fixture = _fixture(notificationsEnabled: false);
+    await fixture.service.initialize();
+    clearInteractions(fixture.plugin);
+    when(() => fixture.android.requestExactAlarmsPermission())
+        .thenAnswer((_) async {
+          when(() => fixture.android.canScheduleExactNotifications())
+              .thenAnswer((_) async => true);
+          return true;
+        });
+
+    expect(await fixture.service.requestExactAlarmPermission(), isTrue);
+
+    expect(fixture.service.isReminderEnabled, isTrue);
+    expect(fixture.service.isWeeklyReportEnabled, isTrue);
+    expect(fixture.service.isReminderDegraded, isTrue);
+    expect(fixture.service.isWeeklyReportDegraded, isTrue);
+    verifyNever(
+      () => fixture.plugin.zonedSchedule(
+        any(),
+        any(),
+        any(),
+        any(),
+        any(),
+        androidScheduleMode: any(named: 'androidScheduleMode'),
+        matchDateTimeComponents: any(named: 'matchDateTimeComponents'),
+        payload: any(named: 'payload'),
+      ),
+    );
   });
 
   test('系统通知恢复后检查状态会恢复已开启的降级提醒', () async {
@@ -370,6 +447,7 @@ void main() {
     await fixture.service.initialize();
     expect(fixture.service.isReminderDegraded, isTrue);
     expect(fixture.service.isWeeklyReportDegraded, isTrue);
+    clearInteractions(fixture.plugin);
     when(() => fixture.android.areNotificationsEnabled())
         .thenAnswer((_) async => true);
 
@@ -380,6 +458,42 @@ void main() {
     expect(fixture.service.isWeeklyReportDegraded, isFalse);
     expect(fixture.service.isReminderEnabled, isTrue);
     expect(fixture.service.isWeeklyReportEnabled, isTrue);
+    for (final id in [1001, 1002]) {
+      verify(
+        () => fixture.plugin.zonedSchedule(
+          id,
+          any(),
+          any(),
+          any(),
+          any(),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          matchDateTimeComponents: id == 1001
+              ? DateTimeComponents.time
+              : DateTimeComponents.dayOfWeekAndTime,
+          payload: id == 1001
+              ? NotificationService.payloadDailyReminder
+              : NotificationService.payloadWeeklyReport,
+        ),
+      ).called(1);
+    }
+
+    clearInteractions(fixture.plugin);
+    expect(
+      (await fixture.service.getDeliveryStatus()).notificationsEnabled,
+      isTrue,
+    );
+    verifyNever(
+      () => fixture.plugin.zonedSchedule(
+        any(),
+        any(),
+        any(),
+        any(),
+        any(),
+        androidScheduleMode: any(named: 'androidScheduleMode'),
+        matchDateTimeComponents: any(named: 'matchDateTimeComponents'),
+        payload: any(named: 'payload'),
+      ),
+    );
   });
 
   test('在外部改变准时权限后检查状态也会更新已有调度模式', () async {
@@ -390,13 +504,22 @@ void main() {
     when(() => fixture.android.canScheduleExactNotifications())
         .thenAnswer((_) async => true);
 
-    expect((await fixture.service.getDeliveryStatus()).exactAlarmsEnabled, isTrue);
+    expect(
+      (await fixture.service.getDeliveryStatus()).exactAlarmsEnabled,
+      isTrue,
+    );
 
-    verify(() => fixture.plugin.zonedSchedule(
-      1001, any(), any(), any(), any(),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
-      payload: NotificationService.payloadDailyReminder,
-    )).called(1);
+    verify(
+      () => fixture.plugin.zonedSchedule(
+        1001,
+        any(),
+        any(),
+        any(),
+        any(),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: NotificationService.payloadDailyReminder,
+      ),
+    ).called(1);
   });
 }

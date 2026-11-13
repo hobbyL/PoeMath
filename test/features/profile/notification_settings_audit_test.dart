@@ -154,7 +154,7 @@ void main() {
     verify(() => service.openSystemNotificationSettings()).called(1);
   });
 
-  testWidgets('准时提醒授权成功后重新应用通知，页面显示已开启', (tester) async {
+  testWidgets('准时提醒授权成功后刷新设备状态并保留已有提醒', (tester) async {
     final service = _service(enabled: true);
     var status = const NotificationDeliveryStatus(exactAlarmsEnabled: false);
     when(() => service.getDeliveryStatus()).thenAnswer((_) async => status);
@@ -162,17 +162,44 @@ void main() {
       status = const NotificationDeliveryStatus(exactAlarmsEnabled: true);
       return true;
     });
-    when(() => service.reconcileWithStoredSettings())
-        .thenAnswer((_) async => true);
     await _pump(tester, service);
     expect(find.text('未开启，系统可能延后通知，点击开启'), findsOneWidget);
+    clearInteractions(service);
 
     await tester.tap(find.text('准时提醒'));
     await tester.pumpAndSettle();
 
     verify(() => service.requestExactAlarmPermission()).called(1);
-    verify(() => service.reconcileWithStoredSettings()).called(1);
+    verify(() => service.getDeliveryStatus()).called(1);
+    verifyNever(() => service.reconcileWithStoredSettings());
     expect(find.text('已开启，按设置时间提醒'), findsOneWidget);
+    expect(find.text('已开启准时提醒'), findsOneWidget);
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
+  });
+
+  testWidgets('准时授权成功但通知仍关闭时明确提示提醒未生效', (tester) async {
+    final service = _service(enabled: true);
+    var status = const NotificationDeliveryStatus(
+      notificationsEnabled: false,
+      exactAlarmsEnabled: false,
+    );
+    when(() => service.isReminderDegraded).thenReturn(true);
+    when(() => service.getDeliveryStatus()).thenAnswer((_) async => status);
+    when(() => service.requestExactAlarmPermission()).thenAnswer((_) async {
+      status = const NotificationDeliveryStatus(
+        notificationsEnabled: false,
+        exactAlarmsEnabled: true,
+      );
+      return true;
+    });
+    await _pump(tester, service);
+
+    await tester.tap(find.text('准时提醒'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('准时提醒权限已开启，但提醒未能生效，请检查系统通知设置'), findsOneWidget);
+    expect(find.text('已开启准时提醒'), findsNothing);
+    expect(find.textContaining('系统通知未开启'), findsOneWidget);
     expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
   });
 
@@ -223,21 +250,23 @@ void main() {
       notificationsEnabled: false,
       exactAlarmsEnabled: false,
     );
-    when(() => service.getDeliveryStatus()).thenAnswer((_) async => status);
-    when(() => service.isReminderDegraded).thenReturn(true);
-    when(() => service.reconcileWithStoredSettings()).thenAnswer((_) async {
-      when(() => service.isReminderDegraded).thenReturn(false);
-      return true;
+    var degraded = true;
+    when(() => service.isReminderDegraded).thenAnswer((_) => degraded);
+    when(() => service.getDeliveryStatus()).thenAnswer((_) async {
+      degraded = !status.canDeliverDailyReminder;
+      return status;
     });
     await _pump(tester, service);
     expect(find.textContaining('系统通知未开启'), findsOneWidget);
+    clearInteractions(service);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     status = const NotificationDeliveryStatus(exactAlarmsEnabled: true);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
 
-    verify(() => service.reconcileWithStoredSettings()).called(1);
+    verify(() => service.getDeliveryStatus()).called(1);
+    verifyNever(() => service.reconcileWithStoredSettings());
     expect(find.text('已允许，点击检查通知和角标设置'), findsOneWidget);
     expect(find.textContaining('提醒未能生效'), findsNothing);
     expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
