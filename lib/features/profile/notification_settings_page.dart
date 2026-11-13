@@ -68,22 +68,26 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage>
     }
   }
 
-  Future<void> _refreshDeliveryStatus() => _save(() async {
-    try {
-      final status = await _notificationService.getDeliveryStatus();
-      if (!mounted) return;
-      setState(() {
-        _deliveryStatus = status;
-        _statusError = false;
-        _reminderDegraded = _notificationService.isReminderDegraded;
-        _weeklyDegraded = _notificationService.isWeeklyReportDegraded;
-      });
-    } on Object catch (error, stack) {
-      AppLogger.e('读取通知状态失败', tag: 'Notify', error: error, stackTrace: stack);
-      if (!mounted) return;
-      setState(() => _statusError = true);
-    }
-  }, '读取通知状态失败，请稍后重试', refreshStatus: false);
+  Future<void> _refreshDeliveryStatus() => _save(
+    () async {
+      try {
+        final status = await _notificationService.getDeliveryStatus();
+        if (!mounted) return;
+        setState(() {
+          _deliveryStatus = status;
+          _statusError = false;
+          _reminderDegraded = _notificationService.isReminderDegraded;
+          _weeklyDegraded = _notificationService.isWeeklyReportDegraded;
+        });
+      } on Object catch (error, stack) {
+        AppLogger.e('读取通知状态失败', tag: 'Notify', error: error, stackTrace: stack);
+        if (!mounted) return;
+        setState(() => _statusError = true);
+      }
+    },
+    '读取通知状态失败，请稍后重试',
+    refreshStatus: false,
+  );
 
   String get _timeLabel =>
       '${_reminderHour.toString().padLeft(2, '0')}:${_reminderMinute.toString().padLeft(2, '0')}';
@@ -124,11 +128,10 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage>
       _showMessage('准时提醒未开启，系统可能延后通知');
       return;
     }
-    final degraded = (svc.isReminderEnabled && svc.isReminderDegraded) ||
+    final degraded =
+        (svc.isReminderEnabled && svc.isReminderDegraded) ||
         (svc.isWeeklyReportEnabled && svc.isWeeklyReportDegraded);
-    _showMessage(degraded
-        ? '准时提醒权限已开启，但提醒未能生效，请检查系统通知设置'
-        : '已开启准时提醒');
+    _showMessage(degraded ? '准时提醒权限已开启，但提醒未能生效，请检查系统通知设置' : '已开启准时提醒');
   }, '开启准时提醒失败，请稍后重试');
 
   Future<void> _sendTestNotification() => _save(() async {
@@ -265,135 +268,140 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage>
       appBar: AppBar(title: const Text('通知设置')),
       body: SafeArea(
         child: AnimatedPageBody(
-          padding: const EdgeInsets.all(SpacingTokens.lg),
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.md,
+            vertical: SpacingTokens.sm,
+          ),
           children: [
-            ColoredCard(
-              color: theme.colorScheme.primary,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+            // 保留稳定分组，条件项变化时只更新组内卡片，避免重播列表入场动画。
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppTile(
+                  icon: Icons.settings_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: '系统通知',
+                  subtitle: _statusError
+                      ? '暂时无法读取通知状态，点击重试'
+                      : _deliveryStatus == null
+                      ? '正在检查通知权限'
+                      : _deliveryStatus!.notificationsEnabled
+                      ? '已允许，点击检查通知和角标设置'
+                      : '未开启，点击开启通知和角标',
+                  onTap: _busy
+                      ? null
+                      : _statusError
+                      ? _refreshDeliveryStatus
+                      : _openSystemNotificationSettings,
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                if (_deliveryStatus?.exactAlarmsEnabled != null) ...[
                   AppTile(
-                    flat: true,
-                    icon: Icons.settings_outlined,
+                    icon: Icons.alarm_outlined,
                     iconColor: theme.colorScheme.primary,
-                    title: '系统通知',
-                    subtitle: _statusError
-                        ? '暂时无法读取通知状态，点击重试'
-                        : _deliveryStatus == null
-                        ? '正在检查通知权限'
-                        : _deliveryStatus!.notificationsEnabled
-                        ? '已允许，点击检查通知和角标设置'
-                        : '未开启，点击开启通知和角标',
-                    onTap: _busy
-                        ? null
-                        : _statusError
-                        ? _refreshDeliveryStatus
-                        : _openSystemNotificationSettings,
+                    title: '准时提醒',
+                    subtitle: _deliveryStatus!.exactAlarmsEnabled!
+                        ? '已开启，按设置时间提醒'
+                        : '未开启，系统可能延后通知，点击开启',
+                    onTap: _busy ? null : _requestExactAlarmPermission,
                   ),
-                  if (_deliveryStatus?.exactAlarmsEnabled != null)
-                    AppTile(
-                      flat: true,
-                      icon: Icons.alarm_outlined,
-                      iconColor: theme.colorScheme.primary,
-                      title: '准时提醒',
-                      subtitle: _deliveryStatus!.exactAlarmsEnabled!
-                          ? '已开启，按设置时间提醒'
-                          : '未开启，系统可能延后通知，点击开启',
-                      onTap: _busy ? null : _requestExactAlarmPermission,
-                    ),
-                  AppTile(
-                    flat: true,
-                    icon: Icons.notification_add_outlined,
-                    iconColor: theme.colorScheme.primary,
-                    title: '发送测试通知',
-                    subtitle: '立即发送一条提醒，返回桌面查看角标',
-                    onTap: _busy ? null : _sendTestNotification,
-                  ),
+                  const SizedBox(height: SpacingTokens.sm),
                 ],
-              ),
+                AppTile(
+                  icon: Icons.notification_add_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: '发送测试通知',
+                  subtitle: '立即发送一条提醒，返回桌面查看角标',
+                  onTap: _busy ? null : _sendTestNotification,
+                ),
+              ],
             ),
-            const SizedBox(height: SpacingTokens.md),
-            ColoredCard(
-              color: theme.colorScheme.primary,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AppTile(
-                    flat: true,
-                    icon: Icons.notifications_outlined,
-                    iconColor: theme.colorScheme.primary,
-                    title: '每日学习提醒',
-                    subtitle: '每天定时推送通知，提醒孩子学习诗词和口算',
-                    trailingInTitle: true,
-                    trailing: Semantics(
-                      label: '每日学习提醒',
-                      child: Switch(
-                        value: _reminderEnabled,
-                        onChanged: _busy ? null : _toggleReminder,
-                      ),
+            const SizedBox(height: SpacingTokens.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppTile(
+                  icon: Icons.notifications_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: '每日学习提醒',
+                  subtitle: '每天定时推送通知，提醒孩子学习诗词和口算',
+                  trailingInTitle: true,
+                  trailing: Semantics(
+                    label: '每日学习提醒',
+                    child: Switch(
+                      value: _reminderEnabled,
+                      onChanged: _busy ? null : _toggleReminder,
                     ),
                   ),
-                  if (_reminderEnabled && _reminderWarning != null)
-                    Text(
+                ),
+                if (_reminderEnabled && _reminderWarning != null)
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: SpacingTokens.md,
+                      top: SpacingTokens.xs,
+                      right: SpacingTokens.md,
+                    ),
+                    child: Text(
                       _reminderWarning!,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.error,
                       ),
                     ),
-                  if (_reminderEnabled) ...[
-                    const SizedBox(height: SpacingTokens.sm),
-                    AppTile(
-                      flat: true,
-                      icon: Icons.access_time,
-                      iconColor: theme.colorScheme.primary,
-                      title: '提醒时间：$_timeLabel',
-                      subtitle: '',
-                      trailingIcon: Icons.edit_outlined,
-                      onTap: _busy ? null : _pickTime,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            ColoredCard(
-              color: theme.colorScheme.primary,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+                  ),
+                if (_reminderEnabled) ...[
+                  const SizedBox(height: SpacingTokens.sm),
                   AppTile(
-                    flat: true,
-                    icon: Icons.insert_chart_outlined,
+                    icon: Icons.access_time,
                     iconColor: theme.colorScheme.primary,
-                    title: '学习周报推送',
-                    subtitle: '每周日 18:00 推送本周学习数据汇总通知',
-                    trailingInTitle: true,
-                    trailing: Semantics(
-                      label: '学习周报推送',
-                      child: Switch(
-                        value: _weeklyEnabled,
-                        onChanged: _busy ? null : _toggleWeekly,
-                      ),
+                    title: '提醒时间：$_timeLabel',
+                    subtitle: '',
+                    trailingIcon: Icons.edit_outlined,
+                    onTap: _busy ? null : _pickTime,
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppTile(
+                  icon: Icons.insert_chart_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: '学习周报推送',
+                  subtitle: '每周日 18:00 推送本周学习数据汇总通知',
+                  trailingInTitle: true,
+                  trailing: Semantics(
+                    label: '学习周报推送',
+                    child: Switch(
+                      value: _weeklyEnabled,
+                      onChanged: _busy ? null : _toggleWeekly,
                     ),
                   ),
-                  if (_weeklyEnabled && _weeklyWarning != null)
-                    Text(
+                ),
+                if (_weeklyEnabled && _weeklyWarning != null)
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: SpacingTokens.md,
+                      top: SpacingTokens.xs,
+                      right: SpacingTokens.md,
+                    ),
+                    child: Text(
                       _weeklyWarning!,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.error,
                       ),
                     ),
-                  const SizedBox(height: SpacingTokens.sm),
-                  AppTile(
-                    flat: true,
-                    icon: Icons.assessment_outlined,
-                    iconColor: theme.colorScheme.primary,
-                    title: '查看本周学习周报',
-                    subtitle: '',
-                    onTap: () => context.push(AppRoutes.weeklyReport),
                   ),
-                ],
-              ),
+                const SizedBox(height: SpacingTokens.sm),
+                AppTile(
+                  icon: Icons.assessment_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: '查看本周学习周报',
+                  subtitle: '',
+                  onTap: () => context.push(AppRoutes.weeklyReport),
+                ),
+              ],
             ),
             if (_busy) ...[
               const SizedBox(height: SpacingTokens.md),
