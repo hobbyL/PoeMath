@@ -17,7 +17,8 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: Center(
-              child: VerticalCalcWidget(problem: problem, showAnswer: true),),
+            child: VerticalCalcWidget(problem: problem, showAnswer: true),
+          ),
         ),
       ),
     );
@@ -28,5 +29,31 @@ void main() {
     final b = tester.getRect(find.text('202.0'));
     expect(a.right, b.right);
     expect(a.width, b.width);
+  });
+
+  testWidgets('答错时竖式结果行显示用户输入', (tester) async {
+    final problem = MathProblem(
+      operands: [NumberValue.fromInt(23), NumberValue.fromInt(14)],
+      operators: const [Operator.add],
+      result: NumberValue.fromInt(37),
+      mode: ProblemMode.vertical,
+      grade: 2,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: VerticalCalcWidget(
+              problem: problem,
+              answerText: '36',
+              answerIsCorrect: false,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('36'), findsOneWidget);
+    expect(find.text('37'), findsNothing);
   });
 }

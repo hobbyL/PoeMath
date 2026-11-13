@@ -900,11 +900,12 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                 ),
               ),
               Expanded(
-                child: sideBySide
+                child: sideBySide && _judgement == null
                     ? SafeArea(
                         top: false,
                         bottom: false,
                         child: Row(
+                          key: const ValueKey('math-practice-split-layout'),
                           children: [
                             Expanded(
                               child: SafeArea(
@@ -915,17 +916,25 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                               ),
                             ),
                             Expanded(
-                              child: Align(
-                                alignment: Alignment.bottomCenter,
-                                child: SingleChildScrollView(
-                                  child: _buildAnswerControls(context),
+                              child: SafeArea(
+                                top: false,
+                                left: false,
+                                right: false,
+                                child: Align(
+                                  alignment: Alignment.center,
+                                  child: SingleChildScrollView(
+                                    child: _buildAnswerControls(context),
+                                  ),
                                 ),
                               ),
                             ),
                           ],
                         ),
                       )
-                    : _buildQuestionArea(context),
+                    : _buildQuestionArea(
+                        context,
+                        showNextProblemButton: sideBySide,
+                      ),
               ),
             ],
           ),
@@ -935,7 +944,10 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     );
   }
 
-  Widget _buildQuestionArea(BuildContext context) {
+  Widget _buildQuestionArea(
+    BuildContext context, {
+    bool showNextProblemButton = false,
+  }) {
     final currentIndex = ref.watch(mathCurrentIndexProvider);
     final problem = ref.watch(currentProblemProvider)!;
     final theme = Theme.of(context);
@@ -946,39 +958,46 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final question = Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // 题目文本（竖式模式特殊展示）
-              KeyedSubtree(
-                key: ValueKey('q_$currentIndex'),
-                child:
-                    (problem.mode == ProblemMode.vertical
-                            ? VerticalCalcWidget(
-                                problem: problem,
-                                showAnswer: _judgement != null,
-                              ) as Widget
-                            : MathText(
-                                problem.problemText,
-                                style: TypographyTokens.mathProblemStyle(
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                                textAlign: TextAlign.center,
-                              ))
-                        .animatePage(context)
-                        .fadeIn(duration: 350.ms)
-                        .slideX(
-                          begin: 0.12,
-                          end: 0,
-                          duration: 350.ms,
-                          curve: Curves.easeOutCubic,
-                        ),
-              ),
-              const SizedBox(height: SpacingTokens.xl),
-
-              // 判定反馈
-              if (_judgement != null) ...[
-                _buildJudgementFeedback(context)
+          final filledAnswer = _judgement == null
+              ? null
+              : _judgement!.isCorrect
+              ? problem.answerText
+              : _userAnswerOfCurrent();
+          final questionText = filledAnswer == null
+              ? problem.problemText
+              : problem.problemText.replaceFirst(
+                  problem.mode == ProblemMode.compare ? '○' : '?',
+                  filledAnswer,
+                );
+          final questionContent = KeyedSubtree(
+            key: ValueKey('q_$currentIndex'),
+            child:
+                (problem.mode == ProblemMode.vertical
+                        ? VerticalCalcWidget(
+                            problem: problem,
+                            answerText: filledAnswer,
+                            answerIsCorrect: _judgement?.isCorrect ?? false,
+                          ) as Widget
+                        : MathText(
+                            questionText,
+                            style: TypographyTokens.mathProblemStyle(
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            textAlign: TextAlign.center,
+                          ))
+                    .animatePage(context)
+                    .fadeIn(duration: 350.ms)
+                    .slideX(
+                      begin: 0.12,
+                      end: 0,
+                      duration: 350.ms,
+                      curve: Curves.easeOutCubic,
+                    ),
+          );
+          final isInlineFeedback = showNextProblemButton && _judgement != null;
+          final judgementFeedback = _judgement == null
+              ? null
+              : _buildJudgementFeedback(context)
                     .animatePage(context)
                     .fadeIn(duration: 300.ms)
                     .scale(
@@ -994,10 +1013,42 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                       color: _judgement!.isCorrect
                           ? theme.semantic.success.withValues(alpha: 0.3)
                           : Colors.transparent,
-                    ),
+                    );
+          final question = Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isInlineFeedback)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(child: questionContent),
+                    const SizedBox(width: SpacingTokens.lg),
+                    if (_judgement!.isCorrect)
+                      judgementFeedback!
+                    else
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: constraints.maxWidth * 0.45,
+                        ),
+                        child: judgementFeedback!,
+                      ),
+                  ],
+                )
+              else
+                questionContent,
+              if (_judgement != null && !isInlineFeedback) ...[
+                const SizedBox(height: SpacingTokens.xl),
+                judgementFeedback!,
+              ],
+              if (_judgement != null) ...[
                 const SizedBox(height: SpacingTokens.md),
-                if (_judgement!.correctSteps.isNotEmpty)
-                  _buildStepsSection(context),
+                if (_judgement!.correctSteps.isNotEmpty ||
+                    showNextProblemButton)
+                  _buildStepsSection(
+                    context,
+                    showNextProblemButton: showNextProblemButton,
+                  ),
               ],
             ],
           );
@@ -1024,90 +1075,163 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     final problem = ref.read(currentProblemProvider)!;
     final theme = Theme.of(context);
 
-    return ColoredCard(
-      color: judgement.isCorrect
-          ? theme.semantic.success
-          : theme.colorScheme.tertiary,
-      width: double.infinity,
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(
-                judgement.isCorrect
-                    ? Icons.check_circle_rounded
-                    : Icons.lightbulb_outline_rounded,
-                color: judgement.isCorrect
-                    ? theme.semantic.success
-                    : theme.colorScheme.tertiary,
-                size: 24,
-              ),
-              const SizedBox(width: SpacingTokens.sm),
-              Text(
-                judgement.isCorrect ? '回答正确！' : '再想想',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: judgement.isCorrect
-                      ? theme.semantic.success
-                      : theme.colorScheme.onTertiaryContainer,
-                ),
-              ),
-            ],
+    final feedbackRow = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          judgement.isCorrect
+              ? Icons.check_circle_rounded
+              : Icons.lightbulb_outline_rounded,
+          color: judgement.isCorrect
+              ? theme.semantic.success
+              : theme.colorScheme.error,
+          size: 24,
+        ),
+        const SizedBox(width: SpacingTokens.sm),
+        Text(
+          judgement.isCorrect ? '回答正确！' : '再想想',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: judgement.isCorrect
+                ? theme.semantic.success
+                : theme.colorScheme.error,
           ),
-          if (!judgement.isCorrect) ...[
-            const SizedBox(height: SpacingTokens.sm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '正确答案：${problem.answerText}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+        ),
+        if (!judgement.isCorrect) ...[
+          const SizedBox(width: SpacingTokens.md),
+          Text(
+            '正确答案：${problem.answerText}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
             ),
-            if (judgement.diagnosis != null) ...[
-              const SizedBox(height: SpacingTokens.xs),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  judgement.diagnosis!.message,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ],
+          ),
         ],
-      ),
+      ],
+    );
+
+    if (judgement.isCorrect) return Center(child: feedbackRow);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        feedbackRow,
+        if (judgement.diagnosis != null) ...[
+          const SizedBox(height: SpacingTokens.xs),
+          Text(
+            judgement.diagnosis!.message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
     );
   }
 
-  Widget _buildStepsSection(BuildContext context) {
+  Widget _buildStepsSection(
+    BuildContext context, {
+    bool showNextProblemButton = false,
+  }) {
     final judgement = _judgement!;
     final theme = Theme.of(context);
+    final hasSteps = judgement.correctSteps.isNotEmpty;
 
     return Column(
       children: [
-        TextButton.icon(
-          onPressed: () => setState(() => _showSteps = !_showSteps),
-          icon: Icon(_showSteps ? Icons.expand_less : Icons.expand_more),
-          label: Text(_showSteps ? '收起解题步骤' : '查看解题步骤'),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasSteps)
+              TextButton.icon(
+                onPressed: () => setState(() => _showSteps = !_showSteps),
+                icon: Icon(_showSteps ? Icons.expand_less : Icons.expand_more),
+                label: Text(_showSteps ? '收起解题步骤' : '查看解题步骤'),
+              ),
+            if (hasSteps && showNextProblemButton)
+              const SizedBox(width: SpacingTokens.sm),
+            if (showNextProblemButton) _buildNextProblemButton(),
+          ],
         ),
         if (_showSteps)
-          ColoredCard(
-            color: theme.colorScheme.primary,
-            width: double.infinity,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < judgement.correctSteps.length; i++) ...[
-                  if (i > 0) const SizedBox(height: SpacingTokens.sm),
+          Center(
+            child: ConstrainedBox(
+              key: const ValueKey('math-practice-steps-content'),
+              constraints: const BoxConstraints(
+                maxWidth: ResponsiveLayout.mediumBreakpoint,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < judgement.correctSteps.length; i++) ...[
+                    if (i > 0) const SizedBox(height: SpacingTokens.sm),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          key: ValueKey('math-practice-step-marker-${i + 1}'),
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '${i + 1}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              // 实色主色底与 onPrimary 前景配对，跟随亮暗主题。
+                              color: theme.colorScheme.onPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: SpacingTokens.sm),
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                judgement.correctSteps[i].description,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              if (judgement
+                                      .correctSteps[i]
+                                      .resultHint
+                                      .isNotEmpty &&
+                                  !(i == judgement.correctSteps.length - 1 &&
+                                      judgement.correctSteps[i].resultHint ==
+                                          ref
+                                              .read(currentProblemProvider)!
+                                              .answerText))
+                                Text(
+                                  judgement.correctSteps[i].resultHint,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: SpacingTokens.sm),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Container(
+                        key: ValueKey(
+                          'math-practice-step-marker-${judgement.correctSteps.length + 1}',
+                        ),
                         width: 24,
                         height: 24,
                         decoration: BoxDecoration(
@@ -1116,40 +1240,25 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
                         ),
                         alignment: Alignment.center,
                         child: Text(
-                          '${i + 1}',
+                          '${judgement.correctSteps.length + 1}',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            // 实色主色底与 onPrimary 前景配对，跟随亮暗主题。
                             color: theme.colorScheme.onPrimary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                       const SizedBox(width: SpacingTokens.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              judgement.correctSteps[i].description,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface,
-                              ),
-                            ),
-                            if (judgement.correctSteps[i].resultHint.isNotEmpty)
-                              Text(
-                                judgement.correctSteps[i].resultHint,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                          ],
+                      Text(
+                        '最终结果：${ref.read(currentProblemProvider)!.answerText}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
                 ],
-              ],
+              ),
             ),
           ),
       ],
@@ -1196,6 +1305,19 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
     return _problemRecords[index].userAnswer;
   }
 
+  Widget _buildNextProblemButton() {
+    final isLastProblem =
+        ref.read(mathCurrentIndexProvider) + 1 >=
+        ref.read(mathProblemsProvider).length;
+    return FilledButton.icon(
+      key: const ValueKey('math-next-problem-button'),
+      onPressed: _submitting || _isFinishing ? null : _nextProblem,
+      icon: const Icon(Icons.arrow_forward_rounded),
+      iconAlignment: IconAlignment.end,
+      label: Text(isLastProblem ? '查看成绩' : '下一题'),
+    );
+  }
+
   Widget _buildAnswerControls(BuildContext context) {
     if (_judgement != null) {
       // 已作答，显示"下一题"按钮
@@ -1206,21 +1328,7 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
           vertical: SpacingTokens.sm,
         ),
         child:
-            SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _submitting || _isFinishing
-                        ? null
-                        : _nextProblem,
-                    icon: const Icon(Icons.arrow_forward_rounded),
-                    label: Text(
-                      ref.read(mathCurrentIndexProvider) + 1 >=
-                              ref.read(mathProblemsProvider).length
-                          ? '查看成绩'
-                          : '下一题',
-                    ),
-                  ),
-                )
+            SizedBox(width: double.infinity, child: _buildNextProblemButton())
                 .animatePage(context)
                 .fadeIn(duration: 250.ms)
                 .slideY(
