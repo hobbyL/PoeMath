@@ -32,6 +32,18 @@ void main() {
     expect(mathLight.colorScheme.primary, ColorTokens.mathPurpleDeep);
   });
 
+  test('所有学科和明暗主题的 bottom sheet 都不限制最大宽度', () {
+    for (final subject in AppSubject.values) {
+      for (final brightness in Brightness.values) {
+        final theme = AppTheme.resolve(
+          subject: subject,
+          brightness: brightness,
+        );
+        expect(theme.bottomSheetTheme.constraints?.maxWidth, double.infinity);
+      }
+    }
+  });
+
   group('widget 主题切换', () {
     setUp(() async {
       await setUpHiveForTesting();

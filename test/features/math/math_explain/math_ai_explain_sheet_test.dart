@@ -29,6 +29,7 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/llm/llm_config.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
+import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/widgets/ai_action_tag.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
@@ -103,10 +104,10 @@ String _sseData(String content) {
 /// 控制器已切流式（explainStream），mock 必须回 `text/event-stream`；
 /// 经 MockClient.send 以单 chunk 字节流交付，收尾直达 ready 终态。
 http.Response _sseResponse(String content) => http.Response.bytes(
-      utf8.encode('${_sseData(content)}data: [DONE]\n\n'),
-      200,
-      headers: const {'content-type': 'text/event-stream; charset=utf-8'},
-    );
+  utf8.encode('${_sseData(content)}data: [DONE]\n\n'),
+  200,
+  headers: const {'content-type': 'text/event-stream; charset=utf-8'},
+);
 
 /// 把 explainStream 的真实异步 SSE 流推进到终态并稳定界面。
 ///
@@ -132,12 +133,12 @@ void main() {
     final settings = _MockSettingsRepository();
     when(() => settings.readLlmConfigForScenario(LlmScenario.mathExplain))
         .thenAnswer(
-      (_) async => const LlmConfig(
-        baseUrl: 'https://llm-math.example.com',
-        apiKey: 'secret-key-math',
-        model: 'qwen-plus',
-      ),
-    );
+          (_) async => const LlmConfig(
+            baseUrl: 'https://llm-math.example.com',
+            apiKey: 'secret-key-math',
+            model: 'qwen-plus',
+          ),
+        );
     return settings;
   }
 
@@ -156,9 +157,8 @@ void main() {
         GoRoute(path: '/', builder: (context, state) => _SheetHost()),
         GoRoute(
           path: AppRoutes.llmSettings,
-          builder: (context, state) => const Scaffold(
-            body: Center(child: Text('llm-settings-stub')),
-          ),
+          builder: (context, state) =>
+              const Scaffold(body: Center(child: Text('llm-settings-stub'))),
         ),
       ],
     );
@@ -169,7 +169,13 @@ void main() {
           if (client != null)
             llmExplainHttpClientProvider.overrideWithValue(client),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          theme: AppTheme.resolve(
+            subject: AppSubject.math,
+            brightness: Brightness.light,
+          ),
+          routerConfig: router,
+        ),
       ),
     );
     await tester.pump();
@@ -212,9 +218,8 @@ void main() {
     // loading 中关闭：discardPending 使晚到回调失效，dispose 不写状态。
     // 出场动画期间 busy 转圈仍在树上（无限动画），不能 pumpAndSettle，
     // 推过出场时长（modal 反向动画 ~200ms）即可。
-    await Navigator.of(
-      tester.element(find.byType(MathAiExplainSheet)),
-    ).maybePop();
+    await Navigator.of(tester.element(find.byType(MathAiExplainSheet)))
+        .maybePop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -230,6 +235,22 @@ void main() {
     // 弹层已关、令牌已废弃：请求不发出、无 defunct 断言崩溃。
     expect(find.text('AI 解析'), findsNothing);
     expect(requests, 0);
+  });
+
+  testWidgets('横屏下 AI 解析弹层占满可用宽度', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1200, 800);
+    addTearDown(tester.view.reset);
+
+    final settings = _MockSettingsRepository();
+    when(() => settings.readLlmConfigForScenario(LlmScenario.mathExplain))
+        .thenAnswer((_) async => null);
+    await pumpSheet(tester, settings: settings);
+
+    final sheetRect = tester.getRect(find.byType(BottomSheet));
+    expect(sheetRect.left, 0);
+    expect(sheetRect.right, tester.view.physicalSize.width);
+    expect(sheetRect.width, tester.view.physicalSize.width);
   });
 
   testWidgets('ready：清洗 markdown 分段渲染 + 重新生成；请求走场景配置', (tester) async {
@@ -264,9 +285,8 @@ void main() {
     expect(captured.headers['authorization'], 'Bearer secret-key-math');
 
     // 关闭弹层：不写 provider 状态，无 defunct 断言崩溃。
-    await Navigator.of(
-      tester.element(find.byType(MathAiExplainSheet)),
-    ).maybePop();
+    await Navigator.of(tester.element(find.byType(MathAiExplainSheet)))
+        .maybePop();
     await tester.pumpAndSettle();
     expect(find.text('AI 解析'), findsNothing);
   });
@@ -308,13 +328,10 @@ void main() {
       tester,
       settings: configuredRepo(),
       client: MockClient.streaming((_, __) async {
-        return http.StreamedResponse(
-          () async* {
-            yield utf8.encode(_sseData('已经生成的解析'));
-            throw http.ClientException('中断');
-          }(),
-          200,
-        );
+        return http.StreamedResponse(() async* {
+          yield utf8.encode(_sseData('已经生成的解析'));
+          throw http.ClientException('中断');
+        }(), 200);
       }),
     );
     expect(find.text('已经生成的解析'), findsOneWidget);
@@ -360,10 +377,7 @@ void main() {
       }),
     );
 
-    expect(
-      find.text('还没有配置 AI 服务，配置后即可使用 AI 解析。'),
-      findsOneWidget,
-    );
+    expect(find.text('还没有配置 AI 服务，配置后即可使用 AI 解析。'), findsOneWidget);
     // 未配置态主操作收敛为「去设置」tag（非按钮）。
     expect(find.widgetWithText(AiActionTag, '去设置'), findsOneWidget);
     // 未配置不发任何网络请求。
@@ -398,9 +412,8 @@ void main() {
 
     // loading 中关闭：discardPending 废令牌，但 provider state 仍残留
     // loading（dispose 不写状态）。出场动画期间转圈仍在，只推帧。
-    await Navigator.of(
-      tester.element(find.byType(MathAiExplainSheet)),
-    ).maybePop();
+    await Navigator.of(tester.element(find.byType(MathAiExplainSheet)))
+        .maybePop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('AI 解析'), findsNothing);

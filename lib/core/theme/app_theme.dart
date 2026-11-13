@@ -29,6 +29,9 @@ class AppTheme {
         brightness == Brightness.light ? MathTheme.light() : MathTheme.dark(),
     };
     return theme.copyWith(
+      bottomSheetTheme: const BottomSheetThemeData(
+        constraints: BoxConstraints(maxWidth: double.infinity),
+      ),
       navigationBarTheme: NavigationBarThemeData(
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
