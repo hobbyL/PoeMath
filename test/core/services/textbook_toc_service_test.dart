@@ -41,10 +41,12 @@ void main() {
       loadOutline: () async => [],
       loadPage: (number) async => number == 2 ? toc : const TextbookTocPage(''),
     );
-    expect(
-      (await service.scan().last).result!.entries.map((e) => e.level),
-      [0, 1, 1, 0],
-    );
+    expect((await service.scan().last).result!.entries.map((e) => e.level), [
+      0,
+      1,
+      1,
+      0,
+    ]);
   });
 
   test('单元保留独立课号，跨栏跨页延续，集合子篇和附录归属正确', () async {
@@ -162,14 +164,24 @@ void main() {
           : const TextbookTocPage(''),
     );
     final result = (await service.scan().last).result!;
-    expect(
-      result.entries.map((e) => e.title),
-      ['星河', '远山', '流水', '朝霞', '晚风', '一叶', '春雨'],
-    );
-    expect(
-      result.entries.map((e) => e.printedPage),
-      [11, 12, 13, 21, 22, 23, 24],
-    );
+    expect(result.entries.map((e) => e.title), [
+      '星河',
+      '远山',
+      '流水',
+      '朝霞',
+      '晚风',
+      '一叶',
+      '春雨',
+    ]);
+    expect(result.entries.map((e) => e.printedPage), [
+      11,
+      12,
+      13,
+      21,
+      22,
+      23,
+      24,
+    ]);
   });
 
   test('内置目录优先、保留层级、过滤越界目的页，不提取全文', () async {
@@ -191,13 +203,15 @@ void main() {
   test('任意位置及跨页文字目录，正文标题和页脚校准不同偏移', () async {
     for (final offset in [2, 7]) {
       final pages = <int, TextbookTocPage>{
-        15: page(
-          [('目录', 0.4, 0.1), ('1 星河……1', 0.1, 0.2), ('2 远山……2', 0.1, 0.3)],
-        ),
+        15: page([
+          ('目录', 0.4, 0.1),
+          ('1 星河……1', 0.1, 0.2),
+          ('2 远山……2', 0.1, 0.3),
+        ]),
         16: page([('3 流水……3', 0.1, 0.2), ('4 未知……8', 0.1, 0.3)]),
-        1 + offset: page([('星河', 0.1, 0.2), ('1', 0.5, 0.95)]),
-        2 + offset: page([('远山', 0.1, 0.2), ('2', 0.5, 0.95)]),
-        3 + offset: page([('流水', 0.1, 0.2), ('3', 0.5, 0.95)]),
+        1 + offset: page([('星河', 0.1, 0.2), ('1', 0.1, 0.95)]),
+        2 + offset: page([('远山', 0.1, 0.2), ('2', 0.1, 0.95)]),
+        3 + offset: page([('流水', 0.1, 0.2), ('3', 0.1, 0.95)]),
       };
       final service = TextbookTocService(
         pageCount: 20,
@@ -207,14 +221,18 @@ void main() {
       );
       final result = (await service.scan().last).result!;
       expect(result.directoryPages, [15, 16]);
-      expect(
-        result.entries.map((entry) => entry.title),
-        ['星河', '远山', '流水', '未知'],
-      );
-      expect(
-        result.entries.map((entry) => entry.page),
-        [1 + offset, 2 + offset, 3 + offset, null],
-      );
+      expect(result.entries.map((entry) => entry.title), [
+        '星河',
+        '远山',
+        '流水',
+        '未知',
+      ]);
+      expect(result.entries.map((entry) => entry.page), [
+        1 + offset,
+        2 + offset,
+        3 + offset,
+        null,
+      ]);
     }
   });
 
@@ -236,10 +254,12 @@ void main() {
       loadPage: (number) async => number == 3 ? toc : const TextbookTocPage(''),
     );
     final result = (await service.scan().last).result!;
-    expect(
-      result.entries.map((entry) => entry.title),
-      ['朝霞', '晚风', 'a o e', 'i u ü'],
-    );
+    expect(result.entries.map((entry) => entry.title), [
+      '朝霞',
+      '晚风',
+      'a o e',
+      'i u ü',
+    ]);
     expect(result.entries[1].level, greaterThan(0));
     expect(result.entries.every((entry) => entry.page == null), isTrue);
   });
@@ -255,26 +275,28 @@ void main() {
         ('未知', 0.1, 0.4),
         ('9', 0.8, 0.4),
       ]),
-      4: page([('古诗二首', 0.1, 0.2), ('2', 0.5, 0.95)]),
-      9: page([('古诗二首', 0.1, 0.2), ('7', 0.5, 0.95)]),
+      4: page([('古诗二首', 0.1, 0.2), ('2', 0.1, 0.95)]),
+      9: page([('古诗二首', 0.1, 0.2), ('7', 0.1, 0.95)]),
     };
     final service = TextbookTocService(
       pageCount: 12,
       loadOutline: () async => [],
       loadPage: (number) async => pages[number] ?? const TextbookTocPage(''),
     );
-    expect(
-      (await service.scan().last).result!.entries.map((e) => e.page),
-      [4, 9, null],
-    );
+    expect((await service.scan().last).result!.entries.map((e) => e.page), [
+      4,
+      9,
+      null,
+    ]);
   });
 
   test('文件分段书签回退文字目录，完成结果内存复用，强制刷新重新读取', () async {
     var loads = 0;
     final service = TextbookTocService(
       pageCount: 10,
-      loadOutline: () async =>
-          const [TextbookTocEntry(title: '36126-0_DJD', page: 1)],
+      loadOutline: () async => const [
+        TextbookTocEntry(title: '36126-0_DJD', page: 1),
+      ],
       loadPage: (number) async {
         loads++;
         return TextbookTocPage(number == 2 ? '目录\n星河 1\n远山 2' : '');

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_number_label.dart';
 
 /// 审核专用原页查看器，不写孩子的续读或学习记录。
 class TextbookCourseSourcePage extends ConsumerStatefulWidget {
@@ -27,6 +29,7 @@ class TextbookCourseSourcePage extends ConsumerStatefulWidget {
 class _TextbookSourcePageState extends ConsumerState<TextbookCourseSourcePage> {
   late int _page = widget.sources.first.pdfPage;
   TextbookGoToPage? _goTo;
+  TextbookPageNumberService? _pageNumbers;
   int _revision = 0;
   bool _busy = false;
 
@@ -70,6 +73,9 @@ class _TextbookSourcePageState extends ConsumerState<TextbookCourseSourcePage> {
             final revision = _revision;
             final options = TextbookViewerOptions(
               path: path,
+              contentCache: ref
+                  .read(textbookFileServiceProvider)
+                  .contentCache(widget.book),
               initialPage: _page,
               onPageChanged: (page) {
                 if (mounted && revision == _revision) {
@@ -81,8 +87,14 @@ class _TextbookSourcePageState extends ConsumerState<TextbookCourseSourcePage> {
                   setState(() => _goTo = goTo);
                 }
               },
+              onPageNumbersReady: (numbers) {
+                if (mounted && revision == _revision) {
+                  setState(() => _pageNumbers = numbers);
+                }
+              },
               onRetry: () => setState(() {
                 _goTo = null;
+                _pageNumbers = null;
                 _revision++;
               }),
             );
@@ -102,13 +114,21 @@ class _TextbookSourcePageState extends ConsumerState<TextbookCourseSourcePage> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              Text('第 $_page / ${widget.book.pageCount} 页'),
+              TextbookPageNumberLabel(
+                service: _pageNumbers,
+                pages: [_page],
+                builder: (context, label) => Text(label),
+              ),
               const SizedBox(width: SpacingTokens.md),
               for (final page
                   in widget.sources.map((source) => source.pdfPage).toSet())
                 TextButton(
                   onPressed: _goTo == null || _busy ? null : () => _jump(page),
-                  child: Text('来源第 $page 页'),
+                  child: TextbookPageNumberLabel(
+                    service: _pageNumbers,
+                    pages: [page],
+                    builder: (context, label) => Text('来源$label'),
+                  ),
                 ),
             ],
           ),

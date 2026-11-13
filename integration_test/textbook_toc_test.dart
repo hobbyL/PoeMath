@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:poemath/core/services/textbook_content_cache.dart';
+import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_preview.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
@@ -25,9 +26,11 @@ void main() {
     );
     TextbookTocLoader? toc;
     TextbookSearch? search;
+    TextbookPageNumberService? pageNumbers;
     Future<void> open() async {
       toc = null;
       search = null;
+      pageNumbers = null;
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -44,6 +47,7 @@ void main() {
                 onRetry: () {},
                 onTocReady: (value) => toc = value,
                 onSearchReady: (value) => search = value,
+                onPageNumbersReady: (value) => pageNumbers = value,
               ),
             ),
           ),
@@ -63,6 +67,11 @@ void main() {
       expect(firstToc.last.result!.entries.map((e) => e.page), [2, 3]);
       final firstSearch = await search!('sample').toList();
       expect(firstSearch.map((page) => page.matchCount), [1, 1, 1]);
+      expect((await pageNumbers!.load([1, 2, 3])).pages, {
+        1: null,
+        2: null,
+        3: null,
+      });
       final cacheDirectory = Directory(
         '${directory.path}/textbooks/cache/${book.pdfSha256}',
       );
@@ -75,18 +84,28 @@ void main() {
       }
 
       final before = await snapshot();
-      expect(before.length, 4);
+      expect(before.keys.map((path) => path.split('/').last).toSet(), {
+        'toc.json',
+        'printed-pages.json',
+        for (var page = 1; page <= 3; page++) 'page-$page.json',
+        for (var page = 1; page <= 3; page++) 'layout-$page.json',
+      });
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
       await open();
       final nextToc = await toc!(false).toList();
       expect(nextToc.map((event) => event.phase), [TextbookTocPhase.ready]);
-      expect(
-        nextToc.single.result!.entries.map((e) => e.title),
-        ['Chapter', 'Section'],
-      );
+      expect(nextToc.single.result!.entries.map((e) => e.title), [
+        'Chapter',
+        'Section',
+      ]);
       final nextSearch = await search!('PoeMath').toList();
       expect(nextSearch.map((page) => page.matchCount), [1, 1, 1]);
+      expect((await pageNumbers!.load([1, 2, 3])).pages, {
+        1: null,
+        2: null,
+        3: null,
+      });
       final after = await snapshot();
       expect(after, before);
     } finally {
@@ -134,8 +153,7 @@ void main() {
   const local = String.fromEnvironment('TEXTBOOK_TOC_ACCEPTANCE');
   for (final sample in [
     (
-      path:
-          '/data/user/0/com.poemath.app/files/textbooks/294652c84058ac8d60364e3e04e4cd5ebd37ecf189293b5308ce26c46cfa498f.pdf',
+      path: '/data/user/0/com.poemath.app/files/textbooks/294652c84058ac8d60364e3e04e4cd5ebd37ecf189293b5308ce26c46cfa498f.pdf',
       pages: [4, 5, 6],
       count: 42,
       targets: {
@@ -166,105 +184,100 @@ void main() {
       },
     ),
   ]) {
-    testWidgets(
-      '真实PDF自动目录：${sample.path.split('/').last}',
-      (tester) async {
-        TextbookTocLoader? load;
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: TextbookPdfPreview(
-                options: TextbookViewerOptions(
-                  path: sample.path,
-                  initialPage: 1,
-                  onPageChanged: (_) {},
-                  onReady: (_) {},
-                  onRetry: () {},
-                  onTocReady: (value) => load = value,
-                ),
+    testWidgets('真实PDF自动目录：${sample.path.split('/').last}', (tester) async {
+      TextbookTocLoader? load;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TextbookPdfPreview(
+              options: TextbookViewerOptions(
+                path: sample.path,
+                initialPage: 1,
+                onPageChanged: (_) {},
+                onReady: (_) {},
+                onRetry: () {},
+                onTocReady: (value) => load = value,
               ),
             ),
           ),
-        );
-        for (var i = 0; i < 300 && load == null; i++) {
-          await tester.pump(const Duration(milliseconds: 50));
-        }
-        expect(load, isNotNull);
-        final document =
-            tester.widget<PdfPageView>(find.byType(PdfPageView).first).document;
-        final result =
-            (await load!(false).last.timeout(const Duration(minutes: 2)))
-                .result!;
-        debugPrint(
-          'TOC_ACCEPTANCE count=${result.entries.length} resolved=${result.entries.where((e) => e.page != null).length} pages=${result.directoryPages}',
-        );
-        expect(result.source, TextbookTocSource.text);
-        expect(result.directoryPages, sample.pages);
-        if (sample.count > 0) {
-          final numbered = result.entries.where((e) => e.printedPage != null);
-          expect(numbered.length, sample.count);
-          expect(numbered.every((e) => e.page != null), isTrue);
-          expect(
-            result.entries.where((e) => e.isGroup).length,
-            greaterThanOrEqualTo(sample.count == 61 ? 7 : 8),
-          );
-          expect(
-            result.entries.where((e) => e.lessonNumber == 1).length,
-            greaterThanOrEqualTo(2),
-          );
-          expect(result.entries.last.level, 0);
-          final child = result.entries.firstWhere(
-            (e) =>
-                e.title ==
-                (sample.count == 42
-                    ? '池上'
-                    : sample.count == 43
-                        ? '江雪'
-                        : '学弈'),
-          );
-          expect(child.level, 2);
-          String parentTitle(String title, int level) {
-            final index = result.entries.indexWhere((e) => e.title == title);
-            return result.entries
-                .take(index)
-                .lastWhere((e) => e.level == level)
-                .title;
-          }
-
-          if (sample.count == 42) {
-            expect(parentTitle('池上', 1), '古诗二首');
-            expect(
-              result.entries.firstWhere((e) => e.title == '动物儿歌').lessonNumber,
-              5,
-            );
-          } else if (sample.count == 43) {
-            expect(parentTitle('雾在哪里', 0), contains('第七单元'));
-            expect(parentTitle('江雪', 1), '古诗二首');
-          } else {
-            expect(parentTitle('为人民服务', 0), '第四单元');
-            expect(parentTitle('依依惜别', 0), '第六单元');
-            expect(parentTitle('采薇（节选）', 0), '古诗词诵读');
-            expect(parentTitle('学弈', 1), '文言文二则');
-          }
-        }
-        for (final target in sample.targets.entries) {
-          expect(
-            result.entries
-                .where((e) => e.title == target.key)
-                .map((e) => e.page),
-            [target.value],
-            reason: target.key,
-          );
-        }
-        expect((await load!(false).last).result, same(result));
+        ),
+      );
+      for (var i = 0; i < 300 && load == null; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(load, isNotNull);
+      final document = tester
+          .widget<PdfPageView>(find.byType(PdfPageView).first)
+          .document;
+      final result = (await load!(
+        false,
+      ).last.timeout(const Duration(minutes: 2))).result!;
+      debugPrint(
+        'TOC_ACCEPTANCE count=${result.entries.length} resolved=${result.entries.where((e) => e.page != null).length} pages=${result.directoryPages}',
+      );
+      expect(result.source, TextbookTocSource.text);
+      expect(result.directoryPages, sample.pages);
+      if (sample.count > 0) {
+        final numbered = result.entries.where((e) => e.printedPage != null);
+        expect(numbered.length, sample.count);
+        expect(numbered.every((e) => e.page != null), isTrue);
         expect(
-          tester.widget<PdfPageView>(find.byType(PdfPageView).first).document,
-          same(document),
+          result.entries.where((e) => e.isGroup).length,
+          greaterThanOrEqualTo(sample.count == 61 ? 7 : 8),
         );
-        await tester.pumpWidget(const SizedBox());
-        expect(tester.takeException(), isNull);
-      },
-      skip: local.isEmpty,
-    );
+        expect(
+          result.entries.where((e) => e.lessonNumber == 1).length,
+          greaterThanOrEqualTo(2),
+        );
+        expect(result.entries.last.level, 0);
+        final child = result.entries.firstWhere(
+          (e) =>
+              e.title ==
+              (sample.count == 42
+                  ? '池上'
+                  : sample.count == 43
+                  ? '江雪'
+                  : '学弈'),
+        );
+        expect(child.level, 2);
+        String parentTitle(String title, int level) {
+          final index = result.entries.indexWhere((e) => e.title == title);
+          return result.entries
+              .take(index)
+              .lastWhere((e) => e.level == level)
+              .title;
+        }
+
+        if (sample.count == 42) {
+          expect(parentTitle('池上', 1), '古诗二首');
+          expect(
+            result.entries.firstWhere((e) => e.title == '动物儿歌').lessonNumber,
+            5,
+          );
+        } else if (sample.count == 43) {
+          expect(parentTitle('雾在哪里', 0), contains('第七单元'));
+          expect(parentTitle('江雪', 1), '古诗二首');
+        } else {
+          expect(parentTitle('为人民服务', 0), '第四单元');
+          expect(parentTitle('依依惜别', 0), '第六单元');
+          expect(parentTitle('采薇（节选）', 0), '古诗词诵读');
+          expect(parentTitle('学弈', 1), '文言文二则');
+        }
+      }
+      for (final target in sample.targets.entries) {
+        expect(
+          result.entries.where((e) => e.title == target.key).map((e) => e.page),
+          [target.value],
+          reason: target.key,
+        );
+      }
+      expect((await load!(false).last).result, same(result));
+      expect(
+        tester.widget<PdfPageView>(find.byType(PdfPageView).first).document,
+        same(document),
+      );
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    }, skip: local.isEmpty);
   }
 }

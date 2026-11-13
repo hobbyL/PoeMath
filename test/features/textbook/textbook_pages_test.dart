@@ -32,6 +32,7 @@ import 'package:poemath/features/textbook/widgets/textbook_search_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
 
 import '../../helpers/textbook_fixture.dart';
+import '../../helpers/textbook_page_number_fixture.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 
@@ -53,6 +54,7 @@ class _MemoryRepository implements TextbookRepository {
   Future<void> markOpened(String profileId, String id) async {
     recent[profileId] = id;
   }
+
   @override
   Stream<BoxEvent> watchReading(String profileId) => const Stream.empty();
 
@@ -160,6 +162,12 @@ class _Files extends TextbookFileService {
   }
 }
 
+void _readyNumbers(TextbookViewerOptions options) {
+  options.onPageNumbersReady?.call(
+    pageNumberFixture(pageCount: options.contentCache?.book.pageCount ?? 3),
+  );
+}
+
 class _Viewer extends StatefulWidget {
   const _Viewer(this.options);
   final TextbookViewerOptions options;
@@ -171,11 +179,12 @@ class _ViewerState extends State<_Viewer> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => widget.options.onReady(
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _readyNumbers(widget.options);
+      widget.options.onReady(
         (page) async => widget.options.onPageChanged(page),
-      ),
-    );
+      );
+    });
   }
 
   @override
@@ -202,11 +211,12 @@ class _LifecycleViewerState extends State<_LifecycleViewer> {
   void initState() {
     super.initState();
     widget.onCreate();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => widget.options.onReady(
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _readyNumbers(widget.options);
+      widget.options.onReady(
         (page) async => widget.options.onPageChanged(page),
-      ),
-    );
+      );
+    });
   }
 
   @override
@@ -255,6 +265,9 @@ void main() {
             _DownloadIntents(),
           ),
           textbookFileServiceProvider.overrideWithValue(files),
+          textbookPrintedPageProvider.overrideWith(
+            (ref, key) async => key.page,
+          ),
           textbookCatalogProvider.overrideWith((ref) async => catalog),
           textbookPreviewBuilderProvider.overrideWithValue(
             (_, options) => _Viewer(options),
@@ -721,18 +734,25 @@ void main() {
     testWidgets('PDF 就绪才记录最近阅读，管理预览不记录（管理：$manage）', (tester) async {
       repo.books[book.pdfSha256] = book;
       TextbookViewerOptions? options;
-      await pump(tester, TextbookDetailPage(
-        bookId: book.pdfSha256,
-        manage: manage,
-        previewBuilder: (_, value) {
-          options = value;
-          return const SizedBox.expand();
-        },
-      ));
+      await pump(
+        tester,
+        TextbookDetailPage(
+          bookId: book.pdfSha256,
+          manage: manage,
+          previewBuilder: (_, value) {
+            options = value;
+            return const SizedBox.expand();
+          },
+        ),
+      );
       expect(repo.recentBook('default'), isNull);
+      _readyNumbers(options!);
       options!.onReady((_) async {});
       await tester.pumpAndSettle();
-      expect(repo.recentBook('default')?.pdfSha256, manage ? null : book.pdfSha256);
+      expect(
+        repo.recentBook('default')?.pdfSha256,
+        manage ? null : book.pdfSha256,
+      );
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
@@ -811,7 +831,7 @@ void main() {
     final footer = tester
         .widget<Scaffold>(find.byType(Scaffold))
         .bottomNavigationBar!;
-    const footerLabels = ['上一页', '1 / 3', '下一页'];
+    const footerLabels = ['上一页', '正在读取页码', '下一页'];
     for (final label in footerLabels) {
       expect(
         find.descendant(of: find.byWidget(footer), matching: find.text(label)),
@@ -867,19 +887,21 @@ void main() {
           .onPressed,
       isNull,
     );
+    _readyNumbers(options!);
     options!.onReady((page) async {
       jumps.add(page);
       options!.onPageChanged(page);
     });
     await tester.pumpAndSettle();
+    expect(find.text('第 1 页'), findsOneWidget);
     await tester.tap(find.text('下一页'));
     await tester.pumpAndSettle();
     expect(jumps, [2]);
-    expect(find.text('2 / 3'), findsOneWidget);
+    expect(find.text('第 2 页'), findsOneWidget);
     expect(tester.getRect(controls), controlsRect);
     options!.onPageChanged(3);
     await tester.pumpAndSettle();
-    expect(find.text('3 / 3'), findsOneWidget);
+    expect(find.text('第 3 页'), findsOneWidget);
     expect(
       tester
           .widget<TextButton>(find.widgetWithText(TextButton, '下一页'))
@@ -929,6 +951,7 @@ void main() {
       );
       expect(options!.onPreviousPage, isNull);
       expect(options!.onNextPage, isNull);
+      _readyNumbers(options!);
       options!.onReady((page) async {
         jumps.add(page);
         if (jumps.length == 1) await turning.future;
@@ -1010,7 +1033,7 @@ void main() {
       bookId: selected.pdfSha256,
       previewBuilder: (_, value) {
         options = value;
-        return const SizedBox.expand();
+        return _Viewer(value);
       },
     );
     await pump(tester, detail(bookA));
@@ -1032,7 +1055,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await pump(tester, detail(bookA));
     expect(options!.initialPage, 10);
-    expect(find.text('10 / 30'), findsOneWidget);
+    expect(find.text('第 10 页'), findsOneWidget);
     ProfileScope.switchTo('other');
     options!.onPageChanged(11);
     await tester.pumpAndSettle();
@@ -1104,7 +1127,7 @@ void main() {
       ),
     );
     expect(options!.initialPage, 3);
-    expect(find.text('PDF 第 3 / 3 页'), findsOneWidget);
+    expect(find.text('第 3 页'), findsOneWidget);
     options!.onPageChanged(3);
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
@@ -1220,7 +1243,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    for (final label in ['上一页', '1 / 3', '下一页', '原书阅读']) {
+    for (final label in ['上一页', '第 1 页', '下一页', '原书阅读']) {
       final button = find.ancestor(
         of: find.text(label),
         matching: find.byWidgetPredicate(
@@ -1340,7 +1363,7 @@ void main() {
     expect(repo.reading('default', book.pdfSha256).page, 3);
   });
 
-  testWidgets('详情页码支持输入与键盘跳转、校验、取消，成功跳转保存续读', (tester) async {
+  testWidgets('详情 PDF 备用页码支持输入与键盘跳转、校验、取消，成功跳转保存续读', (tester) async {
     final longBook = Textbook.fromJson({...book.toJson(), 'pageCount': 127});
     repo.books[longBook.pdfSha256] = longBook;
     await repo.savePage('default', longBook, 2);
@@ -1360,6 +1383,7 @@ void main() {
       large: true,
       size: const Size(320, 800),
     );
+    _readyNumbers(options!);
     options!.onReady((page) async {
       jumps.add(page);
       await turning.future;
@@ -1369,8 +1393,8 @@ void main() {
     final pageNumber = find.byKey(
       const ValueKey('textbook-detail-page-number'),
     );
-    expect(find.text('2 / 127'), findsOneWidget);
-    for (final label in ['上一页', '2 / 127', '下一页']) {
+    expect(find.text('第 2 页'), findsOneWidget);
+    for (final label in ['上一页', '第 2 页', '下一页']) {
       final button = find.ancestor(
         of: find.text(label),
         matching: find.byWidgetPredicate(
@@ -1386,6 +1410,8 @@ void main() {
     }
     await tester.tap(pageNumber);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('PDF 页'));
+    await tester.pumpAndSettle();
     expect(
       tester.widget<TextFormField>(find.byType(TextFormField)).controller!.text,
       '2',
@@ -1400,9 +1426,11 @@ void main() {
     await tester.enterText(find.byType(TextFormField), '127');
     await tester.tap(find.text('取消'));
     await tester.pumpAndSettle();
-    expect(find.text('2 / 127'), findsOneWidget);
+    expect(find.text('第 2 页'), findsOneWidget);
     expect(jumps, isEmpty);
     await tester.tap(pageNumber);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PDF 页'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), '127');
     await tester.testTextInput.receiveAction(TextInputAction.go);
@@ -1421,9 +1449,11 @@ void main() {
     turning.complete();
     await tester.pumpAndSettle();
     expect(options!.initialPage, 127);
-    expect(find.text('127 / 127'), findsOneWidget);
+    expect(find.text('第 127 页'), findsOneWidget);
     expect(tester.widget<TextButton>(pageNumber).onPressed, isNotNull);
     await tester.tap(pageNumber);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PDF 页'));
     await tester.pumpAndSettle();
     expect(
       tester.widget<TextFormField>(find.byType(TextFormField)).controller!.text,
@@ -1434,6 +1464,60 @@ void main() {
     expect(repo.saved, [(profile: 'default', page: 127)]);
     expect(repo.reading('default', longBook.pdfSha256).page, 127);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('详情按实际书页跳转，保存物理页并由原书阅读恢复', (tester) async {
+    final printedBook = Textbook.fromJson({...book.toJson(), 'pageCount': 8});
+    repo.books[printedBook.pdfSha256] = printedBook;
+    final numbers = pageNumberFixture(pageCount: 8, pages: {6: 1, 7: 2, 8: 3});
+    final jumps = <int>[];
+    TextbookViewerOptions? options;
+    await pump(
+      tester,
+      TextbookDetailPage(
+        bookId: printedBook.pdfSha256,
+        previewBuilder: (_, value) {
+          options = value;
+          return const SizedBox.expand();
+        },
+      ),
+    );
+    options!.onPageNumbersReady!(numbers);
+    options!.onReady((page) async {
+      jumps.add(page);
+      options!.onPageChanged(page);
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('未标页码'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('textbook-detail-page-number')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '书页')).selected,
+      isTrue,
+    );
+    await tester.enterText(find.byType(TextFormField), '2');
+    await tester.tap(find.text('跳转'));
+    await tester.pumpAndSettle();
+    expect(jumps, [7]);
+    expect(find.text('第 2 页'), findsOneWidget);
+    expect(repo.reading('default', printedBook.pdfSha256).page, 7);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pump(
+      tester,
+      TextbookReaderPage(
+        bookId: printedBook.pdfSha256,
+        viewerBuilder: (_, value) {
+          options = value;
+          return const SizedBox.expand();
+        },
+      ),
+    );
+    expect(options!.initialPage, 7);
+    options!.onPageNumbersReady!(numbers);
+    options!.onReady((_) async {});
+    await tester.pumpAndSettle();
+    expect(find.text('第 2 页'), findsOneWidget);
+    expect(repo.reading('default', printedBook.pdfSha256).page, 7);
   });
 
   testWidgets('详情双页输入右页、同展开页跳转，切单页保留准确页码', (tester) async {
@@ -1458,7 +1542,7 @@ void main() {
     await tester.enterText(find.byType(TextFormField), '3');
     await tester.tap(find.text('跳转'));
     await tester.pumpAndSettle();
-    expect(find.text('2–3 / 3'), findsOneWidget);
+    expect(find.text('第 2–3 页'), findsOneWidget);
     expect(options!.initialPage, 3);
     await tester.tap(pageNumber);
     await tester.pumpAndSettle();
@@ -1469,7 +1553,7 @@ void main() {
     await tester.enterText(find.byType(TextFormField), '2');
     await tester.tap(find.text('跳转'));
     await tester.pumpAndSettle();
-    expect(find.text('2–3 / 3'), findsOneWidget);
+    expect(find.text('第 2–3 页'), findsOneWidget);
     expect(options!.initialPage, 2);
     await tester.tap(pageNumber);
     await tester.pumpAndSettle();
@@ -1478,7 +1562,7 @@ void main() {
     await tester.pumpAndSettle();
     tester.view.physicalSize = const Size(360, 800);
     await tester.pumpAndSettle();
-    expect(find.text('3 / 3'), findsOneWidget);
+    expect(find.text('第 3 页'), findsOneWidget);
     expect(options!.initialPage, 3);
     expect(repo.saved, [
       (profile: 'default', page: 3),
@@ -1511,6 +1595,7 @@ void main() {
       (widget) => widget is IconButton && widget.tooltip == '搜索本书',
     );
     expect(tester.widget<IconButton>(searchButton).onPressed, isNull);
+    _readyNumbers(options!);
     options!.onReady((page) async {
       jumps.add(page);
       await turning.future;
@@ -1561,7 +1646,7 @@ void main() {
     expect(tester.widget<IconButton>(searchButton).onPressed, isNull);
     turning.complete();
     await tester.pumpAndSettle();
-    expect(find.text('2–3 / 3'), findsOneWidget);
+    expect(find.text('第 2–3 页'), findsOneWidget);
     expect(options!.initialPage, 3);
     expect(repo.saved, [(profile: 'default', page: 3)]);
     expect(repo.reading('default', book.pdfSha256).page, 3);
@@ -1617,6 +1702,7 @@ void main() {
         ),
       ),
     );
+    _readyNumbers(options!);
     options!.onReady((page) async {
       jumps.add(page);
       options!.onPageChanged(page);
@@ -1653,7 +1739,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(TextbookTocDrawer), findsNothing);
     expect(jumps, [3]);
-    expect(find.text('2–3 / 3'), findsOneWidget);
+    expect(find.text('第 2–3 页'), findsOneWidget);
     expect(find.byType(AppBar), findsNothing);
     expect(
       tester.getRect(toc).center.dx -
@@ -1697,6 +1783,7 @@ void main() {
         },
       ),
     );
+    _readyNumbers(options!);
     options!.onReady((page) async => options!.onPageChanged(page));
     Stream<TextbookTocProgress> load(bool refresh) => Stream.value(
       const TextbookTocProgress(
@@ -1778,7 +1865,7 @@ void main() {
     tester.view.physicalSize = const Size(1000, 700);
     await tester.pumpAndSettle();
     expect(options!.doublePage, isTrue);
-    expect(find.text('PDF 第 2–3 / 3 页'), findsOneWidget);
+    expect(find.text('第 2–3 页'), findsOneWidget);
     expect(
       tester
           .widget<IconButton>(
@@ -1790,7 +1877,7 @@ void main() {
     tester.view.physicalSize = const Size(360, 800);
     await tester.pumpAndSettle();
     expect(options!.doublePage, isFalse);
-    expect(find.text('PDF 第 3 / 3 页'), findsOneWidget);
+    expect(find.text('第 3 页'), findsOneWidget);
   });
 
   testWidgets('阅读从保存页开始，跳页校验，晚到回调仍写进入时档案', (tester) async {
@@ -1809,8 +1896,10 @@ void main() {
       ),
     );
     expect(options!.initialPage, 2);
-    expect(find.text('PDF 第 2 / 3 页'), findsOneWidget);
-    await tester.tap(find.text('PDF 第 2 / 3 页'));
+    expect(find.text('第 2 页'), findsOneWidget);
+    await tester.tap(find.text('第 2 页'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PDF 页'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), '99');
     await tester.tap(find.text('跳转'));
@@ -1824,7 +1913,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(repo.reading('default', book.pdfSha256).page, 3);
     expect(repo.reading('other', book.pdfSha256).page, 1);
-    expect(find.text('PDF 第 3 / 3 页'), findsOneWidget);
+    expect(find.text('第 3 页'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

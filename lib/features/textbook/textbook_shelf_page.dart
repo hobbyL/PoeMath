@@ -10,6 +10,7 @@ import 'package:poemath/features/textbook/providers/textbook_download_controller
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_cover_grid.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_cover.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_number_label.dart';
 
 class TextbookShelfPage extends ConsumerStatefulWidget {
   const TextbookShelfPage({super.key});
@@ -37,10 +38,20 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
     final reading = ref
         .watch(textbookRepositoryProvider)
         .reading(ProfileScope.currentId, book.pdfSha256);
+    final pageLabel = installed
+        ? asyncTextbookPageLabel(
+            ref.watch(
+              textbookPrintedPageProvider((
+                bookId: book.pdfSha256,
+                page: reading.page.clamp(1, book.pageCount),
+              )),
+            ),
+          )
+        : '';
     final status =
         download?.label ??
         (installed
-            ? '已下载 · 第 ${reading.page.clamp(1, book.pageCount)} 页'
+            ? '已下载 · $pageLabel'
             : path.isLoading
             ? '检查本地文件中'
             : '未下载 · ${(book.fileSize / (1024 * 1024)).toStringAsFixed(1)} MB');

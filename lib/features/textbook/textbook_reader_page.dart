@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -14,6 +15,7 @@ import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_layout.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_number_label.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
 import 'package:poemath/features/textbook/widgets/textbook_toc_dialog.dart';
 
@@ -49,6 +51,7 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
   bool _recentSaveFailed = false;
   TextbookGoToPage? _goToPage;
   TextbookTocLoader? _toc;
+  TextbookPageNumberService? _pageNumbers;
 
   @override
   void initState() {
@@ -129,8 +132,11 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
   Future<void> _jump() async {
     final page = await showDialog<int>(
       context: context,
-      builder: (context) =>
-          TextbookPageDialog(page: _page, pageCount: _book!.pageCount),
+      builder: (context) => TextbookPageDialog(
+        page: _page,
+        pageCount: _book!.pageCount,
+        pageNumbers: _pageNumbers,
+      ),
     );
     if (page != null && mounted) await _navigate(page);
   }
@@ -154,6 +160,7 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
       context: context,
       load: toc,
       currentPage: _page,
+      pageNumbers: _pageNumbers,
     );
     if (page != null && mounted) await _navigate(page);
   }
@@ -163,6 +170,7 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
     _viewerRevision++;
     _goToPage = null;
     _toc = null;
+    _pageNumbers = null;
   });
 
   @override
@@ -195,9 +203,6 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
       layout.spreadIndex(_page),
       book.pageCount,
     );
-    final pageLabel = visiblePages.length == 2
-        ? 'PDF 第 ${visiblePages.first}–${visiblePages.last} / ${book.pageCount} 页'
-        : 'PDF 第 $_page / ${book.pageCount} 页';
     final pathState = ref.watch(textbookPathProvider(book.pdfSha256));
     final revision = _viewerRevision;
     return Scaffold(
@@ -270,6 +275,11 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
                 setState(() => _toc = toc);
               }
             },
+            onPageNumbersReady: (numbers) {
+              if (mounted && revision == _viewerRevision) {
+                setState(() => _pageNumbers = numbers);
+              }
+            },
             onRetry: _retry,
             doublePage: layout.doublePage,
             onPreviousPage: _goToPage != null && previous != null
@@ -321,7 +331,11 @@ class _TextbookReaderPageState extends ConsumerState<TextbookReaderPage>
                   Expanded(
                     child: TextButton(
                       onPressed: _goToPage == null ? null : _jump,
-                      child: Text(pageLabel),
+                      child: TextbookPageNumberLabel(
+                        service: _pageNumbers,
+                        pages: visiblePages,
+                        builder: (context, label) => Text(label),
+                      ),
                     ),
                   ),
                   IconButton(

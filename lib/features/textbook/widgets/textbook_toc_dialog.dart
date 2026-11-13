@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
+import 'package:poemath/data/models/textbook_page_numbers.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_number_label.dart';
 
 int? _entryIndexForPage(List<TextbookTocEntry> entries, int? currentPage) {
   if (currentPage == null) return null;
@@ -30,6 +33,7 @@ Future<int?> showTextbookToc({
   required BuildContext context,
   required TextbookTocLoader load,
   int? currentPage,
+  TextbookPageNumberService? pageNumbers,
 }) => showGeneralDialog<int>(
   context: context,
   barrierDismissible: true,
@@ -39,7 +43,11 @@ Future<int?> showTextbookToc({
       : Durations.medium2,
   pageBuilder: (_, __, ___) => Align(
     alignment: Alignment.centerLeft,
-    child: TextbookTocDrawer(load: load, currentPage: currentPage),
+    child: TextbookTocDrawer(
+      load: load,
+      currentPage: currentPage,
+      pageNumbers: pageNumbers,
+    ),
   ),
   transitionBuilder: (_, animation, __, child) => SlideTransition(
     position: Tween(begin: const Offset(-1, 0), end: Offset.zero).animate(
@@ -54,10 +62,16 @@ Future<int?> showTextbookToc({
 );
 
 class TextbookTocDrawer extends StatefulWidget {
-  const TextbookTocDrawer({super.key, required this.load, this.currentPage});
+  const TextbookTocDrawer({
+    super.key,
+    required this.load,
+    this.currentPage,
+    this.pageNumbers,
+  });
 
   final TextbookTocLoader load;
   final int? currentPage;
+  final TextbookPageNumberService? pageNumbers;
 
   @override
   State<TextbookTocDrawer> createState() => _TextbookTocDrawerState();
@@ -378,38 +392,45 @@ class _TextbookTocDrawerState extends State<TextbookTocDrawer> {
                                 MediaQuery.textScalerOf(context).scale(1),
                               ),
                         ),
-                        child: AppTile(
-                          key: ValueKey('textbook-toc-entry-$index'),
-                          flat: true,
-                          selected: index == _selectedIndex,
-                          iconColor: theme.colorScheme.primary,
-                          title: title,
-                          titleSuffix: entry.page == null
+                        child: TextbookPageNumberLabel(
+                          service: entry.page == null
                               ? null
-                              : '第 ${entry.page} 页',
-                          subtitle:
-                              entry.page != null || branch || entry.isGroup
-                              ? ''
-                              : entry.printedPage != null
-                              ? '书内第 ${entry.printedPage} 页 · 暂未定位页码'
-                              : '暂无跳转页码',
-                          subtitleMaxLines: 2,
-                          trailingInTitle: true,
-                          trailingIcon: branch && !collapsed
-                              ? Icons.expand_more
-                              : Icons.chevron_right,
-                          onTrailingTap: branch ? toggle : null,
-                          trailingTooltip: branch
-                              ? '${collapsed ? '展开' : '收起'}$title'
-                              : null,
-                          trailing: !branch && entry.page == null
-                              ? const Icon(Icons.bookmark_border)
-                              : null,
-                          onTap: entry.page == null
-                              ? branch
-                                    ? toggle
-                                    : null
-                              : () => Navigator.pop(context, entry.page),
+                              : widget.pageNumbers,
+                          pages: entry.page == null ? const [] : [entry.page!],
+                          fallbackLabel: textbookPrintedPageLabel(
+                            entry.printedPage,
+                          ),
+                          builder: (context, pageLabel) => AppTile(
+                            key: ValueKey('textbook-toc-entry-$index'),
+                            flat: true,
+                            selected: index == _selectedIndex,
+                            iconColor: theme.colorScheme.primary,
+                            title: title,
+                            titleSuffix: entry.page == null ? null : pageLabel,
+                            subtitle:
+                                entry.page != null || branch || entry.isGroup
+                                ? ''
+                                : entry.printedPage != null
+                                ? '书内第 ${entry.printedPage} 页 · 暂未定位页码'
+                                : '暂无跳转页码',
+                            subtitleMaxLines: 2,
+                            trailingInTitle: true,
+                            trailingIcon: branch && !collapsed
+                                ? Icons.expand_more
+                                : Icons.chevron_right,
+                            onTrailingTap: branch ? toggle : null,
+                            trailingTooltip: branch
+                                ? '${collapsed ? '展开' : '收起'}$title'
+                                : null,
+                            trailing: !branch && entry.page == null
+                                ? const Icon(Icons.bookmark_border)
+                                : null,
+                            onTap: entry.page == null
+                                ? branch
+                                      ? toggle
+                                      : null
+                                : () => Navigator.pop(context, entry.page),
+                          ),
                         ),
                       ),
                     );

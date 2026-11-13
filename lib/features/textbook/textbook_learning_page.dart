@@ -9,6 +9,7 @@ import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_learning_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_number_label.dart';
 import 'package:poemath/features/textbook/widgets/textbook_cover_grid.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_cover.dart';
 import 'package:poemath/features/chinese/expression/widgets/content_preparation_actions.dart';
@@ -96,8 +97,13 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
         .clamp(1, book.pageCount);
     final theme = Theme.of(context);
     final title = '${book.title}\n${book.volumeLabel}';
+    final pageLabel = asyncTextbookPageLabel(
+      ref.watch(
+        textbookPrintedPageProvider((bookId: book.pdfSha256, page: page)),
+      ),
+    );
     return Semantics(
-      label: '${book.title}，${book.volumeLabel}，第 $page / ${book.pageCount} 页',
+      label: '${book.title}，${book.volumeLabel}，$pageLabel',
       button: true,
       excludeSemantics: true,
       onTap: () => _open(book),

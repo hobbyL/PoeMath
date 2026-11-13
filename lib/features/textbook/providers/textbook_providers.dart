@@ -7,6 +7,7 @@ import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/domain/textbook_reading_content.dart';
 import 'package:poemath/domain/textbook_text_display.dart';
+import 'package:poemath/domain/textbook_printed_page.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
 import 'package:poemath/data/repositories/textbook_progress_cleanup.dart';
@@ -207,3 +208,40 @@ final textbookPathProvider = FutureProvider.autoDispose.family<String?, String>(
     return ref.watch(textbookFileServiceProvider).installedPath(book);
   },
 );
+
+/// 没有阅读器的书架/续读入口只提取保存位置，不在列表中索引全书。
+final textbookPrintedPageProvider = FutureProvider.autoDispose
+    .family<int?, ({String bookId, int page})>((ref, key) async {
+      final book = ref
+          .watch(textbookLocalListProvider)
+          .where((book) => book.pdfSha256 == key.bookId)
+          .firstOrNull;
+      if (book == null) return null;
+      final files = ref.watch(textbookFileServiceProvider);
+      final token = TextbookDraftToken();
+      ref.onDispose(token.cancel);
+      final cache = files.contentCache(book);
+      final path = await ref.watch(textbookPathProvider(key.bookId).future);
+      token.check();
+      if (path == null) throw StateError('本地课本文件缺失');
+      final printed = await cache.pageNumber(key.page, () async {
+        token.check();
+        final layout = await cache.cachedPageLayout(key.page);
+        token.check();
+        if (layout != null) return printedTextbookPage(layout);
+        NativeTextbookPdfSource? source;
+        try {
+          source = await NativeTextbookPdfSource.open(
+            path: path,
+            book: book,
+            cache: cache,
+            token: token,
+          );
+          return printedTextbookPage(await source.page(key.page));
+        } finally {
+          await source?.close();
+        }
+      });
+      token.check();
+      return printed;
+    });

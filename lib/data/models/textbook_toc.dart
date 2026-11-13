@@ -1,3 +1,5 @@
+import 'package:poemath/data/models/textbook_page_text.dart';
+
 /// 目录仅用于原书导航，不属于已审核的课程内容。
 class TextbookTocEntry {
   const TextbookTocEntry({
@@ -72,6 +74,22 @@ class TextbookTocGlyph {
 
 class TextbookTocPage {
   const TextbookTocPage(this.text, {this.glyphs = const []});
+
+  factory TextbookTocPage.fromPageText(TextbookPageText page) =>
+      TextbookTocPage(
+        page.text,
+        glyphs: [
+          for (final g in page.glyphs)
+            if (g.text.trim().isNotEmpty)
+              TextbookTocGlyph(
+                text: g.text,
+                left: g.left,
+                top: g.top,
+                right: g.right,
+                height: g.height,
+              ),
+        ],
+      );
 
   final String text;
   final List<TextbookTocGlyph> glyphs;

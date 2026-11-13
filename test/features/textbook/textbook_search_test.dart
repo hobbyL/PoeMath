@@ -3,17 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/textbook/widgets/textbook_search_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
 
+import '../../helpers/textbook_page_number_fixture.dart';
+
 void main() {
   test('中文搜索忽略夹在字间的拼音和换行，保留标点及数字边界', () async {
-    final pages = [
-      '春\r\nchOn\r\n晓\r\nxiAo。春 chūn 晓 xiǎo。',
-      '春，晓；春1晓。',
-      '',
-    ];
+    final pages = ['春\r\nchOn\r\n晓\r\nxiAo。春 chūn 晓 xiǎo。', '春，晓；春1晓。', ''];
     final results = await searchTextbookPages(
       query: ' 春晓 ',
       pageCount: pages.length,
@@ -43,8 +42,11 @@ void main() {
     }
 
     expect(
-      await searchTextbookPages(query: ' ', pageCount: 3, loadPageText: load)
-          .toList(),
+      await searchTextbookPages(
+        query: ' ',
+        pageCount: 3,
+        loadPageText: load,
+      ).toList(),
       isEmpty,
     );
     expect(loaded, isEmpty);
@@ -80,6 +82,9 @@ void main() {
     TextbookSearch search, {
     bool large = false,
     Size size = const Size(360, 800),
+    int pageCount = 3,
+    TextbookPageNumberService? pageNumbers,
+    ValueChanged<int?>? selected,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -88,20 +93,27 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(large ? 2 : 1),
-          ),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(large ? 2 : 1)),
           child: child!,
         ),
         home: Builder(
           builder: (context) {
             return Scaffold(
               body: TextButton(
-                onPressed: () => showDialog<int>(
-                  context: context,
-                  builder: (_) =>
-                      TextbookSearchDialog(search: search, pageCount: 3),
-                ),
+                onPressed: () async {
+                  final target = await showDialog<int>(
+                    context: context,
+                    builder: (_) => TextbookSearchDialog(
+                      search: search,
+                      pageCount: pageCount,
+                      pageNumbers:
+                          pageNumbers ??
+                          pageNumberFixture(pageCount: pageCount),
+                    ),
+                  );
+                  selected?.call(target);
+                },
                 child: const Text('打开搜索'),
               ),
             );
@@ -112,6 +124,32 @@ void main() {
     await tester.tap(find.text('打开搜索'));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('搜索结果显示页脚书页，选择返回原 PDF 页', (tester) async {
+    int? target;
+    await open(
+      tester,
+      (_) => Stream.value(
+        const TextbookSearchPage(
+          page: 7,
+          hasText: true,
+          matchCount: 1,
+          snippet: '春夏秋冬',
+        ),
+      ),
+      pageCount: 8,
+      pageNumbers: pageNumberFixture(pageCount: 8, pages: {7: 2}),
+      selected: (value) => target = value,
+    );
+    await tester.enterText(find.byType(TextField), '春夏秋冬');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(find.text('第 2 页 · 1 处'), findsOneWidget);
+    expect(find.text('第 7 页 · 1 处'), findsNothing);
+    await tester.tap(find.text('第 2 页 · 1 处'));
+    await tester.pumpAndSettle();
+    expect(target, 7);
+  });
 
   testWidgets('更换关键词取消旧流，进度和晚到结果不串用，关闭停止扫描', (tester) async {
     var firstCancelled = false;
@@ -141,11 +179,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('旧结果'), findsOneWidget);
     expect(find.text('搜索关键词 1 条'), findsOneWidget);
+    expect(find.text('正在搜索，已扫描 1 / 3 个页面'), findsOneWidget);
     expect(
       tester
-          .widget<LinearProgressIndicator>(
-            find.byType(LinearProgressIndicator),
-          )
+          .widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator))
           .value,
       1 / 3,
     );

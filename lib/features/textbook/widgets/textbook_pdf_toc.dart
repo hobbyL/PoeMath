@@ -1,5 +1,6 @@
 import 'package:pdfrx/pdfrx.dart';
 import 'package:poemath/core/services/textbook_content_cache.dart';
+import 'package:poemath/core/services/textbook_pdf_page_loader.dart';
 import 'package:poemath/core/services/textbook_toc_service.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 
@@ -40,41 +41,13 @@ TextbookTocService textbookPdfTocService(
       return entries;
     },
     loadPage: (number) async {
-      final revision = cache?.revision;
-      checkAvailable();
-      final page = await document.pages[number - 1].waitForLoaded(
-        timeout: const Duration(seconds: 15),
+      final page = await loadTextbookPdfPage(
+        document: document,
+        number: number,
+        cache: cache,
+        checkAvailable: checkAvailable,
       );
-      checkAvailable();
-      if (page == null) throw StateError('PDF page loading timed out');
-      final raw = await page.loadText();
-      checkAvailable();
-      await cache?.rememberText(
-        number,
-        raw?.fullText ?? '',
-        generation: revision,
-      );
-      checkAvailable();
-      if (raw == null) return const TextbookTocPage('');
-      final glyphs = <TextbookTocGlyph>[];
-      for (var i = 0;
-          i < raw.fullText.length && i < raw.charRects.length;
-          i++) {
-        final text = raw.fullText.substring(i, i + 1);
-        if (text.trim().isEmpty) continue;
-        final rect = raw.charRects[i].toRect(page: page);
-        if (rect.isEmpty || !rect.isFinite) continue;
-        glyphs.add(
-          TextbookTocGlyph(
-            text: text,
-            left: rect.left / page.width,
-            top: rect.top / page.height,
-            right: rect.right / page.width,
-            height: rect.height / page.height,
-          ),
-        );
-      }
-      return TextbookTocPage(raw.fullText, glyphs: glyphs);
+      return TextbookTocPage.fromPageText(page);
     },
   );
 }

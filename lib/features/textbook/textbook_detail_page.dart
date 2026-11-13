@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
@@ -18,6 +19,7 @@ import 'package:poemath/domain/textbook_lesson_content.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_dialog.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_layout.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_number_label.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_cover.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_preview.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
@@ -54,6 +56,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   TextbookGoToPage? _goToPage;
   TextbookSearch? _search;
   TextbookTocLoader? _toc;
+  TextbookPageNumberService? _pageNumbers;
 
   @override
   void initState() {
@@ -79,6 +82,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     _goToPage = null;
     _search = null;
     _toc = null;
+    _pageNumbers = null;
   }
 
   Future<void> _savePreviewPage(Textbook book, int page) async {
@@ -149,6 +153,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
         _goToPage = null;
         _search = null;
         _toc = null;
+        _pageNumbers = null;
       });
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
@@ -185,8 +190,11 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   Future<void> _jumpToPage(Textbook book) async {
     final page = await showDialog<int>(
       context: context,
-      builder: (_) =>
-          TextbookPageDialog(page: _previewPage, pageCount: book.pageCount),
+      builder: (_) => TextbookPageDialog(
+        page: _previewPage,
+        pageCount: book.pageCount,
+        pageNumbers: _pageNumbers,
+      ),
     );
     if (page != null && mounted) await _turnPage(page, book.pageCount);
   }
@@ -196,8 +204,11 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     if (search == null) return;
     final page = await showDialog<int>(
       context: context,
-      builder: (_) =>
-          TextbookSearchDialog(pageCount: book.pageCount, search: search),
+      builder: (_) => TextbookSearchDialog(
+        pageCount: book.pageCount,
+        search: search,
+        pageNumbers: _pageNumbers,
+      ),
     );
     if (page != null && mounted) await _turnPage(page, book.pageCount);
   }
@@ -206,6 +217,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     _goToPage = null;
     _search = null;
     _toc = null;
+    _pageNumbers = null;
     _previewRevision++;
   });
 
@@ -216,6 +228,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
       context: context,
       load: toc,
       currentPage: _previewPage,
+      pageNumbers: _pageNumbers,
     );
     if (page != null && mounted) await _turnPage(page, book.pageCount);
   }
@@ -340,6 +353,11 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
           setState(() => _toc = toc);
         }
       },
+      onPageNumbersReady: (numbers) {
+        if (mounted && _previewVisible && revision == _previewRevision) {
+          setState(() => _pageNumbers = numbers);
+        }
+      },
       onRetry: _retryPreview,
       doublePage: layout.doublePage,
       onPreviousPage: canTurn && previous != null
@@ -368,9 +386,6 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
           layout.spreadIndex(_previewPage),
           book.pageCount,
         );
-        final pageLabel = pages.length == 2
-            ? '${pages.first}–${pages.last} / ${book.pageCount}'
-            : '$_previewPage / ${book.pageCount}';
         final canNavigate =
             available && !_turning && _previewVisible && _goToPage != null;
         final padding = const EdgeInsets.symmetric(
@@ -391,7 +406,12 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
             key: const ValueKey('textbook-detail-page-number'),
             onPressed: canNavigate ? () => _jumpToPage(book) : null,
             style: TextButton.styleFrom(padding: padding),
-            child: Text(pageLabel, textAlign: TextAlign.center),
+            child: TextbookPageNumberLabel(
+              service: _pageNumbers,
+              pages: pages,
+              builder: (context, label) =>
+                  Text(label, textAlign: TextAlign.center),
+            ),
           ),
         );
         final searchButton = SizedBox(

@@ -1,20 +1,24 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_number_label.dart';
 
 class TextbookSearchDialog extends StatefulWidget {
   const TextbookSearchDialog({
     super.key,
     required this.search,
     required this.pageCount,
+    this.pageNumbers,
   });
 
   final TextbookSearch search;
   final int pageCount;
+  final TextbookPageNumberService? pageNumbers;
 
   @override
   State<TextbookSearchDialog> createState() => _TextbookSearchDialogState();
@@ -110,7 +114,7 @@ class _TextbookSearchDialogState extends State<TextbookSearchDialog> {
     final status = _failed
         ? '搜索未完成，请重试'
         : _searching
-        ? '正在搜索 $_searched / ${widget.pageCount} 页'
+        ? '正在搜索，已扫描 $_searched / ${widget.pageCount} 个页面'
         : !_started
         ? null
         : _textPages == 0
@@ -191,14 +195,21 @@ class _TextbookSearchDialogState extends State<TextbookSearchDialog> {
                         const SizedBox(height: SpacingTokens.sm),
                     itemBuilder: (context, index) {
                       final result = _results[index];
-                      return AppTile(
-                        key: ValueKey('textbook-search-result-${result.page}'),
-                        iconColor: theme.colorScheme.primary,
-                        title: '第 ${result.page} 页 · ${result.matchCount} 处',
-                        subtitle: result.snippet,
-                        subtitleMaxLines: 2,
-                        trailingInTitle: true,
-                        onTap: () => Navigator.pop(context, result.page),
+                      return TextbookPageNumberLabel(
+                        service: widget.pageNumbers,
+                        pages: [result.page],
+                        fallbackLabel: '未标页码',
+                        builder: (context, pageLabel) => AppTile(
+                          key: ValueKey(
+                            'textbook-search-result-${result.page}',
+                          ),
+                          iconColor: theme.colorScheme.primary,
+                          title: '$pageLabel · ${result.matchCount} 处',
+                          subtitle: result.snippet,
+                          subtitleMaxLines: 2,
+                          trailingInTitle: true,
+                          onTap: () => Navigator.pop(context, result.page),
+                        ),
                       );
                     },
                   ),

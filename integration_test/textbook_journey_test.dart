@@ -217,9 +217,9 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.search);
         await _until(
           tester,
-          () => find.text('第 $target 页 · 1 处').evaluate().isNotEmpty,
+          () => find.text('未标页码 · 1 处').evaluate().isNotEmpty,
         );
-        expect(find.text('第 $target 页 · 1 处'), findsOneWidget);
+        expect(find.text('未标页码 · 1 处'), findsOneWidget);
         await tester.tap(
           find.byKey(ValueKey('textbook-search-result-$target')),
         );
@@ -255,7 +255,8 @@ void main() {
                 1 &&
             _detailReadEnabled(tester),
       );
-      expect(find.text('2 / 3'), findsOneWidget);
+      await _until(tester, () => find.text('未标页码').evaluate().isNotEmpty);
+      expect(find.text('未标页码'), findsOneWidget);
       expect(repo.reading('default', book.pdfSha256).page, 2);
       expect(repo.recentBook('default'), isNull);
       await tester.tap(find.byKey(const ValueKey('textbook-detail-read')));
@@ -296,7 +297,8 @@ void main() {
         tester,
         () => repo.reading('default', book.pdfSha256).page == 2,
       );
-      expect(find.text('PDF 第 2 / 3 页'), findsOneWidget);
+      await _until(tester, () => find.text('未标页码').evaluate().isNotEmpty);
+      expect(find.text('未标页码'), findsOneWidget);
       router.go(AppRoutes.textbookManagement);
       await _until(tester, () => find.text('书籍管理').evaluate().isNotEmpty);
       await _until(tester, () => find.byType(PdfViewer).evaluate().isEmpty);

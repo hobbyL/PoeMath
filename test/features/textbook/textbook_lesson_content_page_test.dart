@@ -25,6 +25,7 @@ import 'package:poemath/features/textbook/widgets/textbook_pdf_preview.dart';
 import 'package:poemath/features/textbook/widgets/textbook_pdf_view.dart';
 
 import '../../helpers/textbook_course_fixture.dart';
+import '../../helpers/textbook_page_number_fixture.dart';
 
 class _Files extends TextbookFileService {
   @override
@@ -39,6 +40,7 @@ class _Books implements TextbookRepository {
   Future<void> markOpened(String profileId, String id) async {
     recent[profileId] = id;
   }
+
   @override
   Stream<BoxEvent> watchReading(String profileId) => const Stream.empty();
 
@@ -88,11 +90,14 @@ class _PreviewState extends State<_Preview> {
   void initState() {
     super.initState();
     widget.onCreate();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => widget.options.onReady(
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.options.onPageNumbersReady?.call(
+        pageNumberFixture(pageCount: courseFixtureBook().pageCount),
+      );
+      widget.options.onReady(
         (page) async => widget.options.onPageChanged(page),
-      ),
-    );
+      );
+    });
   }
 
   @override
@@ -614,7 +619,7 @@ void main() {
       router.pop();
       await tester.pumpAndSettle();
       expect(find.byType(TextbookDetailPage), findsOneWidget);
-      expect(find.text('2 / 3'), findsOneWidget);
+      expect(find.text('第 2 页'), findsOneWidget);
       expect(creates, 1);
       expect(disposes, 0);
       expect(books.saved, [2]);
@@ -714,7 +719,7 @@ void main() {
       router.pop();
       await tester.pumpAndSettle();
       expect(find.byType(TextbookDetailPage), findsOneWidget);
-      expect(find.text('2 / 3'), findsOneWidget);
+      expect(find.text('第 2 页'), findsOneWidget);
       expect(creates, 1);
       expect(disposes, 0);
     }

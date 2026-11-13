@@ -60,6 +60,8 @@ void main() {
               .overrideWith((ref) async => null),
           textbookPathProvider(other.pdfSha256)
               .overrideWith((ref) async => '/other.pdf'),
+          textbookPrintedPageProvider((bookId: other.pdfSha256, page: 1))
+              .overrideWith((ref) async => 6),
         ],
         child: MaterialApp.router(routerConfig: router),
       ),
@@ -72,7 +74,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(find.text('继续读《${book.title}》'), findsOneWidget);
-    expect(find.textContaining('PDF 第 2 / 3 页'), findsOneWidget);
+    expect(find.textContaining('页码读取失败'), findsOneWidget);
     expect(find.textContaining('课本文件缺失'), findsOneWidget);
     await tester.tap(find.text('继续读《${book.title}》'));
     await tester.pumpAndSettle();
@@ -82,7 +84,7 @@ void main() {
     ProfileScope.switchTo('child');
     await tester.pumpAndSettle();
     expect(find.text('继续读《另一课本》'), findsOneWidget);
-    expect(find.textContaining('PDF 第 1 / 3 页'), findsOneWidget);
+    expect(find.textContaining('第 6 页'), findsOneWidget);
     await tester.runAsync(() => repo.delete(other.pdfSha256));
     await tester.pumpAndSettle();
     expect(find.textContaining('继续读'), findsNothing);

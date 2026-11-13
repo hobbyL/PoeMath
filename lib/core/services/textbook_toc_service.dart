@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:poemath/core/services/textbook_content_cache.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
+import 'package:poemath/domain/textbook_printed_page.dart';
 
 final _spaces = RegExp(r'\s+');
 final _han = RegExp(r'[\u3400-\u9FFF]');
@@ -51,7 +52,8 @@ class TextbookTocService {
           .map(
             (entry) => TextbookTocEntry(
               title: entry.title.trim(),
-              page: entry.page != null &&
+              page:
+                  entry.page != null &&
                       entry.page! >= 1 &&
                       entry.page! <= pageCount
                   ? entry.page
@@ -65,10 +67,13 @@ class TextbookTocService {
       outline = [];
     }
     final usable = outline.where((entry) => entry.page != null).toList();
-    final fileSegments = usable.isNotEmpty &&
+    final fileSegments =
+        usable.isNotEmpty &&
         usable.every(
-          (entry) => RegExp(r'(^\d{4,}[-_]|\.pdf$|_DJD$)', caseSensitive: false)
-              .hasMatch(entry.title),
+          (entry) => RegExp(
+            r'(^\d{4,}[-_]|\.pdf$|_DJD$)',
+            caseSensitive: false,
+          ).hasMatch(entry.title),
         );
     if (usable.isNotEmpty && !fileSegments) {
       _cached = TextbookTocResult(
@@ -87,8 +92,9 @@ class TextbookTocService {
       hasText |= text.text.trim().isNotEmpty;
       final rows = _rows(text);
       final heading = rows.any(
-        (row) => _tocHeading
-            .hasMatch(row.text.replaceAll(_spaces, '').toLowerCase()),
+        (row) => _tocHeading.hasMatch(
+          row.text.replaceAll(_spaces, '').toLowerCase(),
+        ),
       );
       final entries = _entries(rows);
       if (heading || entries.length >= 2) {
@@ -128,11 +134,8 @@ class TextbookTocService {
       if (!directoryPages.contains(page)) {
         final text = await loadPage(page);
         final rows = _rows(text);
-        final footer = rows
-            .where((row) => row.top > 0.87 && _number.hasMatch(row.text.trim()))
-            .map((row) => int.parse(row.text.trim()))
-            .toSet();
-        if (footer.length == 1) footers[page] = footer.single;
+        final footer = printedTextbookFooter(text.glyphs);
+        if (footer != null) footers[page] = footer;
         for (var index = 0; index < entries.length; index++) {
           final entry = entries[index];
           if (entry.printedPage == null) continue;
@@ -163,8 +166,9 @@ class TextbookTocService {
       final entry = entries[index];
       if (entry.printedPage == null) continue;
       final key = _normalize(entry.title, _han.hasMatch(entry.title));
-      final pages =
-          confirmed[index].isNotEmpty ? confirmed[index] : matches[index];
+      final pages = confirmed[index].isNotEmpty
+          ? confirmed[index]
+          : matches[index];
       if (titleCounts[key] == 1 && pages.length == 1) {
         final offset = pages.single - entry.printedPage!;
         (votes[offset] ??= {}).add(entry.printedPage!);
@@ -172,7 +176,8 @@ class TextbookTocService {
     }
     final ranked = votes.entries.toList()
       ..sort((a, b) => b.value.length.compareTo(a.value.length));
-    final offset = ranked.isNotEmpty &&
+    final offset =
+        ranked.isNotEmpty &&
             ranked.first.value.length >= 2 &&
             (ranked.length == 1 ||
                 ranked.first.value.length > ranked[1].value.length)
@@ -221,13 +226,12 @@ class TextbookTocService {
     TextbookTocPhase phase,
     int scanned, [
     TextbookTocResult? result,
-  ]) =>
-      TextbookTocProgress(
-        phase: phase,
-        scanned: scanned,
-        total: pageCount,
-        result: result,
-      );
+  ]) => TextbookTocProgress(
+    phase: phase,
+    scanned: scanned,
+    total: pageCount,
+    result: result,
+  );
 }
 
 String _normalize(String value, bool chinese) {
@@ -263,7 +267,8 @@ List<TextbookTocEntry> _hierarchy(List<TextbookTocEntry> entries) {
       collectionIndent = null;
     } else if (entry.lessonNumber != null) {
       categoryLevel = null;
-      collectionIndent = RegExp(r'^(古诗[一二三四五六七八九十0-9]+首|文言文[一二三四五六七八九十0-9]+则)$')
+      collectionIndent =
+          RegExp(r'^(古诗[一二三四五六七八九十0-9]+首|文言文[一二三四五六七八九十0-9]+则)$')
               .hasMatch(title)
           ? entry.level
           : null;
@@ -316,18 +321,21 @@ class _Row {
 }
 
 List<_Row> _rows(TextbookTocPage page) {
-  final glyphs = page.glyphs
-      .where((glyph) => glyph.text.trim().isNotEmpty && glyph.height > 0)
-      .toList()
-    ..sort((a, b) => (a.top + a.height / 2).compareTo(b.top + b.height / 2));
+  final glyphs =
+      page.glyphs
+          .where((glyph) => glyph.text.trim().isNotEmpty && glyph.height > 0)
+          .toList()
+        ..sort(
+          (a, b) => (a.top + a.height / 2).compareTo(b.top + b.height / 2),
+        );
   if (glyphs.isEmpty) {
     final lines = page.text.split(RegExp(r'[\r\n]+'));
     return [
       for (var i = 0; i < lines.length; i++)
         _Row(i / math.max(1, lines.length), 0.02, [
-          for (final match in RegExp(r'\S+').allMatches(
-            lines[i].replaceAll(_leaders, '  '),
-          ))
+          for (final match in RegExp(
+            r'\S+',
+          ).allMatches(lines[i].replaceAll(_leaders, '  ')))
             _Run(
               match.group(0)!,
               _number.hasMatch(match.group(0)!) ? 0.95 : 0,
@@ -337,13 +345,14 @@ List<_Row> _rows(TextbookTocPage page) {
     ];
   }
   // 用正文典型字号设置容差，避免“一”、句点的极薄墨迹把同一行拆开。
-  final heights = glyphs
-      .where(
-        (glyph) => RegExp(r'[\u3400-\u9FFFA-Za-z0-9]').hasMatch(glyph.text),
-      )
-      .map((glyph) => glyph.height)
-      .toList()
-    ..sort();
+  final heights =
+      glyphs
+          .where(
+            (glyph) => RegExp(r'[\u3400-\u9FFFA-Za-z0-9]').hasMatch(glyph.text),
+          )
+          .map((glyph) => glyph.height)
+          .toList()
+        ..sort();
   final lineHeight = heights.isEmpty ? 0.015 : heights[heights.length ~/ 2];
   final groups = <List<TextbookTocGlyph>>[];
   var rowCenter = 0.0;
@@ -481,11 +490,12 @@ List<_Candidate> _entries(List<_Row> rows) {
       ifAbsent: () => 1,
     );
   }
-  final stable = endpoints.entries
-      .where((column) => column.value >= 3)
-      .map((column) => column.key)
-      .toList()
-    ..sort();
+  final stable =
+      endpoints.entries
+          .where((column) => column.value >= 3)
+          .map((column) => column.key)
+          .toList()
+        ..sort();
   if (stable.length >= 2) {
     final cuts = stable.take(stable.length - 1).map((x) => x + 0.03).toList();
     final separated = <_Row>[];
@@ -508,9 +518,10 @@ List<_Candidate> _entries(List<_Row> rows) {
   }
   // 按页码列分栏，然后各栏从上到下，避免把双栏同高条目串在一起。
   final columns = <double>[];
-  for (final entry in [...result]
-    ..removeWhere((entry) => entry.printedPage == null)
-    ..sort((a, b) => a.column.compareTo(b.column))) {
+  for (final entry
+      in [...result]
+        ..removeWhere((entry) => entry.printedPage == null)
+        ..sort((a, b) => a.column.compareTo(b.column))) {
     final column = columns
         .where((value) => (value - entry.column).abs() < 0.07)
         .firstOrNull;

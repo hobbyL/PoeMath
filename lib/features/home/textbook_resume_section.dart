@@ -6,6 +6,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
+import 'package:poemath/features/textbook/widgets/textbook_page_number_label.dart';
 
 final recentTextbookProvider =
     Provider.autoDispose<({Textbook book, int page})?>((ref) {
@@ -44,12 +45,16 @@ class TextbookResumeCard extends ConsumerWidget {
       loading: () => ' · 正在检查文件',
       error: (_, __) => ' · 文件检查失败，点击重试',
     );
+    final pageLabel = asyncTextbookPageLabel(
+      ref.watch(
+        textbookPrintedPageProvider((bookId: book.pdfSha256, page: page)),
+      ),
+    );
     return AppTile(
       icon: Icons.menu_book_outlined,
       iconColor: theme.colorScheme.primary,
       title: '继续读《${book.title}》',
-      subtitle:
-          'PDF 第 $page / ${book.pageCount} 页 · ${book.volumeLabel}$status',
+      subtitle: '$pageLabel · ${book.volumeLabel}$status',
       onTap: () async {
         if (path.hasError) {
           ref.invalidate(textbookPathProvider(book.pdfSha256));

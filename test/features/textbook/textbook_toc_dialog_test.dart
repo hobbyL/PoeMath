@@ -3,9 +3,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/services/textbook_page_number_service.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_toc_dialog.dart';
+
+import '../../helpers/textbook_page_number_fixture.dart';
 
 const _result = TextbookTocResult(
   source: TextbookTocSource.text,
@@ -16,11 +19,11 @@ const _result = TextbookTocResult(
   ],
 );
 TextbookTocProgress _ready(TextbookTocResult result) => TextbookTocProgress(
-      phase: TextbookTocPhase.ready,
-      scanned: 20,
-      total: 20,
-      result: result,
-    );
+  phase: TextbookTocPhase.ready,
+  scanned: 20,
+  total: 20,
+  result: result,
+);
 
 void main() {
   Future<void> open(
@@ -31,6 +34,7 @@ void main() {
     bool large = false,
     bool reduceMotion = false,
     bool settle = true,
+    TextbookPageNumberService? pageNumbers,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -49,6 +53,7 @@ void main() {
                   context: context,
                   load: load,
                   currentPage: currentPage,
+                  pageNumbers: pageNumbers,
                 );
                 selected?.call(page);
               },
@@ -78,7 +83,12 @@ void main() {
           const TextbookTocResult(
             source: TextbookTocSource.bookmarks,
             entries: [
-              TextbookTocEntry(title: '有较长标题的目录子章节仍然可以选择', page: 7, level: 3),
+              TextbookTocEntry(
+                title: '有较长标题的目录子章节仍然可以选择',
+                page: 7,
+                printedPage: 7,
+                level: 3,
+              ),
             ],
           ),
         ),
@@ -120,10 +130,7 @@ void main() {
       tester,
       (_) => Stream.value(
         _ready(
-          TextbookTocResult(
-            source: TextbookTocSource.text,
-            entries: entries,
-          ),
+          TextbookTocResult(source: TextbookTocSource.text, entries: entries),
         ),
       ),
       currentPage: 47,
@@ -146,14 +153,10 @@ void main() {
       theme.colorScheme.onPrimaryContainer,
     );
     expect(
-      find.byWidgetPredicate(
-        (widget) => widget is AppTile && widget.selected,
-      ),
+      find.byWidgetPredicate((widget) => widget is AppTile && widget.selected),
       findsOneWidget,
     );
-    final viewport = tester.getRect(
-      find.byType(CustomScrollView),
-    );
+    final viewport = tester.getRect(find.byType(CustomScrollView));
     final target = tester.getRect(entry);
     expect(target.top, greaterThanOrEqualTo(viewport.top));
     expect(target.bottom, lessThanOrEqualTo(viewport.bottom));
@@ -225,9 +228,7 @@ void main() {
       currentPage: 3,
     );
     expect(
-      find.byWidgetPredicate(
-        (widget) => widget is AppTile && widget.selected,
-      ),
+      find.byWidgetPredicate((widget) => widget is AppTile && widget.selected),
       findsNothing,
     );
     await tester.tapAt(
@@ -251,9 +252,7 @@ void main() {
     );
     expect(
       tester
-          .widget<AppTile>(
-            find.byKey(const ValueKey('textbook-toc-entry-4')),
-          )
+          .widget<AppTile>(find.byKey(const ValueKey('textbook-toc-entry-4')))
           .selected,
       isTrue,
     );
@@ -306,8 +305,9 @@ void main() {
     expect(target.hitTestable(), findsOneWidget);
     // 定位仅改变目录滚动位置，不返回一个跳页结果。
     expect(selectedCalls, 0);
-    final scroll =
-        tester.widget<CustomScrollView>(find.byType(CustomScrollView));
+    final scroll = tester.widget<CustomScrollView>(
+      find.byType(CustomScrollView),
+    );
     scroll.controller!.jumpTo(0);
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('收起阅读单元'));
@@ -332,8 +332,14 @@ void main() {
       directoryPages: [4],
       entries: [
         TextbookTocEntry(title: '第一单元 · 识字', isGroup: true),
-        TextbookTocEntry(title: '古诗二首', lessonNumber: 1, page: 7, level: 1),
-        TextbookTocEntry(title: '春雨', page: 7, level: 2),
+        TextbookTocEntry(
+          title: '古诗二首',
+          lessonNumber: 1,
+          page: 7,
+          printedPage: 7,
+          level: 1,
+        ),
+        TextbookTocEntry(title: '春雨', page: 7, printedPage: 7, level: 2),
         TextbookTocEntry(title: '第二单元 · 阅读', isGroup: true),
         TextbookTocEntry(title: '远山', lessonNumber: 1, page: 8, level: 1),
         TextbookTocEntry(title: '写字表', page: 20),
@@ -416,8 +422,9 @@ void main() {
       selected: (value) => selected = value,
     );
     expect(find.text('部分条目暂未定位页码'), findsOneWidget);
-    final unresolved = tester
-        .widget<AppTile>(find.byKey(const ValueKey('textbook-toc-entry-1')));
+    final unresolved = tester.widget<AppTile>(
+      find.byKey(const ValueKey('textbook-toc-entry-1')),
+    );
     expect(unresolved.onTap, isNull);
     expect(find.text('查看原目录'), findsNothing);
     await tester.tap(find.text('已定位章节'));
@@ -425,10 +432,48 @@ void main() {
     expect(selected, 9);
   });
 
+  testWidgets('目录书页标签和选中状态保留不同的页码坐标', (tester) async {
+    int? selected;
+    await open(
+      tester,
+      (_) => Stream.value(_ready(_result)),
+      currentPage: 9,
+      pageNumbers: pageNumberFixture(pageCount: 20, pages: {9: 2}),
+      selected: (value) => selected = value,
+    );
+    expect(find.text('第 2 页'), findsOneWidget);
+    final entry = find.byKey(const ValueKey('textbook-toc-entry-0'));
+    expect(tester.widget<AppTile>(entry).selected, isTrue);
+    await tester.tap(entry);
+    await tester.pumpAndSettle();
+    expect(selected, 9);
+  });
+
+  testWidgets('没有书页证据的书签显示未标页码，仍可定位 PDF', (tester) async {
+    int? selected;
+    await open(
+      tester,
+      (_) => Stream.value(
+        _ready(
+          const TextbookTocResult(
+            source: TextbookTocSource.bookmarks,
+            entries: [TextbookTocEntry(title: '书签章节', page: 7)],
+          ),
+        ),
+      ),
+      selected: (value) => selected = value,
+    );
+    expect(find.text('未标页码'), findsOneWidget);
+    await tester.tap(find.text('书签章节'));
+    await tester.pumpAndSettle();
+    expect(selected, 7);
+  });
+
   testWidgets('进度可见，点击空白关闭取消读取，无迟到更新', (tester) async {
     var cancelled = false;
-    final stream =
-        StreamController<TextbookTocProgress>(onCancel: () => cancelled = true);
+    final stream = StreamController<TextbookTocProgress>(
+      onCancel: () => cancelled = true,
+    );
     stream.add(
       const TextbookTocProgress(
         phase: TextbookTocPhase.locating,
@@ -475,24 +520,20 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final refreshes = <bool>[];
-    await open(
-      tester,
-      (refresh) {
-        refreshes.add(refresh);
-        return refresh
-            ? Stream.value(
-                _ready(
-                  const TextbookTocResult(
-                    entries: [],
-                    source: TextbookTocSource.text,
-                    hasText: false,
-                  ),
+    await open(tester, (refresh) {
+      refreshes.add(refresh);
+      return refresh
+          ? Stream.value(
+              _ready(
+                const TextbookTocResult(
+                  entries: [],
+                  source: TextbookTocSource.text,
+                  hasText: false,
                 ),
-              )
-            : Stream.error(StateError('暂时不可读'));
-      },
-      large: true,
-    );
+              ),
+            )
+          : Stream.error(StateError('暂时不可读'));
+    }, large: true);
     expect(find.text('目录识别未完成，请重试'), findsOneWidget);
     await tester.ensureVisible(find.text('重试'));
     await tester.tap(find.text('重试'));
@@ -511,10 +552,7 @@ void main() {
       tester,
       (_) => Stream.value(
         _ready(
-          const TextbookTocResult(
-            entries: [],
-            source: TextbookTocSource.text,
-          ),
+          const TextbookTocResult(entries: [], source: TextbookTocSource.text),
         ),
       ),
     );

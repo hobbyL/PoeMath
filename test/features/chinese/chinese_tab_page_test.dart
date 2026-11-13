@@ -173,7 +173,13 @@ void main() {
     expect(_bookCard(current), findsOneWidget);
     expect(_bookCard(other), findsNothing);
     expect(find.text('第 2 / 3 页'), findsNothing);
-    expect(find.bySemanticsLabel('当前课本，三年级上册，第 2 / 3 页'), findsOneWidget);
+    expect(find.bySemanticsLabel('当前课本，三年级上册，页码读取失败'), findsOneWidget);
+    expect(
+      TextbookRepository()
+          .reading(ProfileScope.currentId, current.pdfSha256)
+          .page,
+      2,
+    );
     semantics.dispose();
     expect(find.text('请家长补齐课本文件'), findsOneWidget);
     final navigation = tester.widget<NavigationBar>(find.byType(NavigationBar));

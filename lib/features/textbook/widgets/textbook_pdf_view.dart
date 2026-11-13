@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:poemath/core/services/textbook_content_cache.dart';
+import 'package:poemath/core/services/textbook_page_number_service.dart';
+import 'package:poemath/core/services/textbook_pdf_page_loader.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_page_corner.dart';
@@ -26,6 +28,7 @@ class TextbookViewerOptions {
     this.doublePage = false,
     this.onSearchReady,
     this.onTocReady,
+    this.onPageNumbersReady,
     this.contentCache,
     this.onPreviousPage,
     this.onNextPage,
@@ -38,6 +41,7 @@ class TextbookViewerOptions {
   final bool doublePage;
   final ValueChanged<TextbookSearch>? onSearchReady;
   final ValueChanged<TextbookTocLoader>? onTocReady;
+  final ValueChanged<TextbookPageNumberService>? onPageNumbersReady;
   final TextbookContentCache? contentCache;
   final VoidCallback? onPreviousPage;
   final VoidCallback? onNextPage;
@@ -63,9 +67,9 @@ class _TextbookPdfViewState extends State<TextbookPdfView> {
     final layout = TextbookPageLayout(doublePage: widget.options.doublePage);
     final rects = _controller.layout.pageLayouts;
     final numbers = layout.pages(layout.spreadIndex(page), rects.length);
-    return numbers.map((number) => rects[number - 1]).reduce(
-          (left, right) => left.expandToInclude(right),
-        );
+    return numbers
+        .map((number) => rects[number - 1])
+        .reduce((left, right) => left.expandToInclude(right));
   }
 
   Future<void> _goToPage(int page, {bool animate = true}) async {
@@ -115,137 +119,146 @@ class _TextbookPdfViewState extends State<TextbookPdfView> {
 
   @override
   Widget build(BuildContext context) => PdfViewer(
-        _documentRef,
-        controller: _controller,
-        initialPageNumber: widget.options.initialPage,
-        params: PdfViewerParams(
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-          layoutPages: widget.options.doublePage ? textbookFacingPages : null,
-          horizontalCacheExtent: 1,
-          verticalCacheExtent: 2,
-          maxImageBytesCachedOnMemory: 64 * 1024 * 1024,
-          onGeneralTap: (_, controller, details) {
-            if (details.type != PdfViewerGeneralTapType.tap ||
-                !_viewerReady ||
-                _changingLayout ||
-                _navigating) {
-              return false;
-            }
-            final spread = _spreadRect(_page);
-            final corner = textbookPageCornerAt(
-              details.localPosition,
-              Rect.fromPoints(
-                controller.documentToLocal(spread.topLeft),
-                controller.documentToLocal(spread.bottomRight),
-              ),
-            );
-            final action = switch (corner) {
-              TextbookPageCorner.previous => widget.options.onPreviousPage,
-              TextbookPageCorner.next => widget.options.onNextPage,
-              null => null,
-            };
-            if (action == null) return false;
-            action();
-            return true;
-          },
-          sizeDelegateProvider: PdfViewerSizeDelegateProviderLegacy(
-            calculateInitialZoom: (_, controller, fitScale, coverScale) {
-              if (!widget.options.doublePage) return coverScale;
-              final rect = _spreadRect(_page);
-              return math.min(
-                controller.viewSize.width / (rect.width + SpacingTokens.md),
-                controller.viewSize.height / (rect.height + SpacingTokens.md),
-              );
-            },
+    _documentRef,
+    controller: _controller,
+    initialPageNumber: widget.options.initialPage,
+    params: PdfViewerParams(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      layoutPages: widget.options.doublePage ? textbookFacingPages : null,
+      horizontalCacheExtent: 1,
+      verticalCacheExtent: 2,
+      maxImageBytesCachedOnMemory: 64 * 1024 * 1024,
+      onGeneralTap: (_, controller, details) {
+        if (details.type != PdfViewerGeneralTapType.tap ||
+            !_viewerReady ||
+            _changingLayout ||
+            _navigating) {
+          return false;
+        }
+        final spread = _spreadRect(_page);
+        final corner = textbookPageCornerAt(
+          details.localPosition,
+          Rect.fromPoints(
+            controller.documentToLocal(spread.topLeft),
+            controller.documentToLocal(spread.bottomRight),
           ),
-          calculateCurrentPageNumber: widget.options.doublePage
-              ? (visible, rects, _) {
-                  if (!_viewerReady || _changingLayout || _navigating) {
-                    return _page;
+        );
+        final action = switch (corner) {
+          TextbookPageCorner.previous => widget.options.onPreviousPage,
+          TextbookPageCorner.next => widget.options.onNextPage,
+          null => null,
+        };
+        if (action == null) return false;
+        action();
+        return true;
+      },
+      sizeDelegateProvider: PdfViewerSizeDelegateProviderLegacy(
+        calculateInitialZoom: (_, controller, fitScale, coverScale) {
+          if (!widget.options.doublePage) return coverScale;
+          final rect = _spreadRect(_page);
+          return math.min(
+            controller.viewSize.width / (rect.width + SpacingTokens.md),
+            controller.viewSize.height / (rect.height + SpacingTokens.md),
+          );
+        },
+      ),
+      calculateCurrentPageNumber: widget.options.doublePage
+          ? (visible, rects, _) {
+              if (!_viewerReady || _changingLayout || _navigating) {
+                return _page;
+              }
+              var bestPage = 1;
+              var bestArea = 0.0;
+              const layout = TextbookPageLayout(doublePage: true);
+              for (
+                var index = 0;
+                index < layout.spreadCount(rects.length);
+                index++
+              ) {
+                var area = 0.0;
+                for (final number in layout.pages(index, rects.length)) {
+                  final intersection = visible.intersect(rects[number - 1]);
+                  if (!intersection.isEmpty) {
+                    area += intersection.width * intersection.height;
                   }
-                  var bestPage = 1;
-                  var bestArea = 0.0;
-                  const layout = TextbookPageLayout(doublePage: true);
-                  for (var index = 0;
-                      index < layout.spreadCount(rects.length);
-                      index++) {
-                    var area = 0.0;
-                    for (final number in layout.pages(index, rects.length)) {
-                      final intersection = visible.intersect(rects[number - 1]);
-                      if (!intersection.isEmpty) {
-                        area += intersection.width * intersection.height;
-                      }
-                    }
-                    if (area > bestArea) {
-                      bestArea = area;
-                      bestPage = layout.firstPage(index);
-                    }
-                  }
-                  return layout.spreadIndex(bestPage) ==
-                          layout.spreadIndex(_page)
-                      ? _page
-                      : layout.firstPage(layout.spreadIndex(bestPage));
                 }
-              : null,
-          onViewerReady: (document, _) async {
-            final page = widget.options.initialPage;
-            if (widget.options.doublePage) {
-              await _goToPage(page, animate: false);
+                if (area > bestArea) {
+                  bestArea = area;
+                  bestPage = layout.firstPage(index);
+                }
+              }
+              return layout.spreadIndex(bestPage) == layout.spreadIndex(_page)
+                  ? _page
+                  : layout.firstPage(layout.spreadIndex(bestPage));
             }
-            _changingLayout = false;
-            _viewerReady = true;
-            if (mounted) {
-              final toc = textbookPdfTocService(
-                document,
-                isAvailable: () => mounted,
-                cache: widget.options.contentCache,
-              );
-              widget.options.onTocReady?.call(
-                (refresh) => toc.scan(refresh: refresh),
-              );
-              widget.options.onReady(_goToPage);
-            }
-          },
-          onPageChanged: (page) {
-            if (page != null &&
-                _viewerReady &&
-                !_changingLayout &&
-                !_navigating) {
-              _page = page;
-              widget.options.onPageChanged(page);
-            }
-          },
-          loadingBannerBuilder: (context, _, __) => const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: SpacingTokens.md),
-                Text('正在打开原书…'),
-              ],
+          : null,
+      onViewerReady: (document, _) async {
+        final page = widget.options.initialPage;
+        if (widget.options.doublePage) {
+          await _goToPage(page, animate: false);
+        }
+        _changingLayout = false;
+        _viewerReady = true;
+        if (mounted) {
+          widget.options.onPageNumbersReady?.call(
+            textbookPdfPageNumberService(
+              document,
+              cache: widget.options.contentCache,
+              checkAvailable: () {
+                if (!mounted) {
+                  throw StateError('原书已关闭');
+                }
+              },
             ),
-          ),
-          errorBannerBuilder: (context, _, __, ___) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(SpacingTokens.lg),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '原书无法打开，请重新尝试或回书架导入完整的 PDF。',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: SpacingTokens.md),
-                  FilledButton(
-                    onPressed: widget.options.onRetry,
-                    child: const Text('重新打开'),
-                  ),
-                ],
+          );
+          final toc = textbookPdfTocService(
+            document,
+            isAvailable: () => mounted,
+            cache: widget.options.contentCache,
+          );
+          widget.options.onTocReady?.call(
+            (refresh) => toc.scan(refresh: refresh),
+          );
+          widget.options.onReady(_goToPage);
+        }
+      },
+      onPageChanged: (page) {
+        if (page != null && _viewerReady && !_changingLayout && !_navigating) {
+          _page = page;
+          widget.options.onPageChanged(page);
+        }
+      },
+      loadingBannerBuilder: (context, _, __) => const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: SpacingTokens.md),
+            Text('正在打开原书…'),
+          ],
+        ),
+      ),
+      errorBannerBuilder: (context, _, __, ___) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '原书无法打开，请重新尝试或回书架导入完整的 PDF。',
+                textAlign: TextAlign.center,
               ),
-            ),
+              const SizedBox(height: SpacingTokens.md),
+              FilledButton(
+                onPressed: widget.options.onRetry,
+                child: const Text('重新打开'),
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 /// 标准从左到右的对开布局：封面居中，偶数页左侧、奇数页右侧。
@@ -263,15 +276,10 @@ PdfPageLayout textbookFacingPages(List<PdfPage> pages, PdfViewerParams params) {
     final x = number == 1
         ? (width * 2 + params.margin - page.width) / 2 + params.margin
         : number.isEven
-            ? params.margin + width - page.width
-            : params.margin * 2 + width;
+        ? params.margin + width - page.width
+        : params.margin * 2 + width;
     rects.add(
-      Rect.fromLTWH(
-        x,
-        y + (height - page.height) / 2,
-        page.width,
-        page.height,
-      ),
+      Rect.fromLTWH(x, y + (height - page.height) / 2, page.width, page.height),
     );
     if (number.isOdd || i == pages.length - 1) y += height + params.margin;
   }

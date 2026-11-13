@@ -8,13 +8,11 @@ import 'package:poemath/core/services/textbook_cover_cache.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
+import 'package:poemath/data/models/textbook_page_numbers.dart';
 
 /// 可重建的本机派生数据；不保存查询词，不进入学习备份。
 class TextbookContentCache {
-  TextbookContentCache({
-    required this.book,
-    required this._directoryProvider,
-  }) {
+  TextbookContentCache({required this.book, required this._directoryProvider}) {
     if (!Textbook.isValidId(book.pdfSha256)) {
       throw ArgumentError.value(book.pdfSha256, 'pdfSha256');
     }
@@ -22,7 +20,10 @@ class TextbookContentCache {
 
   static const formatVersion = 1;
   // 修改目录识别算法或层级规则时递增，保留可复用的逐页文字。
-  static const tocVersion = 1;
+  static const tocVersion = 2;
+  // 旧版 raw text 可能包含裁切邻页；只复用共享可见布局生成的文字。
+  static const textVersion = 2;
+  static const pageNumberVersion = 1;
   static const _maxFileBytes = 2 * 1024 * 1024;
   static const _maxBookTextBytes = 32 * 1024 * 1024;
   static const _maxMemoryCharacters = 4 * 1024 * 1024;
@@ -35,24 +36,29 @@ class TextbookContentCache {
   final _pending = <int, Future<String>>{};
   final _layouts = <int, TextbookPageText>{};
   final _pendingLayouts = <int, Future<TextbookPageText>>{};
+  final _pendingNumbers = <int, Future<int?>>{};
+  Future<TextbookPageNumbers>? _numberRead;
+  TextbookPageNumbers? _pageNumbers;
   int _characters = 0;
   int _generation = 0;
   Future<void> _writes = Future<void>.value();
   TextbookTocResult? _toc;
 
   int get revision => _generation;
+  TextbookPageNumbers get pageNumbers =>
+      _pageNumbers ?? TextbookPageNumbers(pageCount: book.pageCount);
 
   Future<Directory> _directory() async => Directory(
-        '${(await _directoryProvider()).path}/textbooks/cache/${book.pdfSha256}',
-      );
+    '${(await _directoryProvider()).path}/textbooks/cache/${book.pdfSha256}',
+  );
 
   Map<String, Object?> _envelope(Object data) => {
-        'version': formatVersion,
-        'sha256': book.pdfSha256,
-        'pageCount': book.pageCount,
-        'pdfSize': book.fileSize,
-        'data': data,
-      };
+    'version': formatVersion,
+    'sha256': book.pdfSha256,
+    'pageCount': book.pageCount,
+    'pdfSize': book.fileSize,
+    'data': data,
+  };
 
   Future<Object?> _read(String name) async {
     try {
@@ -139,9 +145,13 @@ class TextbookContentCache {
     result = (() async {
       try {
         final stored = await _read('page-$page');
-        if (stored is String && generation == _generation) {
-          _remember(page, stored);
-          return stored;
+        if (stored is Map<String, dynamic> &&
+            stored['textVersion'] == textVersion &&
+            stored['text'] is String &&
+            generation == _generation) {
+          final text = stored['text'] as String;
+          _remember(page, text);
+          return text;
         }
         final loaded = await load();
         if (generation == _generation) {
@@ -162,7 +172,65 @@ class TextbookContentCache {
     final revision = generation ?? _generation;
     if (revision != _generation || _texts[page] == text) return;
     _remember(page, text);
-    await _write('page-$page', text, revision);
+    await _write('page-$page', {
+      'textVersion': textVersion,
+      'text': text,
+    }, revision);
+  }
+
+  Future<TextbookPageNumbers> readPageNumbers() {
+    final cached = _pageNumbers;
+    if (cached != null) return Future.value(cached);
+    final pending = _numberRead;
+    if (pending != null) return pending;
+    final generation = _generation;
+    late final Future<TextbookPageNumbers> result;
+    result = (() async {
+      try {
+        final raw = await _read('printed-pages');
+        if (generation != _generation) throw StateError('原书缓存已失效');
+        return _pageNumbers =
+            decodeTextbookPageNumbers(raw, pageCount: book.pageCount) ??
+            TextbookPageNumbers(pageCount: book.pageCount);
+      } finally {
+        if (identical(_numberRead, result)) _numberRead = null;
+      }
+    })();
+    return _numberRead = result;
+  }
+
+  /// 数字/null 都是已完成的页；读取错误不记成无页码，后续可以重试。
+  Future<int?> pageNumber(int page, Future<int?> Function() load) {
+    RangeError.checkValueInInterval(page, 1, book.pageCount, 'page');
+    final pending = _pendingNumbers[page];
+    if (pending != null) return pending;
+    final generation = _generation;
+    late final Future<int?> result;
+    result = (() async {
+      try {
+        final numbers = await readPageNumbers();
+        if (generation != _generation) throw StateError('原书缓存已失效');
+        if (numbers.pages.containsKey(page)) return numbers.pages[page];
+        final printed = await load();
+        if (generation != _generation) throw StateError('原书缓存已失效');
+        // 不用 await 前的快照，避免并发不同页完成时丢失另一页的结果。
+        final updated = pageNumbers.withPage(page, printed);
+        _pageNumbers = updated;
+        await _write(
+          'printed-pages',
+          encodeTextbookPageNumbers(updated),
+          generation,
+        );
+        if (generation != _generation) throw StateError('原书缓存已失效');
+        return printed;
+      } finally {
+        if (identical(_pendingNumbers[page], result)) {
+          _pendingNumbers.remove(page);
+        }
+      }
+    })();
+    _pendingNumbers[page] = result;
+    return result;
   }
 
   /// 只读已有原页布局，命中时无需打开原生 PDF 文档。
@@ -177,8 +245,9 @@ class TextbookContentCache {
       return null;
     }
     try {
-      final value =
-          TextbookPageText.fromJson(raw['page'] as Map<String, dynamic>);
+      final value = TextbookPageText.fromJson(
+        raw['page'] as Map<String, dynamic>,
+      );
       return value.page == page ? value : null;
     } on Object {
       return null;
@@ -208,14 +277,10 @@ class TextbookContentCache {
           value = await load();
           if (generation != _generation) throw StateError('原书缓存已失效');
           if (value.page != page) throw const FormatException('原书页码不一致');
-          await _write(
-            'layout-$page',
-            {
-              'layoutVersion': layoutVersion,
-              'page': value.toJson(),
-            },
-            generation,
-          );
+          await _write('layout-$page', {
+            'layoutVersion': layoutVersion,
+            'page': value.toJson(),
+          }, generation);
         }
         if (generation != _generation) throw StateError('原书缓存已失效');
         if (value.glyphs.length <= 20000) {
@@ -268,6 +333,9 @@ class TextbookContentCache {
     _pending.clear();
     _layouts.clear();
     _pendingLayouts.clear();
+    _pendingNumbers.clear();
+    _numberRead = null;
+    _pageNumbers = null;
     _characters = 0;
     final result = _writes.then((_) async {
       authorize?.call();
@@ -289,23 +357,55 @@ class TextbookContentCache {
   }
 }
 
+Map<String, Object?> encodeTextbookPageNumbers(TextbookPageNumbers numbers) => {
+  'pageNumberVersion': TextbookContentCache.pageNumberVersion,
+  'pages': {
+    for (final entry in numbers.pages.entries) '${entry.key}': entry.value,
+  },
+};
+
+TextbookPageNumbers? decodeTextbookPageNumbers(
+  Object? value, {
+  required int pageCount,
+}) {
+  if (value is! Map<String, dynamic> ||
+      value['pageNumberVersion'] != TextbookContentCache.pageNumberVersion ||
+      value['pages'] is! Map<String, dynamic>) {
+    return null;
+  }
+  final pages = <int, int?>{};
+  for (final entry in (value['pages'] as Map<String, dynamic>).entries) {
+    final page = int.tryParse(entry.key);
+    final printed = entry.value;
+    if (page == null ||
+        page < 1 ||
+        page > pageCount ||
+        entry.key != '$page' ||
+        (printed != null && (printed is! int || printed < 1))) {
+      return null;
+    }
+    pages[page] = printed as int?;
+  }
+  return TextbookPageNumbers(pageCount: pageCount, pages: pages);
+}
+
 Map<String, Object?> encodeTextbookToc(TextbookTocResult result) => {
-      'tocVersion': TextbookContentCache.tocVersion,
-      'source': result.source.name,
-      'directoryPages': result.directoryPages,
-      'hasText': result.hasText,
-      'entries': [
-        for (final entry in result.entries)
-          {
-            'title': entry.title,
-            'page': entry.page,
-            'printedPage': entry.printedPage,
-            'level': entry.level,
-            'lessonNumber': entry.lessonNumber,
-            'isGroup': entry.isGroup,
-          },
-      ],
-    };
+  'tocVersion': TextbookContentCache.tocVersion,
+  'source': result.source.name,
+  'directoryPages': result.directoryPages,
+  'hasText': result.hasText,
+  'entries': [
+    for (final entry in result.entries)
+      {
+        'title': entry.title,
+        'page': entry.page,
+        'printedPage': entry.printedPage,
+        'level': entry.level,
+        'lessonNumber': entry.lessonNumber,
+        'isGroup': entry.isGroup,
+      },
+  ],
+};
 
 TextbookTocResult? decodeTextbookToc(Object? value, {required int pageCount}) {
   if (value is! Map<String, dynamic> ||

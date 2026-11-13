@@ -628,7 +628,7 @@ class _TextbookDraftDetailsState
                               for (final page in candidate.pages)
                                 TextButton(
                                   onPressed: () => _page(page),
-                                  child: Text('原书第$page页'),
+                                  child: Text('PDF 第 $page 页'),
                                 ),
                               TextButton(
                                 onPressed: () => _candidate(doc, candidate),

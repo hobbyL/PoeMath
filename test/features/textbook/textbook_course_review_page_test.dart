@@ -13,6 +13,7 @@ import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_course_draft.dart';
 import 'package:poemath/data/models/textbook_course_review.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
+import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_course_editor_page.dart';
 import 'package:poemath/features/textbook/textbook_course_node_page.dart';
@@ -24,6 +25,7 @@ import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
+import '../../helpers/textbook_page_number_fixture.dart';
 
 class _Courses extends TextbookCourseRepository {
   TextbookCoursePack? current;
@@ -109,10 +111,10 @@ void main() {
         child: MaterialApp(
           builder: large
               ? (context, child) => MediaQuery(
-                    data: MediaQuery.of(context)
-                        .copyWith(textScaler: const TextScaler.linear(2)),
-                    child: child!,
-                  )
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: const TextScaler.linear(2)),
+                  child: child!,
+                )
               : null,
           home: child,
         ),
@@ -122,14 +124,15 @@ void main() {
   }
 
   Widget launcher(Widget page) => Builder(
-        builder: (context) => Scaffold(
-          body: TextButton(
-            onPressed: () => Navigator.of(context)
+    builder: (context) => Scaffold(
+      body: TextButton(
+        onPressed: () =>
+            Navigator.of(context)
                 .push<Object?>(MaterialPageRoute(builder: (_) => page)),
-            child: const Text('打开审核'),
-          ),
-        ),
-      );
+        child: const Text('打开审核'),
+      ),
+    ),
+  );
 
   // 导入确认框下保留忙碌指示器，此时只推进有限帧，不等待无限动画。
   Future<void> tap(
@@ -201,9 +204,7 @@ void main() {
       }
       await tap(
         tester,
-        find.text(
-          decision == TextbookReviewStatus.approved ? '通过审核' : '退回修改',
-        ),
+        find.text(decision == TextbookReviewStatus.approved ? '通过审核' : '退回修改'),
       );
       final exercise = courses.current!.lessons.single.exercises.single;
       expect(courses.saves, 1);
@@ -240,7 +241,7 @@ void main() {
         {
           'text': '看星星',
           'emphasis': [0],
-        }
+        },
       ],
       [
         {'text': '春风', 'emphasis': <int>[]},
@@ -291,10 +292,7 @@ void main() {
       final second = tester.getRect(cells.at(1));
       if (!large) {
         final editable = tester.state<EditableTextState>(
-          find.descendant(
-            of: cells.at(0),
-            matching: find.byType(EditableText),
-          ),
+          find.descendant(of: cells.at(0), matching: find.byType(EditableText)),
         );
         final boxes = editable.renderEditable.getBoxesForSelection(
           const TextSelection(baseOffset: 1, extentOffset: 4),
@@ -303,8 +301,9 @@ void main() {
       }
       expect(first.left, closeTo(tester.getRect(cells.at(2)).left, .1));
       expect(second.left, closeTo(tester.getRect(cells.at(3)).left, .1));
-      final content =
-          tester.getRect(find.byKey(const ValueKey('course-content-body')));
+      final content = tester.getRect(
+        find.byKey(const ValueKey('course-content-body')),
+      );
       expect((first.left + second.right) / 2, closeTo(content.center.dx, .1));
       expect(tester.takeException(), isNull);
       expect(courses.saves, 0);
@@ -360,9 +359,7 @@ void main() {
       expect(title.overflow, isNull);
       expect(
         title.style,
-        Theme.of(tester.element(heading))
-            .textTheme
-            .titleLarge
+        Theme.of(tester.element(heading)).textTheme.titleLarge
             ?.copyWith(fontWeight: FontWeight.w600),
       );
       expect(
@@ -399,11 +396,10 @@ void main() {
   testWidgets('三类字词各用一个两行省略的空格摘要，详情自动换行展示全部', (tester) async {
     final data = courseFixture();
     final lesson = (data['lessons'] as List).single as Map<String, dynamic>;
-    final characters = List.filled(2, '春夏秋冬风雨雪山水花草星月天地日云林田园')
-        .join()
-        .runes
-        .map(String.fromCharCode)
-        .toList();
+    final characters = List.filled(
+      2,
+      '春夏秋冬风雨雪山水花草星月天地日云林田园',
+    ).join().runes.map(String.fromCharCode).toList();
     const requirements = {
       'recognitionCharacters': 'recognition',
       'writingCharacters': 'writing',
@@ -440,8 +436,10 @@ void main() {
         find.byKey(ValueKey('course-target-${requirements[category]}-0')),
         findsNothing,
       );
-      final summary =
-          find.descendant(of: row, matching: find.text(tile.subtitle));
+      final summary = find.descendant(
+        of: row,
+        matching: find.text(tile.subtitle),
+      );
       expect(tester.widget<Text>(summary).maxLines, 2);
       expect(tester.widget<Text>(summary).overflow, TextOverflow.ellipsis);
       expect(
@@ -473,8 +471,9 @@ void main() {
       expect(second.top, closeTo(first.top, 0.1), reason: category);
       expect(second.left, greaterThan(first.right));
       expect(tester.getRect(terms.last).top, greaterThan(first.top));
-      final body =
-          tester.getRect(find.byKey(const ValueKey('course-content-body')));
+      final body = tester.getRect(
+        find.byKey(const ValueKey('course-content-body')),
+      );
       final rows = <double, List<Rect>>{};
       for (var index = 0; index < texts.length; index++) {
         final rect = tester.getRect(terms.at(index));
@@ -532,10 +531,13 @@ void main() {
       tester.getRect(find.byWidget(characters.last)).top,
       greaterThan(tester.getRect(find.byWidget(characters.first)).top),
     );
-    final body =
-        tester.getRect(find.byKey(const ValueKey('course-content-body')));
-    final pinyin =
-        find.descendant(of: longWord, matching: find.byType(OverflowBox));
+    final body = tester.getRect(
+      find.byKey(const ValueKey('course-content-body')),
+    );
+    final pinyin = find.descendant(
+      of: longWord,
+      matching: find.byType(OverflowBox),
+    );
     final rects = [
       for (final token in tester.widgetList<Text>(
         find.descendant(of: pinyin, matching: find.byType(Text)),
@@ -754,10 +756,7 @@ void main() {
       find.byKey(const ValueKey('course-target-paragraphs')),
       -300,
     );
-    await tap(
-      tester,
-      find.byKey(const ValueKey('course-target-paragraphs')),
-    );
+    await tap(tester, find.byKey(const ValueKey('course-target-paragraphs')));
     expect(find.byType(TextbookCourseText), findsOneWidget);
     expect(find.text('𠀀'), findsOneWidget);
     expect(find.text('xīng'), findsOneWidget);
@@ -769,8 +768,9 @@ void main() {
     expect(find.textContaining('字词尚未提供注音'), findsNothing);
     final content = find.byType(TextbookCourseParagraphsContent);
     final title = find.text('星月测试');
-    final contentCard =
-        find.ancestor(of: content, matching: find.byType(ColoredCard)).first;
+    final contentCard = find
+        .ancestor(of: content, matching: find.byType(ColoredCard))
+        .first;
     expect(
       tester.getRect(title).center.dx,
       closeTo(tester.getRect(contentCard).center.dx, 0.1),
@@ -814,10 +814,7 @@ void main() {
       findsNothing,
       reason: '段落视图按屏宽自动换行，不再横向滚动',
     );
-    expect(
-      find.byType(PopupMenuButton<String>),
-      findsNothing,
-    );
+    expect(find.byType(PopupMenuButton<String>), findsNothing);
     final reviewer = tester.widget<TextField>(
       find.widgetWithText(TextField, '审核人'),
     );
@@ -893,10 +890,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
-    expect(
-      tester.widget<TextField>(anchor).controller!.text,
-      '尚未保存的标题',
-    );
+    expect(tester.widget<TextField>(anchor).controller!.text, '尚未保存的标题');
     await tap(tester, find.text('取消'));
     expect(courses.saves, 0);
     expect(courses.current!.toJson(), courseFixture());
@@ -944,8 +938,10 @@ void main() {
       ..['pinyin'] = null;
     final exercise =
         (lesson['exercises'] as List<dynamic>).single as Map<String, dynamic>;
-    final prompt = List.generate(12, (index) => '问题${index + 1}：请读课文并说一说星月的特点。')
-        .join('\n');
+    final prompt = List.generate(
+      12,
+      (index) => '问题${index + 1}：请读课文并说一说星月的特点。',
+    ).join('\n');
     exercise['prompt'] = prompt;
     courses.current = TextbookCoursePack.fromJson(data);
     tester.view.padding = const FakeViewPadding(left: 24, right: 12);
@@ -1009,8 +1005,9 @@ void main() {
       tester.getSize(summary).width,
       greaterThan(tester.getSize(paragraphRow).width * 0.75),
     );
-    final exerciseRow =
-        find.byKey(const ValueKey('course-target-exercise-001'));
+    final exerciseRow = find.byKey(
+      const ValueKey('course-target-exercise-001'),
+    );
     await tester.scrollUntilVisible(exerciseRow, 300);
     await tester.pumpAndSettle();
     final exerciseTile = tester.widget<AppTile>(exerciseRow);
@@ -1049,8 +1046,9 @@ void main() {
       size: const Size(360, 620),
     );
     await tap(tester, find.byKey(const ValueKey('course-lesson-lesson-001')));
-    final exerciseRow =
-        find.byKey(const ValueKey('course-target-exercise-001'));
+    final exerciseRow = find.byKey(
+      const ValueKey('course-target-exercise-001'),
+    );
     await tester.scrollUntilVisible(exerciseRow, 300);
     await tester.ensureVisible(exerciseRow);
     await tester.pumpAndSettle();
@@ -1058,8 +1056,10 @@ void main() {
       of: find.byType(ListView),
       matching: find.byType(Scrollable),
     );
-    final offset =
-        tester.state<ScrollableState>(listScrollable).position.pixels;
+    final offset = tester
+        .state<ScrollableState>(listScrollable)
+        .position
+        .pixels;
     final rowTop = tester.getTopLeft(exerciseRow).dy;
     expect(offset, greaterThan(0));
     await tap(tester, exerciseRow);
@@ -1132,18 +1132,22 @@ void main() {
     lesson['recitations'] = <Object?>[];
     (lesson['coverage'] as Map<String, dynamic>)['recitations'] =
         TextbookCoverage.notApplicable.name;
-    final node =
-        TextbookCoursePack.fromJson(data).lessons.single.paragraphs.single;
+    final node = TextbookCoursePack.fromJson(data)
+        .lessons
+        .single
+        .paragraphs
+        .single;
     await pump(tester, Scaffold(body: TextbookCourseText(node: node)));
 
     final style = Theme.of(tester.element(find.byType(TextbookCourseText)))
         .textTheme
         .titleSmall;
     Finder character(String value) => find.byWidgetPredicate(
-          (widget) =>
-              widget is Text && widget.data == value && widget.style == style,
-        );
-    final cellWidth = tester.getRect(character('庚')).left -
+      (widget) =>
+          widget is Text && widget.data == value && widget.style == style,
+    );
+    final cellWidth =
+        tester.getRect(character('庚')).left -
         tester.getRect(character('己')).left;
     expect(
       tester.getRect(character('乙')).left - tester.getRect(character('甲')).left,
@@ -1186,15 +1190,9 @@ void main() {
         TextbookCoverage.notApplicable.name;
     courses.current = TextbookCoursePack.fromJson(data);
 
-    await pump(
-      tester,
-      TextbookCourseReviewPage(bookId: book.pdfSha256),
-    );
+    await pump(tester, TextbookCourseReviewPage(bookId: book.pdfSha256));
     await tap(tester, find.byKey(const ValueKey('course-lesson-lesson-001')));
-    await tap(
-      tester,
-      find.byKey(const ValueKey('course-target-paragraphs')),
-    );
+    await tap(tester, find.byKey(const ValueKey('course-target-paragraphs')));
 
     for (final value in ['xiǎo', 'qīng', 'wā', '小', '青', '蛙']) {
       expect(find.text(value), findsOneWidget);
@@ -1216,11 +1214,7 @@ void main() {
     final lesson =
         (data['lessons'] as List<dynamic>).single as Map<String, dynamic>;
     (lesson['paragraphs'] as List<dynamic>).add(
-      courseFixtureText(
-        'paragraph-002',
-        '第二段。',
-        ['dì', 'èr', 'duàn', '。'],
-      ),
+      courseFixtureText('paragraph-002', '第二段。', ['dì', 'èr', 'duàn', '。']),
     );
     courses.current = TextbookCoursePack.fromJson(data);
 
@@ -1265,10 +1259,9 @@ void main() {
 
     final paragraphs = courses.current!.lessons.single.paragraphs;
     expect(paragraphs.every((paragraph) => paragraph.isApproved), isTrue);
-    expect(
-      paragraphs.map((paragraph) => paragraph.review.reviewer).toSet(),
-      {'核对家长'},
-    );
+    expect(paragraphs.map((paragraph) => paragraph.review.reviewer).toSet(), {
+      '核对家长',
+    });
     expect(
       paragraphs.map((paragraph) => paragraph.review.reviewedAt).toSet().length,
       1,
@@ -1304,8 +1297,9 @@ void main() {
     );
     expect(rootUnitArrowRect.size, const Size.square(SpacingTokens.lg));
     final referenceArrowRight = rootUnitArrowRect.right;
-    final rootLessonRow =
-        find.byKey(const ValueKey('course-lesson-lesson-001'));
+    final rootLessonRow = find.byKey(
+      const ValueKey('course-lesson-lesson-001'),
+    );
     final rootLessonArrowRect = tester.getRect(
       find.descendant(
         of: rootLessonRow,
@@ -1436,8 +1430,9 @@ void main() {
       final data = courseFixture();
       final lesson =
           (data['lessons'] as List<dynamic>).single as Map<String, dynamic>;
-      final paragraph = (lesson['paragraphs'] as List<dynamic>).single
-          as Map<String, dynamic>;
+      final paragraph =
+          (lesson['paragraphs'] as List<dynamic>).single
+              as Map<String, dynamic>;
       // 模拟解析层输出：段首两个全角空格 + PDF 折行。
       paragraph
         ..['text'] = '　　霜风吹夏雨落，秋霜降冬雪飘。\n春水清。'
@@ -1445,8 +1440,11 @@ void main() {
       lesson['recitations'] = <Object?>[];
       (lesson['coverage'] as Map<String, dynamic>)['recitations'] =
           TextbookCoverage.notApplicable.name;
-      final node =
-          TextbookCoursePack.fromJson(data).lessons.single.paragraphs.single;
+      final node = TextbookCoursePack.fromJson(data)
+          .lessons
+          .single
+          .paragraphs
+          .single;
 
       await pump(
         tester,
@@ -1484,24 +1482,25 @@ void main() {
       final data = courseFixture();
       final lesson =
           (data['lessons'] as List<dynamic>).single as Map<String, dynamic>;
-      final paragraph = (lesson['paragraphs'] as List<dynamic>).single
-          as Map<String, dynamic>;
+      final paragraph =
+          (lesson['paragraphs'] as List<dynamic>).single
+              as Map<String, dynamic>;
       paragraph
         ..['text'] = '　　　霜风吹夏雨落秋霜降冬雪飘\n春水清。\n　保护禾苗。'
         ..['pinyin'] = null;
       lesson['recitations'] = <Object?>[];
       (lesson['coverage'] as Map<String, dynamic>)['recitations'] =
           TextbookCoverage.notApplicable.name;
-      final node =
-          TextbookCoursePack.fromJson(data).lessons.single.paragraphs.single;
+      final node = TextbookCoursePack.fromJson(data)
+          .lessons
+          .single
+          .paragraphs
+          .single;
 
       await pump(
         tester,
         Scaffold(
-          body: SizedBox(
-            width: 180,
-            child: TextbookCourseText(node: node),
-          ),
+          body: SizedBox(width: 180, child: TextbookCourseText(node: node)),
         ),
         size: const Size(220, 400),
         large: large,
@@ -1548,10 +1547,7 @@ void main() {
       );
       final tokens = tester
           .widgetList<Text>(
-            find.descendant(
-              of: pinyinInFirstLine,
-              matching: find.byType(Text),
-            ),
+            find.descendant(of: pinyinInFirstLine, matching: find.byType(Text)),
           )
           .toList();
       for (var index = 1; index < tokens.length; index++) {
@@ -1601,10 +1597,7 @@ void main() {
     );
     await tap(tester, find.byKey(const ValueKey('course-lesson-lesson-001')));
     expect(find.textContaining('星𠀀，月明。'), findsOneWidget);
-    await tap(
-      tester,
-      find.byKey(const ValueKey('course-target-paragraphs')),
-    );
+    await tap(tester, find.byKey(const ValueKey('course-target-paragraphs')));
     expect(find.text('尚未提供注音'), findsNothing);
     expect(find.text('通过前需要处理'), findsNothing);
     expect(find.textContaining('请先补充'), findsNothing);
@@ -1620,8 +1613,9 @@ void main() {
   });
 
   testWidgets('编辑正文注音保存，相关审核失效，可重新逐项审核', (tester) async {
-    courses.current =
-        TextbookCoursePack.fromJson(courseFixture(reviewed: true));
+    courses.current = TextbookCoursePack.fromJson(
+      courseFixture(reviewed: true),
+    );
     await pump(
       tester,
       launcher(
@@ -1750,7 +1744,14 @@ void main() {
     );
     expect(
       courses
-          .current!.lessons.single.recitations.single.ranges.single.textSha256,
+          .current!
+          .lessons
+          .single
+          .recitations
+          .single
+          .ranges
+          .single
+          .textSha256,
       textbookTextDigest('𠀀'),
     );
     expect(tester.takeException(), isNull);
@@ -1758,6 +1759,12 @@ void main() {
 
   testWidgets('对照原书从指定页打开，跳页不依赖或写入孩子阅读记录', (tester) async {
     final seen = <int>[];
+    final jumps = <int>[];
+    final reading = TextbookRepository()
+        .reading('default', book.pdfSha256)
+        .toJson();
+    final numbers = pageNumberFixture(pageCount: 3, pages: {2: 26, 3: 27});
+    const sources = [TextbookSourcePage(2, '1', 'manual')];
     var reported = false;
     await pump(
       tester,
@@ -1768,13 +1775,19 @@ void main() {
         ],
         child: TextbookCourseSourcePage(
           book: book,
-          sources: const [TextbookSourcePage(2, '1', 'manual')],
+          sources: sources,
           viewerBuilder: (context, options) {
             seen.add(options.initialPage);
             if (!reported) {
               reported = true;
-              WidgetsBinding.instance
-                  .addPostFrameCallback((_) => options.onPageChanged(3));
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                options.onPageNumbersReady!(numbers);
+                options.onReady((page) async {
+                  jumps.add(page);
+                  options.onPageChanged(page);
+                });
+                options.onPageChanged(3);
+              });
             }
             return const Text('原页查看器');
           },
@@ -1782,7 +1795,14 @@ void main() {
       ),
     );
     expect(seen.first, 2);
-    expect(find.text('第 3 / 3 页'), findsOneWidget);
+    expect(find.text('第 27 页'), findsOneWidget);
+    await tap(tester, find.text('来源第 26 页'));
+    expect(jumps, [2]);
+    expect(find.text('第 26 页'), findsOneWidget);
+    expect(
+      TextbookRepository().reading('default', book.pdfSha256).toJson(),
+      reading,
+    );
     expect(courses.current!.toJson(), courseFixture());
     expect(tester.takeException(), isNull);
   });
@@ -1818,8 +1838,9 @@ void main() {
   });
 
   testWidgets('在App核对各类覆盖状态，保存后课目审核失效', (tester) async {
-    courses.current =
-        TextbookCoursePack.fromJson(courseFixture(reviewed: true));
+    courses.current = TextbookCoursePack.fromJson(
+      courseFixture(reviewed: true),
+    );
     await pump(tester, TextbookCourseReviewPage(bookId: book.pdfSha256));
     await tap(tester, find.byKey(const ValueKey('course-lesson-lesson-001')));
     await tap(tester, find.byTooltip('核对内容范围'));
@@ -1851,26 +1872,17 @@ void main() {
       final sheet = find.byType(BottomSheet);
       expect(sheet, findsOneWidget);
       expect(
-        find.descendant(
-          of: sheet,
-          matching: find.text('原书无此要求'),
-        ),
+        find.descendant(of: sheet, matching: find.text('原书无此要求')),
         findsNothing,
       );
       await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
       expect(sheet, findsNothing);
     }
+    await tap(tester, find.byKey(const ValueKey('coverage-words')));
     await tap(
       tester,
-      find.byKey(const ValueKey('coverage-words')),
-    );
-    await tap(
-      tester,
-      find.descendant(
-        of: find.byType(BottomSheet),
-        matching: find.text('待核对'),
-      ),
+      find.descendant(of: find.byType(BottomSheet), matching: find.text('待核对')),
     );
     await tap(tester, find.text('保存范围核对'));
     expect(
