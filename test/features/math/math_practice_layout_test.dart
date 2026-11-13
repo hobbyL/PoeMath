@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/widgets/page_animation_scope.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/repositories/settings_repository.dart';
@@ -15,6 +16,20 @@ import '../../helpers/hive_test_helper.dart';
 void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
+
+  void expectFullWidthProgress(WidgetTester tester) {
+    final progress = find.byType(LinearProgressIndicator);
+    expect(progress, findsOneWidget);
+    final rect = tester.getRect(progress);
+    final pixelRatio = tester.view.devicePixelRatio;
+    expect(rect.left, tester.view.padding.left / pixelRatio + SpacingTokens.md);
+    expect(
+      rect.right,
+      (tester.view.physicalSize.width - tester.view.padding.right) /
+              pixelRatio -
+          SpacingTokens.md,
+    );
+  }
 
   Future<void> openPractice(WidgetTester tester, ProblemMode mode) async {
     tester.view.devicePixelRatio = 1;
@@ -64,6 +79,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     expect(find.byKey(const ValueKey('q_0')), findsOneWidget);
+    expectFullWidthProgress(tester);
   }
 
   Future<void> closePractice(WidgetTester tester) async {
@@ -77,6 +93,9 @@ void main() {
     final question = tester.getRect(find.byKey(const ValueKey('q_0')));
     final input = tester.getRect(find.text('输入答案'));
     final keypad = tester.getRect(find.byType(NumberKeypad));
+    final progress = tester.getRect(find.byType(LinearProgressIndicator));
+    expect(progress.bottom, lessThan(question.top));
+    expect(progress.bottom, lessThanOrEqualTo(keypad.top));
     expect(question.top, greaterThanOrEqualTo(84));
     expect(question.bottom, lessThan(input.top));
     expect(input.bottom, lessThanOrEqualTo(387));
@@ -93,6 +112,7 @@ void main() {
     expect(find.text('37'), findsOneWidget);
     tester.view.physicalSize = const Size(411, 914);
     await tester.pump();
+    expectFullWidthProgress(tester);
     expect(find.text('37'), findsOneWidget);
     expect(
       tester.getRect(find.text('37')).bottom,
@@ -100,6 +120,7 @@ void main() {
     );
     tester.view.physicalSize = const Size(914, 411);
     await tester.pump();
+    expectFullWidthProgress(tester);
     await tester.runAsync(() async {
       await tester.tap(find.byIcon(Icons.check_rounded));
       await Future<void>.delayed(const Duration(milliseconds: 50));

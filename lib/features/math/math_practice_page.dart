@@ -875,33 +875,60 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
       bottomNavigationBar: sideBySide ? null : _buildAnswerControls(context),
       body: Stack(
         children: [
-          if (sideBySide)
-            SafeArea(
-              top: false,
-              bottom: false,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SafeArea(
-                      top: false,
-                      left: false,
-                      right: false,
-                      child: _buildQuestionArea(context),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 进度属于整轮练习，横跨题目和答题操作区。
+              SafeArea(
+                top: false,
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: SpacingTokens.md,
+                    vertical: SpacingTokens.sm,
+                  ),
+                  child: LinearProgressIndicator(
+                    value: (currentIndex + 1) / problems.length,
+                    backgroundColor: theme.colorScheme.primary.withValues(
+                      alpha: 0.1,
+                    ),
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.circular(
+                      SpacingTokens.radiusSmall,
                     ),
                   ),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: SingleChildScrollView(
-                        child: _buildAnswerControls(context),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            )
-          else
-            _buildQuestionArea(context),
+              Expanded(
+                child: sideBySide
+                    ? SafeArea(
+                        top: false,
+                        bottom: false,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: SafeArea(
+                                top: false,
+                                left: false,
+                                right: false,
+                                child: _buildQuestionArea(context),
+                              ),
+                            ),
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                child: SingleChildScrollView(
+                                  child: _buildAnswerControls(context),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _buildQuestionArea(context),
+              ),
+            ],
+          ),
           ConfettiOverlay(controller: _confettiController),
         ],
       ),
@@ -909,7 +936,6 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
   }
 
   Widget _buildQuestionArea(BuildContext context) {
-    final problems = ref.watch(mathProblemsProvider);
     final currentIndex = ref.watch(mathCurrentIndexProvider);
     final problem = ref.watch(currentProblemProvider)!;
     final theme = Theme.of(context);
@@ -975,35 +1001,18 @@ class _MathPracticePageState extends ConsumerState<MathPracticePage> {
               ],
             ],
           );
-          final progress = LinearProgressIndicator(
-            value: (currentIndex + 1) / problems.length,
-            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(SpacingTokens.radiusSmall),
-          );
-          return Column(
-            children: [
-              progress,
-              const SizedBox(height: SpacingTokens.md),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, area) => SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: area.maxHeight),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          question,
-                          if (_judgement == null &&
-                              problem.mode != ProblemMode.compare)
-                            _buildAnswerInput(context),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  question,
+                  if (_judgement == null && problem.mode != ProblemMode.compare)
+                    _buildAnswerInput(context),
+                ],
               ),
-            ],
+            ),
           );
         },
       ),
