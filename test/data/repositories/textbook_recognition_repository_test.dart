@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:poemath/core/services/backup_service.dart';
@@ -14,6 +15,7 @@ import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_recognition_repository.dart';
 import 'package:poemath/domain/textbook_recognition_content.dart';
 import 'package:poemath/domain/textbook_recognition_session.dart';
+
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/recognition_fixture.dart';
@@ -48,15 +50,19 @@ void main() {
     pack = recognitionFixture();
     await courses.importDraft(book, pack);
     repo = TextbookRecognitionRepository(
-        book: book, editionId: pack.edition.id, courses: courses,);
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+    );
   });
   tearDown(() async {
     ProfileScope.reset();
     await tearDownHiveForTesting();
     await dir.delete(recursive: true);
   });
-  Future<RecognitionProgress> start(
-      {TextbookRecognitionRepository? using,}) async {
+  Future<RecognitionProgress> start({
+    TextbookRecognitionRepository? using,
+  }) async {
     final r = using ?? repo;
     final p = await r.load();
     final targets = recognitionTargets(pack, pack.lessons.single);
@@ -77,23 +83,31 @@ void main() {
     );
   }
 
-  Future<RecognitionProgress> answer(RecognitionProgress p,
-          {TextbookRecognitionRepository? using,}) =>
-      (using ?? repo).change(
-        lessonId: pack.lessons.single.id,
-        fingerprint: p.session!.fingerprint,
-        operationId: 'answer',
-        expectedRevision: p.revision,
-        sessionId: p.session!.id,
-        reduce: (latest, targets) => answerRecognition(
-            latest, targets, RecognitionEvidence.study, DateTime(2026, 10, 25),),
-      );
+  Future<RecognitionProgress> answer(
+    RecognitionProgress p, {
+    TextbookRecognitionRepository? using,
+  }) => (using ?? repo).change(
+    lessonId: pack.lessons.single.id,
+    fingerprint: p.session!.fingerprint,
+    operationId: 'answer',
+    expectedRevision: p.revision,
+    sessionId: p.session!.id,
+    reduce: (latest, targets) => answerRecognition(
+      latest,
+      targets,
+      RecognitionEvidence.study,
+      DateTime(2026, 10, 25),
+    ),
+  );
   test('真实Hive关闭重开恢复完整题组及反馈；重放同操作不重复记数', () async {
     final p = await answer(await start());
     await HiveBoxes.close();
     await HiveBoxes.init();
     final reopened = TextbookRecognitionRepository(
-        book: book, editionId: pack.edition.id, courses: courses,);
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+    );
     expect((await reopened.load()).toJson(), p.toJson());
     final replay = await answer(p, using: reopened);
     expect(replay.toJson(), p.toJson());
@@ -102,7 +116,10 @@ void main() {
   test('跨仓库实例同键串写；不同操作的旧revision拒绝覆盖', () async {
     final p = await start();
     final other = TextbookRecognitionRepository(
-        book: book, editionId: pack.edition.id, courses: courses,);
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+    );
     final values = await Future.wait([answer(p), answer(p, using: other)]);
     expect(values.first.toJson(), values.last.toJson());
     await expectLater(
@@ -121,7 +138,11 @@ void main() {
     final box = FailingBox();
     box.fail = false;
     final failing = TextbookRecognitionRepository(
-        book: book, editionId: pack.edition.id, courses: courses, box: box,);
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+      box: box,
+    );
     final p = await start(using: failing);
     box.fail = true;
     await expectLater(answer(p, using: failing), throwsA(isA<HiveError>()));
@@ -172,13 +193,16 @@ void main() {
     await restore;
     await expectLater(repo.load(), throwsStateError);
     final fresh = TextbookRecognitionRepository(
-        book: book, editionId: pack.edition.id, courses: courses,);
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+    );
     final loaded = await fresh.load();
     expect(loaded.session, isNull);
     expect(loaded.records.values.single.studies, 1);
     expect(HiveBoxes.settings.get(repo.key), jsonEncode(p.toJson()));
   });
-  test('档案隔离及旧scope拒写；备份不导出/注入本机记录', () async {
+  test('档案隔离及旧scope拒写；进度单独备份且不接受settings注入', () async {
     await unlockParentForTesting();
     addTearDown(lockParentForTesting);
     final p = await answer(await start());
@@ -186,20 +210,30 @@ void main() {
     ProfileScope.switchTo('other');
     await expectLater(repo.load(), throwsStateError);
     final other = TextbookRecognitionRepository(
-        book: book, editionId: pack.edition.id, courses: courses,);
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+    );
     expect((await other.load()).records, isEmpty);
     expect(other.key, isNot(repo.key));
     ProfileScope.reset();
     final backup = BackupService();
     final exported = await backup.exportToJson();
-    expect(exported.contains('textbook_recognition_v1:'), false);
     final injected = jsonDecode(exported) as Map<String, dynamic>;
+    final learning = injected['textbookLearning'] as Map<String, dynamic>;
+    expect(learning[repo.key], raw);
+    expect((injected['settings'] as Map).containsKey(repo.key), false);
     (injected['settings'] as Map)[repo.key] = 'injected';
     await backup.restoreFromJson(jsonEncode(injected));
     expect(HiveBoxes.settings.get(repo.key), raw);
     final fresh = TextbookRecognitionRepository(
-        book: book, editionId: pack.edition.id, courses: courses,);
-    expect((await fresh.load()).records.values.single.toJson(),
-        p.records.values.single.toJson(),);
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+    );
+    expect(
+      (await fresh.load()).records.values.single.toJson(),
+      p.records.values.single.toJson(),
+    );
   });
 }
