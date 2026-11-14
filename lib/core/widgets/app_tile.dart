@@ -36,6 +36,7 @@ class AppTile extends StatelessWidget {
     this.backgroundColor,
     required this.title,
     this.titleMaxLines,
+    this.titleWrap = false,
     this.titleSuffix,
     this.titleSuffixInline = false,
     required this.subtitle,
@@ -87,6 +88,9 @@ class AppTile extends StatelessWidget {
 
   /// 标题最大行数；设置后超出部分以省略号显示。
   final int? titleMaxLines;
+
+  /// 有尾部状态或辅助信息时也允许标题自然换行；[titleMaxLines] 仍优先。
+  final bool titleWrap;
 
   /// 紧跟标题的辅助信息；标题过长时省略，大字号空间不足时辅助信息另起一行。
   final String? titleSuffix;
@@ -151,15 +155,13 @@ class AppTile extends StatelessWidget {
       fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
       color: selected ? theme.colorScheme.onPrimaryContainer : null,
     );
+    final maxTitleLines =
+        titleMaxLines ??
+        (titleWrap || titleSuffix == null && trailingText == null ? null : 1);
     final titleText = Text(
       title,
-      maxLines:
-          titleMaxLines ??
-          (titleSuffix == null && trailingText == null ? null : 1),
-      overflow:
-          titleMaxLines == null && titleSuffix == null && trailingText == null
-          ? null
-          : TextOverflow.ellipsis,
+      maxLines: maxTitleLines,
+      overflow: maxTitleLines == null ? null : TextOverflow.ellipsis,
       style: titleStyle,
     );
     final titleWidget = titleSuffix == null

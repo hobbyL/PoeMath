@@ -278,6 +278,40 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
     }
   }
 
+  Future<void> _unitActions(
+    Textbook book,
+    MathTextbookCourse course,
+    List<MathTextbookLesson> lessons,
+  ) async {
+    if (lessons.isEmpty) return;
+    final lesson = lessons.length == 1
+        ? lessons.single
+        : await showModalBottomSheet<MathTextbookLesson>(
+            context: context,
+            useSafeArea: true,
+            builder: (sheet) => ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              children: [
+                Text('选择课时', style: Theme.of(sheet).textTheme.titleLarge),
+                const SizedBox(height: SpacingTokens.sm),
+                for (final lesson in lessons)
+                  AppTile(
+                    key: ValueKey('math-review-actions-${lesson.id}'),
+                    flat: true,
+                    flatTrailingEdgeAligned: true,
+                    iconColor: Theme.of(sheet).colorScheme.primary,
+                    title: lesson.title,
+                    subtitle: '',
+                    onTap: () => Navigator.pop(sheet, lesson),
+                  ),
+              ],
+            ),
+          );
+    if (!mounted || lesson == null) return;
+    await _lessonActions(book, course, lesson);
+  }
+
   Future<void> _lessonActions(
     Textbook book,
     MathTextbookCourse course,
@@ -448,8 +482,8 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
                     running:
                         _opening || _navigating || progress?.running == true,
                     onLesson: (lesson) => _openLesson(book, lesson),
-                    onLessonActions: (lesson) =>
-                        _lessonActions(book, data, lesson),
+                    onUnitActions: (lessons) =>
+                        _unitActions(book, data, lessons),
                     onBookReview: () => _bookReview(book, data),
                   );
                 }

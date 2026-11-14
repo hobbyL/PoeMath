@@ -21,6 +21,7 @@ import 'package:poemath/features/textbook/math_textbook_lesson_page.dart';
 import 'package:poemath/features/textbook/math_textbook_review_page.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
+import 'package:poemath/features/textbook/widgets/math_textbook_review_content.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_source_preview.dart';
 
 import '../../helpers/hive_test_helper.dart';
@@ -405,6 +406,69 @@ void main() {
     });
   }
 
+  for (final knownCatalog in [true, false]) {
+    testWidgets('已有旧版草稿进入审核页仍尝试更新一次（已核验书目：$knownCatalog）', (tester) async {
+      courses.current = courses.current!.replace(
+        outline: MathTextbookCourseOutline(
+          source: 'bookmarks',
+          ranges: const [
+            MathTextbookCourseRange(title: '自有旧课', startPage: 1, endPage: 2),
+          ],
+          completedLessonIds: const ['math-1-2'],
+        ),
+      );
+      await mount(
+        tester,
+        MathTextbookReviewPage(bookId: book.pdfSha256),
+        knownCatalog: knownCatalog,
+      );
+      expect(generator.bookCalls, knownCatalog ? 1 : 0);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(MathTextbookReviewPage)),
+      );
+      container.invalidate(mathTextbookCourseProvider(book.pdfSha256));
+      await tester.pumpAndSettle();
+      expect(
+        generator.bookCalls,
+        knownCatalog ? 1 : 0,
+        reason: '课程刷新不应重复启动同一次更新',
+      );
+    });
+  }
+
+  testWidgets('旧大范围课时单独保留对照，不混进当前目录和审核计数', (tester) async {
+    final old = mathLessonFixture(title: '原来的大课时');
+    courses.current = MathTextbookCourse.forBook(book).replace(
+      lessons: [
+        old,
+        mathLessonFixture(title: '第一课', end: 1),
+        mathLessonFixture(title: '第二课', start: 2, end: 3),
+      ],
+      outline: MathTextbookCourseOutline(
+        source: 'text',
+        organizationVersion: mathTextbookOrganizationVersion,
+        ranges: const [
+          MathTextbookCourseRange(title: '第一课', startPage: 1, endPage: 1),
+          MathTextbookCourseRange(title: '第二课', startPage: 2, endPage: 3),
+        ],
+        retainedLessonIds: [old.id],
+      ),
+    );
+    await mount(tester, MathTextbookReviewPage(bookId: book.pdfSha256));
+    expect(
+      find.byKey(const ValueKey('math-review-lesson-math-1-2')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('math-retained-lesson-math-1-2')),
+      findsOneWidget,
+    );
+    expect(find.text('保留的原课时'), findsOneWidget);
+    expect(find.textContaining('0/3 课已通过'), findsNothing);
+    expect(find.textContaining('0/2 课已通过'), findsWidgets);
+    expect(courses.current!.lessons.first.toJson(), old.toJson());
+  });
+
   testWidgets('课时按类别进入核对，未改内容保留审核，原页编辑返回不丢修改', (tester) async {
     final lesson = mathLearningFixture().approve(
       pdfSha256: book.pdfSha256,
@@ -429,6 +493,15 @@ void main() {
     expect(find.text('知识点'), findsOneWidget);
     expect(find.textContaining('教材原题与题组'), findsNothing);
     expect(input('所属单元'), findsNothing);
+    final addKnowledge = find.byTooltip('添加知识点');
+    expect(addKnowledge.hitTestable(), findsOneWidget);
+    expect(tester.getTopLeft(addKnowledge).dx, greaterThan(160));
+    await tester.tap(addKnowledge);
+    await tester.pumpAndSettle();
+    expect(input('知识点名称'), findsOneWidget);
+    expect(input('知识要点（按原书补齐）'), findsOneWidget);
+    await tester.tap(find.byTooltip('返回'));
+    await tester.pumpAndSettle();
     await visible(tester, find.text('应用到课时草稿'));
     await tester.tap(find.text('应用到课时草稿'));
     await tester.pumpAndSettle();
@@ -450,6 +523,98 @@ void main() {
     expect(courses.current!.lessons.single.review, isNull);
     expect(tester.takeException(), isNull);
   });
+
+  for (final width in [420.0, 320.0]) {
+    testWidgets('长列表底部应用按钮保持可点击并完整保存修改（宽度：$width）', (tester) async {
+      final original = mathLearningFixture();
+      final points = [
+        ...original.learning!.knowledgePoints,
+        for (var i = 1; i <= 24; i++)
+          MathTextbookKnowledgePoint(
+            id: 'extra-$i',
+            title: '追加知识点$i',
+            summary: '对照本课原书核对第$i项知识内容。',
+            blockIds: ['example'],
+          ),
+      ];
+      final lesson = original
+          .edit(
+            learning: MathTextbookLearning.fromJson({
+              ...original.learning!.toJson(),
+              'knowledgePoints': points.map((point) => point.toJson()).toList(),
+              'coverageConfirmed': false,
+            }),
+          )
+          .approve(
+            pdfSha256: book.pdfSha256,
+            reviewer: '家长',
+            editingMilliseconds: 0,
+            at: DateTime.utc(2026, 11, 14),
+          );
+      courses.current = courses.current!.replace(lessons: [lesson]);
+      final narrow = width == 320;
+      await mount(
+        tester,
+        MathTextbookLessonPage(bookId: book.pdfSha256, lessonId: lesson.id),
+        size: Size(width, 640),
+        scale: narrow ? 2 : 1,
+      );
+      if (narrow) {
+        await openSource(tester);
+        await visible(tester, find.text('知识点、教材原题与本课巩固'));
+        await tester.tap(find.text('知识点、教材原题与本课巩固'));
+      } else {
+        await visible(tester, find.text('合并数量'));
+        await tester.tap(find.text('合并数量'));
+      }
+      await tester.pumpAndSettle();
+      if (narrow) {
+        await tester.enterText(input('所属单元'), '固定底部的测试单元');
+        tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpAndSettle();
+      }
+      final apply = find.widgetWithText(FilledButton, '应用到课时草稿');
+      final beforeScroll = tester.getRect(apply);
+      expect(apply.hitTestable(), findsOneWidget);
+      expect(beforeScroll.bottom, lessThanOrEqualTo(narrow ? 440 : 640));
+      final viewport = tester.getRect(find.byType(Scrollable).first);
+      expect(viewport.height, greaterThan(0));
+      expect(viewport.bottom, lessThanOrEqualTo(beforeScroll.top));
+      await visible(tester, find.byTooltip('移除追加知识点24'));
+      expect(tester.getRect(apply), beforeScroll);
+      expect(apply.hitTestable(), findsOneWidget);
+      await tester.tap(find.byTooltip('移除追加知识点24'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, '移除'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('移除追加知识点24'), findsNothing);
+      expect(tester.getRect(apply), beforeScroll);
+      expect(apply.hitTestable(), findsOneWidget);
+      await tester.tap(apply);
+      await tester.pumpAndSettle();
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      expect(courses.saves, 0);
+      expect(courses.current!.lessons.single.toJson(), lesson.toJson());
+      await visible(tester, find.text('保存草稿'));
+      await tester.tap(find.text('保存草稿'));
+      await tester.pumpAndSettle();
+      final saved = courses.current!.lessons.single;
+      expect(saved.learning!.toJson(), {
+        ...original.learning!.toJson(),
+        'unitTitle': narrow ? '固定底部的测试单元' : original.learning!.unitTitle,
+        'knowledgePoints': points
+            .take(points.length - 1)
+            .map((point) => point.toJson())
+            .toList(),
+        'coverageConfirmed': false,
+      });
+      expect(saved.isApproved(book.pdfSha256), isFalse);
+      expect(courses.saves, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('320dp 双倍字号下可填写范围、整理并进入待核列表', (tester) async {
     courses.current = null;
@@ -474,7 +639,207 @@ void main() {
     expect(courses.current!.lessons.single.startPage, 1);
     expect(courses.current!.lessons.single.endPage, 2);
     await visible(tester, find.text('自有完整小节'));
-    expect(find.textContaining('待家长核对'), findsOneWidget);
+    expect(find.textContaining('待家长核对'), findsNothing);
+    expect(find.textContaining('PDF 第'), findsNothing);
+    final unit = find.byKey(const ValueKey('math-review-unit-待确认归属的内容'));
+    final more = find.descendant(
+      of: unit,
+      matching: find.byIcon(Icons.more_vert),
+    );
+    final summary = find.descendant(of: unit, matching: find.text('0/1 课已通过'));
+    await visible(tester, more, delta: -300);
+    expect(
+      tester.getCenter(more).dx,
+      greaterThan(tester.getCenter(summary).dx),
+    );
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(find.text('选择课时'), findsNothing);
+    expect(find.text('重新整理此课'), findsOneWidget);
+    expect(find.text('移除课时区间'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final largeText in [false, true]) {
+    testWidgets('同名的单课单元合并后，课时入口与菜单分别响应（大字：$largeText）', (tester) async {
+      const title = '100 以内的加法和减法（二）';
+      final reviewBook = mathTextbookFixture(pages: 4);
+      final lesson = mathLessonFixture(title: title);
+      final course = MathTextbookCourse.forBook(reviewBook).replace(
+        lessons: [
+          lesson,
+          mathLessonFixture(title: '原书练习', start: 3, end: 3),
+        ],
+        pendingLessons: [lesson.edit(title: '待比较的新稿')],
+        outline: MathTextbookCourseOutline(
+          source: 'bookmarks',
+          organizationVersion: mathTextbookOrganizationVersion,
+          completedLessonIds: [lesson.id],
+          ranges: const [
+            MathTextbookCourseRange(
+              title: title,
+              unitTitle: title,
+              startPage: 1,
+              endPage: 2,
+            ),
+            MathTextbookCourseRange(
+              title: '原书练习',
+              unitTitle: '第二单元',
+              startPage: 3,
+              endPage: 3,
+            ),
+            MathTextbookCourseRange(
+              title: '待整理课时',
+              unitTitle: '待整理单元',
+              startPage: 4,
+              endPage: 4,
+            ),
+          ],
+        ),
+      );
+      final opened = <String>[];
+      final actions = <List<String>>[];
+      await mount(
+        tester,
+        Scaffold(
+          body: MathTextbookReviewContent(
+            book: reviewBook,
+            course: course,
+            progress: const SizedBox.shrink(),
+            running: false,
+            onLesson: (lesson) => opened.add(lesson.id),
+            onUnitActions: (lessons) =>
+                actions.add(lessons.map((lesson) => lesson.id).toList()),
+            onBookReview: () {},
+          ),
+        ),
+        size: Size(largeText ? 320 : 420, 640),
+        scale: largeText ? 2 : 1,
+      );
+      expect(find.text(title), findsOneWidget);
+      expect(find.text('有新整理结果待比较'), findsOneWidget);
+      final unit = find.byKey(const ValueKey('math-review-unit-$title'));
+      final more = find.descendant(
+        of: unit,
+        matching: find.byTooltip('课时更多操作'),
+      );
+      final summary = find.descendant(
+        of: unit,
+        matching: find.text('0/1 课已通过'),
+      );
+      final icon = find.descendant(
+        of: unit,
+        matching: find.byIcon(Icons.more_vert),
+      );
+      expect(
+        tester.getCenter(more).dx,
+        greaterThan(tester.getCenter(summary).dx),
+      );
+      for (final other in ['第二单元', '待整理单元']) {
+        final header = find.byKey(ValueKey('math-review-unit-$other'));
+        expect(
+          tester
+              .getRect(
+                find.descendant(
+                  of: header,
+                  matching: find.byIcon(Icons.more_vert),
+                ),
+              )
+              .right,
+          closeTo(tester.getRect(icon).right, .01),
+        );
+        expect(
+          tester
+              .getRect(
+                find.descendant(of: header, matching: find.text('0/1 课已通过')),
+              )
+              .right,
+          closeTo(tester.getRect(summary).right, .01),
+        );
+      }
+      final arrow = find.descendant(
+        of: find.byKey(const ValueKey('math-review-lesson-math-3-3')),
+        matching: find.byIcon(Icons.chevron_right),
+      );
+      expect(
+        tester.getRect(arrow).right,
+        closeTo(tester.getRect(icon).right, .01),
+      );
+      await tester.tap(find.text(title));
+      await tester.pumpAndSettle();
+      expect(opened, [lesson.id]);
+      expect(actions, isEmpty);
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      expect(actions, [
+        [lesson.id],
+      ]);
+      expect(opened, [lesson.id]);
+      await tester.tap(summary);
+      await tester.pumpAndSettle();
+      expect(actions, [
+        [lesson.id],
+        [lesson.id],
+      ]);
+      expect(opened, [lesson.id]);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('多课单元的同名课只显示一次，菜单仍可整理第二课', (tester) async {
+    courses.current = MathTextbookCourse.forBook(book).replace(
+      lessons: [
+        mathLessonFixture(title: '第一课'),
+        mathLessonFixture(title: '第二课', start: 3, end: 3),
+      ],
+      outline: MathTextbookCourseOutline(
+        source: 'bookmarks',
+        organizationVersion: mathTextbookOrganizationVersion,
+        completedLessonIds: const ['math-1-2', 'math-3-3'],
+        ranges: const [
+          MathTextbookCourseRange(
+            title: '第一课',
+            unitTitle: '第一课',
+            startPage: 1,
+            endPage: 2,
+          ),
+          MathTextbookCourseRange(
+            title: '第二课',
+            unitTitle: '第一课',
+            startPage: 3,
+            endPage: 3,
+          ),
+        ],
+      ),
+    );
+    final original = courses.current!.toJson();
+    await mount(
+      tester,
+      MathTextbookReviewPage(bookId: book.pdfSha256),
+      size: const Size(320, 640),
+      scale: 2,
+    );
+    expect(find.text('第一课'), findsOneWidget);
+    expect(find.text('第二课'), findsOneWidget);
+    final more = find.descendant(
+      of: find.byKey(const ValueKey('math-review-unit-第一课')),
+      matching: find.byIcon(Icons.more_vert),
+    );
+    await visible(tester, more);
+    await tester.tap(more);
+    await tester.pumpAndSettle();
+    expect(find.text('选择课时'), findsOneWidget);
+    final selected = find.byKey(const ValueKey('math-review-actions-math-3-3'));
+    await tester.ensureVisible(selected);
+    await tester.tap(selected);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('重新整理此课'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(input('课时名称')).controller!.text, '第二课');
+    expect(tester.widget<TextField>(input('起始 PDF 页')).controller!.text, '3');
+    expect(tester.widget<TextField>(input('结束 PDF 页')).controller!.text, '3');
+    expect(courses.current!.toJson(), original);
+    expect(generator.calls, 0);
     expect(tester.takeException(), isNull);
   });
 

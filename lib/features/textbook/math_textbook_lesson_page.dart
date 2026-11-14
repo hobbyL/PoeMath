@@ -442,13 +442,14 @@ class _MathTextbookLessonPageState extends ConsumerState<MathTextbookLessonPage>
   Widget _overview(MathTextbookLesson lesson, MathTextbookLesson? pending) {
     final color = Theme.of(context).colorScheme.primary;
     final learning = lesson.learning;
+    final approved = lesson.isApproved(widget.bookId);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'PDF 第 ${lesson.startPage}～${lesson.endPage} 页 · ${lesson.isApproved(widget.bookId) ? '已通过' : '待家长核对'}${_dirty ? ' · 有未保存修改' : ''}',
-        ),
-        const SizedBox(height: SpacingTokens.sm),
+        if (approved || _dirty) ...[
+          Text([if (approved) '已通过', if (_dirty) '有未保存修改'].join(' · ')),
+          const SizedBox(height: SpacingTokens.sm),
+        ],
         AppTile(
           flat: true,
           flatTrailingEdgeAligned: true,

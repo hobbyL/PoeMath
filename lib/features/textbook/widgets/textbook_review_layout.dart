@@ -32,6 +32,7 @@ class TextbookReviewSectionHeader extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.summary,
+    this.showDivider = true,
     this.actionIcon = Icons.chevron_right,
     this.actionIconAlignment = IconAlignment.end,
   });
@@ -40,6 +41,7 @@ class TextbookReviewSectionHeader extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
   final String? summary;
+  final bool showDivider;
   final IconData actionIcon;
   final IconAlignment actionIconAlignment;
 
@@ -47,7 +49,7 @@ class TextbookReviewSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const Divider(height: SpacingTokens.xl),
+      if (showDivider) const Divider(height: SpacingTokens.xl),
       Wrap(
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,

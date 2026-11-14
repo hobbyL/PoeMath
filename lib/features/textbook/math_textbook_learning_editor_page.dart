@@ -53,6 +53,13 @@ class _MathTextbookLearningEditorPageState
   bool _coverage = false, _noExercises = false, _dirty = false;
   String? _error;
 
+  _LearningFormKind? get _sectionKind => switch (widget.section) {
+    MathTextbookLearningSection.knowledge => _LearningFormKind.knowledge,
+    MathTextbookLearningSection.exercises => _LearningFormKind.exercise,
+    MathTextbookLearningSection.practice => _LearningFormKind.plan,
+    _ => null,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -66,12 +73,7 @@ class _MathTextbookLearningEditorPageState
     if (widget.startAdding) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        final kind = switch (widget.section) {
-          MathTextbookLearningSection.knowledge => _LearningFormKind.knowledge,
-          MathTextbookLearningSection.exercises => _LearningFormKind.exercise,
-          MathTextbookLearningSection.practice => _LearningFormKind.plan,
-          _ => null,
-        };
+        final kind = _sectionKind;
         if (kind != null) unawaited(_edit(kind, null));
       });
     }
@@ -253,6 +255,14 @@ class _MathTextbookLearningEditorPageState
     final section = widget.section;
     final all = section == MathTextbookLearningSection.all;
     final coverage = all || section == MathTextbookLearningSection.coverage;
+    final title = switch (section) {
+      MathTextbookLearningSection.all => '知识点、题目与巩固',
+      MathTextbookLearningSection.knowledge => '知识点',
+      MathTextbookLearningSection.exercises => '教材原题与题组',
+      MathTextbookLearningSection.practice => '本课巩固',
+      MathTextbookLearningSection.coverage => '核对内容范围',
+    };
+    final kind = _sectionKind;
     return PopScope<void>(
       canPop: !_dirty,
       onPopInvokedWithResult: (didPop, _) {
@@ -260,128 +270,147 @@ class _MathTextbookLearningEditorPageState
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(switch (section) {
-            MathTextbookLearningSection.all => '知识点、题目与巩固',
-            MathTextbookLearningSection.knowledge => '知识点',
-            MathTextbookLearningSection.exercises => '教材原题与题组',
-            MathTextbookLearningSection.practice => '本课巩固',
-            MathTextbookLearningSection.coverage => '核对内容范围',
-          }),
+          title: Text(title),
           leading: IconButton(
             tooltip: '返回',
             onPressed: _leave,
             icon: const Icon(Icons.arrow_back),
           ),
+          actions: [
+            if (kind != null)
+              IconButton(
+                tooltip: '添加$title',
+                onPressed: () => _edit(kind, null),
+                icon: const Icon(Icons.add),
+              ),
+          ],
         ),
         body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(SpacingTokens.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ColoredCard(
-                color: color,
-                child: Text(
-                  '${widget.lesson.title}\n把知识点和题目关联到原书内容，填写确定的答案或家长核对方式。应用后请回到课时页面保存并审核。',
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  children: [
+                    if (coverage)
+                      TextField(
+                        controller: _unit,
+                        maxLength: 200,
+                        decoration: const InputDecoration(labelText: '所属单元'),
+                        onChanged: (_) => _change(() {}),
+                      ),
+                    if (all || section == MathTextbookLearningSection.knowledge)
+                      _collection('知识点', _LearningFormKind.knowledge, [
+                        for (final k in _knowledge)
+                          (k.id, k.title, k.summary, k.toJson()),
+                      ]),
+                    if (all || section == MathTextbookLearningSection.exercises)
+                      _collection('教材原题与题组', _LearningFormKind.exercise, [
+                        for (final e in _exercises)
+                          (
+                            e.id,
+                            e.title,
+                            '${e.fields.length} 个作答项 · ${e.needsParent ? '含家长核对项' : '自动核对'}',
+                            e.toJson(),
+                          ),
+                      ]),
+                    if (all || section == MathTextbookLearningSection.practice)
+                      _collection('本课巩固', _LearningFormKind.plan, [
+                        for (final p in _plans)
+                          (
+                            p.id,
+                            p.title,
+                            mathTextbookPracticeLabel(p.kind),
+                            p.toJson(),
+                          ),
+                      ]),
+                    if (_exercises.isEmpty &&
+                        (coverage ||
+                            section == MathTextbookLearningSection.exercises))
+                      AppTile(
+                        iconColor: color,
+                        title: '本课没有独立习题',
+                        subtitle: '仅在原书确实没有本课习题时确认',
+                        trailing: Switch(
+                          value: _noExercises,
+                          onChanged: (v) => _change(() => _noExercises = v),
+                        ),
+                      ),
+                    const SizedBox(height: SpacingTokens.md),
+                    if (coverage)
+                      AppTile(
+                        iconColor: color,
+                        title: '本课内容已逐页核对',
+                        subtitle: '知识点、完整题组、多空答案、单位和巩固范围均与原书一致',
+                        trailing: Checkbox(
+                          value: _coverage,
+                          onChanged: (v) => setState(() {
+                            _coverage = v ?? false;
+                            _dirty = true;
+                          }),
+                        ),
+                      ),
+                    if (all)
+                      Wrap(
+                        spacing: SpacingTokens.sm,
+                        runSpacing: SpacingTokens.sm,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _import,
+                            icon: const Icon(Icons.input_outlined),
+                            label: const Text('导入学习配置'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              await Clipboard.setData(
+                                ClipboardData(
+                                  text: const JsonEncoder.withIndent('  ')
+                                      .convert(_learning.toJson()),
+                                ),
+                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('学习配置已复制')),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.copy_outlined),
+                            label: const Text('复制学习配置'),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: SpacingTokens.md),
-              if (coverage)
-                TextField(
-                  controller: _unit,
-                  maxLength: 200,
-                  decoration: const InputDecoration(labelText: '所属单元'),
-                  onChanged: (_) => _change(() {}),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  SpacingTokens.md,
+                  SpacingTokens.sm,
+                  SpacingTokens.md,
+                  SpacingTokens.md,
                 ),
-              if (all || section == MathTextbookLearningSection.knowledge)
-                _collection('知识点', _LearningFormKind.knowledge, [
-                  for (final k in _knowledge)
-                    (k.id, k.title, k.summary, k.toJson()),
-                ]),
-              if (all || section == MathTextbookLearningSection.exercises)
-                _collection('教材原题与题组', _LearningFormKind.exercise, [
-                  for (final e in _exercises)
-                    (
-                      e.id,
-                      e.title,
-                      '${e.fields.length} 个作答项 · ${e.needsParent ? '含家长核对项' : '自动核对'}',
-                      e.toJson(),
-                    ),
-                ]),
-              if (all || section == MathTextbookLearningSection.practice)
-                _collection('本课巩固', _LearningFormKind.plan, [
-                  for (final p in _plans)
-                    (
-                      p.id,
-                      p.title,
-                      mathTextbookPracticeLabel(p.kind),
-                      p.toJson(),
-                    ),
-                ]),
-              if (_exercises.isEmpty &&
-                  (coverage ||
-                      section == MathTextbookLearningSection.exercises))
-                AppTile(
-                  iconColor: color,
-                  title: '本课没有独立习题',
-                  subtitle: '仅在原书确实没有本课习题时确认',
-                  trailing: Switch(
-                    value: _noExercises,
-                    onChanged: (v) => _change(() => _noExercises = v),
-                  ),
-                ),
-              const SizedBox(height: SpacingTokens.md),
-              if (coverage)
-                AppTile(
-                  iconColor: color,
-                  title: '本课内容已逐页核对',
-                  subtitle: '知识点、完整题组、多空答案、单位和巩固范围均与原书一致',
-                  trailing: Checkbox(
-                    value: _coverage,
-                    onChanged: (v) => setState(() {
-                      _coverage = v ?? false;
-                      _dirty = true;
-                    }),
-                  ),
-                ),
-              if (all)
-                Wrap(
-                  spacing: SpacingTokens.sm,
-                  runSpacing: SpacingTokens.sm,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextButton.icon(
-                      onPressed: _import,
-                      icon: const Icon(Icons.input_outlined),
-                      label: const Text('导入学习配置'),
-                    ),
-                    TextButton.icon(
-                      onPressed: () async {
-                        await Clipboard.setData(
-                          ClipboardData(
-                            text: const JsonEncoder.withIndent('  ')
-                                .convert(_learning.toJson()),
-                          ),
-                        );
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('学习配置已复制')),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.copy_outlined),
-                      label: const Text('复制学习配置'),
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: SpacingTokens.sm,
+                        ),
+                        child: ColoredCard(
+                          color: Theme.of(context).colorScheme.error,
+                          child: Text(_error!),
+                        ),
+                      ),
+                    FilledButton(
+                      onPressed: _apply,
+                      child: const Text('应用到课时草稿'),
                     ),
                   ],
                 ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: SpacingTokens.sm,
-                  ),
-                  child: ColoredCard(
-                    color: Theme.of(context).colorScheme.error,
-                    child: Text(_error!),
-                  ),
-                ),
-              FilledButton(onPressed: _apply, child: const Text('应用到课时草稿')),
+              ),
             ],
           ),
         ),
@@ -400,14 +429,16 @@ class _MathTextbookLearningEditorPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextbookReviewSectionHeader(
-            title: '$title · ${rows.length}',
-            actionLabel: '添加$title',
-            actionIcon: Icons.add,
-            actionIconAlignment: IconAlignment.start,
-            onAction: () => _edit(kind, null),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
+          if (widget.section == MathTextbookLearningSection.all) ...[
+            TextbookReviewSectionHeader(
+              title: '$title · ${rows.length}',
+              actionLabel: '添加$title',
+              actionIcon: Icons.add,
+              actionIconAlignment: IconAlignment.start,
+              onAction: () => _edit(kind, null),
+            ),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
           for (final row in rows)
             Padding(
               padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
