@@ -25,6 +25,7 @@ import 'package:poemath/features/textbook/math_textbook_practice_page.dart';
 import 'package:poemath/features/textbook/math_textbook_study_page.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
+import 'package:poemath/features/textbook/widgets/math_textbook_study_content.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/math_textbook_fixture.dart';
@@ -267,6 +268,60 @@ void defineMathTextbookLearningTests({
     await waitFor(tester, () => find.text('本课练习暂不可用').evaluate().isNotEmpty);
     expect(find.byType(TextField), findsNothing);
     expect(HiveBoxes.mathSessions.values, isEmpty);
+  });
+
+  testWidgets('长摘要以简短入口呈现，双倍字号可直接打开对应完整内容', (tester) async {
+    final source = mathLearningFixture();
+    final knowledge = source.learning!.knowledgePoints.single;
+    final long = MathTextbookLesson.fromJson({
+      ...source.toJson(),
+      'learning': {
+        ...source.learning!.toJson(),
+        'knowledgePoints': [
+          {...knowledge.toJson(), 'summary': '用加法求合并后的数量。\n' * 80},
+        ],
+      },
+    });
+    await tester.runAsync(() => install(long, approve: false));
+    await mount(
+      tester,
+      AppRoutes.mathTextbookStudyOf(book.pdfSha256, lesson.id),
+      size: const Size(320, 860),
+      scale: 2,
+      brightness: Brightness.dark,
+    );
+    await waitFor(tester, () => find.text('知识与例题').evaluate().isNotEmpty);
+    await visible(tester, find.text(knowledge.title));
+    final entry = find.ancestor(
+      of: find.text(knowledge.title),
+      matching: find.byType(AppTile),
+    );
+    expect(tester.getSize(entry).height, lessThan(860 * .65));
+    await capture?.call(tester, 'compact-knowledge-index');
+    await tap(tester, find.text(knowledge.title));
+    await waitFor(
+      tester,
+      () => find.byType(MathTextbookSourceContentPage).evaluate().isNotEmpty,
+    );
+    expect(
+      tester
+          .widget<MathTextbookSourceContentPage>(
+            find.byType(MathTextbookSourceContentPage),
+          )
+          .blocks
+          .map((b) => b.id),
+      ['example'],
+    );
+    expect(
+      find.text('把2个圆和3个圆合在一起，共有5个圆。', findRichText: true),
+      findsOneWidget,
+    );
+    final saved = await io(tester, () => courses.load(book));
+    expect(
+      saved!.lessons.single.learning!.knowledgePoints.single.summary,
+      '用加法求合并后的数量。\n' * 80,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   for (final large in [false, true]) {

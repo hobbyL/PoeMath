@@ -170,7 +170,7 @@ class MathTextbookLearningRepository {
     String? planId,
     Set<String>? exerciseIds,
   }) {
-    final lesson = course?.lessons.where((l) => l.id == id).firstOrNull;
+    final lesson = course?.currentLessons.where((l) => l.id == id).firstOrNull;
     if (lesson == null ||
         digest != null && lesson.contentDigest(book.pdfSha256) != digest) {
       throw StateError('本课内容已更新，旧记录已保留，请重新打开本课');

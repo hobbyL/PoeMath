@@ -169,6 +169,69 @@ void main() {
     );
   });
 
+  test('目录重分后旧稿及作答保留，但旧范围不能继续写入当前学习', () async {
+    final lesson = await saveLesson(mathLearningFixture(manual: true));
+    await courses.saveOutline(
+      book,
+      MathTextbookCourseOutline(
+        source: 'text',
+        ranges: const [
+          MathTextbookCourseRange(title: '原范围', startPage: 1, endPage: 2),
+        ],
+      ),
+      generation: 0,
+      authorize: () {},
+    );
+    final repo = repository();
+    await repo.markRead(lesson.id, lesson.contentDigest(book.pdfSha256));
+    final draft = await answer(repo, await repo.start(lesson.id), '已在纸上完成');
+    final before = await repo.load();
+    expect(before.history.single.result, MathTextbookResult.pendingParent);
+    final updated = await courses.saveOutline(
+      book,
+      MathTextbookCourseOutline(
+        source: 'text',
+        organizationVersion: 1,
+        ranges: const [
+          MathTextbookCourseRange(title: '第一课', startPage: 1, endPage: 1),
+          MathTextbookCourseRange(title: '第二课', startPage: 2, endPage: 3),
+        ],
+      ),
+      generation: 0,
+      authorize: () {},
+    );
+    expect(updated.outline!.retainedLessonIds, [lesson.id]);
+    expect(updated.lessons.single.toJson(), lesson.toJson());
+    expect(updated.currentLessons, isEmpty);
+    await reopenStorage();
+    final reopenedCourses = MathTextbookCourseRepository(
+      directoryProvider: () async => root,
+    );
+    final reopened = MathTextbookLearningRepository(
+      book: book,
+      courses: reopenedCourses,
+      findBook: books.find,
+    );
+    await expectLater(reopened.start(lesson.id), throwsStateError);
+    await expectLater(
+      reopened.markRead(lesson.id, lesson.contentDigest(book.pdfSha256)),
+      throwsStateError,
+    );
+    await expectLater(reopened.saveDraft(draft), throwsStateError);
+    await expectLater(reopened.submit(draft, 0), throwsStateError);
+    await expectLater(
+      reopened.parentCheck(
+        attemptId: before.history.single.id,
+        passed: true,
+        reviewer: '测试家长',
+        authorize: () {},
+      ),
+      throwsStateError,
+    );
+    expect((await reopened.load()).toJson(), before.toJson());
+    expect((await reopenedCourses.load(book))!.toJson(), updated.toJson());
+  });
+
   test('未审核的大课时141组纸上题可启动和重开，旧内容不能续写', () async {
     final source = mathLearningFixture(
       manual: true,

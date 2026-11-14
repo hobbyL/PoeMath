@@ -71,7 +71,7 @@ class MathTextbookHistoryPage extends ConsumerWidget {
                           .watch(mathTextbookCourseProvider(bookId))
                           .valueOrNull;
                       bool currentAttempt(MathTextbookAttempt attempt) {
-                        final lesson = course?.lessons
+                        final lesson = course?.currentLessons
                             .where((lesson) => lesson.id == attempt.lessonId)
                             .firstOrNull;
                         return lesson?.isApproved(bookId) == true &&

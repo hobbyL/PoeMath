@@ -14,6 +14,7 @@ import 'package:poemath/core/services/math_textbook_pdf_graphics.dart';
 import 'package:poemath/core/utils/logger.dart';
 
 import '../test/features/textbook/math_textbook_learning_test.dart' as learning;
+import '../test/features/textbook/math_textbook_reading_test.dart' as reading;
 import '../test/helpers/math_textbook_pdf_fixture.dart';
 
 void main() {
@@ -26,6 +27,7 @@ void main() {
     );
   });
   learning.defineMathTextbookLearningTests(capture: _capture);
+  reading.defineMathTextbookReadingTests();
 
   testWidgets('Android 原生 PDFium 的裁切、旋转和图形像素与来源一致', (tester) async {
     await tester.runAsync(() async {

@@ -10,6 +10,7 @@ import 'package:poemath/data/models/math_textbook_progress.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/domain/math_textbook_progress.dart';
 import 'package:poemath/domain/math_textbook_practice.dart';
+import 'package:poemath/domain/math_textbook_course_plan.dart';
 import 'package:poemath/features/textbook/math_textbook_labels.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
@@ -107,7 +108,7 @@ class MathTextbookBookPage extends ConsumerWidget {
     Map<String, MathTextbookLessonProgress> summaries,
   ) {
     final color = Theme.of(context).colorScheme.primary;
-    final lessons = [...?course?.lessons]
+    final lessons = [...?course?.currentLessons]
       ..sort((a, b) => a.startPage.compareTo(b.startPage));
     final read = summaries.values.where((summary) => summary.read).length;
     final completed = summaries.values
@@ -153,6 +154,19 @@ class MathTextbookBookPage extends ConsumerWidget {
                 onTap: () => context.push(AppRoutes.textbookReadOf(bookId)),
               ),
               const SizedBox(height: SpacingTokens.sm),
+              if (course?.outline != null &&
+                  course!.outline!.organizationVersion <
+                      mathTextbookOrganizationVersion) ...[
+                AppTile(
+                  icon: Icons.auto_stories_outlined,
+                  iconColor: color,
+                  title: '更新课时内容',
+                  subtitle: '按讲解、例题和练习重新整理',
+                  onTap: () =>
+                      context.push(AppRoutes.mathTextbookReviewOf(bookId)),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+              ],
               if (selected)
                 const Text('这是当前使用的数学课本')
               else
@@ -268,7 +282,7 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
                       description: mathTextbookDisplayError(error, '请返回重试。'),
                     ),
                     data: (course) {
-                      final lesson = course?.lessons
+                      final lesson = course?.currentLessons
                           .where((l) => l.id == widget.lessonId)
                           .firstOrNull;
                       if (lesson == null) {
@@ -380,7 +394,9 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
       padding: const EdgeInsets.all(SpacingTokens.md),
       children: [
         Text(lesson.title, style: Theme.of(context).textTheme.headlineSmall),
-        if (learning?.unitTitle.isNotEmpty ?? false) Text(learning!.unitTitle),
+        if ((learning?.unitTitle.isNotEmpty ?? false) &&
+            learning!.unitTitle != lesson.title)
+          Text(learning.unitTitle),
         const SizedBox(height: SpacingTokens.sm),
         Text(summary.label),
         const SizedBox(height: SpacingTokens.md),
@@ -388,28 +404,26 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
           icon: Icons.auto_stories_outlined,
           iconColor: color,
           title: '阅读本课内容',
-          subtitle: '文字、公式和原书图形',
+          subtitle: '按原书顺序阅读讲解、例题与练习',
           onTap: () => _showContent(book, lesson),
         ),
         const SizedBox(height: SpacingTokens.md),
+        if (learning?.knowledgePoints.isNotEmpty ?? false) ...[
+          Text('知识与例题', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: SpacingTokens.sm),
+        ],
         for (final k
             in learning?.knowledgePoints ?? <MathTextbookKnowledgePoint>[])
           Padding(
             padding: const EdgeInsets.only(bottom: SpacingTokens.md),
-            child: ColoredCard(
-              color: color,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(k.title, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: SpacingTokens.sm),
-                  Text(k.summary),
-                  TextButton(
-                    onPressed: () => _showContent(book, lesson, knowledge: k),
-                    child: const Text('查看对应原书内容'),
-                  ),
-                ],
-              ),
+            child: AppTile(
+              icon: Icons.lightbulb_outline,
+              iconColor: color,
+              title: k.title,
+              titleMaxLines: 2,
+              subtitle: k.summary,
+              subtitleMaxLines: 3,
+              onTap: () => _showContent(book, lesson, knowledge: k),
             ),
           ),
         if (_error != null)

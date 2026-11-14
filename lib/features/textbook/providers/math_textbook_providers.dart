@@ -98,7 +98,7 @@ final mathTextbookBookLearningProvider = FutureProvider.autoDispose
       return (
         course: course,
         lessons: await _summarizeCourse(
-          course.lessons,
+          course.currentLessons,
           id,
           MathTextbookProgress(
             profileId: progress.profileId,

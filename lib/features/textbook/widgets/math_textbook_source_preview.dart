@@ -122,9 +122,13 @@ class MathTextbookSourcePreview extends ConsumerStatefulWidget {
     super.key,
     required this.book,
     required this.source,
+    this.expandToWidth = false,
+    this.framed = true,
   });
   final Textbook book;
   final MathTextbookRegion source;
+  final bool expandToWidth;
+  final bool framed;
   @override
   ConsumerState<MathTextbookSourcePreview> createState() =>
       _MathTextbookSourcePreviewState();
@@ -202,9 +206,8 @@ class _MathTextbookSourcePreviewState
   }
 
   @override
-  Widget build(BuildContext context) => ColoredCard(
-    color: Theme.of(context).colorScheme.secondary,
-    child: _error != null
+  Widget build(BuildContext context) {
+    final content = _error != null
         ? Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -220,16 +223,31 @@ class _MathTextbookSourcePreviewState
         : Semantics(
             label: '原书 PDF 第 ${widget.source.page} 页所选区域，可放大查看',
             image: true,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * .45,
-              ),
-              child: InteractiveViewer(
-                minScale: 1,
-                maxScale: 4,
-                child: RawImage(image: _image, fit: BoxFit.contain),
-              ),
-            ),
-          ),
-  );
+            child: widget.expandToWidth
+                ? AspectRatio(
+                    aspectRatio: _image!.width / _image!.height,
+                    child: InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: RawImage(image: _image, fit: BoxFit.contain),
+                    ),
+                  )
+                : ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * .45,
+                    ),
+                    child: InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: RawImage(image: _image, fit: BoxFit.contain),
+                    ),
+                  ),
+          );
+    return widget.framed
+        ? ColoredCard(
+            color: Theme.of(context).colorScheme.secondary,
+            child: content,
+          )
+        : content;
+  }
 }
