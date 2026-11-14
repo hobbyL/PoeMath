@@ -510,7 +510,17 @@ void main() {
       });
       await tester.pump();
       await tester.pump(const Duration(seconds: 2));
+      // Correct feedback precedes the durable checkpoint under suite load.
+      // Wait for real IO and drive frames before reading or flushing Hive.
+      for (var i = 0; i < 100 && HiveBoxes.mathSessions.isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await drainHiveWritesForTesting(tester);
       expect(find.text('回答正确！'), findsOneWidget);
+      expect(HiveBoxes.mathSessions.values, hasLength(1));
       final record = HiveBoxes.mathSessions.values.single.problemRecords.single;
       expect(record.userAnswer, answer);
       expect(record.isCorrect, isTrue);
