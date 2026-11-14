@@ -10,6 +10,7 @@ import 'package:poemath/features/textbook/widgets/textbook_text_search.dart';
 
 import '../../helpers/textbook_fixture.dart';
 import '../../helpers/textbook_draft_fixture.dart';
+
 import 'package:poemath/data/models/textbook_page_text.dart';
 
 const _tree = TextbookTocResult(
@@ -34,12 +35,11 @@ void main() {
   late Directory directory;
   final book = textbookFixture();
   TextbookContentCache reopen() => TextbookContentCache(
-        book: book,
-        directoryProvider: () async => directory,
-      );
-  File stored(String name) => File(
-        '${directory.path}/textbooks/cache/${book.pdfSha256}/$name.json',
-      );
+    book: book,
+    directoryProvider: () async => directory,
+  );
+  File stored(String name) =>
+      File('${directory.path}/textbooks/cache/${book.pdfSha256}/$name.json');
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('textbook_content_');
   });
@@ -99,10 +99,8 @@ void main() {
     final second = await searchTextbookPages(
       query: '远山',
       pageCount: 3,
-      loadPageText: (page) => next.pageText(
-        page,
-        () => throw StateError('不应再提取文字'),
-      ),
+      loadPageText: (page) =>
+          next.pageText(page, () => throw StateError('不应再提取文字')),
     ).toList();
     expect(second.map((page) => page.matchCount), [0, 0, 1]);
     expect(second.map((page) => page.hasText), [true, false, true]);
@@ -163,8 +161,9 @@ void main() {
 
   test('损坏JSON、版本/身份/页数不匹配及非法目录均回退重建', () async {
     await reopen().rememberText(1, '旧文字');
-    final original = jsonDecode(await stored('page-1').readAsString())
-        as Map<String, dynamic>;
+    final original = jsonDecode(
+      await stored('page-1').readAsString(),
+    ) as Map<String, dynamic>;
     for (final entry in <String, Object>{
       'version': 999,
       'sha256': 'wrong',
@@ -186,6 +185,7 @@ void main() {
     final data = toc['data'] as Map<String, dynamic>;
     for (final changed in [
       {...data, 'tocVersion': 999},
+      {...data, 'tocVersion': TextbookContentCache.tocVersion - 1},
       {
         ...data,
         'directoryPages': [4],
@@ -227,8 +227,8 @@ void main() {
   });
 
   test('存储不可写时结果仍可用，下一实例可重建', () async {
-    final blocked =
-        await File('${directory.path}/blocked').writeAsString('file');
+    final blocked = await File('${directory.path}/blocked')
+        .writeAsString('file');
     final cache = TextbookContentCache(
       book: book,
       directoryProvider: () async => Directory(blocked.path),
@@ -268,8 +268,9 @@ void main() {
       (await cache.pageLayout(2, () async => page)).toJson(),
       page.toJson(),
     );
-    final raw = jsonDecode(await stored('layout-2').readAsString())
-        as Map<String, dynamic>;
+    final raw = jsonDecode(
+      await stored('layout-2').readAsString(),
+    ) as Map<String, dynamic>;
     (raw['data'] as Map)['layoutVersion'] = 0;
     await stored('layout-2').writeAsString(jsonEncode(raw));
     expect(await reopen().cachedPageLayout(2), isNull);

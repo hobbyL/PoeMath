@@ -556,9 +556,49 @@ class _DirectoryPage {
 }
 
 List<_DirectoryPage> _chooseDirectory(List<_DirectoryPage> pages) {
+  List<_Candidate> numbered(_DirectoryPage page) =>
+      page.entries.where((entry) => entry.printedPage != null).toList();
+
+  bool looksLikeDirectory(_DirectoryPage page) {
+    final entries = numbered(page);
+    if (entries.length < 2) return false;
+    var increasing = 0;
+    for (var i = 1; i < entries.length; i++) {
+      if (entries[i].printedPage! >= entries[i - 1].printedPage!) increasing++;
+    }
+    if (increasing / (entries.length - 1) < 0.8) return false;
+    final columns = <double, int>{};
+    for (final entry in entries) {
+      final column = columns.keys
+          .where((value) => (value - entry.column).abs() < 0.04)
+          .firstOrNull;
+      columns.update(
+        column ?? entry.column,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+    }
+    return columns.values
+                .where((count) => count >= 2)
+                .fold<int>(0, (total, count) => total + count) /
+            entries.length >=
+        0.8;
+  }
+
   final groups = <List<_DirectoryPage>>[];
   for (final page in pages) {
-    if (groups.isEmpty || groups.last.last.page + 1 != page.page) {
+    // 正文中的数值也能形成候选条目。目录续页还须有重复页码列，
+    // 且页码顺序延续；不能仅因紧接“目录”并含两个数字就并入目录。
+    if (!page.heading && !looksLikeDirectory(page)) continue;
+    final previous = groups.isEmpty ? null : groups.last.last;
+    final before = previous == null ? <_Candidate>[] : numbered(previous);
+    final after = numbered(page);
+    final continues =
+        page.heading ||
+        before.isEmpty ||
+        after.isEmpty ||
+        after.first.printedPage! >= before.last.printedPage!;
+    if (previous == null || previous.page + 1 != page.page || !continues) {
       groups.add([page]);
     } else {
       groups.last.add(page);

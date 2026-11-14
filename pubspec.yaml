@@ -48,6 +48,9 @@ dependencies:
   image_picker: 1.2.4
   # PDF 离线阅读；2.5+ 要求 Flutter 3.47，固定当前 SDK 兼容版。
   pdfrx: 2.11.0
+  # Direct access to the already locked PDFium binding for math page geometry.
+  pdfium_dart: 0.4.1
+  ffi: 2.2.0
   fl_chart: ^1.2.0
 
   # 本地通知（每日学习提醒）

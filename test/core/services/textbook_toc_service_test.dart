@@ -24,6 +24,55 @@ TextbookTocPage page(List<(String, double, double)> lines) {
 }
 
 void main() {
+  for (final (name, body) in [
+    (
+      '正文行内数字不形成目录续页',
+      [('一组分到 8 个，另一组分到 12 个。', 0.1, 0.2), ('先取 3 份，然后再取 7 份。', 0.1, 0.3)],
+    ),
+    (
+      '正文答案列即使整齐递增也不能重置目录页码',
+      [
+        ('买了几本书', 0.1, 0.2),
+        ('2', 0.8, 0.2),
+        ('留下几本书', 0.1, 0.3),
+        ('4', 0.8, 0.3),
+      ],
+    ),
+  ]) {
+    test(name, () async {
+      final pages = {
+        3: page([
+          ('目录', 0.4, 0.05),
+          ('长度测量', 0.1, 0.2),
+          ('1', 0.8, 0.2),
+          ('数据整理', 0.1, 0.3),
+          ('5', 0.8, 0.3),
+        ]),
+        4: page([
+          ('分数计算', 0.1, 0.2),
+          ('10', 0.8, 0.2),
+          ('总复习', 0.1, 0.3),
+          ('20', 0.8, 0.3),
+        ]),
+        5: page([('长度测量', 0.1, 0.1), ...body, ('1', 0.1, 0.95)]),
+      };
+      final scanner = TextbookTocService(
+        pageCount: 30,
+        loadOutline: () async => [],
+        loadPage: (number) async => pages[number] ?? const TextbookTocPage(''),
+      );
+      final result = (await scanner.scan().last).result!;
+      expect(result.directoryPages, [3, 4]);
+      expect(result.entries.map((entry) => entry.title), [
+        '长度测量',
+        '数据整理',
+        '分数计算',
+        '总复习',
+      ]);
+      expect(result.entries.first.page, 5);
+    });
+  }
+
   test('没有单元头时，集合子篇只比父课深一层', () async {
     final toc = page([
       ('目录', 0.4, 0.05),

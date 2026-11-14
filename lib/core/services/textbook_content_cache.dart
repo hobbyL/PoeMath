@@ -20,7 +20,7 @@ class TextbookContentCache {
 
   static const formatVersion = 1;
   // 修改目录识别算法或层级规则时递增，保留可复用的逐页文字。
-  static const tocVersion = 2;
+  static const tocVersion = 3;
   // 旧版 raw text 可能包含裁切邻页；只复用共享可见布局生成的文字。
   static const textVersion = 2;
   static const pageNumberVersion = 1;
