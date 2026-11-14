@@ -63,14 +63,19 @@ class MathEngine {
     Random? random,
     String? skillId,
     bool verticalProcessOnly = false,
+    GradeConfig? curriculum,
   }) {
     if (verticalProcessOnly && mode != ProblemMode.vertical) {
       throw ArgumentError('逐列过程练习必须使用竖式模式');
     }
     final rng = random ?? Random();
     final candidateCount = difficulty == DifficultyLevel.hard ? 8 : 1;
-    var config = GradePresets.get(grade, semester);
-    if (difficulty != null) {
+    if (curriculum != null &&
+        (curriculum.grade != grade || curriculum.semester != semester)) {
+      throw ArgumentError('本课约束与教材册次不匹配');
+    }
+    var config = curriculum ?? GradePresets.get(grade, semester);
+    if (difficulty != null && curriculum == null) {
       config = DifficultyAdjuster.adjust(config, difficulty);
     }
     if (mode != null && !config.allowedModes.contains(mode)) {
@@ -94,9 +99,11 @@ class MathEngine {
     var candidates = 0;
 
     // 约束检查，不通过则重新生成（最多 100 次）
-    for (var i = 0;
-        i < (requestedSkill == null && !verticalProcessOnly ? 100 : 1000);
-        i++) {
+    for (
+      var i = 0;
+      i < (requestedSkill == null && !verticalProcessOnly ? 100 : 1000);
+      i++
+    ) {
       final generator =
           selectedGenerator ?? generators[rng.nextInt(generators.length)];
       final problem = generator.generate();
@@ -229,6 +236,7 @@ class MathEngine {
     Random? random,
     String? skillId,
     bool verticalProcessOnly = false,
+    GradeConfig? curriculum,
   }) {
     if (count < 0) throw RangeError.value(count, 'count');
     if (count == 0) return [];
@@ -243,6 +251,7 @@ class MathEngine {
         random: rng,
         skillId: skillId,
         verticalProcessOnly: verticalProcessOnly,
+        curriculum: curriculum,
       );
       pool.putIfAbsent(_expressionKey(problem), () => problem);
     }
@@ -329,16 +338,16 @@ class MathEngine {
   static Set<MathSkill> _generatorSkills(BaseGenerator generator) =>
       switch (generator) {
         AdditionSubtractionGen() => {
-            MathSkill.addition,
-            MathSkill.additionCarry,
-            MathSkill.subtraction,
-            MathSkill.subtractionBorrow,
-            MathSkill.operationOrder,
-          },
+          MathSkill.addition,
+          MathSkill.additionCarry,
+          MathSkill.subtraction,
+          MathSkill.subtractionBorrow,
+          MathSkill.operationOrder,
+        },
         MultiplicationTableGen() => {
-            MathSkill.multiplicationTable,
-            MathSkill.division,
-          },
+          MathSkill.multiplicationTable,
+          MathSkill.division,
+        },
         RemainderDivisionGen() => {MathSkill.remainderDivision},
         MultiDigitMulDivGen() => {MathSkill.multiplication, MathSkill.division},
         MixedOperationGen() => {MathSkill.operationOrder},
@@ -488,8 +497,9 @@ class MathEngine {
     }
     final parts = trimmed.replaceFirst(RegExp(r'^[+-]'), '').split('.');
     final denominator = BigInt.from(10).pow(parts[1].length);
-    final numerator =
-        BigInt.tryParse('${parts[0].isEmpty ? '0' : parts[0]}${parts[1]}');
+    final numerator = BigInt.tryParse(
+      '${parts[0].isEmpty ? '0' : parts[0]}${parts[1]}',
+    );
     if (numerator == null) return null;
     return _boundedFraction(
       trimmed.startsWith('-') ? -numerator : numerator,

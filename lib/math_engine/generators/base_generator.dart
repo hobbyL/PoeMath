@@ -21,6 +21,15 @@ abstract class BaseGenerator {
   /// 生成一道指定模式的题目。
   MathProblem generateWithMode(ProblemMode mode) => generate();
 
+  /// 重试不能递归：人工课程范围可能没有合法解，必须有界失败。
+  MathProblem generateWithRetries(MathProblem? Function() attempt) {
+    for (var retry = 0; retry < 1000; retry++) {
+      final problem = attempt();
+      if (problem != null) return problem;
+    }
+    throw StateError('无法生成符合当前数值和运算约束的题目，请调整已核对的范围');
+  }
+
   // ============ 工具方法 ============
 
   /// 在 [min, max] 范围内生成随机整数。
@@ -106,8 +115,8 @@ abstract class BaseGenerator {
     final CompareRelation relation = offset > 0
         ? CompareRelation.lessThan
         : offset < 0
-            ? CompareRelation.greaterThan
-            : CompareRelation.equal;
+        ? CompareRelation.greaterThan
+        : CompareRelation.equal;
 
     return MathProblem(
       operands: problem.operands,
@@ -138,8 +147,10 @@ abstract class BaseGenerator {
     if (problem.displayText != null ||
         problem.resultForm == ResultForm.withRemainder ||
         problem.resultForm == ResultForm.fraction ||
-        [...problem.operands, problem.result]
-            .any((n) => n.toString().contains('/'))) {
+        [
+          ...problem.operands,
+          problem.result,
+        ].any((n) => n.toString().contains('/'))) {
       return problem;
     }
     // 负数操作数不适合竖式（"- -20" 视觉混乱），回退横式

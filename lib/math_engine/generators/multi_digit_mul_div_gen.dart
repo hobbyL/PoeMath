@@ -11,13 +11,21 @@ class MultiDigitMulDivGen extends BaseGenerator {
   MultiDigitMulDivGen(super.config, {super.random});
 
   @override
-  MathProblem generate() {
-    final useDiv = config.allowedOperators.contains(Operator.divide) &&
-        randomInt(0, 1) == 0;
+  MathProblem generate() => generateWithRetries(_tryGenerate);
+
+  MathProblem? _tryGenerate() {
+    if (!config.allowedOperators.contains(Operator.divide) &&
+        !config.allowedOperators.contains(Operator.multiply)) {
+      throw StateError('乘除法范围缺少可用运算');
+    }
+    final useDiv =
+        config.allowedOperators.contains(Operator.divide) &&
+        (!config.allowedOperators.contains(Operator.multiply) ||
+            randomInt(0, 1) == 0);
     return useDiv ? _generateDivision() : _generateMultiplication();
   }
 
-  MathProblem _generateMultiplication() {
+  MathProblem? _generateMultiplication() {
     final maxOp = config.maxOperand.round().clamp(10, 999999);
     final maxMul = config.maxMultiplier.clamp(2, maxOp);
     final maxA = maxMul.clamp(10, maxOp);
@@ -28,8 +36,8 @@ class MultiDigitMulDivGen extends BaseGenerator {
     final b = randomInt(2, maxB);
     final result = a * b;
 
-    if (result > config.maxResult) return generate();
-    if (a > config.maxOperand || b > config.maxOperand) return generate();
+    if (result > config.maxResult) return null;
+    if (a > config.maxOperand || b > config.maxOperand) return null;
 
     final operands = [NumberValue.fromInt(a), NumberValue.fromInt(b)];
     final operators = [Operator.multiply];
@@ -51,7 +59,7 @@ class MultiDigitMulDivGen extends BaseGenerator {
     return problem;
   }
 
-  MathProblem _generateDivision() {
+  MathProblem? _generateDivision() {
     final maxOp = config.maxOperand.round().clamp(10, 999999);
     // 被除数有效上限：同时受 maxDividend 与 maxOperand（操作数上限）约束
     final dividendCap = config.maxDividend < maxOp ? config.maxDividend : maxOp;
@@ -60,17 +68,22 @@ class MultiDigitMulDivGen extends BaseGenerator {
     final divisorRawCap = config.semester == '上' ? 9 : 99;
     final divisorHalfCap = dividendCap ~/ 2;
     final maxDivisor =
-        (divisorRawCap < divisorHalfCap ? divisorRawCap : divisorHalfCap)
-            .clamp(2, maxOp);
+        (divisorRawCap < divisorHalfCap ? divisorRawCap : divisorHalfCap).clamp(
+          2,
+          maxOp,
+        );
     final b = randomInt(2, maxDivisor);
     final maxQuotient = (dividendCap / b).floor().clamp(1, 999);
-    if (maxQuotient < 2) return _generateMultiplication();
+    if (maxQuotient < 2) return null;
     // 商从 2 起，避免 x ÷ x = 1 的退化题
     final quotient = randomInt(2, maxQuotient);
     final a = b * quotient;
 
-    if (a > dividendCap || a > config.maxOperand || b > config.maxOperand) {
-      return _generateMultiplication();
+    if (a > dividendCap ||
+        a > config.maxOperand ||
+        b > config.maxOperand ||
+        quotient > config.maxResult) {
+      return null;
     }
 
     final operands = [NumberValue.fromInt(a), NumberValue.fromInt(b)];

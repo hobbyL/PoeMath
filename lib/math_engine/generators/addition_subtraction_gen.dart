@@ -11,11 +11,15 @@ class AdditionSubtractionGen extends BaseGenerator {
   AdditionSubtractionGen(super.config, {super.random});
 
   @override
-  MathProblem generate() {
-    final op = randomChoiceFromSet(
-      config.allowedOperators
-          .intersection({Operator.add, Operator.subtract}),
-    );
+  MathProblem generate() => generateWithRetries(_tryGenerate);
+
+  MathProblem? _tryGenerate() {
+    final allowed = config.allowedOperators.intersection({
+      Operator.add,
+      Operator.subtract,
+    });
+    if (allowed.isEmpty) throw StateError('加减法范围缺少可用运算');
+    final op = randomChoiceFromSet(allowed);
 
     // 操作数必须落在 [minOperand, maxOperand]；结果不超过 maxResult。
     // 不能用 maxResult 当操作数上界（如 5 年级上 maxResult=100000、maxOperand=1000）。
@@ -29,14 +33,14 @@ class AdditionSubtractionGen extends BaseGenerator {
 
     if (op == Operator.add) {
       a = randomInt(minOp, maxOp);
+      if (maxRes - a < minOp) return null;
       final maxB = (maxRes - a).clamp(minOp, maxOp);
-      if (maxB < minOp) return generate();
       b = randomInt(minOp, maxB);
       result = a + b;
     } else {
       // 减法：被减数 a ∈ [minOp, maxOp]，减数 b ∈ [minOp, a] 且 ≤ maxOp
       a = randomInt(minOp, maxOp);
-      if (a < minOp) return generate();
+      if (a < minOp) return null;
       final maxB = a < maxOp ? a : maxOp;
       if (maxB < minOp) {
         // 允许 b=0 的退路（一年级上 min 可为 0）
@@ -46,13 +50,14 @@ class AdditionSubtractionGen extends BaseGenerator {
       }
       result = a - b;
     }
+    if (result > maxRes) return null;
 
     // 进退位检查
     if (!config.allowCarry && op == Operator.add && _hasCarry(a, b)) {
-      return generate(); // 重新生成
+      return null;
     }
     if (!config.allowBorrow && op == Operator.subtract && _hasBorrow(a, b)) {
-      return generate();
+      return null;
     }
 
     final operands = [NumberValue.fromInt(a), NumberValue.fromInt(b)];
