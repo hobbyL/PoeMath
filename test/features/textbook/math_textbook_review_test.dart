@@ -15,6 +15,7 @@ import 'package:poemath/data/models/textbook_catalog.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/repositories/math_textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
+import 'package:poemath/domain/math_textbook_course_plan.dart';
 import 'package:poemath/features/textbook/math_textbook_block_editor_page.dart';
 import 'package:poemath/features/textbook/math_textbook_lesson_page.dart';
 import 'package:poemath/features/textbook/math_textbook_review_page.dart';
@@ -107,6 +108,7 @@ class _Generator extends MathTextbookGenerationService {
       course = course.replace(
         outline: MathTextbookCourseOutline(
           source: 'bookmarks',
+          organizationVersion: mathTextbookOrganizationVersion,
           completedLessonIds: const [],
           ranges: const [
             MathTextbookCourseRange(
@@ -169,6 +171,8 @@ class _Generator extends MathTextbookGenerationService {
     required void Function(int, int) onProgress,
     MathTextbookPageLoader? pageLoader,
     String unitTitle = '',
+    bool needsAlignment = false,
+    MathTextbookCourseRange? legacyRange,
   }) async {
     token.check();
     authorize();

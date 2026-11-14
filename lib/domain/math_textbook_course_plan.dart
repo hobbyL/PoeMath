@@ -3,6 +3,10 @@ import 'dart:math' as math;
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 
+export 'math_textbook_content_organizer.dart' show seedMathTextbookLearning;
+
+const mathTextbookOrganizationVersion = 1;
+
 /// 目录只提供待核区间；不把目录标题等同于已确认的知识点或答案。
 MathTextbookCourseOutline planMathTextbookCourse(
   TextbookTocResult toc,
@@ -86,6 +90,7 @@ MathTextbookCourseOutline planMathTextbookCourse(
   return MathTextbookCourseOutline.fromJson(
     MathTextbookCourseOutline(
       source: starts.isEmpty ? 'pages' : toc.source.name,
+      organizationVersion: mathTextbookOrganizationVersion,
       ranges: ranges,
       directoryPages: toc.directoryPages,
       warnings: [
@@ -102,7 +107,8 @@ MathTextbookCourseOutline planMathTextbookCourse(
   );
 }
 
-MathTextbookLearning seedMathTextbookLearning(
+/// Exact pre-organization baseline, used only to protect legacy parent edits.
+MathTextbookLearning legacyMathTextbookLearning(
   MathTextbookLesson lesson, {
   String unitTitle = '',
 }) {

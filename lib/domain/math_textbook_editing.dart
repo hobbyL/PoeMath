@@ -70,6 +70,7 @@ MathTextbookBlock mergeMathTextbookBlocks(
       sources: regions.values.toList(),
       warnings: {...first.warnings, ...second.warnings}.toList(),
       exerciseNumber: first.exerciseNumber ?? second.exerciseNumber,
+      sourceLayout: first.sourceLayout || second.sourceLayout,
       parentNote: [
         first.parentNote,
         second.parentNote,

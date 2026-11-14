@@ -97,7 +97,21 @@ class MathTextbookCourseRepository {
 
     check();
     final current = await _load(book) ?? MathTextbookCourse.forBook(book);
-    final next = current.replace(outline: outline);
+    final currentIds = outline.ranges.map((range) => range.lessonId).toSet();
+    final savedIds = current.lessons.map((lesson) => lesson.id).toSet();
+    final retained = {
+      ...?current.outline?.retainedLessonIds,
+      ...outline.retainedLessonIds,
+      ...?current.outline?.ranges
+          .map((range) => range.lessonId)
+          .where(savedIds.contains),
+    }..removeWhere(currentIds.contains);
+    final next = current.replace(
+      outline: MathTextbookCourseOutline.fromJson({
+        ...outline.toJson(),
+        'retainedLessonIds': retained.toList(),
+      }),
+    );
     await _write(book, next, check);
     return next;
   });
@@ -120,13 +134,18 @@ class MathTextbookCourseRepository {
       pendingLessons: current.pendingLessons
           .where((l) => l.id != lessonId)
           .toList(),
-      outline: current.outline?.completedLessonIds == null
-          ? current.outline
-          : current.outline!.withCompleted(
-              current.outline!.completedLessonIds!.where(
-                (id) => id != lessonId,
-              ),
-            ),
+      outline: current.outline == null
+          ? null
+          : MathTextbookCourseOutline.fromJson({
+              ...current.outline!.toJson(),
+              if (current.outline!.completedLessonIds != null)
+                'completedLessonIds': current.outline!.completedLessonIds!
+                    .where((id) => id != lessonId)
+                    .toList(),
+              'retainedLessonIds': current.outline!.retainedLessonIds
+                  .where((id) => id != lessonId)
+                  .toList(),
+            }),
     );
     await _write(book, next, () {
       authorize();
@@ -216,6 +235,7 @@ class MathTextbookCourseRepository {
     MathTextbookLesson lesson, {
     required int generation,
     required void Function() authorize,
+    String? unmodifiedLegacyDigest,
   }) => _serial(() async {
     void check() {
       authorize();
@@ -234,6 +254,20 @@ class MathTextbookCourseRepository {
     } else if (previous.contentDigest(book.pdfSha256) ==
         lesson.contentDigest(book.pdfSha256)) {
       return current;
+    } else if (previous.review == null &&
+        unmodifiedLegacyDigest != null &&
+        previous.contentDigest(book.pdfSha256) == unmodifiedLegacyDigest) {
+      // Only a byte-for-content reproduction of the old automatic draft can
+      // take this path. Parent edits anywhere, not just the summary, prevent it.
+      next = current.replace(
+        lessons: [
+          for (final item in current.lessons)
+            item.id == lesson.id ? lesson : item,
+        ],
+        pendingLessons: current.pendingLessons
+            .where((item) => item.id != lesson.id)
+            .toList(),
+      );
     } else {
       next = current.replace(
         pendingLessons: [

@@ -41,9 +41,14 @@ class MathTextbookCourseOutline {
     List<int> directoryPages = const [],
     List<String> warnings = const [],
     List<String>? completedLessonIds,
+    this.organizationVersion = 0,
+    List<MathTextbookCourseRange> legacyRanges = const [],
+    List<String> retainedLessonIds = const [],
   }) : ranges = List.unmodifiable(ranges),
        directoryPages = List.unmodifiable(directoryPages),
        warnings = List.unmodifiable(warnings),
+       legacyRanges = List.unmodifiable(legacyRanges),
+       retainedLessonIds = List.unmodifiable(retainedLessonIds),
        completedLessonIds = completedLessonIds == null
            ? null
            : List.unmodifiable(completedLessonIds);
@@ -51,6 +56,12 @@ class MathTextbookCourseOutline {
   final List<MathTextbookCourseRange> ranges;
   final List<int> directoryPages;
   final List<String> warnings;
+  final int organizationVersion;
+
+  /// The original range titles are needed to reproduce the exact old automatic
+  /// baseline, including after an interrupted upgrade. They are not edits.
+  final List<MathTextbookCourseRange> legacyRanges;
+  final List<String> retainedLessonIds;
 
   /// Null identifies older drafts; a new run explicitly records even zero saves.
   final List<String>? completedLessonIds;
@@ -65,6 +76,10 @@ class MathTextbookCourseOutline {
     'ranges': ranges.map((r) => r.toJson()).toList(),
     'directoryPages': directoryPages,
     'warnings': warnings,
+    if (organizationVersion != 0) 'organizationVersion': organizationVersion,
+    if (legacyRanges.isNotEmpty)
+      'legacyRanges': legacyRanges.map((r) => r.toJson()).toList(),
+    if (retainedLessonIds.isNotEmpty) 'retainedLessonIds': retainedLessonIds,
     if (completedLessonIds != null) 'completedLessonIds': completedLessonIds,
   };
   factory MathTextbookCourseOutline.fromJson(Object? value) {
@@ -92,6 +107,22 @@ class MathTextbookCourseOutline {
             completed.any((id) => !ranges.any((r) => r.lessonId == id)))) {
       throw const FormatException('已整理课时与目录不符');
     }
+    final legacy = _list(
+      raw['legacyRanges'] ?? [],
+      '旧整理区间',
+      max: 400,
+    ).map(MathTextbookCourseRange.fromJson).toList();
+    final retained = _strings(
+      raw['retainedLessonIds'] ?? [],
+      '保留的旧课时',
+      1000,
+      200,
+    );
+    if (legacy.map((r) => r.lessonId).toSet().length != legacy.length ||
+        retained.toSet().length != retained.length ||
+        retained.any((id) => ranges.any((r) => r.lessonId == id))) {
+      throw const FormatException('保留的旧课时与当前目录重复');
+    }
     return MathTextbookCourseOutline(
       source: source,
       ranges: ranges,
@@ -102,6 +133,13 @@ class MathTextbookCourseOutline {
       ).map((p) => _integer(p, '目录页', min: 1, max: 10000)).toList(),
       warnings: _strings(raw['warnings'] ?? [], '目录待核说明', 30, 1000),
       completedLessonIds: completed,
+      organizationVersion: _integer(
+        raw['organizationVersion'] ?? 0,
+        '内容整理版本',
+        max: 10000,
+      ),
+      legacyRanges: legacy,
+      retainedLessonIds: retained,
     );
   }
 }

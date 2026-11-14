@@ -88,6 +88,79 @@ void main() {
     );
   });
 
+  test('原书排版选项兼容旧摘要，合并与严格往返保留显示选择', () {
+    final old = mathLessonFixture().blocks.first;
+    expect(old.toJson().containsKey('sourceLayout'), isFalse);
+    expect(MathTextbookBlock.fromJson(old.toJson()).toJson(), old.toJson());
+    final source = MathTextbookBlock.fromJson({
+      ...old.toJson(),
+      'sourceLayout': true,
+    });
+    expect(source.needsSource, isTrue);
+    expect(mergeMathTextbookBlocks(old, source).sourceLayout, isTrue);
+    expect(
+      MathTextbookBlock.fromJson(source.toJson()).toJson(),
+      source.toJson(),
+    );
+    for (final invalid in [null, 1, 'true']) {
+      expect(
+        () => MathTextbookBlock.fromJson({
+          ...old.toJson(),
+          'sourceLayout': invalid,
+        }),
+        throwsFormatException,
+      );
+    }
+  });
+
+  test('旧课时可保留对照，但未知或现有目录ID不能隐藏当前课程', () {
+    final old = mathLessonFixture();
+    final outline = MathTextbookCourseOutline(
+      source: 'text',
+      organizationVersion: 1,
+      ranges: const [
+        MathTextbookCourseRange(title: '第一课', startPage: 1, endPage: 1),
+        MathTextbookCourseRange(title: '第二课', startPage: 2, endPage: 3),
+      ],
+      retainedLessonIds: [old.id],
+      legacyRanges: const [
+        MathTextbookCourseRange(title: '旧课时', startPage: 1, endPage: 2),
+      ],
+    );
+    final course = MathTextbookCourse.forBook(book)
+        .replace(lessons: [old], outline: outline);
+    final restored = MathTextbookCourse.fromJson(
+      jsonDecode(jsonEncode(course.toJson())),
+    );
+    expect(restored.lessons.single.toJson(), old.toJson());
+    expect(restored.currentLessons, isEmpty);
+    for (final changes in [
+      {
+        'retainedLessonIds': ['math-3-3'],
+      },
+      {
+        'retainedLessonIds': ['math-1-1'],
+      },
+      {
+        'legacyRanges': [
+          const MathTextbookCourseRange(
+            title: '越界',
+            startPage: 1,
+            endPage: 4,
+          ).toJson(),
+        ],
+      },
+    ]) {
+      expect(
+        () => MathTextbookCourse.fromJson({
+          ...course.toJson(),
+          'outline': {...outline.toJson(), ...changes},
+        }),
+        throwsFormatException,
+      );
+    }
+  });
+
   test('错误坐标、缺页、重复编号和跨书身份被拒绝', () {
     final lesson = mathLessonFixture();
     final raw = lesson.toJson();

@@ -9,6 +9,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/domain/math_textbook_course_plan.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_review_content.dart';
@@ -329,17 +330,23 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
             .length ??
         0;
     final running = progress?.running == true;
+    final outdated =
+        outline != null &&
+        outline.organizationVersion < mathTextbookOrganizationVersion;
     final done = running ? progress!.completed : saved;
     final total = running && progress!.total > 0
         ? progress.total
         : outline?.ranges.length ?? 0;
     if (!running &&
+        !outdated &&
         progress?.failed != true &&
         (total > 0 && done == total || outline == null)) {
       return const SizedBox.shrink();
     }
     return TextbookReviewProgressCard(
-      message: progress?.message ?? '已保存 $saved/$total 课，可继续整理',
+      message:
+          progress?.message ??
+          (outdated ? '可按讲解、例题和练习更新内容，人工修改将保留' : '已保存 $saved/$total 课，可继续整理'),
       completed: done,
       total: total,
       running: running,
@@ -349,13 +356,13 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
   }
 
   Future<void> _bookReview(Textbook book, MathTextbookCourse course) async {
-    final saved = course.lessons.length;
-    final approved = course.lessons
+    final saved = course.currentLessons.length;
+    final approved = course.currentLessons
         .where((lesson) => lesson.isApproved(book.pdfSha256))
         .length;
     final total = course.outline?.ranges.length ?? saved;
     final pending = course.pendingLessons.length;
-    final pages = course.lessons
+    final pages = course.currentLessons
         .expand((lesson) => lesson.blocks)
         .where((block) => block.kind == MathTextbookBlockKind.sourcePage)
         .expand((block) => block.sources.map((source) => source.page))
@@ -427,6 +434,12 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
                 ],
               ),
               data: (data) {
+                final needsOrganization =
+                    data == null ||
+                    data.outline != null &&
+                        data.outline!.organizationVersion <
+                            mathTextbookOrganizationVersion;
+                if (needsOrganization) _tryAutomaticOrganization(book);
                 if (data != null) {
                   return MathTextbookReviewContent(
                     book: book,
@@ -442,17 +455,6 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
                 }
                 final path = ref.watch(textbookPathProvider(widget.bookId));
                 final entries = ref.watch(textbookCatalogProvider);
-                if (!_attempted && path.hasValue && entries.hasValue) {
-                  _attempted = true;
-                  if (path.valueOrNull != null &&
-                      entries.valueOrNull!.any(
-                        (entry) => entry.book.pdfSha256 == widget.bookId,
-                      )) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) _generateBook(book);
-                    });
-                  }
-                }
                 return AppEmptyState(
                   icon: Icons.fact_check_outlined,
                   title: '从原书整理课程草稿',
@@ -477,6 +479,21 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
               },
             ),
     );
+  }
+
+  void _tryAutomaticOrganization(Textbook book) {
+    final path = ref.watch(textbookPathProvider(widget.bookId));
+    final entries = ref.watch(textbookCatalogProvider);
+    if (_attempted || !path.hasValue || !entries.hasValue) return;
+    _attempted = true;
+    if (path.valueOrNull != null &&
+        entries.valueOrNull!.any(
+          (entry) => entry.book.pdfSha256 == widget.bookId,
+        )) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _generateBook(book);
+      });
+    }
   }
 }
 

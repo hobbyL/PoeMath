@@ -4,6 +4,7 @@ import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/math_textbook_page_layout.dart';
 import 'package:poemath/data/models/textbook_page_text.dart';
 import 'package:poemath/domain/math_textbook_editing.dart';
+import 'package:poemath/domain/textbook_printed_page.dart';
 
 /// 数学专用二维版面整理。输入完整页；选区仅由页面证据产生。
 class MathTextbookDraftParser {
@@ -14,6 +15,7 @@ class MathTextbookDraftParser {
     required int startPage,
     required int endPage,
     required List<MathTextbookPageLayout> pages,
+    bool classifyContent = true,
   }) {
     if (startPage < 1 ||
         endPage < startPage ||
@@ -28,7 +30,7 @@ class MathTextbookDraftParser {
     for (var number = startPage; number <= endPage; number++) {
       final page = byNumber[number];
       if (page == null) throw const FormatException('课时页面缺失');
-      final pageBlocks = _parsePage(page, lessonId);
+      final pageBlocks = _parsePage(page, lessonId, classifyContent);
       // 只有原书明确写出续页关系才自动合并；其他跨页关系由家长指定。
       if (blocks.isNotEmpty &&
           pageBlocks.isNotEmpty &&
@@ -58,6 +60,7 @@ class MathTextbookDraftParser {
   List<MathTextbookBlock> _parsePage(
     MathTextbookPageLayout page,
     String lessonId,
+    bool classifyContent,
   ) {
     final number = page.text.page;
     final prefix = '$lessonId-p$number';
@@ -99,6 +102,11 @@ class MathTextbookDraftParser {
     final blocks = <MathTextbookBlock>[];
     var serial = 0;
     String id() => '$prefix-${serial++}';
+    final bodyHeight = _median(
+      glyphs
+          .where((g) => RegExp(r'[\u3400-\u9fff]').hasMatch(g.text))
+          .map((g) => g.height),
+    );
 
     // 分数线是独立绘图证据；拒绝把竖式的宽列间距误当连续数字。
     for (final line in page.graphics.lines.where((l) => l.dark)) {
@@ -399,19 +407,56 @@ class MathTextbookDraftParser {
           previous = token;
         }
         final text = spans.map((s) => s.readable).join();
-        final marker = _exerciseNumber(text, combined, page);
+        final explicitExample = classifyContent
+            ? RegExp(r'^例\s*([0-9]{1,2})(?!\d)').firstMatch(text)
+            : null;
+        final marker =
+            explicitExample?[1] ?? _exerciseNumber(text, combined, page);
+        final badge = classifyContent && marker != null
+            ? page.graphics.regions
+                  .where(
+                    (region) =>
+                        region.containsCenter(combined.first.region) &&
+                        _numberBadge(
+                          region,
+                          glyphs,
+                          page.text.width / page.text.height,
+                        ),
+                  )
+                  .firstOrNull
+            : null;
+        final example =
+            classifyContent &&
+            marker != null &&
+            (explicitExample != null ||
+                bodyHeight > 0 &&
+                    combined.first.height >= bodyHeight * .95 &&
+                    badge != null);
+        final heading =
+            classifyContent &&
+            marker == null &&
+            (_sectionHeading(text) ||
+                bodyHeight > 0 &&
+                    lineHeight > bodyHeight * 1.2 &&
+                    text.length <= 45 &&
+                    RegExp(r'[\u3400-\u9fff]').hasMatch(text) &&
+                    !RegExp(r'[。！？?!=]').hasMatch(text));
+        var source = combined.map((t) => t.region).reduce((a, b) => a.merge(b));
+        if (badge != null) source = source.merge(badge);
         blocks.add(
           MathTextbookBlock(
             id: id(),
-            kind: marker != null
+            kind: heading
+                ? MathTextbookBlockKind.heading
+                : example
+                ? MathTextbookBlockKind.example
+                : marker != null
                 ? MathTextbookBlockKind.exercise
                 : spans.every((s) => s.expression != null)
                 ? MathTextbookBlockKind.formula
                 : MathTextbookBlockKind.text,
             spans: spans,
-            sources: [
-              _pad(combined.map((t) => t.region).reduce((a, b) => a.merge(b))),
-            ],
+            sources: [_pad(source)],
             exerciseNumber: marker,
           ),
         );
@@ -445,7 +490,7 @@ class MathTextbookDraftParser {
       final body = candidates.first;
       blocks[blocks.indexOf(marker)] = MathTextbookBlock(
         id: marker.id,
-        kind: MathTextbookBlockKind.exercise,
+        kind: marker.kind,
         spans: [
           ...marker.spans,
           if (body.spans.isNotEmpty) const MathTextbookSpan.text(' '),
@@ -487,6 +532,9 @@ class MathTextbookDraftParser {
           .where(
             (b) =>
                 b.sources.length == 1 &&
+                (!classifyContent ||
+                    b.kind != MathTextbookBlockKind.heading &&
+                        b.exerciseNumber == null) &&
                 b.sources.first.left >= region.left - .006 &&
                 b.sources.first.right <= region.right + .006 &&
                 b.sources.first.top >= region.top - .004 &&
@@ -518,6 +566,16 @@ class MathTextbookDraftParser {
         ),
       );
     }
+    final printedPage = classifyContent ? printedTextbookPage(page.text) : null;
+    if (printedPage != null) {
+      blocks.removeWhere((block) {
+        final region = block.sources.single;
+        return block.text.trim() == '$printedPage' &&
+            region.top > .88 &&
+            region.width < .13 &&
+            (region.right < .25 || region.left > .75);
+      });
+    }
     final ordered = _readingOrder(blocks, 0);
     final merged = <MathTextbookBlock>[];
     for (final block in ordered) {
@@ -525,6 +583,7 @@ class MathTextbookDraftParser {
       if (previous != null &&
           block.kind == MathTextbookBlockKind.text &&
           (previous.kind == MathTextbookBlockKind.text ||
+              previous.kind == MathTextbookBlockKind.example ||
               previous.kind == MathTextbookBlockKind.exercise) &&
           (previous.sources.last.left - block.sources.first.left).abs() <
               0.025 &&
@@ -550,6 +609,7 @@ class MathTextbookDraftParser {
             top: 0,
             right: 1,
             bottom: 1,
+            printedPage: printedPage?.toString(),
           ),
         ],
         warnings: [
@@ -675,6 +735,11 @@ class MathTextbookDraftParser {
     }
   }
 }
+
+bool _sectionHeading(String text) => RegExp(
+  r'^(?:练习[一二三四五六七八九十百0-9]+|做一做|想一想|说一说|试一试|'
+  r'你知道吗[？?]?|生活中的数学|整理和复习|回顾与反思|阅读资料)$',
+).hasMatch(text.replaceAll(RegExp(r'\s'), ''));
 
 List<_Token> _mixedNumbers(List<_Token> tokens) {
   final output = <_Token>[];

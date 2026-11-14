@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,7 @@ import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/math_textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
+import 'package:poemath/features/textbook/widgets/math_textbook_source_preview.dart';
 
 class _BookFiles extends TextbookFileService {
   _BookFiles(this.input, Directory root)
@@ -30,6 +32,7 @@ void main() {
     'MATH_TEXTBOOK_FULL_EVIDENCE_DIRECTORY',
   );
   const library = String.fromEnvironment('TEXTBOOK_PDFIUM_LIBRARY');
+  const legacyCourse = String.fromEnvironment('MATH_TEXTBOOK_LEGACY_COURSE');
   final enabled =
       inputDirectory.isNotEmpty &&
       evidenceDirectory.isNotEmpty &&
@@ -134,6 +137,146 @@ void main() {
             directoryProvider: () async => root,
           );
           expect((await reopened.load(book))!.toJson(), course.toJson());
+          for (final range in ranges.where((range) => range.needsAlignment)) {
+            final learning = course.lessons
+                .singleWhere((l) => l.id == range.lessonId)
+                .learning!;
+            expect(learning.knowledgePoints, isEmpty);
+            expect(learning.exercises, isEmpty);
+            expect(learning.practicePlans, isEmpty);
+          }
+          if (key == '2a') {
+            final length = course.lessons.singleWhere(
+              (l) => l.id == 'math-7-15',
+            );
+            final addition = course.lessons.singleWhere(
+              (l) => l.id == 'math-16-42',
+            );
+            expect(length.title.replaceAll(RegExp(r'\s'), ''), '长度单位');
+            expect(
+              addition.title.replaceAll(RegExp(r'\s'), ''),
+              '100以内的加法和减法（二）',
+            );
+            final example1 = length.blocks.singleWhere(
+              (b) =>
+                  b.kind == MathTextbookBlockKind.example &&
+                  b.exerciseNumber == '1',
+            );
+            final example2 = length.blocks.singleWhere(
+              (b) =>
+                  b.kind == MathTextbookBlockKind.example &&
+                  b.exerciseNumber == '2',
+            );
+            final example3 = length.blocks.singleWhere(
+              (b) =>
+                  b.kind == MathTextbookBlockKind.example &&
+                  b.exerciseNumber == '3',
+            );
+            expect(
+              length.learning!.knowledgePoints
+                  .singleWhere((k) => k.blockIds.contains(example1.id))
+                  .summary,
+              contains('需要使用统一的长度单位'),
+            );
+            final summary = length.learning!.knowledgePoints
+                .singleWhere((k) => k.blockIds.contains(example2.id))
+                .summary;
+            expect(summary, contains('量比较短的物体，可以用厘米作单位。'));
+            expect(summary, isNot(contains('食指宽')));
+            expect(summary, isNot(contains('便利贴宽')));
+            expect(example3.sources.single.top, lessThan(.65));
+            expect(example3.sources.single.bottom, greaterThan(.9));
+            expect(
+              length.learning!.exercises.any(
+                (e) => e.blockIds.contains(example1.id),
+              ),
+              isFalse,
+            );
+            final pictures = await Directory('${root.path}/reading-crops')
+                .create();
+            for (final block in [
+              example1,
+              example2,
+              example3,
+              length.blocks.singleWhere(
+                (b) =>
+                    b.kind == MathTextbookBlockKind.sourcePage &&
+                    b.sources.single.page == 8,
+              ),
+            ]) {
+              final image = await renderMathTextbookRegion(
+                pdf.path,
+                block.sources.single,
+                MathTextbookRenderToken(),
+              );
+              try {
+                final bytes = await image.toByteData(
+                  format: ui.ImageByteFormat.png,
+                );
+                await File('${pictures.path}/${block.id}.png')
+                    .writeAsBytes(bytes!.buffer.asUint8List());
+              } finally {
+                image.dispose();
+              }
+            }
+            if (legacyCourse.isNotEmpty) {
+              final previous = MathTextbookCourse.fromJson(
+                jsonDecode(await File(legacyCourse).readAsString()),
+              );
+              previous.matchBook(book);
+              final legacyRoot = await Directory('${root.path}/legacy-upgrade')
+                  .create();
+              await Directory('${legacyRoot.path}/textbooks/math-courses')
+                  .create(recursive: true);
+              await File(legacyCourse).copy(
+                '${legacyRoot.path}/textbooks/math-courses/${book.pdfSha256}.json',
+              );
+              final legacyRepository = MathTextbookCourseRepository(
+                directoryProvider: () async => legacyRoot,
+              );
+              final upgraded =
+                  await MathTextbookGenerationService(
+                    legacyRepository,
+                    _BookFiles(pdf.path, legacyRoot),
+                  ).generateBook(
+                    book: book,
+                    token: TextbookDraftToken(),
+                    authorize: () {},
+                    onProgress: (_, __) {},
+                  );
+              expect(
+                upgraded.pendingLessons,
+                isEmpty,
+                reason: '未改动的真实旧自动稿应直接更新',
+              );
+              expect(
+                {
+                  for (final lesson in upgraded.currentLessons)
+                    lesson.id: lesson.toJson(),
+                },
+                {
+                  for (final lesson in course.lessons)
+                    lesson.id: lesson.toJson(),
+                },
+              );
+              for (final id in upgraded.outline!.retainedLessonIds) {
+                expect(
+                  upgraded.lessons.singleWhere((l) => l.id == id).toJson(),
+                  previous.lessons.singleWhere((l) => l.id == id).toJson(),
+                );
+              }
+              expect(
+                upgraded.outline!.retainedLessonIds,
+                contains('math-7-42'),
+              );
+              expect(
+                (await MathTextbookCourseRepository(
+                  directoryProvider: () async => legacyRoot,
+                ).load(book))!.toJson(),
+                upgraded.toJson(),
+              );
+            }
+          }
 
           // 实际调用保存/严格导入/审核，再还原未审原稿；这只是工程验证，不代替家长核对教材。
           final lesson = course.lessons.first;
@@ -240,6 +383,8 @@ void main() {
             'outlineWarnings': course.outline!.warnings,
             'reviewedLessons': 0,
             'structuredImportAndManualSupplement': true,
+            if (key == '2a') 'readingCrops': '${root.path}/reading-crops',
+            if (key == '2a') 'legacyUpgradeVerified': legacyCourse.isNotEmpty,
             'elapsedMilliseconds': stopwatch.elapsedMilliseconds,
             'courseFile':
                 '${root.path}/textbooks/math-courses/${book.pdfSha256}.json',

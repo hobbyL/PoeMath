@@ -14,7 +14,9 @@ String mathTextbookBlockLabel(MathTextbookBlockKind kind) => switch (kind) {
   MathTextbookBlockKind.text => '文字',
   MathTextbookBlockKind.formula => '公式',
   MathTextbookBlockKind.illustration => '图表 / 待补内容',
-  MathTextbookBlockKind.exercise => '题目 / 例题',
+  MathTextbookBlockKind.exercise => '练习题组',
+  MathTextbookBlockKind.example => '例题与讲解',
+  MathTextbookBlockKind.heading => '内容标题',
   MathTextbookBlockKind.sourcePage => '整页对照',
 };
 
@@ -58,6 +60,7 @@ class _MathTextbookBlockEditorPageState
   );
   late final _sources = [...widget.block.sources];
   late MathTextbookBlockKind _kind = widget.block.kind;
+  late bool _sourceLayout = widget.block.sourceLayout;
   int _selectedSource = 0;
   late RangeValues _horizontal = RangeValues(
     _sources.first.left,
@@ -146,6 +149,7 @@ class _MathTextbookBlockEditorPageState
               ? null
               : _number.text.trim(),
           parentNote: _note.text.trim(),
+          sourceLayout: _sourceLayout,
         ).toJson(),
       );
       Navigator.pop(context, block);
@@ -302,6 +306,20 @@ class _MathTextbookBlockEditorPageState
                         _kind = kind!;
                         _changed = true;
                       }),
+              ),
+              const SizedBox(height: SpacingTokens.md),
+              AppTile(
+                icon: Icons.auto_stories_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: '保留原书图文排版',
+                subtitle: '开启后先显示完整原图，文字可展开查看。',
+                trailing: Switch(
+                  value: _sourceLayout,
+                  onChanged: (value) => setState(() {
+                    _sourceLayout = value;
+                    _changed = true;
+                  }),
+                ),
               ),
               const SizedBox(height: SpacingTokens.md),
               TextField(

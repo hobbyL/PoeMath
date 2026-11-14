@@ -108,7 +108,15 @@ class MathTextbookSpan {
   }
 }
 
-enum MathTextbookBlockKind { text, formula, illustration, exercise, sourcePage }
+enum MathTextbookBlockKind {
+  text,
+  formula,
+  illustration,
+  exercise,
+  sourcePage,
+  heading,
+  example,
+}
 
 class MathTextbookBlock {
   MathTextbookBlock({
@@ -119,6 +127,7 @@ class MathTextbookBlock {
     List<String> warnings = const [],
     this.exerciseNumber,
     this.parentNote = '',
+    this.sourceLayout = false,
   }) : spans = List.unmodifiable(spans),
        sources = List.unmodifiable(sources),
        warnings = List.unmodifiable(warnings);
@@ -130,8 +139,13 @@ class MathTextbookBlock {
   final List<String> warnings;
   final String? exerciseNumber;
   final String parentNote;
+
+  /// Read a complete diagram/example in its original layout. Text remains
+  /// available separately for accessibility and parent editing.
+  final bool sourceLayout;
   String get text => spans.map((span) => span.readable).join();
   bool get needsSource =>
+      sourceLayout ||
       warnings.isNotEmpty ||
       kind == MathTextbookBlockKind.illustration ||
       kind == MathTextbookBlockKind.sourcePage;
@@ -144,6 +158,7 @@ class MathTextbookBlock {
     'warnings': warnings,
     if (exerciseNumber != null) 'exerciseNumber': exerciseNumber,
     'parentNote': parentNote,
+    if (sourceLayout) 'sourceLayout': true,
   };
 
   factory MathTextbookBlock.fromJson(Object? value) {
@@ -152,6 +167,9 @@ class MathTextbookBlock {
         .where((k) => k.name == raw['kind'])
         .firstOrNull;
     if (kind == null) throw const FormatException('数学内容块类型无效');
+    if (raw.containsKey('sourceLayout') && raw['sourceLayout'] is! bool) {
+      throw const FormatException('原书排版选项无效');
+    }
     final sources = _list(
       raw['sources'],
       '来源区域',
@@ -182,6 +200,7 @@ class MathTextbookBlock {
           ? null
           : _string(raw['exerciseNumber'], '题号', max: 40),
       parentNote: _string(raw['parentNote'], '家长说明', empty: true, max: 5000),
+      sourceLayout: raw['sourceLayout'] == true,
     );
   }
 }
@@ -371,6 +390,11 @@ class MathTextbookCourse {
   final List<MathTextbookLesson> pendingLessons;
   final MathTextbookCourseOutline? outline;
 
+  List<MathTextbookLesson> get currentLessons {
+    final retained = outline?.retainedLessonIds.toSet() ?? <String>{};
+    return lessons.where((lesson) => !retained.contains(lesson.id)).toList();
+  }
+
   Map<String, dynamic> toJson() => {
     'kind': 'mathTextbookCourse',
     'schemaVersion': 2,
@@ -444,8 +468,15 @@ class MathTextbookCourse {
         : MathTextbookCourseOutline.fromJson(raw['outline']);
     if (outline != null &&
         (outline.ranges.any((r) => r.endPage > pageCount) ||
+            outline.legacyRanges.any((r) => r.endPage > pageCount) ||
             outline.directoryPages.any((p) => p > pageCount))) {
       throw const FormatException('整理目录超出本书页数');
+    }
+    if (outline?.retainedLessonIds.any(
+          (id) => !lessons.any((lesson) => lesson.id == id),
+        ) ==
+        true) {
+      throw const FormatException('保留课时缺少对应草稿');
     }
     if (outline?.completedLessonIds?.any((id) {
           final range = outline.ranges.firstWhere(

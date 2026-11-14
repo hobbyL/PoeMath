@@ -13,6 +13,7 @@ import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/repositories/math_textbook_course_repository.dart';
 import 'package:poemath/domain/math_textbook_draft_parser.dart';
 import 'package:poemath/domain/math_textbook_course_plan.dart';
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
 
 typedef MathTextbookPageLoader = Future<MathTextbookPageLayout> Function(
   int page,
@@ -34,6 +35,8 @@ class MathTextbookGenerationService {
     required void Function(int completed, int total) onProgress,
     MathTextbookPageLoader? pageLoader,
     String unitTitle = '',
+    bool needsAlignment = false,
+    MathTextbookCourseRange? legacyRange,
   }) async {
     if (book.subject != TextbookSubject.math) {
       throw const FormatException('请先将这本教材的学科确认为数学');
@@ -134,21 +137,49 @@ class MathTextbookGenerationService {
         await Future<void>.delayed(Duration.zero);
       }
       check();
-      final parsed = const MathTextbookDraftParser().parse(
-        title: title,
-        startPage: startPage,
-        endPage: endPage,
-        pages: pages,
+      final parsed = organizeMathTextbookLesson(
+        const MathTextbookDraftParser().parse(
+          title: title,
+          startPage: startPage,
+          endPage: endPage,
+          pages: pages,
+        ),
       );
       final lesson = parsed.edit(
-        learning: seedMathTextbookLearning(parsed, unitTitle: unitTitle),
+        learning: needsAlignment
+            ? MathTextbookLearning(
+                unitTitle: unitTitle,
+                knowledgePoints: const [],
+                exercises: const [],
+                practicePlans: const [],
+              )
+            : seedMathTextbookLearning(parsed, unitTitle: unitTitle),
       );
+      String? legacyDigest;
+      if (legacyRange != null && legacyRange.lessonId == lesson.id) {
+        final old = const MathTextbookDraftParser().parse(
+          title: legacyRange.title,
+          startPage: startPage,
+          endPage: endPage,
+          pages: pages,
+          classifyContent: false,
+        );
+        legacyDigest = old
+            .edit(
+              learning: legacyMathTextbookLearning(
+                old,
+                unitTitle: legacyRange.unitTitle,
+              ),
+            )
+            .contentDigest(book.pdfSha256);
+      }
       check();
       return await repository.saveGenerated(
         book,
         lesson,
         generation: epoch,
         authorize: check,
+        unmodifiedLegacyDigest: legacyDigest,
       );
     } finally {
       await document?.dispose();
@@ -186,7 +217,11 @@ class MathTextbookGenerationService {
       check();
       var current = await repository.load(book);
       check();
-      var outline = refresh ? null : current?.outline;
+      final previousOutline = current?.outline;
+      final outdated =
+          previousOutline != null &&
+          previousOutline.organizationVersion < mathTextbookOrganizationVersion;
+      var outline = refresh || outdated ? null : previousOutline;
       if (pageLoader == null) {
         final path = await files.installedPath(book);
         check();
@@ -241,7 +276,9 @@ class MathTextbookGenerationService {
             loadPage: (number) async =>
                 TextbookTocPage.fromPageText(await textPage(number)),
           );
-          await for (final progress in scanner.scan(refresh: refresh)) {
+          await for (final progress in scanner.scan(
+            refresh: refresh || outdated,
+          )) {
             check();
             onStatus?.call(
               '正在定位目录 · 已读取 ${progress.scanned}/${progress.total} 页',
@@ -250,7 +287,7 @@ class MathTextbookGenerationService {
           }
         }
         check();
-        outline = planMathTextbookCourse(
+        final planned = planMathTextbookCourse(
           directory ??
               const TextbookTocResult(
                 entries: [],
@@ -259,6 +296,16 @@ class MathTextbookGenerationService {
               ),
           book.pageCount,
         ).withCompleted(const []);
+        final legacyRanges = <MathTextbookCourseRange>[];
+        if (previousOutline != null) {
+          legacyRanges.addAll(
+            outdated ? previousOutline.ranges : previousOutline.legacyRanges,
+          );
+        }
+        outline = MathTextbookCourseOutline.fromJson({
+          ...planned.toJson(),
+          'legacyRanges': legacyRanges.map((range) => range.toJson()).toList(),
+        });
         current = await repository.saveOutline(
           book,
           outline,
@@ -305,6 +352,10 @@ class MathTextbookGenerationService {
           startPage: range.startPage,
           endPage: range.endPage,
           unitTitle: range.unitTitle,
+          needsAlignment: range.needsAlignment,
+          legacyRange: outline.legacyRanges
+              .where((old) => old.lessonId == range.lessonId)
+              .firstOrNull,
           token: token,
           authorize: check,
           onProgress: (count, _) => onProgress(completed + count, total),
