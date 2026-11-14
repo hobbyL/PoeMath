@@ -6,6 +6,7 @@
 import 'dart:convert';
 
 import 'package:hive/hive.dart';
+import 'package:poemath/data/models/math_textbook_session_context.dart';
 
 part 'math_mistake.g.dart';
 
@@ -93,6 +94,9 @@ class MathMistake extends HiveObject {
   @HiveField(21, defaultValue: '[]')
   String repracticeHistoryJson;
 
+  @HiveField(22, defaultValue: '[]')
+  String textbookSourcesJson;
+
   MathMistake({
     required this.id,
     required this.profileId,
@@ -116,8 +120,45 @@ class MathMistake extends HiveObject {
     this.attemptJson,
     List<String> appliedActivityIds = const [],
     this.repracticeHistoryJson = '[]',
+    this.textbookSourcesJson = '[]',
   }) : createdAt = createdAt ?? DateTime.now(),
        appliedActivityIds = List.of(appliedActivityIds);
+
+  static List<MathTextbookSessionContext> decodeTextbookSources(
+    String encoded,
+  ) {
+    if (utf8.encode(encoded).length > 1024 * 1024) {
+      throw const FormatException('教材错题来源超过容量');
+    }
+    final raw = jsonDecode(encoded);
+    if (raw is! List || raw.length > 20) {
+      throw const FormatException('教材错题来源数量无效');
+    }
+    return List.unmodifiable(raw.map(MathTextbookSessionContext.fromJson));
+  }
+
+  List<MathTextbookSessionContext> get textbookSources =>
+      decodeTextbookSources(textbookSourcesJson);
+
+  void addTextbookSource(MathTextbookSessionContext source) {
+    final valid = MathTextbookSessionContext.fromJson(source.toJson());
+    final sources = textbookSources
+        .where(
+          (previous) =>
+              !(previous.bookId == valid.bookId &&
+                  previous.editionId == valid.editionId &&
+                  previous.lessonDigest == valid.lessonDigest &&
+                  previous.planId == valid.planId &&
+                  previous.item.exercise.id == valid.item.exercise.id),
+        )
+        .toList();
+    sources.insert(0, valid);
+    final encoded = jsonEncode(
+      sources.take(20).map((source) => source.toJson()).toList(),
+    );
+    decodeTextbookSources(encoded);
+    textbookSourcesJson = encoded;
+  }
 
   List<MathRepracticeResult> get repracticeHistory {
     final decoded = jsonDecode(repracticeHistoryJson);
@@ -161,6 +202,7 @@ class MathMistake extends HiveObject {
     attemptJson: attemptJson,
     appliedActivityIds: List.of(appliedActivityIds),
     repracticeHistoryJson: repracticeHistoryJson,
+    textbookSourcesJson: textbookSourcesJson,
   );
 
   // ============ 派生状态（单一真相源：isResolved + consolidationRound）============

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:hive/hive.dart';
+
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
@@ -40,6 +42,7 @@ class PracticeDraftRepository {
     _active.add(done.future);
     try {
       final value = await runZoned(action, zoneValues: {_writeZone: true});
+      // 排空已经进入的写入后，恢复期间的旧页面不能收到可用结果。
       assertCurrent();
       return value;
     } finally {
@@ -66,13 +69,14 @@ class PracticeDraftRepository {
 
   static const kinds = ['math', 'word'];
   static const poemKinds = ['poemQuiz', 'poemRecite', 'poemDictation'];
+  static const scopedKinds = [...poemKinds, 'mathTextbook'];
   static const _prefix = 'practice_draft:';
   static final Map<String, Future<void>> _writes = {};
   static final Map<String, Object> _owners = {};
   final Map<String, Object> _leases = {};
 
   String _key(String kind, [String? scope]) {
-    if (poemKinds.contains(kind)) {
+    if (scopedKinds.contains(kind)) {
       if (scope == null || scope.isEmpty) {
         throw ArgumentError.value(scope, 'scope');
       }
@@ -102,7 +106,7 @@ class PracticeDraftRepository {
   }
 
   Iterable<String> scopes(String kind) {
-    if (!poemKinds.contains(kind)) throw ArgumentError.value(kind, 'kind');
+    if (!scopedKinds.contains(kind)) throw ArgumentError.value(kind, 'kind');
     final prefix = ProfileScope.key('$_prefix$kind:');
     return HiveBoxes.meta.keys
         .whereType<String>()
@@ -216,6 +220,32 @@ class PracticeDraftRepository {
         );
       }
     }
+  }
+
+  /// 删除本书的数学草稿，撤销全部档案中仍存活页面的写入所有权。
+  static Future<int> deleteMathTextbookBookDrafts(
+    String bookId, {
+    required Box<dynamic> box,
+  }) async {
+    final keys = <String>[];
+    for (final key in box.keys.whereType<String>()) {
+      if (!key.contains('_practice_draft:mathTextbook:')) continue;
+      final raw = box.get(key);
+      if (raw is! String) continue;
+      try {
+        final data = jsonDecode(raw);
+        if (data is Map<String, dynamic> && data['bookId'] == bookId) {
+          keys.add(key);
+        }
+      } on FormatException {
+        // 无法识别的记录不按猜测归属删除。
+      }
+    }
+    for (final key in keys) {
+      _owners.remove(key);
+      await _enqueue(key, () => box.delete(key));
+    }
+    return keys.length;
   }
 
   Stream<void> changes() => HiveBoxes.meta

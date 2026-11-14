@@ -13,21 +13,34 @@ class ActivitySettlementLedger {
   static const userStatsChannel = 'user_stats';
   static const dailySummaryChannel = 'daily_summary';
   static const String _keyMarker = '_activity_settlement:';
-  static const Set<String> _channels = {
-    userStatsChannel,
-    dailySummaryChannel,
-  };
+  static const Set<String> _channels = {userStatsChannel, dailySummaryChannel};
 
   static final Map<String, Future<void>> _inFlight = {};
+  static final Object _guardZone = Object();
+
+  /// 将冻结的学习上下文检查传到排队后的结算步骤。
+  static Future<T> withGuard<T>(
+    void Function() ensureCurrent,
+    Future<T> Function() action,
+  ) {
+    final parent = Zone.current[_guardZone] as void Function()?;
+    void check() {
+      parent?.call();
+      ensureCurrent();
+    }
+
+    return runZoned(action, zoneValues: {_guardZone: check});
+  }
 
   static List<String> get completedKeys {
-    final keys = HiveBoxes.meta.keys
-        .whereType<String>()
-        .where(
-          (key) => isSettlementKey(key) && HiveBoxes.meta.get(key) == true,
-        )
-        .toList()
-      ..sort();
+    final keys =
+        HiveBoxes.meta.keys
+            .whereType<String>()
+            .where(
+              (key) => isSettlementKey(key) && HiveBoxes.meta.get(key) == true,
+            )
+            .toList()
+          ..sort();
     return keys;
   }
 
@@ -53,14 +66,20 @@ class ActivitySettlementLedger {
         throw ArgumentError.value(key, 'keys', '包含无效活动结算标记');
       }
     }
-    final existingKeys =
-        HiveBoxes.meta.keys.whereType<String>().where(isSettlementKey).toList();
+    final existingKeys = HiveBoxes.meta.keys
+        .whereType<String>()
+        .where(isSettlementKey)
+        .toList();
     await HiveBoxes.meta.deleteAll(existingKeys);
     await HiveBoxes.meta.putAll({for (final key in replacement) key: true});
   }
 
   static Future<T> serial<T>(
-      String channel, Future<T> Function() action,) async {
+    String channel,
+    Future<T> Function() action,
+  ) async {
+    final guard = Zone.current[_guardZone] as void Function()?;
+    guard?.call();
     final lockKey = ProfileScope.key('settlement_lock:$channel');
     while (_inFlight[lockKey] != null) {
       await _inFlight[lockKey];
@@ -68,7 +87,10 @@ class ActivitySettlementLedger {
     final done = Completer<void>();
     _inFlight[lockKey] = done.future;
     try {
-      return await action();
+      guard?.call();
+      final result = await action();
+      guard?.call();
+      return result;
     } finally {
       _inFlight.remove(lockKey);
       done.complete();
@@ -98,6 +120,7 @@ class ActivitySettlementLedger {
         return false;
       }
       await action();
+      (Zone.current[_guardZone] as void Function()?)?.call();
       await HiveBoxes.meta.put(key, true);
       return true;
     });

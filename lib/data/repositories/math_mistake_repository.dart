@@ -10,6 +10,7 @@ import 'package:poemath/core/services/parent_access_service.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/math_mistake.dart';
+import 'package:poemath/data/models/math_textbook_session_context.dart';
 import 'package:poemath/data/repositories/activity_settlement_ledger.dart';
 
 /// 一次重练提交的结果，决定 UI 反馈文案。
@@ -84,6 +85,7 @@ class MathMistakeRepository {
     String? problemJson,
     String? attemptJson,
     String? activityId,
+    MathTextbookSessionContext? textbookSource,
   }) async {
     final id = problemKey(
       problemText: problemText,
@@ -116,29 +118,30 @@ class MathMistakeRepository {
             activityId,
           ];
         }
+        if (textbookSource != null) existing.addTextbookSource(textbookSource);
         await add(existing);
         return;
       }
 
-      await add(
-        MathMistake(
-          id: id,
-          profileId: ProfileScope.currentId,
-          problemText: problemText,
-          correctAnswer: correctAnswer,
-          userAnswer: userAnswer,
-          problemType: problemType,
-          grade: grade,
-          errorType: errorType,
-          solutionStepsJson: solutionStepsJson,
-          skillId: skillId,
-          semester: semester,
-          problemJson: problemJson,
-          attemptJson: attemptJson,
-          lastWrongAt: now,
-          appliedActivityIds: activityId == null ? const [] : [activityId],
-        ),
+      final mistake = MathMistake(
+        id: id,
+        profileId: ProfileScope.currentId,
+        problemText: problemText,
+        correctAnswer: correctAnswer,
+        userAnswer: userAnswer,
+        problemType: problemType,
+        grade: grade,
+        errorType: errorType,
+        solutionStepsJson: solutionStepsJson,
+        skillId: skillId,
+        semester: semester,
+        problemJson: problemJson,
+        attemptJson: attemptJson,
+        lastWrongAt: now,
+        appliedActivityIds: activityId == null ? const [] : [activityId],
       );
+      if (textbookSource != null) mistake.addTextbookSource(textbookSource);
+      await add(mistake);
     }
 
     if (activityId == null) {

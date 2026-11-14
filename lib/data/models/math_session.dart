@@ -115,6 +115,7 @@ class ProblemRecord {
   final String? skillId;
   final Map<String, dynamic>? problem;
   final Map<String, dynamic>? attempt;
+  final Map<String, dynamic>? textbookContext;
 
   const ProblemRecord({
     required this.problemText,
@@ -124,17 +125,19 @@ class ProblemRecord {
     this.skillId,
     this.problem,
     this.attempt,
+    this.textbookContext,
   });
 
   Map<String, dynamic> toJson() => {
-        'q': problemText,
-        'a': answerText,
-        'u': userAnswer,
-        'c': isCorrect,
-        if (skillId != null) 'skillId': skillId,
-        if (problem != null) 'problem': problem,
-        if (attempt != null) 'attempt': attempt,
-      };
+    'q': problemText,
+    'a': answerText,
+    'u': userAnswer,
+    'c': isCorrect,
+    if (skillId != null) 'skillId': skillId,
+    if (problem != null) 'problem': problem,
+    if (attempt != null) 'attempt': attempt,
+    if (textbookContext != null) 'textbookContext': textbookContext,
+  };
 
   factory ProblemRecord.fromJson(Map<String, dynamic> json) {
     return ProblemRecord(
@@ -145,6 +148,7 @@ class ProblemRecord {
       skillId: json['skillId'] as String?,
       problem: json['problem'] as Map<String, dynamic>?,
       attempt: json['attempt'] as Map<String, dynamic>?,
+      textbookContext: json['textbookContext'] as Map<String, dynamic>?,
     );
   }
 }
