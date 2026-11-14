@@ -12,6 +12,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/parent_access_boundary.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
+import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 
 Future<void> showTextbookCacheSheet(BuildContext context, Textbook book) {
   return showModalBottomSheet<void>(
@@ -146,7 +147,8 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
           '· 课程内容（含待确认差异与审核记录）\n'
           '· 书目登记\n'
           '· 全部档案的阅读位置\n'
-          '· 全部档案的认一认、写一写学习进度\n\n'
+          '· 全部档案的认一认、写一写、习题与数学教材进度\n'
+          '· 数学教材作答、家长核对和本书练习草稿\n\n'
           '学习进度删除后不可恢复；重新导入同一 PDF 将从零开始。',
         ),
         actions: [
@@ -170,6 +172,12 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
     setState(() => _busy = true);
     try {
       assertParentAccess(context);
+      final mathCourses = ref.read(mathTextbookRepositoryProvider);
+      mathCourses.invalidate(id);
+      await ref.read(mathTextbookGenerationProvider.notifier).stop(id);
+      await mathCourses.drain();
+      if (!mounted) return;
+      assertParentAccess(context);
       await ref
           .read(textbookProgressCleanupProvider)
           .deleteBookProgress(id); // 1. 学习进度（可先删，重导入后从零开始）
@@ -178,6 +186,9 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
       await ref
           .read(textbookCourseRepositoryProvider)
           .clear(widget.book); // 2. 课程数据
+      if (!mounted) return;
+      assertParentAccess(context);
+      await ref.read(mathTextbookRepositoryProvider).clear(widget.book);
       if (!mounted) return;
       assertParentAccess(context);
       await ref.read(textbookFileServiceProvider).removePdf(id); // 3. 原书与派生缓存
@@ -191,6 +202,9 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
       ref.invalidate(textbookPathProvider(id));
       ref.invalidate(textbookCourseProvider(id));
       ref.invalidate(textbookCourseDocumentProvider(id));
+      ref.invalidate(mathTextbookCourseProvider(id));
+      ref.invalidate(mathTextbookLearningRepositoryProvider(id));
+      ref.invalidate(mathTextbookProgressProvider(id));
     } on Object {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -440,10 +454,14 @@ class _TextbookCacheSheetState extends ConsumerState<TextbookCacheSheet> {
                       builder: (context) {
                         final id = widget.book.pdfSha256;
                         final generationBusy =
-                            ref
-                                .watch(textbookGenerationProvider)[id]
-                                ?.running ??
-                            false;
+                            (ref
+                                    .watch(textbookGenerationProvider)[id]
+                                    ?.running ??
+                                false) ||
+                            (ref
+                                    .watch(mathTextbookGenerationProvider)[id]
+                                    ?.running ??
+                                false);
                         final downloading =
                             ref.watch(textbookDownloadsProvider)[id]?.active ??
                             false;

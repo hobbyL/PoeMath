@@ -12,6 +12,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook.dart';
+import 'package:poemath/features/textbook/widgets/textbook_subject_dialog.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
@@ -131,10 +132,26 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   Future<void> _read() =>
       _openRoute(AppRoutes.textbookReadOf(widget.bookId), extra: _previewPage);
 
-  Future<void> _review() => _openRoute(
-    AppRoutes.textbookReviewOf(widget.bookId),
-    suspendPreview: false,
-  );
+  Future<void> _review() async {
+    final book = ref
+        .read(textbookListProvider)
+        .where((b) => b.pdfSha256 == widget.bookId)
+        .firstOrNull;
+    if (book == null) return;
+    var subject = book.subject;
+    if (subject == TextbookSubject.unknown) {
+      final selected = await confirmTextbookSubject(context, ref, book);
+      if (!mounted || selected == null) return;
+      subject = selected;
+    }
+    if (subject == TextbookSubject.english) return;
+    await _openRoute(
+      subject == TextbookSubject.math
+          ? AppRoutes.mathTextbookReviewOf(widget.bookId)
+          : AppRoutes.textbookReviewOf(widget.bookId),
+      suspendPreview: subject == TextbookSubject.math,
+    );
+  }
 
   Future<void> _showContent(TextbookContentSection section, List<int> pages) =>
       _openRoute(
@@ -239,6 +256,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     bool showToc = false,
     VoidCallback? onToc,
     VoidCallback? onReview,
+    VoidCallback? onSubject,
   }) {
     final colors = Theme.of(context).colorScheme;
     final buttonStyle = IconButton.styleFrom(
@@ -262,6 +280,12 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
           onPressed: onReview,
           icon: const Icon(Icons.fact_check_outlined),
         );
+        Widget subjectButton({ButtonStyle? style}) => IconButton(
+          tooltip: '教材学科',
+          style: style,
+          onPressed: onSubject,
+          icon: const Icon(Icons.category_outlined),
+        );
         return Scaffold(
           bottomNavigationBar: bottomNavigationBar,
           appBar: layout.doublePage
@@ -283,7 +307,10 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                         )
                       : const BackButton(),
                   title: const Text('教材详情'),
-                  actions: [if (onReview != null) reviewButton()],
+                  actions: [
+                    if (onSubject != null) subjectButton(),
+                    if (onReview != null) reviewButton(),
+                  ],
                 ),
           body: SafeArea(
             child: Stack(
@@ -308,6 +335,8 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                             child: Center(child: tocButton(style: buttonStyle)),
                           ),
                         const Spacer(),
+                        if (onSubject != null)
+                          subjectButton(style: buttonStyle),
                         if (onReview != null) reviewButton(style: buttonStyle),
                       ],
                     ),
@@ -546,7 +575,28 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
   Widget _contentActions(
     List<int> pages,
     AsyncValue<TextbookCoursePack?> course,
+    Textbook book,
   ) {
+    if (book.subject != TextbookSubject.chinese) {
+      if (book.subject == TextbookSubject.math && !widget.manage) {
+        return TextButton(
+          onPressed: !_turning && _previewVisible
+              ? () => _openRoute(AppRoutes.mathTextbookBookOf(widget.bookId))
+              : null,
+          child: const Text('课时学习'),
+        );
+      }
+      if (!widget.manage || book.subject == TextbookSubject.english) {
+        return const SizedBox.shrink();
+      }
+      return TextButton.icon(
+        onPressed: !_turning && _previewVisible ? _review : null,
+        icon: const Icon(Icons.fact_check_outlined),
+        label: Text(
+          book.subject == TextbookSubject.math ? '整理与审核数学课时' : '确认教材学科',
+        ),
+      );
+    }
     final pack = course.valueOrNull;
     final lessons = pack == null
         ? const <TextbookCourseLesson>[]
@@ -638,7 +688,16 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
     return _detailScaffold(
       bottomNavigationBar: _pageControls(book, available: available),
       showToc: available,
-      onReview: widget.manage && !_turning && _previewVisible ? _review : null,
+      onSubject: widget.manage && !_turning && _previewVisible
+          ? () => confirmTextbookSubject(context, ref, book)
+          : null,
+      onReview:
+          widget.manage &&
+              book.subject != TextbookSubject.english &&
+              !_turning &&
+              _previewVisible
+          ? _review
+          : null,
       onToc:
           available &&
               !_turning &&
@@ -801,7 +860,7 @@ class _TextbookDetailPageState extends ConsumerState<TextbookDetailPage> {
                 padding: const EdgeInsets.symmetric(
                   horizontal: SpacingTokens.md,
                 ),
-                child: _contentActions(pages, course),
+                child: _contentActions(pages, course, book),
               ),
             ],
           );

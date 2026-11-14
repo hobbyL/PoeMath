@@ -17,10 +17,13 @@ import 'package:go_router/go_router.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
+import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/math_entry_kind.dart';
+import 'package:poemath/features/math/math_home_page.dart';
 import 'package:poemath/features/math/math_tab_page.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
+import 'package:poemath/features/textbook/providers/textbook_learning_providers.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 import '../../helpers/hive_test_helper.dart';
@@ -30,11 +33,18 @@ class _RouteProbe {
   final List<String> pushed = [];
 }
 
+const _toolRoutes = [
+  (route: AppRoutes.mathMistake, tooltip: '错题 3', screen: '错题页面'),
+  (route: AppRoutes.studyHub, tooltip: '公式知识库', screen: '公式知识库页面'),
+  (route: AppRoutes.mathHistory, tooltip: '练习记录', screen: '练习记录页面'),
+];
+
 Future<_RouteProbe> _pumpTab(
   WidgetTester tester, {
   required ProviderContainer container,
   Size size = const Size(800, 1600),
   double textScale = 1,
+  bool home = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -43,8 +53,25 @@ Future<_RouteProbe> _pumpTab(
 
   final probe = _RouteProbe();
   final router = GoRouter(
+    initialLocation: home
+        ? AppRoutes.mathSectionOf(MathSection.practice.name)
+        : '/',
     routes: [
       GoRoute(path: '/', builder: (_, __) => const MathTabPage()),
+      GoRoute(
+        path: AppRoutes.mathTab,
+        builder: (_, state) => MathHomePage(
+          section: MathSection.fromId(state.uri.queryParameters['section']),
+        ),
+      ),
+      for (final tool in _toolRoutes)
+        GoRoute(
+          path: tool.route,
+          builder: (_, __) {
+            probe.pushed.add(tool.route);
+            return Scaffold(appBar: AppBar(title: Text(tool.screen)));
+          },
+        ),
       GoRoute(
         path: AppRoutes.wordProblemLibrary,
         builder: (_, __) {
@@ -91,6 +118,69 @@ Future<_RouteProbe> _pumpTab(
 void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
+
+  for (final large in [false, true]) {
+    testWidgets('数学导航按钮直接打开原工具，课本切换后恢复（大字号：$large）', (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          mistakeCountProvider.overrideWith((ref) => 3),
+          subjectTextbooksProvider(TextbookSubject.math)
+              .overrideWith((ref) => const []),
+        ],
+      );
+      addTearDown(container.dispose);
+      try {
+        final probe = await _pumpTab(
+          tester,
+          container: container,
+          home: true,
+          size: large ? const Size(320, 820) : const Size(360, 800),
+          textScale: large ? 2 : 1,
+        );
+        expect(find.byType(AppBar), findsOneWidget);
+        final switcher = find.byType(SegmentedButton<MathSection>);
+        for (final tool in _toolRoutes) {
+          final button = find.byTooltip(tool.tooltip);
+          expect(button.hitTestable(), findsOneWidget);
+          expect(
+            tester.getCenter(button).dx,
+            tool.route == AppRoutes.mathHistory
+                ? greaterThan(tester.getCenter(switcher).dx)
+                : lessThan(tester.getCenter(switcher).dx),
+          );
+          await tester.tap(button);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(find.text(tool.screen), findsOneWidget);
+          expect(probe.pushed.last, tool.route);
+          await tester.pageBack();
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 600));
+        }
+
+        await tester.tap(find.text('课本(0)'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
+        expect(tester.widget<SegmentedButton<MathSection>>(switcher).selected, {
+          MathSection.textbook,
+        });
+        expect(find.byType(AppBar), findsOneWidget);
+        expect(find.byTooltip('公式知识库'), findsNothing);
+
+        await tester.tap(find.text('练习'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
+        for (final tool in _toolRoutes) {
+          expect(find.byTooltip(tool.tooltip).hitTestable(), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(seconds: 1));
+        await drainHiveWritesForTesting(tester);
+      }
+    });
+  }
 
   for (final mistakes in [0, 3]) {
     testWidgets('320dp 两倍字号完整显示标题和四类入口，错题 $mistakes', (tester) async {

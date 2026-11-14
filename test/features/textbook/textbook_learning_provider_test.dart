@@ -10,12 +10,13 @@ import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/textbook_fixture.dart';
+import '../../helpers/textbook_draft_fixture.dart';
 
 Textbook _book(String id, int grade, String semester) => Textbook.fromJson({
-      ...textbookFixture(id: id.padLeft(64, '0')).toJson(),
-      'grade': grade,
-      'semester': semester,
-    });
+  ...textbookFixture(id: id.padLeft(64, '0')).toJson(),
+  'grade': grade,
+  'semester': semester,
+});
 
 void main() {
   setUp(setUpHiveForTesting);
@@ -74,5 +75,52 @@ void main() {
     addTearDown(container.dispose);
     expect(container.read(currentTextbooksProvider), isEmpty);
     expect(container.read(textbookLocalListProvider), hasLength(1));
+  });
+
+  test('旧登记只按已知目录 SHA 识别，数学和未知教材不进入语文学习', () async {
+    final entry = draftFixtureEntry();
+    final known = entry.book.withSubject(TextbookSubject.unknown);
+    final chinese = _book('a', 3, '上');
+    final math = _book('b', 3, '上').withSubject(TextbookSubject.math);
+    final unknown = _book('c', 3, '上').withSubject(TextbookSubject.unknown);
+    final repository = TextbookRepository();
+    for (final book in [known, chinese, math, unknown]) {
+      await repository.addIfAbsent(book);
+    }
+    await SettingsRepository().setLearningBackground(3, '上');
+    final container = ProviderContainer(
+      overrides: [
+        textbookCatalogProvider.overrideWith((ref) async => [entry]),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(textbookCatalogProvider.future);
+    final local = container.read(textbookLocalListProvider);
+    expect(
+      local.singleWhere((b) => b.pdfSha256 == known.pdfSha256).subject,
+      TextbookSubject.chinese,
+    );
+    expect(
+      local.singleWhere((b) => b.pdfSha256 == unknown.pdfSha256).subject,
+      TextbookSubject.unknown,
+    );
+    expect(
+      container
+          .read(currentTextbooksProvider)
+          .every((b) => b.subject == TextbookSubject.chinese),
+      isTrue,
+    );
+    expect(
+      container.read(currentTextbooksProvider).map((b) => b.pdfSha256),
+      contains(chinese.pdfSha256),
+    );
+    expect(
+      container.read(currentTextbooksProvider).map((b) => b.pdfSha256),
+      isNot(contains(math.pdfSha256)),
+    );
+    expect(
+      await container.read(textbookCourseProvider(math.pdfSha256).future),
+      isNull,
+    );
   });
 }

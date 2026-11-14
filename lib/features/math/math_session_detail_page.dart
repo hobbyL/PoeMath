@@ -13,6 +13,8 @@ import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/models/math_textbook_session_context.dart';
+import 'package:poemath/features/textbook/math_textbook_record_page.dart';
 import 'package:poemath/data/repositories/math_mistake_repository.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/core/utils/responsive_layout.dart';
@@ -306,6 +308,14 @@ class _ProblemRow extends ConsumerWidget {
     }
 
     final canNavigate = mistakeId != null;
+    MathTextbookSessionContext? snapshot;
+    if (record.textbookContext != null) {
+      try {
+        snapshot = MathTextbookSessionContext.fromJson(record.textbookContext);
+      } on FormatException {
+        /* 旧记录文本仍可查看。 */
+      }
+    }
 
     // 参考 _SessionCard 配色：用 primary/tertiary 做主视觉
     final statusColor = isCorrect
@@ -313,7 +323,13 @@ class _ProblemRow extends ConsumerWidget {
         : theme.colorScheme.primary;
 
     return GestureDetector(
-      onTap: canNavigate
+      onTap: snapshot != null
+          ? () => Navigator.of(context).push<void>(
+              MaterialPageRoute(
+                builder: (_) => MathTextbookRecordPage(snapshot: snapshot!),
+              ),
+            )
+          : canNavigate
           ? () => context.push(AppRoutes.mathMistakeDetail, extra: mistakeId)
           : null,
       child: ColoredCard(

@@ -23,7 +23,15 @@ import 'package:poemath/features/math/widgets/practice_entry_card.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 class MathTabPage extends ConsumerWidget {
-  const MathTabPage({super.key});
+  const MathTabPage({
+    super.key,
+    this.navigationTitle,
+    this.navigationToolbarHeight,
+    this.showAppBar = true,
+  });
+  final Widget? navigationTitle;
+  final double? navigationToolbarHeight;
+  final bool showAppBar;
 
   /// 册次简写：`2` + `上` → `二上`（用于 AppBar 标题后缀）。
   ///
@@ -178,70 +186,81 @@ class MathTabPage extends ConsumerWidget {
     final titleStyle = theme.textTheme.titleLarge!;
     final titleScale =
         textScaler.scale(titleStyle.fontSize!) / titleStyle.fontSize!;
-    final stackedTitle = !isWide && titleScale > 1.3;
+    final stackedTitle = navigationTitle == null && !isWide && titleScale > 1.3;
     // 按枚举声明顺序渲染卡片，与 MathEntryKind 的文档约定一致。
     final visible = MathEntryKind.values.where(kinds.contains).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        // 标题带上当前册次简写（如「数学练习 · 二上」）：册次由学习背景
-        // 决定且页面上不再有别的常驻展示位，附在标题后是最省空间的告知。
-        // 不叫「口算练习」：页面已含四类入口，且「口算练习」是其中一张
-        // 卡片的标题，同名会造成语义混淆（也影响按文案定位的测试）。
-        toolbarHeight: stackedTitle
-            ? textScaler.scale(theme.textTheme.titleMedium!.fontSize!) *
-                      2 *
-                      1.3 +
-                  SpacingTokens.md
-            : kToolbarHeight,
-        title: Text(
-          stackedTitle
-              ? '数学练习\n${_shortVolume(grade, semester)}'
-              : '数学练习 · ${_shortVolume(grade, semester)}',
-          textAlign: TextAlign.center,
-          style: stackedTitle ? theme.textTheme.titleMedium : null,
-        ),
-        automaticallyImplyLeading: false,
-        leadingWidth: mistakeCount > 0 ? (isWide ? 160.0 : 96.0) : null,
-        leading: mistakeCount > 0
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isWide)
-                    TextButton.icon(
-                      onPressed: () => context.push(AppRoutes.mathMistake),
-                      icon: const Icon(Icons.error_outline, size: 18),
-                      label: Text('错题 $mistakeCount'),
-                    )
-                  else
-                    IconButton(
-                      onPressed: () => context.push(AppRoutes.mathMistake),
-                      icon: Badge(
-                        label: Text('$mistakeCount'),
-                        child: const Icon(Icons.error_outline),
-                      ),
-                      tooltip: '错题 $mistakeCount',
-                    ),
-                  IconButton(
-                    onPressed: () => context.push(AppRoutes.studyHub),
-                    icon: const Icon(Icons.auto_stories_outlined),
-                    tooltip: '公式知识库',
+      appBar: showAppBar
+          ? AppBar(
+              // 标题带上当前册次简写（如「数学练习 · 二上」）：册次由学习背景
+              // 决定且页面上不再有别的常驻展示位，附在标题后是最省空间的告知。
+              // 不叫「口算练习」：页面已含四类入口，且「口算练习」是其中一张
+              // 卡片的标题，同名会造成语义混淆（也影响按文案定位的测试）。
+              toolbarHeight:
+                  navigationToolbarHeight ??
+                  (stackedTitle
+                      ? textScaler.scale(
+                                  theme.textTheme.titleMedium!.fontSize!,
+                                ) *
+                                2 *
+                                1.3 +
+                            SpacingTokens.md
+                      : kToolbarHeight),
+              centerTitle: navigationTitle != null ? true : null,
+              title:
+                  navigationTitle ??
+                  Text(
+                    stackedTitle
+                        ? '数学练习\n${_shortVolume(grade, semester)}'
+                        : '数学练习 · ${_shortVolume(grade, semester)}',
+                    textAlign: TextAlign.center,
+                    style: stackedTitle ? theme.textTheme.titleMedium : null,
                   ),
-                ],
-              )
-            : IconButton(
-                onPressed: () => context.push(AppRoutes.studyHub),
-                icon: const Icon(Icons.auto_stories_outlined),
-                tooltip: '公式知识库',
-              ),
-        actions: [
-          IconButton(
-            onPressed: () => context.push(AppRoutes.mathHistory),
-            icon: const Icon(Icons.history_outlined),
-            tooltip: '练习记录',
-          ),
-        ],
-      ),
+              automaticallyImplyLeading: false,
+              leadingWidth: mistakeCount > 0 ? (isWide ? 160.0 : 96.0) : null,
+              leading: mistakeCount > 0
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isWide)
+                          TextButton.icon(
+                            onPressed: () =>
+                                context.push(AppRoutes.mathMistake),
+                            icon: const Icon(Icons.error_outline, size: 18),
+                            label: Text('错题 $mistakeCount'),
+                          )
+                        else
+                          IconButton(
+                            onPressed: () =>
+                                context.push(AppRoutes.mathMistake),
+                            icon: Badge(
+                              label: Text('$mistakeCount'),
+                              child: const Icon(Icons.error_outline),
+                            ),
+                            tooltip: '错题 $mistakeCount',
+                          ),
+                        IconButton(
+                          onPressed: () => context.push(AppRoutes.studyHub),
+                          icon: const Icon(Icons.auto_stories_outlined),
+                          tooltip: '公式知识库',
+                        ),
+                      ],
+                    )
+                  : IconButton(
+                      onPressed: () => context.push(AppRoutes.studyHub),
+                      icon: const Icon(Icons.auto_stories_outlined),
+                      tooltip: '公式知识库',
+                    ),
+              actions: [
+                IconButton(
+                  onPressed: () => context.push(AppRoutes.mathHistory),
+                  icon: const Icon(Icons.history_outlined),
+                  tooltip: '练习记录',
+                ),
+              ],
+            )
+          : null,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {

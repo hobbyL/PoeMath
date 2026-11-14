@@ -15,10 +15,10 @@ class AppRoutes {
   static const String studyHub = '/study';
   static const String profile = '/profile';
 
-  static String chineseSectionOf(String section) => Uri(
-        path: chineseTab,
-        queryParameters: {'section': section},
-      ).toString();
+  static String chineseSectionOf(String section) =>
+      Uri(path: chineseTab, queryParameters: {'section': section}).toString();
+  static String mathSectionOf(String section) =>
+      Uri(path: mathTab, queryParameters: {'section': section}).toString();
 
   // ============ 诗词模块 ============
   static const String poemDetail = '/poem/detail/:id';
@@ -47,6 +47,16 @@ class AppRoutes {
   static const String textbookDictation = '/textbook/dictation/:id/:lesson';
   static const String textbookManagement = '/profile/settings/books';
   static const String textbookManageDetail = '/profile/settings/books/:id';
+  static const String mathTextbookReview = '/profile/settings/books/:id/math';
+  static const String mathTextbookLesson =
+      '/profile/settings/books/:id/math/:lesson';
+  static const String mathTextbookBook = '/math/textbook/:id';
+  static const String mathTextbookStudy = '/math/textbook/:id/lesson/:lesson';
+  static const String mathTextbookPractice =
+      '/math/textbook/:id/lesson/:lesson/practice';
+  static const String mathTextbookHistory = '/math/textbook/:id/history';
+  static const String mathTextbookParentHistory =
+      '/profile/settings/books/:id/math-history';
 
   // ============ 看图说话 ==========
   static const String pictureStoryPractice = '/chinese/expression/practice/:id';
@@ -111,6 +121,25 @@ class AppRoutes {
   static String textbookDetailOf(String id) => '/textbook/detail/$id';
   static String textbookReadOf(String id) => '/textbook/read/$id';
   static String textbookReviewOf(String id) => '/textbook/review/$id';
+  static String mathTextbookReviewOf(String id) =>
+      '/profile/settings/books/$id/math';
+  static String mathTextbookLessonOf(String id, String lesson) =>
+      '/profile/settings/books/$id/math/${Uri.encodeComponent(lesson)}';
+  static String mathTextbookBookOf(String id) => '/math/textbook/$id';
+  static String mathTextbookStudyOf(String id, String lesson) =>
+      '/math/textbook/$id/lesson/${Uri.encodeComponent(lesson)}';
+  static String mathTextbookPracticeOf(
+    String id,
+    String lesson, {
+    String? planId,
+  }) => Uri(
+    path: '/math/textbook/$id/lesson/$lesson/practice',
+    queryParameters: planId == null ? null : {'plan': planId},
+  ).toString();
+  static String mathTextbookHistoryOf(String id, {bool parent = false}) =>
+      parent
+      ? '/profile/settings/books/$id/math-history'
+      : '/math/textbook/$id/history';
   static String textbookRecognitionOf(
     String id,
     String lesson,
@@ -127,13 +156,10 @@ class AppRoutes {
         : '$path?${Uri(queryParameters: {'target': targetId}).query}';
   }
 
-  static String textbookWritingOf(
-    String id,
-    String lesson,
-    String targetId,
-  ) =>
+  static String textbookWritingOf(String id, String lesson, String targetId) =>
       Uri(
-        path: '/textbook/writing/${Uri.encodeComponent(id)}'
+        path:
+            '/textbook/writing/${Uri.encodeComponent(id)}'
             '/${Uri.encodeComponent(lesson)}',
         queryParameters: {'target': targetId},
       ).toString();

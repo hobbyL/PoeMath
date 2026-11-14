@@ -20,6 +20,7 @@ import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_generation_controller.dart';
 import 'package:poemath/features/textbook/textbook_course_node_page.dart';
 import 'package:poemath/features/textbook/widgets/textbook_course_content.dart';
+import 'package:poemath/features/textbook/widgets/textbook_review_layout.dart';
 
 class TextbookCourseReviewPage extends ConsumerStatefulWidget {
   const TextbookCourseReviewPage({
@@ -465,37 +466,18 @@ class _TextbookCourseReviewPageState
       child: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),
         children: [
-          Text(pack.edition.title, style: theme.textTheme.headlineSmall),
-          const SizedBox(height: SpacingTokens.sm),
-          Text(
-            '${pack.edition.editionLabel} · ${nodes.where((node) => node.isApproved).length}/${nodes.length} 项已通过',
+          TextbookReviewHeading(
+            title: pack.edition.title,
+            summary:
+                '${pack.edition.editionLabel} · ${nodes.where((node) => node.isApproved).length}/${nodes.length} 项已通过',
           ),
-          const SizedBox(height: SpacingTokens.md),
           _generationStatus(book),
           for (final unit in pack.units) ...[
-            const Divider(height: SpacingTokens.xl),
-            Wrap(
+            TextbookReviewSectionHeader(
               key: ValueKey('course-unit-${unit.id}'),
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: SpacingTokens.md,
-              children: [
-                Text(unit.title, style: theme.textTheme.titleMedium),
-                TextButton.icon(
-                  onPressed: () => _open(book, pack, nodeId: unit.id),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, SpacingTokens.minTapTarget),
-                    padding: const EdgeInsetsDirectional.only(
-                      start: SpacingTokens.sm,
-                    ),
-                    iconSize: SpacingTokens.lg,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  iconAlignment: IconAlignment.end,
-                  icon: const Icon(Icons.chevron_right),
-                  label: Text('单元审核 · ${textbookCourseReviewLabel(unit)}'),
-                ),
-              ],
+              title: unit.title,
+              actionLabel: '单元审核 · ${textbookCourseReviewLabel(unit)}',
+              onAction: () => _open(book, pack, nodeId: unit.id),
             ),
             for (final id in unit.lessonIds)
               Builder(
@@ -546,29 +528,13 @@ class _TextbookCourseReviewPageState
     final total = progress?.total ?? generation!.plans.length;
     final ready = !running && (progress?.phase ?? generation?.phase) == 'ready';
     if (ready) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: SpacingTokens.md),
-      child: ColoredCard(
-        color: Theme.of(context).colorScheme.primary,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(progress?.message ?? '已保存 $done/$total 课，可继续整理'),
-            if (running) ...[
-              const SizedBox(height: SpacingTokens.sm),
-              LinearProgressIndicator(value: total > 0 ? done / total : null),
-            ],
-            TextButton(
-              onPressed: running
-                  ? () => ref
-                        .read(textbookGenerationProvider.notifier)
-                        .pause(book.pdfSha256)
-                  : () => _generate(book),
-              child: Text(running ? '暂停整理' : '继续整理'),
-            ),
-          ],
-        ),
-      ),
+    return TextbookReviewProgressCard(
+      message: progress?.message ?? '已保存 $done/$total 课，可继续整理',
+      completed: done,
+      total: total,
+      running: running,
+      onPause: () => _generationController.pause(book.pdfSha256),
+      onResume: () => _generate(book),
     );
   }
 }
@@ -771,36 +737,14 @@ class _TextbookCourseLessonPageState
                     onTap: _draftDetails,
                   ),
                   for (final entry in groups.entries) ...[
-                    const Divider(height: SpacingTokens.xl),
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          entry.key == 'paragraphs'
-                              ? textbookCourseCategoryLabels[entry.key]!
-                              : '${textbookCourseCategoryLabels[entry.key]} · ${entry.value.length}',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        TextButton.icon(
-                          onPressed: () => _add(entry.key),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsetsDirectional.only(
-                              top: SpacingTokens.sm,
-                              end: SpacingTokens.sm,
-                              bottom: SpacingTokens.sm,
-                            ),
-                            minimumSize: const Size(
-                              SpacingTokens.minTapTarget,
-                              SpacingTokens.minTapTarget,
-                            ),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            alignment: AlignmentDirectional.centerEnd,
-                          ),
-                          icon: const Icon(Icons.add),
-                          label: const Text('添加'),
-                        ),
-                      ],
+                    TextbookReviewSectionHeader(
+                      title: entry.key == 'paragraphs'
+                          ? textbookCourseCategoryLabels[entry.key]!
+                          : '${textbookCourseCategoryLabels[entry.key]} · ${entry.value.length}',
+                      actionLabel: '添加',
+                      actionIcon: Icons.add,
+                      actionIconAlignment: IconAlignment.start,
+                      onAction: () => _add(entry.key),
                     ),
                     const SizedBox(height: SpacingTokens.xs),
                     if (lesson.coverage[entry.key] != TextbookCoverage.pending)

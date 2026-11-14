@@ -20,10 +20,14 @@ class TextbookLearningPage extends ConsumerStatefulWidget {
     super.key,
     this.navigationTitle,
     this.navigationToolbarHeight,
+    this.subject = TextbookSubject.chinese,
+    this.showAppBar = true,
   });
 
   final Widget? navigationTitle;
   final double? navigationToolbarHeight;
+  final TextbookSubject subject;
+  final bool showAppBar;
 
   @override
   ConsumerState<TextbookLearningPage> createState() =>
@@ -43,32 +47,37 @@ class _TextbookLearningPageState extends ConsumerState<TextbookLearningPage> {
     final volume =
         '${Textbook.gradeLabels[settings.selectedGrade]}'
         '${settings.selectedSemester}册';
-    final books = ref.watch(currentTextbooksProvider);
+    final books = widget.subject == TextbookSubject.chinese
+        ? ref.watch(currentTextbooksProvider)
+        : ref.watch(subjectTextbooksProvider(widget.subject));
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        centerTitle: widget.navigationTitle != null,
-        title:
-            widget.navigationTitle ??
-            Text(
-              '课本(${books.length})',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-        toolbarHeight: widget.navigationToolbarHeight,
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              centerTitle: widget.navigationTitle != null,
+              title:
+                  widget.navigationTitle ??
+                  Text(
+                    '课本(${books.length})',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              toolbarHeight: widget.navigationToolbarHeight,
+            )
+          : null,
       body: SafeArea(
         top: false,
         bottom: false,
         child: CustomScrollView(
-          key: PageStorageKey('textbook-list-$volume'),
+          key: PageStorageKey('textbook-list-${widget.subject.name}-$volume'),
           slivers: [
             if (books.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: AppEmptyState(
                   icon: Icons.menu_book_outlined,
-                  title: '暂无$volume课本',
+                  title:
+                      '暂无$volume${widget.subject == TextbookSubject.math ? '数学' : ''}课本',
                   description: '请家长在“设置 → 学习与内容 → 书籍管理”中添加。',
                   actions: const [
                     ContentPreparationActions(

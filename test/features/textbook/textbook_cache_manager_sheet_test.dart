@@ -6,6 +6,8 @@ import 'package:poemath/core/services/textbook_course_generation_service.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
+import 'package:poemath/data/repositories/math_textbook_course_repository.dart';
+import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/data/repositories/textbook_progress_cleanup.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/features/textbook/providers/textbook_download_controller.dart';
@@ -102,6 +104,15 @@ class _FakeCourses extends TextbookCourseRepository {
   }
 }
 
+class _FakeMathCourses extends MathTextbookCourseRepository {
+  _FakeMathCourses(this.onAction);
+  final void Function(String)? onAction;
+  @override
+  Future<void> clear(Textbook book) async {
+    onAction?.call('math-course');
+  }
+}
+
 /// 构造期惰性 box：仅用于绕开超类对 HiveBoxes.settings 的访问，
 /// 测试中从不调用其成员。
 class _UnusedBox implements Box<dynamic> {
@@ -112,8 +123,7 @@ class _UnusedBox implements Box<dynamic> {
 }
 
 class _FakeRepo extends TextbookRepository {
-  _FakeRepo({this._onAction})
-      : super(box: const _UnusedBox());
+  _FakeRepo({this._onAction}) : super(box: const _UnusedBox());
   final void Function(String)? _onAction;
   final deleted = <String>[];
 
@@ -125,8 +135,7 @@ class _FakeRepo extends TextbookRepository {
 }
 
 class _FakeCleanup extends TextbookProgressCleanup {
-  _FakeCleanup({this._onAction})
-      : super(box: const _UnusedBox());
+  _FakeCleanup({this._onAction}) : super(box: const _UnusedBox());
   final void Function(String)? _onAction;
   final deleted = <String>[];
 
@@ -188,6 +197,9 @@ void main() {
         overrides: [
           textbookFileServiceProvider.overrideWithValue(files),
           textbookCourseRepositoryProvider.overrideWithValue(courses),
+          mathTextbookRepositoryProvider.overrideWithValue(
+            _FakeMathCourses(onAction),
+          ),
           // 固定生成状态，避免触发真实生成链。
           textbookGenerationProvider.overrideWith((ref) {
             return TextbookGenerationController(
@@ -395,11 +407,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      calls,
-      ['progress', 'course', 'files', 'repo'],
-      reason: '书目登记最后删除，中途失败不产生幽灵书',
-    );
+    expect(calls, [
+      'progress',
+      'course',
+      'math-course',
+      'files',
+      'repo',
+    ], reason: '书目登记最后删除，中途失败不产生幽灵书');
     expect(progress.deleted, [book.pdfSha256]);
     expect(courses.cleared, 1);
     expect(repo.deleted, [book.pdfSha256]);
@@ -421,8 +435,12 @@ void main() {
         (_) {},
       );
       controller.state = {
-        book.pdfSha256:
-            const TextbookGenerationProgress('running', 1, 3, '整理中'),
+        book.pdfSha256: const TextbookGenerationProgress(
+          'running',
+          1,
+          3,
+          '整理中',
+        ),
       };
       return controller;
     });

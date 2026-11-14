@@ -18,10 +18,15 @@ import 'package:poemath/data/models/textbook_catalog.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/features/textbook/widgets/textbook_toc_dialog.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
+import 'package:poemath/data/repositories/settings_repository.dart';
 import 'package:poemath/data/repositories/textbook_download_repository.dart';
 import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_detail_page.dart';
+import 'package:poemath/features/math/math_home_page.dart';
+import 'package:poemath/features/textbook/math_textbook_review_page.dart';
+import 'package:poemath/features/textbook/math_textbook_study_page.dart';
+import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_reader_page.dart';
 import 'package:poemath/features/textbook/textbook_management_page.dart';
 import 'package:poemath/features/textbook/textbook_shelf_page.dart';
@@ -324,6 +329,170 @@ void main() {
     evidencePdfPages: const [1],
   );
 
+  Future<GoRouter> pumpMathShelf(
+    WidgetTester tester,
+    Textbook mathBook, {
+    bool large = false,
+    List<TextbookViewerOptions>? previewOptions,
+  }) async {
+    await tester.runAsync(
+      () => SettingsRepository().setLearningBackground(
+        mathBook.grade,
+        mathBook.semester,
+      ),
+    );
+    files.paths[mathBook.pdfSha256] = '/math-navigation.pdf';
+    tester.view.physicalSize = large
+        ? const Size(320, 820)
+        : const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final router = createAppRouter(
+      initialLocation: AppRoutes.mathSectionOf(MathSection.textbook.name),
+    );
+    addTearDown(router.dispose);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await drainHiveWritesForTesting(tester);
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          textbookRepositoryProvider.overrideWithValue(repo),
+          textbookDownloadRepositoryProvider.overrideWithValue(
+            _DownloadIntents(),
+          ),
+          textbookFileServiceProvider.overrideWithValue(files),
+          textbookPrintedPageProvider.overrideWith(
+            (ref, key) async => key.page,
+          ),
+          textbookCatalogProvider.overrideWith((ref) async => []),
+          textbookCourseProvider(mathBook.pdfSha256)
+              .overrideWith((ref) async => null),
+          mathTextbookCourseProvider(mathBook.pdfSha256)
+              .overrideWith((ref) async => null),
+          mathTextbookProgressProvider(mathBook.pdfSha256)
+              .overrideWith((ref) async => null),
+          textbookPreviewBuilderProvider.overrideWithValue((_, options) {
+            previewOptions?.add(options);
+            return _Viewer(options);
+          }),
+          textbookCoverRendererProvider.overrideWithValue(
+            (_, __) async => null,
+          ),
+        ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(large ? 2 : 1)),
+            child: child!,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    return router;
+  }
+
+  for (final large in [false, true]) {
+    testWidgets('数学书架先打开原书内容，课时学习需明确进入${large ? '，320dp双倍字号' : ''}', (
+      tester,
+    ) async {
+      final mathBook = textbookFixture(
+        title: '数学样本课本',
+        subject: TextbookSubject.math,
+      );
+      repo.books[mathBook.pdfSha256] = mathBook;
+      repo.readings['default:${mathBook.pdfSha256}'] = const TextbookReading(
+        page: 2,
+      );
+      lockParentForTesting();
+      final options = <TextbookViewerOptions>[];
+      final router = await pumpMathShelf(
+        tester,
+        mathBook,
+        large: large,
+        previewOptions: options,
+      );
+      expect(find.byType(MathHomePage), findsOneWidget);
+      await tester.tap(find.byKey(ValueKey('textbook-${mathBook.pdfSha256}')));
+      await tester.pumpAndSettle();
+
+      final detail = tester.widget<TextbookDetailPage>(
+        find.byType(TextbookDetailPage),
+      );
+      expect(detail.bookId, mathBook.pdfSha256);
+      expect(detail.manage, isFalse);
+      expect(
+        find.byKey(const ValueKey('textbook-detail-preview-card')),
+        findsOneWidget,
+      );
+      expect(find.byType(_Viewer), findsOneWidget);
+      expect(options.last.path, '/math-navigation.pdf');
+      expect(options.last.initialPage, 2);
+      expect(find.byType(MathTextbookBookPage), findsNothing);
+      expect(find.byType(MathTextbookReviewPage), findsNothing);
+      expect(find.byTooltip('内容审核'), findsNothing);
+      expect(repo.selected, isEmpty);
+
+      await tester.tap(find.text('下一页'));
+      await tester.pumpAndSettle();
+      expect(repo.reading('default', mathBook.pdfSha256).page, 3);
+      await tester.tap(find.text('课时学习'));
+      await tester.pumpAndSettle();
+      expect(find.byType(MathTextbookBookPage), findsOneWidget);
+      expect(find.byType(MathTextbookReviewPage), findsNothing);
+      expect(repo.selected, isEmpty);
+      await tester.ensureVisible(find.text('设为当前数学课本'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('设为当前数学课本'));
+      await tester.pumpAndSettle();
+      expect(repo.selected, {'default:math': mathBook.pdfSha256});
+
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(TextbookDetailPage), findsOneWidget);
+      expect(find.byType(_Viewer), findsOneWidget);
+      expect(options.last.initialPage, 3);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(MathHomePage), findsOneWidget);
+      expect(repo.reading('default', mathBook.pdfSha256).page, 3);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('数学书架缺失PDF时仍打开内容详情并保留续读页，不跳整理审核', (tester) async {
+    final mathBook = textbookFixture(
+      title: '数学样本课本',
+      subject: TextbookSubject.math,
+    );
+    repo.books[mathBook.pdfSha256] = mathBook;
+    repo.readings['default:${mathBook.pdfSha256}'] = const TextbookReading(
+      page: 2,
+    );
+    files.installed = false;
+    lockParentForTesting();
+    await pumpMathShelf(tester, mathBook);
+    await tester.tap(find.byKey(ValueKey('textbook-${mathBook.pdfSha256}')));
+    await tester.pumpAndSettle();
+
+    final detail = tester.widget<TextbookDetailPage>(
+      find.byType(TextbookDetailPage),
+    );
+    expect(detail.bookId, mathBook.pdfSha256);
+    expect(detail.manage, isFalse);
+    expect(find.text('本地 PDF 暂不可用'), findsOneWidget);
+    expect(find.byType(_Viewer), findsNothing);
+    expect(find.byType(MathTextbookBookPage), findsNothing);
+    expect(find.byType(MathTextbookReviewPage), findsNothing);
+    expect(repo.reading('default', mathBook.pdfSha256).page, 2);
+    expect(repo.selected, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('下载页不含提示与筛选，窄屏大字的封面卡片可下载且不提前登记', (tester) async {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -377,7 +546,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     files.installed = false;
-    final entries = await const TextbookCatalogRepository().load();
+    final entries = (await const TextbookCatalogRepository().load())
+        .where((entry) => entry.book.subject == TextbookSubject.chinese)
+        .toList();
     await pump(
       tester,
       const TextbookShelfPage(),
@@ -541,7 +712,7 @@ void main() {
     expect(files.imports, 0);
   });
 
-  testWidgets('导入要求填写年级学期，取消登记不写书目，失败后可重试', (tester) async {
+  testWidgets('导入要求填写学科年级学期，取消登记不写书目，失败后可重试', (tester) async {
     await pump(
       tester,
       TextbookManagementPage(
@@ -554,6 +725,7 @@ void main() {
     await tester.tap(find.text('导入教材'));
     await tester.pumpAndSettle();
     expect(find.text('请选择年级'), findsOneWidget);
+    expect(find.text('请选择学科'), findsOneWidget);
     expect(find.text('请选择学期'), findsOneWidget);
     expect(files.imports, 0);
     await tester.tap(find.text('取消'));
@@ -561,10 +733,15 @@ void main() {
     expect(repo.list(), isEmpty);
     await tester.tap(find.byTooltip('导入'));
     await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<TextbookSubject>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('语文').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<int>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('三年级').last);
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('上册').last);
@@ -749,6 +926,101 @@ void main() {
       'page': 2,
       'match': 'matches',
     });
+  });
+
+  Finder subjectTile(TextbookSubject subject) => find.descendant(
+    of: find.byType(BottomSheet),
+    matching: find.byWidgetPredicate(
+      (widget) => widget is AppTile && widget.title == subject.label,
+    ),
+  );
+
+  void expectSubjectSelection(WidgetTester tester, TextbookSubject expected) {
+    for (final subject in TextbookSubject.values.where(
+      (value) => value != TextbookSubject.unknown,
+    )) {
+      final tile = tester.widget<AppTile>(subjectTile(subject));
+      expect(tile.selected, subject == expected);
+      expect(
+        find.descendant(
+          of: subjectTile(subject),
+          matching: find.byIcon(Icons.check_rounded),
+        ),
+        subject == expected ? findsOneWidget : findsNothing,
+      );
+    }
+  }
+
+  Future<void> openSubjectSheet(WidgetTester tester) async {
+    await tester.tap(find.byTooltip('教材学科'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('确认教材学科'),
+      ),
+      findsOneWidget,
+    );
+  }
+
+  for (final large in [false, true]) {
+    testWidgets('学科确认后重新打开选中保存结果，取消保留结果（大字体：$large）', (tester) async {
+      final unknown = book.withSubject(TextbookSubject.unknown);
+      repo.books[book.pdfSha256] = unknown;
+      await pump(
+        tester,
+        TextbookDetailPage(bookId: book.pdfSha256, manage: true),
+        large: large,
+        size: large ? const Size(320, 820) : null,
+      );
+      await openSubjectSheet(tester);
+      expectSubjectSelection(tester, TextbookSubject.unknown);
+      expect(repo.subjectSaves, isEmpty);
+
+      await tester.tap(subjectTile(TextbookSubject.math));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(repo.find(book.pdfSha256)!.subject, TextbookSubject.math);
+      expect(repo.subjectSaves, [TextbookSubject.math]);
+
+      await openSubjectSheet(tester);
+      expectSubjectSelection(tester, TextbookSubject.math);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(repo.subjectSaves, [TextbookSubject.math]);
+
+      await openSubjectSheet(tester);
+      expectSubjectSelection(tester, TextbookSubject.math);
+      await tester.tap(subjectTile(TextbookSubject.english));
+      await tester.pumpAndSettle();
+      expect(repo.find(book.pdfSha256)!.subject, TextbookSubject.english);
+
+      await openSubjectSheet(tester);
+      expectSubjectSelection(tester, TextbookSubject.english);
+      expect(repo.subjectSaves, [
+        TextbookSubject.math,
+        TextbookSubject.english,
+      ]);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('学科 sheet 读取最新登记值，不沿用详情页旧数据', (tester) async {
+    repo.books[book.pdfSha256] = book;
+    await pump(
+      tester,
+      TextbookDetailPage(bookId: book.pdfSha256, manage: true),
+    );
+    await openSubjectSheet(tester);
+    expectSubjectSelection(tester, TextbookSubject.chinese);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    // 不刷新页面的书目 provider，模拟调用方仍持有之前的教材对象。
+    repo.books[book.pdfSha256] = book.withSubject(TextbookSubject.math);
+    await openSubjectSheet(tester);
+    expectSubjectSelection(tester, TextbookSubject.math);
+    expect(repo.subjectSaves, isEmpty);
   });
 
   for (final manage in [false, true]) {

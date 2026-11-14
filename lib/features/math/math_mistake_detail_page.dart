@@ -26,6 +26,7 @@ import 'package:poemath/features/math/widgets/mistake_repractice_dialog.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 import 'package:poemath/features/math/math_practice_request.dart';
 import 'package:poemath/features/math/math_mistake_snapshot.dart';
+import 'package:poemath/features/textbook/math_textbook_record_page.dart';
 import 'package:poemath/math_engine/models/vertical_attempt.dart';
 
 String _repracticeLabel(
@@ -100,6 +101,22 @@ class MathMistakeDetailPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            for (final source in mistake.textbookSources)
+              Padding(
+                padding: const EdgeInsets.only(bottom: SpacingTokens.sm),
+                child: AppTile(
+                  icon: Icons.menu_book_outlined,
+                  iconColor: theme.colorScheme.primary,
+                  title: '教材来源',
+                  subtitle:
+                      '${source.bookTitle} · ${source.item.exercise.title}',
+                  onTap: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => MathTextbookRecordPage(snapshot: source),
+                    ),
+                  ),
+                ),
+              ),
             // 题目卡片
             ColoredCard(
                   color: theme.colorScheme.primary,

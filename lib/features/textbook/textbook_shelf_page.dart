@@ -6,6 +6,7 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/models/textbook_catalog.dart';
+import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/features/textbook/providers/textbook_download_controller.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/textbook_cover_grid.dart';
@@ -19,6 +20,7 @@ class TextbookShelfPage extends ConsumerStatefulWidget {
 }
 
 class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
+  TextbookSubject _subject = TextbookSubject.chinese;
   Future<void> _open(TextbookCatalogEntry entry) async {
     await context.push(AppRoutes.textbookDetailOf(entry.book.pdfSha256));
     if (mounted) setState(() {});
@@ -217,22 +219,48 @@ class _TextbookShelfPageState extends ConsumerState<TextbookShelfPage> {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            catalog.when(
-              data: (entries) => entries.isEmpty
-                  ? const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: AppEmptyState(
-                        icon: Icons.download_outlined,
-                        title: '暂无可下载书籍',
-                        description: '可先在书籍管理中导入本地 PDF。',
-                      ),
-                    )
-                  : TextbookCoverGrid(
-                      itemCount: entries.length,
-                      naturalRowHeight: true,
-                      itemBuilder: (_, index) =>
-                          _bookCard(entries[index], textStyle),
+            SliverPadding(
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              sliver: SliverToBoxAdapter(
+                child: SegmentedButton<TextbookSubject>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(
+                      value: TextbookSubject.chinese,
+                      label: Text('语文'),
                     ),
+                    ButtonSegment(
+                      value: TextbookSubject.math,
+                      label: Text('数学'),
+                    ),
+                  ],
+                  selected: {_subject},
+                  onSelectionChanged: (values) =>
+                      setState(() => _subject = values.single),
+                ),
+              ),
+            ),
+            catalog.when(
+              data: (catalogEntries) {
+                final entries = catalogEntries
+                    .where((entry) => entry.book.subject == _subject)
+                    .toList();
+                return entries.isEmpty
+                    ? const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: AppEmptyState(
+                          icon: Icons.download_outlined,
+                          title: '暂无可下载书籍',
+                          description: '可先在书籍管理中导入本地 PDF。',
+                        ),
+                      )
+                    : TextbookCoverGrid(
+                        itemCount: entries.length,
+                        naturalRowHeight: true,
+                        itemBuilder: (_, index) =>
+                            _bookCard(entries[index], textStyle),
+                      );
+              },
               loading: () =>
                   const SliverToBoxAdapter(child: LinearProgressIndicator()),
               error: (_, __) => SliverFillRemaining(

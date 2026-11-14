@@ -366,7 +366,9 @@ void main() {
     });
     await _pumpAt(tester);
     expect(find.text('课本(21)'), findsOneWidget);
-    final scrollView = find.byKey(const PageStorageKey('textbook-list-三年级上册'));
+    final scrollView = find.byKey(
+      const PageStorageKey('textbook-list-chinese-三年级上册'),
+    );
     await tester.drag(scrollView, const Offset(0, -600));
     await tester.pumpAndSettle();
     double offset() => tester

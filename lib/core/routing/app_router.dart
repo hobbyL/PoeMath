@@ -12,6 +12,7 @@ import 'package:flutter/widgets.dart';
 
 import 'package:poemath/core/config/app_config.dart';
 import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/routing/route_fallback_page.dart';
 import 'package:poemath/data/models/math_session.dart';
@@ -34,7 +35,7 @@ import 'package:poemath/features/math/math_mistake_page.dart';
 import 'package:poemath/features/math/math_practice_page.dart';
 import 'package:poemath/features/math/math_mistake_detail_page.dart';
 import 'package:poemath/features/math/math_session_detail_page.dart';
-import 'package:poemath/features/math/math_tab_page.dart';
+import 'package:poemath/features/math/math_home_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_generate_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_library_page.dart';
 import 'package:poemath/features/math/word_problem/word_problem_practice_page.dart';
@@ -69,6 +70,11 @@ import 'package:poemath/features/shell/onboarding_page.dart';
 import 'package:poemath/features/shell/splash_page.dart';
 import 'package:poemath/features/textbook/textbook_shelf_page.dart';
 import 'package:poemath/features/textbook/textbook_management_page.dart';
+import 'package:poemath/features/textbook/math_textbook_review_page.dart';
+import 'package:poemath/features/textbook/math_textbook_lesson_page.dart';
+import 'package:poemath/features/textbook/math_textbook_study_page.dart';
+import 'package:poemath/features/textbook/math_textbook_practice_page.dart';
+import 'package:poemath/features/textbook/math_textbook_history_page.dart';
 import 'package:poemath/features/textbook/textbook_detail_page.dart';
 import 'package:poemath/features/textbook/textbook_reader_page.dart';
 import 'package:poemath/features/textbook/textbook_course_review_page.dart';
@@ -136,7 +142,11 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
             path: AppRoutes.mathTab,
             pageBuilder: (context, state) => NoTransitionPage<void>(
               key: state.pageKey,
-              child: const MathTabPage(),
+              child: MathHomePage(
+                section: MathSection.fromId(
+                  state.uri.queryParameters['section'],
+                ),
+              ),
             ),
           ),
           GoRoute(
@@ -173,6 +183,77 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         pageBuilder: (context, state) => fadeSlideTransitionPage(
           state: state,
           child: const TextbookShelfPage(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathTextbookReview,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: ParentAccessBoundary(
+            child: MathTextbookReviewPage(bookId: state.pathParameters['id']!),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathTextbookBook,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: MathTextbookBookPage(bookId: state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathTextbookStudy,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: MathTextbookStudyPage(
+            bookId: state.pathParameters['id']!,
+            lessonId: state.pathParameters['lesson']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathTextbookPractice,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: MathTextbookPracticePage(
+            key: ValueKey(
+              'math-textbook-practice:${state.uri}:${ProfileScope.revision}',
+            ),
+            bookId: state.pathParameters['id']!,
+            lessonId: state.pathParameters['lesson']!,
+            planId: state.uri.queryParameters['plan'],
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathTextbookHistory,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: MathTextbookHistoryPage(bookId: state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathTextbookParentHistory,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: ParentAccessBoundary(
+            child: MathTextbookHistoryPage(
+              bookId: state.pathParameters['id']!,
+              parent: true,
+            ),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.mathTextbookLesson,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: ParentAccessBoundary(
+            child: MathTextbookLessonPage(
+              bookId: state.pathParameters['id']!,
+              lessonId: state.pathParameters['lesson']!,
+            ),
+          ),
         ),
       ),
       GoRoute(

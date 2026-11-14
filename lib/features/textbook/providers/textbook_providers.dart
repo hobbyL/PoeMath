@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/services/textbook_pdf_source.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -25,7 +26,7 @@ final textbookDownloadRepositoryProvider = Provider<TextbookDownloadRepository>(
   (ref) => TextbookDownloadRepository(),
 );
 final textbookProgressCleanupProvider = Provider<TextbookProgressCleanup>(
-  (ref) => TextbookProgressCleanup(),
+  (ref) => TextbookProgressCleanup(metaBox: HiveBoxes.meta),
 );
 final textbookFileServiceProvider = Provider<TextbookFileService>(
   (ref) => TextbookFileService(),
@@ -39,7 +40,7 @@ final textbookCourseProvider = FutureProvider.autoDispose
           .watch(textbookListProvider)
           .where((book) => book.pdfSha256 == id)
           .firstOrNull;
-      if (book == null) return null;
+      if (book == null || book.subject != TextbookSubject.chinese) return null;
       return ref.watch(textbookCourseRepositoryProvider).load(book);
     });
 final textbookCourseDocumentProvider = FutureProvider.autoDispose
@@ -48,7 +49,7 @@ final textbookCourseDocumentProvider = FutureProvider.autoDispose
           .watch(textbookListProvider)
           .where((b) => b.pdfSha256 == id)
           .firstOrNull;
-      if (book == null) return null;
+      if (book == null || book.subject != TextbookSubject.chinese) return null;
       return ref.watch(textbookCourseRepositoryProvider).loadDocument(book);
     });
 final textbookReadingContentProvider = FutureProvider.autoDispose
@@ -164,9 +165,24 @@ final textbookGenerationProvider =
         },
       ),
     );
-final textbookLocalListProvider = Provider<List<Textbook>>(
-  (ref) => ref.watch(textbookRepositoryProvider).list(),
-);
+final textbookLocalListProvider = Provider<List<Textbook>>((ref) {
+  final local = ref.watch(textbookRepositoryProvider).list();
+  if (local.every((book) => book.subject != TextbookSubject.unknown)) {
+    return local;
+  }
+  final catalog = ref.watch(textbookCatalogProvider).valueOrNull ?? [];
+  final known = {
+    for (final entry in catalog) entry.book.pdfSha256: entry.book.subject,
+  };
+  return [
+    for (final book in local)
+      if (book.subject == TextbookSubject.unknown &&
+          known.containsKey(book.pdfSha256))
+        book.withSubject(known[book.pdfSha256]!)
+      else
+        book,
+  ];
+});
 final textbookCatalogProvider = FutureProvider<List<TextbookCatalogEntry>>(
   (ref) => const TextbookCatalogRepository().load(),
 );

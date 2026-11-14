@@ -83,6 +83,7 @@ class _TextbookManagementPageState
           .read(textbookRepositoryProvider)
           .addIfAbsent(
             Textbook(
+              subject: details.subject,
               pdfSha256: imported.sha256,
               title: details.title,
               grade: details.grade,

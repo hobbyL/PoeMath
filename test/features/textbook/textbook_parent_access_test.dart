@@ -14,6 +14,8 @@ import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
+import 'package:poemath/data/repositories/math_textbook_course_repository.dart';
+import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/textbook_management_page.dart';
@@ -21,6 +23,7 @@ import 'package:poemath/features/textbook/widgets/textbook_cache_manager_sheet.d
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/textbook_fixture.dart';
+import '../../helpers/math_textbook_fixture.dart';
 
 class _MissingFiles extends TextbookFileService {
   final removed = <String>[];
@@ -82,6 +85,7 @@ void main() {
   late _MissingFiles files;
   late Directory directory;
   late TextbookCourseRepository courses;
+  late MathTextbookCourseRepository mathCourses;
 
   setUp(() async {
     binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -91,12 +95,18 @@ void main() {
     repo = TextbookRepository();
     files = _MissingFiles();
     directory = await Directory.systemTemp.createTemp('textbook-parent-');
-    courses =
-        TextbookCourseRepository(directoryProvider: () async => directory);
+    courses = TextbookCourseRepository(
+      directoryProvider: () async => directory,
+    );
+    mathCourses = MathTextbookCourseRepository(
+      directoryProvider: () async => directory,
+    );
     await repo.addIfAbsent(book);
     await repo.savePage('default', book, 2);
-    await HiveBoxes.settings
-        .put(progressKey, jsonEncode({'bookId': book.pdfSha256}));
+    await HiveBoxes.settings.put(
+      progressKey,
+      jsonEncode({'bookId': book.pdfSha256}),
+    );
     await access.configure('246810');
   });
   tearDown(() async {
@@ -106,13 +116,13 @@ void main() {
   });
 
   List<Override> overrides() => [
-        textbookRepositoryProvider.overrideWithValue(repo),
-        textbookFileServiceProvider.overrideWithValue(files),
-        textbookCourseRepositoryProvider.overrideWithValue(courses),
-        textbookCourseProvider(book.pdfSha256)
-            .overrideWith((ref) async => null),
-        textbookCatalogProvider.overrideWith((ref) async => []),
-      ];
+    textbookRepositoryProvider.overrideWithValue(repo),
+    textbookFileServiceProvider.overrideWithValue(files),
+    textbookCourseRepositoryProvider.overrideWithValue(courses),
+    mathTextbookRepositoryProvider.overrideWithValue(mathCourses),
+    textbookCourseProvider(book.pdfSha256).overrideWith((ref) async => null),
+    textbookCatalogProvider.overrideWith((ref) async => []),
+  ];
 
   Future<void> mount(WidgetTester tester, Widget child) async {
     tester.view.physicalSize = const Size(800, 1400);
@@ -137,7 +147,11 @@ void main() {
 
   Future<void> waitForUnlockDialog(WidgetTester tester) async {
     final unlock = find.widgetWithText(FilledButton, '解锁');
-    for (var attempt = 0; attempt < 50 && unlock.evaluate().isEmpty; attempt++) {
+    for (
+      var attempt = 0;
+      attempt < 50 && unlock.evaluate().isEmpty;
+      attempt++
+    ) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 20)),
       );
@@ -150,10 +164,9 @@ void main() {
   void expectPreserved() {
     expect(repo.find(book.pdfSha256)!.toJson(), book.toJson());
     expect(repo.reading('default', book.pdfSha256).page, 2);
-    expect(
-      jsonDecode(HiveBoxes.settings.get(progressKey) as String),
-      {'bookId': book.pdfSha256},
-    );
+    expect(jsonDecode(HiveBoxes.settings.get(progressKey) as String), {
+      'bookId': book.pdfSha256,
+    });
     expect(files.removed, isEmpty);
   }
 
@@ -179,6 +192,8 @@ void main() {
   for (final location in [
     AppRoutes.textbookManageDetailOf(book.pdfSha256),
     AppRoutes.textbookReviewOf(book.pdfSha256),
+    AppRoutes.mathTextbookReviewOf(book.pdfSha256),
+    AppRoutes.mathTextbookLessonOf(book.pdfSha256, 'math-1-2'),
   ]) {
     testWidgets('教材管理深链锁定时不构造可编辑页面：$location', (tester) async {
       access.lock();
@@ -199,7 +214,9 @@ void main() {
       // Mount without the route boundary to verify the handler itself rechecks.
       await mount(
         tester,
-        MaterialApp(home: Scaffold(body: TextbookCacheSheet(book: book))),
+        MaterialApp(
+          home: Scaffold(body: TextbookCacheSheet(book: book)),
+        ),
       );
       final key = ValueKey(deleting ? 'cache-delete-book' : 'cache-clear-all');
       await tester.runAsync(() => tester.tap(find.byKey(key)));
@@ -219,11 +236,22 @@ void main() {
   }
 
   testWidgets('家长正常授权删除按实际仓储清除书目和学习记录', (tester) async {
+    final mathBook = book.withSubject(TextbookSubject.math);
+    await tester.runAsync(
+      () => mathCourses.saveGenerated(
+        mathBook,
+        mathLessonFixture(),
+        generation: 0,
+        authorize: access.assertAllowed,
+      ),
+    );
     final observedRepo = _ObservedDeleteRepository();
     repo = observedRepo;
     await mount(
       tester,
-      MaterialApp(home: Scaffold(body: TextbookCacheSheet(book: book))),
+      MaterialApp(
+        home: Scaffold(body: TextbookCacheSheet(book: book)),
+      ),
     );
     await tester.runAsync(
       () => tester.tap(find.byKey(const ValueKey('cache-delete-book'))),
@@ -235,9 +263,11 @@ void main() {
     );
     await tester.runAsync(() => tester.tap(confirm));
     // 书目消失只是中间状态；交替推进真实 IO 和虚拟时钟，等完整删除结束。
-    for (var attempt = 0;
-        attempt < 100 && !observedRepo.deleted.isCompleted;
-        attempt++) {
+    for (
+      var attempt = 0;
+      attempt < 100 && !observedRepo.deleted.isCompleted;
+      attempt++
+    ) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 20)),
       );
@@ -249,6 +279,7 @@ void main() {
     expect(HiveBoxes.settings.containsKey(progressKey), isFalse);
     expect(repo.reading('default', book.pdfSha256).page, 1);
     expect(files.removed, [book.pdfSha256]);
+    expect(await tester.runAsync(() => mathCourses.load(mathBook)), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await drainHiveWritesForTesting(tester);
   });
@@ -257,9 +288,7 @@ void main() {
     final picked = Completer<PlatformFile?>();
     await mount(
       tester,
-      MaterialApp(
-        home: TextbookManagementPage(pickPdf: () => picked.future),
-      ),
+      MaterialApp(home: TextbookManagementPage(pickPdf: () => picked.future)),
     );
     await tester.tap(find.byTooltip('导入'));
     await tester.pump();
