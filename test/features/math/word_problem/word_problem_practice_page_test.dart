@@ -115,23 +115,27 @@ Future<void> _answer(WidgetTester tester, String digits) async {
   );
   await tester.runAsync(() async {
     await tester.tap(find.byIcon(Icons.check_rounded));
-    await Future<void>.delayed(const Duration(milliseconds: 150));
   });
-  await tester.pump();
+  await _waitUntil(tester, () {
+    final button = find.widgetWithText(
+      FilledButton,
+      find.text('查看成绩').evaluate().isNotEmpty ? '查看成绩' : '下一题',
+    );
+    return button.evaluate().isNotEmpty &&
+        tester.widget<FilledButton>(button).onPressed != null;
+  });
   await tester.pump(const Duration(milliseconds: 300));
 }
 
-Future<void> _waitUntil(
-  WidgetTester tester,
-  bool Function() completed,
-) async {
-  await tester.pump();
-  for (var i = 0; i < 100 && !completed(); i++) {
+Future<void> _waitUntil(WidgetTester tester, bool Function() completed) async {
+  final clock = Stopwatch()..start();
+  do {
+    await tester.pump(const Duration(milliseconds: 50));
+    if (completed()) return;
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
-    await tester.pump(const Duration(milliseconds: 50));
-  }
+  } while (clock.elapsed < const Duration(seconds: 8));
   expect(completed(), isTrue, reason: '练习异步流程未完成');
 }
 
@@ -205,9 +209,7 @@ void main() {
     );
     await _startPractice(
       tester,
-      current: [
-        first,
-      ],
+      current: [first],
       library: [
         first,
         old,
@@ -350,8 +352,9 @@ void main() {
       await HiveBoxes.llmProblems.put('default_p1', problems.first);
     });
     await tester.runAsync(() async {
-      await tester
-          .pumpWidget(_wrap(WordProblemPracticePage(problems: problems)));
+      await tester.pumpWidget(
+        _wrap(WordProblemPracticePage(problems: problems)),
+      );
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await tester.pump();
@@ -390,8 +393,9 @@ void main() {
       await HiveBoxes.llmProblems.put('default_p1', problems.first);
     });
     await tester.runAsync(() async {
-      await tester
-          .pumpWidget(_wrap(WordProblemPracticePage(problems: problems)));
+      await tester.pumpWidget(
+        _wrap(WordProblemPracticePage(problems: problems)),
+      );
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await tester.pump();
@@ -437,8 +441,9 @@ void main() {
       ),
     ];
     await tester.runAsync(() async {
-      await tester
-          .pumpWidget(_wrap(WordProblemPracticePage(problems: problems)));
+      await tester.pumpWidget(
+        _wrap(WordProblemPracticePage(problems: problems)),
+      );
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await tester.pump();
@@ -490,59 +495,60 @@ void main() {
   });
 
   testWidgets('结算失败可重试，重复点击不重复累计或奖励', (tester) async {
+    addTearDown(() => _closePractice(tester));
     final problem = _problem(id: 'retry', questionText: '还剩几个苹果？', answer: 8);
     final sessions = _FailFinalSessionOnce();
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('sound_enabled', false);
       await HiveBoxes.settings.put('haptic_enabled', false);
       await tester.pumpWidget(
-        _wrap(
-          WordProblemPracticePage(problems: [problem]),
-          sessions: sessions,
-        ),
+        _wrap(WordProblemPracticePage(problems: [problem]), sessions: sessions),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 300));
     });
-    await tester.pump();
+    await _waitUntil(
+      tester,
+      () => PracticeDraftRepository().get('word') != null,
+    );
     await _answer(tester, '8');
     await tester.runAsync(() async {
       await tester.tap(find.text('查看成绩'));
-      await Future<void>.delayed(const Duration(milliseconds: 300));
     });
-    await tester.pump();
+    await _waitUntil(
+      tester,
+      () => find.text('答题进度或结算保存失败，请重试').evaluate().isNotEmpty,
+    );
     expect(find.text('答题进度或结算保存失败，请重试'), findsOneWidget);
     expect(HiveBoxes.mathSessions.values.single.starsEarned, 0);
     expect(
-      HiveBoxes.meta.keys
-          .any((key) => key.toString().contains('practice_draft:word')),
+      HiveBoxes.meta.keys.any(
+        (key) => key.toString().contains('practice_draft:word'),
+      ),
       isTrue,
     );
     await tester.runAsync(() async {
       await tester.tap(find.text('查看成绩'));
       // 同一帧连点被同步转移锁拦住。
       await tester.tap(find.text('查看成绩'));
-      await Future<void>.delayed(const Duration(milliseconds: 300));
     });
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
+    await _waitUntil(tester, () => find.text('再练一组').evaluate().isNotEmpty);
     final stats = HiveBoxes.userStats.get('default_stats')!;
     expect(stats.mathTotalProblems, 1);
     expect(stats.totalStars, HiveBoxes.mathSessions.values.single.starsEarned);
     expect(HiveBoxes.learningActivities.length, 1);
     expect(
-      HiveBoxes.meta.keys
-          .any((key) => key.toString().contains('practice_draft:word')),
+      HiveBoxes.meta.keys.any(
+        (key) => key.toString().contains('practice_draft:word'),
+      ),
       isFalse,
     );
-    await tester.runAsync(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump(const Duration(seconds: 5));
   });
   testWidgets('恢复待结算草稿后保存失败，保留当前结果和重试入口', (tester) async {
-    final problem =
-        _problem(id: 'resume-retry', questionText: '还剩几个苹果？', answer: 8);
+    addTearDown(() => _closePractice(tester));
+    final problem = _problem(
+      id: 'resume-retry',
+      questionText: '还剩几个苹果？',
+      answer: 8,
+    );
     final sessions = _FailFinalSessionOnce();
     await tester.runAsync(() async {
       await HiveBoxes.settings.put('sound_enabled', false);
@@ -570,18 +576,18 @@ void main() {
           sessions: sessions,
         ),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 300));
     });
-    await tester.pump();
+    await _waitUntil(
+      tester,
+      () => find.text('练习已恢复，进度或结算暂未保存，请重试').evaluate().isNotEmpty,
+    );
     expect(find.text('练习已恢复，进度或结算暂未保存，请重试'), findsOneWidget);
     expect(find.text('查看成绩'), findsOneWidget);
     expect(HiveBoxes.userStats.get('default_stats')!.mathTotalProblems, 1);
     await tester.runAsync(() async {
       await tester.tap(find.text('查看成绩'));
-      await Future<void>.delayed(const Duration(milliseconds: 300));
     });
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
+    await _waitUntil(tester, () => find.text('再练一组').evaluate().isNotEmpty);
     expect(HiveBoxes.mathSessions.values.single.durationSeconds, 60);
     expect(
       HiveBoxes.mathSessions.values.single.finishedAt,
@@ -590,10 +596,5 @@ void main() {
     expect(HiveBoxes.learningActivities.length, 1);
     expect(HiveBoxes.userStats.get('default_stats')!.mathTotalProblems, 1);
     expect(PracticeDraftRepository().get('word'), isNull);
-    await tester.runAsync(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-    });
-    await tester.pump(const Duration(seconds: 5));
   });
 }

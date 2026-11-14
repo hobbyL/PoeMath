@@ -25,8 +25,12 @@ import '../../helpers/parent_access_test_helper.dart';
 class _RetryPlanRepository extends TodayPlanRepository {
   int attempts = 0;
   bool fail = true;
+  Future<void>? saving;
   @override
-  Future<void> saveConfig(TodayPlanConfig config) async {
+  Future<void> saveConfig(TodayPlanConfig config) =>
+      saving = _saveConfig(config);
+
+  Future<void> _saveConfig(TodayPlanConfig config) async {
     attempts++;
     if (fail) throw StateError('模拟保存失败');
     await super.saveConfig(config);
@@ -46,6 +50,10 @@ void main() {
 
   testWidgets('保存失败保留编辑，重试成功只写一次；放弃不重复写入', (tester) async {
     final repository = _RetryPlanRepository();
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await drainHiveWritesForTesting(tester);
+    });
     const plan = TodayPlan(
       dateKey: '2026-11-08',
       profileId: 'default',
@@ -78,7 +86,7 @@ void main() {
     repository.fail = false;
     await tester.runAsync(() async {
       await tester.tap(find.text('重试保存'));
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await repository.saving!;
     });
     await tester.pumpAndSettle();
     expect(repository.attempts, 2);
@@ -98,8 +106,6 @@ void main() {
     expect(repository.attempts, 3);
     expect(repository.config.reviewCount, 3);
     expect(find.text('调整每日计划'), findsNothing);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await drainHiveWritesForTesting(tester);
   });
 
   for (final scale in [1.0, 1.7]) {

@@ -18,6 +18,20 @@ import 'package:poemath/data/repositories/settings_repository.dart';
 
 import '../../helpers/hive_test_helper.dart';
 
+void _practiceTest(
+  String description,
+  Future<void> Function(WidgetTester tester) body,
+) => testWidgets(description, (tester) async {
+  try {
+    await body(tester);
+  } finally {
+    // dispose schedules one last draft save. Drain it while fake microtasks
+    // can still advance, before the suite's tearDown closes the real Hive boxes.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await drainHiveWritesForTesting(tester);
+  }
+});
+
 class _FailFinalSessionOnce extends MathSessionRepository {
   bool fail = true;
 
@@ -110,7 +124,7 @@ void main() {
       return container;
     }
 
-    testWidgets('竖式入口遇普通草稿：不弹恢复框，直接开新竖式练习', (tester) async {
+    _practiceTest('竖式入口遇普通草稿：不弹恢复框，直接开新竖式练习', (tester) async {
       // 预置一份**普通**草稿（mode 缺省 = 综合）。
       final draft = _checkpoint(_addition())
         ..remove('completedAt')
@@ -146,7 +160,7 @@ void main() {
       });
     });
 
-    testWidgets('口算入口遇竖式草稿：同样不弹框，直接开普通练习', (tester) async {
+    _practiceTest('口算入口遇竖式草稿：同样不弹框，直接开普通练习', (tester) async {
       final draft = _checkpoint(_addition(mode: ProblemMode.vertical))
         ..remove('completedAt')
         ..['input'] = ''
@@ -187,7 +201,7 @@ void main() {
       });
     });
 
-    testWidgets('无预设请求（如首页直达）遇草稿：仍弹恢复框', (tester) async {
+    _practiceTest('无预设请求（如首页直达）遇草稿：仍弹恢复框', (tester) async {
       final draft = _checkpoint(_addition())
         ..remove('completedAt')
         ..['input'] = ''
@@ -224,7 +238,7 @@ void main() {
   setUp(setUpHiveForTesting);
   tearDown(tearDownHiveForTesting);
   for (final mode in [ProblemMode.findResult, ProblemMode.vertical]) {
-    testWidgets('${mode.name} 键盘贴底且滚动题目时不移动，按键避开手势区', (tester) async {
+    _practiceTest('${mode.name} 键盘贴底且滚动题目时不移动，按键避开手势区', (tester) async {
       tester.view.physicalSize = const Size(320, 640);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -278,7 +292,7 @@ void main() {
       });
     });
   }
-  testWidgets('口算恢复后结算失败保留重试，时间和统计不重复', (tester) async {
+  _practiceTest('口算恢复后结算失败保留重试，时间和统计不重复', (tester) async {
     final sessions = _FailFinalSessionOnce();
     final sound = _RecordingSoundService();
     await tester.runAsync(() async {
@@ -322,7 +336,7 @@ void main() {
     });
     await tester.pump(const Duration(seconds: 5));
   });
-  testWidgets('损坏草稿解析失败不显示上一组题，离页不覆盖原草稿', (tester) async {
+  _practiceTest('损坏草稿解析失败不显示上一组题，离页不覆盖原草稿', (tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
     final original = _checkpoint(_addition())..['startedAt'] = 'invalid';
@@ -347,7 +361,7 @@ void main() {
     });
     expect(PracticeDraftRepository().get('math')!['startedAt'], 'invalid');
   });
-  testWidgets('恢复相同题组、位置、输入与已答结果，多次打开不重复统计', (tester) async {
+  _practiceTest('恢复相同题组、位置、输入与已答结果，多次打开不重复统计', (tester) async {
     final first = MathProblem(
       operands: [NumberValue.fromInt(12), NumberValue.fromInt(4)],
       operators: [Operator.subtract],
@@ -434,7 +448,7 @@ void main() {
       ['thousands', 'hundreds', 'tens', 'ones'],
     ),
   ]) {
-    testWidgets('竖式$a${op.symbol}$b显示所有结果数位，只填结果即可提交', (tester) async {
+    _practiceTest('竖式$a${op.symbol}$b显示所有结果数位，只填结果即可提交', (tester) async {
       tester.view.physicalSize = const Size(400, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -510,7 +524,7 @@ void main() {
   }
 
   for (final legacy in [true, false]) {
-    testWidgets('恢复乘法${legacy ? '旧完整答案' : '新高位作答'}草稿，数位内容可见且可直接提交', (
+    _practiceTest('恢复乘法${legacy ? '旧完整答案' : '新高位作答'}草稿，数位内容可见且可直接提交', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(400, 900);
@@ -603,7 +617,7 @@ void main() {
     });
   }
 
-  testWidgets('恢复旧进位判错记录保留历史判定和统计，重开不重复写入', (tester) async {
+  _practiceTest('恢复旧进位判错记录保留历史判定和统计，重开不重复写入', (tester) async {
     final problem = MathProblem(
       operands: [NumberValue.fromInt(38), NumberValue.fromInt(45)],
       operators: [Operator.add],
@@ -678,7 +692,7 @@ void main() {
     }
   });
 
-  testWidgets('前台时钟暂停期间不累计，结算后不能重新启动', (tester) async {
+  _practiceTest('前台时钟暂停期间不累计，结算后不能重新启动', (tester) async {
     final clock = PracticeClock();
     addTearDown(clock.dispose);
     clock.start(elapsedMilliseconds: 5000);
@@ -702,7 +716,7 @@ void main() {
     expect(clock.elapsedMilliseconds, finished);
   });
   for (final tens in ['7', '8']) {
-    testWidgets('窄屏大字恢复旧进位选中项，十位$tens按结果判分并保存草稿', (tester) async {
+    _practiceTest('窄屏大字恢复旧进位选中项，十位$tens按结果判分并保存草稿', (tester) async {
       tester.view.physicalSize = const Size(320, 640);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
