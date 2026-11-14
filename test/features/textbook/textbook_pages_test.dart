@@ -47,6 +47,27 @@ class _DownloadIntents extends TextbookDownloadRepository {
 }
 
 class _MemoryRepository implements TextbookRepository {
+  final selected = <String, String>{};
+  final subjectSaves = <TextbookSubject>[];
+  @override
+  Textbook? currentBook(String profileId, TextbookSubject subject) =>
+      find(selected['$profileId:${subject.name}'] ?? '');
+  @override
+  Future<void> selectBook(String profileId, Textbook book) async {
+    selected['$profileId:${book.subject.name}'] = book.pdfSha256;
+  }
+
+  @override
+  Future<void> setSubject(
+    String id,
+    TextbookSubject subject, {
+    required void Function() authorize,
+  }) async {
+    authorize();
+    books[id] = books[id]!.withSubject(subject);
+    subjectSaves.add(subject);
+  }
+
   final recent = <String, String>{};
   @override
   Textbook? recentBook(String profileId) => find(recent[profileId] ?? '');

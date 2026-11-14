@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
+
 import '../../helpers/textbook_fixture.dart';
 
 class _MockBox extends Mock implements Box<dynamic> {}
@@ -37,8 +39,10 @@ void main() {
     expect(repo.find(book.pdfSha256)!.toJson(), book.toJson());
     expect(repo.list().length, 1);
     expect(repo.recentBook('child')!.pdfSha256, book.pdfSha256);
-    expect(repo.reading('child', book.pdfSha256).toJson(),
-        {'page': 2, 'match': 'matches'},);
+    expect(repo.reading('child', book.pdfSha256).toJson(), {
+      'page': 2,
+      'match': 'matches',
+    });
   });
 
   test('页码边界、档案与不同资源隔离，核对更新不覆盖排队阅读更新', () async {
@@ -50,8 +54,10 @@ void main() {
       repo.savePage('child', book, 100),
       repo.setMatch('child', book.pdfSha256, TextbookMatch.differs),
     ]);
-    expect(repo.reading('child', book.pdfSha256).toJson(),
-        {'page': 3, 'match': 'differs'},);
+    expect(repo.reading('child', book.pdfSha256).toJson(), {
+      'page': 3,
+      'match': 'differs',
+    });
     expect(repo.reading('parent', book.pdfSha256).page, 1);
     expect(repo.reading('child', other.pdfSha256).page, 1);
     await repo.savePage('child', book, -10);
@@ -63,14 +69,47 @@ void main() {
     await repo.addIfAbsent(book);
     final badId = List.filled(64, 'b').join();
     await box.put(
-        '${TextbookRepository.bookKeyPrefix}$badId', jsonEncode(book.toJson()),);
+      '${TextbookRepository.bookKeyPrefix}$badId',
+      jsonEncode(book.toJson()),
+    );
     await box.put(
-        '${TextbookRepository.bookKeyPrefix}${List.filled(64, 'c').join()}',
-        '{bad json',);
+      '${TextbookRepository.bookKeyPrefix}${List.filled(64, 'c').join()}',
+      '{bad json',
+    );
     expect(repo.list().map((book) => book.pdfSha256), [book.pdfSha256]);
-    expect(() => Textbook.fromJson({...book.toJson(), 'schemaVersion': 2}),
-        throwsFormatException,);
+    expect(
+      () => Textbook.fromJson({...book.toJson(), 'schemaVersion': 3}),
+      throwsFormatException,
+    );
     expect(repo.find('../file'), isNull);
+  });
+
+  test('v1 登记保留未知学科，家长确认后保存 v2 且不改变续读', () async {
+    final original = textbookFixture(title: '数学不能只凭书名识别');
+    final old = {...original.toJson(), 'schemaVersion': 1}..remove('subject');
+    await box.put(
+      '${TextbookRepository.bookKeyPrefix}${original.pdfSha256}',
+      jsonEncode(old),
+    );
+    expect(repo.find(original.pdfSha256)!.subject, TextbookSubject.unknown);
+    await repo.savePage('child', original, 2);
+    var checked = false;
+    await repo.setSubject(
+      original.pdfSha256,
+      TextbookSubject.math,
+      authorize: () => checked = true,
+    );
+    expect(checked, isTrue);
+    final reopened = TextbookRepository(box: box);
+    expect(reopened.find(original.pdfSha256)!.subject, TextbookSubject.math);
+    expect(reopened.find(original.pdfSha256)!.toJson()['schemaVersion'], 2);
+    expect(reopened.reading('child', original.pdfSha256).page, 2);
+    for (final subject in [null, 2, 'science']) {
+      expect(
+        () => Textbook.fromJson({...original.toJson(), 'subject': subject}),
+        throwsFormatException,
+      );
+    }
   });
 
   test('写入失败不污染后续队列，失败调用向 UI 报错', () async {
@@ -81,10 +120,10 @@ void main() {
     var attempts = 0;
     when(() => mocked.put(any<Object>(), any<Object>()))
         .thenAnswer((call) async {
-      if (++attempts == 1) throw HiveError('disk full');
-      values[call.positionalArguments[0] as String] =
-          call.positionalArguments[1];
-    });
+          if (++attempts == 1) throw HiveError('disk full');
+          values[call.positionalArguments[0] as String] =
+              call.positionalArguments[1];
+        });
     final failing = TextbookRepository(box: mocked);
     final book = textbookFixture();
     await expectLater(failing.addIfAbsent(book), throwsA(isA<HiveError>()));
@@ -114,7 +153,10 @@ void main() {
     expect(repo.recentBook('other:child')!.pdfSha256, other.pdfSha256);
     expect(repo.reading('child', book.pdfSha256).page, 1);
     expect(repo.reading('parent', book.pdfSha256).page, 1);
-    expect(repo.reading('child', book.pdfSha256).match, TextbookMatch.unchecked);
+    expect(
+      repo.reading('child', book.pdfSha256).match,
+      TextbookMatch.unchecked,
+    );
     // 其他书不受影响。
     expect(repo.find(other.pdfSha256), isNotNull);
     expect(repo.reading('child', other.pdfSha256).page, 3);
@@ -127,8 +169,8 @@ void main() {
     // 真实键已从 box 移除，而不只是 getter 返回默认值。
     expect(
       box.keys.whereType<String>().where(
-            (key) => key.endsWith(':${book.pdfSha256}'),
-          ),
+        (key) => key.endsWith(':${book.pdfSha256}'),
+      ),
       isEmpty,
     );
   });
@@ -147,7 +189,10 @@ void main() {
     await repo.delete(other.pdfSha256);
     await repo.markOpened('child', other.pdfSha256);
     expect(repo.recentBook('child'), isNull);
-    expect(box.containsKey('${TextbookRepository.recentKeyPrefix}child'), isFalse);
+    expect(
+      box.containsKey('${TextbookRepository.recentKeyPrefix}child'),
+      isFalse,
+    );
   });
 
   test('损坏的最近标识报告失败，不自动改写原值', () async {

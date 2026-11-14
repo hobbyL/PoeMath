@@ -6,76 +6,76 @@ import '../../tools/textbook_importer/course.dart' as tool;
 String get courseFixtureHash => List.filled(64, 'a').join();
 
 Textbook courseFixtureBook() => Textbook(
-      pdfSha256: courseFixtureHash,
-      title: '自有合成教材',
-      grade: 1,
-      semester: '下',
-      publisher: '合成出版社',
-      editionNote: '自有测试版',
-      originalFileName: 'sample.pdf',
-      pageCount: 3,
-      fileSize: 1234,
-      importedAt: DateTime.utc(2026, 10, 23),
-    );
+  subject: TextbookSubject.chinese,
+  pdfSha256: courseFixtureHash,
+  title: '自有合成教材',
+  grade: 1,
+  semester: '下',
+  publisher: '合成出版社',
+  editionNote: '自有测试版',
+  originalFileName: 'sample.pdf',
+  pageCount: 3,
+  fileSize: 1234,
+  importedAt: DateTime.utc(2026, 10, 23),
+);
 
 Map<String, dynamic> courseFixtureCatalog() => {
-      'schemaVersion': 1,
-      'books': [
-        {
-          'sha256': courseFixtureHash,
-          'bytes': 1234,
-          'pageCount': 3,
-          'title': '自有合成教材',
-          'grade': 1,
-          'semester': '下',
-          'publisher': '合成出版社',
-          'editionNotes': '自有测试内容，没有真实教材正文',
-          'editionLabel': '自有测试版',
-          'sourceRepository': 'example/textbook',
-          'sourceCommit': List.filled(40, 'b').join(),
-          'sourcePath': 'sample.pdf',
-          'downloadUrl':
-              'https://raw.githubusercontent.com/example/textbook/${List.filled(40, 'b').join()}/sample.pdf',
-          'evidencePdfPages': [1],
-          'checkedAt': '2026-10-23T00:00:00Z',
-        },
-      ],
-    };
+  'schemaVersion': 1,
+  'books': [
+    {
+      'sha256': courseFixtureHash,
+      'bytes': 1234,
+      'pageCount': 3,
+      'title': '自有合成教材',
+      'grade': 1,
+      'semester': '下',
+      'publisher': '合成出版社',
+      'editionNotes': '自有测试内容，没有真实教材正文',
+      'editionLabel': '自有测试版',
+      'sourceRepository': 'example/textbook',
+      'sourceCommit': List.filled(40, 'b').join(),
+      'sourcePath': 'sample.pdf',
+      'downloadUrl':
+          'https://raw.githubusercontent.com/example/textbook/${List.filled(40, 'b').join()}/sample.pdf',
+      'evidencePdfPages': [1],
+      'checkedAt': '2026-10-23T00:00:00Z',
+    },
+  ],
+};
 
 Map<String, dynamic> courseFixtureExtraction() => {
-      'schemaVersion': 1,
-      'status': 'draft',
-      'contentReviewStatus': 'unreviewed',
-      'source': {'sha256': courseFixtureHash, 'fileSizeBytes': 1234},
-      'qualitySummary': {'pageCount': 3, 'pagesNeedingReview': <int>[]},
-      'pages': [
-        for (var i = 1; i <= 3; i++)
-          {
-            'pdfPageNumber': i,
-            'text': '自有测试第$i页',
-            'extractionStatus': 'text_extracted',
-          },
-      ],
-    };
+  'schemaVersion': 1,
+  'status': 'draft',
+  'contentReviewStatus': 'unreviewed',
+  'source': {'sha256': courseFixtureHash, 'fileSizeBytes': 1234},
+  'qualitySummary': {'pageCount': 3, 'pagesNeedingReview': <int>[]},
+  'pages': [
+    for (var i = 1; i <= 3; i++)
+      {
+        'pdfPageNumber': i,
+        'text': '自有测试第$i页',
+        'extractionStatus': 'text_extracted',
+      },
+  ],
+};
 
 Map<String, dynamic> courseFixtureSource(int page) => {
-      'pdfPage': page,
-      'printedPage': '${page - 1}',
-      'extractionStatus': 'manual',
-    };
+  'pdfPage': page,
+  'printedPage': '${page - 1}',
+  'extractionStatus': 'manual',
+};
 
 Map<String, dynamic> courseFixtureText(
   String id,
   String text,
   List<String>? pinyin,
-) =>
-    {
-      'id': id,
-      'text': text,
-      'pinyin': pinyin,
-      'sources': [courseFixtureSource(2)],
-      'review': tool.newTextbookReview(),
-    };
+) => {
+  'id': id,
+  'text': text,
+  'pinyin': pinyin,
+  'sources': [courseFixtureSource(2)],
+  'review': tool.newTextbookReview(),
+};
 
 /// 所有文字均为自有合成材料；同时覆盖补充平面汉字、标点和明确子段范围。
 Map<String, dynamic> courseFixture({
@@ -109,29 +109,31 @@ Map<String, dynamic> courseFixture({
           category: 'complete',
       },
       'paragraphs': [
-        courseFixtureText(
-          'paragraph-001',
-          '星𠀀，月。',
-          ['xīng', 'hē', '，', 'yuè', '。'],
-        ),
+        courseFixtureText('paragraph-001', '星𠀀，月。', [
+          'xīng',
+          'hē',
+          '，',
+          'yuè',
+          '。',
+        ]),
       ],
       'recognitionCharacters': [
         {
           ...courseFixtureText('recognition-001', '𠀀', ['hē']),
           'requirement': 'recognition',
-        }
+        },
       ],
       'writingCharacters': [
         {
           ...courseFixtureText('writing-001', '星', ['xīng']),
           'requirement': 'writing',
-        }
+        },
       ],
       'words': [
         {
           ...courseFixtureText('word-001', '星月', ['xīng', 'yuè']),
           'requirement': 'reading',
-        }
+        },
       ],
       'recitations': [
         {
@@ -143,7 +145,7 @@ Map<String, dynamic> courseFixture({
               'start': 0,
               'end': 2,
               'textSha256': textbookTextDigest('星𠀀'),
-            }
+            },
           ],
           'sources': [courseFixtureSource(3)],
           'review': tool.newTextbookReview(),

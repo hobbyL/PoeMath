@@ -12,10 +12,30 @@ class TextbookRepository {
   static const bookKeyPrefix = 'textbook_book_v1:';
   static const readingKeyPrefix = 'textbook_reading_v1:';
   static const recentKeyPrefix = 'textbook_recent_v1:';
+  static const selectionKeyPrefix = 'textbook_selection_v1:';
   Future<void> _writes = Future<void>.value();
 
   String _recentKey(String profileId) =>
       '$recentKeyPrefix${Uri.encodeComponent(profileId)}';
+
+  String _selectionKey(String profileId, TextbookSubject subject) =>
+      '$selectionKeyPrefix${Uri.encodeComponent(profileId)}:${subject.name}';
+
+  Textbook? currentBook(String profileId, TextbookSubject subject) {
+    final id = _box.get(_selectionKey(profileId, subject));
+    if (id is! String) return null;
+    final book = find(id);
+    return book?.subject == subject ? book : null;
+  }
+
+  Future<void> selectBook(String profileId, Textbook book) =>
+      _enqueue(() async {
+        final current = find(book.pdfSha256);
+        if (current == null || current.subject != book.subject) {
+          throw const FormatException('本书已移除或学科已变更');
+        }
+        await _box.put(_selectionKey(profileId, book.subject), book.pdfSha256);
+      });
 
   Textbook? recentBook(String profileId) {
     final id = _box.get(_recentKey(profileId));
@@ -36,6 +56,9 @@ class TextbookRepository {
         final key = event.key;
         return key is String &&
             (key == _recentKey(profileId) ||
+                key.startsWith(
+                  '$selectionKeyPrefix${Uri.encodeComponent(profileId)}:',
+                ) ||
                 key.startsWith(
                   '$readingKeyPrefix${Uri.encodeComponent(profileId)}:',
                 ) ||
@@ -78,6 +101,18 @@ class TextbookRepository {
           jsonEncode(validated.toJson()),
         );
       });
+
+  Future<void> setSubject(
+    String id,
+    TextbookSubject subject, {
+    required void Function() authorize,
+  }) => _enqueue(() async {
+    authorize();
+    final current = find(id);
+    if (current == null) throw const FormatException('教材已移除，请重新打开');
+    final updated = Textbook.fromJson(current.withSubject(subject).toJson());
+    await _box.put('$bookKeyPrefix$id', jsonEncode(updated.toJson()));
+  });
 
   String _readingKey(String profileId, String id) =>
       '$readingKeyPrefix${Uri.encodeComponent(profileId)}:$id';
@@ -130,7 +165,9 @@ class TextbookRepository {
       if (key.startsWith(readingKeyPrefix) && key.endsWith(':$id')) {
         await _box.delete(key);
       }
-      if (key.startsWith(recentKeyPrefix) && _box.get(key) == id) {
+      if ((key.startsWith(recentKeyPrefix) ||
+              key.startsWith(selectionKeyPrefix)) &&
+          _box.get(key) == id) {
         await _box.delete(key);
       }
     }

@@ -17,6 +17,7 @@ class TextbookCatalogEntry {
     this.editionNumber,
     this.printingDate,
     this.printingNumber,
+    this.approvalYear,
   });
 
   final Textbook book;
@@ -33,6 +34,7 @@ class TextbookCatalogEntry {
   final int? editionNumber;
   final String? printingDate;
   final int? printingNumber;
+  final int? approvalYear;
   Uri? get fallbackDownloadUrl => sourceBlobSha == null
       ? null
       : Uri.https(
@@ -47,7 +49,9 @@ class TextbookCatalogEntry {
     final path = json['sourcePath'] as String;
     final pages = (json['evidencePdfPages'] as List).cast<int>();
     final book = Textbook.fromJson({
-      'schemaVersion': 1,
+      // 已发布的 v1 目录全部为已核验的语文书目；不能按本地书名猜测学科。
+      'schemaVersion': 2,
+      'subject': json['subject'] ?? 'chinese',
       'pdfSha256': json['sha256'],
       'title': json['title'],
       'grade': json['grade'],
@@ -58,11 +62,14 @@ class TextbookCatalogEntry {
       'pageCount': json['pageCount'],
       'fileSize': json['bytes'],
       'importedAt': json['checkedAt'],
+      'editionId': json['editionId'],
+      'curriculumStandard': json['curriculumStandard'],
     });
     final edition = json['editionLabel'] as String;
     final blob = json['gitBlobSha'] as String?;
     final cover = json['coverAsset'] as String?;
     final coverHash = json['coverSha256'] as String?;
+    final approvalYear = json['approvalYear'] as int?;
     if (uri.scheme != 'https' ||
         uri.host != 'raw.githubusercontent.com' ||
         uri.userInfo.isNotEmpty ||
@@ -79,7 +86,8 @@ class TextbookCatalogEntry {
                 coverHash == null ||
                 !RegExp(r'^[a-f0-9]{64}$').hasMatch(coverHash) ||
                 json['coverSourcePdfPage'] != 1)) ||
-        (cover == null && coverHash != null)) {
+        (cover == null && coverHash != null) ||
+        approvalYear != null && (approvalYear < 1900 || approvalYear > 2099)) {
       throw const FormatException('教材目录信息无效');
     }
     return TextbookCatalogEntry(
@@ -97,6 +105,7 @@ class TextbookCatalogEntry {
       editionNumber: json['editionNumber'] as int?,
       printingDate: json['printingDate'] as String?,
       printingNumber: json['printingNumber'] as int?,
+      approvalYear: approvalYear,
     );
   }
 }

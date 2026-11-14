@@ -33,6 +33,20 @@ class _Files extends TextbookFileService {
 }
 
 class _Books implements TextbookRepository {
+  @override
+  Textbook? currentBook(String profileId, TextbookSubject subject) => null;
+  @override
+  Future<void> selectBook(String profileId, Textbook book) async {}
+  @override
+  Future<void> setSubject(
+    String id,
+    TextbookSubject subject, {
+    required void Function() authorize,
+  }) async {
+    authorize();
+    throw UnsupportedError('This read-only fixture does not edit registration');
+  }
+
   final recent = <String, String>{};
   @override
   Textbook? recentBook(String profileId) => find(recent[profileId] ?? '');

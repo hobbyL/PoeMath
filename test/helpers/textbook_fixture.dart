@@ -5,19 +5,20 @@ Textbook textbookFixture({
   String title = '语文测试教材',
   int pageCount = 3,
   int fileSize = 25,
-}) =>
-    Textbook(
-      pdfSha256: id ?? List.filled(64, 'a').join(),
-      title: title,
-      grade: 3,
-      semester: '上',
-      publisher: '测试出版社',
-      editionNote: '合成样本',
-      originalFileName: 'sample.pdf',
-      pageCount: pageCount,
-      fileSize: fileSize,
-      importedAt: DateTime.utc(2026, 10, 22),
-    );
+  TextbookSubject subject = TextbookSubject.chinese,
+}) => Textbook(
+  subject: subject,
+  pdfSha256: id ?? List.filled(64, 'a').join(),
+  title: title,
+  grade: 3,
+  semester: '上',
+  publisher: '测试出版社',
+  editionNote: '合成样本',
+  originalFileName: 'sample.pdf',
+  pageCount: pageCount,
+  fileSize: fileSize,
+  importedAt: DateTime.utc(2026, 10, 22),
+);
 
 /// 自有三页 PDF，用于真实 PDFium 打开/渲染测试；不含教材内容。
 List<int> syntheticPdf({bool bookmarks = false}) {

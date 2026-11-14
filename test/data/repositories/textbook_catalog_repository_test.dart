@@ -1,33 +1,27 @@
 import 'dart:convert';
 import 'dart:ui' as ui;
+
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/data/models/textbook_catalog.dart';
+import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test('真实目录覆盖12册且保留来源、校验身份与实际版本证据', () async {
-    final books = await const TextbookCatalogRepository().load();
+    final catalog = await const TextbookCatalogRepository().load();
+    expect(catalog, hasLength(24));
+    final books = catalog
+        .where((entry) => entry.book.subject == TextbookSubject.chinese)
+        .toList();
     expect(
-        books
-            .map((entry) => '${entry.book.grade}${entry.book.semester}')
-            .toList(),
-        [
-          '1上',
-          '1下',
-          '2上',
-          '2下',
-          '3上',
-          '3下',
-          '4上',
-          '4下',
-          '5上',
-          '5下',
-          '6上',
-          '6下',
-        ]);
+      books
+          .map((entry) => '${entry.book.grade}${entry.book.semester}')
+          .toList(),
+      ['1上', '1下', '2上', '2下', '3上', '3下', '4上', '4下', '5上', '5下', '6上', '6下'],
+    );
     expect(books.where((entry) => entry.editionLabel == '2022课标修订').length, 9);
     expect(
       books
@@ -50,8 +44,9 @@ void main() {
       books.fold<int>(0, (sum, entry) => sum + entry.book.fileSize),
       208724096,
     );
-    final sixth =
-        books.singleWhere((entry) => entry.book.volumeLabel == '六年级上册');
+    final sixth = books.singleWhere(
+      (entry) => entry.book.volumeLabel == '六年级上册',
+    );
     expect(
       sixth.book.pdfSha256,
       'e828449236d0c1b347e5cd6291d58b0febe83a3e21b2b7428697d8006af49ece',
@@ -59,13 +54,14 @@ void main() {
     expect(sixth.book.pageCount, 138);
     expect(sixth.evidencePdfPages, [3, 136]);
     expect(sixth.book.editionNote, contains('未载明出版年月'));
-    expect(
-      sixth.downloadUrl.pathSegments.take(3),
-      ['hantang', 'yuwen', sixth.sourceCommit],
-    );
+    expect(sixth.downloadUrl.pathSegments.take(3), [
+      'hantang',
+      'yuwen',
+      sixth.sourceCommit,
+    ]);
   });
 
-  test('12册封面均可离线解码且绑定目录中的原PDF身份与封面SHA', () async {
+  test('语文与数学24册封面均可离线解码且绑定原PDF身份与封面SHA', () async {
     final books = await const TextbookCatalogRepository().load();
     for (final entry in books) {
       expect(
@@ -73,8 +69,10 @@ void main() {
         'assets/textbooks/covers/${entry.book.pdfSha256}.webp',
       );
       final data = await rootBundle.load(entry.coverAsset!);
-      final bytes =
-          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+      final bytes = data.buffer.asUint8List(
+        data.offsetInBytes,
+        data.lengthInBytes,
+      );
       expect(sha256.convert(bytes).toString(), entry.coverSha256);
       final codec = await ui.instantiateImageCodec(bytes);
       try {
@@ -99,8 +97,10 @@ void main() {
     for (final change in <Map<String, dynamic>>[
       {'sha256': 'not-a-sha'},
       {
-        'downloadUrl':
-            (raw['downloadUrl'] as String).replaceFirst('https:', 'http:'),
+        'downloadUrl': (raw['downloadUrl'] as String).replaceFirst(
+          'https:',
+          'http:',
+        ),
       },
       {'sourceCommit': 'main'},
       {'coverAsset': 'assets/textbooks/covers/another-book.webp'},
