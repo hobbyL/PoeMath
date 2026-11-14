@@ -28,6 +28,8 @@ import 'package:poemath/data/models/check_in.dart';
 import 'package:poemath/data/models/formula_favorite.dart';
 import 'package:poemath/data/models/math_mistake.dart';
 import 'package:poemath/data/models/math_session.dart';
+import 'package:poemath/data/models/math_textbook_progress.dart';
+import 'package:poemath/data/models/math_textbook_session_context.dart';
 import 'package:poemath/data/models/learning_activity.dart';
 import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/models/textbook.dart';
@@ -74,6 +76,7 @@ const String _textbookReadingPrefix = 'textbook_reading_v1:';
 const String _textbookRecognitionPrefix = 'textbook_recognition_v1:';
 const String _textbookWritingPrefix = 'textbook_writing_v1:';
 const String _textbookExercisePrefix = 'textbook_exercise_v1:';
+const String _textbookMathPrefix = MathTextbookProgress.prefix;
 
 /// 允许随备份迁移的 settings key 及其类型契约（key → 期望类型标签）。
 ///
@@ -341,6 +344,7 @@ class BackupService {
       'challengeRecords': _exportChallengeRecords(),
       'learningActivities': _exportLearningActivities(),
       'textbookLearning': _exportTextbookLearning(),
+      'mathTextbookProgressVersion': 1,
       'pictureStoryPractice': _exportPictureStoryPractice(),
       'llmProblems': _exportLlmProblems(),
       'conversations': [
@@ -1182,6 +1186,11 @@ class BackupService {
     if (data.containsKey('textbookLearning')) {
       count += await _restoreTextbookLearning(
         data['textbookLearning'] as Map<String, dynamic>,
+        replaceMath:
+            data['mathTextbookProgressVersion'] == 1 ||
+            (data['textbookLearning'] as Map<String, dynamic>).keys.any(
+              (key) => key.startsWith(_textbookMathPrefix),
+            ),
       );
     }
     if (data.containsKey('pictureStoryPractice')) {
@@ -1336,6 +1345,7 @@ class BackupService {
         'problemJson': m.problemJson,
         'attemptJson': m.attemptJson,
         'repracticeHistoryJson': m.repracticeHistoryJson,
+        'textbookSourcesJson': m.textbookSourcesJson,
       };
     }).toList();
   }
@@ -1346,6 +1356,7 @@ class BackupService {
         _textbookRecognitionPrefix,
         _textbookWritingPrefix,
         _textbookExercisePrefix,
+        _textbookMathPrefix,
       ]);
 
   Map<String, String> _exportTextbookProgressValues(
@@ -1683,6 +1694,7 @@ class BackupService {
         appliedActivityIds: (m['appliedActivityIds'] as List<dynamic>? ?? [])
             .cast<String>(),
         repracticeHistoryJson: m['repracticeHistoryJson'] as String? ?? '[]',
+        textbookSourcesJson: m['textbookSourcesJson'] as String? ?? '[]',
       );
       await box.put('${obj.profileId}_${obj.id}', obj);
     }
@@ -1853,13 +1865,17 @@ class BackupService {
     return items.length;
   }
 
-  Future<int> _restoreTextbookLearning(Map<String, dynamic> data) async {
+  Future<int> _restoreTextbookLearning(
+    Map<String, dynamic> data, {
+    required bool replaceMath,
+  }) async {
     final settings = data.cast<String, String>();
-    final progressPrefixes = const [
+    final progressPrefixes = [
       _textbookReadingPrefix,
       _textbookRecognitionPrefix,
       _textbookWritingPrefix,
       _textbookExercisePrefix,
+      if (replaceMath) _textbookMathPrefix,
     ];
     final oldSettingsKeys = HiveBoxes.settings.keys
         .whereType<String>()
@@ -2466,6 +2482,14 @@ class BackupService {
       _optionalNullableString(item, key, path);
     }
     _optionalNullableString(item, 'repracticeHistoryJson', path);
+    _optionalNullableString(item, 'textbookSourcesJson', path);
+    try {
+      MathMistake.decodeTextbookSources(
+        item['textbookSourcesJson'] as String? ?? '[]',
+      );
+    } on Object {
+      _invalidField('$path.textbookSourcesJson', '教材错题来源快照无效');
+    }
     try {
       final rawHistory = jsonDecode(
         item['repracticeHistoryJson'] as String? ?? '[]',
@@ -2528,6 +2552,42 @@ class BackupService {
       });
     }
     _optionalNullableString(item, 'problemsJson', path);
+    final details = item['problemsJson'] as String?;
+    if (details != null &&
+        (item['problemType'] == 'textbook' ||
+            details.contains('"textbookContext"'))) {
+      try {
+        if (utf8.encode(details).length > 8 * 1024 * 1024) {
+          throw const FormatException('练习快照超过容量');
+        }
+        final records = jsonDecode(details);
+        if (records is! List || records.length > 1000) {
+          throw const FormatException('题目数量无效');
+        }
+        var correct = 0;
+        for (final raw in records) {
+          if (raw is! Map<String, dynamic>) {
+            throw const FormatException('题目须为对象');
+          }
+          final context = MathTextbookSessionContext.fromJson(
+            raw['textbookContext'],
+          );
+          final answer = context.item.exercise.fields
+              .map((field) => context.answers[field.id]!)
+              .join('；');
+          if (raw['c'] != context.correct || raw['u'] != answer) {
+            throw const FormatException('作答与快照判分不一致');
+          }
+          if (context.correct) correct++;
+        }
+        if (records.length != item['totalProblems'] ||
+            correct != (item['correctCount'] ?? 0)) {
+          throw const FormatException('题目快照与统计不一致');
+        }
+      } on Object {
+        _invalidField('$path.problemsJson', '数学教材练习快照无效');
+      }
+    }
   }
 
   void _validateFormulaFavorite(Map<String, dynamic> item, String path) {
@@ -2690,6 +2750,11 @@ class BackupService {
   }
 
   void _validateTextbookLearning(Map<String, dynamic> data) {
+    if (data.containsKey('mathTextbookProgressVersion') &&
+        (data['mathTextbookProgressVersion'] != 1 ||
+            !data.containsKey('textbookLearning'))) {
+      _invalidField('mathTextbookProgressVersion', '数学教材进度版本或数据段无效');
+    }
     if (!data.containsKey('textbookLearning')) return;
     final learning = data['textbookLearning'];
     if (learning is! Map<String, dynamic>) {
@@ -2705,7 +2770,7 @@ class BackupService {
 
   void _validateTextbookProgressEntry(String key, Object? value) {
     final path = 'textbookLearning.$key';
-    if (value is! String || value.length > 4 * 1024 * 1024) {
+    if (value is! String || utf8.encode(value).length > 4 * 1024 * 1024) {
       _invalidField(path, '进度必须是有效的 JSON 字符串');
     }
     final parsed = jsonDecode(value);
@@ -2735,6 +2800,7 @@ class BackupService {
         _textbookRecognitionPrefix,
         _textbookWritingPrefix,
         _textbookExercisePrefix,
+        _textbookMathPrefix,
       ].where(key.startsWith).firstOrNull;
       if (prefix == null ||
           !RegExp(r'^[a-f0-9]{64}$').hasMatch(key.substring(prefix.length))) {
@@ -2760,6 +2826,8 @@ class BackupService {
           WritingProgress.fromJson(parsed);
         case _textbookExercisePrefix:
           TextbookExerciseProgress.fromJson(parsed);
+        case _textbookMathPrefix:
+          MathTextbookProgress.fromJson(parsed);
       }
     } on Object {
       _invalidField(path, '教材学习进度内容无效');

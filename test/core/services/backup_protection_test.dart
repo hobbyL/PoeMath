@@ -297,10 +297,12 @@ void main() {
     await drafts.save('math', {'sessionId': 'original'});
     final entered = Completer<void>();
     final release = Completer<void>();
+    String? inFlightTheme;
     final active = drafts.guard(() async {
       entered.complete();
       await release.future;
       await HiveBoxes.settings.put('theme_mode', 'dark');
+      inFlightTheme = HiveBoxes.settings.get('theme_mode') as String;
     });
     final activeResult = expectLater(active, throwsStateError);
     await entered.future;
@@ -311,6 +313,7 @@ void main() {
     expect(() => drafts.assertCurrent(), throwsStateError);
     release.complete();
     await activeResult;
+    expect(inFlightTheme, 'dark');
     await restore;
     expect(HiveBoxes.settings.get('theme_mode'), 'light');
     expect(drafts.get('math'), isNull);
