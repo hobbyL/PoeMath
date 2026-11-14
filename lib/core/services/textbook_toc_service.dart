@@ -144,7 +144,13 @@ class TextbookTocService {
           if (needle.isEmpty) continue;
           final headingMatch = rows.any((row) {
             final value = _normalize(_cleanTitle(row.text), chinese);
-            return row.top < 0.7 && value == needle;
+            return row.top < 0.7 &&
+                (value == needle ||
+                    _normalize(
+                          _cleanTitle(row.text, stripNumber: false),
+                          chinese,
+                        ) ==
+                        needle);
           });
           if (headingMatch) {
             matches[index].add(page);
@@ -297,13 +303,17 @@ List<TextbookTocEntry> _hierarchy(List<TextbookTocEntry> entries) {
   return result;
 }
 
-String _cleanTitle(String value) => value
-    .replaceAll(_leaders, ' ')
-    .replaceFirst(RegExp(r'^\s*[◎*＊★☆]?\s*(?:\d\s*)+[.、．\s]*'), '')
-    .replaceFirst(RegExp(r'^\s*[◎*＊★☆]\s*'), '')
-    .replaceAll(RegExp(r'(?<=[\u3400-\u9FFF])\s+(?=[\u3400-\u9FFF])'), '')
-    .replaceAllMapped(RegExp(r'\s*([（）：，、])\s*'), (match) => match[1]!)
-    .trim();
+String _cleanTitle(String value, {bool stripNumber = true}) {
+  var title = value.replaceAll(_leaders, ' ');
+  if (stripNumber) {
+    title = title.replaceFirst(RegExp(r'^\s*[◎*＊★☆]?\s*\d+[.、．\s]*'), '');
+  }
+  return title
+      .replaceFirst(RegExp(r'^\s*[◎*＊★☆]\s*'), '')
+      .replaceAll(RegExp(r'(?<=[\u3400-\u9FFF])\s+(?=[\u3400-\u9FFF])'), '')
+      .replaceAllMapped(RegExp(r'\s*([（）：，、])\s*'), (match) => match[1]!)
+      .trim();
+}
 
 class _Run {
   _Run(this.text, this.left, this.right);
@@ -438,7 +448,7 @@ List<_Candidate> _candidates(List<_Row> rows) {
           )) {
         final raw = pending.map((part) => part.text).join(' ');
         final title = _cleanTitle(raw);
-        final number = RegExp(r'^\s*[◎*＊★☆]?\s*((?:\d\s*)+)').firstMatch(raw);
+        final number = RegExp(r'^\s*[◎*＊★☆]?\s*(\d+)').firstMatch(raw);
         if (title.isNotEmpty && title.length <= 100 && int.parse(value) > 0) {
           result.add(
             _Candidate(
@@ -476,6 +486,8 @@ List<_Candidate> _candidates(List<_Row> rows) {
 
 List<_Candidate> _entries(List<_Row> rows) {
   var result = _candidates(rows);
+  rows = _joinWrappedDirectoryRows(rows, result);
+  result = _candidates(rows);
   // 页码列重复出现形成可靠栏界；先切开各栏，再解释行内的课号/页码。
   // 否则左栏无页码的单元标题会吞入右栏同高的课号或诗歌标题。
   final endpoints = <double, int>{};
@@ -546,6 +558,112 @@ List<_Candidate> _entries(List<_Row> rows) {
     }
   }
   return result;
+}
+
+/// A wrapped title can surround a vertically centred lesson/page number.
+/// Join only within a repeated page-number column and between its neighbours;
+/// ordinary adjacent entries and another column must retain their own rows.
+List<_Row> _joinWrappedDirectoryRows(
+  List<_Row> rows,
+  List<_Candidate> candidates,
+) {
+  final endpoints = <double, int>{};
+  for (final candidate in candidates) {
+    if (candidate.printedPage == null) continue;
+    final column = endpoints.keys
+        .where((x) => (x - candidate.column).abs() < .04)
+        .firstOrNull;
+    endpoints.update(
+      column ?? candidate.column,
+      (count) => count + 1,
+      ifAbsent: () => 1,
+    );
+  }
+  final columns =
+      endpoints.entries
+          .where((entry) => entry.value >= 2)
+          .map((entry) => entry.key)
+          .toList()
+        ..sort();
+  final used = <_Run>{};
+  final joined = <_Row>[];
+  for (var column = 0; column < columns.length; column++) {
+    final left = column == 0 ? 0.0 : columns[column - 1] + .03;
+    final anchors = [
+      for (final row in rows)
+        for (final run in row.runs)
+          if (_number.hasMatch(run.text) &&
+              (run.right - columns[column]).abs() < .04)
+            (row: row, run: run),
+    ]..sort((a, b) => a.row.top.compareTo(b.row.top));
+    for (var index = 0; index < anchors.length; index++) {
+      final anchor = anchors[index];
+      final center = anchor.row.top + anchor.row.height / 2;
+      final neighbours = rows.where((row) {
+        final y = row.top + row.height / 2;
+        return (y - center).abs() <=
+                math.max(row.height, anchor.row.height) * 1.5 &&
+            (index == 0 || y > (anchors[index - 1].row.top + center) / 2) &&
+            (index + 1 == anchors.length ||
+                y < (anchors[index + 1].row.top + center) / 2);
+      });
+      final lines = [
+        for (final row in neighbours)
+          (
+            row: row,
+            runs: row.runs
+                .where(
+                  (run) =>
+                      !used.contains(run) &&
+                      run.left >= left &&
+                      run.right < anchor.run.left - .025,
+                )
+                .toList(),
+          ),
+      ];
+      final titles = lines
+          .where((line) => line.runs.any((run) => _han.hasMatch(run.text)))
+          .toList();
+      if (titles.length < 2 || titles.length > 3) continue;
+      final titleStarts = titles.map(
+        (line) => line.runs.firstWhere((run) => _han.hasMatch(run.text)).left,
+      );
+      if (titleStarts.reduce(math.max) - titleStarts.reduce(math.min) > .06) {
+        continue;
+      }
+      final parts = lines.expand((line) => line.runs).toList();
+      final number = parts
+          .where(
+            (run) =>
+                _number.hasMatch(run.text) &&
+                run.right < titleStarts.reduce(math.min) - .03,
+          )
+          .firstOrNull;
+      final text = parts
+          .where((run) => run != number)
+          .map((run) => run.text)
+          .join(' ');
+      if (text.length > 100 || _tocHeading.hasMatch(text)) continue;
+      used.addAll(parts);
+      used.add(anchor.run);
+      joined.add(
+        _Row(titles.first.row.top, anchor.row.height, [
+          if (number != null) number,
+          _Run(text, titleStarts.reduce(math.min), anchor.run.left - .025),
+          anchor.run,
+        ]),
+      );
+    }
+  }
+  return [
+    for (final row in rows)
+      _Row(
+        row.top,
+        row.height,
+        row.runs.where((run) => !used.contains(run)).toList(),
+      ),
+    ...joined,
+  ]..sort((a, b) => a.top.compareTo(b.top));
 }
 
 class _DirectoryPage {

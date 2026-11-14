@@ -24,6 +24,67 @@ TextbookTocPage page(List<(String, double, double)> lines) {
 }
 
 void main() {
+  test('跨行数学目录保留标题里的数值，并用居中的页码定位完整单元', () async {
+    final pages = {
+      3: page([
+        ('目录', 0.4, 0.05),
+        ('1', 0.1, 0.15),
+        ('长度单位', 0.24, 0.15),
+        ('2', 0.8, 0.15),
+        ('2', 0.1, 0.317),
+        ('100以内的加法', 0.24, 0.30),
+        ('和减法（二）', 0.24, 0.335),
+        ('11', 0.8, 0.317),
+        ('3', 0.1, 0.48),
+        ('角的初步认识', 0.24, 0.48),
+        ('38', 0.8, 0.48),
+      ]),
+      7: page([('1 长度单位', 0.1, 0.1), ('2', 0.1, 0.95)]),
+      16: page([('2 100以内的加法和减法（二）', 0.1, 0.1), ('11', 0.1, 0.95)]),
+      43: page([('3 角的初步认识', 0.1, 0.1), ('38', 0.1, 0.95)]),
+    };
+    final service = TextbookTocService(
+      pageCount: 50,
+      loadOutline: () async => [],
+      loadPage: (number) async => pages[number] ?? const TextbookTocPage(''),
+    );
+    final result = (await service.scan().last).result!;
+    expect(result.directoryPages, [3]);
+    expect(
+      result.entries.map(
+        (entry) =>
+            (entry.title, entry.lessonNumber, entry.printedPage, entry.page),
+      ),
+      [('长度单位', 1, 2, 7), ('100以内的加法和减法（二）', 2, 11, 16), ('角的初步认识', 3, 38, 43)],
+    );
+  });
+
+  test('数学目录课号与标题中的数量和范围分别保留', () async {
+    final toc = page([
+      ('目录', 0.4, 0.05),
+      ('3', 0.1, 0.2),
+      ('5以内数的认识和加减法', 0.24, 0.2),
+      ('14', 0.8, 0.2),
+      ('5', 0.1, 0.35),
+      ('6~10的认识和加减法', 0.24, 0.35),
+      ('39', 0.8, 0.35),
+      ('6', 0.1, 0.5),
+      ('11~20各数的认识', 0.24, 0.5),
+      ('73', 0.8, 0.5),
+    ]);
+    final service = TextbookTocService(
+      pageCount: 100,
+      loadOutline: () async => [],
+      loadPage: (number) async => number == 3 ? toc : const TextbookTocPage(''),
+    );
+    expect(
+      (await service.scan().last).result!.entries.map(
+        (entry) => (entry.title, entry.lessonNumber, entry.printedPage),
+      ),
+      [('5以内数的认识和加减法', 3, 14), ('6~10的认识和加减法', 5, 39), ('11~20各数的认识', 6, 73)],
+    );
+  });
+
   for (final (name, body) in [
     (
       '正文行内数字不形成目录续页',
