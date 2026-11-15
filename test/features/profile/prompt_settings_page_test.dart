@@ -75,18 +75,14 @@ Future<void> _pumpPage(
   await tester.pumpAndSettle();
 }
 
-/// Hive 写链 tap：runAsync 真实异步区内触发并留足真实时间。
-Future<void> _tapReal(
-  WidgetTester tester,
-  Finder finder, {
-  Duration delay = const Duration(milliseconds: 150),
-}) async {
+/// 在真实区启动写链，并等待已排队的 Hive 写入完成。
+Future<void> _tapReal(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.runAsync(() async {
     await tester.tap(finder);
-    await Future<void>.delayed(delay);
   });
+  await drainHiveWritesForTesting(tester);
   await tester.pump();
   await tester.pump(const Duration(seconds: 1));
 }
@@ -177,17 +173,11 @@ void main() {
     await tester.enterText(_sectionField('诗词讲解'), '新诗词提示');
     await _tapReal(tester, _sectionButton('诗词讲解', '保存'));
 
-    expect(
-      HiveBoxes.settings.get('llm_poem_explain_prompt'),
-      '新诗词提示',
-    );
+    expect(HiveBoxes.settings.get('llm_poem_explain_prompt'), '新诗词提示');
     expect(find.text('已保存'), findsOneWidget);
     expect(find.text('已自定义'), findsOneWidget);
     // 口算侧不受影响。
-    expect(
-      HiveBoxes.settings.get('llm_math_explain_prompt'),
-      isNull,
-    );
+    expect(HiveBoxes.settings.get('llm_math_explain_prompt'), isNull);
 
     // SnackBar 消退后排空异步链。
     await tester.pump(const Duration(seconds: 5));
@@ -237,10 +227,7 @@ void main() {
     await _tapReal(tester, _sectionButton('诗词讲解', '恢复默认'));
 
     // 弹层先只读展示内置默认全文，用户决定前可先看原来是什么样。
-    expect(
-      find.text('内置默认提示词如下，确认后将替换当前内容：'),
-      findsOneWidget,
-    );
+    expect(find.text('内置默认提示词如下，确认后将替换当前内容：'), findsOneWidget);
     expect(find.text(kPoemExplainSystemPrompt), findsOneWidget);
     // 当前自定义值不出现在弹层中（编辑框自身内容不算）。
     expect(
@@ -275,10 +262,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsNothing);
-    expect(
-      HiveBoxes.settings.get('llm_poem_explain_prompt'),
-      '我的诗词风格',
-    );
+    expect(HiveBoxes.settings.get('llm_poem_explain_prompt'), '我的诗词风格');
     expect(_fieldText(tester, '诗词讲解'), '我的诗词风格');
     expect(find.text('已自定义'), findsOneWidget);
 
@@ -291,19 +275,13 @@ void main() {
     final resetBtn = _sectionButton('诗词讲解', '恢复默认');
     // 恢复默认是 TextButton.icon：已是默认态时 onPressed 为 null。
     final resetButtonWidget = tester.widget<TextButton>(
-      find.ancestor(
-        of: resetBtn,
-        matching: find.byType(TextButton),
-      ),
+      find.ancestor(of: resetBtn, matching: find.byType(TextButton)),
     );
     expect(resetButtonWidget.onPressed, isNull);
 
     await _tapReal(tester, resetBtn);
     expect(find.byType(AlertDialog), findsNothing);
-    expect(
-      find.text('内置默认提示词如下，确认后将替换当前内容：'),
-      findsNothing,
-    );
+    expect(find.text('内置默认提示词如下，确认后将替换当前内容：'), findsNothing);
 
     await tester.pump(const Duration(seconds: 2));
   });
@@ -314,21 +292,21 @@ void main() {
       'llm_word_problem_prompt',
       kWordProblemGenerationSystemPrompt,
       _maxLength,
-      false
+      false,
     ),
     (
       '看图说话生图',
       'llm_picture_story_image_prompt',
       kPictureStoryImageGenerationSystemPrompt,
       kPictureStoryImagePromptMaxLength,
-      true
+      true,
     ),
     (
       '根据图片出题',
       'llm_picture_story_question_prompt',
       kPictureStoryQuestionGenerationSystemPrompt,
       kPictureStoryQuestionPromptMaxLength,
-      true
+      true,
     ),
   ]) {
     testWidgets('$title：保存后重新进入保留内容，取消恢复不改写，确认和清空均恢复默认', (tester) async {
@@ -444,11 +422,17 @@ void main() {
     await _pumpPage(tester);
     await tester.enterText(_sectionField('看图说话点评'), '请指出孩子原话中的依据');
     await _tapReal(tester, _sectionButton('看图说话点评', '保存'));
-    expect(HiveBoxes.settings.get('llm_picture_story_feedback_prompt'), '请指出孩子原话中的依据');
+    expect(
+      HiveBoxes.settings.get('llm_picture_story_feedback_prompt'),
+      '请指出孩子原话中的依据',
+    );
     expect(HiveBoxes.settings.get('llm_assistant_prompt'), isNull);
     await tester.enterText(_sectionField('看图说话点评'), '');
     await _tapReal(tester, _sectionButton('看图说话点评', '保存'));
-    expect(HiveBoxes.settings.containsKey('llm_picture_story_feedback_prompt'), isFalse);
+    expect(
+      HiveBoxes.settings.containsKey('llm_picture_story_feedback_prompt'),
+      isFalse,
+    );
   });
 
   testWidgets('助手人设区块：编辑保存落 llm_assistant_prompt 键', (tester) async {

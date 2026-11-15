@@ -67,9 +67,19 @@ class _ControlledSettings extends SettingsRepository {
   }
 }
 
+class _DelayedSettings extends _ControlledSettings {
+  @override
+  Future<void> setCompletionSound(CompletionSound sound) async {
+    if (!release.isCompleted) {
+      Timer(const Duration(milliseconds: 120), release.complete);
+    }
+    await super.setCompletionSound(sound);
+  }
+}
+
 Finder _radio(CompletionSound sound) => find.byWidgetPredicate(
-      (widget) => widget is Radio<CompletionSound> && widget.value == sound,
-    );
+  (widget) => widget is Radio<CompletionSound> && widget.value == sound,
+);
 
 Future<void> _mount(
   WidgetTester tester,
@@ -88,13 +98,39 @@ Future<void> _mount(
 }
 
 Finder _answerRadio(AnswerFeedbackSound sound) => find.byWidgetPredicate(
-      (widget) => widget is Radio<AnswerFeedbackSound> && widget.value == sound,
-    );
+  (widget) => widget is Radio<AnswerFeedbackSound> && widget.value == sound,
+);
 
 Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
+}
+
+/// 保存前后都使用真实 IO；下一次选择须等到持久化和选项恢复可用。
+Future<void> _saveSelection<T>(
+  WidgetTester tester,
+  Finder finder, {
+  required bool Function() isSaved,
+}) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.runAsync(() async {
+    await tester.tap(finder);
+  });
+  await tester.pump();
+  await drainHiveWritesForTesting(tester);
+  await tester.pump();
+  bool ready() => isSaved() && tester.widget<Radio<T>>(finder).enabled == true;
+  final stopwatch = Stopwatch()..start();
+  while (!ready() && stopwatch.elapsed < const Duration(seconds: 5)) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump();
+  }
+  expect(ready(), isTrue, reason: '保存完成且选项重新可用后才能继续选择');
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -119,13 +155,12 @@ void main() {
       (AnswerFeedbackSound.childVoice, false),
     ]);
     expect(settings.answerFeedbackSound, AnswerFeedbackSound.classic);
-    await tester.ensureVisible(_answerRadio(AnswerFeedbackSound.childVoice));
-    await tester.pumpAndSettle();
-    await tester.runAsync(() async {
-      await tester.tap(_answerRadio(AnswerFeedbackSound.childVoice));
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    });
-    await tester.pumpAndSettle();
+    await _saveSelection<AnswerFeedbackSound>(
+      tester,
+      _answerRadio(AnswerFeedbackSound.childVoice),
+      isSaved: () =>
+          settings.answerFeedbackSound == AnswerFeedbackSound.childVoice,
+    );
     expect(settings.answerFeedbackSound, AnswerFeedbackSound.childVoice);
     expect(settings.completionSound, CompletionSound.ensemble);
     for (final sound in CompletionSound.values) {
@@ -136,13 +171,11 @@ void main() {
     expect(settings.completionSound, CompletionSound.ensemble);
     expect(settings.soundEnabled, isFalse);
     for (final sound in CompletionSound.values) {
-      await tester.ensureVisible(_radio(sound));
-      await tester.pumpAndSettle();
-      await tester.runAsync(() async {
-        await tester.tap(_radio(sound));
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      });
-      await tester.pumpAndSettle();
+      await _saveSelection<CompletionSound>(
+        tester,
+        _radio(sound),
+        isSaved: () => settings.completionSound == sound,
+      );
       expect(settings.completionSound, sound);
       expect(settings.answerFeedbackSound, AnswerFeedbackSound.childVoice);
       expect(
@@ -158,12 +191,31 @@ void main() {
     expect(preview.disposed, isTrue);
   });
 
+  testWidgets('真实区延迟保存时，等待选项恢复可用再继续选择', (tester) async {
+    final settings = _DelayedSettings();
+    final container = ProviderContainer(
+      overrides: [settingsRepositoryProvider.overrideWithValue(settings)],
+    );
+    addTearDown(container.dispose);
+    await _mount(tester, container, _PreviewSound());
+    await _saveSelection<CompletionSound>(
+      tester,
+      _radio(CompletionSound.arcade),
+      isSaved: () => settings.completionSound == CompletionSound.arcade,
+    );
+    await _saveSelection<CompletionSound>(
+      tester,
+      _radio(CompletionSound.pizzicato),
+      isSaved: () => settings.completionSound == CompletionSound.pizzicato,
+    );
+    expect(settings.writes, 2);
+    expect(settings.selected, CompletionSound.pizzicato);
+  });
+
   testWidgets('保存未完成时拦截连续选择，失败提示且可重试', (tester) async {
     final settings = _ControlledSettings()..fail = true;
     final container = ProviderContainer(
-      overrides: [
-        settingsRepositoryProvider.overrideWithValue(settings),
-      ],
+      overrides: [settingsRepositoryProvider.overrideWithValue(settings)],
     );
     addTearDown(container.dispose);
     await _mount(tester, container, _PreviewSound());
@@ -208,8 +260,9 @@ void main() {
     await tester.runAsync(unlockParentForTesting);
     addTearDown(lockParentForTesting);
     final settings = SettingsRepository();
-    await tester
-        .runAsync(() => settings.setCompletionSound(CompletionSound.steelDrum));
+    await tester.runAsync(
+      () => settings.setCompletionSound(CompletionSound.steelDrum),
+    );
     await tester.runAsync(
       () => settings.setAnswerFeedbackSound(AnswerFeedbackSound.childVoice),
     );
@@ -250,9 +303,8 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     });
     await tester.pumpAndSettle();
-    await Navigator.of(
-      tester.element(find.byType(CompletionSoundPicker)),
-    ).maybePop();
+    await Navigator.of(tester.element(find.byType(CompletionSoundPicker)))
+        .maybePop();
     await tester.pumpAndSettle();
     expect(find.byType(CompletionSoundPicker), findsNothing);
     expect(find.textContaining('经典电玩'), findsOneWidget);
