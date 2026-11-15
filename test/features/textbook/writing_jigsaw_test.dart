@@ -209,6 +209,19 @@ void main() {
           );
           expect(tray.top, greaterThanOrEqualTo(board.bottom));
           expect(tray.center.dx, closeTo(board.center.dx, 0.01));
+          if (size.width > size.height) {
+            expectLandscapeJigsawControls(tester);
+            await tester.tap(find.byKey(const ValueKey('jigsaw-hint-toggle')));
+            await tester.pumpAndSettle();
+            expect(jigsawPainter(tester).showHint, isFalse);
+          } else {
+            expect(
+              tester
+                  .getRect(find.byKey(const ValueKey('jigsaw-progress')))
+                  .bottom,
+              lessThan(board.top),
+            );
+          }
           expect(tester.takeException(), isNull);
           for (final id in jigsawPainter(tester).layout.trayOrder) {
             final finder = find.byKey(ValueKey('jigsaw-piece-$id'));
@@ -227,6 +240,14 @@ void main() {
             expect(jigsawPainter(tester).placed, contains(id));
           }
           expect(find.text('拼好了！'), findsOneWidget);
+          if (size.width > size.height) {
+            expectLandscapeJigsawControls(tester);
+            await tester.tap(find.byKey(const ValueKey('jigsaw-restart')));
+            await tester.pumpAndSettle();
+            expect(jigsawPainter(tester).placed, isEmpty);
+            expect(jigsawPainter(tester).showHint, isFalse);
+            expectLandscapeJigsawControls(tester);
+          }
           expect(tester.takeException(), isNull);
         }
       });

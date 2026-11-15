@@ -17,6 +17,20 @@ WritingJigsawBoardPainter jigsawPainter(WidgetTester tester) =>
             .painter!
         as WritingJigsawBoardPainter;
 
+void expectLandscapeJigsawControls(WidgetTester tester) {
+  final progress = tester.getRect(
+    find.byKey(const ValueKey('jigsaw-progress')),
+  );
+  final restart = tester.getRect(find.byKey(const ValueKey('jigsaw-restart')));
+  final hint = tester.getRect(find.byKey(const ValueKey('jigsaw-hint-toggle')));
+  final board = tester.getRect(find.byKey(const ValueKey('jigsaw-board')));
+  expect(progress.right, lessThan(restart.left));
+  expect(restart.right, lessThan(hint.left));
+  expect(progress.center.dy, closeTo(restart.center.dy, 0.01));
+  expect(hint.center.dy, closeTo(restart.center.dy, 0.01));
+  expect(progress.top, greaterThan(board.bottom));
+}
+
 Future<void> dragJigsawPiece(
   WidgetTester tester,
   int id, {

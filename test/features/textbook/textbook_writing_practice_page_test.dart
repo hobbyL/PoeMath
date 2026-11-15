@@ -482,12 +482,27 @@ void main() {
       final tray = tester.getRect(find.byKey(const ValueKey('jigsaw-tray')));
       expect(tray.top, greaterThanOrEqualTo(board.bottom));
       expect(tray.center.dx, closeTo(board.center.dx, 0.01));
+      if (size.width > size.height) {
+        expectLandscapeJigsawControls(tester);
+        await tester.tap(find.byKey(const ValueKey('jigsaw-hint-toggle')));
+        await tester.pumpAndSettle();
+        expect(jigsawPainter(tester).showHint, isFalse);
+      }
       expect(find.text('拖动碎片，拼回整字。'), findsNothing);
       for (final id in jigsawPainter(tester).layout.trayOrder) {
         await dragJigsawPiece(tester, id);
       }
       expect(savedProgress().records.values.single.puzzleCount, 1);
       expect(find.text('完整的字拼出来啦。'), findsNothing);
+      if (size.width > size.height) {
+        expectLandscapeJigsawControls(tester);
+        await tester.tap(find.byKey(const ValueKey('jigsaw-restart')));
+        await tester.pumpAndSettle();
+        expect(jigsawPainter(tester).placed, isEmpty);
+        expect(jigsawPainter(tester).showHint, isFalse);
+        expect(savedProgress().records.values.single.puzzleCount, 1);
+        expectLandscapeJigsawControls(tester);
+      }
       expect(tester.takeException(), isNull);
     });
   }

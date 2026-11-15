@@ -278,42 +278,54 @@ class _WritingJigsawState extends State<WritingJigsaw> {
     }
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final progress = Semantics(
+      liveRegion: true,
+      child: AutoFitLine(
+        child: Text(
+          _complete ? '拼好了！' : '已拼 ${_placed.length}/${layout.pieces.length}',
+          key: const ValueKey('jigsaw-progress'),
+          maxLines: 1,
+          style: theme.textTheme.titleMedium,
+        ),
+      ),
+    );
+    final hintToggle = Semantics(
+      toggled: _showHint,
+      child: TextButton.icon(
+        key: const ValueKey('jigsaw-hint-toggle'),
+        onPressed: widget.enabled
+            ? () => setState(() => _showHint = !_showHint)
+            : null,
+        icon: Icon(
+          _showHint ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+        ),
+        label: AutoFitLine(
+          child: Text(_showHint ? '关闭提示' : '开启提示', maxLines: 1),
+        ),
+      ),
+    );
+    final restart = OutlinedButton.icon(
+      key: const ValueKey('jigsaw-restart'),
+      onPressed: widget.enabled && !_saving && (!_complete || _saved)
+          ? () => setState(_newRound)
+          : null,
+      icon: const Icon(Icons.refresh),
+      label: AutoFitLine(child: Text(_complete ? '再拼一次' : '重新拼装', maxLines: 1)),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: SpacingTokens.sm,
-          children: [
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                _complete
-                    ? '拼好了！'
-                    : '已拼 ${_placed.length}/${layout.pieces.length}',
-                key: const ValueKey('jigsaw-progress'),
-                style: theme.textTheme.titleMedium,
-              ),
-            ),
-            Semantics(
-              toggled: _showHint,
-              child: TextButton.icon(
-                key: const ValueKey('jigsaw-hint-toggle'),
-                onPressed: widget.enabled
-                    ? () => setState(() => _showHint = !_showHint)
-                    : null,
-                icon: Icon(
-                  _showHint
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                ),
-                label: Text(_showHint ? '关闭提示' : '开启提示'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: SpacingTokens.sm),
+        if (!landscape) ...[
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: SpacingTokens.sm,
+            children: [progress, hintToggle],
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+        ],
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -338,14 +350,19 @@ class _WritingJigsawState extends State<WritingJigsaw> {
           spacing: SpacingTokens.sm,
           runSpacing: SpacingTokens.sm,
           children: [
-            OutlinedButton.icon(
-              key: const ValueKey('jigsaw-restart'),
-              onPressed: widget.enabled && !_saving && (!_complete || _saved)
-                  ? () => setState(_newRound)
-                  : null,
-              icon: const Icon(Icons.refresh),
-              label: Text(_complete ? '再拼一次' : '重新拼装'),
-            ),
+            if (landscape)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(child: progress),
+                  const SizedBox(width: SpacingTokens.md),
+                  Flexible(child: restart),
+                  const SizedBox(width: SpacingTokens.md),
+                  Flexible(child: hintToggle),
+                ],
+              )
+            else
+              restart,
             if (_complete && _saved)
               FilledButton(
                 onPressed: widget.enabled ? widget.onWrite : null,
