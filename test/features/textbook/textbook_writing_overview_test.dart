@@ -37,7 +37,6 @@ void main() {
     TextbookCoursePack? courses,
     WritingProgress? progress,
     ValueChanged<String>? onPractice,
-    VoidCallback? onRecords,
     Size size = const Size(420, 900),
     double scale = 1,
   }) async {
@@ -69,7 +68,6 @@ void main() {
                 bookId: bookId,
                 lesson: package.lessons.single,
                 onPractice: onPractice,
-                onRecords: onRecords,
               ),
             ),
           ),
@@ -104,15 +102,8 @@ void main() {
 
   testWidgets('字卡展示田字格大字与「去练字」入口', (tester) async {
     final practiced = <String>[];
-    var recordsOpened = 0;
-    await pump(
-      tester,
-      onPractice: practiced.add,
-      onRecords: () => recordsOpened++,
-    );
-    await tester.tap(find.byKey(const ValueKey('writing-records-entry')));
-    await tester.pumpAndSettle();
-    expect(recordsOpened, 1);
+    await pump(tester, onPractice: practiced.add);
+    expect(find.byKey(const ValueKey('writing-records-entry')), findsNothing);
     expect(practiced, isEmpty);
 
     for (final id in ['writing-001', 'writing-002']) {

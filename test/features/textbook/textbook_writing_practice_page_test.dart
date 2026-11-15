@@ -637,6 +637,15 @@ void main() {
       final modes = tester.getRect(find.byKey(const ValueKey('writing-mode')));
       expect(navigation.contains(modes.topLeft), isTrue);
       expect(navigation.contains(modes.bottomRight), isTrue);
+      final recordsEntry = find.byKey(const ValueKey('writing-records-entry'));
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: recordsEntry),
+        findsOneWidget,
+      );
+      expect(
+        tester.getCenter(recordsEntry).dx,
+        greaterThan(tester.getCenter(find.byTooltip('朗读')).dx),
+      );
       expectReadableText(tester, find.text('写一写'));
       expectReadableText(tester, find.text('拼一拼'));
       await tester.tap(find.text('拼一拼'));

@@ -433,6 +433,23 @@ void main() {
           expect(find.text('家长抽查'), findsNothing);
           expect(find.text('我来认'), findsNothing);
         case TextbookContentSection.writing:
+          final recordsEntry = find.byKey(
+            const ValueKey('writing-records-entry'),
+          );
+          expect(
+            find.descendant(of: find.byType(AppBar), matching: recordsEntry),
+            findsOneWidget,
+          );
+          expect(
+            tester.getCenter(recordsEntry).dx,
+            greaterThan(
+              tester
+                  .getCenter(
+                    find.byKey(const ValueKey('writing-dictation-entry')),
+                  )
+                  .dx,
+            ),
+          );
           expect(
             tester
                 .widget<TextbookWritingOverview>(

@@ -702,12 +702,6 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         ),
         actions: [
           IconButton(
-            key: const ValueKey('writing-records-entry'),
-            onPressed: _busy || !_current ? null : _openRecords,
-            tooltip: '练习记录',
-            icon: const Icon(Icons.history_outlined),
-          ),
-          IconButton(
             onPressed: _playCharacter,
             tooltip: '朗读',
             icon: Icon(
@@ -715,6 +709,12 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
                   ? Icons.volume_up
                   : Icons.volume_up_outlined,
             ),
+          ),
+          IconButton(
+            key: const ValueKey('writing-records-entry'),
+            onPressed: _busy || !_current ? null : _openRecords,
+            tooltip: '练习记录',
+            icon: const Icon(Icons.history_outlined),
           ),
         ],
       ),

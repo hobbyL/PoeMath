@@ -59,6 +59,7 @@ class _TextbookLessonContentPageState
   bool _changingControl = false;
   bool _openingRecognition = false;
   bool _openingWriting = false;
+  bool _choosingWritingLesson = false;
   bool _showPinyin = false;
   int _recognitionNavigationGeneration = 0;
 
@@ -367,11 +368,6 @@ class _TextbookLessonContentPageState
               lesson: lesson,
               onPractice: (targetId) =>
                   unawaited(_openWriting(lesson.id, targetId)),
-              onRecords: () => unawaited(
-                _openWritingRoute(
-                  AppRoutes.textbookWritingRecordsOf(bookId, lesson.id),
-                ),
-              ),
             ),
             TextbookContentSection.exercise => TextbookExerciseOverview(
               bookId: bookId,
@@ -449,55 +445,83 @@ class _TextbookLessonContentPageState
     );
   }
 
-  Future<void> _openDictation(List<TextbookCourseLesson> lessons) async {
-    if (_openingWriting || lessons.isEmpty) return;
-    final selection = lessons.length == 1
-        ? Future<String?>.value(lessons.single.id)
-        : showModalBottomSheet<String>(
-            context: context,
-            isScrollControlled: true,
-            useSafeArea: true,
-            builder: (sheetContext) => SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(SpacingTokens.md),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '选择听写课文',
-                      style: Theme.of(sheetContext).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: SpacingTokens.sm),
-                    for (final lesson in lessons)
-                      AppTile(
-                        icon: Icons.hearing_outlined,
-                        iconColor: Theme.of(sheetContext).colorScheme.primary,
-                        title: lesson.title,
-                        subtitle: '${lesson.writingCharacters.length} 个会写字',
-                        flat: true,
-                        onTap: () => Navigator.pop(sheetContext, lesson.id),
+  Future<void> _openDictation(List<TextbookCourseLesson> lessons) =>
+      _openWritingLesson(
+        lessons,
+        selectionTitle: '选择听写课文',
+        selectionIcon: Icons.hearing_outlined,
+        routeForLesson: (lessonId) =>
+            AppRoutes.textbookDictationOf(bookId, lessonId),
+      );
+
+  Future<void> _openWritingRecords(List<TextbookCourseLesson> lessons) =>
+      _openWritingLesson(
+        lessons,
+        selectionTitle: '选择练习记录课文',
+        selectionIcon: Icons.history_outlined,
+        routeForLesson: (lessonId) =>
+            AppRoutes.textbookWritingRecordsOf(bookId, lessonId),
+      );
+
+  Future<void> _openWritingLesson(
+    List<TextbookCourseLesson> lessons, {
+    required String selectionTitle,
+    required IconData selectionIcon,
+    required String Function(String lessonId) routeForLesson,
+  }) async {
+    if (_openingWriting || _choosingWritingLesson || lessons.isEmpty) return;
+    _choosingWritingLesson = true;
+    try {
+      final selection = lessons.length == 1
+          ? Future<String?>.value(lessons.single.id)
+          : showModalBottomSheet<String>(
+              context: context,
+              isScrollControlled: true,
+              useSafeArea: true,
+              builder: (sheetContext) => SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(SpacingTokens.md),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        selectionTitle,
+                        style: Theme.of(sheetContext).textTheme.titleMedium,
                       ),
-                  ],
+                      const SizedBox(height: SpacingTokens.sm),
+                      for (final lesson in lessons)
+                        AppTile(
+                          icon: selectionIcon,
+                          iconColor: Theme.of(sheetContext).colorScheme.primary,
+                          title: lesson.title,
+                          subtitle: '${lesson.writingCharacters.length} 个会写字',
+                          flat: true,
+                          onTap: () => Navigator.pop(sheetContext, lesson.id),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-    // 弹出课文选择本身也会触发 didPushNext；从弹层已打开的代次开始守卫。
-    final generation = _recognitionNavigationGeneration;
-    final lessonId = await selection;
-    if (!mounted ||
-        _leaving ||
-        _route?.isCurrent == false ||
-        generation != _recognitionNavigationGeneration ||
-        lessonId == null ||
-        !_lessons.any(
-          (lesson) =>
-              lesson.id == lessonId && lesson.writingCharacters.isNotEmpty,
-        )) {
-      return;
+            );
+      // 弹出课文选择本身也会触发 didPushNext；从弹层已打开的代次开始守卫。
+      final generation = _recognitionNavigationGeneration;
+      final lessonId = await selection;
+      if (!mounted ||
+          _leaving ||
+          _route?.isCurrent == false ||
+          generation != _recognitionNavigationGeneration ||
+          lessonId == null ||
+          !_lessons.any(
+            (lesson) =>
+                lesson.id == lessonId && lesson.writingCharacters.isNotEmpty,
+          )) {
+        return;
+      }
+      await _openWritingRoute(routeForLesson(lessonId));
+    } finally {
+      _choosingWritingLesson = false;
     }
-    await _openWritingRoute(AppRoutes.textbookDictationOf(bookId, lessonId));
   }
 
   Future<void> _openWritingRoute(String path) async {
@@ -552,7 +576,7 @@ class _TextbookLessonContentPageState
         reading[lesson.id]?.valueOrNull?.lesson ?? lesson,
     ];
     _lessons = lessons;
-    final dictationLessons = [
+    final writingLessons = [
       for (final lesson in lessons)
         if (lesson.writingCharacters.isNotEmpty) lesson,
     ];
@@ -597,14 +621,14 @@ class _TextbookLessonContentPageState
         title: Text(title),
         actions: [
           if (selected == TextbookContentSection.writing &&
-              dictationLessons.isNotEmpty)
+              writingLessons.isNotEmpty) ...[
             if (isWide)
               TextButton.icon(
                 key: const ValueKey('writing-dictation-entry'),
                 style: TextButton.styleFrom(
                   foregroundColor: Theme.of(context).colorScheme.onSurface,
                 ),
-                onPressed: () => unawaited(_openDictation(dictationLessons)),
+                onPressed: () => unawaited(_openDictation(writingLessons)),
                 icon: const Icon(Icons.hearing_outlined),
                 label: const Text('听写'),
               )
@@ -612,9 +636,16 @@ class _TextbookLessonContentPageState
               IconButton(
                 key: const ValueKey('writing-dictation-entry'),
                 tooltip: '听写',
-                onPressed: () => unawaited(_openDictation(dictationLessons)),
+                onPressed: () => unawaited(_openDictation(writingLessons)),
                 icon: const Icon(Icons.hearing_outlined),
               ),
+            IconButton(
+              key: const ValueKey('writing-records-entry'),
+              tooltip: '练习记录',
+              onPressed: () => unawaited(_openWritingRecords(writingLessons)),
+              icon: const Icon(Icons.history_outlined),
+            ),
+          ],
           if (selected == TextbookContentSection.reading &&
               lessons.any((lesson) => lesson.paragraphs.isNotEmpty)) ...[
             IconButton(

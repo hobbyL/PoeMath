@@ -13,10 +13,12 @@ import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 import 'package:poemath/features/textbook/writing/textbook_dictation_page.dart';
+import 'package:poemath/features/textbook/writing/textbook_writing_records_page.dart';
 import 'package:poemath/features/textbook/writing/writing_canvas.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
 
@@ -62,17 +64,25 @@ void main() {
   });
 
   List<Override> overrides() => [
-        ttsServiceProvider.overrideWithValue(tts),
-        textbookCourseProvider(book.pdfSha256).overrideWith((_) async => pack),
-        textbookFileServiceProvider.overrideWithValue(
-          TextbookFileService(narrationAudioCache: cache),
-        ),
-        writingStrokeDataProvider.overrideWith(
-          (_) async => const WritingStrokeAsset({}),
-        ),
-        textbookWritingProgressProvider(book.pdfSha256)
-            .overrideWith((_) async => null),
-      ];
+    ttsServiceProvider.overrideWithValue(tts),
+    textbookListProvider.overrideWithValue([book]),
+    textbookCourseProvider(book.pdfSha256).overrideWith((_) async => pack),
+    textbookFileServiceProvider.overrideWithValue(
+      TextbookFileService(narrationAudioCache: cache),
+    ),
+    writingStrokeDataProvider.overrideWith(
+      (_) async => const WritingStrokeAsset({}),
+    ),
+    textbookWritingProgressProvider(book.pdfSha256).overrideWith(
+      (_) async => pack == null
+          ? null
+          : WritingProgress(
+              profileId: ProfileScope.currentId,
+              bookId: book.pdfSha256,
+              editionId: pack!.edition.id,
+            ),
+    ),
+  ];
 
   Future<void> pump(
     WidgetTester tester, {
@@ -394,7 +404,8 @@ void main() {
       find.widgetWithText(OutlinedButton, '再读一次'),
     );
     final foreground = replay.style!.foregroundColor!
-        .resolve(const <WidgetState>{})!.computeLuminance();
+        .resolve(const <WidgetState>{})!
+        .computeLuminance();
     final background = Theme.of(tester.element(find.byType(WritingCanvas)))
         .scaffoldBackgroundColor
         .computeLuminance();
@@ -535,7 +546,7 @@ void main() {
     }
   });
 
-  testWidgets('写一写右上入口窄屏仅图标、宽屏显示听写，往返保留课文字卡', (tester) async {
+  testWidgets('写一写导航右侧记录和听写入口适配宽度，往返保留课文字卡', (tester) async {
     for (final width in [320.0, 420.0, 1200.0]) {
       tester.view.physicalSize = Size(width, 900);
       tester.view.devicePixelRatio = 1;
@@ -577,7 +588,8 @@ void main() {
       } else {
         final button = tester.widget<TextButton>(entry);
         final foreground = button.style!.foregroundColor!
-            .resolve(const <WidgetState>{})!.computeLuminance();
+            .resolve(const <WidgetState>{})!
+            .computeLuminance();
         final background = Theme.of(tester.element(entry))
             .appBarTheme
             .backgroundColor!
@@ -589,6 +601,41 @@ void main() {
       }
       final appBar = tester.getRect(find.byType(AppBar));
       expect(tester.getCenter(entry).dx, greaterThan(appBar.center.dx));
+      final recordsEntry = find.byKey(const ValueKey('writing-records-entry'));
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: recordsEntry),
+        findsOneWidget,
+      );
+      expect(tester.widget<IconButton>(recordsEntry).tooltip, '练习记录');
+      expect(
+        tester.getCenter(recordsEntry).dx,
+        greaterThan(tester.getCenter(entry).dx),
+      );
+      await tester.tap(recordsEntry);
+      await tester.pumpAndSettle();
+      expect(find.byType(TextbookWritingRecordsPage), findsOneWidget);
+      expect(
+        tester
+            .widget<TextbookWritingRecordsPage>(
+              find.byType(TextbookWritingRecordsPage),
+            )
+            .lessonId,
+        'lesson-001',
+      );
+      expect(
+        find.byKey(const ValueKey('writing-record-writing-001')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('writing-record-writing-002')),
+        findsOneWidget,
+      );
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('writing-card-writing-001')),
+        findsOneWidget,
+      );
       await tester.tap(entry);
       await tester.pumpAndSettle();
       expect(find.byType(TextbookDictationPage), findsOneWidget);
@@ -608,7 +655,7 @@ void main() {
     }
   });
 
-  testWidgets('同页多课先选择听写课文，进入所选课目', (tester) async {
+  testWidgets('同页多课的记录和听写先选择课文，取消不进入、选择后定位所选课目', (tester) async {
     final raw = pack!.toJson();
     final second = pack!.lessons.single.toJson()
       ..['id'] = 'lesson-002'
@@ -625,19 +672,18 @@ void main() {
     }
     second['coverage'] = {
       for (final category in TextbookCoursePack.categories)
-        category:
-            category == 'writingCharacters' ? 'complete' : 'notApplicable',
+        category: category == 'writingCharacters'
+            ? 'complete'
+            : 'notApplicable',
     };
     (raw['lessons'] as List).add(second);
     final unit = (raw['units'] as List).single as Map<String, dynamic>;
     (unit['lessonIds'] as List).add('lesson-002');
     pack = TextbookCoursePack.fromJson(raw);
     final router = createAppRouter(
-      initialLocation: AppRoutes.textbookContentOf(
-        book.pdfSha256,
-        'writing',
-        [2],
-      ),
+      initialLocation: AppRoutes.textbookContentOf(book.pdfSha256, 'writing', [
+        2,
+      ]),
     );
     addTearDown(router.dispose);
     await tester.pumpWidget(
@@ -647,6 +693,45 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    final recordsEntry = find.byKey(const ValueKey('writing-records-entry'));
+    expect(recordsEntry, findsOneWidget);
+    await tester.tap(recordsEntry);
+    await tester.pumpAndSettle();
+    expect(find.text('选择练习记录课文'), findsOneWidget);
+    expect(find.byType(TextbookWritingRecordsPage), findsNothing);
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('选择练习记录课文'), findsNothing);
+    expect(find.byType(TextbookWritingRecordsPage), findsNothing);
+    await tester.tap(recordsEntry);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('第二课测试'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(TextbookWritingRecordsPage), findsOneWidget);
+    expect(
+      tester
+          .widget<TextbookWritingRecordsPage>(
+            find.byType(TextbookWritingRecordsPage),
+          )
+          .lessonId,
+      'lesson-002',
+    );
+    expect(
+      find.byKey(const ValueKey('writing-record-writing-003')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('writing-record-writing-001')),
+      findsNothing,
+    );
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(recordsEntry, findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('writing-dictation-entry')));
     await tester.pumpAndSettle();
     expect(find.text('选择听写课文'), findsOneWidget);
@@ -686,11 +771,9 @@ void main() {
         'notApplicable';
     pack = TextbookCoursePack.fromJson(raw);
     final router = createAppRouter(
-      initialLocation: AppRoutes.textbookContentOf(
-        book.pdfSha256,
-        'writing',
-        [2],
-      ),
+      initialLocation: AppRoutes.textbookContentOf(book.pdfSha256, 'writing', [
+        2,
+      ]),
     );
     addTearDown(router.dispose);
     await tester.pumpWidget(
@@ -701,6 +784,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('writing-dictation-entry')), findsNothing);
+    expect(find.byKey(const ValueKey('writing-records-entry')), findsNothing);
     expect(find.text('原书未要求本课会写字。'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
