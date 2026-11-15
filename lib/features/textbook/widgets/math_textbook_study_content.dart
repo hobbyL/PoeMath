@@ -14,9 +14,17 @@ class MathTextbookStudyContent extends StatefulWidget {
     super.key,
     required this.book,
     required this.block,
+    this.framed = true,
+    this.showTitle = true,
+    this.showTextToggle = true,
+    this.forceSourcePreview = false,
   });
   final Textbook book;
   final MathTextbookBlock block;
+  final bool framed;
+  final bool showTitle;
+  final bool showTextToggle;
+  final bool forceSourcePreview;
   @override
   State<MathTextbookStudyContent> createState() =>
       _MathTextbookStudyContentState();
@@ -33,13 +41,13 @@ class _MathTextbookStudyContentState extends State<MathTextbookStudyContent> {
   }
 
   @override
-  Widget build(BuildContext context) => ColoredCard(
-    color: Theme.of(context).colorScheme.primary,
-    child: Column(
+  Widget build(BuildContext context) {
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (block.kind == MathTextbookBlockKind.example ||
-            block.kind == MathTextbookBlockKind.exercise) ...[
+        if (widget.showTitle &&
+            (block.kind == MathTextbookBlockKind.example ||
+                block.kind == MathTextbookBlockKind.exercise)) ...[
           Text(
             mathTextbookSectionTitle(block),
             style: Theme.of(context).textTheme.titleMedium,
@@ -48,7 +56,7 @@ class _MathTextbookStudyContentState extends State<MathTextbookStudyContent> {
         ],
         if (!block.sourceLayout && block.spans.isNotEmpty)
           MathTextbookContent(spans: block.spans),
-        if (block.needsSource) ...[
+        if (widget.forceSourcePreview || block.needsSource) ...[
           for (final source in block.sources)
             Padding(
               padding: const EdgeInsets.only(top: SpacingTokens.sm),
@@ -60,7 +68,9 @@ class _MathTextbookStudyContentState extends State<MathTextbookStudyContent> {
               ),
             ),
         ],
-        if (block.sourceLayout && block.spans.isNotEmpty) ...[
+        if (widget.showTextToggle &&
+            block.sourceLayout &&
+            block.spans.isNotEmpty) ...[
           AppTile(
             flat: true,
             iconColor: Theme.of(context).colorScheme.primary,
@@ -77,9 +87,20 @@ class _MathTextbookStudyContentState extends State<MathTextbookStudyContent> {
             child: Text(block.parentNote),
           ),
       ],
-    ),
-  );
+    );
+    return widget.framed
+        ? ColoredCard(
+            color: Theme.of(context).colorScheme.primary,
+            child: content,
+          )
+        : Semantics(container: true, explicitChildNodes: true, child: content);
+  }
 }
+
+String mathTextbookSourcePageLabel(MathTextbookRegion source) =>
+    source.printedPage == null
+    ? 'PDF 第 ${source.page} 页'
+    : '书本第 ${source.printedPage} 页';
 
 class MathTextbookSourceContentPage extends StatelessWidget {
   const MathTextbookSourceContentPage({
@@ -87,13 +108,16 @@ class MathTextbookSourceContentPage extends StatelessWidget {
     required this.book,
     required this.title,
     required this.blocks,
+    this.knowledgePoint = false,
   });
   final Textbook book;
   final String title;
   final List<MathTextbookBlock> blocks;
+  final bool knowledgePoint;
   @override
   Widget build(BuildContext context) {
     final reading = mathTextbookReadingBlocks(blocks);
+    final firstSource = reading.firstOrNull?.sources.first;
     void openPage(int page) =>
         context.push(AppRoutes.textbookReadOf(book.pdfSha256), extra: page);
     return Scaffold(
@@ -103,9 +127,9 @@ class MathTextbookSourceContentPage extends StatelessWidget {
           IconButton(
             tooltip: '打开原书',
             icon: const Icon(Icons.menu_book_outlined),
-            onPressed: reading.isEmpty
+            onPressed: firstSource == null
                 ? null
-                : () => openPage(reading.first.sources.first.page),
+                : () => openPage(firstSource.page),
           ),
         ],
       ),
@@ -127,14 +151,12 @@ class MathTextbookSourceContentPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (newPage)
+                  if (newPage && !knowledgePoint)
                     AppTile(
                       flat: true,
                       icon: Icons.menu_book_outlined,
                       iconColor: Theme.of(context).colorScheme.primary,
-                      title: source.printedPage == null
-                          ? 'PDF 第 ${source.page} 页'
-                          : '书本第 ${source.printedPage} 页',
+                      title: mathTextbookSourcePageLabel(source),
                       subtitle: '打开完整原页',
                       onTap: () => openPage(source.page),
                     ),
@@ -149,7 +171,13 @@ class MathTextbookSourceContentPage extends StatelessWidget {
                       ),
                     )
                   else
-                    MathTextbookStudyContent(book: book, block: block),
+                    MathTextbookStudyContent(
+                      book: book,
+                      block: block,
+                      framed: !knowledgePoint,
+                      showTitle: !knowledgePoint,
+                      showTextToggle: !knowledgePoint,
+                    ),
                 ],
               ),
             );

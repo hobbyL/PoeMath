@@ -333,6 +333,7 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
         builder: (_) => MathTextbookSourceContentPage(
           book: book,
           title: knowledge?.title ?? lesson.title,
+          knowledgePoint: knowledge != null,
           blocks: knowledge == null
               ? lesson.blocks
               : lesson.blocks
