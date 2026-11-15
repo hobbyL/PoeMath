@@ -154,7 +154,7 @@ void main() {
 
   testWidgets('无笔顺数据时降级：直接进入自由书写，显示提示', (tester) async {
     await pump(tester);
-    expect(find.text('写一写 · 星'), findsOneWidget);
+    expect(find.text('写一写 · 星'), findsNothing);
     expect(find.byKey(const ValueKey('writing-free')), findsOneWidget);
     expect(find.text('这个字暂时没有笔顺数据，可以自由书写。'), findsOneWidget);
     expect(find.text('看笔顺'), findsNothing);
@@ -468,6 +468,12 @@ void main() {
   testWidgets('整页窄屏大字号仍可拖取全部拼块并完成', (tester) async {
     asset = fullAsset;
     await pump(tester, size: const Size(320, 568), scale: 2);
+    final navigation = tester.getRect(find.byType(AppBar));
+    final modes = tester.getRect(find.byKey(const ValueKey('writing-mode')));
+    expect(navigation.contains(modes.topLeft), isTrue);
+    expect(navigation.contains(modes.bottomRight), isTrue);
+    expectReadableText(tester, find.text('写一写'));
+    expectReadableText(tester, find.text('拼一拼'));
     await tester.tap(find.text('拼一拼'));
     await tester.pumpAndSettle();
     for (final id in jigsawPainter(tester).layout.trayOrder) {

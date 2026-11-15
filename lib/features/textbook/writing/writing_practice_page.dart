@@ -584,15 +584,55 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     final target = _target;
     if (_loading || target == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('写一写')),
+        appBar: AppBar(),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _errorView(),
       );
     }
+    final labelStyle = Theme.of(context).textTheme.labelLarge!;
+    final labelHeight =
+        MediaQuery.textScalerOf(context).scale(labelStyle.fontSize!) *
+        (labelStyle.height ?? 1);
     return Scaffold(
       appBar: AppBar(
-        title: Text('写一写 · ${target.text}'),
+        centerTitle: true,
+        titleSpacing: SpacingTokens.sm,
+        toolbarHeight: math.max(
+          kToolbarHeight,
+          labelHeight + SpacingTokens.sm * 4,
+        ),
+        title: SegmentedButton<_WritingMode>(
+          key: const ValueKey('writing-mode'),
+          showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            minimumSize: const Size(
+              SpacingTokens.minTapTarget,
+              SpacingTokens.minTapTarget,
+            ),
+            padding: const EdgeInsets.all(SpacingTokens.sm),
+          ),
+          segments: const [
+            ButtonSegment(
+              value: _WritingMode.write,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('写一写', maxLines: 1),
+              ),
+            ),
+            ButtonSegment(
+              value: _WritingMode.puzzle,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('拼一拼', maxLines: 1),
+              ),
+            ),
+          ],
+          selected: {_mode},
+          onSelectionChanged: _busy || !_current
+              ? null
+              : (selection) => _selectMode(selection.single),
+        ),
         actions: [
           IconButton(
             onPressed: _playCharacter,
@@ -609,29 +649,9 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(SpacingTokens.md),
-              child: SegmentedButton<_WritingMode>(
-                key: const ValueKey('writing-mode'),
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: _WritingMode.write, label: Text('写一写')),
-                  ButtonSegment(value: _WritingMode.puzzle, label: Text('拼一拼')),
-                ],
-                selected: {_mode},
-                onSelectionChanged: _busy || !_current
-                    ? null
-                    : (selection) => _selectMode(selection.single),
-              ),
-            ),
             if (_error case final message?)
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  SpacingTokens.md,
-                  0,
-                  SpacingTokens.md,
-                  SpacingTokens.md,
-                ),
+                padding: const EdgeInsets.all(SpacingTokens.md),
                 child: ColoredCard(
                   color: Theme.of(context).colorScheme.error,
                   child: Column(
@@ -652,12 +672,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
                 index: _mode.index,
                 children: [
                   ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                      SpacingTokens.md,
-                      0,
-                      SpacingTokens.md,
-                      SpacingTokens.md,
-                    ),
+                    padding: const EdgeInsets.all(SpacingTokens.md),
                     children: [
                       _stepper(),
                       const SizedBox(height: SpacingTokens.md),
@@ -665,12 +680,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
                     ],
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      SpacingTokens.md,
-                      0,
-                      SpacingTokens.md,
-                      SpacingTokens.md,
-                    ),
+                    padding: const EdgeInsets.all(SpacingTokens.md),
                     child: WritingJigsaw(
                       key: ValueKey((
                         widget.bookId,
