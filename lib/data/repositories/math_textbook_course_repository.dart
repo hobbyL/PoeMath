@@ -236,6 +236,7 @@ class MathTextbookCourseRepository {
     required int generation,
     required void Function() authorize,
     String? unmodifiedLegacyDigest,
+    String? unmodifiedPreviousDigest,
   }) => _serial(() async {
     void check() {
       authorize();
@@ -248,15 +249,15 @@ class MathTextbookCourseRepository {
     final previous = current.lessons
         .where((l) => l.id == lesson.id)
         .firstOrNull;
+    final previousDigest = previous?.contentDigest(book.pdfSha256);
     final MathTextbookCourse next;
     if (previous == null) {
       next = current.replace(lessons: [...current.lessons, lesson]);
-    } else if (previous.contentDigest(book.pdfSha256) ==
-        lesson.contentDigest(book.pdfSha256)) {
+    } else if (previousDigest == lesson.contentDigest(book.pdfSha256)) {
       return current;
     } else if (previous.review == null &&
-        unmodifiedLegacyDigest != null &&
-        previous.contentDigest(book.pdfSha256) == unmodifiedLegacyDigest) {
+        (previousDigest == unmodifiedLegacyDigest ||
+            previousDigest == unmodifiedPreviousDigest)) {
       // Only a byte-for-content reproduction of the old automatic draft can
       // take this path. Parent edits anywhere, not just the summary, prevent it.
       next = current.replace(

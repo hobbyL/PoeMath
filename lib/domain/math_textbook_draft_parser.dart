@@ -8,7 +8,10 @@ import 'package:poemath/domain/textbook_printed_page.dart';
 
 /// 数学专用二维版面整理。输入完整页；选区仅由页面证据产生。
 class MathTextbookDraftParser {
-  const MathTextbookDraftParser();
+  const MathTextbookDraftParser({this.legacyLayout = false});
+
+  /// Only used to reproduce an earlier automatic draft before replacing it.
+  final bool legacyLayout;
 
   MathTextbookLesson parse({
     required String title,
@@ -64,9 +67,12 @@ class MathTextbookDraftParser {
   ) {
     final number = page.text.page;
     final prefix = '$lessonId-p$number';
-    if (page.text.glyphs.length > 6000 ||
+    final restoreLayout = classifyContent && !legacyLayout;
+    final complex =
+        page.text.glyphs.length > 6000 ||
         page.graphics.lines.length > 2000 ||
-        page.graphics.regions.length > 4000) {
+        page.graphics.regions.length > 4000;
+    if (complex || restoreLayout && !page.graphics.complete) {
       return [
         MathTextbookBlock(
           id: '$prefix-source',
@@ -81,11 +87,14 @@ class MathTextbookDraftParser {
               bottom: 1,
             ),
           ],
-          warnings: const ['本页版面较复杂，已保留整页，请对照补齐'],
+          warnings: [
+            if (complex) '本页版面较复杂，已保留整页，请对照补齐',
+            if (restoreLayout && !page.graphics.complete) '本页绘图证据未完整读取，已保留整页',
+          ],
         ),
       ];
     }
-    final glyphs = page.text.glyphs
+    var glyphs = page.text.glyphs
         .where(
           (g) =>
               g.text.trim().isNotEmpty &&
@@ -97,6 +106,7 @@ class MathTextbookDraftParser {
               (g.top + g.bottom) / 2 <= 1,
         )
         .toList();
+    if (restoreLayout) glyphs = _deduplicateOverlappingGlyphs(glyphs);
     final consumed = <int>{};
     final tokens = <_Token>[];
     final blocks = <MathTextbookBlock>[];
@@ -107,6 +117,12 @@ class MathTextbookDraftParser {
           .where((g) => RegExp(r'[\u3400-\u9fff]').hasMatch(g.text))
           .map((g) => g.height),
     );
+
+    // Reserve the complete vertical work before looking for fractions. A carry
+    // above a partly written result must not become its numerator.
+    if (restoreLayout) {
+      _verticalArithmetic(page, glyphs, consumed, blocks, id);
+    }
 
     // 分数线是独立绘图证据；拒绝把竖式的宽列间距误当连续数字。
     for (final line in page.graphics.lines.where((l) => l.dark)) {
@@ -126,14 +142,38 @@ class MathTextbookDraftParser {
       final below = around
           .where((g) => _cy(g) > line.y + g.height * 0.15)
           .toList();
-      if (!_numericRow(above) || !_numericRow(below)) continue;
+      final height = _median(around.map((g) => g.height));
+      // Ink bounds of a narrow "1" leave a larger gap than its advance width.
+      // The bar and font height still constrain a contiguous fraction row.
+      final digitGap = restoreLayout
+          ? height / (page.text.width / page.text.height) * .55
+          : null;
+      if (!_numericRow(above, maxGap: digitGap) ||
+          !_numericRow(below, maxGap: digitGap)) {
+        continue;
+      }
+      if (restoreLayout) {
+        final numeratorRegion = _bounds(number, above);
+        final denominatorRegion = _bounds(number, below);
+        final centered =
+            (numeratorRegion.centerX - denominatorRegion.centerX).abs() <=
+            math.max(
+              (line.right - line.left) * .12,
+              height / (page.text.width / page.text.height) * .25,
+            );
+        if (!centered ||
+            _divisionBracket(page, line, below, glyphs, consumed)) {
+          continue;
+        }
+      }
       final hasOperator = glyphs.any(
         (g) =>
             !consumed.contains(g.index) &&
             const ['+', '−', '-', '×', '÷'].contains(g.text) &&
             g.centerX >= line.left &&
             g.centerX <= line.right &&
-            (_cy(g) - line.y).abs() < g.height * 1.6,
+            (_cy(g) - line.y).abs() <
+                (restoreLayout ? math.max(height, g.height) : g.height) * 1.6,
       );
       if (hasOperator) continue;
       above.sort((a, b) => a.left.compareTo(b.left));
@@ -168,14 +208,18 @@ class MathTextbookDraftParser {
                     !consumed.contains(g.index) &&
                     RegExp(r'^[a-zA-Z]$').hasMatch(g.text) &&
                     g.centerX < exponent.centerX &&
-                    exponent.left - g.right < g.height * 2 &&
-                    exponent.height < g.height * 0.85 &&
+                    (restoreLayout || exponent.left - g.right < g.height * 2) &&
+                    exponent.height < g.height * (restoreLayout ? .9 : .85) &&
                     _cy(g) - _cy(exponent) > g.height * 0.30 &&
                     _cy(g) - _cy(exponent) < g.height,
               )
               .toList()
             ..sort((a, b) => b.right.compareTo(a.right));
       if (letters.isEmpty) continue;
+      if (restoreLayout &&
+          exponent.left - letters.first.right >= letters.first.height * 2) {
+        continue;
+      }
       final base = <TextbookPageGlyph>[letters.first];
       for (final letter in letters.skip(1)) {
         if (base.last.left - letter.right > letter.height * 0.5 ||
@@ -201,7 +245,9 @@ class MathTextbookDraftParser {
       consumed.addAll(token.indices);
     }
 
-    _verticalAdditions(page, glyphs, consumed, blocks, id);
+    if (!restoreLayout) {
+      _legacyVerticalAdditions(page, glyphs, consumed, blocks, id);
+    }
 
     // 不完整或暂不支持的竖式按整个列式保留，不能把每一列拆成独立图片。
     for (final line in page.graphics.lines.where(
@@ -386,7 +432,7 @@ class MathTextbookDraftParser {
       for (final segment in segments) {
         final combined = _mixedNumbers(segment);
         final lineHeight = segment.map((t) => t.height).reduce(math.max);
-        final spans = <MathTextbookSpan>[];
+        var spans = <MathTextbookSpan>[];
         _Token? previous;
         for (final token in combined) {
           final sourceAdjacent =
@@ -443,6 +489,9 @@ class MathTextbookDraftParser {
                     !RegExp(r'[。！？?!=]').hasMatch(text));
         var source = combined.map((t) => t.region).reduce((a, b) => a.merge(b));
         if (badge != null) source = source.merge(badge);
+        if (restoreLayout) {
+          spans = _inlineMathSpans(spans, mathContext: marker != null);
+        }
         blocks.add(
           MathTextbookBlock(
             id: id(),
@@ -468,39 +517,93 @@ class MathTextbookDraftParser {
         in blocks
             .where(
               (b) =>
-                  b.exerciseNumber != null && RegExp(r'^\d+$').hasMatch(b.text),
+                  b.exerciseNumber != null &&
+                  (RegExp(r'^\d+$').hasMatch(b.text) ||
+                      restoreLayout &&
+                          RegExp(r'^\d+\s*[（(]\s*$').hasMatch(b.text)),
             )
             .toList()) {
-      final source = marker.sources.single;
-      final candidates =
-          blocks
-              .where(
-                (b) =>
-                    b != marker &&
-                    b.exerciseNumber == null &&
-                    b.sources.single.left > source.right &&
-                    b.sources.single.left - source.right < .12 &&
-                    (b.sources.single.top - source.top).abs() < .02,
-              )
-              .toList()
-            ..sort(
-              (a, b) => a.sources.single.left.compareTo(b.sources.single.left),
-            );
-      if (candidates.isEmpty) continue;
-      final body = candidates.first;
-      blocks[blocks.indexOf(marker)] = MathTextbookBlock(
-        id: marker.id,
-        kind: marker.kind,
-        spans: [
-          ...marker.spans,
-          if (body.spans.isNotEmpty) const MathTextbookSpan.text(' '),
-          ...body.spans,
-        ],
-        sources: [source.merge(body.sources.single)],
-        exerciseNumber: marker.exerciseNumber,
-        warnings: body.warnings,
-      );
-      blocks.remove(body);
+      var current = marker;
+      do {
+        final source = current.sources.single;
+        final candidates =
+            blocks
+                .where(
+                  (b) =>
+                      b != current &&
+                      (b.exerciseNumber == null ||
+                          restoreLayout &&
+                              RegExp(r'^[（(]\d+[）)]').hasMatch(b.text)) &&
+                      b.sources.single.left > source.right &&
+                      b.sources.single.left - source.right < .12 &&
+                      (b.sources.single.top - source.top).abs() < .02,
+                )
+                .toList()
+              ..sort(
+                (a, b) =>
+                    a.sources.single.left.compareTo(b.sources.single.left),
+              );
+        if (candidates.isEmpty) break;
+        final body = candidates.first;
+        final joined = MathTextbookBlock(
+          id: current.id,
+          kind: current.kind,
+          spans: [
+            ...current.spans,
+            if (body.spans.isNotEmpty) const MathTextbookSpan.text(' '),
+            ...body.spans,
+          ],
+          sources: [source.merge(body.sources.single)],
+          exerciseNumber: current.exerciseNumber,
+          warnings: restoreLayout
+              ? {...current.warnings, ...body.warnings}.toList()
+              : body.warnings,
+          sourceLayout: current.sourceLayout || body.sourceLayout,
+        );
+        blocks[blocks.indexOf(current)] = joined;
+        blocks.remove(body);
+        current = joined;
+        // A blank can separate the badge, opening bracket and prompt into
+        // three segments. Continue only until that bracket has its body.
+      } while (restoreLayout &&
+          RegExp(r'^\d+\s*[（(]\s*$').hasMatch(current.text));
+    }
+
+    if (restoreLayout) {
+      for (var index = 0; index < blocks.length; index++) {
+        final block = blocks[index];
+        if (block.kind != MathTextbookBlockKind.heading ||
+            _sectionHeading(block.text)) {
+          continue;
+        }
+        final source = block.sources.single;
+        final besideQuestion = blocks.any((other) {
+          if (other.exerciseNumber == null ||
+              other.kind != MathTextbookBlockKind.exercise &&
+                  other.kind != MathTextbookBlockKind.example) {
+            return false;
+          }
+          final marker = other.sources.single;
+          return marker.left < source.left &&
+              (marker.centerY - source.centerY).abs() <
+                  math.max(marker.height, source.height) * .6;
+        });
+        // Large handwritten print beside a numbered example is its prompt,
+        // not a new section. Small drawing labels can distort the body median.
+        if (besideQuestion) blocks[index] = _plainTextBlock(block);
+      }
+      for (var index = 0; index < blocks.length; index++) {
+        final block = blocks[index];
+        if (block.exerciseNumber == null ||
+            !RegExp(r'^[0-9\s.、()（）①-⑳]+$').hasMatch(block.text)) {
+          continue;
+        }
+        // Picture positions and isolated number badges do not supply a prompt.
+        // Keep their glyphs in the surrounding illustration/question instead.
+        if (!_pictorialQuestion(block, blocks, page)) {
+          blocks[index] = _plainTextBlock(block);
+        }
+      }
     }
 
     // 线条和图像按重叠区域聚合，保留表格与图形；不猜测图形语义。
@@ -622,7 +725,309 @@ class MathTextbookDraftParser {
     return merged;
   }
 
-  void _verticalAdditions(
+  void _verticalArithmetic(
+    MathTextbookPageLayout page,
+    List<TextbookPageGlyph> glyphs,
+    Set<int> consumed,
+    List<MathTextbookBlock> blocks,
+    String Function() id,
+  ) {
+    final aspect = page.text.width / page.text.height;
+    for (final line in page.graphics.lines.where((l) => l.dark)) {
+      final operations = glyphs.where((g) {
+        final size = math.max(g.height, g.width * aspect);
+        return !consumed.contains(g.index) &&
+            ['+', '-', '−', '×'].contains(g.text) &&
+            g.centerX >= line.left &&
+            g.centerX < line.right &&
+            line.y > _cy(g) &&
+            line.y - _cy(g) < size * 3.5;
+      }).toList();
+      if (operations.length != 1) continue;
+      final operation = operations.single;
+      final size = math.max(operation.height, operation.width * aspect);
+      final digits = glyphs
+          .where(
+            (g) =>
+                !consumed.contains(g.index) &&
+                _digit(g.text) &&
+                g.centerX > operation.centerX &&
+                g.centerX <= line.right &&
+                _cy(g) > line.y - size * 9 &&
+                _cy(g) < line.y + size * 4,
+          )
+          .toList();
+      if (digits.length < 2) continue;
+      final height = _median(digits.map((g) => g.height));
+      final rows = <List<TextbookPageGlyph>>[];
+      for (final glyph
+          in (digits.where((g) => g.height >= height * .8).toList()
+            ..sort((a, b) => _cy(a).compareTo(_cy(b))))) {
+        if (rows.isEmpty ||
+            (_cy(glyph) - _cy(rows.last.first)).abs() > height * .5) {
+          rows.add([glyph]);
+        } else {
+          rows.last.add(glyph);
+        }
+      }
+      // Nearby horizontal equations can share the same x coordinates. Their
+      // explicit relation sign separates them from the vertical operand rows.
+      final arithmeticRows = rows.where(
+        (row) => !_rowNeighbors(
+          row.first,
+          glyphs,
+          consumed,
+        ).any((g) => g.text == '=' || g.text == '≈'),
+      );
+      final above = arithmeticRows.where((r) => _cy(r.first) < line.y).toList();
+      final below = arithmeticRows.where((r) => _cy(r.first) > line.y).toList();
+      // This structure owns exactly two operands and at most one result row.
+      // More rows are source work, even when a later separator was not read.
+      if (above.length != 2 || below.length > 1) continue;
+      final chosen = <List<TextbookPageGlyph>>[
+        above[above.length - 2],
+        above.last,
+        if (below.isNotEmpty) below.first else [],
+      ];
+      if ((_cy(chosen[1].first) - _cy(operation)).abs() > height * .7 ||
+          _cy(chosen[1].first) - _cy(chosen[0].first) > height * 3.5) {
+        continue;
+      }
+      // A multi-row product or a division ladder must stay complete in its
+      // original region; the first partial product is not the final answer.
+      if (page.graphics.lines.any(
+        (other) =>
+            other != line &&
+            other.dark &&
+            other.y > line.y + height * .5 &&
+            other.y < line.y + height * 6 &&
+            math.min(other.right, line.right) -
+                    math.max(other.left, line.left) >
+                (line.right - line.left) * .7,
+      )) {
+        continue;
+      }
+      for (final row in chosen.where((r) => r.isNotEmpty)) {
+        final top = row.map((g) => g.top).reduce(math.min);
+        final bottom = row.map((g) => g.bottom).reduce(math.max);
+        row.addAll(
+          glyphs.where(
+            (g) =>
+                !consumed.contains(g.index) &&
+                g.text == '.' &&
+                g.centerX > operation.centerX &&
+                g.centerX <= line.right &&
+                _cy(g) >= top &&
+                _cy(g) <= bottom + height * .12,
+          ),
+        );
+        row.sort((a, b) => a.left.compareTo(b.left));
+      }
+      final columns = <double>[];
+      final characters = chosen.expand((r) => r).toList()
+        ..sort((a, b) => a.centerX.compareTo(b.centerX));
+      for (final glyph in characters) {
+        if (columns.isEmpty || glyph.centerX - columns.last > height * .32) {
+          columns.add(glyph.centerX);
+        }
+      }
+      if (columns.isEmpty || columns.length > 12) continue;
+      int columnOf(double x) {
+        var closest = 0;
+        for (var column = 1; column < columns.length; column++) {
+          if ((columns[column] - x).abs() < (columns[closest] - x).abs()) {
+            closest = column;
+          }
+        }
+        return closest;
+      }
+
+      final grid = <String>[];
+      var aligned = true;
+      for (final row in chosen) {
+        final cells = List.filled(columns.length, ' ');
+        for (final glyph in row) {
+          final column = columnOf(glyph.centerX);
+          if (cells[column] != ' ' ||
+              (glyph.centerX - columns[column]).abs() > height * .4) {
+            aligned = false;
+            break;
+          }
+          cells[column] = glyph.text;
+        }
+        grid.add(cells.join());
+      }
+      if (!aligned) continue;
+      final selectedIndices = characters.map((g) => g.index).toSet();
+      final notes =
+          glyphs
+              .where(
+                (g) =>
+                    !consumed.contains(g.index) &&
+                    !selectedIndices.contains(g.index) &&
+                    (_digit(g.text) || g.text == '.') &&
+                    g.height < height * .8 &&
+                    g.centerX >= columns.first - height * .4 &&
+                    g.centerX <= line.right + height * .4 &&
+                    _cy(g) >=
+                        chosen[0].map((c) => c.top).reduce(math.min) -
+                            height * 1.6 &&
+                    _cy(g) < line.y,
+              )
+              .toList()
+            ..sort((a, b) => _cy(a).compareTo(_cy(b)));
+      final bands = <List<TextbookPageGlyph>>[];
+      for (final note in notes) {
+        if (bands.isEmpty ||
+            (_cy(note) - _cy(bands.last.first)).abs() > height * .22) {
+          bands.add([note]);
+        } else {
+          bands.last.add(note);
+        }
+      }
+      final annotations = <MathTextbookVerticalAnnotation>[];
+      final levels = <int, int>{};
+      for (final band in bands) {
+        band.sort((a, b) => a.left.compareTo(b.left));
+        final groups = <List<TextbookPageGlyph>>[];
+        for (final glyph in band) {
+          if (groups.isEmpty ||
+              glyph.left - groups.last.last.right >
+                  math.max(glyph.width, groups.last.last.width) * 1.3) {
+            groups.add([glyph]);
+          } else {
+            groups.last.add(glyph);
+          }
+        }
+        final y = _cy(band.first);
+        final row = y < _cy(chosen[0].first)
+            ? 0
+            : y < _cy(chosen[1].first)
+            ? 1
+            : 2;
+        final level = levels[row] ?? 0;
+        levels[row] = level + 1;
+        for (final group in groups) {
+          final region = _bounds(page.text.page, group);
+          // Printed carries sit just to the right of the receiving digit.
+          // Borrowed values above an operand remain centered on its column.
+          final carryColumn = columns.lastIndexWhere(
+            (x) => x <= region.centerX,
+          );
+          final column = row == 2 && carryColumn >= 0
+              ? carryColumn
+              : columnOf(region.centerX);
+          if ((region.centerX - columns[column]).abs() > height * 1.25) {
+            aligned = false;
+            break;
+          }
+          annotations.add(
+            MathTextbookVerticalAnnotation(
+              value: group.map((g) => g.text).join(),
+              row: row,
+              columnFromRight: columns.length - column - 1,
+              level: level,
+            ),
+          );
+        }
+      }
+      if (!aligned) continue;
+      final symbol = operation.text == '−' ? '-' : operation.text;
+      final ordinaryAddition =
+          symbol == '+' &&
+          grid.every((r) => RegExp(r'^ *\d+$').hasMatch(r)) &&
+          !grid.last.startsWith(' ') &&
+          annotations.every(
+            (a) =>
+                a.row == 2 &&
+                a.level == 0 &&
+                RegExp(r'^[1-9]$').hasMatch(a.value),
+          );
+      final MathTextbookExpression expression;
+      try {
+        expression = MathTextbookExpression.fromJson(
+          (ordinaryAddition
+                  ? MathTextbookVerticalAddition(
+                      grid.map((r) => r.trim()).toList(),
+                      [
+                        for (final a in annotations)
+                          MathTextbookCarry(
+                            int.parse(a.value),
+                            a.columnFromRight,
+                          ),
+                      ],
+                    )
+                  : MathTextbookVerticalArithmetic(
+                      grid,
+                      operation: symbol,
+                      annotations: annotations,
+                    ))
+              .toJson(),
+        );
+      } on FormatException {
+        continue;
+      }
+      final placeholders = glyphs
+          .where(
+            (g) =>
+                !consumed.contains(g.index) &&
+                ['(', ')', '（', '）'].contains(g.text) &&
+                g.centerX >= line.left &&
+                g.centerX <= line.right &&
+                _cy(g) > line.y &&
+                _cy(g) < line.y + height * 3,
+          )
+          .toList();
+      final selected = [operation, ...characters, ...notes, ...placeholders];
+      var region = _bounds(page.text.page, selected).merge(
+        MathTextbookRegion(
+          page: page.text.page,
+          left: line.left,
+          right: line.right,
+          top: math.max(0.0, line.y - height * .05),
+          bottom: math.min(
+            1.0,
+            line.y + height * (chosen[2].isEmpty ? 1.8 : .05),
+          ),
+        ),
+      );
+      // PDF paths can carry dots, strike-throughs and other written work.
+      // Bounds prove that extra ink exists, not what that ink means: keep the
+      // source crop instead of guessing an annotation from its rectangle.
+      final decorations = page.graphics.regions
+          .where(
+            (r) =>
+                r.width * aspect <= height * 2 &&
+                r.height <= height * 1.75 &&
+                r.left >= line.left - height * .4 &&
+                r.right <= line.right + height * .4 &&
+                r.top >= region.top - height * 1.6 &&
+                r.bottom <= region.bottom + height * .25,
+          )
+          .toList();
+      for (final decoration in decorations) {
+        region = region.merge(decoration);
+      }
+      final keepLayout =
+          grid.last.contains(' ') ||
+          annotations.any((a) => a.row < 2 || a.value == '.') ||
+          decorations.isNotEmpty;
+      blocks.add(
+        MathTextbookBlock(
+          id: id(),
+          kind: MathTextbookBlockKind.formula,
+          spans: [MathTextbookSpan.math(expression)],
+          sources: [_pad(region)],
+          sourceLayout: keepLayout,
+          warnings: keepLayout ? const ['空位、借位或绘图标注按原书版面保留'] : const [],
+        ),
+      );
+      consumed.addAll(selected.map((g) => g.index));
+    }
+  }
+
+  // Frozen detection for exact v0/v1 automatic-draft reproduction only.
+  void _legacyVerticalAdditions(
     MathTextbookPageLayout page,
     List<TextbookPageGlyph> glyphs,
     Set<int> consumed,
@@ -736,6 +1141,73 @@ class MathTextbookDraftParser {
   }
 }
 
+List<TextbookPageGlyph> _deduplicateOverlappingGlyphs(
+  List<TextbookPageGlyph> glyphs,
+) {
+  final seen = <String, List<TextbookPageGlyph>>{};
+  final kept = <TextbookPageGlyph>[];
+  for (final glyph in glyphs) {
+    final sameText = seen.putIfAbsent(glyph.text, () => []);
+    final copy = sameText.any((other) {
+      final width = math.min(glyph.width, other.width);
+      final height = math.min(glyph.height, other.height);
+      if ((glyph.centerX - other.centerX).abs() > width * .6 ||
+          (_cy(glyph) - _cy(other)).abs() > height * .3 ||
+          math.max(glyph.height, other.height) > height * 1.5) {
+        return false;
+      }
+      final overlapWidth =
+          math.min(glyph.right, other.right) - math.max(glyph.left, other.left);
+      final overlapHeight =
+          math.min(glyph.bottom, other.bottom) - math.max(glyph.top, other.top);
+      return overlapWidth > width * .4 && overlapHeight > height * .7;
+    });
+    if (copy) continue;
+    sameText.add(glyph);
+    kept.add(glyph);
+  }
+  return kept;
+}
+
+final _inlineArithmetic = RegExp(
+  r'(?:[−-]?\d+(?:\.\d+)?%?|[a-zA-Z]{1,8}|[?？□]|\([^()\r\n]{1,64}\))'
+  r'(?:\s*[+\-−×÷=<>≤≥:/]\s*(?:\d+(?:\.\d+)?%?|[a-zA-Z]{1,8}|[?？□]|\([^()\r\n]{1,64}\))?)+',
+);
+
+List<MathTextbookSpan> _inlineMathSpans(
+  List<MathTextbookSpan> spans, {
+  required bool mathContext,
+}) {
+  final output = <MathTextbookSpan>[];
+  for (final span in spans) {
+    final text = span.text;
+    if (text == null) {
+      output.add(span);
+      continue;
+    }
+    var end = 0;
+    for (final match in _inlineArithmetic.allMatches(text)) {
+      final source = match[0]!;
+      if (!mathContext && !RegExp(r'[+−×÷=<>≤≥]').hasMatch(source)) continue;
+      MathTextbookExpression expression;
+      try {
+        expression = parseMathTextbookExpression(source.replaceAll('？', '?'));
+      } on FormatException {
+        continue;
+      }
+      if (match.start > end) {
+        output.add(MathTextbookSpan.text(text.substring(end, match.start)));
+      }
+      output.add(MathTextbookSpan.math(expression));
+      end = match.end;
+    }
+    if (end < text.length) {
+      output.add(MathTextbookSpan.text(text.substring(end)));
+    }
+  }
+  return output.length > 1000 ? spans : output;
+}
+
 bool _sectionHeading(String text) => RegExp(
   r'^(?:练习[一二三四五六七八九十百0-9]+|做一做|想一想|说一说|试一试|'
   r'你知道吗[？?]?|生活中的数学|整理和复习|回顾与反思|阅读资料)$',
@@ -805,6 +1277,97 @@ List<TextbookPageGlyph> _rowNeighbors(
     right++;
   }
   return row.sublist(left, right + 1);
+}
+
+MathTextbookBlock _plainTextBlock(MathTextbookBlock block) => MathTextbookBlock(
+  id: block.id,
+  kind: MathTextbookBlockKind.text,
+  spans: block.spans,
+  sources: block.sources,
+  warnings: block.warnings,
+  parentNote: block.parentNote,
+  sourceLayout: block.sourceLayout,
+);
+
+bool _pictorialQuestion(
+  MathTextbookBlock block,
+  List<MathTextbookBlock> blocks,
+  MathTextbookPageLayout page,
+) {
+  final source = block.sources.single;
+  final aspect = page.text.width / page.text.height;
+  // A position label inside a drawing cannot become a new question, even if
+  // it is circled. A real picture-only prompt has its drawing beside the badge.
+  if (page.graphics.regions.any(
+    (r) =>
+        r.containsCenter(source) &&
+        r.width * aspect > source.height * 2 &&
+        r.height > source.height * 2,
+  )) {
+    return false;
+  }
+  if (!page.graphics.regions.any(
+    (r) =>
+        r.left > source.right &&
+        r.top <= source.bottom + source.height * 2 &&
+        r.bottom > source.top &&
+        r.width * aspect > source.height * 3 &&
+        r.height > source.height * 2,
+  )) {
+    return false;
+  }
+  final number = int.tryParse(block.exerciseNumber ?? '');
+  if (number == null) return false;
+  if (block.kind == MathTextbookBlockKind.example) return true;
+  return blocks.any((other) {
+    final adjacent = int.tryParse(other.exerciseNumber ?? '');
+    if (other == block ||
+        adjacent == null ||
+        (adjacent - number).abs() != 1 ||
+        RegExp(r'^[0-9\s.、()（）①-⑳]+$').hasMatch(other.text)) {
+      return false;
+    }
+    final neighbor = other.sources.single;
+    return (neighbor.left - source.left).abs() <= source.height * .35 &&
+        neighbor.height >= source.height * .75 &&
+        neighbor.height <= source.height * 1.5;
+  });
+}
+
+bool _divisionBracket(
+  MathTextbookPageLayout page,
+  MathTextbookLine line,
+  List<TextbookPageGlyph> below,
+  List<TextbookPageGlyph> glyphs,
+  Set<int> consumed,
+) {
+  final height = _median(below.map((g) => g.height));
+  final horizontal = height / (page.text.width / page.text.height);
+  final baseline = _median(below.map(_cy));
+  if (!glyphs.any(
+    (g) =>
+        !consumed.contains(g.index) &&
+        _digit(g.text) &&
+        (baseline - _cy(g)).abs() <= height * .45 &&
+        g.right <= line.left + horizontal * .25 &&
+        line.left - g.right <= horizontal * 1.6,
+  )) {
+    return false;
+  }
+  final bottom = below.map((g) => g.bottom).reduce(math.max);
+  // A curved/vertical path at the bar's left edge and a number beside it are
+  // evidence of division work, not of a fraction. Keep its complete source.
+  return page.graphics.regions.any(
+    (r) =>
+        r.left >= line.left - horizontal * 1.5 &&
+        r.left <= line.left + horizontal * .35 &&
+        r.right >= line.left - horizontal * .4 &&
+        r.top >= line.y - height * .35 &&
+        r.top <= line.y + height * .25 &&
+        r.height >= height * .5 &&
+        r.bottom >= baseline &&
+        r.bottom <= bottom + height * .8,
+  );
 }
 
 bool _numberBadge(
@@ -933,7 +1496,7 @@ double _median(Iterable<double> values) {
       : (sorted[sorted.length ~/ 2 - 1] + sorted[sorted.length ~/ 2]) / 2;
 }
 
-bool _numericRow(List<TextbookPageGlyph> row) {
+bool _numericRow(List<TextbookPageGlyph> row, {double? maxGap}) {
   if (row.isEmpty) return false;
   final sorted = [...row]..sort((a, b) => a.left.compareTo(b.left));
   final height = _median(row.map((g) => g.height));
@@ -943,7 +1506,7 @@ bool _numericRow(List<TextbookPageGlyph> row) {
   }
   for (var i = 1; i < sorted.length; i++) {
     if (sorted[i].left - sorted[i - 1].right >
-        _median(row.map((g) => g.width)) * 0.7) {
+        math.max(_median(row.map((g) => g.width)) * 0.7, maxGap ?? 0)) {
       return false;
     }
   }

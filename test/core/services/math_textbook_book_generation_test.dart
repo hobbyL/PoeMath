@@ -10,6 +10,7 @@ import 'package:poemath/data/models/math_textbook_page_layout.dart';
 import 'package:poemath/data/models/textbook_toc.dart';
 import 'package:poemath/data/repositories/math_textbook_course_repository.dart';
 import 'package:poemath/domain/math_textbook_course_plan.dart';
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
 import 'package:poemath/domain/math_textbook_draft_parser.dart';
 
 import '../../helpers/math_textbook_fixture.dart';
@@ -321,116 +322,143 @@ void main() {
     );
   });
 
-  for (final reviewed in [false, true]) {
-    test('旧整理升级中断重开仅替换原始自动稿，保护${reviewed ? '已审稿' : '未审人工修改'}', () async {
-      final legacyRanges = [
-        for (var n = 1; n <= 3; n++)
-          MathTextbookCourseRange(
-            title: ['甲课', '乙课', '丙课'][n - 1],
-            unitTitle: n == 3 ? '第二单元' : '第一单元',
-            startPage: n,
-            endPage: n,
-          ),
-      ];
-      for (final range in legacyRanges) {
-        final parsed = const MathTextbookDraftParser().parse(
-          title: range.title,
-          startPage: range.startPage,
-          endPage: range.endPage,
-          pages: [page(range.startPage)],
-          classifyContent: false,
-        );
-        await repository.saveGenerated(
-          book,
-          parsed.edit(
-            learning: legacyMathTextbookLearning(
-              parsed,
-              unitTitle: range.unitTitle,
+  for (final (version, reviewed) in [
+    for (final version in [0, 1])
+      for (final reviewed in [false, true]) (version, reviewed),
+  ]) {
+    test(
+      'v$version旧整理升级中断重开仅替换原始自动稿，保护${reviewed ? '已审稿' : '未审人工修改'}',
+      () async {
+        MathTextbookPageLayout upgradePage(int number) =>
+            (MathPageFixture(number)
+                  ..text('自有完整内容', .1, .1)
+                  ..text('1. 算一算：2+3=□。', .1, .3))
+                .build();
+        final legacyRanges = [
+          for (var n = 1; n <= 3; n++)
+            MathTextbookCourseRange(
+              title: ['甲课', '乙课', '丙课'][n - 1],
+              unitTitle: n == 3 ? '第二单元' : '第一单元',
+              startPage: n,
+              endPage: n,
             ),
+        ];
+        for (final range in legacyRanges) {
+          final raw = MathTextbookDraftParser(legacyLayout: version == 1).parse(
+            title: range.title,
+            startPage: range.startPage,
+            endPage: range.endPage,
+            pages: [upgradePage(range.startPage)],
+            classifyContent: version == 1,
+          );
+          final parsed = version == 1
+              ? organizeMathTextbookLesson(raw, legacyLayout: true)
+              : raw;
+          await repository.saveGenerated(
+            book,
+            parsed.edit(
+              learning: version == 1
+                  ? seedMathTextbookLearning(
+                      parsed,
+                      unitTitle: range.unitTitle,
+                      legacyLayout: true,
+                    )
+                  : legacyMathTextbookLearning(
+                      parsed,
+                      unitTitle: range.unitTitle,
+                    ),
+            ),
+            generation: 0,
+            authorize: () {},
+          );
+        }
+        var old = await repository.saveOutline(
+          book,
+          MathTextbookCourseOutline(
+            source: 'bookmarks',
+            organizationVersion: version,
+            ranges: legacyRanges,
+            completedLessonIds: legacyRanges.map((r) => r.lessonId).toList(),
           ),
           generation: 0,
           authorize: () {},
         );
-      }
-      var old = await repository.saveOutline(
-        book,
-        MathTextbookCourseOutline(
-          source: 'bookmarks',
-          ranges: legacyRanges,
-          completedLessonIds: legacyRanges.map((r) => r.lessonId).toList(),
-        ),
-        generation: 0,
-        authorize: () {},
-      );
-      final original = old.lessons[1];
-      final authored = reviewed
-          ? original.approve(
-              pdfSha256: book.pdfSha256,
-              reviewer: '家长',
-              editingMilliseconds: 0,
-            )
-          : original.edit(title: '家长修订的课名');
-      old = await repository.saveLesson(
-        book,
-        authored,
-        expectedRevision: old.revision,
-        generation: 0,
-        authorize: () {},
-      );
-      final token = TextbookDraftToken();
-      final entered = Completer<void>();
-      final gate = Completer<MathTextbookPageLayout>();
-      final run = service.generateBook(
-        book: book,
-        toc: toc,
-        token: token,
-        authorize: () {},
-        onProgress: (_, __) {},
-        pageLoader: (number) async {
-          if (number == 2) {
-            entered.complete();
-            return gate.future;
-          }
-          return page(number);
-        },
-      );
-      final failure = expectLater(run, throwsA(isA<TextbookDraftCancelled>()));
-      await entered.future;
-      token.cancel();
-      gate.complete(page(2));
-      await failure;
-      final paused = (await repository.load(book))!;
-      expect(paused.outline!.completedLessonIds, ['math-1-1']);
-      expect(
-        paused.outline!.legacyRanges.map((r) => r.toJson()),
-        legacyRanges.map((r) => r.toJson()),
-      );
-      expect(paused.lessons.first.toJson(), isNot(old.lessons.first.toJson()));
-      expect(paused.pendingLessons, isEmpty);
-      repository = MathTextbookCourseRepository(
-        directoryProvider: () async => directory,
-      );
-      service = MathTextbookGenerationService(
-        repository,
-        TextbookFileService(directoryProvider: () async => directory),
-      );
-      final reads = <int>[];
-      final resumed = await service.generateBook(
-        book: book,
-        token: TextbookDraftToken(),
-        authorize: () {},
-        onProgress: (_, __) {},
-        pageLoader: (number) async {
-          reads.add(number);
-          return page(number);
-        },
-      );
-      expect(reads, [2, 3]);
-      expect(resumed.lessons[1].toJson(), authored.toJson());
-      expect(resumed.lessons[2].toJson(), isNot(old.lessons[2].toJson()));
-      expect(resumed.pendingLessons.map((l) => l.id), ['math-2-2']);
-      expect((await repository.load(book))!.toJson(), resumed.toJson());
-    });
+        final original = old.lessons[1];
+        final authored = reviewed
+            ? original.approve(
+                pdfSha256: book.pdfSha256,
+                reviewer: '家长',
+                editingMilliseconds: 0,
+              )
+            : original.edit(title: '家长修订的课名');
+        old = await repository.saveLesson(
+          book,
+          authored,
+          expectedRevision: old.revision,
+          generation: 0,
+          authorize: () {},
+        );
+        final token = TextbookDraftToken();
+        final entered = Completer<void>();
+        final gate = Completer<MathTextbookPageLayout>();
+        final run = service.generateBook(
+          book: book,
+          toc: toc,
+          token: token,
+          authorize: () {},
+          onProgress: (_, __) {},
+          pageLoader: (number) async {
+            if (number == 2) {
+              entered.complete();
+              return gate.future;
+            }
+            return upgradePage(number);
+          },
+        );
+        final failure = expectLater(
+          run,
+          throwsA(isA<TextbookDraftCancelled>()),
+        );
+        await entered.future;
+        token.cancel();
+        gate.complete(upgradePage(2));
+        await failure;
+        final paused = (await repository.load(book))!;
+        expect(paused.outline!.completedLessonIds, ['math-1-1']);
+        expect(
+          paused.outline!.legacyRanges.map((r) => r.toJson()),
+          legacyRanges.map((r) => r.toJson()),
+        );
+        expect(
+          paused.lessons.first.toJson(),
+          isNot(old.lessons.first.toJson()),
+        );
+        expect(paused.pendingLessons, isEmpty);
+        repository = MathTextbookCourseRepository(
+          directoryProvider: () async => directory,
+        );
+        service = MathTextbookGenerationService(
+          repository,
+          TextbookFileService(directoryProvider: () async => directory),
+        );
+        final reads = <int>[];
+        final resumed = await service.generateBook(
+          book: book,
+          token: TextbookDraftToken(),
+          authorize: () {},
+          onProgress: (_, __) {},
+          pageLoader: (number) async {
+            reads.add(number);
+            return upgradePage(number);
+          },
+        );
+        expect(reads, [2, 3]);
+        expect(resumed.lessons[1].toJson(), authored.toJson());
+        expect(resumed.lessons[2].toJson(), isNot(old.lessons[2].toJson()));
+        expect(resumed.pendingLessons.map((l) => l.id), ['math-2-2']);
+        expect((await repository.load(book))!.toJson(), resumed.toJson());
+      },
+    );
   }
 
   test('修正漏单元的目录后原大课时完整保留，当前列表只呈现新范围', () async {

@@ -156,6 +156,7 @@ class MathTextbookGenerationService {
             : seedMathTextbookLearning(parsed, unitTitle: unitTitle),
       );
       String? legacyDigest;
+      String? previousDigest;
       if (legacyRange != null && legacyRange.lessonId == lesson.id) {
         final old = const MathTextbookDraftParser().parse(
           title: legacyRange.title,
@@ -172,6 +173,31 @@ class MathTextbookGenerationService {
               ),
             )
             .contentDigest(book.pdfSha256);
+        final previous = organizeMathTextbookLesson(
+          const MathTextbookDraftParser(legacyLayout: true).parse(
+            title: legacyRange.title,
+            startPage: startPage,
+            endPage: endPage,
+            pages: pages,
+          ),
+          legacyLayout: true,
+        );
+        previousDigest = previous
+            .edit(
+              learning: legacyRange.needsAlignment
+                  ? MathTextbookLearning(
+                      unitTitle: legacyRange.unitTitle,
+                      knowledgePoints: const [],
+                      exercises: const [],
+                      practicePlans: const [],
+                    )
+                  : seedMathTextbookLearning(
+                      previous,
+                      unitTitle: legacyRange.unitTitle,
+                      legacyLayout: true,
+                    ),
+            )
+            .contentDigest(book.pdfSha256);
       }
       check();
       return await repository.saveGenerated(
@@ -180,6 +206,7 @@ class MathTextbookGenerationService {
         generation: epoch,
         authorize: check,
         unmodifiedLegacyDigest: legacyDigest,
+        unmodifiedPreviousDigest: previousDigest,
       );
     } finally {
       await document?.dispose();

@@ -6,10 +6,18 @@ import 'package:poemath/domain/textbook_pinyin_font.dart';
 
 final _practiceHeading = RegExp(r'^(?:练习[一二三四五六七八九十百0-9]+|做一做|想一想|说一说|试一试)$');
 final _subquestion = RegExp(r'^(?:[（(]\d+[）)]|[①-⑳])');
+const _exampleStepHeadings = {'阅读与理解', '分析与解答', '回顾与反思'};
+final _instructionNumber = RegExp(r'^([0-9]{1,2})[.、]\s*');
+
+bool isMathTextbookPracticeHeading(String text) =>
+    _practiceHeading.hasMatch(text.replaceAll(RegExp(r'\s'), ''));
 
 /// Keep each example/question with its explanation and drawing. The original
 /// page remains an independent anchor; an uncertain diagram is never flattened.
-MathTextbookLesson organizeMathTextbookLesson(MathTextbookLesson lesson) {
+MathTextbookLesson organizeMathTextbookLesson(
+  MathTextbookLesson lesson, {
+  bool legacyLayout = false,
+}) {
   // An explicitly joined cross-page question already owns its complete sources.
   if (lesson.blocks.any(
     (b) => b.sources.map((s) => s.page).toSet().length > 1,
@@ -25,19 +33,24 @@ MathTextbookLesson organizeMathTextbookLesson(MathTextbookLesson lesson) {
               b.sources.first.page == page,
         )
         .toList();
-    final blocks = lesson.blocks
+    var blocks = lesson.blocks
         .where(
           (b) =>
               b.kind != MathTextbookBlockKind.sourcePage &&
               b.sources.first.page == page &&
               !isMathTextbookFooter(b),
         )
+        .map(
+          (block) =>
+              legacyLayout ? block : _namedUnitHeading(block, lesson.title),
+        )
         .toList();
+    if (!legacyLayout) blocks = _practiceQuestionRoles(blocks);
     if (blocks.isEmpty) {
       organized.addAll(originals);
       continue;
     }
-    final anchors =
+    final candidates =
         blocks
             .where(
               (b) =>
@@ -53,6 +66,9 @@ MathTextbookLesson organizeMathTextbookLesson(MathTextbookLesson lesson) {
                 ? a.sources.first.left.compareTo(b.sources.first.left)
                 : top;
           });
+    final anchors = legacyLayout
+        ? candidates
+        : _contentAnchors(candidates, blocks);
     final groups = <List<MathTextbookBlock>>[];
     for (final anchor in anchors) {
       // Parallel questions share a band. Keep them together instead of cutting
@@ -145,19 +161,52 @@ MathTextbookLesson organizeMathTextbookLesson(MathTextbookLesson lesson) {
                 (b.spans.isNotEmpty ||
                     b.kind == MathTextbookBlockKind.illustration),
           );
-      final visual = !titleOnly && intersecting.any((b) => b.needsSource);
+      final mathCells = legacyLayout
+          ? const <MathTextbookBlock>[]
+          : members
+                .where((b) => b.spans.any((s) => s.expression != null))
+                .toList();
+      final parallelMath = mathCells.any(
+        (left) => mathCells.any(
+          (right) =>
+              right.sources.first.left - left.sources.first.right >
+                  math.max(
+                        left.sources.first.height,
+                        right.sources.first.height,
+                      ) *
+                      .8 &&
+              (right.sources.first.top - left.sources.first.top).abs() <
+                  math.min(
+                        left.sources.first.height,
+                        right.sources.first.height,
+                      ) *
+                      .6,
+        ),
+      );
+      // A worksheet can have several formula columns without drawing paths.
+      // Keep those columns in the source layout instead of flattening them.
+      final visual =
+          !titleOnly &&
+          (parallelMath || intersecting.any((b) => b.needsSource));
       final spans = <MathTextbookSpan>[];
-      // Labels inside an illustration stay in the image. Only the ordered
-      // prose and supported expressions contribute to the reading summary.
+      // Illustration labels stay in the image. Supported expressions keep
+      // their structure through grouping, including intermediate work.
       for (final block in members.where(
         (b) =>
-            b.kind != MathTextbookBlockKind.illustration &&
             b.spans.isNotEmpty &&
             !(visual && !group.contains(b) && _isLayoutLabel(b)),
       )) {
+        final content = block.kind == MathTextbookBlockKind.illustration
+            ? legacyLayout
+                  ? const <MathTextbookSpan>[]
+                  : block.spans
+                        .where((span) => span.expression != null)
+                        .toList()
+            : block.spans;
+        if (content.isEmpty) continue;
         if (spans.isNotEmpty) spans.add(const MathTextbookSpan.text('\n'));
         spans.addAll(
-          block.spans.map(
+          content.map(
             (span) => span.text == null
                 ? span
                 : MathTextbookSpan.text(_decodePrintedAnnotation(span.text!)),
@@ -179,12 +228,23 @@ MathTextbookLesson organizeMathTextbookLesson(MathTextbookLesson lesson) {
           : anchor?.kind == MathTextbookBlockKind.example
           ? MathTextbookBlockKind.example
           : MathTextbookBlockKind.text;
+      final drawings = !legacyLayout && visual
+          ? members.where((b) => b.kind == MathTextbookBlockKind.illustration)
+          : const <MathTextbookBlock>[];
       final region = MathTextbookRegion(
         page: page,
         left: intersecting.map((b) => b.sources.first.left).reduce(math.min),
-        top: start,
+        // Question bands can overlap a drawing's edge. Preserve every owned
+        // drawing in full while retaining the next question's prompt.
+        top: drawings.fold(
+          start,
+          (edge, b) => math.min(edge, b.sources.first.top),
+        ),
         right: intersecting.map((b) => b.sources.first.right).reduce(math.max),
-        bottom: end,
+        bottom: drawings.fold(
+          end,
+          (edge, b) => math.max(edge, b.sources.first.bottom),
+        ),
         printedPage: originals.firstOrNull?.sources.first.printedPage,
       );
       final numbers = group
@@ -212,6 +272,138 @@ MathTextbookLesson organizeMathTextbookLesson(MathTextbookLesson lesson) {
     organized.addAll(originals);
   }
   return MathTextbookLesson.fromJson(lesson.edit(blocks: organized).toJson());
+}
+
+MathTextbookBlock _namedUnitHeading(
+  MathTextbookBlock block,
+  String lessonTitle,
+) {
+  if (block.kind != MathTextbookBlockKind.exercise ||
+      block.parentNote.isNotEmpty ||
+      block.sources.first.top > .18) {
+    return block;
+  }
+  final text = block.text.replaceAll(RegExp(r'\s'), '');
+  final match = RegExp(r'^[0-9]{1,2}[.、](.+)$').firstMatch(text);
+  if (match == null) return block;
+  final title = lessonTitle.replaceAll(RegExp(r'\s'), '');
+  final name = match[1]!;
+  if (name != title &&
+      !(title.endsWith(name) &&
+          RegExp(r'^[0-9]{1,2}[.、]?$')
+              .hasMatch(title.substring(0, title.length - name.length)))) {
+    return block;
+  }
+  // The named unit on the page is a heading, even when it starts with "2.".
+  return MathTextbookBlock.fromJson({
+    ...block.toJson(),
+    'kind': MathTextbookBlockKind.heading.name,
+    'exerciseNumber': null,
+  });
+}
+
+List<MathTextbookBlock> _practiceQuestionRoles(List<MathTextbookBlock> blocks) {
+  final ordered = [...blocks]
+    ..sort((a, b) => a.sources.first.top.compareTo(b.sources.first.top));
+  final replacements = <String, MathTextbookBlock>{};
+  var practice = false;
+  for (final block in ordered) {
+    if (block.kind == MathTextbookBlockKind.heading) {
+      final text = block.text.replaceAll(RegExp(r'\s'), '');
+      if (_practiceHeading.hasMatch(text)) {
+        practice = true;
+      } else if (!_exampleStepHeadings.contains(text) &&
+          blocks.any((b) => _independentHeadingBackdrop(b, block))) {
+        practice = false;
+      }
+    } else if (practice && block.kind == MathTextbookBlockKind.example) {
+      // Practice badges can look larger than nearby small drawing labels.
+      // The printed practice section determines their role.
+      replacements[block.id] = MathTextbookBlock.fromJson({
+        ...block.toJson(),
+        'kind': MathTextbookBlockKind.exercise.name,
+      });
+    }
+  }
+  return [for (final block in blocks) replacements[block.id] ?? block];
+}
+
+bool _independentHeadingBackdrop(
+  MathTextbookBlock block,
+  MathTextbookBlock heading,
+) =>
+    _isHeadingBackdrop(block, heading) &&
+    heading.sources.first.top - block.sources.first.top <=
+        heading.sources.first.height * .8 &&
+    block.sources.first.height <= heading.sources.first.height * 3;
+
+List<MathTextbookBlock> _contentAnchors(
+  List<MathTextbookBlock> candidates,
+  List<MathTextbookBlock> blocks,
+) {
+  final instructionIds = <String>{};
+  for (final frame in blocks.where(
+    (b) => b.kind == MathTextbookBlockKind.illustration,
+  )) {
+    final source = frame.sources.first;
+    if (source.width < .3 || source.height < .08) continue;
+    final steps = candidates
+        .where(
+          (b) =>
+              b.kind == MathTextbookBlockKind.exercise &&
+              b.parentNote.isEmpty &&
+              _instructionNumber.hasMatch(b.text) &&
+              source.containsCenter(b.sources.first),
+        )
+        .toList();
+    if (steps.length < 2 ||
+        !RegExp(r'^(?:先|首先)').hasMatch(
+          steps.first.text.replaceFirst(_instructionNumber, '').trimLeft(),
+        ) ||
+        !steps
+            .skip(1)
+            .any(
+              (b) => RegExp(r'^(?:再|然后|最后|接着)').hasMatch(
+                b.text.replaceFirst(_instructionNumber, '').trimLeft(),
+              ),
+            )) {
+      continue;
+    }
+    final numbers = steps
+        .map((b) => int.parse(_instructionNumber.firstMatch(b.text)![1]!))
+        .toList();
+    if (numbers.first != 1 ||
+        numbers.indexed.any((entry) => entry.$2 != entry.$1 + 1)) {
+      continue;
+    }
+    instructionIds.addAll(steps.map((b) => b.id));
+  }
+  final anchors = <MathTextbookBlock>[];
+  MathTextbookBlock? question;
+  for (final block in candidates) {
+    final phase =
+        block.kind == MathTextbookBlockKind.heading &&
+        _exampleStepHeadings.contains(block.text.replaceAll(RegExp(r'\s'), ''));
+    final heading = block.kind == MathTextbookBlockKind.heading;
+    final independentHeading =
+        !phase &&
+        (_practiceHeading.hasMatch(block.text.replaceAll(RegExp(r'\s'), '')) ||
+            blocks.any((b) => _independentHeadingBackdrop(b, block)));
+    if (question != null &&
+        (heading && !independentHeading ||
+            question.kind == MathTextbookBlockKind.example &&
+                instructionIds.contains(block.id))) {
+      continue;
+    }
+    anchors.add(block);
+    if (block.kind == MathTextbookBlockKind.example ||
+        block.kind == MathTextbookBlockKind.exercise) {
+      question = block;
+    } else {
+      question = null;
+    }
+  }
+  return anchors;
 }
 
 bool _isHeadingBackdrop(MathTextbookBlock block, MathTextbookBlock heading) {
@@ -264,7 +456,8 @@ bool isMathTextbookFooter(MathTextbookBlock block) {
 }
 
 /// Source anchors are available through the original-book action, not repeated
-/// underneath every extracted fragment. A source-only page remains visible.
+/// underneath every extracted fragment. Source-only and incomplete pages remain
+/// visible so partial text cannot hide missing drawings in an older draft.
 List<MathTextbookBlock> mathTextbookReadingBlocks(
   List<MathTextbookBlock> blocks,
 ) {
@@ -281,6 +474,7 @@ List<MathTextbookBlock> mathTextbookReadingBlocks(
         (b) =>
             !isMathTextbookFooter(b) &&
             (b.kind != MathTextbookBlockKind.sourcePage ||
+                b.warnings.isNotEmpty ||
                 b.sources.any((s) => !contentPages.contains(s.page))),
       )
       .toList();
@@ -335,6 +529,7 @@ String _knowledgeSummary(MathTextbookBlock block) {
 MathTextbookLearning seedMathTextbookLearning(
   MathTextbookLesson lesson, {
   String unitTitle = '',
+  bool legacyLayout = false,
 }) {
   final knowledge = <MathTextbookKnowledgePoint>[];
   final exercises = <MathTextbookExercise>[];
@@ -372,7 +567,13 @@ MathTextbookLearning seedMathTextbookLearning(
       continue;
     }
     final summary = _knowledgeSummary(block);
-    if (summary.isEmpty) continue;
+    // A printed example is still a knowledge source when its explanation is
+    // pictorial or mathematical. Keep its source and leave the prose empty;
+    // do not invent a textual rule from the drawing.
+    if (summary.isEmpty &&
+        (legacyLayout || block.kind != MathTextbookBlockKind.example)) {
+      continue;
+    }
     final title = block.kind == MathTextbookBlockKind.example
         ? '$section · ${mathTextbookSectionTitle(block)}'
         : section;

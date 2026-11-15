@@ -14,6 +14,8 @@ import 'package:poemath/data/repositories/math_textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_catalog_repository.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_source_preview.dart';
 
+import '../../helpers/math_textbook_real_content_expectations.dart';
+
 class _BookFiles extends TextbookFileService {
   _BookFiles(this.input, Directory root)
     : super(directoryProvider: () async => root);
@@ -33,6 +35,9 @@ void main() {
   );
   const library = String.fromEnvironment('TEXTBOOK_PDFIUM_LIBRARY');
   const legacyCourse = String.fromEnvironment('MATH_TEXTBOOK_LEGACY_COURSE');
+  const previousCourse = String.fromEnvironment(
+    'MATH_TEXTBOOK_PREVIOUS_COURSE',
+  );
   final enabled =
       inputDirectory.isNotEmpty &&
       evidenceDirectory.isNotEmpty &&
@@ -137,6 +142,28 @@ void main() {
             directoryProvider: () async => root,
           );
           expect((await reopened.load(book))!.toJson(), course.toJson());
+          final content = verifyMathTextbookRealContent(course, key);
+          final contentCrops = await Directory('${root.path}/content-crops')
+              .create();
+          for (final block in content) {
+            for (final source in block.sources) {
+              final image = await renderMathTextbookRegion(
+                pdf.path,
+                source,
+                MathTextbookRenderToken(),
+              );
+              try {
+                final bytes = await image.toByteData(
+                  format: ui.ImageByteFormat.png,
+                );
+                await File(
+                  '${contentCrops.path}/${block.id}-p${source.page}.png',
+                ).writeAsBytes(bytes!.buffer.asUint8List());
+              } finally {
+                image.dispose();
+              }
+            }
+          }
           for (final range in ranges.where((range) => range.needsAlignment)) {
             final learning = course.lessons
                 .singleWhere((l) => l.id == range.lessonId)
@@ -219,16 +246,20 @@ void main() {
                 image.dispose();
               }
             }
-            if (legacyCourse.isNotEmpty) {
+            for (final (version, previousFile) in [
+              if (legacyCourse.isNotEmpty) ('v0', legacyCourse),
+              if (previousCourse.isNotEmpty) ('v1', previousCourse),
+            ]) {
               final previous = MathTextbookCourse.fromJson(
-                jsonDecode(await File(legacyCourse).readAsString()),
+                jsonDecode(await File(previousFile).readAsString()),
               );
               previous.matchBook(book);
-              final legacyRoot = await Directory('${root.path}/legacy-upgrade')
-                  .create();
+              final legacyRoot = await Directory(
+                '${root.path}/$version-upgrade',
+              ).create();
               await Directory('${legacyRoot.path}/textbooks/math-courses')
                   .create(recursive: true);
-              await File(legacyCourse).copy(
+              await File(previousFile).copy(
                 '${legacyRoot.path}/textbooks/math-courses/${book.pdfSha256}.json',
               );
               final legacyRepository = MathTextbookCourseRepository(
@@ -247,7 +278,7 @@ void main() {
               expect(
                 upgraded.pendingLessons,
                 isEmpty,
-                reason: '未改动的真实旧自动稿应直接更新',
+                reason: '未改动的真实$version自动稿应直接更新',
               );
               expect(
                 {
@@ -382,9 +413,19 @@ void main() {
             'warningBlocks': blocks.where((b) => b.warnings.isNotEmpty).length,
             'outlineWarnings': course.outline!.warnings,
             'reviewedLessons': 0,
+            'realContentChecks': true,
+            'contentPages':
+                content
+                    .expand((b) => b.sources.map((s) => s.page))
+                    .toSet()
+                    .toList()
+                  ..sort(),
+            'contentCrops': contentCrops.path,
             'structuredImportAndManualSupplement': true,
             if (key == '2a') 'readingCrops': '${root.path}/reading-crops',
             if (key == '2a') 'legacyUpgradeVerified': legacyCourse.isNotEmpty,
+            if (key == '2a')
+              'previousUpgradeVerified': previousCourse.isNotEmpty,
             'elapsedMilliseconds': stopwatch.elapsedMilliseconds,
             'courseFile':
                 '${root.path}/textbooks/math-courses/${book.pdfSha256}.json',

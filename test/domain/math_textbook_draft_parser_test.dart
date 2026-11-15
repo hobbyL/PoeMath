@@ -90,18 +90,16 @@ void main() {
   test('分数线缺失时保留二维区域，不把上下数字压成整数', () {
     final page = MathPageFixture(1)..fraction('1', '4', .2, .3);
     page.lines.clear();
-    final lesson = parse(page, complete: false);
+    final lesson = parse(page);
     expect(_expressions(lesson), isEmpty);
-    expect(
-      lesson.blocks.any(
-        (b) =>
-            b.kind == MathTextbookBlockKind.illustration &&
-            b.warnings.isNotEmpty,
-      ),
-      isTrue,
+    final image = lesson.blocks.singleWhere(
+      (b) => b.kind == MathTextbookBlockKind.illustration,
     );
+    expect(image.warnings, contains('数字列的关系尚未确定，请对照原书核对'));
+    expect(image.sources.single.top, lessThan(.275));
+    expect(image.sources.single.bottom, greaterThan(.322));
     expect(lesson.blocks.map((b) => b.text).join(), isNot(contains('14')));
-    expect(lesson.blocks.last.warnings, contains('本页绘图证据未完整读取，已保留整页'));
+    expect(lesson.blocks.last.kind, MathTextbookBlockKind.sourcePage);
   });
 
   test('相邻两行横式不是竖式，空格后的数字也不是题号', () {
