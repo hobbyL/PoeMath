@@ -260,6 +260,11 @@ class _MathTextbookAttemptPageState
   @override
   Widget build(BuildContext context) {
     final item = _attempt.item;
+    final paperPlan =
+        _attempt.planId != null &&
+        item.exercise.fields.every(
+          (field) => field.rule.kind == MathTextbookAnswerKind.parent,
+        );
     return Scaffold(
       appBar: AppBar(title: const Text('作答详情')),
       body: SafeArea(
@@ -278,12 +283,16 @@ class _MathTextbookAttemptPageState
                 '核对人：${_attempt.parentReviewer} · ${_attempt.parentReviewedAt!.toLocal().toString().split('.').first}',
               ),
             const SizedBox(height: SpacingTokens.md),
-            for (final block in item.blocks)
+            for (final block in mathTextbookPracticeDisplayBlocks(
+              item,
+              parentPlan: paperPlan,
+            ))
               Padding(
                 padding: const EdgeInsets.only(bottom: SpacingTokens.md),
                 child: MathTextbookStudyContent(
                   book: widget.book,
                   block: block,
+                  forceSourcePreview: _attempt.planId == null || paperPlan,
                 ),
               ),
             if (item.exercise.note.isNotEmpty) Text(item.exercise.note),
@@ -296,7 +305,7 @@ class _MathTextbookAttemptPageState
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        field.label,
+                        mathTextbookAnswerFieldLabel(field),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text('你的作答：${_attempt.answers[field.id] ?? ''}'),

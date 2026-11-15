@@ -13,6 +13,185 @@ import '../helpers/math_textbook_fixture.dart';
 
 void main() {
   final book = mathTextbookFixture();
+
+  test('原题只参照已绑定且位于题目前的例题，不读取未绑定或后续示范', () {
+    final source = mathTaskClarityFixture();
+    final example = source.blocks.first;
+    final lesson = MathTextbookLesson.fromJson({
+      ...source.toJson(),
+      'blocks': [
+        {...example.toJson(), 'id': 'older'},
+        example.toJson(),
+        {...example.toJson(), 'id': 'unbound'},
+        source.blocks.last.toJson(),
+        {...example.toJson(), 'id': 'future'},
+      ],
+      'learning': {
+        ...source.learning!.toJson(),
+        'knowledgePoints': [
+          {
+            ...source.learning!.knowledgePoints.single.toJson(),
+            'blockIds': ['older', 'example', 'future'],
+          },
+        ],
+      },
+    });
+    final item = originalMathTextbookItems(lesson).single;
+    final retained = item.toJson();
+    expect(
+      mathTextbookExerciseReferences(lesson, item).map((block) => block.id),
+      ['example'],
+    );
+    expect(item.toJson(), retained);
+    final ordinary = mathLearningFixture(manual: true);
+    expect(
+      mathTextbookExerciseReferences(
+        ordinary,
+        originalMathTextbookItems(ordinary).single,
+      ),
+      isEmpty,
+    );
+  });
+
+  for (final generic in [true, false]) {
+    test('实践说明只改变展示，保留冻结任务、来源和核对规则（默认：$generic）', () {
+      final lesson = mathTaskClarityFixture(genericPractice: generic);
+      final plan = lesson.learning!.practicePlans.single;
+      final item = generateMathTextbookPractice(
+        lesson: lesson,
+        plan: plan,
+        grade: book.grade,
+        semester: book.semester,
+        random: Random(42),
+      ).single;
+      final retained = item.toJson();
+      final display = mathTextbookPracticeDisplayBlocks(item, parentPlan: true);
+      expect(display.single.text, mathTextbookPaperTaskInstruction(plan.task));
+      expect(display.single.sources, item.blocks.single.sources);
+      expect(item.toJson(), retained);
+      expect(item.blocks.single.text, plan.task);
+      expect(item.blocks.single.needsSource, isFalse);
+      if (!generic) {
+        expect(identical(display.single, item.blocks.single), isTrue);
+      }
+    });
+  }
+
+  test('仅有做一做标题的纸上题展示完整原页，保留印刷页码和冻结裁剪', () {
+    final lesson = mathTaskClarityFixture();
+    final original = originalMathTextbookItems(lesson).single;
+    final heading = MathTextbookBlock.fromJson({
+      ...original.blocks.single.toJson(),
+      'exerciseNumber': null,
+      'spans': [const MathTextbookSpan.text('做 一 做').toJson()],
+      'sourceLayout': true,
+    });
+    final item = MathTextbookPracticeItem(
+      exercise: original.exercise,
+      blocks: [heading],
+    );
+    final retained = item.toJson();
+    final display = mathTextbookPracticeDisplayBlocks(item).single;
+    expect(display.kind, MathTextbookBlockKind.sourcePage);
+    expect(display.sources.single.toJson(), {
+      'page': 2,
+      'left': 0.0,
+      'top': 0.0,
+      'right': 1.0,
+      'bottom': 1.0,
+      'printedPage': '8',
+    });
+    expect(item.toJson(), retained);
+    expect(item.blocks.single.sources.single.top, .2);
+  });
+
+  for (final manual in [false, true]) {
+    test('独立文字原题展示完整原页，同时保留题干、题号和冻结来源（纸上：$manual）', () {
+      final original = originalMathTextbookItems(
+        mathLearningFixture(manual: manual),
+      ).single;
+      final block = MathTextbookBlock.fromJson({
+        ...original.blocks.single.toJson(),
+        'parentNote': '自有核对说明',
+        'sources': [
+          {
+            ...original.blocks.single.sources.single.toJson(),
+            'printedPage': '8',
+          },
+        ],
+      });
+      final item = MathTextbookPracticeItem(
+        exercise: original.exercise,
+        blocks: [block],
+      );
+      final retained = item.toJson();
+      final display = mathTextbookPracticeDisplayBlocks(item).single;
+      expect(display.kind, MathTextbookBlockKind.exercise);
+      expect(display.spans, block.spans);
+      expect(display.exerciseNumber, '1');
+      expect(display.parentNote, block.parentNote);
+      expect(display.sources.single.toJson(), {
+        'page': 2,
+        'left': 0.0,
+        'top': 0.0,
+        'right': 1.0,
+        'bottom': 1.0,
+        'printedPage': '8',
+      });
+      expect(item.toJson(), retained);
+      expect(block.sources.single.top, .2);
+    });
+  }
+
+  test('已有配图、多个题块和生成巩固题保留原有来源区域', () {
+    final lesson = mathLearningFixture();
+    final original = originalMathTextbookItems(lesson).single;
+    final block = original.blocks.single;
+    final cases = [
+      [
+        MathTextbookBlock.fromJson({...block.toJson(), 'sourceLayout': true}),
+      ],
+      [
+        MathTextbookBlock.fromJson({...block.toJson(), 'kind': 'illustration'}),
+      ],
+      [
+        MathTextbookBlock.fromJson({
+          ...block.toJson(),
+          'warnings': ['自有配图核对说明'],
+        }),
+      ],
+      [
+        block,
+        MathTextbookBlock.fromJson({...block.toJson(), 'id': 'second-block'}),
+      ],
+    ];
+    for (final blocks in cases) {
+      final item = MathTextbookPracticeItem(
+        exercise: original.exercise,
+        blocks: blocks,
+      );
+      final retained = item.toJson();
+      final display = mathTextbookPracticeDisplayBlocks(item);
+      for (var index = 0; index < blocks.length; index++) {
+        expect(display[index], same(blocks[index]));
+      }
+      expect(item.toJson(), retained);
+    }
+    final generated = generateMathTextbookPractice(
+      lesson: lesson,
+      plan: lesson.learning!.practicePlans.single,
+      grade: book.grade,
+      semester: book.semester,
+      random: Random(42),
+    );
+    for (final item in generated) {
+      expect(
+        mathTextbookPracticeDisplayBlocks(item).single,
+        same(item.blocks.single),
+      );
+    }
+  });
+
   test('未审核且覆盖未确认的纸上原题和实践可练习', () {
     final source = mathLearningFixture(
       manual: true,

@@ -479,8 +479,14 @@ class _MathTextbookStudyPageState extends ConsumerState<MathTextbookStudyPage> {
               iconColor: color,
               title: plan.title,
               subtitle: availability.planIds.contains(plan.id)
-                  ? '${mathTextbookPracticeLabel(plan.kind)} · ${plan.kind == MathTextbookPracticeKind.parentTask ? 1 : plan.count} 题'
+                  ? plan.kind == MathTextbookPracticeKind.parentTask
+                        ? mathTextbookPaperTaskInstruction(
+                            plan.task,
+                            previewVisible: false,
+                          )
+                        : '${mathTextbookPracticeLabel(plan.kind)} · ${plan.count} 题'
                   : '答案与练习范围待核对',
+              subtitleMaxLines: 3,
               onTap: availability.planIds.contains(plan.id)
                   ? () => context.push(
                       AppRoutes.mathTextbookPracticeOf(

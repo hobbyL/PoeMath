@@ -286,6 +286,19 @@ class MathTextbookLearningRepository {
     return draft;
   });
 
+  /// Read source context without rewriting inputs or regenerating frozen items.
+  Future<MathTextbookLesson> sourceLessonForDraft(
+    MathTextbookPracticeDraft draft,
+  ) => _serial((course) async {
+    final raw = drafts.get(draftKind, scope: draft.scope);
+    if (raw == null) throw StateError('本次练习已结束或已替换，请重新打开');
+    final stored = MathTextbookPracticeDraft.fromJson(raw);
+    if (stored.fingerprint != draft.fingerprint) {
+      throw StateError('本次练习的冻结题目已变化，请重新打开');
+    }
+    return _validateDraft(course, stored);
+  });
+
   MathTextbookLesson _validateDraft(
     MathTextbookCourse? course,
     MathTextbookPracticeDraft draft, {

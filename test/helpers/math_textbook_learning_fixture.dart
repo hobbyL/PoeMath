@@ -1,6 +1,62 @@
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
+/// Self-authored paper tasks with a referenced example and retained PDF crops.
+MathTextbookLesson mathTaskClarityFixture({bool genericPractice = true}) {
+  final source = mathLearningFixture(
+    manual: true,
+    count: 1,
+    kind: MathTextbookPracticeKind.parentTask,
+  );
+  final learning = source.learning!;
+  return MathTextbookLesson.fromJson({
+    ...source.toJson(),
+    'title': '自有画角课',
+    'blocks': [
+      {
+        ...source.blocks.first.toJson(),
+        'kind': 'example',
+        'exerciseNumber': '2',
+        'sourceLayout': true,
+        'spans': [
+          const MathTextbookSpan.text('先标出一个点，用尺子从这里向两个方向画直线。').toJson(),
+        ],
+        'sources': [
+          {...source.blocks.first.sources.single.toJson(), 'printedPage': '7'},
+        ],
+      },
+      {
+        ...source.blocks.last.toJson(),
+        'spans': [
+          const MathTextbookSpan.text('照例2的方法，画一个角并标出顶点和两条边。').toJson(),
+        ],
+        'sources': [
+          {...source.blocks.last.sources.single.toJson(), 'printedPage': '8'},
+        ],
+      },
+    ],
+    'learning': {
+      ...learning.toJson(),
+      'knowledgePoints': [
+        {
+          ...learning.knowledgePoints.single.toJson(),
+          'title': '画角方法',
+          'summary': '用尺子从一个顶点向两个方向画出边。',
+        },
+      ],
+      'practicePlans': [
+        {
+          ...learning.practicePlans.single.toJson(),
+          'title': '本课实践',
+          'task': genericPractice
+              ? '选择本课一个例题或活动，在纸上完成并说明方法，请家长对照原书核对。'
+              : '用尺子画一个角，标出顶点和两条边，并向家长说明画法。',
+        },
+      ],
+    },
+  });
+}
+
 /// Roughly one MiB of self-authored content, like a prepared whole textbook.
 MathTextbookLesson denseMathLearningFixture({int additionalBlocks = 2400}) {
   final lesson = mathLearningFixture();

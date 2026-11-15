@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:poemath/data/models/math_textbook_course.dart';
 import 'package:poemath/data/models/textbook_course.dart'
     show textbookContentDigest;
+import 'package:poemath/domain/math_textbook_content_organizer.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 
 typedef MathTextbookPracticeAvailability = ({
@@ -84,6 +85,140 @@ class MathTextbookPracticeItem {
           : MathProblem.fromJson(problem as Map<String, dynamic>),
     );
   }
+}
+
+/// Presentation only: keep the retained task, rules and practice fingerprint.
+String mathTextbookAnswerFieldLabel(MathTextbookAnswerField field) =>
+    field.rule.kind == MathTextbookAnswerKind.parent &&
+        (field.label == '你的答案' || field.label == '你的作答或纸上完成情况')
+    ? '答案或完成情况'
+    : field.label;
+
+String mathTextbookPaperTaskInstruction(
+  String task, {
+  bool previewVisible = true,
+}) => task == '选择本课一个例题或活动，在纸上完成并说明方法，请家长对照原书核对。'
+    ? previewVisible
+          ? '观察下方的原书例题，按例题要求回答问题或完成操作，再向家长说明方法。'
+          : '参照本课原书例题完成作答或操作，再向家长说明方法。'
+    : task;
+
+List<MathTextbookBlock> mathTextbookPracticeDisplayBlocks(
+  MathTextbookPracticeItem item, {
+  bool parentPlan = false,
+}) {
+  final paper =
+      item.exercise.fields.isNotEmpty &&
+      item.exercise.fields.every(
+        (field) => field.rule.kind == MathTextbookAnswerKind.parent,
+      );
+  final display = <MathTextbookBlock>[];
+  for (final block in item.blocks) {
+    final headingOnly =
+        paper &&
+        block.exerciseNumber == null &&
+        isMathTextbookPracticeHeading(block.text);
+    // A standalone text crop can omit the diagrams and example it refers to.
+    // Expand its presentation without changing the retained exercise or draft.
+    final fullPage =
+        !parentPlan &&
+        block.kind == MathTextbookBlockKind.exercise &&
+        (headingOnly || (item.blocks.length == 1 && !block.needsSource));
+    if (fullPage) {
+      display.add(
+        MathTextbookBlock(
+          id: block.id,
+          kind: headingOnly ? MathTextbookBlockKind.sourcePage : block.kind,
+          spans: headingOnly ? const [] : block.spans,
+          sources: [
+            for (final page in block.sources.map((s) => s.page).toSet())
+              MathTextbookRegion(
+                page: page,
+                left: 0,
+                top: 0,
+                right: 1,
+                bottom: 1,
+                printedPage: block.sources
+                    .firstWhere((s) => s.page == page)
+                    .printedPage,
+              ),
+          ],
+          warnings: block.warnings,
+          exerciseNumber: headingOnly ? null : block.exerciseNumber,
+          parentNote: block.parentNote,
+          sourceLayout: headingOnly ? false : block.sourceLayout,
+        ),
+      );
+    } else if (paper &&
+        parentPlan &&
+        block.kind == MathTextbookBlockKind.text &&
+        mathTextbookPaperTaskInstruction(block.text) != block.text) {
+      display.add(
+        MathTextbookBlock(
+          id: block.id,
+          kind: block.kind,
+          spans: [
+            MathTextbookSpan.text(mathTextbookPaperTaskInstruction(block.text)),
+          ],
+          sources: block.sources,
+          warnings: block.warnings,
+          exerciseNumber: block.exerciseNumber,
+          parentNote: block.parentNote,
+          sourceLayout: block.sourceLayout,
+        ),
+      );
+    } else {
+      display.add(block);
+    }
+  }
+  return List.unmodifiable(display);
+}
+
+/// Resolve only references already bound to this exercise's knowledge points.
+/// Call with the immutable lesson validated against the active draft.
+List<MathTextbookBlock> mathTextbookExerciseReferences(
+  MathTextbookLesson lesson,
+  MathTextbookPracticeItem item,
+) {
+  final text = item.blocks.map((b) => b.text).join('\n');
+  final numbers = RegExp(r'例\s*([0-9]+)')
+      .allMatches(text)
+      .map((match) => match.group(1)!)
+      .toSet();
+  if (numbers.isEmpty && !RegExp(r'仿照|参照|按照上面|照上面|上面的?方法').hasMatch(text)) {
+    return const [];
+  }
+  final ids = {
+    for (final knowledge
+        in lesson.learning?.knowledgePoints ?? <MathTextbookKnowledgePoint>[])
+      if (item.exercise.knowledgePointIds.contains(knowledge.id))
+        ...knowledge.blockIds,
+  };
+  final firstQuestion = lesson.blocks.indexWhere(
+    (block) => item.exercise.blockIds.contains(block.id),
+  );
+  if (firstQuestion < 0) return const [];
+  final candidates = lesson.blocks
+      .take(firstQuestion)
+      .where(
+        (block) =>
+            ids.contains(block.id) &&
+            !item.exercise.blockIds.contains(block.id),
+      )
+      .toList();
+  if (numbers.isEmpty) return List.unmodifiable(candidates);
+  final selected = <String>{};
+  for (final number in numbers) {
+    final matches = candidates.where(
+      (block) =>
+          block.kind == MathTextbookBlockKind.example &&
+          block.exerciseNumber == number,
+    );
+    if (matches.isNotEmpty) selected.add(matches.last.id);
+  }
+  return List.unmodifiable(
+    candidates.where((block) => selected.contains(block.id)),
+  );
 }
 
 List<MathTextbookPracticeItem> originalMathTextbookItems(

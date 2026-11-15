@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -14,6 +16,7 @@ import 'package:poemath/data/models/math_textbook_progress.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/repositories/math_textbook_learning_repository.dart';
 import 'package:poemath/domain/math_textbook_grading.dart';
+import 'package:poemath/domain/math_textbook_practice.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 import 'package:poemath/features/math/providers/math_providers.dart';
 import 'package:poemath/features/textbook/math_textbook_labels.dart';
@@ -40,6 +43,10 @@ class _MathTextbookPracticePageState
     with WidgetsBindingObserver {
   MathTextbookLearningRepository? _repository;
   MathTextbookPracticeDraft? _draft;
+  MathTextbookLesson? _sourceLesson;
+  List<MathTextbookBlock> _sourceReferences = const [];
+  bool _sourceLoading = false;
+  String? _sourceError;
   MathSession? _session;
   final _controllers = <String, TextEditingController>{};
   final _clock = Stopwatch();
@@ -53,6 +60,33 @@ class _MathTextbookPracticePageState
   int _baseSeconds = 0, _inputRevision = 0;
   String? _error;
   Textbook? get _book => _repository?.book;
+
+  MathTextbookPracticeItem? get _item {
+    final draft = _draft;
+    return draft == null || draft.index >= draft.items.length
+        ? null
+        : draft.items[draft.index];
+  }
+
+  MathTextbookRegion? get _firstSource =>
+      _item?.blocks.expand((block) => block.sources).firstOrNull;
+
+  bool get _paperOnly =>
+      _item?.exercise.fields.every(
+        (field) => field.rule.kind == MathTextbookAnswerKind.parent,
+      ) ??
+      false;
+
+  String get _pageTitle {
+    if (widget.planId == null) return '教材原题';
+    final plan = _sourceLesson?.learning?.practicePlans
+        .where((plan) => plan.id == widget.planId)
+        .firstOrNull;
+    return plan?.title ?? (_paperOnly ? '本课实践' : '本课巩固');
+  }
+
+  void _openOriginalPage(int page) =>
+      context.push(AppRoutes.textbookReadOf(widget.bookId), extra: page);
 
   @override
   void initState() {
@@ -126,6 +160,7 @@ class _MathTextbookPracticePageState
             draft.results[draft.index] != null;
       });
       _syncControllers();
+      unawaited(_readSources(draft));
     } on Object catch (error, stackTrace) {
       _report(error, stackTrace, '本课练习暂时无法打开，已有草稿保留。');
     } finally {
@@ -133,6 +168,60 @@ class _MathTextbookPracticePageState
         setState(() => _loading = false);
         _updateClock();
       }
+    }
+  }
+
+  Future<void> _readSources(MathTextbookPracticeDraft draft) async {
+    bool current() =>
+        mounted &&
+        !_scopeChanged &&
+        _draft?.sessionId == draft.sessionId &&
+        draft.bookId == widget.bookId &&
+        draft.lessonId == widget.lessonId &&
+        draft.planId == widget.planId;
+    if (!current()) return;
+    setState(() {
+      _sourceLoading = true;
+      _sourceError = null;
+    });
+    try {
+      final lesson = await _repository!.sourceLessonForDraft(draft);
+      if (!current()) return;
+      setState(() {
+        _sourceLesson = lesson;
+        _updateReferences();
+      });
+    } on Object catch (error, stackTrace) {
+      if (!current()) return;
+      AppLogger.e(
+        '原书参考暂时无法载入，当前作答保留。',
+        tag: 'MathTextbook',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      setState(
+        () => _sourceError = mathTextbookDisplayError(error, '原书参考暂时无法载入，请重试。'),
+      );
+    } finally {
+      if (current()) setState(() => _sourceLoading = false);
+    }
+  }
+
+  void _updateReferences() {
+    final lesson = _sourceLesson, item = _item;
+    _sourceReferences = lesson == null || item == null || widget.planId != null
+        ? const []
+        : mathTextbookExerciseReferences(lesson, item);
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    final draft = _draft;
+    if (draft != null && draft.finishedAt == null && _session == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_readSources(draft));
+      });
     }
   }
 
@@ -174,6 +263,7 @@ class _MathTextbookPracticePageState
       controller.dispose();
     }
     _controllers.clear();
+    _updateReferences();
     final draft = _draft;
     if (draft == null || draft.index >= draft.items.length) return;
     final item = draft.items[draft.index];
@@ -337,6 +427,8 @@ class _MathTextbookPracticePageState
       if (!mounted) return;
       setState(() {
         _draft = draft;
+        _sourceLesson = null;
+        _sourceReferences = const [];
         _session = null;
         _committed = false;
         _baseSeconds = 0;
@@ -344,6 +436,7 @@ class _MathTextbookPracticePageState
         _inputRevision++;
       });
       _syncControllers();
+      unawaited(_readSources(draft));
     } on Object catch (error, stackTrace) {
       _report(error, stackTrace, '新练习未开始，原草稿保留。');
     } finally {
@@ -387,13 +480,20 @@ class _MathTextbookPracticePageState
     },
     child: Scaffold(
       appBar: AppBar(
-        title: Text(widget.planId == null ? '教材原题' : '本课巩固'),
+        title: Text(_pageTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         leading: IconButton(
           tooltip: '保存并返回',
           onPressed: _busy ? null : _leave,
           icon: const Icon(Icons.arrow_back),
         ),
         actions: [
+          IconButton(
+            tooltip: '打开原书',
+            onPressed: _firstSource == null || _scopeChanged
+                ? null
+                : () => _openOriginalPage(_firstSource!.page),
+            icon: const Icon(Icons.menu_book_outlined),
+          ),
           IconButton(
             tooltip: '重新开始',
             onPressed: _busy || _scopeChanged ? null : _restart,
@@ -415,17 +515,51 @@ class _MathTextbookPracticePageState
                 ),
               ],
             )
-          : SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.all(SpacingTokens.md),
-                children:
-                    _session != null || _draft!.index >= _draft!.items.length
-                    ? _summary()
-                    : _question(),
-              ),
-            ),
+          : SafeArea(child: _practiceContent()),
     ),
   );
+
+  Widget _practiceContent() {
+    if (_session != null || _draft!.index >= _draft!.items.length) {
+      return ListView(
+        padding: const EdgeInsets.all(SpacingTokens.md),
+        children: _summary(),
+      );
+    }
+    return LayoutBuilder(
+      builder: (_, constraints) => Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              children: _question(),
+            ),
+          ),
+          // Keep feedback readable when the keyboard reduces available height.
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                SpacingTokens.md,
+                SpacingTokens.sm,
+                SpacingTokens.md,
+                SpacingTokens.md,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null)
+                    Flexible(child: SingleChildScrollView(child: _errorCard())),
+                  _questionAction(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   List<Widget> _summary() {
     final draft = _draft!,
@@ -474,27 +608,80 @@ class _MathTextbookPracticePageState
     final evaluation = result == null
         ? null
         : gradeMathTextbookExercise(item.exercise, draft.answers[draft.index]);
+    final paperPlan = widget.planId != null && _paperOnly;
+    final displayBlocks = mathTextbookPracticeDisplayBlocks(
+      item,
+      parentPlan: paperPlan,
+    );
     return [
-      Text(
-        '${draft.index + 1} / ${draft.items.length}',
-        style: Theme.of(context).textTheme.labelLarge,
-      ),
-      const SizedBox(height: SpacingTokens.sm),
-      Text(item.exercise.title, style: Theme.of(context).textTheme.titleLarge),
-      if (item.exercise.number.isNotEmpty) Text('原书题号：${item.exercise.number}'),
-      if (widget.planId != null)
+      if (widget.planId != null) ...[
+        Text(
+          '${draft.index + 1} / ${draft.items.length}',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        Text(
+          paperPlan ? '实践任务' : item.exercise.title,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        if (_firstSource != null)
+          Text(mathTextbookSourcePageLabel(_firstSource!)),
+        if (_paperOnly) const Text('按原书要求完成作答或操作，再在下方记录结果，提交给家长核对。'),
         Text(
           item.exercise.fields.every(
                 (field) => field.rule.kind == MathTextbookAnswerKind.parent,
               )
-              ? '本课纸上练习，完成后记录作答'
+              ? '可在纸上或用实物完成'
               : '按本课已审核范围生成的巩固题',
         ),
-      const SizedBox(height: SpacingTokens.md),
-      for (final block in item.blocks)
+        const SizedBox(height: SpacingTokens.md),
+      ],
+      for (final block in displayBlocks)
         Padding(
           padding: const EdgeInsets.only(bottom: SpacingTokens.md),
-          child: MathTextbookStudyContent(book: _book!, block: block),
+          child: MathTextbookStudyContent(
+            book: _book!,
+            block: block,
+            framed: false,
+            showTitle: false,
+            showTextToggle: false,
+            forceSourcePreview: widget.planId == null || paperPlan,
+          ),
+        ),
+      if (_sourceLoading) const Text('正在载入原书参考…'),
+      for (final reference in _sourceReferences) ...[
+        AppTile(
+          flat: true,
+          icon: Icons.menu_book_outlined,
+          iconColor: Theme.of(context).colorScheme.primary,
+          title: reference.exerciseNumber == null
+              ? '原书示范'
+              : '参考例 ${reference.exerciseNumber}',
+          subtitle: mathTextbookSourcePageLabel(reference.sources.first),
+          onTap: () => _openOriginalPage(reference.sources.first.page),
+        ),
+        MathTextbookStudyContent(
+          book: _book!,
+          block: reference,
+          framed: false,
+          showTitle: false,
+          showTextToggle: false,
+        ),
+        const SizedBox(height: SpacingTokens.md),
+      ],
+      if (_sourceError != null)
+        ColoredCard(
+          color: Theme.of(context).colorScheme.error,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_sourceError!),
+              TextButton(
+                onPressed: () => _readSources(_draft!),
+                child: const Text('重试读取原书参考'),
+              ),
+            ],
+          ),
         ),
       if (item.exercise.note.isNotEmpty) Text(item.exercise.note),
       for (final field in item.exercise.fields) ...[
@@ -520,24 +707,6 @@ class _MathTextbookPracticePageState
           padding: const EdgeInsets.symmetric(vertical: SpacingTokens.md),
           child: Text(mathTextbookResultLabel(result)),
         ),
-      if (_error != null) _errorCard(),
-      const SizedBox(height: SpacingTokens.md),
-      if (result == null || !_committed)
-        FilledButton(
-          onPressed: _busy || _scopeChanged ? null : _submit,
-          child: Text(
-            _busy
-                ? '正在保存…'
-                : result == null
-                ? '核对答案'
-                : '重试保存作答',
-          ),
-        )
-      else
-        FilledButton(
-          onPressed: _busy || _scopeChanged ? null : _next,
-          child: Text(draft.index == draft.items.length - 1 ? '完成本次练习' : '下一题'),
-        ),
       if (_error != null)
         TextButton.icon(
           onPressed: () async {
@@ -553,6 +722,28 @@ class _MathTextbookPracticePageState
           label: const Text('复制当前作答'),
         ),
     ];
+  }
+
+  Widget _questionAction() {
+    final draft = _draft!, result = draft.results[draft.index];
+    if (result == null || !_committed) {
+      return FilledButton(
+        onPressed: _busy || _scopeChanged ? null : _submit,
+        child: Text(
+          _busy
+              ? '正在保存…'
+              : result == null
+              ? _paperOnly
+                    ? '提交给家长核对'
+                    : '核对答案'
+              : '重试保存作答',
+        ),
+      );
+    }
+    return FilledButton(
+      onPressed: _busy || _scopeChanged ? null : _next,
+      child: Text(draft.index == draft.items.length - 1 ? '完成本次练习' : '下一题'),
+    );
   }
 
   Widget _errorCard() => Padding(
@@ -625,6 +816,9 @@ class _MathTextbookPracticePageState
         Text(field.label),
         const SizedBox(height: SpacingTokens.sm),
         TextField(
+          key: ValueKey(
+            'math-answer-${_draft!.sessionId}-${_draft!.index}-${field.id}:q',
+          ),
           controller: _controllers['${field.id}:q'],
           enabled: enabled,
           keyboardType: TextInputType.number,
@@ -636,6 +830,9 @@ class _MathTextbookPracticePageState
         ),
         const SizedBox(height: SpacingTokens.sm),
         TextField(
+          key: ValueKey(
+            'math-answer-${_draft!.sessionId}-${_draft!.index}-${field.id}:r',
+          ),
           controller: _controllers['${field.id}:r'],
           enabled: enabled,
           keyboardType: TextInputType.number,
@@ -649,16 +846,19 @@ class _MathTextbookPracticePageState
     }
     return [
       TextField(
+        key: ValueKey(
+          'math-answer-${_draft!.sessionId}-${_draft!.index}-${field.id}',
+        ),
         controller: _controllers[field.id],
         enabled: enabled,
         minLines: rule.kind == MathTextbookAnswerKind.parent ? 3 : 1,
         maxLines: rule.kind == MathTextbookAnswerKind.parent ? null : 3,
         maxLength: rule.kind == MathTextbookAnswerKind.parent ? 5000 : 512,
         decoration: InputDecoration(
-          labelText: field.label,
+          labelText: mathTextbookAnswerFieldLabel(field),
           counterText: rule.kind == MathTextbookAnswerKind.parent ? null : '',
           helperText: rule.kind == MathTextbookAnswerKind.parent
-              ? '可在纸上完成，请记下完成情况或解题过程'
+              ? '先完成上方任务，再写下答案、做法或操作结果，提交后由家长核对'
               : '${mathTextbookFormLabel(rule.form)}${rule.unit.isEmpty ? '' : ' · 请带单位：${MathTextbookUnits.label(rule.unit)}'}',
           helperMaxLines: 3,
         ),

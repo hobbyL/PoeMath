@@ -120,6 +120,76 @@ void main() {
     return finished;
   }
 
+  test('读取原书参考接受较早的页面进度，不重写草稿或课程且旧页面仍不能回退保存', () async {
+    final lesson = await saveLesson(mathTaskClarityFixture(), reviewed: false);
+    final repo = repository();
+    final initial = await repo.start(lesson.id, planId: 'plan');
+    final saved = initial.copyWith(
+      elapsedSeconds: 30,
+      answers: [
+        {'answer': '已标出顶点，还在画第二条边'},
+      ],
+    );
+    await repo.saveDraft(saved);
+    final retainedDraft = repo.drafts.get(
+      MathTextbookLearningRepository.draftKind,
+      scope: initial.scope,
+    );
+    final retainedProgress = HiveBoxes.settings.get(repo.key);
+    final retainedCourse = (await courses.load(book))!.toJson();
+    expect(
+      (await repo.sourceLessonForDraft(initial)).toJson(),
+      lesson.toJson(),
+    );
+    expect(
+      repo.drafts.get(
+        MathTextbookLearningRepository.draftKind,
+        scope: initial.scope,
+      ),
+      retainedDraft,
+    );
+    expect(HiveBoxes.settings.get(repo.key), retainedProgress);
+    expect((await courses.load(book))!.toJson(), retainedCourse);
+    await expectLater(repo.saveDraft(initial), throwsStateError);
+    expect(
+      (await repo.loadDraft(lesson.id, planId: 'plan'))!.toJson(),
+      saved.toJson(),
+    );
+  });
+
+  test('原书参考读取拒绝变更指纹、过期课程和已被新页面接管的草稿', () async {
+    final lesson = await saveLesson(mathTaskClarityFixture(), reviewed: false);
+    final first = repository();
+    final draft = await first.start(lesson.id);
+    final forged = MathTextbookPracticeDraft.fromJson({
+      ...draft.toJson(),
+      'sessionId': 'another-session',
+    });
+    await expectLater(first.sourceLessonForDraft(forged), throwsStateError);
+    final second = repository();
+    final restored = (await second.loadDraft(lesson.id))!;
+    await expectLater(first.sourceLessonForDraft(draft), throwsStateError);
+    expect((await second.sourceLessonForDraft(restored)).id, lesson.id);
+    final changed = lesson.edit(
+      blocks: [
+        MathTextbookBlock.fromJson({
+          ...lesson.blocks.first.toJson(),
+          'spans': [const MathTextbookSpan.text('调整后的画角示范。').toJson()],
+        }),
+        lesson.blocks.last,
+      ],
+    );
+    await saveLesson(changed, reviewed: false);
+    await expectLater(second.sourceLessonForDraft(restored), throwsStateError);
+    expect(
+      second.drafts.get(
+        MathTextbookLearningRepository.draftKind,
+        scope: restored.scope,
+      )?['sessionId'],
+      restored.sessionId,
+    );
+  });
+
   test('未审核课时可阅读，重复只保存一次，重启保留PDF与档案进度', () async {
     final lesson = await saveLesson(mathLearningFixture(), reviewed: false);
     final repo = repository();
