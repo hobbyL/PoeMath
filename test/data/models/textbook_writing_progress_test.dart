@@ -1,6 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/domain/textbook_writing_review.dart';
+
+import '../../helpers/writing_attempt_fixture.dart';
 
 void main() {
   Map<String, dynamic> legacyRecord() => {
@@ -32,6 +35,7 @@ void main() {
     expect(progress.records[key]!.toJson(), {
       ...legacyRecord(),
       'puzzleCount': 0,
+      'attempts': <Map<String, dynamic>>[],
     });
     expect(progress.revision, 7);
     expect(progress.operations, ['trace-done']);
@@ -83,5 +87,54 @@ void main() {
         throwsFormatException,
       );
     }
+  });
+
+  test('作品与旧累计混合往返，几何、家长及阶段变化保留已有作品', () {
+    final attempt = writingAttemptFixture(kind: WritingAttemptKind.trace);
+    final record = WritingRecord.fromJson({
+      ...legacyRecord(),
+      'attempts': [attempt.toJson()],
+    });
+    final changed = writingRecordParentConfirm(
+      writingRecordStage(record, WritingStageDone.puzzle),
+      passed: true,
+      day: '2026-11-15',
+    );
+    final reopened = WritingRecord.fromJson(changed.toJson());
+    expect(reopened.attempts.single.toJson(), attempt.toJson());
+    expect(reopened.traceCount, 2);
+    expect(reopened.freeCount, 3);
+    expect(reopened.puzzleCount, 1);
+    expect(reopened.parentConfirms, 5);
+  });
+
+  test('详情字段损坏、重复 ID 或作品数超过次数都必须拒绝', () {
+    final attempt = writingAttemptFixture().toJson();
+    for (final value in <Object?>[
+      null,
+      {},
+      '[]',
+      [null],
+    ]) {
+      expect(
+        () => WritingRecord.fromJson({...legacyRecord(), 'attempts': value}),
+        throwsFormatException,
+      );
+    }
+    expect(
+      () => WritingRecord.fromJson({
+        ...legacyRecord(),
+        'attempts': [attempt, attempt],
+      }),
+      throwsFormatException,
+    );
+    expect(
+      () => WritingRecord.fromJson({
+        ...legacyRecord(),
+        'freeCount': 0,
+        'attempts': [attempt],
+      }),
+      throwsFormatException,
+    );
   });
 }

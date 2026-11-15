@@ -2770,7 +2770,10 @@ class BackupService {
 
   void _validateTextbookProgressEntry(String key, Object? value) {
     final path = 'textbookLearning.$key';
-    if (value is! String || utf8.encode(value).length > 4 * 1024 * 1024) {
+    final maxBytes = key.startsWith(_textbookWritingPrefix)
+        ? WritingProgress.maxEncodedBytes
+        : 4 * 1024 * 1024;
+    if (value is! String || utf8.encode(value).length > maxBytes) {
       _invalidField(path, '进度必须是有效的 JSON 字符串');
     }
     final parsed = jsonDecode(value);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 import 'package:poemath/features/textbook/writing/writing_jigsaw.dart';
 
@@ -17,7 +18,7 @@ void main() {
   Future<void> pump(
     WidgetTester tester, {
     String character = '星',
-    Future<bool> Function(String, DateTime)? save,
+    Future<bool> Function(WritingAttempt)? save,
     VoidCallback? write,
     Size size = const Size(400, 760),
     double scale = 1,
@@ -43,7 +44,7 @@ void main() {
             child: WritingJigsaw(
               character: character,
               strokeData: asset[character],
-              onCompleted: save ?? (_, _) async => true,
+              onCompleted: save ?? (_) async => true,
               onWrite: write ?? () {},
               enabled: enabled,
             ),
@@ -80,8 +81,8 @@ void main() {
     final saves = <String>[];
     await pump(
       tester,
-      save: (id, _) async {
-        saves.add(id);
+      save: (attempt) async {
+        saves.add(attempt.id);
         return true;
       },
     );
@@ -130,22 +131,31 @@ void main() {
   });
 
   testWidgets('完整拼装保存一次；重新开始使用新 round ID 并保留提示选择', (tester) async {
-    final rounds = <String>[];
+    final rounds = <WritingAttempt>[];
     await pump(
       tester,
-      save: (round, _) async {
+      save: (round) async {
         rounds.add(round);
         return true;
       },
     );
     await tester.tap(find.text('关闭提示'));
     await tester.pumpAndSettle();
+    final layout = jigsawPainter(tester).layout;
+    await dragJigsawPiece(tester, layout.trayOrder.first, correct: false);
     for (final id in jigsawPainter(tester).layout.trayOrder) {
       await dragJigsawPiece(tester, id);
     }
     expect(find.text('拼好了！'), findsOneWidget);
     expect(jigsawPainter(tester).placed, hasLength(6));
     expect(rounds, hasLength(1));
+    expect(rounds.single.puzzle!.pieces, [
+      for (final piece in layout.pieces) piece.outline,
+    ]);
+    expect(rounds.single.puzzle!.placementOrder, layout.trayOrder);
+    expect(rounds.single.puzzle!.hintEnabled, isFalse);
+    expect(rounds.single.puzzle!.wrongPlacements, 1);
+    expect(rounds.single.referenceStrokes, asset['星']!.strokes);
     await tester.pumpAndSettle();
     expect(rounds, hasLength(1));
     await tester.tap(find.text('再拼一次'));
@@ -156,15 +166,16 @@ void main() {
       await dragJigsawPiece(tester, id);
     }
     expect(rounds, hasLength(2));
-    expect(rounds.last, isNot(rounds.first));
+    expect(rounds.last.id, isNot(rounds.first.id));
+    expect(rounds.last.puzzle!.wrongPlacements, 0);
   });
 
   testWidgets('失败重试沿用同一 round ID；保存中和未保存时不能清空本轮', (tester) async {
-    final rounds = <String>[];
+    final rounds = <WritingAttempt>[];
     final firstSave = Completer<bool>();
     await pump(
       tester,
-      save: (round, _) {
+      save: (round) {
         rounds.add(round);
         return rounds.length == 1 ? firstSave.future : Future.value(true);
       },
@@ -185,7 +196,7 @@ void main() {
     await tester.tap(find.text('重试保存'));
     await tester.pumpAndSettle();
     expect(rounds, hasLength(2));
-    expect(rounds.first, rounds.last);
+    expect(rounds.first, same(rounds.last));
     expect(find.text('完整的字拼出来啦。'), findsNothing);
     expect(find.text('去写一写'), findsOneWidget);
   });

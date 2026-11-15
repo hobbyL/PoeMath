@@ -174,6 +174,20 @@ class AppRoutes {
       '/textbook/writing/${Uri.encodeComponent(id)}'
       '/${Uri.encodeComponent(lesson)}/records';
 
+  static String textbookWritingRecordOf(
+    String id,
+    String lesson,
+    String targetId, {
+    String? attemptId,
+  }) => Uri.parse(textbookWritingRecordsOf(id, lesson))
+      .replace(
+        queryParameters: {
+          'target': targetId,
+          if (attemptId != null) 'attempt': attemptId,
+        },
+      )
+      .toString();
+
   static String textbookContentOf(String id, String section, List<int> pages) =>
       Uri(
         path: '/textbook/content/$id/$section',

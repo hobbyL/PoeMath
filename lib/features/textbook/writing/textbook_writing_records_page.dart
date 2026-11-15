@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/domain/textbook_writing_content.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
+import 'package:poemath/features/textbook/writing/writing_attempt_preview.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
 
 /// 本课各字的练习事实，直接读取现有进度，不记录新的练习。
@@ -16,13 +20,24 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
     super.key,
     required this.bookId,
     required this.lessonId,
+    this.targetId,
+    this.attemptId,
   });
 
   final String bookId, lessonId;
+  final String? targetId, attemptId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('练习记录')),
+    appBar: AppBar(
+      title: Text(
+        attemptId != null
+            ? '练习详情'
+            : targetId != null
+            ? '单字记录'
+            : '练习记录',
+      ),
+    ),
     body: SafeArea(child: _content(context, ref)),
   );
 
@@ -80,6 +95,35 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
         description: '请家长核对本课的书写内容。',
       );
     }
+    if (targetId != null || attemptId != null) {
+      final target = targets.where((t) => t.id == targetId).firstOrNull;
+      if (target == null) {
+        return const AppEmptyState(
+          icon: Icons.edit_outlined,
+          title: '这个字的记录暂不可用',
+          description: '请返回本课练习记录重新选择。',
+        );
+      }
+      final record = _record(target, saved);
+      if (attemptId != null) {
+        final attempt = record?.attempts
+            .where((a) => a.id == attemptId)
+            .firstOrNull;
+        if (attempt == null) {
+          return const AppEmptyState(
+            icon: Icons.history_outlined,
+            title: '该次练习详情暂不可用',
+            description: '请返回这个字的练习记录重新选择。',
+          );
+        }
+        return _WritingAttemptDetails(
+          key: ValueKey(attempt.id),
+          target: target,
+          attempt: attempt,
+        );
+      }
+      return _characterHistory(context, target, saved, record);
+    }
     final theme = Theme.of(context);
     return ListView(
       padding: const EdgeInsets.all(SpacingTokens.md),
@@ -101,11 +145,10 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
   Widget _recordTile(
     BuildContext context,
     WritingTarget target,
-    WritingProgress progress,
-  ) {
-    final saved =
-        progress.records[WritingProgress.targetKey(lessonId, target.id)];
-    final record = saved?.fingerprint == target.fingerprint ? saved : null;
+    WritingProgress progress, {
+    bool openHistory = true,
+  }) {
+    final record = _record(target, progress);
     final counts = [
       ('描红', record?.traceCount ?? 0),
       ('自写', record?.freeCount ?? 0),
@@ -124,10 +167,194 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
             return '$label $count 次 · ${count > 0 ? '已完成' : '未完成'}';
           })
           .join('\n'),
-      trailing: const SizedBox.shrink(),
+      trailing: openHistory ? null : const SizedBox.shrink(),
+      onTap: !openHistory
+          ? null
+          : () => _open(
+              context,
+              AppRoutes.textbookWritingRecordOf(bookId, lessonId, target.id),
+            ),
       flat: true,
       flatLeadingEdgeAligned: true,
       flatTrailingEdgeAligned: true,
     );
   }
+
+  WritingRecord? _record(WritingTarget target, WritingProgress progress) {
+    final saved =
+        progress.records[WritingProgress.targetKey(lessonId, target.id)];
+    return saved?.fingerprint == target.fingerprint ? saved : null;
+  }
+
+  void _open(BuildContext context, String path) {
+    if (ModalRoute.of(context)?.isCurrent == true) context.push<void>(path);
+  }
+
+  Widget _characterHistory(
+    BuildContext context,
+    WritingTarget target,
+    WritingProgress progress,
+    WritingRecord? record,
+  ) {
+    final attempts = (record?.attempts ?? <WritingAttempt>[]).toList()
+      ..sort((a, b) {
+        final time = b.completedAt.compareTo(a.completedAt);
+        return time == 0 ? b.id.compareTo(a.id) : time;
+      });
+    final total =
+        (record?.traceCount ?? 0) +
+        (record?.freeCount ?? 0) +
+        (record?.puzzleCount ?? 0);
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(SpacingTokens.md),
+      children: [
+        _recordTile(context, target, progress, openHistory: false),
+        const Divider(height: SpacingTokens.lg),
+        if (attempts.isEmpty)
+          AppEmptyState(
+            icon: Icons.history_outlined,
+            title: total > 0 ? '以前的练习未保存详情' : '还没有练习作品',
+            description: total > 0
+                ? '原来的次数已保留。新完成的练习会保存时间、用时和作品。'
+                : '完成一次描红、自写或拼装后，可在这里回看作品。',
+          )
+        else ...[
+          Semantics(
+            header: true,
+            child: Text('每次练习', style: theme.textTheme.titleMedium),
+          ),
+          if (total > attempts.length) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            Text(
+              '另有 ${total - attempts.length} 次早期练习未保存详情。',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          const SizedBox(height: SpacingTokens.sm),
+          for (var i = 0; i < attempts.length; i++) ...[
+            AppTile(
+              key: ValueKey('writing-attempt-${attempts[i].id}'),
+              iconColor: theme.colorScheme.primary,
+              title:
+                  '${_kindLabel(attempts[i].kind)} · ${_time(attempts[i].completedAt)}',
+              titleWrap: true,
+              subtitle:
+                  '用时 ${_duration(attempts[i].durationSeconds)} · '
+                  '${attempts[i].puzzle == null ? '${attempts[i].strokes.length} 笔' : '${attempts[i].puzzle!.pieces.length} 块碎片'}',
+              flat: true,
+              flatLeadingEdgeAligned: true,
+              flatTrailingEdgeAligned: true,
+              onTap: () => _open(
+                context,
+                AppRoutes.textbookWritingRecordOf(
+                  bookId,
+                  lessonId,
+                  target.id,
+                  attemptId: attempts[i].id,
+                ),
+              ),
+            ),
+            if (i + 1 < attempts.length)
+              const Divider(height: SpacingTokens.lg),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+class _WritingAttemptDetails extends StatefulWidget {
+  const _WritingAttemptDetails({
+    super.key,
+    required this.target,
+    required this.attempt,
+  });
+  final WritingTarget target;
+  final WritingAttempt attempt;
+
+  @override
+  State<_WritingAttemptDetails> createState() => _WritingAttemptDetailsState();
+}
+
+class _WritingAttemptDetailsState extends State<_WritingAttemptDetails> {
+  bool _showPieceBorders = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final attempt = widget.attempt;
+    final puzzle = attempt.puzzle;
+    return ListView(
+      padding: const EdgeInsets.all(SpacingTokens.md),
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            '${widget.target.text} · ${_kindLabel(attempt.kind)}',
+            style: theme.textTheme.titleLarge,
+          ),
+        ),
+        if (widget.target.pinyin.isNotEmpty) Text(widget.target.pinyin),
+        const SizedBox(height: SpacingTokens.md),
+        Text(
+          '开始 ${_time(attempt.startedAt)}\n'
+          '完成 ${_time(attempt.completedAt)}\n'
+          '用时 ${_duration(attempt.durationSeconds)}',
+        ),
+        const SizedBox(height: SpacingTokens.lg),
+        Text(
+          puzzle == null ? '我的笔迹' : '拼装结果',
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: SpacingTokens.sm),
+        WritingAttemptPreview(
+          attempt: attempt,
+          showPieceBorders: _showPieceBorders,
+        ),
+        const SizedBox(height: SpacingTokens.md),
+        if (puzzle == null)
+          Text(
+            attempt.strokes.isEmpty
+                ? '本次没有留下笔迹。'
+                : '共 ${attempt.strokes.length} 笔',
+          )
+        else ...[
+          Text(
+            '${puzzle.pieces.length} 块碎片已拼好\n'
+            '完成时提示：${puzzle.hintEnabled ? '开启' : '关闭'}\n'
+            '放置调整 ${puzzle.wrongPlacements} 次',
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const ValueKey('writing-attempt-pieces-toggle'),
+              onPressed: () =>
+                  setState(() => _showPieceBorders = !_showPieceBorders),
+              icon: Icon(_showPieceBorders ? Icons.grid_off : Icons.grid_on),
+              label: Text(_showPieceBorders ? '隐藏碎片' : '查看碎片'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+String _kindLabel(WritingAttemptKind kind) => switch (kind) {
+  WritingAttemptKind.trace => '描红',
+  WritingAttemptKind.free => '自写',
+  WritingAttemptKind.puzzle => '拼装',
+};
+
+String _time(DateTime value) =>
+    value.toLocal().toIso8601String().substring(0, 19).replaceFirst('T', ' ');
+
+String _duration(int seconds) {
+  if (seconds < 60) return '$seconds 秒';
+  if (seconds < 3600) return '${seconds ~/ 60} 分 ${seconds % 60} 秒';
+  return '${seconds ~/ 3600} 小时 ${seconds % 3600 ~/ 60} 分';
 }

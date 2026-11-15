@@ -80,7 +80,11 @@ List<Object> _tokenize(String data) {
   var index = 0;
   while (index < data.length) {
     final char = data[index];
-    if (char == 'M' || char == 'L' || char == 'Q' || char == 'C' || char == 'Z') {
+    if (char == 'M' ||
+        char == 'L' ||
+        char == 'Q' ||
+        char == 'C' ||
+        char == 'Z') {
       tokens.add(char);
       index++;
       continue;
@@ -118,6 +122,34 @@ Path characterOutline(List<String> strokes) {
     path.addPath(parseSvgPath(stroke), Offset.zero);
   }
   return path;
+}
+
+/// 拼装及历史作品共用的单位字形，按真实轮廓完整保留边缘笔画。
+Path? puzzleCharacterOutline(List<String> strokes) {
+  final outline = characterOutline(strokes);
+  final bounds = outline.getBounds();
+  if (bounds.isEmpty || !bounds.longestSide.isFinite) return null;
+  final scale = 0.82 / bounds.longestSide;
+  return outline.transform(
+    Float64List.fromList([
+      scale,
+      0,
+      0,
+      0,
+      0,
+      scale,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0.5 - bounds.center.dx * scale,
+      0.5 - bounds.center.dy * scale,
+      0,
+      1,
+    ]),
+  );
 }
 
 /// 田字格内的画布变换：把 1024×1024 暂存坐标等比缩放并居中到 [canvasSize] 方框。

@@ -7,6 +7,7 @@ import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_exercise_progress.dart';
 import 'package:poemath/data/models/textbook_recognition_progress.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/data/repositories/textbook_download_repository.dart';
@@ -14,6 +15,7 @@ import 'package:poemath/data/repositories/textbook_download_repository.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/parent_access_test_helper.dart';
 import '../../helpers/textbook_fixture.dart';
+import '../../helpers/writing_attempt_fixture.dart';
 
 void main() {
   setUp(() async {
@@ -46,6 +48,20 @@ void main() {
       profileId: 'child',
       bookId: book.pdfSha256,
       editionId: editionId,
+      records: {
+        WritingProgress.targetKey('lesson-1', 'character-1'): WritingRecord(
+          fingerprint: 'original-character',
+          freeCount: 1,
+          puzzleCount: 1,
+          attempts: [
+            writingAttemptFixture(id: 'writing-1'),
+            writingAttemptFixture(
+              id: 'puzzle-1',
+              kind: WritingAttemptKind.puzzle,
+            ),
+          ],
+        ),
+      },
     );
     final exercise = TextbookExerciseProgress(
       profileId: 'child',
@@ -109,5 +125,83 @@ void main() {
       HiveBoxes.settings.get(recognitionKey),
       jsonEncode(recognition.toJson()),
     );
+  });
+
+  test('含作品的写字进度超过原 4 MiB 后仍能完整备份与恢复', () async {
+    final book = textbookFixture();
+    final path = List.filled(2000, 'M 0 0 L 10 10 ').join();
+    final progress = WritingProgress(
+      profileId: 'child',
+      bookId: book.pdfSha256,
+      editionId: 'edition-1',
+      records: {
+        WritingProgress.targetKey('lesson-1', 'character-1'): WritingRecord(
+          fingerprint: 'original-character',
+          freeCount: 22,
+          attempts: [
+            for (var i = 0; i < 22; i++)
+              writingAttemptFixture(
+                id: 'large-$i',
+                referenceStrokes: List.filled(8, path),
+              ),
+          ],
+        ),
+      },
+    );
+    final key =
+        'textbook_writing_v1:${textbookTextDigest(jsonEncode(['child', book.pdfSha256, 'edition-1']))}';
+    final raw = jsonEncode(progress.toJson());
+    expect(utf8.encode(raw).length, greaterThan(4 * 1024 * 1024));
+    await HiveBoxes.settings.put(key, raw);
+    final backup = BackupService();
+    final exported = await backup.exportToJson();
+    expect(backup.inspectJson(exported).counts['教材学习进度'], 1);
+    await HiveBoxes.settings.delete(key);
+    await backup.restoreFromJson(exported);
+    expect(HiveBoxes.settings.get(key), raw);
+    final restored = WritingProgress.fromJson(
+      jsonDecode(HiveBoxes.settings.get(key) as String) as Map<String, dynamic>,
+    );
+    expect(restored.records.values.single.attempts, hasLength(22));
+    expect(
+      restored.records.values.single.attempts.last.referenceStrokes,
+      List.filled(8, path),
+    );
+  });
+
+  test('作品损坏的备份在预览及恢复前拒绝，原有记录不被覆盖', () async {
+    final book = textbookFixture();
+    final progress = WritingProgress(
+      profileId: 'child',
+      bookId: book.pdfSha256,
+      editionId: 'edition-1',
+      records: {
+        WritingProgress.targetKey('lesson-1', 'character-1'): WritingRecord(
+          fingerprint: 'original-character',
+          freeCount: 1,
+          attempts: [writingAttemptFixture()],
+        ),
+      },
+    );
+    final key =
+        'textbook_writing_v1:${textbookTextDigest(jsonEncode(['child', book.pdfSha256, 'edition-1']))}';
+    final raw = jsonEncode(progress.toJson());
+    await HiveBoxes.settings.put(key, raw);
+    final backup = BackupService();
+    final data =
+        jsonDecode(await backup.exportToJson()) as Map<String, dynamic>;
+    final corrupt = progress.toJson();
+    final record = (corrupt['records'] as Map).values.single as Map;
+    final attempt = (record['attempts'] as List).single as Map;
+    attempt['strokes'] = [
+      [
+        ['bad', 0.5],
+      ],
+    ];
+    (data['textbookLearning'] as Map)[key] = jsonEncode(corrupt);
+    final invalid = jsonEncode(data);
+    expect(() => backup.inspectJson(invalid), throwsFormatException);
+    await expectLater(backup.restoreFromJson(invalid), throwsFormatException);
+    expect(HiveBoxes.settings.get(key), raw);
   });
 }

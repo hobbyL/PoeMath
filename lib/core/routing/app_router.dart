@@ -348,6 +348,8 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           child: TextbookWritingRecordsPage(
             bookId: state.pathParameters['id']!,
             lessonId: state.pathParameters['lesson']!,
+            targetId: state.uri.queryParameters['target'],
+            attemptId: state.uri.queryParameters['attempt'],
           ),
         ),
       ),

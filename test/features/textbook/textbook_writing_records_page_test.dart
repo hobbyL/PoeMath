@@ -14,6 +14,7 @@ import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_writing_repository.dart';
@@ -23,11 +24,14 @@ import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 import 'package:poemath/features/textbook/writing/textbook_writing_records_page.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
+import 'package:poemath/features/textbook/writing/writing_attempt_preview.dart';
+import 'package:poemath/features/textbook/writing/writing_canvas.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/theme_contrast.dart';
 import '../../helpers/writing_fixture.dart';
+import '../../helpers/writing_attempt_fixture.dart';
 
 class _MemoryCourses extends TextbookCourseRepository {
   _MemoryCourses(this.current);
@@ -77,6 +81,7 @@ void main() {
     int freeCount = 0,
     int puzzleCount = 0,
     String? fingerprint,
+    List<WritingAttempt> attempts = const [],
   }) => WritingRecord(
     fingerprint:
         fingerprint ??
@@ -84,6 +89,7 @@ void main() {
     traceCount: traceCount,
     freeCount: freeCount,
     puzzleCount: puzzleCount,
+    attempts: attempts,
   );
 
   Future<void> store(
@@ -104,6 +110,7 @@ void main() {
         legacyTarget,
       );
       ((raw['records'] as Map)[key] as Map).remove('puzzleCount');
+      ((raw['records'] as Map)[key] as Map).remove('attempts');
     }
     await tester.runAsync(
       () => HiveBoxes.settings.put(repository.key, jsonEncode(raw)),
@@ -113,6 +120,8 @@ void main() {
   Future<void> pump(
     WidgetTester tester, {
     String? lessonId,
+    String? targetId,
+    String? attemptId,
     Future<WritingProgress?> Function()? loadProgress,
     bool settle = true,
     GoRouter? router,
@@ -147,6 +156,8 @@ void main() {
                 home: TextbookWritingRecordsPage(
                   bookId: book.pdfSha256,
                   lessonId: lessonId ?? courses.current.lessons.single.id,
+                  targetId: targetId,
+                  attemptId: attemptId,
                 ),
               )
             : MaterialApp.router(
@@ -360,6 +371,155 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('点击字后按时间回看真实笔迹与当轮拼装，特殊 ID 与返回不改存储', (tester) async {
+    final lessonId = courses.current.lessons.single.id;
+    final trace = writingAttemptFixture(
+      id: 'trace /中文&?#',
+      kind: WritingAttemptKind.trace,
+      completedAt: DateTime.utc(2026, 11, 14, 9),
+    );
+    final puzzle = writingAttemptFixture(
+      id: 'puzzle-1',
+      kind: WritingAttemptKind.puzzle,
+    );
+    await store(tester, {
+      WritingProgress.targetKey(lessonId, 'writing-001'): record(
+        traceCount: 1,
+        freeCount: 4,
+        puzzleCount: 1,
+        attempts: [trace, puzzle],
+      ),
+      WritingProgress.targetKey(lessonId, 'writing-002'): record(
+        targetId: 'writing-002',
+        freeCount: 1,
+        attempts: [writingAttemptFixture(id: 'other-character')],
+      ),
+    });
+    final raw = HiveBoxes.settings.get(repository.key);
+    final router = createAppRouter(
+      initialLocation: AppRoutes.textbookWritingRecordsOf(
+        book.pdfSha256,
+        lessonId,
+      ),
+    );
+    addTearDown(router.dispose);
+    await pump(tester, router: router);
+    await tester.tap(find.byKey(const ValueKey('writing-record-writing-001')));
+    await tester.pumpAndSettle();
+    expect(find.text('单字记录'), findsOneWidget);
+    expect(find.text('另有 4 次早期练习未保存详情。'), findsOneWidget);
+    final traceRow = find.byKey(ValueKey('writing-attempt-${trace.id}'));
+    final puzzleRow = find.byKey(ValueKey('writing-attempt-${puzzle.id}'));
+    expect(
+      tester.getTopLeft(puzzleRow).dy,
+      lessThan(tester.getTopLeft(traceRow).dy),
+    );
+    expect(
+      find.byKey(const ValueKey('writing-attempt-other-character')),
+      findsNothing,
+    );
+    await tester.scrollUntilVisible(traceRow, 160);
+    await tester.tap(traceRow);
+    await tester.pumpAndSettle();
+    final page = tester.widget<TextbookWritingRecordsPage>(
+      find.byType(TextbookWritingRecordsPage),
+    );
+    expect(page.targetId, 'writing-001');
+    expect(page.attemptId, trace.id);
+    expect(find.text('星 · 描红'), findsOneWidget);
+    expect(find.textContaining('用时 1 分 5 秒'), findsOneWidget);
+    final art = find.byKey(const ValueKey('writing-attempt-artwork'));
+    await tester.scrollUntilVisible(art, 160);
+    await tester.pumpAndSettle();
+    final painter =
+        tester.widget<CustomPaint>(art).painter! as TianziGridPainter;
+    final side = tester.getSize(art).width;
+    expect(painter.userStrokes, hasLength(2));
+    expect(painter.userStrokes.first.first.dx, closeTo(side * 0.1, 0.01));
+    expect(painter.userStrokes.first.first.dy, closeTo(side * 0.2, 0.01));
+    expect(painter.strokeWidth, closeTo(side * 0.0125, 0.001));
+    expect(painter.referenceStrokes, trace.referenceStrokes);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(puzzleRow, 160);
+    await tester.tap(puzzleRow);
+    await tester.pumpAndSettle();
+    final toggle = find.byKey(const ValueKey('writing-attempt-pieces-toggle'));
+    await tester.scrollUntilVisible(toggle, 160);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    final puzzlePainter =
+        tester.widget<CustomPaint>(art).painter! as WritingPuzzleResultPainter;
+    expect(puzzlePainter.showPieceBorders, isTrue);
+    expect(puzzlePainter.attempt.puzzle!.pieces, puzzle.puzzle!.pieces);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('练习记录'), findsOneWidget);
+    expect(HiveBoxes.settings.get(repository.key), raw);
+    expect(HiveBoxes.learningActivities.values, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('旧练习详情为空时保留累计并说明，新字显示可开始练习的空状态', (tester) async {
+    await store(tester, {
+      WritingProgress.targetKey(
+        courses.current.lessons.single.id,
+        'writing-001',
+      ): record(
+        freeCount: 3,
+      ),
+    }, legacyTarget: 'writing-001');
+    final raw = HiveBoxes.settings.get(repository.key);
+    await pump(tester, targetId: 'writing-001');
+    expect(find.text('以前的练习未保存详情'), findsOneWidget);
+    expect(subtitle(tester, 'writing-001'), contains('自写 3 次 · 已完成'));
+    expect(find.byType(WritingAttemptPreview), findsNothing);
+    expect(HiveBoxes.settings.get(repository.key), raw);
+    await pump(tester, targetId: 'writing-002');
+    expect(find.text('还没有练习作品'), findsOneWidget);
+    expect(subtitle(tester, 'writing-002'), untouched);
+  });
+
+  testWidgets('目标或作品不存在时不能展示其他字的详情', (tester) async {
+    await store(tester, {
+      WritingProgress.targetKey(
+        courses.current.lessons.single.id,
+        'writing-001',
+      ): record(
+        freeCount: 1,
+        attempts: [writingAttemptFixture()],
+      ),
+    });
+    await pump(tester, targetId: 'missing', attemptId: 'attempt-1');
+    expect(find.text('这个字的记录暂不可用'), findsOneWidget);
+    await pump(tester, targetId: 'writing-002', attemptId: 'attempt-1');
+    expect(find.text('该次练习详情暂不可用'), findsOneWidget);
+    expect(find.byType(WritingAttemptPreview), findsNothing);
+  });
+
+  testWidgets('档案切换后正在查看的作品立即失效，返回原档案才重新可见', (tester) async {
+    await store(tester, {
+      WritingProgress.targetKey(
+        courses.current.lessons.single.id,
+        'writing-001',
+      ): record(
+        freeCount: 1,
+        attempts: [writingAttemptFixture()],
+      ),
+    });
+    await pump(tester, targetId: 'writing-001', attemptId: 'attempt-1');
+    expect(find.byType(WritingAttemptPreview), findsOneWidget);
+    ProfileScope.switchTo('other');
+    await tester.pumpAndSettle();
+    expect(find.byType(WritingAttemptPreview), findsNothing);
+    expect(find.text('该次练习详情暂不可用'), findsOneWidget);
+    ProfileScope.reset();
+    await tester.pumpAndSettle();
+    expect(find.byType(WritingAttemptPreview), findsOneWidget);
+  });
+
   for (final subject in AppSubject.values) {
     for (final brightness in Brightness.values) {
       for (final size in [const Size(320, 568), const Size(760, 360)]) {
@@ -374,10 +534,25 @@ void main() {
               traceCount: 123456,
               freeCount: 4,
               puzzleCount: 5,
+              attempts: [
+                writingAttemptFixture(id: 'writing-1'),
+                writingAttemptFixture(
+                  id: 'puzzle-1',
+                  kind: WritingAttemptKind.puzzle,
+                ),
+              ],
             ),
           });
+          final router = createAppRouter(
+            initialLocation: AppRoutes.textbookWritingRecordsOf(
+              book.pdfSha256,
+              courses.current.lessons.single.id,
+            ),
+          );
+          addTearDown(router.dispose);
           await pump(
             tester,
+            router: router,
             size: size,
             scale: 2,
             theme: AppTheme.resolve(subject: subject, brightness: brightness),
@@ -398,6 +573,47 @@ void main() {
           expect(bounds.right, lessThanOrEqualTo(size.width));
           expect(bounds.bottom, lessThanOrEqualTo(size.height));
           expectReadableText(tester, text);
+          final first = find.byKey(
+            const ValueKey('writing-record-writing-001'),
+          );
+          await tester.ensureVisible(first);
+          await tester.tap(first);
+          await tester.pumpAndSettle();
+          for (final id in ['writing-1', 'puzzle-1']) {
+            final row = find.byKey(ValueKey('writing-attempt-$id'));
+            await tester.scrollUntilVisible(row, 160);
+            await tester.tap(row);
+            await tester.pumpAndSettle();
+            final artwork = find.byKey(
+              const ValueKey('writing-attempt-artwork'),
+            );
+            await tester.scrollUntilVisible(artwork, 160);
+            await tester.pumpAndSettle();
+            final bounds = tester.getRect(artwork);
+            expect(bounds.left, greaterThanOrEqualTo(0));
+            expect(bounds.right, lessThanOrEqualTo(size.width));
+            expect(
+              bounds.top,
+              greaterThanOrEqualTo(tester.getRect(find.byType(AppBar)).bottom),
+            );
+            expect(bounds.bottom, lessThanOrEqualTo(size.height));
+            if (id == 'puzzle-1') {
+              final toggle = find.byKey(
+                const ValueKey('writing-attempt-pieces-toggle'),
+              );
+              await tester.scrollUntilVisible(toggle, 160);
+              await tester.tap(toggle);
+              await tester.pumpAndSettle();
+              expectReadableText(tester, find.text('隐藏碎片'));
+              final painter =
+                  tester.widget<CustomPaint>(artwork).painter!
+                      as WritingPuzzleResultPainter;
+              expect(painter.showPieceBorders, isTrue);
+            }
+            expect(tester.takeException(), isNull);
+            await tester.pageBack();
+            await tester.pumpAndSettle();
+          }
           expect(tester.takeException(), isNull);
         });
       }

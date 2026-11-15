@@ -16,6 +16,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
@@ -27,22 +28,26 @@ import 'package:poemath/features/textbook/writing/writing_jigsaw.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
 import 'package:poemath/features/textbook/writing/writing_practice_page.dart';
 import 'package:poemath/features/textbook/writing/textbook_writing_records_page.dart';
+import 'package:poemath/features/textbook/writing/writing_attempt_preview.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/narration_fakes.dart';
 import '../../helpers/recording_learning_activity_repository.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/writing_fixture.dart';
+import '../../helpers/writing_attempt_fixture.dart';
 import '../../helpers/theme_contrast.dart';
 import '../../helpers/writing_jigsaw_test_helper.dart';
 
 class MemoryBox extends Fake implements Box<dynamic> {
   final data = <String, dynamic>{};
+  final writes = <String>[];
   bool failNext = false;
   @override
   dynamic get(dynamic key, {dynamic defaultValue}) => data[key] ?? defaultValue;
   @override
   Future<void> put(dynamic key, dynamic value) async {
+    writes.add(value as String);
     if (failNext) {
       failNext = false;
       throw HiveError('disk full');
@@ -100,6 +105,10 @@ void main() {
     ProfileScope.reset();
     await tearDownHiveForWidgetTesting();
   });
+
+  WritingProgress savedProgress() => WritingProgress.fromJson(
+    jsonDecode(box.data.values.single as String) as Map<String, dynamic>,
+  );
 
   Future<void> pump(
     WidgetTester tester, {
@@ -197,6 +206,8 @@ void main() {
     final canvas = find.byKey(const ValueKey('writing-free'));
     await tester.drag(canvas, const Offset(40, 40));
     await tester.pumpAndSettle();
+    final written = tester.widget<WritingCanvas>(canvas);
+    final originalStrokes = written.strokes;
 
     await tester.tap(find.text('写好了，看一看'));
     await tester.pumpAndSettle();
@@ -210,6 +221,24 @@ void main() {
     expect(find.text('这个字暂时没有笔顺数据，请家长看一看写得对不对。'), findsOneWidget);
     // 写入成功时不应出现内容失效提示。
     expect(find.textContaining('写字内容已更新'), findsNothing);
+    final attempt = savedProgress().records.values.single.attempts.single;
+    expect(attempt.kind, WritingAttemptKind.free);
+    expect(
+      attempt.strokes.single.first.x,
+      closeTo(originalStrokes.single.first.dx / written.side, 0.00001),
+    );
+    expect(
+      attempt.strokes.single.last.y,
+      closeTo(originalStrokes.single.last.dy / written.side, 0.00001),
+    );
+    expect(
+      activityRepository.records.values.single.completedAt,
+      attempt.completedAt,
+    );
+    expect(
+      activityRepository.records.values.single.durationSeconds,
+      attempt.durationSeconds,
+    );
 
     await tester.tap(find.byKey(const ValueKey('writing-records-entry')));
     await tester.pumpAndSettle();
@@ -222,10 +251,29 @@ void main() {
           .subtitle,
       '描红 0 次 · 未完成\n自写 1 次 · 已完成\n拼装 0 次 · 未完成',
     );
+    await tester.tap(find.byKey(const ValueKey('writing-record-writing-001')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('writing-attempt-${attempt.id}')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<WritingAttemptPreview>(find.byType(WritingAttemptPreview))
+          .attempt
+          .toJson(),
+      attempt.toJson(),
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('我写的'), findsOneWidget);
     expect(activityRepository.records, hasLength(1));
+    expect(
+      tester.widget<WritingCanvas>(find.byType(WritingCanvas)).strokes,
+      originalStrokes,
+    );
 
     await tester.tap(find.byKey(const ValueKey('writing-parent-confirm')));
     await tester.pumpAndSettle();
@@ -234,6 +282,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('家长已确认 1 次'), findsNothing);
     expect(find.textContaining('家长已确认'), findsOneWidget);
+    expect(
+      savedProgress().records.values.single.attempts.single.id,
+      attempt.id,
+    );
   });
 
   testWidgets('家长选择"还要练"不计数', (tester) async {
@@ -313,6 +365,51 @@ void main() {
     expect(find.text('找不到这个字'), findsOneWidget);
   });
 
+  for (final kind in [WritingAttemptKind.trace, WritingAttemptKind.free]) {
+    testWidgets('$kind 保存失败保留原阶段和笔迹，重试冻结同一作品与时间', (tester) async {
+      final isTrace = kind == WritingAttemptKind.trace;
+      if (isTrace) asset = fullAsset;
+      await pump(tester, size: const Size(320, 568), scale: 2);
+      if (isTrace) {
+        await tester.tap(find.text('描红'));
+        await tester.pumpAndSettle();
+      }
+      final canvas = find.byKey(
+        ValueKey(isTrace ? 'writing-trace' : 'writing-free'),
+      );
+      await tester.scrollUntilVisible(canvas, 160);
+      await tester.drag(canvas, const Offset(30, 25));
+      await tester.pumpAndSettle();
+      final strokes = tester.widget<WritingCanvas>(canvas).strokes;
+      final submit = find.text(isTrace ? '描完了，自己写' : '写好了，看一看');
+      await tester.scrollUntilVisible(submit, 160);
+      box.failNext = true;
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(box.data, isEmpty);
+      expect(activityRepository.records, isEmpty);
+      expect(tester.widget<WritingCanvas>(canvas).strokes, strokes);
+      final retry = find.text('重试');
+      await tester.scrollUntilVisible(retry, -160);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(box.writes, hasLength(2));
+      expect(box.writes.first, box.writes.last);
+      final record = savedProgress().records.values.single;
+      expect(record.attempts.single.kind, kind);
+      expect(record.attempts.single.strokes, hasLength(1));
+      expect(record.traceCount, isTrace ? 1 : 0);
+      expect(record.freeCount, isTrace ? 0 : 1);
+      expect(activityRepository.records, hasLength(1));
+      if (isTrace) {
+        expect(find.byKey(const ValueKey('writing-free')), findsOneWidget);
+      } else {
+        expect(find.text('我写的'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   Future<void> openJigsaw(
     WidgetTester tester, {
     Size size = const Size(400, 800),
@@ -324,10 +421,6 @@ void main() {
     await tester.tap(find.text('拼一拼'));
     await tester.pumpAndSettle();
   }
-
-  WritingProgress savedProgress() => WritingProgress.fromJson(
-    jsonDecode(box.data.values.single as String) as Map<String, dynamic>,
-  );
 
   testWidgets('拼装与描红并列，往返后笔迹、已拼碎片和提示选择均保留', (tester) async {
     asset = fullAsset;
@@ -344,6 +437,7 @@ void main() {
         .widget<WritingCanvas>(find.byKey(const ValueKey('writing-trace')))
         .strokes;
     expect(traced, hasLength(1));
+    final beforeSwitch = DateTime.now();
     await tester.tap(find.text('拼一拼'));
     await tester.pumpAndSettle();
     final layout = jigsawPainter(tester).layout;
@@ -365,6 +459,14 @@ void main() {
     expect(jigsawPainter(tester).placed, {id});
     expect(jigsawPainter(tester).showHint, isFalse);
     expect(box.data, isEmpty);
+    await tester.tap(find.text('写一写'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('描完了，自己写'));
+    await tester.pumpAndSettle();
+    final attempt = savedProgress().records.values.single.attempts.single;
+    expect(attempt.kind, WritingAttemptKind.trace);
+    expect(attempt.startedAt.isBefore(beforeSwitch), isTrue);
+    expect(attempt.strokes, hasLength(1));
   });
 
   testWidgets('完成拼装记录独立事实和活动，新一轮完成可再次计数', (tester) async {
@@ -445,7 +547,14 @@ void main() {
     final firstStart = DateTime.now().subtract(const Duration(seconds: 8));
     final firstEvent = tester.widget<WritingJigsaw>(find.byType(WritingJigsaw));
     expect(
-      await firstEvent.onCompleted('duration-round-1', firstStart),
+      await firstEvent.onCompleted(
+        writingAttemptFixture(
+          id: 'stage-puzzle-duration-round-1',
+          kind: WritingAttemptKind.puzzle,
+          startedAt: firstStart,
+          completedAt: DateTime.now(),
+        ),
+      ),
       isTrue,
     );
     await tester.pumpAndSettle();
@@ -460,7 +569,14 @@ void main() {
       find.byType(WritingJigsaw),
     );
     expect(
-      await secondEvent.onCompleted('duration-round-2', secondStart),
+      await secondEvent.onCompleted(
+        writingAttemptFixture(
+          id: 'stage-puzzle-duration-round-2',
+          kind: WritingAttemptKind.puzzle,
+          startedAt: secondStart,
+          completedAt: DateTime.now(),
+        ),
+      ),
       isTrue,
     );
     await tester.pumpAndSettle();
@@ -536,10 +652,17 @@ void main() {
         expect(jigsawPainter(tester).showHint, isFalse);
       }
       expect(find.text('拖动碎片，拼回整字。'), findsNothing);
-      for (final id in jigsawPainter(tester).layout.trayOrder) {
+      final layout = jigsawPainter(tester).layout;
+      for (final id in layout.trayOrder) {
         await dragJigsawPiece(tester, id);
       }
       expect(savedProgress().records.values.single.puzzleCount, 1);
+      final attempt = savedProgress().records.values.single.attempts.single;
+      expect(attempt.puzzle!.pieces, [
+        for (final piece in layout.pieces) piece.outline,
+      ]);
+      expect(attempt.puzzle!.placementOrder, layout.trayOrder);
+      expect(attempt.puzzle!.hintEnabled, size.width < size.height);
       expect(find.text('完整的字拼出来啦。'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('writing-records-entry')));
       await tester.pumpAndSettle();
@@ -552,6 +675,25 @@ void main() {
             .subtitle,
         '描红 0 次 · 未完成\n自写 0 次 · 未完成\n拼装 1 次 · 已完成',
       );
+      await tester.tap(
+        find.byKey(const ValueKey('writing-record-writing-001')),
+      );
+      await tester.pumpAndSettle();
+      final row = find.byKey(ValueKey('writing-attempt-${attempt.id}'));
+      await tester.scrollUntilVisible(row, 160);
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      final art = find.byType(WritingAttemptPreview);
+      await tester.scrollUntilVisible(art, 160);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<WritingAttemptPreview>(art).attempt.toJson(),
+        attempt.toJson(),
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(jigsawPainter(tester).placed, hasLength(6));

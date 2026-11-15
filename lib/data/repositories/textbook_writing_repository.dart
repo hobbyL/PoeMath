@@ -5,6 +5,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
@@ -53,6 +54,10 @@ class TextbookWritingRepository {
 
   WritingProgress _read() {
     final raw = _box.get(key);
+    if (raw != null &&
+        utf8.encode(raw as String).length > WritingProgress.maxEncodedBytes) {
+      throw const FormatException('写字记录超出容量范围');
+    }
     final p = raw == null
         ? WritingProgress(
             profileId: profileId,
@@ -124,6 +129,7 @@ class TextbookWritingRepository {
     required String fingerprint,
     required String operationId,
     required int expectedRevision,
+    bool Function(WritingProgress progress)? alreadyApplied,
     required WritingProgress Function(
       WritingProgress p,
       List<WritingTarget> targets,
@@ -146,7 +152,10 @@ class TextbookWritingRepository {
         throw StateError('写字内容已更新，请重新进入写一写');
       }
       var p = _currentContent(_read(), pack);
-      if (p.operations.contains(operationId)) return p;
+      if (p.operations.contains(operationId) ||
+          alreadyApplied?.call(p) == true) {
+        return p;
+      }
       if (p.revision != expectedRevision) {
         throw StateError('学习记录已变化，请重新进入');
       }
@@ -157,8 +166,12 @@ class TextbookWritingRepository {
           operationId,
         ].reversed.take(200).toList().reversed.toList(),
       );
+      final encoded = jsonEncode(p.toJson());
+      if (utf8.encode(encoded).length > WritingProgress.maxEncodedBytes) {
+        throw StateError('写字作品超出容量范围，未保存本次练习');
+      }
       _current();
-      await _box.put(key, jsonEncode(p.toJson()));
+      await _box.put(key, encoded);
       return p;
     }),
   );
@@ -171,19 +184,46 @@ class TextbookWritingRepository {
     required WritingStageDone stage,
     required String operationId,
     required int expectedRevision,
-  }) => change(
-    lessonId: lessonId,
-    fingerprint: fingerprint,
-    operationId: operationId,
-    expectedRevision: expectedRevision,
-    reduce: (p, targets) {
-      final k = WritingProgress.targetKey(lessonId, targetId);
-      final target = targets.firstWhere((t) => t.id == targetId);
-      final old =
-          p.records[k] ?? WritingRecord(fingerprint: target.fingerprint);
-      return p.copy(records: {...p.records, k: writingRecordStage(old, stage)});
-    },
-  );
+    WritingAttempt? attempt,
+  }) {
+    if (attempt != null &&
+        (attempt.id != operationId || attempt.kind.name != stage.name)) {
+      throw ArgumentError('作品与完成操作不匹配');
+    }
+    final targetKey = WritingProgress.targetKey(lessonId, targetId);
+    return change(
+      lessonId: lessonId,
+      fingerprint: fingerprint,
+      operationId: operationId,
+      expectedRevision: expectedRevision,
+      alreadyApplied: attempt == null
+          ? null
+          : (p) =>
+                p.records[targetKey]?.attempts.any(
+                  (saved) => saved.id == operationId,
+                ) ==
+                true,
+      reduce: (p, targets) {
+        final target = targets.firstWhere((t) => t.id == targetId);
+        final old =
+            p.records[targetKey] ??
+            WritingRecord(fingerprint: target.fingerprint);
+        if (attempt != null &&
+            old.attempts.length >= WritingAttempt.maxAttempts) {
+          throw StateError('这个字的作品超出支持范围，未保存本次练习');
+        }
+        final done = writingRecordStage(old, stage);
+        return p.copy(
+          records: {
+            ...p.records,
+            targetKey: attempt == null
+                ? done
+                : done.copy(attempts: [...old.attempts, attempt]),
+          },
+        );
+      },
+    );
+  }
 
   /// 记录一次几何比对结果（教练提示，不推进复习）。
   Future<WritingProgress> recordGeometryPass({

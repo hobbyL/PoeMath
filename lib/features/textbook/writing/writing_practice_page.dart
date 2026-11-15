@@ -14,6 +14,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/textbook_writing_repository.dart';
@@ -87,8 +88,8 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
   List<List<Offset>> _traced = [];
   List<List<Offset>> _free = [];
   WritingCheckResult? _check;
+  DateTime? _traceStartedAt;
   DateTime? _freeStartedAt;
-  DateTime _stageStartedAt = DateTime.now();
 
   AnimationController? _reveal;
   int _revealedStrokes = 0;
@@ -190,7 +191,10 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         _loading = false;
         _retry = null;
         // 无笔顺数据的字直接进入自由书写（AC6：可写但无几何核对）。
-        if (_strokeData == null) _stage = WritingStage.free;
+        if (_strokeData == null) {
+          _stage = WritingStage.free;
+          _freeStartedAt ??= DateTime.now();
+        }
       });
       _prepareReveal();
     } on Object catch (error) {
@@ -247,17 +251,16 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
       _busy = true;
       _error = null;
     });
+    var saved = false;
     try {
       final value = await action();
       if (_current && generation == _loadId) {
         setState(() {
           _progress = value;
           _retry = null;
-          success?.call();
         });
-        return true;
+        saved = true;
       }
-      return false;
     } on Object catch (error) {
       if (_current && generation == _loadId) {
         setState(() {
@@ -269,10 +272,11 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
                 };
         });
       }
-      return false;
     } finally {
       if (_current && generation == _loadId) setState(() => _busy = false);
     }
+    if (saved && _current && generation == _loadId) success?.call();
+    return saved;
   }
 
   /// 整课指纹。
@@ -299,7 +303,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
 
   void _goTo(WritingStage stage) {
     if (!_current) return;
-    _stageStartedAt = DateTime.now();
+    if (stage == WritingStage.trace) _traceStartedAt ??= DateTime.now();
     unawaited(_stopAudio());
     if (stage == WritingStage.demonstrate) {
       _restartReveal();
@@ -344,23 +348,59 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
       _goTo(WritingStage.free);
       return;
     }
-    await _recordStage(WritingStageDone.trace);
-    if (_current) _goTo(WritingStage.free);
+    await _recordStage(
+      WritingStageDone.trace,
+      onSaved: () => _goTo(WritingStage.free),
+    );
   }
 
   Future<bool> _recordStage(
     WritingStageDone stage, {
-    String? operationId,
-    DateTime? startedAt,
+    WritingAttempt? attempt,
+    VoidCallback? onSaved,
   }) async {
     final repo = _repository;
     final target = _target;
     if (repo == null || target == null) return false;
     final expected = _progress;
     if (expected == null) return false;
+    final now = DateTime.now();
+    final startedAt = stage == WritingStageDone.trace
+        ? _traceStartedAt ?? now
+        : _freeStartedAt ?? now;
     final id =
-        operationId ??
-        'stage-${stage.name}-${DateTime.now().microsecondsSinceEpoch}';
+        attempt?.id ?? 'stage-${stage.name}-${now.microsecondsSinceEpoch}';
+    final WritingAttempt completed;
+    try {
+      completed =
+          attempt ??
+          WritingAttempt.captureWriting(
+            id: id,
+            kind: stage == WritingStageDone.trace
+                ? WritingAttemptKind.trace
+                : WritingAttemptKind.free,
+            startedAt: startedAt,
+            completedAt: now.isBefore(startedAt) ? startedAt : now,
+            referenceStrokes: _strokeData?.strokes ?? const [],
+            canvasSide: _canvasSide,
+            strokes: [
+              for (final stroke
+                  in stage == WritingStageDone.trace ? _traced : _free)
+                [
+                  for (final point in stroke)
+                    math.Point<double>(point.dx, point.dy),
+                ],
+            ],
+          );
+    } on Object catch (error) {
+      if (_current) {
+        setState(() {
+          _error = _message(error);
+          _retry = null;
+        });
+      }
+      return false;
+    }
     final lessonId = widget.lessonId;
     final fingerprint = _fingerprint;
     return _runWrite(
@@ -371,32 +411,32 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         stage: stage,
         operationId: id,
         expectedRevision: expected.revision,
+        attempt: completed,
       ),
-      success: () =>
-          unawaited(_recordWritingActivity(id, startedAt: startedAt)),
+      success: () {
+        if (stage == WritingStageDone.trace) _traceStartedAt = null;
+        if (stage == WritingStageDone.free) {
+          _freeStartedAt = _free.isEmpty ? DateTime.now() : null;
+        }
+        unawaited(_recordWritingActivity(completed));
+        onSaved?.call();
+      },
       allowPageRetry: stage != WritingStageDone.puzzle,
     );
   }
 
-  Future<void> _recordWritingActivity(
-    String operationId, {
-    DateTime? startedAt,
-  }) async {
-    final completedAt = DateTime.now();
-    final elapsed = completedAt
-        .difference(startedAt ?? _stageStartedAt)
-        .inSeconds;
+  Future<void> _recordWritingActivity(WritingAttempt attempt) async {
     try {
       await ref
           .read(learningActivityRepositoryProvider)
           .record(
-            id: 'textbook-writing:$operationId',
+            id: 'textbook-writing:${attempt.id}',
             activityType: LearningActivityType.textbookWriting,
             totalItems: 1,
             successfulItems: 1,
             starsEarned: 0,
-            durationSeconds: elapsed < 0 ? 0 : elapsed,
-            completedAt: completedAt,
+            durationSeconds: attempt.durationSeconds,
+            completedAt: attempt.completedAt,
           );
       ref.invalidate(todayLearningActivityCountsProvider);
     } on Object catch (error, stackTrace) {
@@ -593,7 +633,6 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
 
   void _selectMode(_WritingMode mode) {
     if (_busy || !_current || _mode == mode) return;
-    _stageStartedAt = DateTime.now();
     unawaited(_stopAudio());
     if (mode == _WritingMode.puzzle) _reveal?.stop();
     setState(() {
@@ -725,10 +764,9 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
                       strokeData: _strokeData,
                       enabled:
                           !_busy && _current && _mode == _WritingMode.puzzle,
-                      onCompleted: (roundId, startedAt) => _recordStage(
+                      onCompleted: (attempt) => _recordStage(
                         WritingStageDone.puzzle,
-                        operationId: 'stage-puzzle-$roundId',
-                        startedAt: startedAt,
+                        attempt: attempt,
                       ),
                       onWrite: _writeAfterPuzzle,
                     ),
@@ -919,6 +957,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         child: WritingCanvas(
           key: const ValueKey('writing-trace'),
           strokes: _traced,
+          enabled: !_busy && _current,
           onStrokesChanged: (next) => setState(() => _traced = next),
           referenceStrokes: data.strokes,
           traceOpacity: 0.22,
@@ -930,17 +969,24 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           TextButton(
-            onPressed: () {
-              if (_traced.isEmpty) return;
-              setState(() {
-                _traced = _traced.sublist(0, _traced.length - 1);
-              });
-            },
+            onPressed: _busy
+                ? null
+                : () {
+                    if (_traced.isEmpty) return;
+                    setState(() {
+                      _traced = _traced.sublist(0, _traced.length - 1);
+                    });
+                  },
             child: const Text('撤销一笔'),
           ),
           const SizedBox(width: SpacingTokens.sm),
           TextButton(
-            onPressed: () => setState(() => _traced = []),
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _traced = [];
+                    _traceStartedAt = DateTime.now();
+                  }),
             child: const Text('清空'),
           ),
         ],
@@ -960,6 +1006,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         child: WritingCanvas(
           key: const ValueKey('writing-free'),
           strokes: _free,
+          enabled: !_busy && _current,
           onStrokesChanged: (next) {
             setState(() => _free = next);
           },
@@ -972,15 +1019,22 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           TextButton(
-            onPressed: () {
-              if (_free.isEmpty) return;
-              setState(() => _free = _free.sublist(0, _free.length - 1));
-            },
+            onPressed: _busy
+                ? null
+                : () {
+                    if (_free.isEmpty) return;
+                    setState(() => _free = _free.sublist(0, _free.length - 1));
+                  },
             child: const Text('撤销一笔'),
           ),
           const SizedBox(width: SpacingTokens.sm),
           TextButton(
-            onPressed: () => setState(() => _free = []),
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _free = [];
+                    _freeStartedAt = DateTime.now();
+                  }),
             child: const Text('清空'),
           ),
         ],
@@ -990,10 +1044,12 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         onPressed: _busy
             ? null
             : () async {
-                await _recordStage(WritingStageDone.free);
-                if (_current && _free.isNotEmpty) {
-                  _goTo(WritingStage.check);
-                }
+                await _recordStage(
+                  WritingStageDone.free,
+                  onSaved: () {
+                    if (_free.isNotEmpty) _goTo(WritingStage.check);
+                  },
+                );
               },
         child: const Text('写好了，看一看'),
       ),
@@ -1013,7 +1069,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     final data = _strokeData;
     final result = _check;
     final record = _record;
-    final previewSide = _canvasSide / 2 - SpacingTokens.sm;
+    final previewSide = (_canvasSide - SpacingTokens.lg) / 2;
     return [
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1074,7 +1130,10 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
               onPressed: _busy
                   ? null
                   : () {
-                      setState(() => _free = []);
+                      setState(() {
+                        _free = [];
+                        _freeStartedAt = null;
+                      });
                       _goTo(WritingStage.free);
                     },
               child: const Text('重写'),
@@ -1146,7 +1205,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
       _free = [];
       _check = null;
       _freeStartedAt = null;
-      _stageStartedAt = DateTime.now();
+      _traceStartedAt = null;
       unawaited(_reload());
     }
   }

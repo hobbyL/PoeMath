@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
@@ -6,6 +7,7 @@ import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/textbook_course.dart';
 import 'package:poemath/data/models/textbook_course_review.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
@@ -16,6 +18,7 @@ import 'package:poemath/domain/textbook_writing_review.dart';
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/writing_fixture.dart';
+import '../../helpers/writing_attempt_fixture.dart';
 
 class FailingBox extends Fake implements Box<dynamic> {
   final data = <String, dynamic>{};
@@ -74,6 +77,10 @@ void main() {
       stage: WritingStageDone.trace,
       operationId: 'trace',
       expectedRevision: p.revision,
+      attempt: writingAttemptFixture(
+        id: 'trace',
+        kind: WritingAttemptKind.trace,
+      ),
     );
   }
 
@@ -94,6 +101,7 @@ void main() {
     TextbookWritingRepository? using,
     String operationId = 'puzzle-round',
     int expectedRevision = 0,
+    WritingAttempt? attempt,
   }) => (using ?? repo).recordStage(
     lessonId: lessonId(),
     fingerprint: writingLessonFingerprint(targets()),
@@ -101,6 +109,7 @@ void main() {
     stage: WritingStageDone.puzzle,
     operationId: operationId,
     expectedRevision: expectedRevision,
+    attempt: attempt,
   );
 
   test('拼装写入加密 box，关闭重开后读回；同轮旧 revision 重试不重复计数', () async {
@@ -116,9 +125,14 @@ void main() {
       hasStrokeData: hasStrokeData,
       box: disk,
     );
-    final done = await puzzle(using: persisted);
+    final attempt = writingAttemptFixture(
+      id: 'puzzle-round',
+      kind: WritingAttemptKind.puzzle,
+    );
+    final done = await puzzle(using: persisted, attempt: attempt);
     final record = done.records.values.single;
     expect(record.puzzleCount, 1);
+    expect(record.attempts.single.toJson(), attempt.toJson());
     expect(record.traceCount, 0);
     expect(record.freeCount, 0);
     expect(record.geometryPasses, 0);
@@ -140,13 +154,24 @@ void main() {
       box: disk,
     );
     expect((await persisted.load()).toJson(), done.toJson());
-    expect((await puzzle(using: persisted)).toJson(), done.toJson());
+    expect(
+      (await puzzle(using: persisted, attempt: attempt)).toJson(),
+      done.toJson(),
+    );
     final next = await puzzle(
       using: persisted,
       operationId: 'new-round',
       expectedRevision: 1,
+      attempt: writingAttemptFixture(
+        id: 'new-round',
+        kind: WritingAttemptKind.puzzle,
+      ),
     );
     expect(next.records.values.single.puzzleCount, 2);
+    expect(next.records.values.single.attempts.map((a) => a.id), [
+      'puzzle-round',
+      'new-round',
+    ]);
     await disk.close();
   });
 
@@ -177,11 +202,25 @@ void main() {
       hasStrokeData: hasStrokeData,
       box: box,
     );
-    await expectLater(puzzle(using: failing), throwsA(isA<HiveError>()));
+    final attempt = writingAttemptFixture(
+      id: 'puzzle-round',
+      kind: WritingAttemptKind.puzzle,
+    );
+    await expectLater(
+      puzzle(using: failing, attempt: attempt),
+      throwsA(isA<HiveError>()),
+    );
     expect((await failing.load()).records, isEmpty);
-    final retried = await puzzle(using: failing);
+    final retried = await puzzle(using: failing, attempt: attempt);
     expect(retried.records.values.single.puzzleCount, 1);
-    expect((await puzzle(using: failing)).toJson(), retried.toJson());
+    expect(
+      retried.records.values.single.attempts.single.toJson(),
+      attempt.toJson(),
+    );
+    expect(
+      (await puzzle(using: failing, attempt: attempt)).toJson(),
+      retried.toJson(),
+    );
   });
 
   test('档案切换及恢复后旧实例不能写拼装完成', () async {
@@ -236,6 +275,55 @@ void main() {
       ),
       throwsStateError,
     );
+  });
+
+  test('作品 ID 超过最近 200 次操作窗口后，旧 revision 重放也不重复写入', () async {
+    final saved = await trace();
+    final advanced = saved.copy(
+      revision: 205,
+      operations: [for (var i = 0; i < 200; i++) 'geometry-$i'],
+    );
+    await HiveBoxes.settings.put(repo.key, jsonEncode(advanced.toJson()));
+    final raw = HiveBoxes.settings.get(repo.key);
+    final replay = await repo.recordStage(
+      lessonId: lessonId(),
+      fingerprint: writingLessonFingerprint(targets()),
+      targetId: targets().first.id,
+      stage: WritingStageDone.trace,
+      operationId: 'trace',
+      expectedRevision: 0,
+      attempt: writingAttemptFixture(
+        id: 'trace',
+        kind: WritingAttemptKind.trace,
+      ),
+    );
+    expect(replay.revision, 205);
+    expect(replay.records.values.single.traceCount, 1);
+    expect(replay.records.values.single.attempts, hasLength(1));
+    expect(HiveBoxes.settings.get(repo.key), raw);
+  });
+
+  test('作品种类和 ID 不匹配完成操作时，不写次数或作品', () async {
+    final original = await repo.load();
+    for (final attempt in [
+      writingAttemptFixture(id: 'stage', kind: WritingAttemptKind.puzzle),
+      writingAttemptFixture(id: 'different', kind: WritingAttemptKind.trace),
+    ]) {
+      expect(
+        () => repo.recordStage(
+          lessonId: lessonId(),
+          fingerprint: writingLessonFingerprint(targets()),
+          targetId: targets().first.id,
+          stage: WritingStageDone.trace,
+          operationId: 'stage',
+          expectedRevision: 0,
+          attempt: attempt,
+        ),
+        throwsArgumentError,
+      );
+    }
+    expect((await repo.load()).toJson(), original.toJson());
+    expect(HiveBoxes.settings.get(repo.key), isNull);
   });
 
   test('跨实例同键串写不交错', () async {

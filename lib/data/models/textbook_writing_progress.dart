@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
+
 /// 写一写单字记录与整册进度。
 ///
 /// 与认一认（`textbook_recognition_progress.dart`）同构：整册一个 JSON 对象
@@ -18,6 +20,7 @@ class WritingRecord {
     this.nextDay,
     this.lastDay,
     this.advancedDay,
+    this.attempts = const [],
   });
   final String fingerprint;
 
@@ -31,6 +34,9 @@ class WritingRecord {
   final int geometryPasses, parentConfirms;
   final int stage;
   final String? lastParentDay, nextDay, lastDay, advancedDay;
+
+  /// 新完成练习的作品；旧次数没有可还原的逐次笔迹。
+  final List<WritingAttempt> attempts;
 
   /// 总览小标（design 2.3）：未练 → 已描红 → 已自写通过。
   WritingBadge get badge {
@@ -51,6 +57,7 @@ class WritingRecord {
     String? nextDay,
     String? lastDay,
     String? advancedDay,
+    List<WritingAttempt>? attempts,
   }) => WritingRecord(
     fingerprint: fingerprint,
     traceCount: traceCount ?? this.traceCount,
@@ -63,6 +70,7 @@ class WritingRecord {
     nextDay: nextDay ?? this.nextDay,
     lastDay: lastDay ?? this.lastDay,
     advancedDay: advancedDay ?? this.advancedDay,
+    attempts: attempts == null ? this.attempts : List.unmodifiable(attempts),
   );
 
   Map<String, dynamic> toJson() => {
@@ -77,27 +85,53 @@ class WritingRecord {
     'nextDay': nextDay,
     'lastDay': lastDay,
     'advancedDay': advancedDay,
+    'attempts': attempts.map((a) => a.toJson()).toList(),
   };
 
-  factory WritingRecord.fromJson(Map<String, dynamic> j) => WritingRecord(
-    fingerprint: _string(j, 'fingerprint'),
-    traceCount: _integer(j, 'traceCount'),
-    freeCount: _integer(j, 'freeCount'),
-    // v1 旧记录没有拼装字段。已有字段仍严格验证，不能吞掉损坏值。
-    puzzleCount: j.containsKey('puzzleCount') ? _integer(j, 'puzzleCount') : 0,
-    geometryPasses: _integer(j, 'geometryPasses'),
-    parentConfirms: _integer(j, 'parentConfirms'),
-    stage: _integer(j, 'stage', 4),
-    lastParentDay: _day(j['lastParentDay']),
-    nextDay: _day(j['nextDay']),
-    lastDay: _day(j['lastDay']),
-    advancedDay: _day(j['advancedDay']),
-  );
+  factory WritingRecord.fromJson(Map<String, dynamic> j) {
+    final attempts = j.containsKey('attempts')
+        ? _list(j['attempts'], (v) => WritingAttempt.fromJson(_map(v)))
+        : <WritingAttempt>[];
+    if (attempts.length > WritingAttempt.maxAttempts ||
+        attempts.map((a) => a.id).toSet().length != attempts.length) {
+      throw const FormatException('练习作品过多或重复');
+    }
+    final record = WritingRecord(
+      fingerprint: _string(j, 'fingerprint'),
+      traceCount: _integer(j, 'traceCount'),
+      freeCount: _integer(j, 'freeCount'),
+      // v1 旧记录没有拼装字段。已有字段仍严格验证，不能吞掉损坏值。
+      puzzleCount: j.containsKey('puzzleCount')
+          ? _integer(j, 'puzzleCount')
+          : 0,
+      geometryPasses: _integer(j, 'geometryPasses'),
+      parentConfirms: _integer(j, 'parentConfirms'),
+      stage: _integer(j, 'stage', 4),
+      lastParentDay: _day(j['lastParentDay']),
+      nextDay: _day(j['nextDay']),
+      lastDay: _day(j['lastDay']),
+      advancedDay: _day(j['advancedDay']),
+      attempts: List.unmodifiable(attempts),
+    );
+    for (final entry in [
+      (WritingAttemptKind.trace, record.traceCount),
+      (WritingAttemptKind.free, record.freeCount),
+      (WritingAttemptKind.puzzle, record.puzzleCount),
+    ]) {
+      if (attempts.where((a) => a.kind == entry.$1).length > entry.$2) {
+        throw const FormatException('作品数量与练习次数不匹配');
+      }
+    }
+    return record;
+  }
 }
 
 enum WritingBadge { none, assembled, traced, written }
 
 class WritingProgress {
+  /// 每册作品容量；仓库和备份验证使用同一上限。
+  static const maxEncodedBytes = 32 * 1024 * 1024;
+
   const WritingProgress({
     required this.profileId,
     required this.bookId,

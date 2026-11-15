@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
+import 'package:poemath/data/models/textbook_writing_attempt.dart';
 import 'package:poemath/domain/character_puzzle.dart';
 import 'package:poemath/domain/writing_stroke_data.dart';
 import 'package:poemath/features/textbook/writing/writing_path.dart';
@@ -23,7 +23,7 @@ class WritingJigsaw extends StatefulWidget {
 
   final String character;
   final CharacterStrokeData? strokeData;
-  final Future<bool> Function(String roundId, DateTime startedAt) onCompleted;
+  final Future<bool> Function(WritingAttempt attempt) onCompleted;
   final VoidCallback onWrite;
   final bool enabled;
 
@@ -46,6 +46,8 @@ class _WritingJigsawState extends State<WritingJigsaw> {
   bool _saved = false;
   bool _prepared = false;
   int _roundNumber = 0;
+  int _wrongPlacements = 0;
+  WritingAttempt? _completion;
 
   bool get _complete =>
       _layout != null && _placed.length == _layout!.pieces.length;
@@ -76,31 +78,8 @@ class _WritingJigsawState extends State<WritingJigsaw> {
     _inkPoints = const [];
     final data = widget.strokeData;
     if (data == null || data.strokes.isEmpty) return;
-    final outline = characterOutline(data.strokes);
-    final bounds = outline.getBounds();
-    if (bounds.isEmpty || !bounds.longestSide.isFinite) return;
-    // 使用真实轮廓范围，完整保留少量超出原 1024 画布的笔画。
-    final scale = 0.82 / bounds.longestSide;
-    final normalized = outline.transform(
-      Float64List.fromList([
-        scale,
-        0,
-        0,
-        0,
-        0,
-        scale,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0.5 - bounds.center.dx * scale,
-        0.5 - bounds.center.dy * scale,
-        0,
-        1,
-      ]),
-    );
+    final normalized = puzzleCharacterOutline(data.strokes);
+    if (normalized == null) return;
     final points = <PuzzlePoint>[];
     const samples = 48;
     for (var y = 0; y < samples; y++) {
@@ -131,6 +110,8 @@ class _WritingJigsawState extends State<WritingJigsaw> {
     _placementMessage = null;
     _saved = false;
     _saving = false;
+    _wrongPlacements = 0;
+    _completion = null;
   }
 
   void _place(CharacterPuzzlePiece piece) {
@@ -148,7 +129,23 @@ class _WritingJigsawState extends State<WritingJigsaw> {
     final round = _roundId;
     setState(() => _saving = true);
     try {
-      final saved = await widget.onCompleted(round, _roundStartedAt);
+      final completedAt = DateTime.now();
+      _completion ??= WritingAttempt(
+        id: 'stage-puzzle-$round',
+        kind: WritingAttemptKind.puzzle,
+        startedAt: _roundStartedAt,
+        completedAt: completedAt.isBefore(_roundStartedAt)
+            ? _roundStartedAt
+            : completedAt,
+        referenceStrokes: widget.strokeData!.strokes,
+        puzzle: WritingPuzzleResult(
+          pieces: [for (final piece in _layout!.pieces) piece.outline],
+          placementOrder: _placed.toList(),
+          hintEnabled: _showHint,
+          wrongPlacements: _wrongPlacements,
+        ),
+      );
+      final saved = await widget.onCompleted(_completion!);
       if (mounted && round == _roundId) setState(() => _saved = saved);
     } on Object catch (error, stackTrace) {
       AppLogger.e(
@@ -185,7 +182,12 @@ class _WritingJigsawState extends State<WritingJigsaw> {
   }
 
   void _tryAgain() {
-    if (mounted) setState(() => _placementMessage = '再挪一挪，让笔画接起来。');
+    if (mounted) {
+      setState(() {
+        _wrongPlacements++;
+        _placementMessage = '再挪一挪，让笔画接起来。';
+      });
+    }
   }
 
   void _tapBoard(TapUpDetails details, double side) {
