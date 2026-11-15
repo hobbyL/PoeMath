@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -11,6 +12,7 @@ import 'package:poemath/data/repositories/textbook_course_repository.dart';
 import 'package:poemath/data/repositories/textbook_writing_repository.dart';
 import 'package:poemath/domain/textbook_writing_content.dart';
 import 'package:poemath/domain/textbook_writing_review.dart';
+
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/writing_fixture.dart';
@@ -19,8 +21,7 @@ class FailingBox extends Fake implements Box<dynamic> {
   final data = <String, dynamic>{};
   bool fail = true;
   @override
-  dynamic get(dynamic key, {dynamic defaultValue}) =>
-      data[key] ?? defaultValue;
+  dynamic get(dynamic key, {dynamic defaultValue}) => data[key] ?? defaultValue;
   @override
   Future<void> put(dynamic key, dynamic value) async {
     if (fail) {
@@ -87,6 +88,130 @@ void main() {
       hasStrokeData: hasStrokeData,
     );
     expect((await reopened.load()).toJson(), p.toJson());
+  });
+
+  Future<WritingProgress> puzzle({
+    TextbookWritingRepository? using,
+    String operationId = 'puzzle-round',
+    int expectedRevision = 0,
+  }) => (using ?? repo).recordStage(
+    lessonId: lessonId(),
+    fingerprint: writingLessonFingerprint(targets()),
+    targetId: targets().first.id,
+    stage: WritingStageDone.puzzle,
+    operationId: operationId,
+    expectedRevision: expectedRevision,
+  );
+
+  test('拼装写入加密 box，关闭重开后读回；同轮旧 revision 重试不重复计数', () async {
+    final cipher = HiveAesCipher(Hive.generateSecureKey());
+    var disk = await Hive.openBox<dynamic>(
+      'jigsaw-disk-test',
+      encryptionCipher: cipher,
+    );
+    var persisted = TextbookWritingRepository(
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+      hasStrokeData: hasStrokeData,
+      box: disk,
+    );
+    final done = await puzzle(using: persisted);
+    final record = done.records.values.single;
+    expect(record.puzzleCount, 1);
+    expect(record.traceCount, 0);
+    expect(record.freeCount, 0);
+    expect(record.geometryPasses, 0);
+    expect(record.parentConfirms, 0);
+    expect(record.stage, 0);
+    expect(record.nextDay, isNull);
+    expect(record.lastDay, isNull);
+    expect(record.badge, WritingBadge.assembled);
+    await disk.close();
+    disk = await Hive.openBox<dynamic>(
+      'jigsaw-disk-test',
+      encryptionCipher: cipher,
+    );
+    persisted = TextbookWritingRepository(
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+      hasStrokeData: hasStrokeData,
+      box: disk,
+    );
+    expect((await persisted.load()).toJson(), done.toJson());
+    expect((await puzzle(using: persisted)).toJson(), done.toJson());
+    final next = await puzzle(
+      using: persisted,
+      operationId: 'new-round',
+      expectedRevision: 1,
+    );
+    expect(next.records.values.single.puzzleCount, 2);
+    await disk.close();
+  });
+
+  test('拼装不覆盖既有书写和家长复习历史', () async {
+    final traced = await trace();
+    final confirmed = await repo.recordParentConfirm(
+      lessonId: lessonId(),
+      fingerprint: writingLessonFingerprint(targets()),
+      targetId: targets().first.id,
+      passed: true,
+      day: '2026-11-14',
+      operationId: 'parent-before-puzzle',
+      expectedRevision: traced.revision,
+    );
+    final done = await puzzle(expectedRevision: confirmed.revision);
+    expect(done.records.values.single.toJson(), {
+      ...confirmed.records.values.single.toJson(),
+      'puzzleCount': 1,
+    });
+  });
+
+  test('拼装保存失败不写事实，相同 round ID 重试只计一次', () async {
+    final box = FailingBox();
+    final failing = TextbookWritingRepository(
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+      hasStrokeData: hasStrokeData,
+      box: box,
+    );
+    await expectLater(puzzle(using: failing), throwsA(isA<HiveError>()));
+    expect((await failing.load()).records, isEmpty);
+    final retried = await puzzle(using: failing);
+    expect(retried.records.values.single.puzzleCount, 1);
+    expect((await puzzle(using: failing)).toJson(), retried.toJson());
+  });
+
+  test('档案切换及恢复后旧实例不能写拼装完成', () async {
+    final before = await puzzle();
+    final raw = HiveBoxes.settings.get(repo.key);
+    ProfileScope.switchTo('other');
+    await expectLater(
+      puzzle(operationId: 'wrong-profile', expectedRevision: before.revision),
+      throwsStateError,
+    );
+    expect(HiveBoxes.settings.get(repo.key), raw);
+    ProfileScope.reset();
+    final current = TextbookWritingRepository(
+      book: book,
+      editionId: pack.edition.id,
+      courses: courses,
+      hasStrokeData: hasStrokeData,
+    );
+    await PracticeDraftRepository.whileRestoring(
+      PracticeDraftRepository.clearAll,
+    );
+    await expectLater(
+      puzzle(
+        using: current,
+        operationId: 'stale-restore',
+        expectedRevision: before.revision,
+      ),
+      throwsStateError,
+    );
+    expect(HiveBoxes.settings.get(repo.key), raw);
   });
 
   test('同 operationId 重放不重复计数；旧 revision 拒绝覆盖', () async {

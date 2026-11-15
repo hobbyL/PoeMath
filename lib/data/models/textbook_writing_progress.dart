@@ -10,6 +10,7 @@ class WritingRecord {
     required this.fingerprint,
     this.traceCount = 0,
     this.freeCount = 0,
+    this.puzzleCount = 0,
     this.geometryPasses = 0,
     this.parentConfirms = 0,
     this.stage = 0,
@@ -23,6 +24,9 @@ class WritingRecord {
   /// 已完成描红 / 空格自写的次数（事实记录，不做闯关拦截）。
   final int traceCount, freeCount;
 
+  /// 整字碎片拼装的完成次数，独立于书写和家长确认。
+  final int puzzleCount;
+
   /// 几何比对通过次数、家长确认通过次数。
   final int geometryPasses, parentConfirms;
   final int stage;
@@ -32,12 +36,14 @@ class WritingRecord {
   WritingBadge get badge {
     if (geometryPasses > 0 || parentConfirms > 0) return WritingBadge.written;
     if (traceCount > 0 || freeCount > 0) return WritingBadge.traced;
+    if (puzzleCount > 0) return WritingBadge.assembled;
     return WritingBadge.none;
   }
 
   WritingRecord copy({
     int? traceCount,
     int? freeCount,
+    int? puzzleCount,
     int? geometryPasses,
     int? parentConfirms,
     int? stage,
@@ -45,48 +51,51 @@ class WritingRecord {
     String? nextDay,
     String? lastDay,
     String? advancedDay,
-  }) =>
-      WritingRecord(
-        fingerprint: fingerprint,
-        traceCount: traceCount ?? this.traceCount,
-        freeCount: freeCount ?? this.freeCount,
-        geometryPasses: geometryPasses ?? this.geometryPasses,
-        parentConfirms: parentConfirms ?? this.parentConfirms,
-        stage: stage ?? this.stage,
-        lastParentDay: lastParentDay ?? this.lastParentDay,
-        nextDay: nextDay ?? this.nextDay,
-        lastDay: lastDay ?? this.lastDay,
-        advancedDay: advancedDay ?? this.advancedDay,
-      );
+  }) => WritingRecord(
+    fingerprint: fingerprint,
+    traceCount: traceCount ?? this.traceCount,
+    freeCount: freeCount ?? this.freeCount,
+    puzzleCount: puzzleCount ?? this.puzzleCount,
+    geometryPasses: geometryPasses ?? this.geometryPasses,
+    parentConfirms: parentConfirms ?? this.parentConfirms,
+    stage: stage ?? this.stage,
+    lastParentDay: lastParentDay ?? this.lastParentDay,
+    nextDay: nextDay ?? this.nextDay,
+    lastDay: lastDay ?? this.lastDay,
+    advancedDay: advancedDay ?? this.advancedDay,
+  );
 
   Map<String, dynamic> toJson() => {
-        'fingerprint': fingerprint,
-        'traceCount': traceCount,
-        'freeCount': freeCount,
-        'geometryPasses': geometryPasses,
-        'parentConfirms': parentConfirms,
-        'stage': stage,
-        'lastParentDay': lastParentDay,
-        'nextDay': nextDay,
-        'lastDay': lastDay,
-        'advancedDay': advancedDay,
-      };
+    'fingerprint': fingerprint,
+    'traceCount': traceCount,
+    'freeCount': freeCount,
+    'puzzleCount': puzzleCount,
+    'geometryPasses': geometryPasses,
+    'parentConfirms': parentConfirms,
+    'stage': stage,
+    'lastParentDay': lastParentDay,
+    'nextDay': nextDay,
+    'lastDay': lastDay,
+    'advancedDay': advancedDay,
+  };
 
   factory WritingRecord.fromJson(Map<String, dynamic> j) => WritingRecord(
-        fingerprint: _string(j, 'fingerprint'),
-        traceCount: _integer(j, 'traceCount'),
-        freeCount: _integer(j, 'freeCount'),
-        geometryPasses: _integer(j, 'geometryPasses'),
-        parentConfirms: _integer(j, 'parentConfirms'),
-        stage: _integer(j, 'stage', 4),
-        lastParentDay: _day(j['lastParentDay']),
-        nextDay: _day(j['nextDay']),
-        lastDay: _day(j['lastDay']),
-        advancedDay: _day(j['advancedDay']),
-      );
+    fingerprint: _string(j, 'fingerprint'),
+    traceCount: _integer(j, 'traceCount'),
+    freeCount: _integer(j, 'freeCount'),
+    // v1 旧记录没有拼装字段。已有字段仍严格验证，不能吞掉损坏值。
+    puzzleCount: j.containsKey('puzzleCount') ? _integer(j, 'puzzleCount') : 0,
+    geometryPasses: _integer(j, 'geometryPasses'),
+    parentConfirms: _integer(j, 'parentConfirms'),
+    stage: _integer(j, 'stage', 4),
+    lastParentDay: _day(j['lastParentDay']),
+    nextDay: _day(j['nextDay']),
+    lastDay: _day(j['lastDay']),
+    advancedDay: _day(j['advancedDay']),
+  );
 }
 
-enum WritingBadge { none, traced, written }
+enum WritingBadge { none, assembled, traced, written }
 
 class WritingProgress {
   const WritingProgress({
@@ -111,25 +120,24 @@ class WritingProgress {
     Map<String, WritingRecord>? records,
     int? revision,
     List<String>? operations,
-  }) =>
-      WritingProgress(
-        profileId: profileId,
-        bookId: bookId,
-        editionId: editionId,
-        revision: revision ?? this.revision,
-        records: records ?? this.records,
-        operations: operations ?? this.operations,
-      );
+  }) => WritingProgress(
+    profileId: profileId,
+    bookId: bookId,
+    editionId: editionId,
+    revision: revision ?? this.revision,
+    records: records ?? this.records,
+    operations: operations ?? this.operations,
+  );
 
   Map<String, dynamic> toJson() => {
-        'v': 1,
-        'profileId': profileId,
-        'bookId': bookId,
-        'editionId': editionId,
-        'revision': revision,
-        'records': records.map((k, v) => MapEntry(k, v.toJson())),
-        'operations': operations,
-      };
+    'v': 1,
+    'profileId': profileId,
+    'bookId': bookId,
+    'editionId': editionId,
+    'revision': revision,
+    'records': records.map((k, v) => MapEntry(k, v.toJson())),
+    'operations': operations,
+  };
 
   factory WritingProgress.fromJson(Map<String, dynamic> j) {
     if (j['v'] != 1) throw const FormatException('写字记录版本不支持');
@@ -151,8 +159,7 @@ class WritingProgress {
       bookId: _string(j, 'bookId'),
       editionId: _string(j, 'editionId'),
       revision: _integer(j, 'revision'),
-      records:
-          raw.map((k, v) => MapEntry(k, WritingRecord.fromJson(_map(v)))),
+      records: raw.map((k, v) => MapEntry(k, WritingRecord.fromJson(_map(v)))),
       operations: _list(j['operations'], (v) => v as String),
     );
   }

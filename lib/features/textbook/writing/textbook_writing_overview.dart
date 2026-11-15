@@ -50,6 +50,7 @@ class _WritingOverviewState extends ConsumerState<TextbookWritingOverview> {
 
   static String _badgeLabel(WritingBadge badge) => switch (badge) {
     WritingBadge.none => '未练',
+    WritingBadge.assembled => '已拼装',
     WritingBadge.traced => '已描红',
     WritingBadge.written => '已自写',
   };
@@ -57,6 +58,7 @@ class _WritingOverviewState extends ConsumerState<TextbookWritingOverview> {
   static Color _badgeColor(ThemeData theme, WritingBadge badge) =>
       switch (badge) {
         WritingBadge.none => theme.colorScheme.onSurfaceVariant,
+        WritingBadge.assembled => theme.colorScheme.primary,
         WritingBadge.traced => theme.colorScheme.tertiary,
         WritingBadge.written => theme.semantic.success,
       };

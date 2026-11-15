@@ -24,11 +24,11 @@ class TextbookWritingRepository {
     required this.courses,
     required this.hasStrokeData,
     Box<dynamic>? box,
-  })  : profileId = ProfileScope.currentId,
-        _profileRevision = ProfileScope.revision,
-        _box = box ?? HiveBoxes.settings,
-        epoch =
-            HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int;
+  }) : profileId = ProfileScope.currentId,
+       _profileRevision = ProfileScope.revision,
+       _box = box ?? HiveBoxes.settings,
+       epoch =
+           HiveBoxes.meta.get('practice_draft_epoch', defaultValue: 0) as int;
   final Textbook book;
   final String editionId, profileId;
   final TextbookCourseRepository courses;
@@ -40,9 +40,8 @@ class TextbookWritingRepository {
   final int _profileRevision;
   final _guard = PracticeDraftRepository();
   static final Map<String, Future<void>> _tails = {};
-  String get key => 'textbook_writing_v1:${textbookTextDigest(
-        jsonEncode([profileId, book.pdfSha256, editionId]),
-      )}';
+  String get key =>
+      'textbook_writing_v1:${textbookTextDigest(jsonEncode([profileId, book.pdfSha256, editionId]))}';
 
   void _current() {
     _guard.assertCurrent();
@@ -89,34 +88,35 @@ class TextbookWritingRepository {
   }
 
   Future<T> _serial<T>(Future<T> Function() action) => _guard.guard(() async {
-        final previous = _tails[key];
-        final work = () async {
-          if (previous != null) {
-            try {
-              await previous;
-            } on Object {/* 后续重试不受失败影响。 */}
-          }
-          _current();
-          return action();
-        }();
-        final tail =
-            work.then<void>((_) {}, onError: (Object _, StackTrace __) {});
-        _tails[key] = tail;
+    final previous = _tails[key];
+    final work = () async {
+      if (previous != null) {
         try {
-          return await work;
-        } finally {
-          if (identical(_tails[key], tail)) _tails.remove(key);
+          await previous;
+        } on Object {
+          /* 后续重试不受失败影响。 */
         }
-      });
+      }
+      _current();
+      return action();
+    }();
+    final tail = work.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _tails[key] = tail;
+    try {
+      return await work;
+    } finally {
+      if (identical(_tails[key], tail)) _tails.remove(key);
+    }
+  });
 
   Future<WritingProgress> load() => _serial(
-        () => courses.withCurrentPack(book, (pack) async {
-          _current();
-          var p = _read();
-          if (pack != null) p = _currentContent(p, pack);
-          return p;
-        }),
-      );
+    () => courses.withCurrentPack(book, (pack) async {
+      _current();
+      var p = _read();
+      if (pack != null) p = _currentContent(p, pack);
+      return p;
+    }),
+  );
 
   /// 一次写入：校验指纹与 revision 后施加 [reduce]。
   Future<WritingProgress> change({
@@ -127,46 +127,43 @@ class TextbookWritingRepository {
     required WritingProgress Function(
       WritingProgress p,
       List<WritingTarget> targets,
-    ) reduce,
-  }) =>
-      _serial(
-        () => courses.withCurrentPack(book, (pack) async {
-          _current();
-          if (pack == null || pack.edition.id != editionId) {
-            throw StateError('教材内容已更新，请重新进入');
-          }
-          final lesson =
-              pack.lessons.where((l) => l.id == lessonId).firstOrNull;
-          if (lesson == null) throw StateError('课目已更新，请重新进入');
-          final targets = writingTargets(
-            pack,
-            lesson,
-            hasStrokeData: hasStrokeData,
-          );
-          if (writingLessonFingerprint(targets) != fingerprint) {
-            throw StateError('写字内容已更新，请重新进入写一写');
-          }
-          var p = _currentContent(_read(), pack);
-          if (p.operations.contains(operationId)) return p;
-          if (p.revision != expectedRevision) {
-            throw StateError('学习记录已变化，请重新进入');
-          }
-          p = reduce(p, targets).copy(
-            revision: p.revision + 1,
-            operations: [...p.operations, operationId]
-                .reversed
-                .take(200)
-                .toList()
-                .reversed
-                .toList(),
-          );
-          _current();
-          await _box.put(key, jsonEncode(p.toJson()));
-          return p;
-        }),
+    )
+    reduce,
+  }) => _serial(
+    () => courses.withCurrentPack(book, (pack) async {
+      _current();
+      if (pack == null || pack.edition.id != editionId) {
+        throw StateError('教材内容已更新，请重新进入');
+      }
+      final lesson = pack.lessons.where((l) => l.id == lessonId).firstOrNull;
+      if (lesson == null) throw StateError('课目已更新，请重新进入');
+      final targets = writingTargets(
+        pack,
+        lesson,
+        hasStrokeData: hasStrokeData,
       );
+      if (writingLessonFingerprint(targets) != fingerprint) {
+        throw StateError('写字内容已更新，请重新进入写一写');
+      }
+      var p = _currentContent(_read(), pack);
+      if (p.operations.contains(operationId)) return p;
+      if (p.revision != expectedRevision) {
+        throw StateError('学习记录已变化，请重新进入');
+      }
+      p = reduce(p, targets).copy(
+        revision: p.revision + 1,
+        operations: [
+          ...p.operations,
+          operationId,
+        ].reversed.take(200).toList().reversed.toList(),
+      );
+      _current();
+      await _box.put(key, jsonEncode(p.toJson()));
+      return p;
+    }),
+  );
 
-  /// 记录描红/自写阶段完成（事实计数，不影响复习日程）。
+  /// 记录拼装/描红/自写完成（独立事实计数，不影响复习日程）。
   Future<WritingProgress> recordStage({
     required String lessonId,
     required String fingerprint,
@@ -174,22 +171,19 @@ class TextbookWritingRepository {
     required WritingStageDone stage,
     required String operationId,
     required int expectedRevision,
-  }) =>
-      change(
-        lessonId: lessonId,
-        fingerprint: fingerprint,
-        operationId: operationId,
-        expectedRevision: expectedRevision,
-        reduce: (p, targets) {
-          final k = WritingProgress.targetKey(lessonId, targetId);
-          final target = targets.firstWhere((t) => t.id == targetId);
-          final old = p.records[k] ??
-              WritingRecord(fingerprint: target.fingerprint);
-          return p.copy(
-            records: {...p.records, k: writingRecordStage(old, stage)},
-          );
-        },
-      );
+  }) => change(
+    lessonId: lessonId,
+    fingerprint: fingerprint,
+    operationId: operationId,
+    expectedRevision: expectedRevision,
+    reduce: (p, targets) {
+      final k = WritingProgress.targetKey(lessonId, targetId);
+      final target = targets.firstWhere((t) => t.id == targetId);
+      final old =
+          p.records[k] ?? WritingRecord(fingerprint: target.fingerprint);
+      return p.copy(records: {...p.records, k: writingRecordStage(old, stage)});
+    },
+  );
 
   /// 记录一次几何比对结果（教练提示，不推进复习）。
   Future<WritingProgress> recordGeometryPass({
@@ -199,27 +193,24 @@ class TextbookWritingRepository {
     required bool passed,
     required String operationId,
     required int expectedRevision,
-  }) =>
-      change(
-        lessonId: lessonId,
-        fingerprint: fingerprint,
-        operationId: operationId,
-        expectedRevision: expectedRevision,
-        reduce: (p, targets) {
-          final k = WritingProgress.targetKey(lessonId, targetId);
-          final target = targets.firstWhere((t) => t.id == targetId);
-          final old = p.records[k] ??
-              WritingRecord(fingerprint: target.fingerprint);
-          return p.copy(
-            records: {
-              ...p.records,
-              k: old.copy(
-                geometryPasses: old.geometryPasses + (passed ? 1 : 0),
-              ),
-            },
-          );
+  }) => change(
+    lessonId: lessonId,
+    fingerprint: fingerprint,
+    operationId: operationId,
+    expectedRevision: expectedRevision,
+    reduce: (p, targets) {
+      final k = WritingProgress.targetKey(lessonId, targetId);
+      final target = targets.firstWhere((t) => t.id == targetId);
+      final old =
+          p.records[k] ?? WritingRecord(fingerprint: target.fingerprint);
+      return p.copy(
+        records: {
+          ...p.records,
+          k: old.copy(geometryPasses: old.geometryPasses + (passed ? 1 : 0)),
         },
       );
+    },
+  );
 
   /// 家长终审：唯一权威判定，同时推进间隔复习。
   Future<WritingProgress> recordParentConfirm({
@@ -230,23 +221,22 @@ class TextbookWritingRepository {
     required String day,
     required String operationId,
     required int expectedRevision,
-  }) =>
-      change(
-        lessonId: lessonId,
-        fingerprint: fingerprint,
-        operationId: operationId,
-        expectedRevision: expectedRevision,
-        reduce: (p, targets) {
-          final k = WritingProgress.targetKey(lessonId, targetId);
-          final target = targets.firstWhere((t) => t.id == targetId);
-          final old = p.records[k] ??
-              WritingRecord(fingerprint: target.fingerprint);
-          return p.copy(
-            records: {
-              ...p.records,
-              k: writingRecordParentConfirm(old, passed: passed, day: day),
-            },
-          );
+  }) => change(
+    lessonId: lessonId,
+    fingerprint: fingerprint,
+    operationId: operationId,
+    expectedRevision: expectedRevision,
+    reduce: (p, targets) {
+      final k = WritingProgress.targetKey(lessonId, targetId);
+      final target = targets.firstWhere((t) => t.id == targetId);
+      final old =
+          p.records[k] ?? WritingRecord(fingerprint: target.fingerprint);
+      return p.copy(
+        records: {
+          ...p.records,
+          k: writingRecordParentConfirm(old, passed: passed, day: day),
         },
       );
+    },
+  );
 }

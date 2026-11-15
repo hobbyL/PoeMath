@@ -10,7 +10,8 @@ WritingRecord writingRecordParentConfirm(
   required bool passed,
   required String day,
 }) {
-  final delayed = r.lastDay != null &&
+  final delayed =
+      r.lastDay != null &&
       r.lastDay!.compareTo(day) < 0 &&
       (r.nextDay == null || r.nextDay!.compareTo(day) <= 0);
   var stage = r.stage;
@@ -29,20 +30,21 @@ WritingRecord writingRecordParentConfirm(
     nextDay: !passed
         ? writingLaterDay(day, 1)
         : delayed && advancedDay == day
-            ? writingLaterDay(day, RecognitionPolicy.intervals[stage])
-            : r.nextDay ?? writingLaterDay(day, 1),
+        ? writingLaterDay(day, RecognitionPolicy.intervals[stage])
+        : r.nextDay ?? writingLaterDay(day, 1),
     lastDay: day,
   );
 }
 
-/// 记录一次阶段完成（描红 / 空格自写），不改变复习日程。
+/// 记录一次拼装 / 描红 / 空格自写完成，不改变其他阶段事实或复习日程。
 WritingRecord writingRecordStage(WritingRecord r, WritingStageDone stage) =>
-    r.copy(
-      traceCount: r.traceCount + (stage == WritingStageDone.trace ? 1 : 0),
-      freeCount: r.freeCount + (stage == WritingStageDone.free ? 1 : 0),
-    );
+    switch (stage) {
+      WritingStageDone.puzzle => r.copy(puzzleCount: r.puzzleCount + 1),
+      WritingStageDone.trace => r.copy(traceCount: r.traceCount + 1),
+      WritingStageDone.free => r.copy(freeCount: r.freeCount + 1),
+    };
 
-enum WritingStageDone { trace, free }
+enum WritingStageDone { trace, free, puzzle }
 
 String writingLaterDay(String day, int days) {
   final date = DateTime.parse(day);

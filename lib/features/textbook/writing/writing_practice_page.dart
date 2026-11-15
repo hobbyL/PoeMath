@@ -25,10 +25,13 @@ import 'package:poemath/domain/writing_stroke_data.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 import 'package:poemath/features/textbook/writing/writing_canvas.dart';
+import 'package:poemath/features/textbook/writing/writing_jigsaw.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
 
 /// 四阶段（PRD R2）：看笔顺 → 描红 → 空格自写 → 核对。
 enum WritingStage { demonstrate, trace, free, check }
+
+enum _WritingMode { write, puzzle }
 
 extension on WritingStage {
   String get label => switch (this) {
@@ -78,6 +81,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
   int _activeSessionId = -1;
 
   WritingStage _stage = WritingStage.demonstrate;
+  _WritingMode _mode = _WritingMode.write;
   List<List<Offset>> _traced = [];
   List<List<Offset>> _free = [];
   WritingCheckResult? _check;
@@ -143,6 +147,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     if (mounted) {
       setState(() {
         _loading = true;
+        _busy = false;
         _error = null;
       });
     }
@@ -228,33 +233,42 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
       ? error.message.toString()
       : '保存或读取失败，请重试';
 
-  Future<void> _runWrite(
+  Future<bool> _runWrite(
     Future<WritingProgress> Function() action, {
     VoidCallback? success,
+    bool allowPageRetry = true,
   }) async {
-    if (_busy || !_current) return;
+    if (_busy || !_current) return false;
+    final generation = _loadId;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       final value = await action();
-      if (_current) {
+      if (_current && generation == _loadId) {
         setState(() {
           _progress = value;
           _retry = null;
           success?.call();
         });
+        return true;
       }
+      return false;
     } on Object catch (error) {
-      if (_current) {
+      if (_current && generation == _loadId) {
         setState(() {
           _error = _message(error);
-          _retry = () => _runWrite(action, success: success);
+          _retry = !allowPageRetry
+              ? null
+              : () async {
+                  await _runWrite(action, success: success);
+                };
         });
       }
+      return false;
     } finally {
-      if (_current) setState(() => _busy = false);
+      if (_current && generation == _loadId) setState(() => _busy = false);
     }
   }
 
@@ -331,30 +345,44 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     if (_current) _goTo(WritingStage.free);
   }
 
-  Future<void> _recordStage(WritingStageDone stage) async {
+  Future<bool> _recordStage(
+    WritingStageDone stage, {
+    String? operationId,
+    DateTime? startedAt,
+  }) async {
     final repo = _repository;
     final target = _target;
-    if (repo == null || target == null) return;
+    if (repo == null || target == null) return false;
     final expected = _progress;
-    if (expected == null) return;
-    final operationId =
+    if (expected == null) return false;
+    final id =
+        operationId ??
         'stage-${stage.name}-${DateTime.now().microsecondsSinceEpoch}';
-    await _runWrite(
+    final lessonId = widget.lessonId;
+    final fingerprint = _fingerprint;
+    return _runWrite(
       () => repo.recordStage(
-        lessonId: widget.lessonId,
-        fingerprint: _fingerprint,
+        lessonId: lessonId,
+        fingerprint: fingerprint,
         targetId: target.id,
         stage: stage,
-        operationId: operationId,
+        operationId: id,
         expectedRevision: expected.revision,
       ),
-      success: () => unawaited(_recordWritingActivity(operationId)),
+      success: () =>
+          unawaited(_recordWritingActivity(id, startedAt: startedAt)),
+      allowPageRetry: stage != WritingStageDone.puzzle,
     );
   }
 
-  Future<void> _recordWritingActivity(String operationId) async {
+  Future<void> _recordWritingActivity(
+    String operationId, {
+    DateTime? startedAt,
+  }) async {
     final completedAt = DateTime.now();
-    final elapsed = completedAt.difference(_stageStartedAt).inSeconds;
+    final elapsed = completedAt
+        .difference(startedAt ?? _stageStartedAt)
+        .inSeconds;
     try {
       await ref
           .read(learningActivityRepositoryProvider)
@@ -535,6 +563,22 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
 
   // ============ build ============
 
+  void _selectMode(_WritingMode mode) {
+    if (_busy || !_current || _mode == mode) return;
+    _stageStartedAt = DateTime.now();
+    unawaited(_stopAudio());
+    if (mode == _WritingMode.puzzle) _reveal?.stop();
+    setState(() {
+      _mode = mode;
+      _playing = false;
+    });
+  }
+
+  void _writeAfterPuzzle() {
+    _selectMode(_WritingMode.write);
+    _goTo(_strokeData == null ? WritingStage.free : WritingStage.trace);
+  }
+
   @override
   Widget build(BuildContext context) {
     final target = _target;
@@ -562,29 +606,92 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(SpacingTokens.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_error case final message?) ...[
-              ColoredCard(
-                color: Theme.of(context).colorScheme.error,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(message),
-                    if (_retry != null)
-                      TextButton(
-                        onPressed: _busy ? null : _retry,
-                        child: const Text('重试'),
-                      ),
-                  ],
+            Padding(
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              child: SegmentedButton<_WritingMode>(
+                key: const ValueKey('writing-mode'),
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: _WritingMode.write, label: Text('写一写')),
+                  ButtonSegment(value: _WritingMode.puzzle, label: Text('拼一拼')),
+                ],
+                selected: {_mode},
+                onSelectionChanged: _busy || !_current
+                    ? null
+                    : (selection) => _selectMode(selection.single),
+              ),
+            ),
+            if (_error case final message?)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  SpacingTokens.md,
+                  0,
+                  SpacingTokens.md,
+                  SpacingTokens.md,
+                ),
+                child: ColoredCard(
+                  color: Theme.of(context).colorScheme.error,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(message),
+                      if (_retry != null)
+                        TextButton(
+                          onPressed: _busy ? null : _retry,
+                          child: const Text('重试'),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: SpacingTokens.md),
-            ],
-            _stepper(),
-            const SizedBox(height: SpacingTokens.md),
-            ..._stageContent(),
+            Expanded(
+              child: IndexedStack(
+                index: _mode.index,
+                children: [
+                  ListView(
+                    padding: const EdgeInsets.fromLTRB(
+                      SpacingTokens.md,
+                      0,
+                      SpacingTokens.md,
+                      SpacingTokens.md,
+                    ),
+                    children: [
+                      _stepper(),
+                      const SizedBox(height: SpacingTokens.md),
+                      ..._stageContent(),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      SpacingTokens.md,
+                      0,
+                      SpacingTokens.md,
+                      SpacingTokens.md,
+                    ),
+                    child: WritingJigsaw(
+                      key: ValueKey((
+                        widget.bookId,
+                        widget.lessonId,
+                        widget.targetId,
+                      )),
+                      character: target.text,
+                      strokeData: _strokeData,
+                      enabled:
+                          !_busy && _current && _mode == _WritingMode.puzzle,
+                      onCompleted: (roundId, startedAt) => _recordStage(
+                        WritingStageDone.puzzle,
+                        operationId: 'stage-puzzle-$roundId',
+                        startedAt: startedAt,
+                      ),
+                      onWrite: _writeAfterPuzzle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             if (_busy)
               const Padding(
                 padding: EdgeInsets.all(SpacingTokens.md),
@@ -623,23 +730,13 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         ? WritingStage.values
         : [WritingStage.free, WritingStage.check];
     final current = stages.indexOf(_stage);
-    return Row(
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: SpacingTokens.sm,
+      runSpacing: SpacingTokens.xs,
       children: [
-        for (var i = 0; i < stages.length; i++) ...[
-          if (i > 0)
-            Expanded(
-              child: Container(
-                height: 2,
-                margin: const EdgeInsets.symmetric(
-                  horizontal: SpacingTokens.xs,
-                ),
-                color: i <= current
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.outlineVariant,
-              ),
-            ),
+        for (var i = 0; i < stages.length; i++)
           _stepDot(theme, stages[i], done: i < current, active: i == current),
-        ],
       ],
     );
   }
@@ -657,32 +754,34 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     return InkWell(
       onTap: _busy ? null : () => _goTo(stage),
       borderRadius: BorderRadius.circular(SpacingTokens.radiusMedium),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: SpacingTokens.sm,
-          vertical: SpacingTokens.xs,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: SpacingTokens.minTapTarget,
+          minHeight: SpacingTokens.minTapTarget,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: active ? color : theme.colorScheme.surface,
-                border: Border.all(color: color, width: 2),
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.xs),
-            Text(
-              stage.label,
-              style: theme.textTheme.labelMedium?.copyWith(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.sm,
+            vertical: SpacingTokens.xs,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                active ? Icons.circle : Icons.circle_outlined,
+                size: SpacingTokens.sm,
                 color: color,
-                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
               ),
-            ),
-          ],
+              const SizedBox(height: SpacingTokens.xs),
+              Text(
+                stage.label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: color,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -997,6 +1096,13 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
         oldWidget.lessonId != widget.lessonId ||
         oldWidget.targetId != widget.targetId) {
       unawaited(_stopAudio());
+      _mode = _WritingMode.write;
+      _stage = WritingStage.demonstrate;
+      _traced = [];
+      _free = [];
+      _check = null;
+      _freeStartedAt = null;
+      _stageStartedAt = DateTime.now();
       unawaited(_reload());
     }
   }

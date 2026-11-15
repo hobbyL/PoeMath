@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,12 +11,15 @@ import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
 import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/data/models/textbook_course.dart';
+import 'package:poemath/data/models/textbook_writing_progress.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/data/repositories/textbook_course_repository.dart';
+import 'package:poemath/data/repositories/practice_draft_repository.dart';
 import 'package:poemath/domain/writing_geometry.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 import 'package:poemath/features/textbook/writing/writing_canvas.dart';
+import 'package:poemath/features/textbook/writing/writing_jigsaw.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
 import 'package:poemath/features/textbook/writing/writing_practice_page.dart';
 
@@ -25,13 +29,19 @@ import '../../helpers/recording_learning_activity_repository.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/writing_fixture.dart';
 import '../../helpers/theme_contrast.dart';
+import '../../helpers/writing_jigsaw_test_helper.dart';
 
 class MemoryBox extends Fake implements Box<dynamic> {
   final data = <String, dynamic>{};
+  bool failNext = false;
   @override
   dynamic get(dynamic key, {dynamic defaultValue}) => data[key] ?? defaultValue;
   @override
   Future<void> put(dynamic key, dynamic value) async {
+    if (failNext) {
+      failNext = false;
+      throw HiveError('disk full');
+    }
     data[key as String] = value;
   }
 }
@@ -56,7 +66,10 @@ void main() {
   late NarrationSynth synth;
   late MemoryNarrationCache audioCache;
   late WritingStrokeAsset asset;
+  late WritingStrokeAsset fullAsset;
   late RecordingLearningActivityRepository activityRepository;
+
+  setUpAll(() async => fullAsset = await loadJigsawTestAsset());
 
   setUp(() async {
     ProfileScope.reset();
@@ -87,9 +100,11 @@ void main() {
     WidgetTester tester, {
     String targetId = 'writing-001',
     ThemeData? theme,
+    Size size = const Size(400, 800),
+    double scale = 1,
   }) async {
-    tester.view.physicalSize = const Size(1200, 2400);
-    tester.view.devicePixelRatio = 3;
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
@@ -108,6 +123,11 @@ void main() {
         ],
         child: MaterialApp(
           theme: theme,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          ),
           home: WritingPracticePage(
             bookId: courseFixtureBook().pdfSha256,
             lessonId: courses.current.lessons.single.id,
@@ -149,7 +169,10 @@ void main() {
 
     await tester.tap(find.text('写好了，看一看'));
     await tester.pumpAndSettle();
-    expect(activityRepository.records.values.single.activityType, 'textbookWriting');
+    expect(
+      activityRepository.records.values.single.activityType,
+      'textbookWriting',
+    );
     expect(find.text('我写的'), findsOneWidget);
     expect(find.text('参考'), findsOneWidget);
     // 无数据时显示家长核对提示。
@@ -241,6 +264,217 @@ void main() {
   testWidgets('找不到目标字时显示错误', (tester) async {
     await pump(tester, targetId: 'missing');
     expect(find.text('找不到这个字'), findsOneWidget);
+  });
+
+  Future<void> openJigsaw(
+    WidgetTester tester, {
+    Size size = const Size(400, 800),
+    double scale = 1,
+    ThemeData? theme,
+  }) async {
+    asset = fullAsset;
+    await pump(tester, size: size, scale: scale, theme: theme);
+    await tester.tap(find.text('拼一拼'));
+    await tester.pumpAndSettle();
+  }
+
+  WritingProgress savedProgress() => WritingProgress.fromJson(
+    jsonDecode(box.data.values.single as String) as Map<String, dynamic>,
+  );
+
+  testWidgets('拼装与描红并列，往返后笔迹、已拼碎片和提示选择均保留', (tester) async {
+    asset = fullAsset;
+    await pump(tester);
+    expect(find.byKey(const ValueKey('writing-demo')), findsOneWidget);
+    await tester.tap(find.text('描红'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('writing-trace')),
+      const Offset(30, 25),
+    );
+    await tester.pumpAndSettle();
+    final traced = tester
+        .widget<WritingCanvas>(find.byKey(const ValueKey('writing-trace')))
+        .strokes;
+    expect(traced, hasLength(1));
+    await tester.tap(find.text('拼一拼'));
+    await tester.pumpAndSettle();
+    final layout = jigsawPainter(tester).layout;
+    final id = layout.trayOrder.first;
+    await dragJigsawPiece(tester, id);
+    await tester.tap(find.text('关闭提示'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('写一写'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<WritingCanvas>(find.byKey(const ValueKey('writing-trace')))
+          .strokes,
+      traced,
+    );
+    await tester.tap(find.text('拼一拼'));
+    await tester.pumpAndSettle();
+    expect(jigsawPainter(tester).layout, same(layout));
+    expect(jigsawPainter(tester).placed, {id});
+    expect(jigsawPainter(tester).showHint, isFalse);
+    expect(box.data, isEmpty);
+  });
+
+  testWidgets('完成拼装记录独立事实和活动，新一轮完成可再次计数', (tester) async {
+    await openJigsaw(tester);
+    for (final id in jigsawPainter(tester).layout.trayOrder) {
+      await dragJigsawPiece(tester, id);
+    }
+    var record = savedProgress().records.values.single;
+    expect(record.puzzleCount, 1);
+    expect(record.traceCount, 0);
+    expect(record.freeCount, 0);
+    expect(record.geometryPasses, 0);
+    expect(record.parentConfirms, 0);
+    expect(record.nextDay, isNull);
+    expect(record.badge, WritingBadge.assembled);
+    expect(activityRepository.records, hasLength(1));
+    expect(
+      activityRepository.records.values.single.activityType,
+      'textbookWriting',
+    );
+    expect(find.text('拼好了！'), findsOneWidget);
+    expect(find.textContaining('写字内容已更新'), findsNothing);
+    await tester.tap(find.text('再拼一次'));
+    await tester.pumpAndSettle();
+    for (final id in jigsawPainter(tester).layout.trayOrder) {
+      await dragJigsawPiece(tester, id);
+    }
+    record = savedProgress().records.values.single;
+    expect(record.puzzleCount, 2);
+    expect(record.parentConfirms, 0);
+    expect(activityRepository.records, hasLength(2));
+    await tester.tap(find.text('去写一写'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('writing-trace')), findsOneWidget);
+  });
+
+  testWidgets('拼装保存失败留在完成页，重试只记一次且成功前不记录活动', (tester) async {
+    await openJigsaw(
+      tester,
+      size: const Size(320, 568),
+      scale: 2,
+      theme: AppTheme.resolve(
+        subject: AppSubject.poem,
+        brightness: Brightness.dark,
+      ),
+    );
+    box.failNext = true;
+    for (final id in jigsawPainter(tester).layout.trayOrder) {
+      await dragJigsawPiece(tester, id);
+    }
+    expect(box.data, isEmpty);
+    expect(activityRepository.records, isEmpty);
+    expect(find.text('拼装记录还没保存，请重试。'), findsOneWidget);
+    final retry = find.byKey(const ValueKey('jigsaw-save-retry'));
+    final board = tester.getRect(find.byKey(const ValueKey('jigsaw-board')));
+    await tester.ensureVisible(retry);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(find.byKey(const ValueKey('jigsaw-board'))), board);
+    expect(
+      tester
+          .hitTestOnBinding(tester.getCenter(retry))
+          .path
+          .any((entry) => identical(entry.target, tester.renderObject(retry))),
+      isTrue,
+      reason: '重试保存按钮应可滚动到可点击位置',
+    );
+    await tester.tap(find.text('重试保存'));
+    await tester.pumpAndSettle();
+    expect(savedProgress().records.values.single.puzzleCount, 1);
+    expect(activityRepository.records, hasLength(1));
+    expect(find.text('完整的字拼出来啦。'), findsOneWidget);
+    expect(find.text('拼装记录还没保存，请重试。'), findsNothing);
+  });
+
+  testWidgets('拼装完成事件的本轮开始时间用于活动时长，不累计上一轮', (tester) async {
+    await openJigsaw(tester);
+    final firstStart = DateTime.now().subtract(const Duration(seconds: 8));
+    final firstEvent = tester.widget<WritingJigsaw>(find.byType(WritingJigsaw));
+    expect(
+      await firstEvent.onCompleted('duration-round-1', firstStart),
+      isTrue,
+    );
+    await tester.pumpAndSettle();
+    final first = activityRepository.records.values.single;
+    expect(
+      first.durationSeconds,
+      first.completedAt.difference(firstStart).inSeconds,
+    );
+    expect(first.durationSeconds, greaterThanOrEqualTo(8));
+    final secondStart = DateTime.now().subtract(const Duration(seconds: 2));
+    final secondEvent = tester.widget<WritingJigsaw>(
+      find.byType(WritingJigsaw),
+    );
+    expect(
+      await secondEvent.onCompleted('duration-round-2', secondStart),
+      isTrue,
+    );
+    await tester.pumpAndSettle();
+    final second = activityRepository.records.values.last;
+    expect(
+      second.durationSeconds,
+      second.completedAt.difference(secondStart).inSeconds,
+    );
+    expect(second.durationSeconds, greaterThanOrEqualTo(2));
+    expect(second.durationSeconds, lessThan(first.durationSeconds));
+  });
+
+  for (final restore in [false, true]) {
+    testWidgets('${restore ? '恢复数据' : '档案切换'}后禁用旧拼装页面并保留画面', (tester) async {
+      await openJigsaw(
+        tester,
+        size: const Size(320, 568),
+        scale: 2,
+        theme: AppTheme.resolve(
+          subject: AppSubject.poem,
+          brightness: Brightness.dark,
+        ),
+      );
+      final id = jigsawPainter(tester).layout.trayOrder.first;
+      await dragJigsawPiece(tester, id);
+      if (restore) {
+        await tester.runAsync(
+          () => PracticeDraftRepository.whileRestoring(
+            PracticeDraftRepository.clearAll,
+          ),
+        );
+      } else {
+        ProfileScope.switchTo('other');
+      }
+      await tester.pumpAndSettle();
+      expect(
+        find.text(restore ? '学习数据已恢复，请重新进入写一写' : '档案已切换，请重新进入写一写'),
+        findsOneWidget,
+      );
+      expect(jigsawPainter(tester).placed, {id});
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const ValueKey('jigsaw-hint-toggle')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(box.data, isEmpty);
+    });
+  }
+
+  testWidgets('整页窄屏大字号仍可拖取全部拼块并完成', (tester) async {
+    asset = fullAsset;
+    await pump(tester, size: const Size(320, 568), scale: 2);
+    await tester.tap(find.text('拼一拼'));
+    await tester.pumpAndSettle();
+    for (final id in jigsawPainter(tester).layout.trayOrder) {
+      await dragJigsawPiece(tester, id);
+    }
+    expect(savedProgress().records.values.single.puzzleCount, 1);
+    expect(tester.takeException(), isNull);
   });
 
   group('几何比对（降级前）', () {
