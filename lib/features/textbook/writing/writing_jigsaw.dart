@@ -318,30 +318,10 @@ class _WritingJigsawState extends State<WritingJigsaw> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               // 碎片区单独滚动，始终保留拼装区，短屏不必把整字滚出视口。
-              final landscape =
-                  constraints.maxWidth > constraints.maxHeight * 1.4;
               final side = math.min(
                 320.0,
-                landscape
-                    ? math.min(
-                        constraints.maxHeight,
-                        constraints.maxWidth * 0.43,
-                      )
-                    : math.min(
-                        constraints.maxWidth,
-                        constraints.maxHeight * 0.58,
-                      ),
+                math.min(constraints.maxWidth, constraints.maxHeight * 0.58),
               );
-              if (landscape) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _board(layout, side, scheme),
-                    const SizedBox(width: SpacingTokens.md),
-                    Expanded(child: _tray(layout, side, theme)),
-                  ],
-                );
-              }
               return Column(
                 children: [
                   Center(child: _board(layout, side, scheme)),
@@ -417,17 +397,14 @@ class _WritingJigsawState extends State<WritingJigsaw> {
 
   Widget _tray(CharacterPuzzleLayout layout, double side, ThemeData theme) {
     if (_complete) {
+      if (_saved) return const SizedBox.shrink();
       return SingleChildScrollView(
         child: Column(
           children: [
             Semantics(
               liveRegion: true,
               child: Text(
-                _saving
-                    ? '正在保存拼装记录…'
-                    : _saved
-                    ? '完整的字拼出来啦。'
-                    : '拼装记录还没保存，请重试。',
+                _saving ? '正在保存拼装记录…' : '拼装记录还没保存，请重试。',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium,
               ),
@@ -449,14 +426,16 @@ class _WritingJigsawState extends State<WritingJigsaw> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            _placementMessage ?? '拖动碎片，拼回整字。',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          if (_placementMessage case final message?) ...[
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-          const SizedBox(height: SpacingTokens.sm),
+            const SizedBox(height: SpacingTokens.sm),
+          ],
           Wrap(
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,

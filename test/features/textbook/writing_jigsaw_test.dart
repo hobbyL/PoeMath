@@ -56,6 +56,7 @@ void main() {
 
   testWidgets('默认浅色整字提示可开关，已经吸附的碎片与布局不重置', (tester) async {
     await pump(tester);
+    expect(find.text('拖动碎片，拼回整字。'), findsNothing);
     expect(jigsawPainter(tester).showHint, isTrue);
     final layout = jigsawPainter(tester).layout;
     final id = layout.trayOrder.first;
@@ -185,7 +186,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(rounds, hasLength(2));
     expect(rounds.first, rounds.last);
-    expect(find.text('完整的字拼出来啦。'), findsOneWidget);
+    expect(find.text('完整的字拼出来啦。'), findsNothing);
+    expect(find.text('去写一写'), findsOneWidget);
   });
 
   for (final subject in AppSubject.values) {
@@ -199,6 +201,14 @@ void main() {
             theme: AppTheme.resolve(subject: subject, brightness: brightness),
           );
           expectReadableText(tester, find.text('关闭提示'));
+          final board = tester.getRect(
+            find.byKey(const ValueKey('jigsaw-board')),
+          );
+          final tray = tester.getRect(
+            find.byKey(const ValueKey('jigsaw-tray')),
+          );
+          expect(tray.top, greaterThanOrEqualTo(board.bottom));
+          expect(tray.center.dx, closeTo(board.center.dx, 0.01));
           expect(tester.takeException(), isNull);
           for (final id in jigsawPainter(tester).layout.trayOrder) {
             final finder = find.byKey(ValueKey('jigsaw-piece-$id'));

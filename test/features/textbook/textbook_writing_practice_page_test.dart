@@ -388,7 +388,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(savedProgress().records.values.single.puzzleCount, 1);
     expect(activityRepository.records, hasLength(1));
-    expect(find.text('完整的字拼出来啦。'), findsOneWidget);
+    expect(find.text('完整的字拼出来啦。'), findsNothing);
+    expect(find.text('去写一写'), findsOneWidget);
     expect(find.text('拼装记录还没保存，请重试。'), findsNothing);
   });
 
@@ -465,23 +466,31 @@ void main() {
     });
   }
 
-  testWidgets('整页窄屏大字号仍可拖取全部拼块并完成', (tester) async {
-    asset = fullAsset;
-    await pump(tester, size: const Size(320, 568), scale: 2);
-    final navigation = tester.getRect(find.byType(AppBar));
-    final modes = tester.getRect(find.byKey(const ValueKey('writing-mode')));
-    expect(navigation.contains(modes.topLeft), isTrue);
-    expect(navigation.contains(modes.bottomRight), isTrue);
-    expectReadableText(tester, find.text('写一写'));
-    expectReadableText(tester, find.text('拼一拼'));
-    await tester.tap(find.text('拼一拼'));
-    await tester.pumpAndSettle();
-    for (final id in jigsawPainter(tester).layout.trayOrder) {
-      await dragJigsawPiece(tester, id);
-    }
-    expect(savedProgress().records.values.single.puzzleCount, 1);
-    expect(tester.takeException(), isNull);
-  });
+  for (final size in [const Size(320, 568), const Size(760, 360)]) {
+    testWidgets('整页上下布局大字号仍可拖取全部拼块并完成：$size', (tester) async {
+      asset = fullAsset;
+      await pump(tester, size: size, scale: 2);
+      final navigation = tester.getRect(find.byType(AppBar));
+      final modes = tester.getRect(find.byKey(const ValueKey('writing-mode')));
+      expect(navigation.contains(modes.topLeft), isTrue);
+      expect(navigation.contains(modes.bottomRight), isTrue);
+      expectReadableText(tester, find.text('写一写'));
+      expectReadableText(tester, find.text('拼一拼'));
+      await tester.tap(find.text('拼一拼'));
+      await tester.pumpAndSettle();
+      final board = tester.getRect(find.byKey(const ValueKey('jigsaw-board')));
+      final tray = tester.getRect(find.byKey(const ValueKey('jigsaw-tray')));
+      expect(tray.top, greaterThanOrEqualTo(board.bottom));
+      expect(tray.center.dx, closeTo(board.center.dx, 0.01));
+      expect(find.text('拖动碎片，拼回整字。'), findsNothing);
+      for (final id in jigsawPainter(tester).layout.trayOrder) {
+        await dragJigsawPiece(tester, id);
+      }
+      expect(savedProgress().records.values.single.puzzleCount, 1);
+      expect(find.text('完整的字拼出来啦。'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   group('几何比对（降级前）', () {
     test('笔数不符给出笔画数提示', () {
