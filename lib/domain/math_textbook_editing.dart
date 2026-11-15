@@ -6,7 +6,7 @@ MathTextbookExpression parseMathTextbookExpression(String input) {
   var rest = input.trim();
   final parts = <MathTextbookExpression>[];
   final token = RegExp(
-    r'^(?:(\d+)\s*又\s*(\d+)\s*/\s*(\d+)|(\d+)\s*/\s*(\d+)|([a-zA-Z]{1,8})(?:\^([23])|([²³]))|(\d+(?:\.\d+)?|[a-zA-Z]{1,8}|[+\-−×÷=<>≤≥()%:]))',
+    r'^(?:(\d+)\s*又\s*(\d+)\s*/\s*(\d+)|(\d+)\s*/\s*(\d+)|([a-zA-Z]{1,8})(?:\^([23])|([²³]))|(\d+(?:\.\d+)?|[a-zA-Z]{1,8}|[+\-−×÷=<>≤≥()%:?□]))',
   );
   while (rest.isNotEmpty) {
     final match = token.firstMatch(rest);

@@ -25,6 +25,7 @@ class MathTextbookAtom extends MathTextbookExpression {
     '≤' => r'\le ',
     '≥' => r'\ge ',
     '%' => r'\%',
+    '□' => r'\square',
     '−' => '-',
     _ => RegExp(r'^[a-zA-Z]+$').hasMatch(value) ? '\\mathrm{$value}' : value,
   };
@@ -120,21 +121,109 @@ class MathTextbookVerticalAddition extends MathTextbookExpression {
   @override
   String get readable => '${rows[0]} + ${rows[1]} = ${rows[2]}';
   @override
-  String get latex {
-    final width = rows.map((r) => r.length).reduce((a, b) => a > b ? a : b);
-    String cells(String row) =>
-        row.padLeft(width).split('').map((c) => c == ' ' ? '{}' : c).join('&');
-    final carryCells = List.filled(width, '{}');
-    for (final carry in carries) {
-      carryCells[width - carry.columnFromRight - 1] =
-          '\\scriptstyle ${carry.value}';
-    }
-    return '\\begin{array}{${List.filled(width + 1, 'r').join()}}'
-        '&${cells(rows[0])}\\\\'
-        '+&${cells(rows[1])}\\\\'
-        '&${carryCells.join('&')}\\\\\\hline'
-        '&${cells(rows[2])}\\end{array}';
+  String get latex => _verticalLatex(rows, '+', [
+    for (final carry in carries)
+      MathTextbookVerticalAnnotation(
+        value: '${carry.value}',
+        row: 2,
+        columnFromRight: carry.columnFromRight,
+      ),
+  ]);
+}
+
+/// Stores the printed grid, including empty positions and intermediate work.
+/// A partly written result is never presented as a completed equation.
+class MathTextbookVerticalArithmetic extends MathTextbookExpression {
+  MathTextbookVerticalArithmetic(
+    List<String> rows, {
+    required this.operation,
+    List<MathTextbookVerticalAnnotation> annotations = const [],
+  }) : rows = List.unmodifiable(rows),
+       annotations = List.unmodifiable(annotations);
+
+  final List<String> rows;
+  final String operation;
+  final List<MathTextbookVerticalAnnotation> annotations;
+  @override
+  Map<String, dynamic> toJson() => {
+    'kind': 'verticalArithmetic',
+    'operation': operation,
+    'rows': rows,
+    'annotations': annotations.map((a) => a.toJson()).toList(),
+  };
+  @override
+  String get readable {
+    final label = switch (operation) {
+      '+' => '加法',
+      '-' => '减法',
+      _ => '乘法',
+    };
+    final result = rows[2].trim().isEmpty
+        ? '横线下尚未填写'
+        : '横线下从左到右为${rows[2].split('').map((c) => c == ' ' ? '空位' : c).join('、')}';
+    return [
+      '$label竖式',
+      '第一行${rows[0].trim()}',
+      '第二行${rows[1].trim()}',
+      result,
+      for (final annotation in annotations)
+        '第${annotation.row + 1}行上方，从右数第${annotation.columnFromRight + 1}列标注${annotation.value == '.' ? '圆点' : annotation.value}',
+    ].join('，');
   }
+
+  @override
+  String get latex => _verticalLatex(rows, operation, annotations);
+}
+
+class MathTextbookVerticalAnnotation {
+  const MathTextbookVerticalAnnotation({
+    required this.value,
+    required this.row,
+    required this.columnFromRight,
+    this.level = 0,
+  });
+  final String value;
+  final int row;
+  final int columnFromRight;
+  final int level;
+  Map<String, dynamic> toJson() => {
+    'value': value,
+    'row': row,
+    'columnFromRight': columnFromRight,
+    if (level != 0) 'level': level,
+  };
+}
+
+String _verticalLatex(
+  List<String> rows,
+  String operation,
+  List<MathTextbookVerticalAnnotation> annotations,
+) {
+  final width = rows.map((r) => r.length).reduce((a, b) => a > b ? a : b);
+  String cells(String row) =>
+      row.padLeft(width).split('').map((c) => c == ' ' ? '{}' : c).join('&');
+  String noteRows(int row) {
+    final notes = annotations.where((a) => a.row == row).toList();
+    if (notes.isEmpty && row != 2) return '';
+    final levels = notes.map((a) => a.level).toSet().toList()..sort();
+    if (levels.isEmpty) levels.add(0);
+    return [
+      for (final level in levels)
+        '&${List.generate(width, (column) {
+          final note = notes.where((a) => a.level == level && a.columnFromRight == width - column - 1).firstOrNull;
+          if (note == null) return '{}';
+          return '\\scriptstyle ${note.value == '.' ? r'\cdot' : note.value}';
+        }).join('&')}\\\\',
+    ].join();
+  }
+
+  return '\\begin{array}{${List.filled(width + 1, 'r').join()}}'
+      '${noteRows(0)}'
+      '&${cells(rows[0])}\\\\'
+      '${noteRows(1)}'
+      '${operation == '×' ? r'\times' : operation}&${cells(rows[1])}\\\\'
+      '${noteRows(2)}\\hline'
+      '&${cells(rows[2])}\\end{array}';
 }
 
 String _digits(Object? value, String label) {
@@ -149,7 +238,7 @@ MathTextbookExpression _expression(Object? value, int depth) {
   switch (raw['kind']) {
     case 'atom':
       final value = _string(raw['value'], '数学符号', max: 32);
-      if (!RegExp(r'^(?:\d+(?:\.\d+)?|[a-zA-Z]{1,8}|[+\-−×÷=<>≤≥()%:])$')
+      if (!RegExp(r'^(?:\d+(?:\.\d+)?|[a-zA-Z]{1,8}|[+\-−×÷=<>≤≥()%:?□])$')
           .hasMatch(value)) {
         throw const FormatException('不支持的数学符号');
       }
@@ -206,6 +295,59 @@ MathTextbookExpression _expression(Object? value, int depth) {
         throw const FormatException('进位列重复');
       }
       return MathTextbookVerticalAddition(rows, carries);
+    case 'verticalArithmetic':
+      if (depth != 0) throw const FormatException('竖式须作为独立公式保留');
+      final operation = _string(raw['operation'], '竖式运算', max: 1);
+      if (!['+', '-', '×'].contains(operation)) {
+        throw const FormatException('竖式运算无效');
+      }
+      final values = _list(raw['rows'], '竖式行', max: 3);
+      if (values.length != 3) throw const FormatException('竖式须保留三行');
+      final rows = <String>[];
+      for (var index = 0; index < values.length; index++) {
+        final value = values[index];
+        if (value is! String ||
+            value.length > 12 ||
+            !RegExp(r'^[0-9. ]*$').hasMatch(value) ||
+            (index < 2 &&
+                !RegExp(r'^(?:\d+(?:\.\d+)?|\.\d+)$').hasMatch(value.trim())) ||
+            '.'.allMatches(value).length > 1) {
+          throw const FormatException('竖式数字、小数点或空位无效');
+        }
+        rows.add(value);
+      }
+      final width = rows.map((r) => r.length).reduce((a, b) => a > b ? a : b);
+      final annotations = _list(raw['annotations'] ?? [], '竖式标注', max: 36).map((
+        value,
+      ) {
+        final data = _object(value, '竖式标注');
+        final text = _string(data['value'], '标注数字', max: 2);
+        if (!RegExp(r'^(?:\d{1,2}|\.)$').hasMatch(text)) {
+          throw const FormatException('竖式标注须为数字或圆点');
+        }
+        return MathTextbookVerticalAnnotation(
+          value: text,
+          row: _integer(data['row'], '标注行', max: 2),
+          columnFromRight: _integer(
+            data['columnFromRight'],
+            '标注列',
+            max: width - 1,
+          ),
+          level: _integer(data['level'] ?? 0, '标注层', max: 3),
+        );
+      }).toList();
+      if (annotations
+              .map((a) => (a.row, a.columnFromRight, a.level))
+              .toSet()
+              .length !=
+          annotations.length) {
+        throw const FormatException('竖式标注位置重复');
+      }
+      return MathTextbookVerticalArithmetic(
+        rows,
+        operation: operation,
+        annotations: annotations,
+      );
     default:
       throw const FormatException('不支持的数学表达式结构');
   }
