@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:convert';
 
@@ -6,6 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
+import 'package:poemath/core/routing/app_router.dart';
+import 'package:poemath/core/routing/app_routes.dart';
+import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -22,6 +26,7 @@ import 'package:poemath/features/textbook/writing/writing_canvas.dart';
 import 'package:poemath/features/textbook/writing/writing_jigsaw.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
 import 'package:poemath/features/textbook/writing/writing_practice_page.dart';
+import 'package:poemath/features/textbook/writing/textbook_writing_records_page.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/narration_fakes.dart';
@@ -102,10 +107,25 @@ void main() {
     ThemeData? theme,
     Size size = const Size(400, 800),
     double scale = 1,
+    bool withRouter = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
+    final route = AppRoutes.textbookWritingOf(
+      courseFixtureBook().pdfSha256,
+      courses.current.lessons.single.id,
+      targetId,
+    );
+    final router = withRouter
+        ? createAppRouter(initialLocation: AppRoutes.mathSessionDetail)
+        : null;
+    if (router != null) addTearDown(router.dispose);
+    Widget builder(BuildContext context, Widget? child) => MediaQuery(
+      data: MediaQuery.of(context)
+          .copyWith(textScaler: TextScaler.linear(scale)),
+      child: child!,
+    );
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -121,22 +141,33 @@ void main() {
             TextbookFileService(narrationAudioCache: audioCache),
           ),
         ],
-        child: MaterialApp(
-          theme: theme,
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: TextScaler.linear(scale)),
-            child: child!,
-          ),
-          home: WritingPracticePage(
-            bookId: courseFixtureBook().pdfSha256,
-            lessonId: courses.current.lessons.single.id,
-            targetId: targetId,
-          ),
-        ),
+        child: router != null
+            ? MaterialApp.router(
+                theme: theme,
+                builder: builder,
+                routerConfig: router,
+              )
+            : MaterialApp(
+                theme: theme,
+                builder: builder,
+                home: WritingPracticePage(
+                  bookId: courseFixtureBook().pdfSha256,
+                  lessonId: courses.current.lessons.single.id,
+                  targetId: targetId,
+                ),
+              ),
       ),
     );
     await tester.pumpAndSettle();
+    if (router != null) {
+      unawaited(router.push<void>(route));
+      await tester.pumpAndSettle();
+      expect(
+        find.byType(WritingPracticePage),
+        findsOneWidget,
+        reason: '真实路由进入单字页：${router.routeInformationProvider.value.uri}',
+      );
+    }
   }
 
   for (final subject in AppSubject.values) {
@@ -161,7 +192,7 @@ void main() {
   });
 
   testWidgets('自由书写后可核对并请家长确认', (tester) async {
-    await pump(tester);
+    await pump(tester, withRouter: true);
     // 画一笔。
     final canvas = find.byKey(const ValueKey('writing-free'));
     await tester.drag(canvas, const Offset(40, 40));
@@ -179,6 +210,22 @@ void main() {
     expect(find.text('这个字暂时没有笔顺数据，请家长看一看写得对不对。'), findsOneWidget);
     // 写入成功时不应出现内容失效提示。
     expect(find.textContaining('写字内容已更新'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('writing-records-entry')));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextbookWritingRecordsPage), findsOneWidget);
+    expect(
+      tester
+          .widget<AppTile>(
+            find.byKey(const ValueKey('writing-record-writing-001')),
+          )
+          .subtitle,
+      '描红 0 次 · 未完成\n自写 1 次 · 已完成\n拼装 0 次 · 未完成',
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('我写的'), findsOneWidget);
+    expect(activityRepository.records, hasLength(1));
 
     await tester.tap(find.byKey(const ValueKey('writing-parent-confirm')));
     await tester.pumpAndSettle();
@@ -469,7 +516,7 @@ void main() {
   for (final size in [const Size(320, 568), const Size(760, 360)]) {
     testWidgets('整页上下布局大字号仍可拖取全部拼块并完成：$size', (tester) async {
       asset = fullAsset;
-      await pump(tester, size: size, scale: 2);
+      await pump(tester, size: size, scale: 2, withRouter: true);
       final navigation = tester.getRect(find.byType(AppBar));
       final modes = tester.getRect(find.byKey(const ValueKey('writing-mode')));
       expect(navigation.contains(modes.topLeft), isTrue);
@@ -494,6 +541,22 @@ void main() {
       }
       expect(savedProgress().records.values.single.puzzleCount, 1);
       expect(find.text('完整的字拼出来啦。'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('writing-records-entry')));
+      await tester.pumpAndSettle();
+      expect(find.byType(TextbookWritingRecordsPage), findsOneWidget);
+      expect(
+        tester
+            .widget<AppTile>(
+              find.byKey(const ValueKey('writing-record-writing-001')),
+            )
+            .subtitle,
+        '描红 0 次 · 未完成\n自写 0 次 · 未完成\n拼装 1 次 · 已完成',
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(jigsawPainter(tester).placed, hasLength(6));
+      expect(savedProgress().records.values.single.puzzleCount, 1);
+      expect(activityRepository.records, hasLength(1));
       if (size.width > size.height) {
         expectLandscapeJigsawControls(tester);
         await tester.tap(find.byKey(const ValueKey('jigsaw-restart')));

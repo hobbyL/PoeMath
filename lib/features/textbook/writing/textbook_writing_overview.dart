@@ -32,11 +32,13 @@ class TextbookWritingOverview extends ConsumerStatefulWidget {
     required this.bookId,
     required this.lesson,
     this.onPractice,
+    this.onRecords,
   });
 
   final String bookId;
   final TextbookCourseLesson lesson;
   final ValueChanged<String>? onPractice;
+  final VoidCallback? onRecords;
 
   @override
   ConsumerState<TextbookWritingOverview> createState() =>
@@ -239,21 +241,38 @@ class _WritingOverviewState extends ConsumerState<TextbookWritingOverview> {
           _minimumColumns,
           _maximumColumns,
         );
-        return MasonryLayout(
-          key: const ValueKey('writing-masonry'),
-          columnCount: columns,
-          gap: gap,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final target in targets)
-              _card(
-                context,
-                target,
-                records?[WritingProgress.targetKey(
-                  widget.lesson.id,
-                  target.id,
-                )],
-                (available - gap * (columns - 1)) / columns,
+            if (widget.onRecords != null) ...[
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: const ValueKey('writing-records-entry'),
+                  onPressed: widget.onRecords,
+                  icon: const Icon(Icons.history_outlined),
+                  label: const Text('练习记录'),
+                ),
               ),
+              const SizedBox(height: SpacingTokens.sm),
+            ],
+            MasonryLayout(
+              key: const ValueKey('writing-masonry'),
+              columnCount: columns,
+              gap: gap,
+              children: [
+                for (final target in targets)
+                  _card(
+                    context,
+                    target,
+                    records?[WritingProgress.targetKey(
+                      widget.lesson.id,
+                      target.id,
+                    )],
+                    (available - gap * (columns - 1)) / columns,
+                  ),
+              ],
+            ),
           ],
         );
       },

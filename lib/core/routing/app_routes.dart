@@ -44,6 +44,8 @@ class AppRoutes {
   static const String textbookRecognitionCheck =
       '/textbook/recognition/:id/:lesson/check';
   static const String textbookWriting = '/textbook/writing/:id/:lesson';
+  static const String textbookWritingRecords =
+      '/textbook/writing/:id/:lesson/records';
   static const String textbookDictation = '/textbook/dictation/:id/:lesson';
   static const String textbookManagement = '/profile/settings/books';
   static const String textbookManageDetail = '/profile/settings/books/:id';
@@ -167,6 +169,10 @@ class AppRoutes {
   static String textbookDictationOf(String id, String lesson) =>
       '/textbook/dictation/${Uri.encodeComponent(id)}'
       '/${Uri.encodeComponent(lesson)}';
+
+  static String textbookWritingRecordsOf(String id, String lesson) =>
+      '/textbook/writing/${Uri.encodeComponent(id)}'
+      '/${Uri.encodeComponent(lesson)}/records';
 
   static String textbookContentOf(String id, String section, List<int> pages) =>
       Uri(

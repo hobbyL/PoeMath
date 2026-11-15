@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/utils/logger.dart';
 import 'package:poemath/core/services/tts/narration_audio_cache.dart';
 import 'package:poemath/core/services/tts/narration_session.dart';
@@ -93,6 +95,7 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
   bool _playing = false;
 
   bool _loading = true, _busy = false, _disposed = false;
+  bool _openingRecords = false;
   String? _error;
   Future<void> Function()? _retry;
   String _profile = '';
@@ -554,6 +557,31 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
     }
   }
 
+  Future<void> _openRecords() async {
+    if (_busy || !_current || _openingRecords || _route?.isCurrent == false) {
+      return;
+    }
+    _openingRecords = true;
+    final generation = _loadId;
+    final path = AppRoutes.textbookWritingRecordsOf(
+      widget.bookId,
+      widget.lessonId,
+    );
+    try {
+      await _stopAudio();
+      if (!mounted ||
+          !_current ||
+          _busy ||
+          generation != _loadId ||
+          _route?.isCurrent == false) {
+        return;
+      }
+      await context.push<void>(path);
+    } finally {
+      _openingRecords = false;
+    }
+  }
+
   // ============ 画布尺寸 ============
 
   double get _canvasSide {
@@ -634,6 +662,12 @@ class _WritingPracticePageState extends ConsumerState<WritingPracticePage>
               : (selection) => _selectMode(selection.single),
         ),
         actions: [
+          IconButton(
+            key: const ValueKey('writing-records-entry'),
+            onPressed: _busy || !_current ? null : _openRecords,
+            tooltip: '练习记录',
+            icon: const Icon(Icons.history_outlined),
+          ),
           IconButton(
             onPressed: _playCharacter,
             tooltip: '朗读',

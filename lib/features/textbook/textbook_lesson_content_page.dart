@@ -367,6 +367,11 @@ class _TextbookLessonContentPageState
               lesson: lesson,
               onPractice: (targetId) =>
                   unawaited(_openWriting(lesson.id, targetId)),
+              onRecords: () => unawaited(
+                _openWritingRoute(
+                  AppRoutes.textbookWritingRecordsOf(bookId, lesson.id),
+                ),
+              ),
             ),
             TextbookContentSection.exercise => TextbookExerciseOverview(
               bookId: bookId,

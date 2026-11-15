@@ -37,6 +37,7 @@ void main() {
     TextbookCoursePack? courses,
     WritingProgress? progress,
     ValueChanged<String>? onPractice,
+    VoidCallback? onRecords,
     Size size = const Size(420, 900),
     double scale = 1,
   }) async {
@@ -68,6 +69,7 @@ void main() {
                 bookId: bookId,
                 lesson: package.lessons.single,
                 onPractice: onPractice,
+                onRecords: onRecords,
               ),
             ),
           ),
@@ -83,15 +85,14 @@ void main() {
     int geometryPasses = 0,
     int parentConfirms = 0,
     String? nextDay,
-  }) =>
-      WritingRecord(
-        fingerprint: 'fp',
-        traceCount: traceCount,
-        freeCount: freeCount,
-        geometryPasses: geometryPasses,
-        parentConfirms: parentConfirms,
-        nextDay: nextDay,
-      );
+  }) => WritingRecord(
+    fingerprint: 'fp',
+    traceCount: traceCount,
+    freeCount: freeCount,
+    geometryPasses: geometryPasses,
+    parentConfirms: parentConfirms,
+    nextDay: nextDay,
+  );
 
   WritingProgress progressWith(Map<String, WritingRecord> records) =>
       WritingProgress(
@@ -103,7 +104,16 @@ void main() {
 
   testWidgets('字卡展示田字格大字与「去练字」入口', (tester) async {
     final practiced = <String>[];
-    await pump(tester, onPractice: practiced.add);
+    var recordsOpened = 0;
+    await pump(
+      tester,
+      onPractice: practiced.add,
+      onRecords: () => recordsOpened++,
+    );
+    await tester.tap(find.byKey(const ValueKey('writing-records-entry')));
+    await tester.pumpAndSettle();
+    expect(recordsOpened, 1);
+    expect(practiced, isEmpty);
 
     for (final id in ['writing-001', 'writing-002']) {
       expect(find.byKey(ValueKey('writing-card-$id')), findsOneWidget);
@@ -138,8 +148,9 @@ void main() {
     );
     expect((badgeY.dy - entryY.dy).abs(), lessThan(SpacingTokens.md));
 
-    await tester
-        .tap(find.byKey(const ValueKey('writing-practice-writing-002')));
+    await tester.tap(
+      find.byKey(const ValueKey('writing-practice-writing-002')),
+    );
     await tester.pumpAndSettle();
     expect(practiced, ['writing-002']);
     expect(tester.takeException(), isNull);
@@ -199,10 +210,7 @@ void main() {
       '已自写',
     );
     // 无记录的字不显示复习标记。
-    expect(
-      find.byKey(const ValueKey('writing-due-writing-002')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('writing-due-writing-002')), findsNothing);
   });
 
   testWidgets('字卡不提供朗读按钮，点击任意位置直接进入练字', (tester) async {
@@ -217,9 +225,7 @@ void main() {
     expect(find.byIcon(Icons.volume_up_outlined), findsNothing);
 
     // 点田字格字身：整卡可点，直接进入练字。
-    await tester.tap(
-      find.byKey(const ValueKey('writing-grid-writing-001')),
-    );
+    await tester.tap(find.byKey(const ValueKey('writing-grid-writing-001')));
     await tester.pumpAndSettle();
     expect(practiced, ['writing-001']);
     expect(tester.takeException(), isNull);

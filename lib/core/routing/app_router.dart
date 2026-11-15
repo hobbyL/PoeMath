@@ -83,6 +83,7 @@ import 'package:poemath/features/textbook/recognition/textbook_recognition_pract
 import 'package:poemath/features/textbook/recognition/textbook_recognition_prepare_page.dart';
 import 'package:poemath/features/textbook/recognition/textbook_recognition_check_page.dart';
 import 'package:poemath/features/textbook/writing/writing_practice_page.dart';
+import 'package:poemath/features/textbook/writing/textbook_writing_records_page.dart';
 import 'package:poemath/features/textbook/writing/textbook_dictation_page.dart';
 import 'package:poemath/domain/textbook_lesson_content.dart';
 
@@ -337,6 +338,16 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
             bookId: state.pathParameters['id']!,
             lessonId: state.pathParameters['lesson']!,
             routeObserver: textbookObserver,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.textbookWritingRecords,
+        pageBuilder: (context, state) => fadeSlideTransitionPage(
+          state: state,
+          child: TextbookWritingRecordsPage(
+            bookId: state.pathParameters['id']!,
+            lessonId: state.pathParameters['lesson']!,
           ),
         ),
       ),
