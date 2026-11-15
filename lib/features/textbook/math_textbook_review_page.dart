@@ -518,14 +518,25 @@ class _MathTextbookReviewPageState extends ConsumerState<MathTextbookReviewPage>
   void _tryAutomaticOrganization(Textbook book) {
     final path = ref.watch(textbookPathProvider(widget.bookId));
     final entries = ref.watch(textbookCatalogProvider);
-    if (_attempted || !path.hasValue || !entries.hasValue) return;
+    if (_attempted ||
+        _navigating ||
+        ModalRoute.of(context)?.isCurrent == false ||
+        !path.hasValue ||
+        !entries.hasValue) {
+      return;
+    }
     _attempted = true;
     if (path.valueOrNull != null &&
         entries.valueOrNull!.any(
           (entry) => entry.book.pdfSha256 == widget.bookId,
         )) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _generateBook(book);
+        if (!mounted) return;
+        if (_navigating || ModalRoute.of(context)?.isCurrent == false) {
+          _attempted = false;
+          return;
+        }
+        _generateBook(book);
       });
     }
   }

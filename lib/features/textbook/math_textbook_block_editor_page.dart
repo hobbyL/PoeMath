@@ -464,22 +464,27 @@ class MathTextbookExpressionDialog extends StatefulWidget {
 
 class _MathTextbookExpressionDialogState
     extends State<MathTextbookExpressionDialog> {
-  late bool _vertical = widget.initial is MathTextbookVerticalAddition;
+  List<String> get _initialRows => switch (widget.initial) {
+    MathTextbookVerticalAddition(:final rows) => rows,
+    MathTextbookVerticalArithmetic(:final rows) => rows,
+    _ => const [],
+  };
+  late bool _vertical = _initialRows.isNotEmpty;
+  late String _operation = switch (widget.initial) {
+    MathTextbookVerticalArithmetic(:final operation) => operation,
+    _ => '+',
+  };
   late final _input = TextEditingController(
     text: _vertical ? '' : widget.initial?.readable ?? '',
   );
   late final _rows = [
     for (var i = 0; i < 3; i++)
-      TextEditingController(
-        text: _vertical
-            ? (widget.initial as MathTextbookVerticalAddition).rows[i]
-            : '',
-      ),
+      TextEditingController(text: _initialRows.isEmpty ? '' : _initialRows[i]),
   ];
   late final _carries = [
     for (var i = 0; i < 12; i++)
       TextEditingController(
-        text: _vertical
+        text: widget.initial is MathTextbookVerticalAddition
             ? (widget.initial as MathTextbookVerticalAddition).carries
                       .where((c) => c.columnFromRight == i)
                       .firstOrNull
@@ -489,31 +494,94 @@ class _MathTextbookExpressionDialogState
             : '',
       ),
   ];
+  late final _annotations = [
+    if (widget.initial case MathTextbookVerticalArithmetic(:final annotations))
+      for (final annotation in annotations)
+        _VerticalAnnotationInput(annotation),
+  ];
   String? _error;
+  bool get _showCarries =>
+      _operation == '+' &&
+      widget.initial is! MathTextbookVerticalArithmetic &&
+      _annotations.isEmpty;
   int get _width => _rows
       .map((r) => r.text.length)
       .fold(1, (a, b) => a > b ? a : b)
       .clamp(1, 12);
-  MathTextbookExpression _value() => _vertical
-      ? MathTextbookExpression.fromJson(
-          MathTextbookVerticalAddition(
-            _rows.map((r) => r.text.trim()).toList(),
-            [
-              for (var i = 0; i < _width; i++)
-                if (_carries[i].text.trim().isNotEmpty)
-                  MathTextbookCarry(
-                    int.tryParse(_carries[i].text.trim()) ?? -1,
-                    i,
-                  ),
-            ],
-          ).toJson(),
-        )
-      : parseMathTextbookExpression(_input.text);
+  MathTextbookExpression _value() {
+    if (!_vertical) return parseMathTextbookExpression(_input.text);
+    final rows = _rows.map((r) => r.text).toList();
+    final carries = [
+      if (_showCarries)
+        for (var i = 0; i < _width; i++)
+          if (_carries[i].text.trim().isNotEmpty)
+            MathTextbookCarry(int.tryParse(_carries[i].text.trim()) ?? -1, i),
+    ];
+    final completeAddition =
+        _showCarries &&
+        rows.every((r) => RegExp(r'^ *\d+$').hasMatch(r)) &&
+        !rows.last.startsWith(' ') &&
+        rows.last.length == _width;
+    return MathTextbookExpression.fromJson(
+      (completeAddition
+              ? MathTextbookVerticalAddition(
+                  rows.map((r) => r.trim()).toList(),
+                  carries,
+                )
+              : MathTextbookVerticalArithmetic(
+                  rows,
+                  operation: _operation,
+                  annotations: [
+                    for (final carry in carries)
+                      MathTextbookVerticalAnnotation(
+                        value: '${carry.value}',
+                        row: 2,
+                        columnFromRight: carry.columnFromRight,
+                      ),
+                    for (final input in _annotations)
+                      if (input.value.text.trim().isNotEmpty) input.annotation,
+                  ],
+                ))
+          .toJson(),
+    );
+  }
+
+  void _addAnnotation() => setState(() {
+    if (_showCarries) {
+      for (var i = 0; i < _width; i++) {
+        if (_carries[i].text.trim().isNotEmpty) {
+          _annotations.add(
+            _VerticalAnnotationInput(
+              MathTextbookVerticalAnnotation(
+                value: _carries[i].text.trim(),
+                row: 2,
+                columnFromRight: i,
+              ),
+            ),
+          );
+          _carries[i].clear();
+        }
+      }
+    }
+    _annotations.add(
+      _VerticalAnnotationInput(
+        const MathTextbookVerticalAnnotation(
+          value: '',
+          row: 0,
+          columnFromRight: 0,
+        ),
+      ),
+    );
+    _error = null;
+  });
   @override
   void dispose() {
     _input.dispose();
     for (final field in [..._rows, ..._carries]) {
       field.dispose();
+    }
+    for (final input in _annotations) {
+      input.value.dispose();
     }
     super.dispose();
   }
@@ -542,7 +610,7 @@ class _MathTextbookExpressionDialogState
                 decoration: const InputDecoration(labelText: '公式形式'),
                 items: const [
                   DropdownMenuItem(value: false, child: Text('横式 / 分数 / 上标')),
-                  DropdownMenuItem(value: true, child: Text('加法竖式')),
+                  DropdownMenuItem(value: true, child: Text('竖式')),
                 ],
                 onChanged: (value) => setState(() {
                   _vertical = value!;
@@ -561,34 +629,146 @@ class _MathTextbookExpressionDialogState
                   onChanged: (_) => setState(() => _error = null),
                 ),
               ] else ...[
+                DropdownButtonFormField<String>(
+                  initialValue: _operation,
+                  isExpanded: true,
+                  itemHeight: null,
+                  decoration: const InputDecoration(labelText: '运算'),
+                  items: const [
+                    DropdownMenuItem(value: '+', child: Text('加法 ＋')),
+                    DropdownMenuItem(value: '-', child: Text('减法 −')),
+                    DropdownMenuItem(value: '×', child: Text('乘法 ×')),
+                  ],
+                  onChanged: (value) => setState(() {
+                    _operation = value!;
+                    _error = null;
+                  }),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                const Text('按原书数位对齐，空位用空格保留；横线下可以留空。'),
                 for (var i = 0; i < 3; i++)
                   TextField(
                     controller: _rows[i],
                     maxLength: 12,
-                    keyboardType: TextInputType.number,
+                    keyboardType: TextInputType.text,
                     decoration: InputDecoration(
-                      labelText: const ['第一行加数', '第二行加数', '横线下的结果'][i],
+                      labelText: const ['第一行', '第二行', '横线下的结果'][i],
                     ),
                     onChanged: (_) => setState(() => _error = null),
                   ),
-                const Text('进位写在原书对应数位；没有进位时留空。'),
-                for (var i = 0; i < _width; i++)
-                  TextField(
-                    controller: _carries[i],
-                    maxLength: 1,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText:
-                          '${i == 0
-                              ? '个位'
-                              : i == 1
-                              ? '十位'
-                              : i == 2
-                              ? '百位'
-                              : '右起第 ${i + 1} 位'}进位',
+                if (_showCarries) ...[
+                  const Text('进位写在原书对应数位；没有进位时留空。'),
+                  for (var i = 0; i < _width; i++)
+                    TextField(
+                      controller: _carries[i],
+                      maxLength: 1,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText:
+                            '${i == 0
+                                ? '个位'
+                                : i == 1
+                                ? '十位'
+                                : i == 2
+                                ? '百位'
+                                : '右起第 ${i + 1} 位'}进位',
+                      ),
+                      onChanged: (_) => setState(() => _error = null),
                     ),
-                    onChanged: (_) => setState(() => _error = null),
+                ],
+                for (final input in _annotations)
+                  Padding(
+                    padding: const EdgeInsets.only(top: SpacingTokens.sm),
+                    child: ColoredCard(
+                      key: ObjectKey(input),
+                      color: Theme.of(context).colorScheme.primary,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(child: Text('进位 / 借位标注')),
+                              IconButton(
+                                tooltip: '移除标注',
+                                icon: const Icon(Icons.close),
+                                onPressed: () => setState(() {
+                                  _annotations.remove(input);
+                                  input.value.dispose();
+                                  _error = null;
+                                }),
+                              ),
+                            ],
+                          ),
+                          TextField(
+                            controller: input.value,
+                            maxLength: 2,
+                            decoration: const InputDecoration(
+                              labelText: '标注数字或圆点',
+                            ),
+                            onChanged: (_) => setState(() => _error = null),
+                          ),
+                          DropdownButtonFormField<int>(
+                            initialValue: input.row,
+                            isExpanded: true,
+                            itemHeight: null,
+                            decoration: const InputDecoration(labelText: '位置'),
+                            items: const [
+                              DropdownMenuItem(value: 0, child: Text('第一行上方')),
+                              DropdownMenuItem(value: 1, child: Text('第二行上方')),
+                              DropdownMenuItem(value: 2, child: Text('横线上方')),
+                            ],
+                            onChanged: (value) => setState(() {
+                              input.row = value!;
+                              _error = null;
+                            }),
+                          ),
+                          DropdownButtonFormField<int>(
+                            initialValue: input.columnFromRight < _width
+                                ? input.columnFromRight
+                                : null,
+                            isExpanded: true,
+                            itemHeight: null,
+                            decoration: const InputDecoration(labelText: '数位'),
+                            items: [
+                              for (var column = 0; column < _width; column++)
+                                DropdownMenuItem(
+                                  value: column,
+                                  child: Text('右起第 ${column + 1} 列'),
+                                ),
+                            ],
+                            onChanged: (value) => setState(() {
+                              input.columnFromRight = value!;
+                              _error = null;
+                            }),
+                          ),
+                          DropdownButtonFormField<int>(
+                            initialValue: input.level,
+                            isExpanded: true,
+                            itemHeight: null,
+                            decoration: const InputDecoration(
+                              labelText: '上下层次',
+                            ),
+                            items: [
+                              for (var level = 0; level < 4; level++)
+                                DropdownMenuItem(
+                                  value: level,
+                                  child: Text('从上往下第 ${level + 1} 层'),
+                                ),
+                            ],
+                            onChanged: (value) => setState(() {
+                              input.level = value!;
+                              _error = null;
+                            }),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
+                TextButton.icon(
+                  onPressed: _annotations.length >= 36 ? null : _addAnnotation,
+                  icon: const Icon(Icons.add),
+                  label: const Text('添加标注'),
+                ),
               ],
               if (preview != null) ...[
                 const SizedBox(height: SpacingTokens.md),
@@ -623,4 +803,23 @@ class _MathTextbookExpressionDialogState
       ],
     );
   }
+}
+
+class _VerticalAnnotationInput {
+  _VerticalAnnotationInput(MathTextbookVerticalAnnotation annotation)
+    : value = TextEditingController(text: annotation.value),
+      row = annotation.row,
+      columnFromRight = annotation.columnFromRight,
+      level = annotation.level;
+  final TextEditingController value;
+  int row;
+  int columnFromRight;
+  int level;
+  MathTextbookVerticalAnnotation get annotation =>
+      MathTextbookVerticalAnnotation(
+        value: value.text.trim(),
+        row: row,
+        columnFromRight: columnFromRight,
+        level: level,
+      );
 }

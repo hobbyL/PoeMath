@@ -18,11 +18,13 @@ import 'package:poemath/data/repositories/textbook_repository.dart';
 import 'package:poemath/domain/math_textbook_course_plan.dart';
 import 'package:poemath/features/textbook/math_textbook_block_editor_page.dart';
 import 'package:poemath/features/textbook/math_textbook_lesson_page.dart';
+import 'package:poemath/features/textbook/math_textbook_learning_editor_page.dart';
 import 'package:poemath/features/textbook/math_textbook_review_page.dart';
 import 'package:poemath/features/textbook/providers/math_textbook_providers.dart';
 import 'package:poemath/features/textbook/providers/textbook_providers.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_review_content.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_source_preview.dart';
+import 'package:poemath/features/textbook/widgets/math_textbook_study_content.dart';
 
 import '../../helpers/hive_test_helper.dart';
 import '../../helpers/math_textbook_fixture.dart';
@@ -302,6 +304,200 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('题组和作答页直接显示完整原书内容，跨页来源按阅读顺序排列', (tester) async {
+    final original = mathLearningFixture();
+    final lesson = original
+        .edit(
+          blocks: [
+            for (final block in original.blocks)
+              MathTextbookBlock.fromJson({
+                ...block.toJson(),
+                'sourceLayout': true,
+              }),
+          ],
+          learning: MathTextbookLearning.fromJson({
+            ...original.learning!.toJson(),
+            'exercises': [
+              {
+                ...original.learning!.exercises.single.toJson(),
+                'blockIds': ['exercise', 'example'],
+              },
+            ],
+          }),
+        )
+        .approve(
+          pdfSha256: book.pdfSha256,
+          reviewer: '家长',
+          editingMilliseconds: 0,
+        );
+    courses.current = courses.current!.replace(lessons: [lesson]);
+    final saved = courses.current!.toJson();
+    await mount(
+      tester,
+      MathTextbookLearningEditorPage(
+        book: book,
+        lesson: lesson,
+        section: MathTextbookLearningSection.exercises,
+      ),
+    );
+    await tester.tap(find.text('原书第1题'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widgetList<MathTextbookStudyContent>(
+            find.byType(MathTextbookStudyContent),
+          )
+          .map((widget) => widget.block.id),
+      ['example', 'exercise'],
+    );
+    expect(
+      tester
+          .widgetList<MathTextbookSourcePreview>(
+            find.byType(MathTextbookSourcePreview),
+          )
+          .map((widget) => (widget.book.pdfSha256, widget.source.page)),
+      [(book.pdfSha256, 1), (book.pdfSha256, 2)],
+    );
+    expect(find.byTooltip('打开原书'), findsOneWidget);
+    await tester.tap(find.text('查看文字').first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('把2个圆和3个圆合在一起'), findsOneWidget);
+    await visible(tester, find.text('你的答案'));
+    await tester.tap(find.text('你的答案'));
+    await tester.pumpAndSettle();
+    expect(find.text('编辑作答项'), findsOneWidget);
+    expect(
+      tester
+          .widgetList<MathTextbookStudyContent>(
+            find.byType(MathTextbookStudyContent),
+          )
+          .map((widget) => widget.block.id),
+      ['example', 'exercise'],
+    );
+    await visible(tester, input('确定的答案'));
+    expect(tester.widget<TextField>(input('确定的答案')).controller!.text, '5');
+    expect(courses.current!.toJson(), saved);
+    expect(courses.saves, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('知识点编辑页展示原书图示，空摘要也能对照完整来源', (tester) async {
+    final original = mathLearningFixture();
+    final lesson = original.edit(
+      blocks: [
+        for (final block in original.blocks)
+          MathTextbookBlock.fromJson({...block.toJson(), 'sourceLayout': true}),
+      ],
+      learning: MathTextbookLearning.fromJson({
+        ...original.learning!.toJson(),
+        'knowledgePoints': [
+          {
+            ...original.learning!.knowledgePoints.single.toJson(),
+            'summary': '',
+          },
+        ],
+      }),
+    );
+    final saved = courses.current!.toJson();
+    await mount(
+      tester,
+      MathTextbookLearningEditorPage(
+        book: book,
+        lesson: lesson,
+        section: MathTextbookLearningSection.knowledge,
+      ),
+    );
+    await tester.tap(find.text('合并数量'));
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widgetList<MathTextbookStudyContent>(
+            find.byType(MathTextbookStudyContent),
+          )
+          .map((widget) => widget.block.id),
+      ['example'],
+    );
+    expect(
+      tester
+          .widgetList<MathTextbookSourcePreview>(
+            find.byType(MathTextbookSourcePreview),
+          )
+          .map((widget) => widget.source.page),
+      [1],
+    );
+    expect(find.byTooltip('打开原书'), findsOneWidget);
+    await tester.tap(find.text('查看文字'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('把2个圆和3个圆合在一起'), findsOneWidget);
+    await visible(tester, input('知识要点（按原书补齐）'));
+    expect(tester.widget<TextField>(input('知识要点（按原书补齐）')).controller!.text, '');
+    expect(courses.current!.toJson(), saved);
+    expect(courses.saves, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('更换题组关联后预览立即更新，应用这一项仍不写入课时', (tester) async {
+    final lesson = mathLearningFixture();
+    final saved = courses.current!.toJson();
+    await mount(
+      tester,
+      MathTextbookLearningEditorPage(
+        book: book,
+        lesson: lesson,
+        section: MathTextbookLearningSection.exercises,
+      ),
+    );
+    await tester.tap(find.text('原书第1题'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2 + 3 = ?'), findsOneWidget);
+    await tester.tap(find.text('关联原书内容'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox).at(0));
+    await tester.tap(find.byType(Checkbox).at(1));
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widgetList<MathTextbookStudyContent>(
+            find.byType(MathTextbookStudyContent),
+          )
+          .map((widget) => widget.block.id),
+      ['example'],
+    );
+    expect(find.textContaining('把2个圆和3个圆合在一起'), findsOneWidget);
+    expect(find.textContaining('2 + 3 = ?'), findsNothing);
+    await visible(tester, find.text('应用这一项'));
+    await tester.tap(find.text('应用这一项'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('原书第1题'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widgetList<MathTextbookStudyContent>(
+            find.byType(MathTextbookStudyContent),
+          )
+          .map((widget) => widget.block.id),
+      ['example'],
+    );
+    expect(courses.current!.toJson(), saved);
+    expect(courses.saves, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('学习配置未补齐也能完成内容审核，重新打开保留结果', (tester) async {
     final source = mathLearningFixture();
     final pending = MathTextbookLesson.fromJson({
@@ -435,6 +631,50 @@ void main() {
       );
     });
   }
+
+  testWidgets('离开审核页编辑时不在后台重整，返回审核页后才更新旧草稿', (tester) async {
+    courses.current = courses.current!.replace(
+      outline: MathTextbookCourseOutline(
+        source: 'bookmarks',
+        organizationVersion: mathTextbookOrganizationVersion,
+        ranges: const [
+          MathTextbookCourseRange(title: '自有旧课', startPage: 1, endPage: 2),
+        ],
+        completedLessonIds: const ['math-1-2'],
+      ),
+    );
+    await mount(
+      tester,
+      MathTextbookReviewPage(bookId: book.pdfSha256),
+      knownCatalog: true,
+    );
+    expect(generator.bookCalls, 0);
+    final element = tester.element(find.byType(MathTextbookReviewPage));
+    final container = ProviderScope.containerOf(element, listen: false);
+    final navigator = Navigator.of(element);
+    unawaited(
+      navigator.push<void>(
+        MaterialPageRoute(
+          builder: (_) => const Scaffold(body: Text('当前题目正在编辑')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    courses.current = courses.current!.replace(
+      outline: MathTextbookCourseOutline.fromJson({
+        ...courses.current!.outline!.toJson(),
+        'organizationVersion': 1,
+      }),
+    );
+    container.invalidate(mathTextbookCourseProvider(book.pdfSha256));
+    await tester.pumpAndSettle();
+    expect(find.text('当前题目正在编辑'), findsOneWidget);
+    expect(generator.bookCalls, 0);
+    navigator.pop();
+    await tester.pumpAndSettle();
+    expect(generator.bookCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('旧大范围课时单独保留对照，不混进当前目录和审核计数', (tester) async {
     final old = mathLessonFixture(title: '原来的大课时');
@@ -1009,7 +1249,7 @@ void main() {
     await tester.tap(find.text('编辑测试公式'));
     await tester.pumpAndSettle();
     expect(find.text('公式暂无法显示，请查看原书'), findsNothing);
-    await tester.enterText(input('第一行加数'), '542');
+    await tester.enterText(input('第一行'), '542');
     await tester.enterText(input('横线下的结果'), '809');
     await tester.tap(find.text('使用此公式'));
     await tester.pumpAndSettle();
@@ -1026,6 +1266,74 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final (size, initial) in [
+    (
+      const Size(320, 640),
+      MathTextbookVerticalArithmetic(
+        ['36', '19', '17'],
+        operation: '-',
+        annotations: const [
+          MathTextbookVerticalAnnotation(
+            value: '2',
+            row: 0,
+            columnFromRight: 1,
+          ),
+          MathTextbookVerticalAnnotation(
+            value: '16',
+            row: 0,
+            columnFromRight: 0,
+          ),
+          MathTextbookVerticalAnnotation(
+            value: '.',
+            row: 0,
+            columnFromRight: 1,
+            level: 1,
+          ),
+        ],
+      ),
+    ),
+    (
+      const Size(420, 860),
+      MathTextbookVerticalArithmetic(['35', ' 2', ' 7'], operation: '+'),
+    ),
+  ]) {
+    testWidgets('竖式表单在$size保留空位、借位及标注层次', (tester) async {
+      MathTextbookExpression? result;
+      await mount(
+        tester,
+        Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                result = await showDialog<MathTextbookExpression>(
+                  context: context,
+                  builder: (_) =>
+                      MathTextbookExpressionDialog(initial: initial),
+                );
+              },
+              child: const Text('编辑测试公式'),
+            ),
+          ),
+        ),
+        size: size,
+        scale: 2,
+      );
+      await tester.tap(find.text('编辑测试公式'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(input('横线下的结果')).controller!.text,
+        initial.rows[2],
+      );
+      await visible(tester, find.text('排版预览'), delta: 200);
+      expect(find.text('公式暂无法显示，请查看原书'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('使用此公式'));
+      await tester.pumpAndSettle();
+      expect(result!.toJson(), initial.toJson());
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final size in [const Size(320, 640), const Size(1000, 500)]) {
     testWidgets('二维公式和原书对照适应 $size 大字号布局', (tester) async {

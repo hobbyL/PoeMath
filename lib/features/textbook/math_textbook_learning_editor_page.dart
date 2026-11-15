@@ -13,6 +13,7 @@ import 'package:poemath/data/models/textbook.dart';
 import 'package:poemath/domain/math_textbook_practice.dart';
 import 'package:poemath/features/textbook/math_textbook_labels.dart';
 import 'package:poemath/features/textbook/widgets/math_textbook_content.dart';
+import 'package:poemath/features/textbook/widgets/math_textbook_study_content.dart';
 import 'package:poemath/features/textbook/widgets/textbook_review_layout.dart';
 import 'package:poemath/math_engine/math_engine_api.dart';
 

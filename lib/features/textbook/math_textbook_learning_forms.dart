@@ -8,11 +8,13 @@ class _MathLearningFormPage extends StatefulWidget {
     required this.lesson,
     required this.kind,
     this.initial,
+    this.sourceBlockIds = const [],
   });
   final Textbook book;
   final MathTextbookLesson lesson;
   final _LearningFormKind kind;
   final Map<String, dynamic>? initial;
+  final List<String> sourceBlockIds;
   @override
   State<_MathLearningFormPage> createState() => _MathLearningFormPageState();
 }
@@ -26,6 +28,16 @@ class _MathLearningFormPageState extends State<_MathLearningFormPage> {
   bool _dirty = false;
   String? _error;
   List<MathTextbookPracticeItem>? _preview;
+  bool get _hasBookSource => widget.kind != _LearningFormKind.plan;
+  List<MathTextbookBlock> get _sourceBlocks {
+    final Iterable<String> ids = widget.kind == _LearningFormKind.answer
+        ? widget.sourceBlockIds
+        : _blocks;
+    return widget.lesson.blocks
+        .where((block) => ids.contains(block.id))
+        .toList();
+  }
+
   String get _title => switch (widget.kind) {
     _LearningFormKind.knowledge => '编辑知识点',
     _LearningFormKind.exercise => '编辑题组',
@@ -235,6 +247,7 @@ class _MathLearningFormPageState extends State<_MathLearningFormPage> {
             lesson: widget.lesson,
             kind: _LearningFormKind.answer,
             initial: field?.toJson(),
+            sourceBlockIds: _blocks.toList(),
           ),
         ),
       ),
@@ -295,11 +308,32 @@ class _MathLearningFormPageState extends State<_MathLearningFormPage> {
           onPressed: _leave,
           icon: const Icon(Icons.arrow_back),
         ),
+        actions: [
+          if (_hasBookSource && _sourceBlocks.isNotEmpty)
+            IconButton(
+              tooltip: '打开原书',
+              icon: const Icon(Icons.menu_book_outlined),
+              onPressed: () => context.push(
+                AppRoutes.textbookReadOf(widget.book.pdfSha256),
+                extra: _sourceBlocks.first.sources.first.page,
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(SpacingTokens.md),
           children: [
+            if (_hasBookSource)
+              for (final block in _sourceBlocks)
+                Padding(
+                  key: ValueKey('math-question-source-${block.id}'),
+                  padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+                  child: MathTextbookStudyContent(
+                    book: widget.book,
+                    block: block,
+                  ),
+                ),
             if (widget.kind == _LearningFormKind.answer)
               ..._answerForm()
             else ...[
