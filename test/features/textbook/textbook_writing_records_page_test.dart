@@ -450,8 +450,18 @@ void main() {
     );
     expect(page.targetId, 'writing-001');
     expect(page.attemptId, trace.id);
-    expect(find.text('星 · 描红'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, '星·描红'), findsOneWidget);
+    expect(find.text('星 · 描红'), findsNothing);
+    expect(find.text('xīng'), findsNothing);
+    expect(find.textContaining('开始 '), findsNothing);
     expect(find.textContaining('用时 1 分 5 秒'), findsOneWidget);
+    final heading = tester.getRect(find.text('我的笔迹'));
+    final strokeCount = tester.getRect(
+      find.byKey(const ValueKey('writing-attempt-stroke-count')),
+    );
+    expect(find.text('共 2 笔'), findsOneWidget);
+    expect(strokeCount.left, greaterThan(heading.right));
+    expect(strokeCount.center.dy, closeTo(heading.center.dy, 0.01));
     final art = find.byKey(const ValueKey('writing-attempt-artwork'));
     await tester.scrollUntilVisible(art, 160);
     await tester.pumpAndSettle();
@@ -468,6 +478,11 @@ void main() {
     await tester.scrollUntilVisible(puzzleRow, 160);
     await tester.tap(puzzleRow);
     await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, '星·拼装'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('writing-attempt-stroke-count')),
+      findsNothing,
+    );
     final toggle = find.byKey(const ValueKey('writing-attempt-pieces-toggle'));
     await tester.scrollUntilVisible(toggle, 160);
     await tester.tap(toggle);
@@ -539,13 +554,17 @@ void main() {
     });
     await pump(tester, targetId: 'writing-001', attemptId: 'attempt-1');
     expect(find.byType(WritingAttemptPreview), findsOneWidget);
+    expect(find.widgetWithText(AppBar, '星·自写'), findsOneWidget);
     ProfileScope.switchTo('other');
     await tester.pumpAndSettle();
     expect(find.byType(WritingAttemptPreview), findsNothing);
     expect(find.text('该次练习详情暂不可用'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, '练习详情'), findsOneWidget);
+    expect(find.byKey(const ValueKey('writing-attempt-time')), findsNothing);
     ProfileScope.reset();
     await tester.pumpAndSettle();
     expect(find.byType(WritingAttemptPreview), findsOneWidget);
+    expect(find.widgetWithText(AppBar, '星·自写'), findsOneWidget);
   });
 
   for (final subject in AppSubject.values) {
@@ -630,6 +649,38 @@ void main() {
             await tester.scrollUntilVisible(row, 160);
             await tester.tap(row);
             await tester.pumpAndSettle();
+            expect(
+              find.widgetWithText(AppBar, id == 'puzzle-1' ? '星·拼装' : '星·自写'),
+              findsOneWidget,
+            );
+            expect(find.text('xīng'), findsNothing);
+            expect(find.textContaining('开始 '), findsNothing);
+            final footer = find.byKey(const ValueKey('writing-attempt-time'));
+            final footerText = tester.widget<Text>(footer).data!;
+            expect(footerText, startsWith('完成 '));
+            expect(footerText, contains(' · 用时 '));
+            expect(footerText, isNot(contains('\n')));
+            final footerBounds = tester.getRect(footer);
+            expect(footerBounds.center.dx, closeTo(size.width / 2, 0.01));
+            expect(footerBounds.left, greaterThanOrEqualTo(SpacingTokens.md));
+            expect(
+              footerBounds.right,
+              lessThanOrEqualTo(size.width - SpacingTokens.md),
+            );
+            expect(
+              footerBounds.bottom,
+              closeTo(size.height - SpacingTokens.sm, 0.01),
+            );
+            expectReadableText(tester, footer);
+            if (id == 'writing-1') {
+              final heading = tester.getRect(find.text('我的笔迹'));
+              final count = tester.getRect(
+                find.byKey(const ValueKey('writing-attempt-stroke-count')),
+              );
+              expect(count.left, greaterThan(heading.right));
+              expect(count.center.dy, closeTo(heading.center.dy, 0.01));
+              expect(count.right, lessThanOrEqualTo(size.width));
+            }
             final artwork = find.byKey(
               const ValueKey('writing-attempt-artwork'),
             );
@@ -643,6 +694,8 @@ void main() {
               greaterThanOrEqualTo(tester.getRect(find.byType(AppBar)).bottom),
             );
             expect(bounds.bottom, lessThanOrEqualTo(size.height));
+            expect(bounds.bottom, lessThanOrEqualTo(footerBounds.top));
+            expect(tester.getRect(footer), footerBounds);
             if (id == 'puzzle-1') {
               final toggle = find.byKey(
                 const ValueKey('writing-attempt-pieces-toggle'),

@@ -12,10 +12,14 @@ class WritingAttemptPreview extends StatelessWidget {
     super.key,
     required this.attempt,
     this.showPieceBorders = false,
-  });
+    this.maxSide,
+  }) : assert(maxSide == null || maxSide > 0);
 
   final WritingAttempt attempt;
   final bool showPieceBorders;
+
+  /// 上方滚动区域允许的最大边长，避免作品被固定底部信息遮挡。
+  final double? maxSide;
 
   @override
   Widget build(BuildContext context) {
@@ -29,12 +33,15 @@ class WritingAttemptPreview extends StatelessWidget {
             kToolbarHeight -
             SpacingTokens.md * 2;
         final side = math.min(
-          constraints.maxWidth,
-          math.max(
-            SpacingTokens.minTapTarget,
-            math.min(
-              media.size.shortestSide - SpacingTokens.md * 2,
-              availableHeight,
+          maxSide ?? double.infinity,
+          math.min(
+            constraints.maxWidth,
+            math.max(
+              SpacingTokens.minTapTarget,
+              math.min(
+                media.size.shortestSide - SpacingTokens.md * 2,
+                availableHeight,
+              ),
             ),
           ),
         );

@@ -42,12 +42,18 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
   }
 
   _WritingRecordsView _content(BuildContext context, WidgetRef ref) {
-    _WritingRecordsView view(Widget content, {WritingTarget? target}) => (
-      title: attemptId != null
-          ? '练习详情'
-          : target != null
-          ? '${target.text}·练习记录'
-          : '练习记录',
+    _WritingRecordsView view(
+      Widget content, {
+      WritingTarget? target,
+      String? title,
+    }) => (
+      title:
+          title ??
+          (attemptId != null
+              ? '练习详情'
+              : target != null
+              ? '${target.text}·练习记录'
+              : '练习记录'),
       content: content,
     );
     final course = ref.watch(textbookCourseProvider(bookId));
@@ -135,11 +141,8 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
           );
         }
         return view(
-          _WritingAttemptDetails(
-            key: ValueKey(attempt.id),
-            target: target,
-            attempt: attempt,
-          ),
+          _WritingAttemptDetails(key: ValueKey(attempt.id), attempt: attempt),
+          title: '${target.text}·${_kindLabel(attempt.kind)}',
         );
       }
       return view(_characterHistory(context, target, record), target: target);
@@ -297,12 +300,7 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
 }
 
 class _WritingAttemptDetails extends StatefulWidget {
-  const _WritingAttemptDetails({
-    super.key,
-    required this.target,
-    required this.attempt,
-  });
-  final WritingTarget target;
+  const _WritingAttemptDetails({super.key, required this.attempt});
   final WritingAttempt attempt;
 
   @override
@@ -317,58 +315,95 @@ class _WritingAttemptDetailsState extends State<_WritingAttemptDetails> {
     final theme = Theme.of(context);
     final attempt = widget.attempt;
     final puzzle = attempt.puzzle;
-    return ListView(
-      padding: const EdgeInsets.all(SpacingTokens.md),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Semantics(
-          header: true,
-          child: Text(
-            '${widget.target.text} · ${_kindLabel(attempt.kind)}',
-            style: theme.textTheme.titleLarge,
-          ),
-        ),
-        if (widget.target.pinyin.isNotEmpty) Text(widget.target.pinyin),
-        const SizedBox(height: SpacingTokens.md),
-        Text(
-          '开始 ${_time(attempt.startedAt)}\n'
-          '完成 ${_time(attempt.completedAt)}\n'
-          '用时 ${_duration(attempt.durationSeconds)}',
-        ),
-        const SizedBox(height: SpacingTokens.lg),
-        Text(
-          puzzle == null ? '我的笔迹' : '拼装结果',
-          style: theme.textTheme.titleMedium,
-        ),
-        const SizedBox(height: SpacingTokens.sm),
-        WritingAttemptPreview(
-          attempt: attempt,
-          showPieceBorders: _showPieceBorders,
-        ),
-        const SizedBox(height: SpacingTokens.md),
-        if (puzzle == null)
-          Text(
-            attempt.strokes.isEmpty
-                ? '本次没有留下笔迹。'
-                : '共 ${attempt.strokes.length} 笔',
-          )
-        else ...[
-          Text(
-            '${puzzle.pieces.length} 块碎片已拼好\n'
-            '完成时提示：${puzzle.hintEnabled ? '开启' : '关闭'}\n'
-            '放置调整 ${puzzle.wrongPlacements} 次',
-          ),
-          const SizedBox(height: SpacingTokens.sm),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const ValueKey('writing-attempt-pieces-toggle'),
-              onPressed: () =>
-                  setState(() => _showPieceBorders = !_showPieceBorders),
-              icon: Icon(_showPieceBorders ? Icons.grid_off : Icons.grid_on),
-              label: Text(_showPieceBorders ? '隐藏碎片' : '查看碎片'),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) => ListView(
+              padding: const EdgeInsets.all(SpacingTokens.md),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          puzzle == null ? '我的笔迹' : '拼装结果',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                      ),
+                    ),
+                    if (puzzle == null) ...[
+                      const SizedBox(width: SpacingTokens.sm),
+                      Text(
+                        '共 ${attempt.strokes.length} 笔',
+                        key: const ValueKey('writing-attempt-stroke-count'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                WritingAttemptPreview(
+                  attempt: attempt,
+                  showPieceBorders: _showPieceBorders,
+                  maxSide: (constraints.maxHeight - SpacingTokens.md * 2)
+                      .clamp(SpacingTokens.minTapTarget, double.infinity)
+                      .toDouble(),
+                ),
+                if (puzzle == null && attempt.strokes.isEmpty) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  const Text('本次没有留下笔迹。'),
+                ],
+                if (puzzle != null) ...[
+                  const SizedBox(height: SpacingTokens.md),
+                  Text(
+                    '${puzzle.pieces.length} 块碎片已拼好\n'
+                    '完成时提示：${puzzle.hintEnabled ? '开启' : '关闭'}\n'
+                    '放置调整 ${puzzle.wrongPlacements} 次',
+                  ),
+                  const SizedBox(height: SpacingTokens.sm),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('writing-attempt-pieces-toggle'),
+                      onPressed: () => setState(
+                        () => _showPieceBorders = !_showPieceBorders,
+                      ),
+                      icon: Icon(
+                        _showPieceBorders ? Icons.grid_off : Icons.grid_on,
+                      ),
+                      label: Text(_showPieceBorders ? '隐藏碎片' : '查看碎片'),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        ],
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SpacingTokens.md,
+            vertical: SpacingTokens.sm,
+          ),
+          child: Align(
+            child: AutoFitLine(
+              child: Text(
+                '完成 ${_time(attempt.completedAt)} · '
+                '用时 ${_duration(attempt.durationSeconds)}',
+                key: const ValueKey('writing-attempt-time'),
+                maxLines: 1,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
