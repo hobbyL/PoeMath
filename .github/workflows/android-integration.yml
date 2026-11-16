@@ -9,7 +9,8 @@ permissions:
 jobs:
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Bound each expensive phase separately and leave time to upload diagnostics.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -24,6 +25,20 @@ jobs:
       - run: flutter pub get
       - name: Check native PDFium security inputs
         run: python3 tools/check_pdfium_security.py
+      - name: Warm Android integration build before starting emulator
+        timeout-minutes: 12
+        # Warm native/plugin tasks; flutter test still generates its own Dart entry.
+        # Match its ABI/defines and finish NDK/CMake downloads before boot.
+        run: >-
+          flutter build apk --debug --no-pub
+          --target integration_test/app_journeys_test.dart
+          --target-platform android-x64
+          --dart-define=POEMATH_INTEGRATION_TEST=true
+          --dart-define=INTEGRATION_TEST_SHOULD_REPORT_RESULTS_TO_NATIVE=false
+      - name: Stop build daemon before starting emulator
+        timeout-minutes: 1
+        working-directory: android
+        run: ./gradlew --stop
       - name: Check disk space before Android emulator setup
         run: |
           set -euo pipefail
@@ -42,14 +57,25 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run journeys on minimum supported Android version
+        # SDK setup + 5-minute boot + 10-minute test + bounded diagnostic collection.
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 24
           arch: x86_64
           target: google_apis
+          emulator-boot-timeout: 300
           # The hosted runner had 6106 MB free; the default userdata needed 7373 MB.
           # Keep disposable test data bounded independently of emulator defaults.
           disk-size: 2048M
           pre-emulator-launch-script: df -h "$ANDROID_AVD_HOME"
           disable-animations: true
-          script: flutter test integration_test/app_journeys_test.dart -d emulator-5554 --dart-define=POEMATH_INTEGRATION_TEST=true --no-uninstall
+          script: bash tools/run_android_integration.sh
+      - name: Archive Android integration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-integration-diagnostics
+          path: build/test-results/android-integration/
+          if-no-files-found: ignore
+          retention-days: 7
