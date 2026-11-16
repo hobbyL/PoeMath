@@ -14,6 +14,8 @@ import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
 import 'package:poemath/features/textbook/writing/writing_attempt_preview.dart';
 import 'package:poemath/features/textbook/writing/writing_providers.dart';
 
+typedef _WritingRecordsView = ({String title, Widget content});
+
 /// 本课各字的练习事实，直接读取现有进度，不记录新的练习。
 class TextbookWritingRecordsPage extends ConsumerWidget {
   const TextbookWritingRecordsPage({
@@ -27,43 +29,51 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
   final String bookId, lessonId;
   final String? targetId, attemptId;
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(
-      title: Text(
-        attemptId != null
-            ? '练习详情'
-            : targetId != null
-            ? '单字记录'
-            : '练习记录',
-      ),
-    ),
-    body: SafeArea(child: _content(context, ref)),
-  );
+  static const double _cardWidth = 160;
+  static const int _maximumColumns = 4;
 
-  Widget _content(BuildContext context, WidgetRef ref) {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final view = _content(context, ref);
+    return Scaffold(
+      appBar: AppBar(title: Text(view.title)),
+      body: SafeArea(child: view.content),
+    );
+  }
+
+  _WritingRecordsView _content(BuildContext context, WidgetRef ref) {
+    _WritingRecordsView view(Widget content, {WritingTarget? target}) => (
+      title: attemptId != null
+          ? '练习详情'
+          : target != null
+          ? '${target.text}·练习记录'
+          : '练习记录',
+      content: content,
+    );
     final course = ref.watch(textbookCourseProvider(bookId));
     final strokes = ref.watch(writingStrokeDataProvider);
     final progress = ref.watch(textbookWritingProgressProvider(bookId));
     // 刷新时先隐藏旧值，避免短暂展示上一个档案或版本的记录。
     if (course.isLoading || strokes.isLoading || progress.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return view(const Center(child: CircularProgressIndicator()));
     }
     if (course.hasError || strokes.hasError || progress.hasError) {
-      return AppEmptyState(
-        icon: Icons.history_outlined,
-        title: '暂时无法读取练习记录',
-        description: '请重试。',
-        actions: [
-          TextButton(
-            onPressed: () {
-              ref.invalidate(textbookCourseProvider(bookId));
-              ref.invalidate(writingStrokeDataProvider);
-              ref.invalidate(textbookWritingProgressProvider(bookId));
-            },
-            child: const Text('重试'),
-          ),
-        ],
+      return view(
+        AppEmptyState(
+          icon: Icons.history_outlined,
+          title: '暂时无法读取练习记录',
+          description: '请重试。',
+          actions: [
+            TextButton(
+              onPressed: () {
+                ref.invalidate(textbookCourseProvider(bookId));
+                ref.invalidate(writingStrokeDataProvider);
+                ref.invalidate(textbookWritingProgressProvider(bookId));
+              },
+              child: const Text('重试'),
+            ),
+          ],
+        ),
       );
     }
     final pack = course.valueOrNull;
@@ -77,10 +87,12 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
         saved.profileId != ProfileScope.currentId ||
         saved.bookId != bookId ||
         saved.editionId != pack.edition.id) {
-      return const AppEmptyState(
-        icon: Icons.menu_book_outlined,
-        title: '本课暂不可用',
-        description: '请返回教材重新进入。',
+      return view(
+        const AppEmptyState(
+          icon: Icons.menu_book_outlined,
+          title: '本课暂不可用',
+          description: '请返回教材重新进入。',
+        ),
       );
     }
     final targets = writingTargets(
@@ -89,19 +101,23 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
       hasStrokeData: asset.hasStrokeDataSync,
     );
     if (targets.isEmpty) {
-      return const AppEmptyState(
-        icon: Icons.edit_outlined,
-        title: '本课暂无会写字。',
-        description: '请家长核对本课的书写内容。',
+      return view(
+        const AppEmptyState(
+          icon: Icons.edit_outlined,
+          title: '本课暂无会写字。',
+          description: '请家长核对本课的书写内容。',
+        ),
       );
     }
     if (targetId != null || attemptId != null) {
       final target = targets.where((t) => t.id == targetId).firstOrNull;
       if (target == null) {
-        return const AppEmptyState(
-          icon: Icons.edit_outlined,
-          title: '这个字的记录暂不可用',
-          description: '请返回本课练习记录重新选择。',
+        return view(
+          const AppEmptyState(
+            icon: Icons.edit_outlined,
+            title: '这个字的记录暂不可用',
+            description: '请返回本课练习记录重新选择。',
+          ),
         );
       }
       final record = _record(target, saved);
@@ -110,73 +126,94 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
             .where((a) => a.id == attemptId)
             .firstOrNull;
         if (attempt == null) {
-          return const AppEmptyState(
-            icon: Icons.history_outlined,
-            title: '该次练习详情暂不可用',
-            description: '请返回这个字的练习记录重新选择。',
+          return view(
+            const AppEmptyState(
+              icon: Icons.history_outlined,
+              title: '该次练习详情暂不可用',
+              description: '请返回这个字的练习记录重新选择。',
+            ),
           );
         }
-        return _WritingAttemptDetails(
-          key: ValueKey(attempt.id),
-          target: target,
-          attempt: attempt,
+        return view(
+          _WritingAttemptDetails(
+            key: ValueKey(attempt.id),
+            target: target,
+            attempt: attempt,
+          ),
         );
       }
-      return _characterHistory(context, target, saved, record);
+      return view(_characterHistory(context, target, record), target: target);
     }
     final theme = Theme.of(context);
-    return ListView(
-      padding: const EdgeInsets.all(SpacingTokens.md),
-      children: [
-        Semantics(
-          header: true,
-          child: Text(lesson.title, style: theme.textTheme.titleMedium),
-        ),
-        const SizedBox(height: SpacingTokens.md),
-        for (var index = 0; index < targets.length; index++) ...[
-          _recordTile(context, targets[index], saved),
-          if (index + 1 < targets.length)
-            const Divider(height: SpacingTokens.lg),
-        ],
-      ],
+    final countFontSize = theme.textTheme.bodyMedium!.fontSize!;
+    final textScale =
+        (MediaQuery.textScalerOf(context).scale(countFontSize) / countFontSize)
+            .clamp(1.0, double.infinity);
+    return view(
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final gap = SpacingTokens.sm;
+          final available = constraints.maxWidth - SpacingTokens.md * 2;
+          final columns = ((available + gap) / (_cardWidth * textScale + gap))
+              .floor()
+              .clamp(1, _maximumColumns);
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(SpacingTokens.md),
+            child: MasonryLayout(
+              key: const ValueKey('writing-records-grid'),
+              columnCount: columns,
+              gap: gap,
+              children: [
+                for (final target in targets)
+                  _recordCard(context, target, saved),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
-  Widget _recordTile(
+  Widget _recordCard(
     BuildContext context,
     WritingTarget target,
-    WritingProgress progress, {
-    bool openHistory = true,
-  }) {
+    WritingProgress progress,
+  ) {
+    final theme = Theme.of(context);
     final record = _record(target, progress);
     final counts = [
       ('描红', record?.traceCount ?? 0),
       ('自写', record?.freeCount ?? 0),
       ('拼装', record?.puzzleCount ?? 0),
     ];
-    return AppTile(
+    return ColoredCard(
       key: ValueKey('writing-record-${target.id}'),
-      iconColor: Theme.of(context).colorScheme.primary,
-      title: target.text,
-      titleSuffix: target.pinyin.isEmpty ? null : target.pinyin,
-      titleSuffixInline: true,
-      titleWrap: true,
-      subtitle: counts
-          .map((entry) {
-            final (label, count) = entry;
-            return '$label $count 次 · ${count > 0 ? '已完成' : '未完成'}';
-          })
-          .join('\n'),
-      trailing: openHistory ? null : const SizedBox.shrink(),
-      onTap: !openHistory
-          ? null
-          : () => _open(
-              context,
-              AppRoutes.textbookWritingRecordOf(bookId, lessonId, target.id),
+      color: theme.colorScheme.primary,
+      onTap: () => _open(
+        context,
+        AppRoutes.textbookWritingRecordOf(bookId, lessonId, target.id),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            target.text,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.displayMedium?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
-      flat: true,
-      flatLeadingEdgeAligned: true,
-      flatTrailingEdgeAligned: true,
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          for (final (label, count) in counts)
+            Text(
+              '$label $count 次',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -193,7 +230,6 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
   Widget _characterHistory(
     BuildContext context,
     WritingTarget target,
-    WritingProgress progress,
     WritingRecord? record,
   ) {
     final attempts = (record?.attempts ?? <WritingAttempt>[]).toList()
@@ -209,8 +245,6 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(SpacingTokens.md),
       children: [
-        _recordTile(context, target, progress, openHistory: false),
-        const Divider(height: SpacingTokens.lg),
         if (attempts.isEmpty)
           AppEmptyState(
             icon: Icons.history_outlined,
@@ -220,20 +254,6 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
                 : '完成一次描红、自写或拼装后，可在这里回看作品。',
           )
         else ...[
-          Semantics(
-            header: true,
-            child: Text('每次练习', style: theme.textTheme.titleMedium),
-          ),
-          if (total > attempts.length) ...[
-            const SizedBox(height: SpacingTokens.sm),
-            Text(
-              '另有 ${total - attempts.length} 次早期练习未保存详情。',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          const SizedBox(height: SpacingTokens.sm),
           for (var i = 0; i < attempts.length; i++) ...[
             AppTile(
               key: ValueKey('writing-attempt-${attempts[i].id}'),
@@ -259,6 +279,15 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
             ),
             if (i + 1 < attempts.length)
               const Divider(height: SpacingTokens.lg),
+          ],
+          if (total > attempts.length) ...[
+            const SizedBox(height: SpacingTokens.sm),
+            Text(
+              '另有 ${total - attempts.length} 次早期练习未保存详情。',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ],
       ],

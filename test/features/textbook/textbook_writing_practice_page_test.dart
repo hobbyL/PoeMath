@@ -9,7 +9,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poemath/core/services/textbook_file_service.dart';
 import 'package:poemath/core/routing/app_router.dart';
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/core/theme/app_theme.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -36,6 +35,7 @@ import '../../helpers/recording_learning_activity_repository.dart';
 import '../../helpers/textbook_course_fixture.dart';
 import '../../helpers/writing_fixture.dart';
 import '../../helpers/writing_attempt_fixture.dart';
+import '../../helpers/writing_records_test_helper.dart';
 import '../../helpers/theme_contrast.dart';
 import '../../helpers/writing_jigsaw_test_helper.dart';
 
@@ -243,14 +243,12 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('writing-records-entry')));
     await tester.pumpAndSettle();
     expect(find.byType(TextbookWritingRecordsPage), findsOneWidget);
-    expect(
-      tester
-          .widget<AppTile>(
-            find.byKey(const ValueKey('writing-record-writing-001')),
-          )
-          .subtitle,
-      '描红 0 次 · 未完成\n自写 1 次 · 已完成\n拼装 0 次 · 未完成',
-    );
+    expect(writingRecordTexts(tester, 'writing-001'), [
+      '星',
+      '描红 0 次',
+      '自写 1 次',
+      '拼装 0 次',
+    ]);
     await tester.tap(find.byKey(const ValueKey('writing-record-writing-001')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(ValueKey('writing-attempt-${attempt.id}')));
@@ -676,14 +674,12 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('writing-records-entry')));
       await tester.pumpAndSettle();
       expect(find.byType(TextbookWritingRecordsPage), findsOneWidget);
-      expect(
-        tester
-            .widget<AppTile>(
-              find.byKey(const ValueKey('writing-record-writing-001')),
-            )
-            .subtitle,
-        '描红 0 次 · 未完成\n自写 0 次 · 未完成\n拼装 1 次 · 已完成',
-      );
+      expect(writingRecordTexts(tester, 'writing-001'), [
+        '星',
+        '描红 0 次',
+        '自写 0 次',
+        '拼装 1 次',
+      ]);
       await tester.tap(
         find.byKey(const ValueKey('writing-record-writing-001')),
       );
