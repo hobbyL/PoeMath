@@ -424,7 +424,7 @@ void main() {
     expect(find.text('xīng'), findsNothing);
     expect(find.text('每次练习'), findsNothing);
     expect(find.byType(ColoredCard), findsNothing);
-    expect(find.text('另有 4 次早期练习未保存详情。'), findsOneWidget);
+    expect(find.text('另有 4 次早期练习未保存详情。'), findsNothing);
     final traceRow = find.byKey(ValueKey('writing-attempt-${trace.id}'));
     final puzzleRow = find.byKey(ValueKey('writing-attempt-${puzzle.id}'));
     expect(

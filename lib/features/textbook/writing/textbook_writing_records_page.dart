@@ -290,15 +290,6 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
             if (i + 1 < attempts.length)
               const Divider(height: SpacingTokens.lg),
           ],
-          if (total > attempts.length) ...[
-            const SizedBox(height: SpacingTokens.sm),
-            Text(
-              '另有 ${total - attempts.length} 次早期练习未保存详情。',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
         ],
       ],
     );
