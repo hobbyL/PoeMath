@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/domain/writing_geometry.dart';
 import 'package:poemath/domain/writing_stroke_data.dart';
+import 'package:poemath/features/poem/widgets/poem_stroke_numbers.dart';
 import 'package:poemath/features/textbook/writing/writing_canvas.dart';
 
 /// 手写确认结果：笔迹随回调上交，父组件可在句子格里缩放预览。
@@ -199,19 +200,43 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
     _changeInk(_strokes.sublist(0, _strokes.length - 1));
   }
 
+  Map<int, int> get _strokeNumbers {
+    final badStrokes = _result?.badStrokes;
+    if (badStrokes == null || badStrokes.isEmpty) return const {};
+    // 核对会忽略单点轻触，绘制下标必须映射回完整笔迹，避免标错下一笔。
+    final checkedIndices = [
+      for (var i = 0; i < _strokes.length; i++)
+        if (_strokes[i].length > 1) i,
+    ];
+    return {for (final index in badStrokes) checkedIndices[index]: index + 1};
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final data = widget.strokeData;
     final failed = _result != null && !_result!.allPassed;
+    final strokeNumbers = _strokeNumbers;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        WritingCanvas(
-          strokes: _strokes,
-          onStrokesChanged: _changeInk,
-          side: widget.side,
+        Stack(
+          children: [
+            WritingCanvas(
+              strokes: _strokes,
+              onStrokesChanged: _changeInk,
+              highlightStrokes: strokeNumbers.keys.toSet(),
+              side: widget.side,
+            ),
+            if (strokeNumbers.isNotEmpty)
+              Positioned.fill(
+                child: PoemStrokeNumbers(
+                  strokes: _strokes,
+                  numbers: strokeNumbers,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: SpacingTokens.sm),
         if (!failed)
@@ -241,7 +266,7 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
         if (failed) ...[
           Text(
             _faultMessage(_result!),
-            textAlign: TextAlign.center,
+            textAlign: TextAlign.start,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.error,
             ),
@@ -275,14 +300,18 @@ class _PoemHandwritingPadState extends State<PoemHandwritingPad> {
       return '这个字有 ${result.expectedStrokes} 笔，'
           '写了 ${result.actualStrokes} 笔，再试一次。';
     }
-    final index = (result.firstBadStroke ?? 0) + 1;
-    return switch (result.fault) {
-      StrokeFault.direction => '第 $index 笔的方向不太对，再试一次。',
-      StrokeFault.startPoint => '第 $index 笔的起笔位置不太对，再试一次。',
-      StrokeFault.endPoint => '第 $index 笔的收笔位置不太对，再试一次。',
-      StrokeFault.shape => '第 $index 笔的形状不太对，再试一次。',
-      StrokeFault.length => '第 $index 笔长了一点或短了一点，再试一次。',
-      _ => '再看一遍这个字，再试一次。',
-    };
+    return [
+      for (final entry in result.strokeFaults.entries)
+        '第 ${entry.key + 1} 笔：${_faultDescription(entry.value)}',
+    ].join('\n');
   }
+
+  String _faultDescription(StrokeFault fault) => switch (fault) {
+    StrokeFault.direction => '方向不太对，请检查行笔方向。',
+    StrokeFault.startPoint => '起笔位置不太对，请调整下笔的位置。',
+    StrokeFault.endPoint => '收笔位置不太对，请调整停笔的位置。',
+    StrokeFault.shape => '形状不太对，请检查笔画的弯折和走向。',
+    StrokeFault.length => '长度不太合适，请调整笔画的长短。',
+    StrokeFault.strokesCount => '请再数一数笔画。',
+  };
 }

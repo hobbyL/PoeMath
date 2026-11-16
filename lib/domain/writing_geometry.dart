@@ -56,6 +56,7 @@ class WritingCheckResult {
     required this.fault,
     required this.expectedStrokes,
     required this.actualStrokes,
+    this.strokeFaults = const {},
   });
 
   /// 全部笔画通过。
@@ -63,6 +64,13 @@ class WritingCheckResult {
 
   /// 首个失败笔画的 0 基序号；笔数不符或全对时为 null。
   final int? firstBadStroke;
+
+  /// 每个失败笔画的原因，键为 0 基序号，按书写顺序排列。
+  /// 笔数不符或全对时为空；每笔保留按检查优先级发现的首个问题。
+  final Map<int, StrokeFault> strokeFaults;
+
+  /// 与逐笔原因同源，供画布标出全部错笔。
+  List<int> get badStrokes => strokeFaults.keys.toList(growable: false);
 
   /// 失败类型；全对时为 null。
   final StrokeFault? fault;
@@ -74,7 +82,7 @@ class WritingCheckResult {
   String toString() => allPassed
       ? 'WritingCheckResult(passed, $actualStrokes strokes)'
       : 'WritingCheckResult(failed, firstBadStroke=$firstBadStroke, '
-          'fault=${fault?.name}, $actualStrokes/$expectedStrokes strokes)';
+            'fault=${fault?.name}, $actualStrokes/$expectedStrokes strokes)';
 }
 
 /// 单笔几何特征（坐标为包围盒归一化后的单位方框坐标）。
@@ -180,9 +188,7 @@ List<List<Point<double>>> normalizeStrokeSequence(
     }
   }
   if (!hasPoint) {
-    return [
-      for (final stroke in strokes) List<Point<double>>.of(stroke),
-    ];
+    return [for (final stroke in strokes) List<Point<double>>.of(stroke)];
   }
   final scale = max(maxX - minX, maxY - minY);
   final centerX = (minX + maxX) / 2;
@@ -191,9 +197,7 @@ List<List<Point<double>>> normalizeStrokeSequence(
     // 全部点重合（单点字/单点笔画）：统一落到方框中心。
     return [
       for (final stroke in strokes)
-        [
-          for (final _ in stroke) const Point<double>(0.5, 0.5),
-        ],
+        [for (final _ in stroke) const Point<double>(0.5, 0.5)],
     ];
   }
   return [
@@ -211,7 +215,7 @@ List<List<Point<double>>> normalizeStrokeSequence(
 /// 已知目标字的几何比对：孩子笔画序列 vs 参考 medians。
 ///
 /// 流程：笔数 → 序列包围盒归一化 → 逐笔（方向 → 起点 → 终点 → 形状 → 长度），
-/// 首个失败即短路返回，供 UI 指明"第几笔不对"。纯函数、同步、微秒级。
+/// 收集全部失败笔画及各自原因。笔数不符时不猜测笔画对应关系。
 WritingCheckResult checkWriting({
   required List<List<Point<double>>> userStrokes,
   required List<List<Point<double>>> referenceMedians,
@@ -229,33 +233,22 @@ WritingCheckResult checkWriting({
   }
   final reference = normalizeStrokeSequence(referenceMedians);
   final user = normalizeStrokeSequence(userStrokes);
+  final strokeFaults = <int, StrokeFault>{};
   for (var i = 0; i < reference.length; i++) {
-    if (reference[i].isEmpty || user[i].isEmpty) {
-      return WritingCheckResult(
-        allPassed: false,
-        firstBadStroke: i,
-        fault: StrokeFault.shape,
-        expectedStrokes: expected,
-        actualStrokes: actual,
-      );
-    }
-    final fault = _compareStroke(reference[i], user[i]);
+    final fault = reference[i].isEmpty || user[i].isEmpty
+        ? StrokeFault.shape
+        : _compareStroke(reference[i], user[i]);
     if (fault != null) {
-      return WritingCheckResult(
-        allPassed: false,
-        firstBadStroke: i,
-        fault: fault,
-        expectedStrokes: expected,
-        actualStrokes: actual,
-      );
+      strokeFaults[i] = fault;
     }
   }
   return WritingCheckResult(
-    allPassed: true,
-    firstBadStroke: null,
-    fault: null,
+    allPassed: strokeFaults.isEmpty,
+    firstBadStroke: strokeFaults.isEmpty ? null : strokeFaults.keys.first,
+    fault: strokeFaults.isEmpty ? null : strokeFaults.values.first,
     expectedStrokes: expected,
     actualStrokes: actual,
+    strokeFaults: Map.unmodifiable(strokeFaults),
   );
 }
 

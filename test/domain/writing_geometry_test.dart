@@ -27,8 +27,8 @@ Map<String, List<List<Point<double>>>> _fixtureMedians() {
 }
 
 List<List<Point<double>>> _copy(List<List<Point<double>>> strokes) => [
-      for (final stroke in strokes) List<Point<double>>.of(stroke),
-    ];
+  for (final stroke in strokes) List<Point<double>>.of(stroke),
+];
 
 /// 绕 stroke 起点旋转 [degrees]，用于构造"方向偏但其余维度接近"的笔迹。
 List<Point<double>> _rotateStroke(List<Point<double>> stroke, double degrees) {
@@ -50,11 +50,10 @@ List<Point<double>> _scaleTranslate(
   double scale,
   double dx,
   double dy,
-) =>
-    [
-      for (final point in stroke)
-        Point<double>(point.x * scale + dx, point.y * scale + dy),
-    ];
+) => [
+  for (final point in stroke)
+    Point<double>(point.x * scale + dx, point.y * scale + dy),
+];
 
 void main() {
   final medians = _fixtureMedians();
@@ -75,6 +74,8 @@ void main() {
         );
         expect(result.allPassed, isTrue, reason: '${entry.key}: $result');
         expect(result.firstBadStroke, isNull);
+        expect(result.badStrokes, isEmpty);
+        expect(result.strokeFaults, isEmpty);
         expect(result.fault, isNull);
         expect(result.expectedStrokes, entry.value.length);
         expect(result.actualStrokes, entry.value.length);
@@ -138,6 +139,7 @@ void main() {
         );
         expect(result.allPassed, isFalse, reason: entry.key);
         expect(result.firstBadStroke, 0, reason: '${entry.key}: $result');
+        expect(result.badStrokes, [0], reason: entry.key);
         expect(result.fault, StrokeFault.direction, reason: entry.key);
       }
     });
@@ -157,8 +159,71 @@ void main() {
         );
         expect(result.allPassed, isFalse, reason: entry.key);
         expect(result.firstBadStroke, last, reason: '${entry.key}: $result');
+        expect(result.badStrokes, [last], reason: entry.key);
         expect(result.fault, StrokeFault.direction, reason: entry.key);
       }
+    });
+
+    test('同时定位不相邻的两笔错误，保留首错原因', () {
+      final reference = medians['木']!;
+      final user = _copy(reference);
+      user[0] = user[0].reversed.toList();
+      user[2] = user[2].reversed.toList();
+
+      final result = checkWriting(
+        userStrokes: user,
+        referenceMedians: reference,
+      );
+
+      expect(result.allPassed, isFalse);
+      expect(result.badStrokes, [0, 2]);
+      expect(result.strokeFaults, {
+        0: StrokeFault.direction,
+        2: StrokeFault.direction,
+      });
+      expect(result.firstBadStroke, 0);
+      expect(result.fault, StrokeFault.direction);
+    });
+
+    test('不同错误原因按笔号保留，不把首错原因套用到后续笔画', () {
+      const reference = [
+        [Point<double>(0, 0), Point<double>(1, 0)],
+        [Point<double>(0, 0.5), Point<double>(1, 0.5)],
+        [Point<double>(0, 1), Point<double>(1, 1)],
+      ];
+      final result = checkWriting(
+        userStrokes: [
+          reference[0].reversed.toList(),
+          reference[1],
+          const [Point<double>(0.4, 1), Point<double>(1, 1)],
+        ],
+        referenceMedians: reference,
+      );
+
+      expect(result.allPassed, isFalse);
+      expect(result.badStrokes, [0, 2]);
+      expect(result.strokeFaults, {
+        0: StrokeFault.direction,
+        2: StrokeFault.startPoint,
+      });
+      expect(result.firstBadStroke, 0);
+      expect(result.fault, StrokeFault.direction);
+    });
+
+    test('空笔画记录形状错误，仍继续检查后续笔画', () {
+      final result = checkWriting(
+        userStrokes: const [[], []],
+        referenceMedians: const [
+          [Point<double>(0, 0), Point<double>(1, 0)],
+          [Point<double>(0, 1), Point<double>(1, 1)],
+        ],
+      );
+
+      expect(result.allPassed, isFalse);
+      expect(result.badStrokes, [0, 1]);
+      expect(result.strokeFaults, {0: StrokeFault.shape, 1: StrokeFault.shape});
+      expect(result.firstBadStroke, 0);
+      expect(result.fault, StrokeFault.shape);
     });
 
     test('相邻两笔互换顺序被拒绝', () {
@@ -186,6 +251,7 @@ void main() {
         expect(result.allPassed, isFalse);
         expect(result.fault, StrokeFault.strokesCount);
         expect(result.firstBadStroke, isNull);
+        expect(result.badStrokes, isEmpty, reason: '笔数不符时不能可靠定位错笔');
         expect(result.actualStrokes, entry.value.length - 1);
         expect(result.expectedStrokes, entry.value.length);
       }
@@ -202,6 +268,7 @@ void main() {
         expect(result.allPassed, isFalse);
         expect(result.fault, StrokeFault.strokesCount);
         expect(result.firstBadStroke, isNull);
+        expect(result.badStrokes, isEmpty, reason: '笔数不符时不能可靠定位错笔');
         expect(result.actualStrokes, entry.value.length + 1);
       }
     });
@@ -239,10 +306,7 @@ void main() {
     test('起点平移 0.35 判起点错误', () {
       final result = checkWriting(
         userStrokes: [
-          [
-            const Point<double>(0.35, 0),
-            const Point<double>(1, 0),
-          ],
+          [const Point<double>(0.35, 0), const Point<double>(1, 0)],
           reference[1],
         ],
         referenceMedians: reference,
@@ -255,10 +319,7 @@ void main() {
     test('终点偏移 0.4 判终点错误（方向仍在容差内）', () {
       final result = checkWriting(
         userStrokes: [
-          [
-            const Point<double>(0, 0),
-            const Point<double>(1, 0.4),
-          ],
+          [const Point<double>(0, 0), const Point<double>(1, 0.4)],
           reference[1],
         ],
         referenceMedians: reference,
@@ -307,10 +368,7 @@ void main() {
 
       final dot = checkWriting(
         userStrokes: [
-          [
-            const Point<double>(0.5, 0.5),
-            const Point<double>(0.52, 0.51),
-          ],
+          [const Point<double>(0.5, 0.5), const Point<double>(0.52, 0.51)],
           dotted[1],
         ],
         referenceMedians: dotted,
@@ -325,10 +383,7 @@ void main() {
       ];
       final result = checkWriting(
         userStrokes: [
-          [
-            const Point<double>(0.5, 0.5),
-            const Point<double>(0.45, 0.4),
-          ],
+          [const Point<double>(0.5, 0.5), const Point<double>(0.45, 0.4)],
           dotted[1],
         ],
         referenceMedians: dotted,
@@ -339,10 +394,10 @@ void main() {
 
   group('重采样与归一化工具', () {
     test('重采样保留首末点并等分弧长', () {
-      final points = resamplePolyline(
-        const [Point<double>(0, 0), Point<double>(10, 0)],
-        5,
-      );
+      final points = resamplePolyline(const [
+        Point<double>(0, 0),
+        Point<double>(10, 0),
+      ], 5);
       expect(points.first, const Point<double>(0, 0));
       expect(points.last, const Point<double>(10, 0));
       expect(points.map((p) => p.x).toList(), [0, 2.5, 5, 7.5, 10]);
@@ -355,10 +410,10 @@ void main() {
     });
 
     test('零长度折线不产生 NaN', () {
-      final points = resamplePolyline(
-        const [Point<double>(1, 1), Point<double>(1, 1)],
-        3,
-      );
+      final points = resamplePolyline(const [
+        Point<double>(1, 1),
+        Point<double>(1, 1),
+      ], 3);
       expect(points.every((p) => p.x == 1 && p.y == 1), isTrue);
     });
 
@@ -394,9 +449,10 @@ void main() {
     });
 
     test('StrokeGeometry 提取方向角与路径长', () {
-      final geometry = StrokeGeometry.fromPolyline(
-        const [Point<double>(0, 0), Point<double>(3, 4)],
-      );
+      final geometry = StrokeGeometry.fromPolyline(const [
+        Point<double>(0, 0),
+        Point<double>(3, 4),
+      ]);
       expect(geometry.start, const Point<double>(0, 0));
       expect(geometry.end, const Point<double>(3, 4));
       expect(geometry.directionAngle, closeTo(atan2(4, 3), 1e-9));

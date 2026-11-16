@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:poemath/core/theme/color_tokens.dart';
 import 'package:poemath/features/textbook/writing/writing_path.dart';
 
 typedef CanvasPoint = math.Point<double>;
@@ -16,6 +18,8 @@ class TianziGridPainter extends CustomPainter {
     this.traceOpacity = 0,
     this.userStrokes = const [],
     this.highlightStroke,
+    this.highlightStrokes = const {},
+    this.highlightColor = ColorTokens.poemCinnabar,
     this.strokeColor = Colors.black,
     this.strokeWidth = 3,
     this.showCharacter,
@@ -35,6 +39,10 @@ class TianziGridPainter extends CustomPainter {
 
   /// 高亮笔号（核对阶段标出首错笔画）。
   final int? highlightStroke;
+
+  /// 需要高亮的全部笔画序号，对应 [userStrokes] 的下标。
+  final Set<int> highlightStrokes;
+  final Color highlightColor;
   final Color strokeColor;
   final double strokeWidth;
 
@@ -81,11 +89,7 @@ class TianziGridPainter extends CustomPainter {
     );
     // 米字斜线。
     canvas.drawLine(Offset.zero, Offset(size.width, size.height), dashed);
-    canvas.drawLine(
-      Offset(size.width, 0),
-      Offset(0, size.height),
-      dashed,
-    );
+    canvas.drawLine(Offset(size.width, 0), Offset(0, size.height), dashed);
   }
 
   void _paintReference(
@@ -134,11 +138,12 @@ class TianziGridPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
     final highlight = Paint()
-      ..color = const Color(0xFFB35C5C)
+      ..color = highlightColor
       ..strokeWidth = (strokeWidth + 1) * strokeScale
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
+    final highlightedPaths = <Path>[];
     for (var i = 0; i < userStrokes.length; i++) {
       final stroke = userStrokes[i];
       if (stroke.isEmpty) continue;
@@ -147,7 +152,15 @@ class TianziGridPainter extends CustomPainter {
       for (final point in stroke.skip(1)) {
         path.lineTo(point.dx * strokeScale, point.dy * strokeScale);
       }
-      canvas.drawPath(path, i == highlightStroke ? highlight : paint);
+      if (i == highlightStroke || highlightStrokes.contains(i)) {
+        highlightedPaths.add(path);
+      } else {
+        canvas.drawPath(path, paint);
+      }
+    }
+    // 错笔最后绘制，交叉或重叠处仍能看清标记。
+    for (final path in highlightedPaths) {
+      canvas.drawPath(path, highlight);
     }
   }
 
@@ -158,6 +171,8 @@ class TianziGridPainter extends CustomPainter {
       old.traceOpacity != traceOpacity ||
       old.userStrokes != userStrokes ||
       old.highlightStroke != highlightStroke ||
+      !setEquals(old.highlightStrokes, highlightStrokes) ||
+      old.highlightColor != highlightColor ||
       old.strokeColor != strokeColor ||
       old.strokeWidth != strokeWidth ||
       old.showCharacter != showCharacter ||
@@ -175,6 +190,7 @@ class WritingCanvas extends StatefulWidget {
     this.referenceStrokes,
     this.traceOpacity = 0,
     this.highlightStroke,
+    this.highlightStrokes = const {},
     this.showCharacter,
     this.strokesSide,
     this.side = 240,
@@ -186,6 +202,7 @@ class WritingCanvas extends StatefulWidget {
   final List<String>? referenceStrokes;
   final double traceOpacity;
   final int? highlightStroke;
+  final Set<int> highlightStrokes;
   final String? showCharacter;
 
   /// [strokes] 记录时使用的画布边长。
@@ -218,9 +235,9 @@ class _WritingCanvasState extends State<WritingCanvas> {
 
   /// 绘制用笔画：已完成的 + 进行中的一笔。
   List<List<Offset>> get _painting => [
-        ...widget.strokes,
-        if (_active != null && _active!.isNotEmpty) _active!,
-      ];
+    ...widget.strokes,
+    if (_active != null && _active!.isNotEmpty) _active!,
+  ];
 
   void _start(Offset local) {
     setState(() => _active = [local]);
@@ -258,6 +275,8 @@ class _WritingCanvasState extends State<WritingCanvas> {
             traceOpacity: widget.traceOpacity,
             userStrokes: strokes,
             highlightStroke: widget.highlightStroke,
+            highlightStrokes: widget.highlightStrokes,
+            highlightColor: theme.colorScheme.error,
             strokeColor: theme.colorScheme.onSurface,
             showCharacter: widget.showCharacter,
             strokeScale: widget.strokesSide == null
@@ -278,9 +297,9 @@ class _WritingCanvasState extends State<WritingCanvas> {
       gestures: {
         EagerGestureRecognizer:
             GestureRecognizerFactoryWithHandlers<EagerGestureRecognizer>(
-          () => recognizer,
-          (_) {},
-        ),
+              () => recognizer,
+              (_) {},
+            ),
       },
       child: Listener(
         behavior: HitTestBehavior.opaque,
@@ -381,13 +400,12 @@ class StrokeRevealPainter extends CustomPainter {
         radius *= progress.clamp(0.0, 1.0);
         canvas.save();
         canvas.clipPath(
-          Path()
-            ..addOval(
-              Rect.fromCircle(
-                center: Offset(start.x, start.y),
-                radius: math.max(radius, 1),
-              ),
+          Path()..addOval(
+            Rect.fromCircle(
+              center: Offset(start.x, start.y),
+              radius: math.max(radius, 1),
             ),
+          ),
         );
         canvas.drawPath(parseSvgPath(strokes[count]), fill);
         canvas.restore();
