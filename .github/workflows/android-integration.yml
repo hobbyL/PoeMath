@@ -25,10 +25,10 @@ jobs:
       - run: flutter pub get
       - name: Check native PDFium security inputs
         run: python3 tools/check_pdfium_security.py
-      - name: Warm Android integration build before starting emulator
+      - name: Build Android integration APK before starting emulator
         timeout-minutes: 12
-        # Warm native/plugin tasks; flutter test still generates its own Dart entry.
-        # Match its ABI/defines and finish NDK/CMake downloads before boot.
+        # Install this exact APK using ADB push mode, then attach flutter drive.
+        # A later flutter test would rebuild and use streamed installation again.
         run: >-
           flutter build apk --debug --no-pub
           --target integration_test/app_journeys_test.dart
@@ -57,7 +57,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run journeys on minimum supported Android version
-        # SDK setup + 5-minute boot + 10-minute test + bounded diagnostic collection.
+        # SDK setup + boot + bounded install/launch/test/diagnostic phases.
         timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
