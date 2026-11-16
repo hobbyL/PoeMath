@@ -125,6 +125,9 @@ AGENTS.md
 .codex/
 docs/
 
+# Guard against local audit documents being recreated outside docs/ (never commit)
+/AUDIT_*
+
 # FVM Version Cache
 .fvm/
 .ace-tool/
