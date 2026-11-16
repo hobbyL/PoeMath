@@ -308,7 +308,7 @@ class _WritingAttemptDetails extends StatefulWidget {
 }
 
 class _WritingAttemptDetailsState extends State<_WritingAttemptDetails> {
-  bool _showPieceBorders = false;
+  bool _showPieceBorders = true;
 
   @override
   Widget build(BuildContext context) {
@@ -334,16 +334,31 @@ class _WritingAttemptDetailsState extends State<_WritingAttemptDetails> {
                         ),
                       ),
                     ),
-                    if (puzzle == null) ...[
-                      const SizedBox(width: SpacingTokens.sm),
+                    const SizedBox(width: SpacingTokens.sm),
+                    if (puzzle == null)
                       Text(
                         '共 ${attempt.strokes.length} 笔',
                         key: const ValueKey('writing-attempt-stroke-count'),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
+                      )
+                    else
+                      Flexible(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: AutoFitLine(
+                            child: Text(
+                              '完成时提示：${puzzle.hintEnabled ? '开启' : '关闭'}',
+                              key: const ValueKey('writing-attempt-hint'),
+                              maxLines: 1,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: SpacingTokens.sm),
@@ -360,14 +375,7 @@ class _WritingAttemptDetailsState extends State<_WritingAttemptDetails> {
                 ],
                 if (puzzle != null) ...[
                   const SizedBox(height: SpacingTokens.md),
-                  Text(
-                    '${puzzle.pieces.length} 块碎片已拼好\n'
-                    '完成时提示：${puzzle.hintEnabled ? '开启' : '关闭'}\n'
-                    '放置调整 ${puzzle.wrongPlacements} 次',
-                  ),
-                  const SizedBox(height: SpacingTokens.sm),
                   Align(
-                    alignment: Alignment.centerLeft,
                     child: OutlinedButton.icon(
                       key: const ValueKey('writing-attempt-pieces-toggle'),
                       onPressed: () => setState(

@@ -483,8 +483,32 @@ void main() {
       find.byKey(const ValueKey('writing-attempt-stroke-count')),
       findsNothing,
     );
+    expect(find.text('完成时提示：关闭'), findsOneWidget);
+    final puzzleHeading = tester.getRect(find.text('拼装结果'));
+    final hint = tester.getRect(
+      find.byKey(const ValueKey('writing-attempt-hint')),
+    );
+    expect(hint.left, greaterThan(puzzleHeading.right));
+    expect(hint.center.dy, closeTo(puzzleHeading.center.dy, 0.01));
+    expect(find.textContaining('块碎片已拼好'), findsNothing);
+    expect(find.textContaining('放置调整'), findsNothing);
+    final initialPuzzlePainter =
+        tester.widget<CustomPaint>(art).painter! as WritingPuzzleResultPainter;
+    expect(initialPuzzlePainter.showPieceBorders, isTrue);
+    expect(initialPuzzlePainter.attempt.puzzle!.pieces, puzzle.puzzle!.pieces);
     final toggle = find.byKey(const ValueKey('writing-attempt-pieces-toggle'));
     await tester.scrollUntilVisible(toggle, 160);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, '隐藏碎片'), findsOneWidget);
+    expect(tester.getRect(toggle).center.dx, closeTo(420 / 2, 0.01));
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, '查看碎片'), findsOneWidget);
+    expect(
+      (tester.widget<CustomPaint>(art).painter! as WritingPuzzleResultPainter)
+          .showPieceBorders,
+      isFalse,
+    );
     await tester.tap(toggle);
     await tester.pumpAndSettle();
     final puzzlePainter =
@@ -680,6 +704,20 @@ void main() {
               expect(count.left, greaterThan(heading.right));
               expect(count.center.dy, closeTo(heading.center.dy, 0.01));
               expect(count.right, lessThanOrEqualTo(size.width));
+            } else {
+              final heading = tester.getRect(find.text('拼装结果'));
+              final hint = find.byKey(const ValueKey('writing-attempt-hint'));
+              final hintBounds = tester.getRect(hint);
+              expect(tester.widget<Text>(hint).data, '完成时提示：关闭');
+              expect(hintBounds.left, greaterThan(heading.right));
+              expect(hintBounds.center.dy, closeTo(heading.center.dy, 0.01));
+              expect(
+                hintBounds.right,
+                lessThanOrEqualTo(size.width - SpacingTokens.md),
+              );
+              expectReadableText(tester, hint);
+              expect(find.textContaining('块碎片已拼好'), findsNothing);
+              expect(find.textContaining('放置调整'), findsNothing);
             }
             final artwork = find.byKey(
               const ValueKey('writing-attempt-artwork'),
@@ -697,10 +735,43 @@ void main() {
             expect(bounds.bottom, lessThanOrEqualTo(footerBounds.top));
             expect(tester.getRect(footer), footerBounds);
             if (id == 'puzzle-1') {
+              expect(
+                (tester.widget<CustomPaint>(artwork).painter!
+                        as WritingPuzzleResultPainter)
+                    .showPieceBorders,
+                isTrue,
+              );
               final toggle = find.byKey(
                 const ValueKey('writing-attempt-pieces-toggle'),
               );
               await tester.scrollUntilVisible(toggle, 160);
+              await tester.pumpAndSettle();
+              expectReadableText(tester, find.text('隐藏碎片'));
+              final toggleBounds = tester.getRect(toggle);
+              expect(
+                toggleBounds.top,
+                greaterThanOrEqualTo(
+                  tester.getRect(find.byType(AppBar)).bottom,
+                ),
+              );
+              expect(toggleBounds.bottom, lessThanOrEqualTo(footerBounds.top));
+              expect(
+                tester.getRect(toggle).center.dx,
+                closeTo(size.width / 2, 0.01),
+              );
+              await tester.tap(toggle);
+              await tester.pumpAndSettle();
+              expectReadableText(tester, find.text('查看碎片'));
+              expect(
+                (tester.widget<CustomPaint>(artwork).painter!
+                        as WritingPuzzleResultPainter)
+                    .showPieceBorders,
+                isFalse,
+              );
+              expect(
+                tester.getRect(toggle).center.dx,
+                closeTo(size.width / 2, 0.01),
+              );
               await tester.tap(toggle);
               await tester.pumpAndSettle();
               expectReadableText(tester, find.text('隐藏碎片'));
@@ -708,6 +779,7 @@ void main() {
                   tester.widget<CustomPaint>(artwork).painter!
                       as WritingPuzzleResultPainter;
               expect(painter.showPieceBorders, isTrue);
+              expect(tester.getRect(footer), footerBounds);
             }
             expect(tester.takeException(), isNull);
             await tester.pageBack();
