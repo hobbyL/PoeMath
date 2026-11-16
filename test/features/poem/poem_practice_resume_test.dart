@@ -399,6 +399,13 @@ void main() {
     await _io(tester);
     expect(draft('poemQuiz', 'fillBlank')['sessionId'], old['sessionId']);
     await reopen(tester, choice: '开始新练习');
+    await _io(
+      tester,
+      until: () {
+        final current = repo().get('poemQuiz', scope: scope('fillBlank'));
+        return current != null && current['sessionId'] != old['sessionId'];
+      },
+    );
     expect(
       draft('poemQuiz', 'fillBlank')['sessionId'],
       isNot(old['sessionId']),
