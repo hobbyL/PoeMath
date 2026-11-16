@@ -551,7 +551,7 @@ void main() {
   for (final subject in AppSubject.values) {
     for (final brightness in Brightness.values) {
       for (final size in [const Size(320, 568), const Size(760, 360)]) {
-        testWidgets('$subject/$brightness $size 双倍字号可以滚动读取各字完整记录', (
+        testWidgets('$subject/$brightness $size 双倍字号的完整次数保持同一行', (
           tester,
         ) async {
           await store(tester, {
@@ -585,24 +585,40 @@ void main() {
             scale: 2,
             theme: AppTheme.resolve(subject: subject, brightness: brightness),
           );
-          expectReadableText(tester, find.textContaining('描红 123456 次'));
-          final second = find.byKey(
-            const ValueKey('writing-record-writing-002'),
-          );
-          await tester.ensureVisible(second);
-          await tester.pumpAndSettle();
-          expect(countsText(tester, 'writing-002'), untouched);
-          for (final label in untouched.split('\n')) {
-            final text = find.descendant(
-              of: second,
-              matching: find.text(label),
-            );
-            final bounds = tester.getRect(text);
-            expect(bounds.left, greaterThanOrEqualTo(0));
-            expect(bounds.right, lessThanOrEqualTo(size.width));
-            expect(bounds.bottom, lessThanOrEqualTo(size.height));
-            expectReadableText(tester, text);
+          for (final targetId in ['writing-001', 'writing-002']) {
+            final card = find.byKey(ValueKey('writing-record-$targetId'));
+            await tester.ensureVisible(card);
+            await tester.pumpAndSettle();
+            final cardBounds = tester.getRect(card);
+            Rect? previous;
+            for (final label in writingRecordTexts(tester, targetId).skip(1)) {
+              final text = find.descendant(
+                of: card,
+                matching: find.text(label),
+              );
+              final bounds = tester.getRect(text);
+              expect(bounds.left, greaterThanOrEqualTo(cardBounds.left));
+              expect(bounds.right, lessThanOrEqualTo(cardBounds.right));
+              expect(bounds.right, lessThanOrEqualTo(size.width));
+              expect(bounds.bottom, lessThanOrEqualTo(size.height));
+              if (previous != null) {
+                expect(bounds.center.dy, closeTo(previous.center.dy, 0.01));
+                expect(bounds.left, greaterThan(previous.right));
+              }
+              expect(
+                tester.widget<Text>(text).style!.fontSize!,
+                lessThan(
+                  Theme.of(tester.element(text))
+                      .textTheme
+                      .bodyMedium!
+                      .fontSize!,
+                ),
+              );
+              expectReadableText(tester, text);
+              previous = bounds;
+            }
           }
+          expect(countsText(tester, 'writing-002'), untouched);
           final first = find.byKey(
             const ValueKey('writing-record-writing-001'),
           );

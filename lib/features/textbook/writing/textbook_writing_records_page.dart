@@ -145,7 +145,7 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
       return view(_characterHistory(context, target, record), target: target);
     }
     final theme = Theme.of(context);
-    final countFontSize = theme.textTheme.bodyMedium!.fontSize!;
+    final countFontSize = theme.textTheme.bodySmall!.fontSize!;
     final textScale =
         (MediaQuery.textScalerOf(context).scale(countFontSize) / countFontSize)
             .clamp(1.0, double.infinity);
@@ -204,14 +204,24 @@ class TextbookWritingRecordsPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: SpacingTokens.sm),
-          for (final (label, count) in counts)
-            Text(
-              '$label $count 次',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface,
-              ),
+          AutoFitLine(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var index = 0; index < counts.length; index++) ...[
+                  if (index > 0) const SizedBox(width: SpacingTokens.xs),
+                  Text(
+                    '${counts[index].$1} ${counts[index].$2} 次',
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ],
             ),
+          ),
         ],
       ),
     );
