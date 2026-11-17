@@ -260,20 +260,37 @@ final class LlmClient {
       _checkActive();
       if (_unavailableProviders.contains(provider)) continue;
       var visible = false;
-      final whitespace = StringBuffer();
+      final pending = StringBuffer();
       try {
         await for (final chunk in request(provider.withModel(model))) {
           _checkActive();
           if (!visible) {
-            whitespace.write(chunk);
-            if (whitespace.toString().trim().isEmpty) continue;
+            pending.write(chunk);
+            final text = pending.toString();
+            final normalized = _normalizeLimitNotice(text);
+            // 限额通知可能逐字返回；确认不是完整通知前不展示或保存其前缀。
+            if (_dailyChatLimitNotices.any(
+              (notice) => notice.startsWith(normalized),
+            )) {
+              continue;
+            }
             visible = true;
-            yield whitespace.toString();
+            pending.clear();
+            yield text;
           } else {
             yield chunk;
           }
         }
-        if (!visible) throw const LlmResponseFormatError('模型输出内容为空');
+        if (!visible) {
+          final text = pending.toString();
+          _checkContentLimit(text);
+          if (text.trim().isEmpty) {
+            throw const LlmResponseFormatError('模型输出内容为空');
+          }
+          // 与通知相同开头的普通短回答，正常结束后仍须原样展示。
+          visible = true;
+          yield text;
+        }
         await _reportSuccess(config, provider, model);
         return;
       } on LlmException catch (error) {
@@ -984,16 +1001,24 @@ final class LlmClient {
 
   static void _checkCompletionLimit(ChatCompletion completion) {
     if (completion.toolCalls.isNotEmpty) return;
-    final text = (completion.content ?? '').trim().replaceAll(
-      RegExp(r'\s+'),
-      ' ',
-    );
+    _checkContentLimit(completion.content ?? '');
+  }
+
+  static const _dailyChatLimitNotices = [
+    "you've used your daily chat limit.",
+    "you've used your daily chat limit. please try again later.",
+  ];
+
+  static String _normalizeLimitNotice(String text) => text
+      .trim()
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAll('’', "'")
+      .toLowerCase();
+
+  static void _checkContentLimit(String text) {
     // 实测兼容服务会用 HTTP 200 + stop 返回这段限额通知。
     // 只匹配整段通知，题目或聊天中引用该句不应被误判。
-    if (RegExp(
-      r"^you['’]ve used your daily chat limit\.(?: please try again later\.)?$",
-      caseSensitive: false,
-    ).hasMatch(text)) {
+    if (_dailyChatLimitNotices.contains(_normalizeLimitNotice(text))) {
       throw const LlmRateLimitError();
     }
   }

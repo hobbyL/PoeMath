@@ -19,6 +19,11 @@ abstract interface class StreamingSpeechRecognitionService {
   bool get usedFallback;
 }
 
+/// Optional signal for finalized phrase boundaries from streaming recognition.
+abstract interface class FinalizedTranscriptSpeechRecognitionService {
+  Stream<String> get finalizedTranscriptStream;
+}
+
 abstract interface class RetainedAudioSpeechRecognitionService {
   Uint8List? takeLastAudio();
 }
@@ -29,6 +34,7 @@ final class PreferredSpeechRecognitionService
     implements
         SpeechRecognitionService,
         StreamingSpeechRecognitionService,
+        FinalizedTranscriptSpeechRecognitionService,
         RetainedAudioSpeechRecognitionService {
   PreferredSpeechRecognitionService({
     required this._recorder,
@@ -43,6 +49,7 @@ final class PreferredSpeechRecognitionService
   final SettingsRepository _settingsRepository;
 
   final _transcriptController = StreamController<String>.broadcast();
+  final _finalizedTranscriptController = StreamController<String>.broadcast();
   _RecordingSession? _session;
   int _generation = 0;
   bool _isRecording = false;
@@ -55,6 +62,10 @@ final class PreferredSpeechRecognitionService
 
   @override
   Stream<String> get transcriptStream => _transcriptController.stream;
+
+  @override
+  Stream<String> get finalizedTranscriptStream =>
+      _finalizedTranscriptController.stream;
 
   @override
   String get recognitionMode => _mode;
@@ -137,8 +148,9 @@ final class PreferredSpeechRecognitionService
       }
       await _withRecorder(() async {
         _check(session);
-        final permission =
-            await session.cancelToken.wait(_recorder.hasPermission());
+        final permission = await session.cancelToken.wait(
+          _recorder.hasPermission(),
+        );
         _check(session);
         if (!permission) {
           throw const SpeechPermissionDeniedException();
@@ -150,6 +162,7 @@ final class PreferredSpeechRecognitionService
             onText: (text, {required stable}) {
               if (!_current(session) || text.isEmpty) return;
               _transcriptController.add(text);
+              if (stable) _finalizedTranscriptController.add(text);
             },
           );
           _check(session);
@@ -340,6 +353,7 @@ final class PreferredSpeechRecognitionService
     await cancel();
     await _recorder.dispose();
     await _transcriptController.close();
+    await _finalizedTranscriptController.close();
   }
 }
 

@@ -195,8 +195,9 @@ void main() {
               brightness: Brightness.light,
             ),
             builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(textScaler: TextScaler.linear(scale)),
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
               child: child!,
             ),
           ),
@@ -392,6 +393,7 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
+    String? openedQuizType;
     final router = GoRouter(
       routes: [
         GoRoute(
@@ -402,15 +404,18 @@ void main() {
         ),
         GoRoute(
           path: AppRoutes.poemQuizOf('poem'),
-          builder: (context, _) => Scaffold(
-            body: TextButton(
-              onPressed: () {
-                container.read(lastPracticeScoreProvider.notifier).state = 1;
-                context.pop(PoemPracticeResult.quizPassed);
-              },
-              child: const Text('提交通过'),
-            ),
-          ),
+          builder: (context, state) {
+            openedQuizType = state.uri.queryParameters['type'];
+            return Scaffold(
+              body: TextButton(
+                onPressed: () {
+                  container.read(lastPracticeScoreProvider.notifier).state = 1;
+                  context.pop(PoemPracticeResult.quizPassed);
+                },
+                child: const Text('提交通过'),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -427,6 +432,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     });
     await tester.pumpAndSettle();
+    expect(openedQuizType, 'choice');
     await tester.runAsync(() async {
       final settled = HiveBoxes.userStats.watch().first;
       await tester.tap(find.text('提交通过'));

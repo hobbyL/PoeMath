@@ -160,6 +160,25 @@ void main() {
     expect(sentenceRequests, 0);
   });
 
+  test('只把腾讯云稳态识别结果发布为结束信号', () async {
+    final finalized = <String>[];
+    final subscription = service.finalizedTranscriptStream.listen(
+      finalized.add,
+    );
+    await service.start();
+
+    socket.receiveText('孩子正在');
+    await Future<void>.delayed(Duration.zero);
+    expect(finalized, isEmpty);
+
+    socket.receiveText('孩子正在放风筝', stable: true);
+    await Future<void>.delayed(Duration.zero);
+    expect(finalized, ['孩子正在放风筝']);
+
+    await subscription.cancel();
+    await service.cancel();
+  });
+
   test('实时连接明确返回 4004 时才复用 PCM 回退一句话', () async {
     socket.errorCode = 4004;
     await service.start();

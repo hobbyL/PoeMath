@@ -6,8 +6,12 @@ import 'package:poemath/core/services/speech/tencent_speech_recognition_service.
 
 /// Lets page tests deliver revisions while the final result is still pending.
 class StreamingSpeechFake
-    implements SpeechRecognitionService, StreamingSpeechRecognitionService {
+    implements
+        SpeechRecognitionService,
+        StreamingSpeechRecognitionService,
+        FinalizedTranscriptSpeechRecognitionService {
   final transcripts = StreamController<String>.broadcast();
+  final finalizedTranscripts = StreamController<String>.broadcast();
   Completer<SpeechRecognitionResult>? pendingResult;
   String finalText = '床前明月光';
   String? startText;
@@ -27,6 +31,9 @@ class StreamingSpeechFake
 
   @override
   Stream<String> get transcriptStream => transcripts.stream;
+
+  @override
+  Stream<String> get finalizedTranscriptStream => finalizedTranscripts.stream;
 
   @override
   Future<void> initialize() async {}
@@ -61,5 +68,6 @@ class StreamingSpeechFake
     disposals++;
     await cancel();
     await transcripts.close();
+    await finalizedTranscripts.close();
   }
 }

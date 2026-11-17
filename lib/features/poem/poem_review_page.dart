@@ -296,16 +296,16 @@ class PoemReviewPage extends ConsumerWidget {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.edit_note),
-                  title: const Text('填空测试'),
-                  subtitle: const Text('补全诗句中缺失的文字'),
+                  leading: const Icon(Icons.hearing_outlined),
+                  title: const Text('诗词听写'),
+                  subtitle: const Text('逐句听写，支持点选或手写'),
                   onTap: () {
                     Navigator.pop(ctx);
                     _navigateAndComplete(
                       context,
                       ref,
                       schedule,
-                      '${AppRoutes.poemQuizOf(schedule.poemId)}?type=fill',
+                      AppRoutes.poemDictationOf(schedule.poemId),
                     );
                   },
                 ),

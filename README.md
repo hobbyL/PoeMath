@@ -402,12 +402,11 @@ cat keystore.b64 | pbcopy
 |------|------|------|
 | 诗词列表 | 按年级/作者/朝代筛选、搜索 | `poem_tab_page` |
 | 诗词详情 | 全文、拼音、译文、注释、赏析、名句、作者简介（折叠卡片）| `poem_detail_page` |
-| 背诵模式选择 | 渐进背诵/填空测试/选择题 统一入口 | `poem_recite_mode_page` |
+| 背诵模式选择 | 渐进背诵/选择题/诗词听写 统一入口 | `poem_recite_mode_page` |
 | 渐进式背诵 | 4 档 Slider（全文→首字→半隐→全隐）| `poem_recite_page` |
-| 填空测试 | 自动挖空诗句后半，输入答案 | `poem_quiz_page` |
 | 选择题 | 上句选下句 / 诗句选作者 / 诗题选朝代 | `poem_quiz_page` |
+| 诗词听写 | 逐句听写，支持点选或手写补全整句 | `poem_dictation_page` |
 | 复习计划 | 艾宾浩斯 5 轮复习，一键复习今日全部 | `poem_review_page` |
-| 分享 | 格式化诗词文本分享（share_plus）| `poem_detail_page` |
 | TTS 朗读 | 全文语音朗读，逐句高亮，可调语速；云端音色逐行合成+回退；译文/注释/赏析/背景区域点击朗读 | `poem_detail_page` |
 | AI 讲解 | 家长自配大模型后，一键生成这首诗的儿童口语化讲解（分段展示、可朗读、可重新生成）；未配置时引导去设置 | `poem_detail_page` |
 

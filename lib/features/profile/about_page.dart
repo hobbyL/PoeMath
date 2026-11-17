@@ -4,7 +4,6 @@
 // 职责：关于页面 — 展示应用版本、开发者信息、诊断日志导出、隐私政策和开源许可。
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -12,12 +11,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/constants/app_constants.dart';
 import 'package:poemath/core/routing/app_routes.dart';
-import 'package:poemath/core/services/cache_activity.dart';
 import 'package:poemath/core/services/diagnostics/diagnostic_buffer.dart';
 import 'package:poemath/core/theme/design_tokens.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
@@ -275,9 +271,9 @@ class _AboutPageState extends State<AboutPage> {
     );
   }
 
-  /// 导出诊断缓冲为纯文本文件（保存到设备 / 分享）。
+  /// 导出诊断缓冲为纯文本文件并保存到设备。
   ///
-  /// 复用 `backup_restore_page.dart` 的 bottom sheet + 双 `AppTile` 模式。
+  /// 使用文件选择器将已脱敏的诊断文本保存到设备。
   /// 文本已由 `DiagnosticBuffer` 在写入时 scrub；此处不再过滤，因为
   /// 过滤口径只应有一处（`logging-guidelines.md` 的 Never Log 清单照旧）。
   Future<void> _exportDiagnostics(BuildContext context) async {
@@ -285,44 +281,6 @@ class _AboutPageState extends State<AboutPage> {
     setState(() => _exportingDiagnostics = true);
     final scaffold = ScaffoldMessenger.of(context);
     try {
-      final action = await showModalBottomSheet<String>(
-        context: context,
-        builder: (sheet) => SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(SpacingTokens.md),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '导出诊断日志',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(sheet).textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-                AppTile(
-                  icon: Icons.save_alt_rounded,
-                  iconColor: Theme.of(sheet).colorScheme.primary,
-                  title: '保存到设备',
-                  subtitle: '选择本地目录保存诊断文本',
-                  onTap: () => Navigator.pop(sheet, 'save'),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                AppTile(
-                  icon: Icons.share_rounded,
-                  iconColor: Theme.of(sheet).colorScheme.primary,
-                  title: '分享',
-                  subtitle: '通过其他应用发送诊断文本',
-                  onTap: () => Navigator.pop(sheet, 'share'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      if (action == null || !mounted) return;
-
       final text = await _buildDiagnosticsText();
       final timestamp = DateTime.now()
           .toIso8601String()
@@ -331,30 +289,14 @@ class _AboutPageState extends State<AboutPage> {
           .first;
       final fileName = 'poemath_diagnostics_$timestamp.txt';
 
-      if (action == 'save') {
-        await FilePicker.saveFile(
-          dialogTitle: '保存诊断日志',
-          fileName: fileName,
-          type: FileType.custom,
-          allowedExtensions: ['txt'],
-          bytes: Uint8List.fromList(utf8.encode(text)),
-        );
-      } else {
-        await CacheActivity.use(TemporaryCacheKind.sharing, () async {
-          final dir = await getTemporaryDirectory();
-          final file = File('${dir.path}/$fileName');
-          try {
-            await file.writeAsString(text);
-            if (!mounted) return;
-            await SharePlus.instance.share(
-              ShareParams(files: [XFile(file.path)]),
-            );
-          } finally {
-            if (await file.exists()) await file.delete();
-          }
-        });
-      }
-      if (!mounted) return;
+      final path = await FilePicker.saveFile(
+        dialogTitle: '保存诊断日志',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['txt'],
+        bytes: Uint8List.fromList(utf8.encode(text)),
+      );
+      if (path == null || !mounted) return;
       scaffold.showSnackBar(const SnackBar(content: Text('诊断日志导出完成')));
     } on Object catch (error) {
       if (mounted) {

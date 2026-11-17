@@ -152,7 +152,7 @@ class _TodayPlanSectionState extends ConsumerState<TodayPlanSection> {
           final stats = ref.read(userStatsRepositoryProvider);
           ref.read(lastPracticeScoreProvider.notifier).state = null;
           final result = await context.push<PoemPracticeResult>(
-            AppRoutes.poemQuizOf(task.targetId),
+            '${AppRoutes.poemQuizOf(task.targetId)}?type=choice',
           );
           if (!mounted) return;
           final score = ref.read(lastPracticeScoreProvider);

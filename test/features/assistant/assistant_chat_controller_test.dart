@@ -17,6 +17,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:poemath/core/prompts/assistant_prompt_defaults.dart';
+import 'package:poemath/core/services/cloud_usage_service.dart';
 import 'package:poemath/core/services/llm/chat_message.dart';
 import 'package:poemath/core/services/llm/llm_explain_providers.dart';
 import 'package:poemath/core/services/llm/llm_scenario.dart';
@@ -538,6 +539,90 @@ void main() {
     expect(state.message, '模型服务返回错误，请稍后重试或请家长检查配置');
     expect(state.messages.single.content, '你好');
   });
+
+  for (final retry in ['再次提问', '重新生成', '重发提问']) {
+    test('本机 AI 额度用尽后改为不限，$retry立即使用新额度', () async {
+      await seedProviders();
+      final usage = CloudUsageService.instance;
+      await usage.setLimit(CloudUsageKind.llm, 1);
+      final requests = <bool>[];
+      final container = containerWith(
+        MockClient((request) async {
+          final streaming = _isStream(request.body);
+          requests.add(streaming);
+          return streaming ? _sseResponse('恢复后的回答') : _completionResponse();
+        }),
+      );
+      final notifier = container.read(assistantChatControllerProvider.notifier);
+
+      // 工具探测消耗最后一次额度，流式回答在发网前被本机限额拒绝。
+      await notifier.send('第一次提问');
+      final limited = container.read(assistantChatControllerProvider);
+      expect(limited.isError, isTrue);
+      expect(limited.message, '今日AI请求额度已用完，可请家长调整额度');
+      expect(limited.messages.single.content, '第一次提问');
+      expect(requests, [false]);
+      expect(usage.used(CloudUsageKind.llm), 1);
+
+      // 模拟去设置修改，再回到同一个常驻对话控制器；孩子提问无需家长解锁。
+      notifier.discardPending();
+      await usage.setLimit(CloudUsageKind.llm, null);
+      lockParentForTesting();
+      switch (retry) {
+        case '再次提问':
+          await notifier.send('第二次提问');
+        case '重新生成':
+          await notifier.regenerate();
+        case '重发提问':
+          await notifier.resendFrom(0);
+      }
+
+      final recovered = container.read(assistantChatControllerProvider);
+      expect(recovered.isReady, isTrue);
+      expect(recovered.message, isNull);
+      expect(recovered.messages.last.content, '恢复后的回答');
+      expect(requests, [false, false, true]);
+      expect(usage.limit(CloudUsageKind.llm), isNull);
+      expect(usage.used(CloudUsageKind.llm), 3);
+    });
+  }
+
+  for (final streaming in [false, true]) {
+    test('${streaming ? '流式回答' : '工具探测'}的英文服务商限额转中文，不进入聊天历史且可再次提问', () async {
+      await seedProviders();
+      await CloudUsageService.instance.setLimit(CloudUsageKind.llm, null);
+      var limited = true;
+      final container = containerWith(
+        MockClient((request) async {
+          expect(request.body, isNot(contains('daily chat limit')));
+          final isStream = _isStream(request.body);
+          if (limited && isStream == streaming) {
+            const notice =
+                "You've used your daily chat limit. Please try again later.";
+            return isStream
+                ? _sseResponse(notice)
+                : _completionResponse(content: notice);
+          }
+          return isStream ? _sseResponse('下一次正常回答') : _completionResponse();
+        }),
+      );
+      final notifier = container.read(assistantChatControllerProvider.notifier);
+
+      await notifier.send('第一次提问');
+      final failed = container.read(assistantChatControllerProvider);
+      expect(failed.isError, isTrue);
+      expect(failed.message, '模型服务额度已用尽或请求受限，请切换模型或稍后重试');
+      expect(failed.streamingText, isEmpty);
+      expect(failed.messages.single.content, '第一次提问');
+
+      limited = false;
+      await notifier.send('第二次提问');
+      final recovered = container.read(assistantChatControllerProvider);
+      expect(recovered.isReady, isTrue);
+      expect(recovered.message, isNull);
+      expect(recovered.messages.last.content, '下一次正常回答');
+    });
+  }
 
   test('服务端 5xx：error 态且文案不含 API Key；user 气泡保留', () async {
     await seedProviders();

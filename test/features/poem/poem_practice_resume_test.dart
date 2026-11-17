@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/tts_service.dart';
 import 'package:poemath/data/hive/hive_boxes.dart';
 import 'package:poemath/data/models/achievement.dart';
@@ -20,6 +23,7 @@ import 'package:poemath/features/poem/poem_practice_draft.dart';
 import 'package:poemath/features/poem/poem_quiz_page.dart';
 import 'package:poemath/features/poem/poem_recite_page.dart';
 import 'package:poemath/features/poem/providers/poem_providers.dart';
+import 'package:poemath/features/poem/quiz/quiz_engine.dart';
 import 'package:poemath/features/poem/quiz/quiz_models.dart';
 import 'package:poemath/features/poem/widgets/poem_sentence_writing_sheet.dart';
 import 'package:poemath/features/textbook/writing/stroke_data_provider.dart';
@@ -105,6 +109,42 @@ void main() {
   Map<String, dynamic> draft(String kind, String variant) =>
       repo().get(kind, scope: scope(variant))!;
 
+  Future<void> seedLegacyFillDraft() async {
+    final identity = PoemDraftIdentity(
+      kind: 'poemQuiz',
+      poem: poem,
+      variant: QuizType.fillBlank.name,
+      label: QuizType.fillBlank.label,
+      route: '${AppRoutes.poemQuizOf(poem.id)}?type=fill',
+    );
+    final activityId = 'poem_quiz:${poem.id}:legacy';
+    final session = QuizSession(
+      poemId: poem.id,
+      type: QuizType.fillBlank,
+      questions: QuizEngine.generateFillBlank(poem, random: Random(42)),
+    );
+    final repository = repo()..claim('poemQuiz', scope: identity.scope);
+    await repository.save('poemQuiz', {
+      'poemVersion': 1,
+      'poemId': identity.poemId,
+      'title': identity.title,
+      'label': identity.label,
+      'route': identity.route,
+      'fingerprint': identity.fingerprint,
+      'sessionId': activityId,
+      'elapsedMs': 0,
+      'state': {
+        'activityId': activityId,
+        'session': session.toJson(),
+        'input': '',
+        'answered': false,
+        'completedAt': null,
+        'duration': null,
+        'details': null,
+      },
+    }, scope: identity.scope);
+  }
+
   setUp(() async {
     await setUpHiveForTesting();
     await HiveBoxes.settings.put('haptic_enabled', false);
@@ -121,6 +161,7 @@ void main() {
     Widget page, {
     PracticeDraftRepository? drafts,
     CheckInRepository? checkIn,
+    bool resumeExisting = false,
   }) async {
     tester.view.physicalSize = const Size(600, 1000);
     tester.view.devicePixelRatio = 1;
@@ -160,6 +201,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await _io(tester);
+    if (resumeExisting) {
+      await tester.tap(find.text('继续上次'));
+      await _io(tester);
+      await tester.pump();
+    }
   }
 
   Future<void> leave(WidgetTester tester) async {
@@ -201,10 +247,12 @@ void main() {
     });
   }
 
-  resumeTest('测试保留原题顺序、已答与第二题输入，取消保留，完成只记录一次', (tester) async {
+  resumeTest('旧版填空草稿保留原题顺序、已答与第二题输入，完成只记录一次', (tester) async {
+    await tester.runAsync(seedLegacyFillDraft);
     await mount(
       tester,
       PoemQuizPage(poemId: poem.id, quizType: QuizType.fillBlank),
+      resumeExisting: true,
     );
     final initial = draft('poemQuiz', 'fillBlank');
     final questions =
@@ -316,11 +364,13 @@ void main() {
   });
 
   resumeTest('草稿写入失败保留页面及输入，重试成功才返回', (tester) async {
+    await tester.runAsync(seedLegacyFillDraft);
     final failing = _FailDraft();
     await mount(
       tester,
       PoemQuizPage(poemId: poem.id, quizType: QuizType.fillBlank),
       drafts: failing,
+      resumeExisting: true,
     );
     failing.fail = true;
     await tester.enterText(find.byType(TextField), '保留我的答案');
@@ -340,9 +390,11 @@ void main() {
   });
 
   resumeTest('后台保存当前输入且暂停时长，回到前台继续计时', (tester) async {
+    await tester.runAsync(seedLegacyFillDraft);
     await mount(
       tester,
       PoemQuizPage(poemId: poem.id, quizType: QuizType.fillBlank),
+      resumeExisting: true,
     );
     addTearDown(
       () => tester.binding.handleAppLifecycleStateChanged(
@@ -375,9 +427,11 @@ void main() {
   });
 
   resumeTest('旧版本草稿先提示，取消保留，仅明确重开才替换', (tester) async {
+    await tester.runAsync(seedLegacyFillDraft);
     await mount(
       tester,
       PoemQuizPage(poemId: poem.id, quizType: QuizType.fillBlank),
+      resumeExisting: true,
     );
     await leave(tester);
     final old = draft('poemQuiz', 'fillBlank');
@@ -398,18 +452,67 @@ void main() {
     await tester.tap(find.text('取消'));
     await _io(tester);
     expect(draft('poemQuiz', 'fillBlank')['sessionId'], old['sessionId']);
-    await reopen(tester, choice: '开始新练习');
+    await tester.tap(find.text('打开练习'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text('开始新练习'));
     await _io(
       tester,
-      until: () {
-        final current = repo().get('poemQuiz', scope: scope('fillBlank'));
-        return current != null && current['sessionId'] != old['sessionId'];
-      },
+      until: () => find.text('选择题 · 续练诗').evaluate().isNotEmpty,
     );
-    expect(
-      draft('poemQuiz', 'fillBlank')['sessionId'],
-      isNot(old['sessionId']),
+    await _io(
+      tester,
+      until: () =>
+          repo().get('poemQuiz', scope: scope('multipleChoice')) != null,
     );
+    expect(repo().exists('poemQuiz', scope: scope('fillBlank')), isFalse);
+  });
+
+  resumeTest('旧填空链接没有可恢复草稿时转到选择题', (tester) async {
+    tester.view.physicalSize = const Size(600, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final router = GoRouter(
+      initialLocation: '${AppRoutes.poemQuizOf(poem.id)}?type=fill',
+      routes: [
+        GoRoute(
+          path: AppRoutes.poemQuiz,
+          builder: (context, state) => PoemQuizPage(
+            poemId: state.pathParameters['id']!,
+            quizType: state.uri.queryParameters['type'] == 'fill'
+                ? QuizType.fillBlank
+                : QuizType.multipleChoice,
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          poemByIdProvider(poem.id).overrideWithValue(poem),
+          filteredPoemsProvider.overrideWithValue([poem]),
+          soundServiceProvider.overrideWithValue(RecordingSoundService()),
+          ttsServiceProvider.overrideWithValue(tts),
+          achievementRepoProvider.overrideWithValue(_Achievements()),
+          writingStrokeDataProvider.overrideWith(
+            (ref) => const WritingStrokeAsset({}),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await _io(
+      tester,
+      until: () => find.text('选择题 · 续练诗').evaluate().isNotEmpty,
+    );
+    await _io(
+      tester,
+      until: () =>
+          repo().get('poemQuiz', scope: scope('multipleChoice')) != null,
+    );
+    expect(repo().exists('poemQuiz', scope: scope('fillBlank')), isFalse);
+    expect(find.text('填空测试'), findsNothing);
   });
 
   resumeTest('损坏的背诵填空下标提示重开，取消时仍保留原草稿', (tester) async {

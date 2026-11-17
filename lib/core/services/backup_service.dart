@@ -9,7 +9,6 @@ import 'package:poemath/core/services/backup_payload_cipher.dart';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
 import 'package:hive/hive.dart';
 
 import 'package:poemath/core/prompts/generation_prompt_defaults.dart';
@@ -467,28 +466,6 @@ class BackupService {
       );
       throw BackupCredentialExportException(error);
     }
-  }
-
-  /// 导出并保存到临时文件，返回文件路径。
-  Future<String> exportToFile({String? passphrase}) => CacheActivity.use(
-    TemporaryCacheKind.sharing,
-    () => _exportToFile(passphrase: passphrase),
-  );
-
-  Future<String> _exportToFile({String? passphrase}) async {
-    final json = await exportToJson(
-      passphrase: passphrase,
-      encryptPayload: passphrase?.trim().isNotEmpty == true,
-    );
-    final dir = await getTemporaryDirectory();
-    final timestamp = DateTime.now()
-        .toIso8601String()
-        .replaceAll(':', '-')
-        .split('.')
-        .first;
-    final file = File('${dir.path}/poemath_backup_$timestamp.json');
-    await file.writeAsString(json);
-    return file.path;
   }
 
   /// 探测备份 JSON 是否含 `credentials` 节（决定导入/下载前是否弹口令框）。

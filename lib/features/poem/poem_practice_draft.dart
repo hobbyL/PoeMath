@@ -260,6 +260,12 @@ class PoemPracticeDraft extends ChangeNotifier {
     changed();
   }
 
+  /// Stops a newly opened draft without persisting it, for retired practice routes.
+  void abandon() {
+    _timer?.cancel();
+    _active = false;
+  }
+
   @override
   void dispose() {
     _timer?.cancel();

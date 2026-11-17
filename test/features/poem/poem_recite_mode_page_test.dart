@@ -52,12 +52,12 @@ void main() {
       );
     }
 
-    testWidgets('显示 4 种模式卡片', (tester) async {
+    testWidgets('显示保留的 3 种练习模式', (tester) async {
       await tester.pumpWidget(buildApp(poemId: 'test-001'));
       await tester.pump();
 
       expect(find.text('渐进背诵'), findsOneWidget);
-      expect(find.text('填空测试'), findsOneWidget);
+      expect(find.text('填空测试'), findsNothing);
       expect(find.text('选择题'), findsOneWidget);
       expect(find.text('诗词听写'), findsOneWidget);
     });
@@ -142,7 +142,7 @@ void main() {
       await tester.pump();
 
       expect(
-        find.textContaining('建议先用「渐进背诵」打基础'),
+        find.textContaining('建议先用「渐进背诵」熟悉诗文'),
         findsOneWidget,
       );
     });

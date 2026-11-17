@@ -181,6 +181,117 @@ void main() {
       );
     });
 
+    for (final explain in [false, true]) {
+      test('${explain ? '讲解' : '助手'}逐字返回英文限额时不显示原文，不当作成功回答', () async {
+        const notice =
+            "  YOU’VE\nused your daily chat limit.\nPlease try again later.  ";
+        final emitted = <String>[];
+        final client = LlmClient(
+          httpClient: MockClient.streaming(
+            (_, _) async => _sse([
+              for (final codePoint in notice.runes)
+                _sseData(String.fromCharCode(codePoint)),
+              'data: [DONE]\n\n',
+            ]),
+          ),
+        );
+        addTearDown(client.close);
+        final stream = explain
+            ? client.explainStream(
+                config: _config,
+                systemPrompt: '讲解',
+                userPrompt: '问题',
+              )
+            : client.chatStream(
+                config: _config,
+                systemPrompt: '助手',
+                messages: const [
+                  ChatMessage(role: ChatRole.user, content: '问题'),
+                ],
+              );
+
+        await expectLater(
+          stream.forEach(emitted.add),
+          throwsA(
+            isA<LlmRateLimitError>().having(
+              (error) => error.message,
+              'message',
+              '模型服务额度已用尽或请求受限，请切换模型或稍后重试',
+            ),
+          ),
+        );
+        expect(emitted, isEmpty);
+      });
+    }
+
+    test('流式限额通知前不暴露正文，按配置切换模型后只显示成功回答', () async {
+      final requests = <String>[];
+      final promoted = <String>[];
+      final client = LlmClient(
+        httpClient: MockClient.streaming((_, body) async {
+          final model =
+              (jsonDecode(await body.bytesToString())
+                      as Map<String, dynamic>)['model']
+                  as String;
+          requests.add(model);
+          return _sse([
+            if (model == 'limited') ...[
+              _sseData("You've used your "),
+              _sseData('daily chat limit.'),
+            ] else
+              _sseData('正常回答'),
+            'data: [DONE]\n\n',
+          ]);
+        }),
+        onModelSucceeded: (_, model) async => promoted.add(model),
+      );
+      addTearDown(client.close);
+
+      final chunks = await client
+          .chatStream(
+            config: const LlmConfig(
+              baseUrl: 'https://api.example.com',
+              apiKey: '',
+              model: 'limited',
+              models: ['limited', 'available'],
+            ),
+            systemPrompt: '助手',
+            messages: const [ChatMessage(role: ChatRole.user, content: '问题')],
+          )
+          .toList();
+      expect(chunks.join(), '正常回答');
+      expect(requests, ['limited', 'available']);
+      expect(promoted, ['available']);
+    });
+
+    for (final text in [
+      'You',
+      "You've used your daily chat limit",
+      '"You\'ve used your daily chat limit." 是什么意思？',
+      "You've used your daily chat limit. 这句话表示今日次数已用完。",
+    ]) {
+      test('普通回答或引用通知保持原文：$text', () async {
+        final client = LlmClient(
+          httpClient: MockClient.streaming(
+            (_, _) async => _sse([
+              for (final codePoint in text.runes)
+                _sseData(String.fromCharCode(codePoint)),
+              'data: [DONE]\n\n',
+            ]),
+          ),
+        );
+        addTearDown(client.close);
+        final chunks = await client
+            .chatStream(
+              config: _config,
+              systemPrompt: '助手',
+              messages: const [ChatMessage(role: ChatRole.user, content: '翻译')],
+            )
+            .toList();
+        expect(chunks.join(), text);
+      });
+    }
+
     test('keep-alive 注释行 / 空行 / 坏 JSON 行跳过不中断', () async {
       final client = LlmClient(
         httpClient: MockClient.streaming(

@@ -1,6 +1,6 @@
 // lib/features/poem/poem_recite_mode_page.dart
 //
-// 背诵模式选择页：展示诗词元信息 + 3 种模式卡片 + 诗文预览折叠区。
+// 背诵模式选择页：展示诗词元信息 + 练习模式卡片 + 诗文预览折叠区。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -81,7 +81,7 @@ class PoemReciteModePage extends ConsumerWidget {
             ),
             const SizedBox(height: SpacingTokens.lg),
 
-            // 中间：3 种模式卡片
+            // 中间：练习模式卡片
             Text(
               '选择练习方式',
               style: theme.textTheme.titleMedium?.copyWith(
@@ -97,17 +97,6 @@ class PoemReciteModePage extends ConsumerWidget {
               subtitle: '从全文显示到逐步遮挡，循序渐进掌握',
               onTap: () {
                 context.push(AppRoutes.poemReciteOf(poemId));
-              },
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-
-            _ModeCard(
-              icon: Icons.edit_note,
-              iconColor: theme.colorScheme.primary,
-              title: '填空测试',
-              subtitle: '补全诗句中缺失的文字',
-              onTap: () {
-                context.push('${AppRoutes.poemQuizOf(poemId)}?type=fill');
               },
             ),
             const SizedBox(height: SpacingTokens.sm),
@@ -196,7 +185,7 @@ class PoemReciteModePage extends ConsumerWidget {
                   const SizedBox(width: SpacingTokens.sm),
                   Expanded(
                     child: Text(
-                      '建议先用「渐进背诵」打基础，再通过「填空」和「选择题」检验记忆效果',
+                      '建议先用「渐进背诵」熟悉诗文，再用「选择题」或「诗词听写」检查掌握情况',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

@@ -69,13 +69,16 @@ class PoemReadAlongPage extends ConsumerStatefulWidget {
 class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
   final _learningWrites = PracticeDraftRepository();
   static const _maxRecordingDurationSeconds = 15;
+  static const _finalizedSpeechGracePeriod = Duration(milliseconds: 1200);
 
   late final SpeechRecognitionService _speech;
   late final TtsService _tts;
   bool _tencentConfigured = false;
   Timer? _recordingTimer;
+  Timer? _finalizedSpeechTimer;
   Future<void>? _speechInitialization;
   StreamSubscription<String>? _transcriptSubscription;
+  StreamSubscription<String>? _finalizedTranscriptSubscription;
   String _liveText = '';
   bool _usedSentenceFallback = false;
 
@@ -264,6 +267,11 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     final subscription = _transcriptSubscription;
     _transcriptSubscription = null;
     unawaited(subscription?.cancel());
+    final finalizedSubscription = _finalizedTranscriptSubscription;
+    _finalizedTranscriptSubscription = null;
+    unawaited(finalizedSubscription?.cancel());
+    _finalizedSpeechTimer?.cancel();
+    _finalizedSpeechTimer = null;
   }
 
   Future<void> _startRecording() async {
@@ -321,8 +329,32 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
                       _phase != _ReadAlongPhase.processing)) {
                 return;
               }
+              _finalizedSpeechTimer?.cancel();
+              _finalizedSpeechTimer = null;
               setState(() => _liveText = text);
             });
+      }
+      if (speech is FinalizedTranscriptSpeechRecognitionService) {
+        _finalizedTranscriptSubscription =
+            (speech as FinalizedTranscriptSpeechRecognitionService)
+                .finalizedTranscriptStream
+                .listen((text) {
+                  if (!mounted ||
+                      text.trim().isEmpty ||
+                      _phase != _ReadAlongPhase.recording) {
+                    return;
+                  }
+                  _finalizedSpeechTimer?.cancel();
+                  _finalizedSpeechTimer = Timer(
+                    _finalizedSpeechGracePeriod,
+                    () {
+                      _finalizedSpeechTimer = null;
+                      if (mounted && _phase == _ReadAlongPhase.recording) {
+                        unawaited(_stopRecording());
+                      }
+                    },
+                  );
+                });
       }
       await _speech.start();
       if (!mounted) {
@@ -507,6 +539,8 @@ class _PoemReadAlongPageState extends ConsumerState<PoemReadAlongPage> {
     if (_phase != _ReadAlongPhase.recording) return;
     _recordingTimer?.cancel();
     _recordingTimer = null;
+    _finalizedSpeechTimer?.cancel();
+    _finalizedSpeechTimer = null;
     final scaffold = ScaffoldMessenger.of(context);
     setState(() => _phase = _ReadAlongPhase.processing);
 

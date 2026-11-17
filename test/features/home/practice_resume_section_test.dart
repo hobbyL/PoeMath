@@ -59,6 +59,48 @@ void main() {
     await drainHiveWritesForTesting(tester);
   });
 
+  testWidgets('首页隐藏已移除的填空测试草稿并保留其他诗词草稿', (tester) async {
+    final drafts = PracticeDraftRepository();
+    const fillScope = '["legacy-poem","fillBlank"]';
+    const dictationScope = '["poem","1,3"]';
+    await tester.runAsync(() async {
+      drafts.claim('poemQuiz', scope: fillScope);
+      await drafts.save('poemQuiz', {
+        'sessionId': 'legacy-fill-session',
+        'poemVersion': 1,
+        'title': '梅花',
+        'label': '填空测试',
+        'route': '/poem/quiz/legacy-poem?type=fill',
+        'state': <String, dynamic>{},
+      }, scope: fillScope);
+      drafts.claim('poemDictation', scope: dictationScope);
+      await drafts.save('poemDictation', {
+        'sessionId': 'dictation-session',
+        'poemVersion': 1,
+        'title': '静夜思',
+        'label': '错句听写',
+        'route': '/poem/dictation/poem?lines=1%2C3',
+        'state': <String, dynamic>{},
+      }, scope: dictationScope);
+    });
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(body: PracticeResumeSection()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('继续填空测试'), findsNothing);
+    expect(find.text('继续错句听写'), findsOneWidget);
+    expect(drafts.exists('poemQuiz', scope: fillScope), isTrue);
+    expect(drafts.get('poemQuiz', scope: fillScope)?['title'], '梅花');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await drainHiveWritesForTesting(tester);
+  });
+
   for (final (width, scale, horizontal) in [
     (599.0, 1.0, false),
     (600.0, 1.0, true),

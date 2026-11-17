@@ -12,8 +12,6 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/services/backup_history_service.dart';
 import 'package:poemath/core/services/cache_activity.dart';
@@ -110,7 +108,7 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
                   child: _ActionCard(
                     icon: Icons.upload_file_rounded,
                     title: '导出备份',
-                    subtitle: '保存或分享备份',
+                    subtitle: '保存备份文件',
                     color: theme.colorScheme.primary,
                     onTap: () => _exportBackup(context, ref),
                   ),
@@ -182,43 +180,6 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
     final history = ref.read(backupHistoryProvider);
     try {
       if (!await ensureParentAccess(context) || !context.mounted) return;
-      final action = await showModalBottomSheet<String>(
-        context: context,
-        builder: (sheet) => SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(SpacingTokens.md),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  '导出备份',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(sheet).textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-                AppTile(
-                  icon: Icons.save_alt_rounded,
-                  iconColor: Theme.of(sheet).colorScheme.primary,
-                  title: '保存到设备',
-                  subtitle: '选择本地目录保存备份文件',
-                  onTap: () => Navigator.pop(sheet, 'save'),
-                ),
-                const SizedBox(height: SpacingTokens.sm),
-                AppTile(
-                  icon: Icons.share_rounded,
-                  iconColor: Theme.of(sheet).colorScheme.primary,
-                  title: '分享',
-                  subtitle: '通过其他应用发送备份文件',
-                  onTap: () => Navigator.pop(sheet, 'share'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      if (action == null || !context.mounted) return;
       final passphrase = await store.readBackupPassphrase();
       if (!context.mounted) return;
       final json = await _exportAcceptingCredentialFailure(backup, passphrase);
@@ -229,35 +190,15 @@ class _BackupRestorePageState extends ConsumerState<BackupRestorePage> {
           .replaceAll(':', '-')
           .split('.')
           .first;
-      if (action == 'save') {
-        final path = await FilePicker.saveFile(
-          dialogTitle: '保存备份文件',
-          fileName: 'poemath_backup_$timestamp.json',
-          type: FileType.custom,
-          allowedExtensions: ['json'],
-          bytes: Uint8List.fromList(utf8.encode(json)),
-        );
-        if (path == null) return;
-        await history.markExternalBackup();
-      } else {
-        await CacheActivity.use(TemporaryCacheKind.sharing, () async {
-          final dir = await getTemporaryDirectory();
-          final file = File('${dir.path}/poemath_backup_$timestamp.json');
-          try {
-            await file.writeAsString(json);
-            if (!context.mounted) return;
-            ParentAccessService.instance.assertAllowed();
-            final result = await SharePlus.instance.share(
-              ShareParams(files: [XFile(file.path)]),
-            );
-            if (result.status == ShareResultStatus.success) {
-              await history.markExternalBackup();
-            }
-          } finally {
-            if (await file.exists()) await file.delete();
-          }
-        });
-      }
+      final path = await FilePicker.saveFile(
+        dialogTitle: '保存备份文件',
+        fileName: 'poemath_backup_$timestamp.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: Uint8List.fromList(utf8.encode(json)),
+      );
+      if (path == null) return;
+      await history.markExternalBackup();
       if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('备份导出完成')));

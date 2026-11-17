@@ -156,6 +156,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('100%', skipOffstage: false), findsOneWidget);
     expect(speech.transcripts.hasListener, isFalse);
+    expect(speech.finalizedTranscripts.hasListener, isFalse);
     speech.transcripts.add('迟到的旧文字');
     await tester.pump();
     await tester.pump();
@@ -175,6 +176,36 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     expect(speech.disposals, 1);
     expect(speech.transcripts.hasListener, isFalse);
+    expect(speech.finalizedTranscripts.hasListener, isFalse);
+  });
+
+  testWidgets('流式识别确认读完后自动结束，新的识别文字会延后自动结束', (tester) async {
+    final speech = StreamingSpeechFake();
+    await _pumpPage(tester, speech, tts, settings, useFactory: true);
+    await tester.tap(find.text('读一读'));
+    await tester.pump();
+    await tester.pump();
+
+    speech.transcripts.add('床前明月光');
+    speech.finalizedTranscripts.add('床前明月光');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(speech.stops, 0);
+
+    speech.transcripts.add('疑是地上霜');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1199));
+    expect(speech.stops, 0);
+
+    speech.finalizedTranscripts.add('疑是地上霜');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1200));
+    await tester.pump();
+
+    expect(speech.stops, 1);
+    expect(find.text('100%', skipOffstage: false), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 5));
   });
 
   testWidgets('实时额度耗尽显示回退原因，结束后使用一句话最终结果', (tester) async {

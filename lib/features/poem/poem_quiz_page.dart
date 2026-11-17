@@ -1,6 +1,6 @@
 // lib/features/poem/poem_quiz_page.dart
 //
-// 诗词测试页：填空测试 + 选择题，逐题作答，即时反馈，完成后显示结果。
+// 诗词选择题页；保留旧填空草稿的恢复能力。
 
 import 'dart:async';
 import 'dart:math';
@@ -17,6 +17,7 @@ import 'package:poemath/data/models/achievement.dart';
 import 'package:poemath/core/widgets/app_widgets.dart';
 import 'package:poemath/core/widgets/celebration_dialog.dart';
 import 'package:poemath/core/widgets/confetti_overlay.dart';
+import 'package:poemath/data/models/poem.dart';
 import 'package:poemath/data/providers/repository_providers.dart';
 import 'package:poemath/domain/achievement_check_helper.dart';
 import 'package:poemath/domain/learning_reward_calculator.dart';
@@ -50,6 +51,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   final _fillController = TextEditingController();
   final _fillFocusNode = FocusNode();
   late final CelebrationController _confettiController;
+  QuizType? _effectiveQuizType;
   bool _allowResultPop = false;
   bool _isFinishing = false;
   bool _settled = false;
@@ -62,6 +64,8 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
   bool _progressRecorded = false;
   PoemProgress? _recordedProgress;
   PoemPracticeDraft? _draft;
+
+  QuizType get _quizType => _effectiveQuizType ?? widget.quizType;
 
   void _update(VoidCallback action) {
     setState(action);
@@ -82,7 +86,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final session = QuizSession.fromJson(
       data['session'] as Map<String, dynamic>,
     );
-    if (session.poemId != widget.poemId || session.type != widget.quizType) {
+    if (session.poemId != widget.poemId || session.type != _quizType) {
       throw const FormatException('测试模式不匹配');
     }
     final input = data['input'] as String;
@@ -106,34 +110,54 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     _detailsJson = details;
   }
 
-  Future<void> _openPractice() async {
-    if (!mounted) return;
-    final poem = ref.read(poemByIdProvider(widget.poemId));
-    if (poem == null) return;
-    final type = switch (widget.quizType) {
+  PoemPracticeDraft _createDraft(Poem poem, QuizType type) {
+    final routeType = switch (type) {
       QuizType.fillBlank => 'fill',
       QuizType.multipleChoice => 'choice',
       QuizType.chooseAuthor => 'author',
       QuizType.chooseDynasty => 'dynasty',
     };
-    final draft = _draft = PoemPracticeDraft(
+    return PoemPracticeDraft(
       identity: PoemDraftIdentity(
         kind: 'poemQuiz',
         poem: poem,
-        variant: widget.quizType.name,
-        label: widget.quizType.label,
+        variant: type.name,
+        label: type.label,
         route:
-            '${AppRoutes.poemQuizOf(Uri.encodeComponent(widget.poemId))}?type=$type',
+            '${AppRoutes.poemQuizOf(Uri.encodeComponent(widget.poemId))}?type=$routeType',
       ),
       capture: _captureDraft,
       repository: _learningWrites,
     );
-    final opened = await draft.open(context, _restoreDraft);
+  }
+
+  Future<void> _openPractice() async {
+    if (!mounted) return;
+    final poem = ref.read(poemByIdProvider(widget.poemId));
+    if (poem == null) return;
+    var activeType = widget.quizType;
+    var draft = _draft = _createDraft(poem, activeType);
+    var opened = await draft.open(context, _restoreDraft);
     if (!mounted) return;
     if (!opened) {
       Navigator.of(context).pop();
       return;
     }
+
+    if (activeType == QuizType.fillBlank && !draft.restored) {
+      draft.abandon();
+      draft.dispose();
+      activeType = QuizType.multipleChoice;
+      _effectiveQuizType = activeType;
+      draft = _draft = _createDraft(poem, activeType);
+      opened = await draft.open(context, _restoreDraft);
+      if (!mounted) return;
+      if (!opened) {
+        Navigator.of(context).pop();
+        return;
+      }
+    }
+
     if (draft.restored) {
       _update(() {});
       if (_session!.isFinished) unawaited(_finishQuiz());
@@ -173,7 +197,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
     final random = Random();
     List<QuizQuestion> questions;
 
-    switch (widget.quizType) {
+    switch (_quizType) {
       case QuizType.fillBlank:
         questions = QuizEngine.generateFillBlank(poem, random: random);
       case QuizType.multipleChoice:
@@ -242,7 +266,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
           'poem_quiz:${widget.poemId}:${DateTime.now().microsecondsSinceEpoch}';
       _session = QuizSession(
         poemId: widget.poemId,
-        type: widget.quizType,
+        type: _quizType,
         questions: questions,
       );
     });
@@ -479,7 +503,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
 
     if (_session == null) {
       return Scaffold(
-        appBar: AppBar(title: Text('${widget.quizType.label} · ${poem.title}')),
+        appBar: AppBar(title: Text('${_quizType.label} · ${poem.title}')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -497,7 +521,7 @@ class _PoemQuizPageState extends ConsumerState<PoemQuizPage> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: Text('${widget.quizType.label} · ${poem.title}')),
+        appBar: AppBar(title: Text('${_quizType.label} · ${poem.title}')),
         body: PoemDraftSaveStatus(
           draft: _draft,
           child: Stack(

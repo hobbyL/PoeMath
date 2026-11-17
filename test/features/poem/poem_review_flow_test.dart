@@ -70,7 +70,7 @@ void main() {
     addTearDown(router.dispose);
 
     await tester.pumpWidget(_buildApp(router, reviewRepo: reviewRepo));
-    await _openFillQuiz(tester, '静夜思');
+    await _openDictation(tester, '静夜思');
     await tester.tap(find.text('直接返回'));
     await _pumpUi(tester);
 
@@ -85,7 +85,7 @@ void main() {
     addTearDown(router.dispose);
 
     await tester.pumpWidget(_buildApp(router, reviewRepo: reviewRepo));
-    await _openFillQuiz(tester, '静夜思');
+    await _openDictation(tester, '静夜思');
     await tester.tap(find.text('测试失败'));
     await _pumpUi(tester);
 
@@ -107,7 +107,7 @@ void main() {
     addTearDown(container.dispose);
     await tester.pumpWidget(_buildApp(router, container: container));
     container.read(lastPracticeScoreProvider.notifier).state = 0.5;
-    await _openFillQuizAndTapFail(tester, '静夜思');
+    await _openDictationAndTapFail(tester, '静夜思');
     await _pumpUi(tester);
 
     final schedule = reviewRepo.get('poem_1')!;
@@ -221,6 +221,10 @@ GoRouter _buildRouter() {
         builder: (context, state) => const _PracticeResultPage(),
       ),
       GoRoute(
+        path: AppRoutes.poemDictation,
+        builder: (context, state) => const _PracticeResultPage(),
+      ),
+      GoRoute(
         path: AppRoutes.poemRecite,
         builder: (context, state) => const _PracticeResultPage(),
       ),
@@ -228,17 +232,17 @@ GoRouter _buildRouter() {
   );
 }
 
-Future<void> _openFillQuiz(WidgetTester tester, String poemTitle) async {
+Future<void> _openDictation(WidgetTester tester, String poemTitle) async {
   await _pumpUi(tester);
   expect(find.text(poemTitle), findsOneWidget);
   await tester.tap(find.text('复习'));
   await _pumpUi(tester);
-  await tester.tap(find.text('填空测试'));
+  await tester.tap(find.text('诗词听写'));
   await _pumpUi(tester);
 }
 
-/// 打开填空测试后点「测试失败」（调用前由测试预置侧信道得分）。
-Future<void> _openFillQuizAndTapFail(
+/// 打开诗词听写后点「测试失败」（调用前由测试预置侧信道得分）。
+Future<void> _openDictationAndTapFail(
   WidgetTester tester,
   String poemTitle,
 ) async {
@@ -246,7 +250,7 @@ Future<void> _openFillQuizAndTapFail(
   expect(find.text(poemTitle), findsOneWidget);
   await tester.tap(find.text('复习'));
   await _pumpUi(tester);
-  await tester.tap(find.text('填空测试'));
+  await tester.tap(find.text('诗词听写'));
   await _pumpUi(tester);
   await tester.tap(find.text('测试失败'));
 }

@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/services/tts_service.dart';
@@ -319,17 +318,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
         }
       }
     }
-  }
-
-  Future<void> _sharePoem(Poem poem) async {
-    final text =
-        '《${poem.title}》\n'
-        '${poem.author}·${poem.dynasty}\n'
-        '\n'
-        '${poem.content}\n'
-        '\n'
-        '—— 来自韵算 PoeMath';
-    await SharePlus.instance.share(ShareParams(text: text));
   }
 
   @override
@@ -746,14 +734,6 @@ class _PoemDetailPageState extends ConsumerState<PoemDetailPage> {
                   },
                   icon: const Icon(Icons.mic),
                   label: const Text('跟读'),
-                ),
-              ),
-              const SizedBox(width: SpacingTokens.sm),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _sharePoem(poem),
-                  icon: const Icon(Icons.share_outlined),
-                  label: const Text('分享'),
                 ),
               ),
             ],

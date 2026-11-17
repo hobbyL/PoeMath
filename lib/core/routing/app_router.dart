@@ -451,12 +451,13 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
         path: AppRoutes.poemQuiz,
         pageBuilder: (context, state) {
           final id = state.pathParameters['id']!;
-          final typeStr = state.uri.queryParameters['type'] ?? 'fill';
+          final typeStr = state.uri.queryParameters['type'] ?? 'choice';
           final quizType = switch (typeStr) {
+            'fill' => QuizType.fillBlank,
             'choice' => QuizType.multipleChoice,
             'author' => QuizType.chooseAuthor,
             'dynasty' => QuizType.chooseDynasty,
-            _ => QuizType.fillBlank,
+            _ => QuizType.multipleChoice,
           };
           return fadeSlideTransitionPage(
             state: state,

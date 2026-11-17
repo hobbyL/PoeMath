@@ -41,6 +41,12 @@ final practiceDraftsProvider =
                   !(draft['route'] as String).startsWith('/poem/')) {
                 throw const FormatException('诗词草稿无法读取');
               }
+              final route = Uri.tryParse(draft['route'] as String);
+              if (kind == 'poemQuiz' &&
+                  (route?.queryParameters['type'] == 'fill' ||
+                      draft['label'] == '填空测试')) {
+                continue;
+              }
               result.add(draft);
             } on Object {
               result.add({'kind': kind, 'scope': scope, 'invalid': true});

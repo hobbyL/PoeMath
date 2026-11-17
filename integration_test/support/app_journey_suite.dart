@@ -26,6 +26,7 @@ import 'package:poemath/features/home/home_page.dart';
 import 'package:poemath/features/math/widgets/number_keypad.dart';
 import 'package:poemath/features/math/math_mistake_page.dart';
 import 'package:poemath/features/math/math_session_detail_page.dart';
+import 'package:poemath/features/poem/poem_quiz_page.dart';
 import 'package:poemath/features/profile/backup_restore_page.dart';
 import 'package:poemath/features/profile/parent_protection_page.dart';
 import 'package:poemath/features/profile/settings_page.dart';
@@ -94,10 +95,18 @@ void defineAppJourneyTests({
 
     await _tap(tester, find.text('学习'));
     await _pumpUntil(tester, find.text('选择练习方式'));
-    await _tap(tester, find.text('填空测试'));
-    await _pumpUntil(tester, find.textContaining('____'));
-    expect(find.text('请输入答案…'), findsOneWidget);
-    expect(find.text('提交'), findsOneWidget);
+    expect(find.text('填空测试'), findsNothing);
+    await _tap(tester, find.text('选择题'));
+    await _pumpUntil(tester, find.text('选择题 · 静夜思'));
+    final options = find.descendant(
+      of: find.byType(PoemQuizPage),
+      matching: find.byType(OutlinedButton),
+    );
+    await _pumpUntil(tester, options);
+    expect(options, findsNWidgets(4));
+    expect(find.text('请输入答案…'), findsNothing);
+    await _tap(tester, options.first);
+    await _pumpUntil(tester, find.text('下一题'));
   });
 
   testWidgets('口算错误答题会落入错题本', (tester) async {
