@@ -7,6 +7,8 @@ import 'dart:convert';
 
 import 'package:hive/hive.dart';
 
+part 'picture_story_retelling.dart';
+
 class PictureStorySegment {
   const PictureStorySegment({
     required this.id,
@@ -101,6 +103,8 @@ class PictureStoryPracticeRecord extends HiveObject {
     this.revisionsJson = '[]',
     this.revisionDraft,
     this.feedbackRevision = 0,
+    this.retellingStateJson,
+    this.retellingDraftJson,
   });
 
   String id;
@@ -118,6 +122,42 @@ class PictureStoryPracticeRecord extends HiveObject {
   String revisionsJson;
   String? revisionDraft;
   int feedbackRevision;
+  String? retellingStateJson;
+  String? retellingDraftJson;
+
+  PictureStoryRetellingState? get retellingState => retellingStateJson == null
+      ? null
+      : PictureStoryRetellingState.fromJson(jsonDecode(retellingStateJson!));
+
+  PictureStoryRetellingDraft? get retellingDraft => retellingDraftJson == null
+      ? null
+      : PictureStoryRetellingDraft.fromJson(jsonDecode(retellingDraftJson!));
+
+  PictureStoryTake get currentTake {
+    final state = retellingState;
+    return PictureStoryTake(
+      id: state?.currentId ?? '$id:first',
+      startedAt: state?.currentStartedAt ?? startedAt,
+      completedAt: state?.currentCompletedAt ?? completedAt ?? startedAt,
+      segments: segments,
+      answerText: answerText,
+      feedbackJson: feedbackJson,
+      totalDurationSeconds: totalDurationSeconds,
+      usedHints: usedHints,
+      revisionsJson: revisionsJson,
+      revisionDraft: revisionDraft,
+    );
+  }
+
+  List<PictureStoryTake> get takes =>
+      List.unmodifiable([...?retellingState?.archived, currentTake]);
+
+  Iterable<PictureStorySegment> get allSegments sync* {
+    for (final take in takes) {
+      yield* take.segments;
+    }
+    yield* retellingDraft?.segments ?? const <PictureStorySegment>[];
+  }
 
   List<PictureStoryAnswerRevision> get revisions {
     final raw = jsonDecode(revisionsJson);
@@ -143,6 +183,8 @@ class PictureStoryPracticeRecord extends HiveObject {
     revisionsJson: revisionsJson,
     revisionDraft: revisionDraft,
     feedbackRevision: feedbackRevision,
+    retellingStateJson: retellingStateJson,
+    retellingDraftJson: retellingDraftJson,
   );
 
   List<PictureStorySegment> get segments {
@@ -215,13 +257,15 @@ final class PictureStoryPracticeRecordAdapter
       revisionsJson: fields[12] as String? ?? '[]',
       revisionDraft: fields[13] as String?,
       feedbackRevision: fields[14] as int? ?? 0,
+      retellingStateJson: fields[15] as String?,
+      retellingDraftJson: fields[16] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, PictureStoryPracticeRecord obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(17)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -251,7 +295,11 @@ final class PictureStoryPracticeRecordAdapter
       ..writeByte(13)
       ..write(obj.revisionDraft)
       ..writeByte(14)
-      ..write(obj.feedbackRevision);
+      ..write(obj.feedbackRevision)
+      ..writeByte(15)
+      ..write(obj.retellingStateJson)
+      ..writeByte(16)
+      ..write(obj.retellingDraftJson);
   }
 }
 

@@ -77,10 +77,10 @@ class PictureStoryRepository {
     Box<PictureStoryPracticeRecord>? records,
     PictureStoryImageService? images,
     void Function()? authorize,
-  })  : _settings = settings ?? HiveBoxes.settings,
-        _records = records ?? HiveBoxes.pictureStoryPractice,
-        _images = images ?? PictureStoryImageService.instance,
-        _authorize = authorize ?? ParentAccessService.instance.assertAllowed;
+  }) : _settings = settings ?? HiveBoxes.settings,
+       _records = records ?? HiveBoxes.pictureStoryPractice,
+       _images = images ?? PictureStoryImageService.instance,
+       _authorize = authorize ?? ParentAccessService.instance.assertAllowed;
 
   static const catalogKey = 'picture_story_catalog_v1';
   static const enabledSuffix = '_picture_story_enabled_ids';
@@ -94,8 +94,10 @@ class PictureStoryRepository {
   /// 所有仓储实例与备份共用队列，恢复期间不能插入题目发布或启用写入。
   static Future<T> exclusive<T>(Future<T> Function() operation) {
     final result = _operations.then((_) => operation());
-    _operations =
-        result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _operations = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
     return result;
   }
 
@@ -115,8 +117,9 @@ class PictureStoryRepository {
 
   bool isEnabled(String promptId) =>
       findPrompt(promptId) != null &&
-      (_savedEnabledIds(ProfileScope.currentId) ?? const <String>[])
-          .contains(promptId);
+      (_savedEnabledIds(ProfileScope.currentId) ?? const <String>[]).contains(
+        promptId,
+      );
 
   Stream<BoxEvent> watchCatalog() => _settings.watch(key: catalogKey);
 
@@ -194,112 +197,103 @@ class PictureStoryRepository {
     required String profileId,
     PictureStoryPrompt? original,
     bool enableForProfile = true,
-  }) =>
-      exclusive(() async {
-        _authorize();
-        _checkProfile(profileId);
-        final candidate = prompt.normalized();
-        final state = catalogState();
-        final current = _findPrompt(state, prompt.id);
-        if (original == null) {
-          if (current != null ||
-              state.deletedIds.contains(prompt.id) ||
-              !prompt.id.startsWith('local-')) {
-            throw const FormatException('新题标识已存在，请重新打开新增页面');
-          }
-        } else if (current == null ||
-            current.version != original.version ||
-            !current.sameContent(original)) {
-          throw const FormatException('题目已更新，请保留输入并重新打开编辑');
-        }
-        if (current != null && current.sameContent(candidate)) return current;
+  }) => exclusive(() async {
+    _authorize();
+    _checkProfile(profileId);
+    final candidate = prompt.normalized();
+    final state = catalogState();
+    final current = _findPrompt(state, prompt.id);
+    if (original == null) {
+      if (current != null ||
+          state.deletedIds.contains(prompt.id) ||
+          !prompt.id.startsWith('local-')) {
+        throw const FormatException('新题标识已存在，请重新打开新增页面');
+      }
+    } else if (current == null ||
+        current.version != original.version ||
+        !current.sameContent(original)) {
+      throw const FormatException('题目已更新，请保留输入并重新打开编辑');
+    }
+    if (current != null && current.sameContent(candidate)) return current;
 
-        final saved = candidate.copyWith(version: (current?.version ?? 0) + 1);
-        final versions = [...state.versions];
-        versions.add(saved);
-        final merged = PictureStoryCatalogState(
-          versions,
-          deletedIds: state.deletedIds,
-        );
-        await _images.ensureStored(candidate.image);
-        _authorize();
-        _checkProfile(profileId);
-        final values = <String, Object>{
-          catalogKey: jsonEncode(merged.toJson()),
-        };
-        if (original == null && enableForProfile) {
-          final ids = _savedEnabledIds(profileId) ?? <String>[];
-          if (!ids.contains(saved.id)) ids.add(saved.id);
-          values[enabledKeyFor(profileId)] = jsonEncode(ids);
-        }
-        await _writeSettingsWithRollback(values);
-        return saved;
-      });
+    final saved = candidate.copyWith(version: (current?.version ?? 0) + 1);
+    final versions = [...state.versions];
+    versions.add(saved);
+    final merged = PictureStoryCatalogState(
+      versions,
+      deletedIds: state.deletedIds,
+    );
+    await _images.ensureStored(candidate.image);
+    _authorize();
+    _checkProfile(profileId);
+    final values = <String, Object>{catalogKey: jsonEncode(merged.toJson())};
+    if (original == null && enableForProfile) {
+      final ids = _savedEnabledIds(profileId) ?? <String>[];
+      if (!ids.contains(saved.id)) ids.add(saved.id);
+      values[enabledKeyFor(profileId)] = jsonEncode(ids);
+    }
+    await _writeSettingsWithRollback(values);
+    return saved;
+  });
 
   /// 移出所有孩子的题库；原题版本和图片继续供已开始的练习及历史使用。
   Future<void> deletePrompt({
     required PictureStoryPrompt prompt,
     required String profileId,
-  }) =>
-      CacheActivity.clear(
-        TemporaryCacheKind.pictureStoryImages,
-        () => exclusive(() async {
-          void check() {
-            _authorize();
-            _checkProfile(profileId);
-          }
+  }) => CacheActivity.clear(
+    TemporaryCacheKind.pictureStoryImages,
+    () => exclusive(() async {
+      void check() {
+        _authorize();
+        _checkProfile(profileId);
+      }
 
-          check();
-          final state = catalogState();
-          if (!state.deletedIds.contains(prompt.id)) {
-            final current = _findPrompt(state, prompt.id);
-            if (current == null ||
-                current.version != prompt.version ||
-                !current.sameContent(prompt)) {
-              throw const FormatException('题目不存在或已更新，请重新打开题库后再删除');
-            }
-          }
-          final deletedIds = {...state.deletedIds, prompt.id};
-          // 包含所有孩子的已完成记录和未完成练习，不能只读取当前档案的历史。
-          final practicedVersions = {
-            for (final record in _records.values)
-              (id: record.promptId, version: record.promptVersion),
-          };
-          final merged = PictureStoryCatalogState(
-            state.versions.where(
-              (version) =>
-                  !deletedIds.contains(version.id) ||
-                  !version.image.isLocal ||
-                  practicedVersions.contains(
-                    (id: version.id, version: version.version),
-                  ),
-            ),
-            deletedIds: deletedIds,
-          );
-          final retainedImages = {
-            ...merged.imageIds,
-            ..._draftImageIds(),
-          };
-          await _writeSettingsWithRollback(
-            {catalogKey: jsonEncode(merged.toJson())},
-            operation: '删除',
-            check: check,
-          );
-          // 旧内置题没有本地题图；本地题删除和重试才触发文件回收。
-          if (!prompt.image.isLocal && state.imageIds.isEmpty) return;
-          try {
-            await _images.removeUnreferenced(
-              retainedImages,
-              authorize: check,
-            );
-          } on Object catch (error, stackTrace) {
-            Error.throwWithStackTrace(
-              PictureStoryImageCleanupException(error),
-              stackTrace,
-            );
-          }
-        }),
+      check();
+      final state = catalogState();
+      if (!state.deletedIds.contains(prompt.id)) {
+        final current = _findPrompt(state, prompt.id);
+        if (current == null ||
+            current.version != prompt.version ||
+            !current.sameContent(prompt)) {
+          throw const FormatException('题目不存在或已更新，请重新打开题库后再删除');
+        }
+      }
+      final deletedIds = {...state.deletedIds, prompt.id};
+      // 包含所有孩子的已完成记录和未完成练习，不能只读取当前档案的历史。
+      final practicedVersions = {
+        for (final record in _records.values)
+          (id: record.promptId, version: record.promptVersion),
+      };
+      final merged = PictureStoryCatalogState(
+        state.versions.where(
+          (version) =>
+              !deletedIds.contains(version.id) ||
+              !version.image.isLocal ||
+              practicedVersions.contains((
+                id: version.id,
+                version: version.version,
+              )),
+        ),
+        deletedIds: deletedIds,
       );
+      final retainedImages = {...merged.imageIds, ..._draftImageIds()};
+      await _writeSettingsWithRollback(
+        {catalogKey: jsonEncode(merged.toJson())},
+        operation: '删除',
+        check: check,
+      );
+      // 旧内置题没有本地题图；本地题删除和重试才触发文件回收。
+      if (!prompt.image.isLocal && state.imageIds.isEmpty) return;
+      try {
+        await _images.removeUnreferenced(retainedImages, authorize: check);
+      } on Object catch (error, stackTrace) {
+        Error.throwWithStackTrace(
+          PictureStoryImageCleanupException(error),
+          stackTrace,
+        );
+      }
+    }),
+  );
 
   Set<String> _draftImageIds() {
     final ids = <String>{};
@@ -381,13 +375,10 @@ class PictureStoryRepository {
         verify();
       }
       verify();
-      await _writeSettingsWithRollback(
-        {
-          catalogKey: jsonEncode(merged.toJson()),
-          enabledKeyFor(profileId): jsonEncode(ids),
-        },
-        check: verify,
-      );
+      await _writeSettingsWithRollback({
+        catalogKey: jsonEncode(merged.toJson()),
+        enabledKeyFor(profileId): jsonEncode(ids),
+      }, check: verify);
       return saved;
     });
   }
@@ -433,26 +424,27 @@ class PictureStoryRepository {
   }
 
   Map<String, List<String>> enabledByProfile() => {
-        for (final key in _settings.keys.whereType<String>())
-          if (key.endsWith(enabledSuffix))
-            key.substring(0, key.length - enabledSuffix.length):
-                _savedEnabledIds(
-                      key.substring(0, key.length - enabledSuffix.length),
-                    ) ??
-                    <String>[],
-      };
+    for (final key in _settings.keys.whereType<String>())
+      if (key.endsWith(enabledSuffix))
+        key.substring(0, key.length - enabledSuffix.length):
+            _savedEnabledIds(
+              key.substring(0, key.length - enabledSuffix.length),
+            ) ??
+            <String>[],
+  };
 
   Map<String, Object?> storageSnapshot() => {
-        for (final key in _settings.keys.whereType<String>())
-          if (key == catalogKey || key.endsWith(enabledSuffix))
-            key: _settings.get(key),
-      };
+    for (final key in _settings.keys.whereType<String>())
+      if (key == catalogKey || key.endsWith(enabledSuffix))
+        key: _settings.get(key),
+  };
 
   /// 仅由持有 [exclusive] 的备份恢复/补偿路径调用，保留原始值与键缺失状态。
   Future<void> restoreStorageSnapshot(Map<String, Object?> snapshot) async {
     final currentKeys = storageSnapshot().keys.toList();
-    await _settings
-        .deleteAll(currentKeys.where((key) => !snapshot.containsKey(key)));
+    await _settings.deleteAll(
+      currentKeys.where((key) => !snapshot.containsKey(key)),
+    );
     await _settings.putAll(snapshot);
   }
 
@@ -521,6 +513,94 @@ class PictureStoryRepository {
     });
   }
 
+  Future<PictureStoryPracticeRecord> saveRetellingDraft(
+    PictureStoryPracticeRecord expected,
+    PictureStoryRetellingDraft draft, {
+    required void Function() check,
+  }) => _updateFeedback(
+    expected,
+    check: check,
+    change: (saved) {
+      final checked = PictureStoryRetellingDraft.fromJson(draft.toJson());
+      final existing = saved.retellingDraft;
+      if (saved.takes.any((take) => take.id == checked.id) ||
+          (existing != null &&
+              (existing.id != checked.id ||
+                  existing.startedAt != checked.startedAt))) {
+        throw const FormatException('重讲草稿已更新，请重新打开练习');
+      }
+      saved.retellingDraftJson = jsonEncode(checked.toJson());
+    },
+  );
+
+  Future<PictureStoryPracticeRecord> discardRetellingDraft(
+    PictureStoryPracticeRecord expected, {
+    required void Function() check,
+  }) => _updateFeedback(
+    expected,
+    check: check,
+    change: (saved) => saved.retellingDraftJson = null,
+  );
+
+  Future<PictureStoryPracticeRecord> completeRetelling(
+    PictureStoryPracticeRecord expected, {
+    required void Function() check,
+  }) => _updateFeedback(
+    expected,
+    check: check,
+    change: (saved) {
+      final draft = saved.retellingDraft;
+      if (draft == null || draft.answerText.trim().isEmpty) {
+        throw const FormatException('请先说出或填写本遍表达');
+      }
+      final previous = saved.takes;
+      saved.retellingStateJson = jsonEncode(
+        PictureStoryRetellingState(
+          archived: previous,
+          currentId: draft.id,
+          currentStartedAt: draft.startedAt,
+          currentCompletedAt: DateTime.now(),
+        ).toJson(),
+      );
+      saved.setSegments(draft.segments);
+      saved.usedHints = draft.usedHints;
+      saved.feedbackJson = unavailablePictureStoryFeedback(
+        '这遍表达已保存，可以回听或稍后重试点评。',
+      );
+      saved.revisionsJson = '[]';
+      saved.revisionDraft = null;
+      saved.retellingDraftJson = null;
+    },
+  );
+
+  /// 只接受仍对应当前口述的首次点评，不能覆盖之后的文字修订。
+  Future<PictureStoryPracticeRecord> saveTakeFeedback(
+    PictureStoryPracticeRecord expected,
+    String feedbackJson, {
+    required void Function() check,
+  }) => _updateFeedback(
+    expected,
+    check: check,
+    change: (saved) {
+      final feedback = jsonDecode(feedbackJson);
+      if (feedback is! Map<String, dynamic>) {
+        throw const FormatException('点评内容无效');
+      }
+      if (feedback['source'] == 'vision') {
+        if (feedback['answer'] != saved.answerText ||
+            feedback['prompts'] is! List) {
+          throw const FormatException('点评与本遍表达不一致');
+        }
+        PictureStoryEvaluation.parse(
+          feedbackJson,
+          answer: saved.answerText,
+          questionCount: (feedback['prompts'] as List).length,
+        );
+      }
+      saved.feedbackJson = feedbackJson;
+    },
+  );
+
   /// 原回答/录音保持不变，编辑草稿和每次点评通过版本号防止迟到覆盖。
   Future<PictureStoryPracticeRecord> saveFeedbackDraft(
     PictureStoryPracticeRecord expected,
@@ -568,7 +648,7 @@ class PictureStoryRepository {
           PictureStoryAnswerRevision(
             answer: saved.answerText,
             feedbackJson: saved.feedbackJson,
-            createdAt: saved.completedAt ?? saved.startedAt,
+            createdAt: saved.currentTake.completedAt,
           ).toJson(),
         ...history.map((r) => r.toJson()),
         PictureStoryAnswerRevision(
@@ -608,6 +688,9 @@ class PictureStoryRepository {
           current.answerText != expected.answerText ||
           current.feedbackJson != expected.feedbackJson ||
           current.revisionsJson != expected.revisionsJson ||
+          current.revisionDraft != expected.revisionDraft ||
+          current.retellingStateJson != expected.retellingStateJson ||
+          current.retellingDraftJson != expected.retellingDraftJson ||
           current.promptId != expected.promptId ||
           current.promptVersion != expected.promptVersion) {
         throw const FormatException('这次表达已更新，请重新打开记录再修改');

@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:poemath/core/routing/app_routes.dart';
 import 'package:poemath/core/routing/page_transitions.dart';
 import 'package:poemath/core/theme/spacing_tokens.dart';
 import 'package:poemath/core/utils/profile_scope.dart';
@@ -14,7 +16,7 @@ import 'package:poemath/data/models/picture_story_practice_record.dart';
 import 'package:poemath/data/repositories/picture_story_repository.dart';
 import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
-import 'package:poemath/features/chinese/expression/widgets/picture_story_feedback.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_takes_view.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_history_prompt_card.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 
@@ -92,7 +94,7 @@ class _PictureStoryRecordDetailPageState
       if (!exists) throw const FileSystemException('录音文件不存在');
       setState(() => _playing = segment.id);
       await _player.play(DeviceFileSource(segment.audioPath));
-    } on Exception {
+    } on Object {
       if (!mounted || request != _playRequest) return;
       setState(() => _playing = null);
       ScaffoldMessenger.of(context)
@@ -223,6 +225,25 @@ class _PictureStoryRecordDetailPageState
                   const SizedBox(height: SpacingTokens.sm),
                 ],
                 FilledButton.icon(
+                  onPressed: !_sameProfile
+                      ? null
+                      : () async {
+                          await _stopPlayback();
+                          if (!context.mounted || !_sameProfile) return;
+                          await context.push(
+                            AppRoutes.pictureStoryPracticeOf(
+                              record.promptId,
+                              recordId: record.id,
+                            ),
+                          );
+                        },
+                  icon: const Icon(Icons.mic_none_outlined),
+                  label: Text(
+                    record.retellingDraftJson == null ? '再讲一遍' : '继续未完成的重讲',
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                FilledButton.icon(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(0, SpacingTokens.minTapTarget),
                     padding: const EdgeInsets.symmetric(
@@ -232,7 +253,12 @@ class _PictureStoryRecordDetailPageState
                   ),
                   onPressed: () => _edit(record),
                   icon: const Icon(Icons.edit_outlined),
-                  label: const Text('修改表达并重新点评', textAlign: TextAlign.center),
+                  label: Text(
+                    record.retellingStateJson == null
+                        ? '修改表达并重新点评'
+                        : '修改最新一遍并重新点评',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
             ),
@@ -247,7 +273,6 @@ class _PictureStoryRecordDetailPageState
     PictureStoryPracticeRecord record,
     PictureStoryPrompt? prompt,
   ) {
-    final theme = Theme.of(context);
     return [
       if (_showPrompt) ...[
         PictureStoryHistoryPromptCard(prompt: prompt, showImage: false),
@@ -259,31 +284,11 @@ class _PictureStoryRecordDetailPageState
         const Text('原题版本暂时无法读取，表达与录音记录仍保留。'),
         const SizedBox(height: SpacingTokens.sm),
       ],
-      Text(
-        record.answerText.isEmpty ? '本次未保存表达文字' : record.answerText,
-        style: theme.textTheme.bodyLarge,
-      ),
-      if (record.segments.isNotEmpty) ...[
-        const SizedBox(height: SpacingTokens.sm),
-        for (final (index, segment) in record.segments.indexed)
-          AppTile(
-            flat: true,
-            flatLeadingEdgeAligned: true,
-            flatTrailingEdgeAligned: true,
-            iconColor: theme.colorScheme.primary,
-            trailingIcon: _playing == segment.id
-                ? Icons.stop_circle_outlined
-                : Icons.play_circle_outline,
-            title: '第 ${index + 1} 段录音',
-            subtitle: '',
-            trailingText: '${segment.durationSeconds} 秒',
-            onTap: () => _play(segment),
-          ),
-      ],
-      PictureStoryFeedback(
-        feedbackJson: record.feedbackJson,
-        legacyHeading: '点评',
-        separated: true,
+      PictureStoryTakesView(
+        record: record,
+        playingId: _playing,
+        onPlay: (segment) => _play(segment),
+        onSelectionChanged: () => unawaited(_stopPlayback()),
       ),
     ];
   }

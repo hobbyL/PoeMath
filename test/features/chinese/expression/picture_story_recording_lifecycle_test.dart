@@ -675,9 +675,9 @@ void main() {
     expect(feedback['source'], 'unavailable');
     expect(find.text('本次未获得 AI 点评'), findsOneWidget);
     expect(find.text(feedback['suggestion'] as String), findsOneWidget);
-    expect(find.text('孩子的表达'), findsNWidgets(2));
+    expect(find.text('孩子的表达'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
-    await tester.tap(find.text('孩子的表达').last);
+    await tester.tap(find.text('第 1 段录音'));
     await waitUntil(
       tester,
       () => find.text('录音文件已清理，文字记录仍然保留').evaluate().isNotEmpty,

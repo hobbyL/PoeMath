@@ -393,6 +393,7 @@ GoRouter createAppRouter({String initialLocation = AppRoutes.splash}) {
           state: state,
           child: PictureStoryPracticePage(
             promptId: state.pathParameters['id']!,
+            recordId: state.uri.queryParameters['record'],
           ),
         ),
       ),

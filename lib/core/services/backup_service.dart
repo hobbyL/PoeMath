@@ -1387,6 +1387,8 @@ class BackupService {
       'revisionsJson': record.revisionsJson,
       'revisionDraft': record.revisionDraft,
       'feedbackRevision': record.feedbackRevision,
+      if (record.retellingState case final state?)
+        'retellingState': state.toJson(portable: true),
     };
   }
 
@@ -1878,19 +1880,28 @@ class BackupService {
       final promptId = item['promptId'] as String;
       final promptVersion = item['promptVersion'] as int;
       final old = previous['${profileId}_$id'];
+      final rawState = item['retellingState'];
+      final state = rawState == null
+          ? null
+          : PictureStoryRetellingState.fromJson(rawState, portable: true);
+      final localTakes =
+          old != null &&
+              old.promptId == promptId &&
+              old.promptVersion == promptVersion
+          ? old.takes
+          : const <PictureStoryTake>[];
+      final currentId = state?.currentId ?? '$id:first';
+      final localCurrent = localTakes
+          .where((take) => take.id == currentId)
+          .firstOrNull;
       final sourceSegments = (jsonDecode(
         item['segmentsJson'] as String,
       ) as List).cast<Map<String, dynamic>>();
       final segments = <Map<String, dynamic>>[];
       for (final segment in sourceSegments) {
-        final local =
-            old != null &&
-                old.promptId == promptId &&
-                old.promptVersion == promptVersion
-            ? old.segments
-                  .where((value) => value.id == segment['id'])
-                  .firstOrNull
-            : null;
+        final local = localCurrent?.segments
+            .where((value) => value.id == segment['id'])
+            .firstOrNull;
         var audioPath = '';
         if (local != null &&
             local.durationSeconds == segment['durationSeconds'] &&
@@ -1922,6 +1933,36 @@ class BackupService {
         revisionDraft: item['revisionDraft'] as String?,
         feedbackRevision: item['feedbackRevision'] as int,
       );
+      if (state != null) {
+        final restoredTakes = <PictureStoryTake>[];
+        for (final take in state.archived) {
+          final local = localTakes.where((t) => t.id == take.id).firstOrNull;
+          final restoredSegments = <PictureStorySegment>[];
+          for (final segment in take.segments) {
+            final prior = local?.segments
+                .where((s) => s.id == segment.id)
+                .firstOrNull;
+            final canReuse =
+                prior != null &&
+                prior.transcript == segment.transcript &&
+                prior.durationSeconds == segment.durationSeconds &&
+                prior.audioPath.isNotEmpty &&
+                await File(prior.audioPath).exists();
+            restoredSegments.add(
+              segment.copyWith(audioPath: canReuse ? prior.audioPath : ''),
+            );
+          }
+          restoredTakes.add(take.withSegments(restoredSegments));
+        }
+        record.retellingStateJson = jsonEncode(
+          PictureStoryRetellingState(
+            archived: restoredTakes,
+            currentId: state.currentId,
+            currentStartedAt: state.currentStartedAt,
+            currentCompletedAt: state.currentCompletedAt,
+          ).toJson(),
+        );
+      }
       await box.put('${record.profileId}_picture_story:${record.id}', record);
     }
     return items.length;
@@ -2850,6 +2891,9 @@ class BackupService {
         _invalidField('$path.usedHints', '必须是布尔值');
       }
       _optionalNullableString(item, 'revisionDraft', path);
+      if (item['retellingState'] case final state?) {
+        PictureStoryRetellingState.fromJson(state, portable: true);
+      }
 
       final rawSegments = jsonDecode(item['segmentsJson'] as String);
       if (rawSegments is! List || rawSegments.length > 2000) {

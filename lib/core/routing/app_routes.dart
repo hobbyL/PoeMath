@@ -195,8 +195,9 @@ class AppRoutes {
       ).toString();
   static String textbookManageDetailOf(String id) =>
       '/profile/settings/books/$id';
-  static String pictureStoryPracticeOf(String id) =>
-      '/chinese/expression/practice/${Uri.encodeComponent(id)}';
+  static String pictureStoryPracticeOf(String id, {String? recordId}) =>
+      '/chinese/expression/practice/${Uri.encodeComponent(id)}'
+      '${recordId == null ? '' : '?record=${Uri.encodeQueryComponent(recordId)}'}';
   static String pictureStoryPromptHistoryOf(String id) =>
       '/chinese/expression/history/${Uri.encodeComponent(id)}';
   static String pictureStoryRecordDetailOf(String id) =>

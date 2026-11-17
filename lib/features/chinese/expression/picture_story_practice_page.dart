@@ -30,15 +30,21 @@ import 'package:poemath/features/chinese/expression/picture_story_audio_service.
 import 'package:poemath/features/chinese/expression/picture_story_review_page.dart';
 import 'package:poemath/features/chinese/expression/providers/picture_story_providers.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_illustration.dart';
-import 'package:poemath/features/chinese/expression/widgets/picture_story_feedback.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_guidance.dart';
+import 'package:poemath/features/chinese/expression/widgets/picture_story_takes_view.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_scene_scaffold.dart';
 import 'package:poemath/features/chinese/expression/widgets/picture_story_unavailable_view.dart';
 import 'package:poemath/features/home/providers/home_providers.dart';
 
 class PictureStoryPracticePage extends ConsumerStatefulWidget {
-  const PictureStoryPracticePage({super.key, required this.promptId});
+  const PictureStoryPracticePage({
+    super.key,
+    required this.promptId,
+    this.recordId,
+  });
 
   final String promptId;
+  final String? recordId;
 
   @override
   ConsumerState<PictureStoryPracticePage> createState() =>
@@ -59,7 +65,15 @@ class _PictureStoryPracticePageState
   PictureStoryFeedbackService? _feedbackService;
   PictureStoryPracticeRecord? _record;
   PictureStoryPracticeRecord? _savedRecord;
-  bool get _completed => _savedRecord?.status == 'completed';
+  bool get _completed =>
+      _savedRecord?.status == 'completed' && _retellingDraft == null;
+  PictureStoryPracticeRecord? _parentRecord;
+  PictureStoryRetellingDraft? _retellingDraft;
+  Future<void> _retellingWrites = Future.value();
+  bool _guided = true;
+  int _questionIndex = 0;
+  int _stage = 0;
+  final _speakingKey = GlobalKey();
   List<PictureStorySegment> _segments = [];
   String _liveText = '';
   String? _message;
@@ -82,6 +96,9 @@ class _PictureStoryPracticePageState
   StreamSubscription<String>? _profileChanges;
   PictureStoryPrompt? _prompt;
   bool _promptReadFailed = false;
+
+  bool get _busy =>
+      _starting || _recording || _processing || _finishing || _deleting;
 
   bool get _canComplete =>
       _foreground &&
@@ -107,9 +124,38 @@ class _PictureStoryPracticePageState
     _audio = ref.read(pictureStoryAudioServiceProvider);
     _repository = ref.read(pictureStoryRepositoryProvider);
     try {
+      if (widget.recordId case final recordId?) {
+        final saved = _repository.find(recordId)?.copy();
+        if (saved == null ||
+            saved.status != 'completed' ||
+            saved.promptId != widget.promptId) {
+          return;
+        }
+        _prompt = _repository
+            .findPrompt(saved.promptId, version: saved.promptVersion)
+            ?.copyWith();
+        if (_prompt == null) return;
+        _parentRecord = saved;
+        _savedRecord = saved;
+        _retellingDraft =
+            saved.retellingDraft ??
+            PictureStoryRetellingDraft(
+              id: '${saved.id}:take:${DateTime.now().microsecondsSinceEpoch}',
+              startedAt: DateTime.now(),
+            );
+        _guided = _retellingDraft!.guided;
+        _usedHints = _retellingDraft!.usedHints;
+        _segments = _retellingDraft!.segments.toList();
+        _record = saved.copy()
+          ..status = 'draft'
+          ..setSegments(_segments);
+        unawaited(_saveDraft());
+        return;
+      }
       _prompt = _repository.findPrompt(widget.promptId)?.copyWith();
     } on Object {
       _promptReadFailed = true;
+      _prompt = null;
     }
     // 入口捕获不可变版本；失效题目不能创建一个没有原题的草稿。
     if (_prompt == null) return;
@@ -218,13 +264,19 @@ class _PictureStoryPracticePageState
     final generation = ++_generation;
     setState(() {
       _starting = true;
+      _stage = 1;
       _liveText = '';
       _message = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _starting) _showSpeaking();
     });
     SpeechRecognitionService? speech;
     StreamSubscription<String>? subscription;
     var started = false;
     try {
+      await _stopPlayback();
+      if (!_current(generation)) return;
       final factory = ref.read(speechRecognitionServiceFactoryProvider);
       // Each attempt owns its recorder; a late old start cannot cancel a new one.
       speech = factory();
@@ -413,7 +465,10 @@ class _PictureStoryPracticePageState
           await _playbackSubscription?.cancel();
           await _player.stop();
         }
-        await _audio.delete(segment.audioPath);
+        final retained = _savedRecord?.allSegments.any(
+          (item) => item.audioPath == segment.audioPath,
+        );
+        if (retained != true) await _audio.delete(segment.audioPath);
       } on Object catch (error, stackTrace) {
         AppLogger.e(
           '录音片段已删除，音频文件清理失败',
@@ -458,6 +513,10 @@ class _PictureStoryPracticePageState
       _showCompletionHint('请先填写或说出你的表达，再完成练习。');
       return;
     }
+    if (_retellingDraft != null) {
+      await _completeRetelling();
+      return;
+    }
     setState(() {
       _finishing = true;
       _message = null;
@@ -500,6 +559,70 @@ class _PictureStoryPracticePageState
             _message = '表达已保存，AI 点评未能保存，可稍后重试。';
           }
         }
+      }
+    } finally {
+      if (_current(generation)) setState(() => _finishing = false);
+    }
+  }
+
+  Future<void> _completeRetelling() async {
+    final generation = _generation;
+    setState(() {
+      _finishing = true;
+      _message = null;
+    });
+    try {
+      if (!await _saveDraft(generation: generation) || !_current(generation)) {
+        return;
+      }
+      final completed = await _repository.completeRetelling(
+        _parentRecord!,
+        check: () {
+          if (!_current(generation)) {
+            throw const _PictureStoryRecordingCancelled();
+          }
+        },
+      );
+      _parentRecord = completed;
+      _savedRecord = completed;
+      _record = completed.copy();
+      _retellingDraft = null;
+      if (!_current(generation)) return;
+      final image = await _captureIllustration();
+      if (!_current(generation)) return;
+      final feedback = await _generateAiFeedback(
+        prompt: _prompt!,
+        generation: generation,
+        image: image,
+      );
+      if (!_current(generation) || feedback == null) return;
+      final saved = await _repository.saveTakeFeedback(
+        completed,
+        feedback,
+        check: () {
+          if (!_current(generation)) {
+            throw const _PictureStoryRecordingCancelled();
+          }
+        },
+      );
+      _parentRecord = saved;
+      _savedRecord = saved;
+      _record = saved.copy();
+    } on _PictureStoryRecordingCancelled {
+      // 已成功保存的版本继续可用，旧页面不能提交后续结果。
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '重讲保存失败',
+        tag: 'PictureStory',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (_current(generation)) {
+        setState(
+          () => _message = _retellingDraft == null
+              ? '这遍表达已保存，点评未能保存，可稍后重试。'
+              : '这遍表达暂未完成保存，已录内容保留，请重试。',
+        );
       }
     } finally {
       if (_current(generation)) setState(() => _finishing = false);
@@ -552,9 +675,33 @@ class _PictureStoryPracticePageState
     }
 
     try {
-      await _repository.save(record, check: check);
+      if (_retellingDraft case final workingDraft?) {
+        final draft = workingDraft.copyWith(
+          segments: record.segments,
+          usedHints: _usedHints,
+          guided: _guided,
+        );
+        final write = _retellingWrites.then((_) async {
+          check();
+          final saved = await _repository.saveRetellingDraft(
+            _parentRecord!,
+            draft,
+            check: check,
+          );
+          _parentRecord = saved;
+          return saved;
+        });
+        _retellingWrites = write.then<void>(
+          (_) {},
+          onError: (Object _, StackTrace _) {},
+        );
+        final saved = await write;
+        if (revision == _draftRevision) _savedRecord = saved;
+      } else {
+        await _repository.save(record, check: check);
+      }
       if (revision == _draftRevision) {
-        _savedRecord = record;
+        if (_retellingDraft == null) _savedRecord = record;
         if (mounted && _foreground) setState(() {});
       }
       return true;
@@ -643,7 +790,10 @@ class _PictureStoryPracticePageState
         _current(generation) &&
         !_deleting &&
         request == _playRequest &&
-        _segments.any((item) => item.id == segment.id);
+        (_segments.any((item) => item.id == segment.id) ||
+            (_completed &&
+                (_savedRecord?.allSegments.any((s) => s.id == segment.id) ??
+                    false)));
     if (!canPlay()) return;
     try {
       final exists = await File(segment.audioPath).exists();
@@ -686,6 +836,106 @@ class _PictureStoryPracticePageState
     }
   }
 
+  Future<void> _stopPlayback() async {
+    ++_playRequest;
+    await _playbackSubscription?.cancel();
+    await _player.stop();
+    if (mounted) setState(() => _playingId = null);
+  }
+
+  void _useHelp() {
+    if (_finishing || _deleting || _completed) return;
+    _usedHints = true;
+    unawaited(_saveDraft());
+  }
+
+  void _showSpeaking() {
+    setState(() => _stage = 1);
+    final target = _speakingKey.currentContext;
+    if (target != null) Scrollable.ensureVisible(target, alignment: .2);
+  }
+
+  Future<void> _retell(PictureStoryPracticeRecord record) async {
+    await _stopPlayback();
+    if (!mounted) return;
+    await context.push(
+      AppRoutes.pictureStoryPracticeOf(record.promptId, recordId: record.id),
+    );
+    if (!mounted || ProfileScope.revision != _profileRevision) return;
+    final saved = _repository.find(record.id)?.copy();
+    if (saved != null) {
+      setState(() {
+        _savedRecord = saved;
+        _record = saved.copy();
+      });
+    }
+  }
+
+  Future<void> _discardRetelling() async {
+    if (_busy || _retellingDraft == null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('放弃这一遍重讲？'),
+        content: const Text('这一遍未完成的录音和文字将被移除，之前完成的表达会保留。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('继续讲'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('放弃这一遍'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted || !_current(_generation)) return;
+    final generation = _generation;
+    setState(() => _deleting = true);
+    try {
+      await _retellingWrites;
+      if (!_current(generation)) return;
+      final removed = _parentRecord!.retellingDraft?.segments ?? _segments;
+      final saved = await _repository.discardRetellingDraft(
+        _parentRecord!,
+        check: () {
+          if (!_current(generation)) {
+            throw const _PictureStoryRecordingCancelled();
+          }
+        },
+      );
+      _parentRecord = saved;
+      _savedRecord = saved;
+      _record = saved.copy();
+      _retellingDraft = null;
+      _segments = saved.segments;
+      await _stopPlayback();
+      final retained = saved.allSegments.map((s) => s.audioPath).toSet();
+      for (final segment in removed) {
+        if (!retained.contains(segment.audioPath)) {
+          await _audio.delete(segment.audioPath);
+        }
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger.e(
+        '取消重讲失败',
+        tag: 'PictureStory',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (_current(generation)) {
+        setState(
+          () => _message = _retellingDraft == null
+              ? '重讲草稿已移除，录音文件未能清理。'
+              : '暂时无法移除草稿，已录内容仍保留，请重试。',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -698,17 +948,24 @@ class _PictureStoryPracticePageState
         ),
       );
     }
-    if (_completed && !_finishing) {
+    if (_completed) {
       return _buildResult(theme, prompt, _savedRecord!);
     }
     return PictureStorySceneScaffold(
       image: prompt.image,
       semanticLabel: '看图说话练习：${prompt.title}',
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(SpacingTokens.md),
+          child: _recordingActions(),
+        ),
+      ),
       actions: [
         IconButton(
           onPressed: () => setState(() {
             _showHints = !_showHints;
-            if (_showHints) _usedHints = true;
+            if (_showHints) _useHelp();
           }),
           isSelected: _showHints,
           tooltip: _showHints ? '隐藏提示' : '显示提示',
@@ -765,15 +1022,26 @@ class _PictureStoryPracticePageState
                 Text('练习已完成', style: theme.textTheme.titleLarge),
                 Text(prompt.title, style: theme.textTheme.titleMedium),
                 const SizedBox(height: SpacingTokens.sm),
-                Text(record.answerText),
-                if (!_finishing)
-                  PictureStoryFeedback(feedbackJson: record.feedbackJson),
+                PictureStoryTakesView(
+                  record: record,
+                  playingId: _playingId,
+                  onPlay: (segment) => _play(segment),
+                  onSelectionChanged: () => unawaited(_stopPlayback()),
+                ),
                 if (_finishing) ...[
                   const SizedBox(height: SpacingTokens.sm),
                   const LinearProgressIndicator(semanticsLabel: '正在点评'),
                   const Text('表达已保存，正在等待 AI 点评…'),
                 ],
                 const SizedBox(height: SpacingTokens.md),
+                FilledButton.icon(
+                  onPressed: _finishing ? null : () => _retell(record),
+                  icon: const Icon(Icons.mic_none_outlined),
+                  label: Text(
+                    record.retellingDraftJson == null ? '再讲一遍' : '继续未完成的重讲',
+                  ),
+                ),
+                const SizedBox(height: SpacingTokens.sm),
                 FilledButton.tonalIcon(
                   onPressed: _finishing
                       ? null
@@ -808,22 +1076,6 @@ class _PictureStoryPracticePageState
             ),
           ),
           const SizedBox(height: SpacingTokens.md),
-          Text('回听最初的表达', style: theme.textTheme.titleMedium),
-          const SizedBox(height: SpacingTokens.sm),
-          for (final segment in record.segments)
-            AppTile(
-              icon: _playingId == segment.id
-                  ? Icons.stop_circle_outlined
-                  : Icons.play_circle_outline,
-              iconColor: theme.colorScheme.primary,
-              title:
-                  '第 ${segment.position + 1} 段 · ${segment.durationSeconds} 秒',
-              subtitle: segment.answerText.isEmpty
-                  ? '未填写文字'
-                  : segment.answerText,
-              onTap: () => _play(segment),
-            ),
-          const SizedBox(height: SpacingTokens.md),
           FilledButton(
             onPressed: () {
               if (context.canPop()) {
@@ -847,46 +1099,106 @@ class _PictureStoryPracticePageState
       fontSize: TypographyTokens.fsBodySmall,
     );
     return [
-      ColoredCard(
-        color: theme.colorScheme.primary,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(prompt.title, style: titleStyle),
-            const SizedBox(height: SpacingTokens.sm),
-            Text('先观察，再说一说', style: bodyStyle),
-            const SizedBox(height: SpacingTokens.sm),
-            for (final question in prompt.questions)
-              Padding(
-                padding: const EdgeInsets.only(bottom: SpacingTokens.xs),
-                child: Text('· $question', style: bodyStyle),
-              ),
-            if (_showHints) ...[
-              const SizedBox(height: SpacingTokens.sm),
-              Text(prompt.sceneFacts.join('\n'), style: bodyStyle),
-            ],
-          ],
-        ),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            label: _stage == 0 ? '当前步骤：观察画面' : '当前步骤：试着讲',
+            child: Wrap(
+              spacing: SpacingTokens.sm,
+              runSpacing: SpacingTokens.xs,
+              children: [
+                ChoiceChip(
+                  label: const Text('观察画面'),
+                  selected: _stage == 0,
+                  onSelected: _busy ? null : (_) => setState(() => _stage = 0),
+                ),
+                ChoiceChip(
+                  label: const Text('试着讲'),
+                  selected: _stage == 1,
+                  onSelected: _busy ? null : (_) => _showSpeaking(),
+                ),
+                const Chip(label: Text('回听完善')),
+              ],
+            ),
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          PictureStoryGuidance(
+            prompt: prompt,
+            guided: _guided,
+            questionIndex: _questionIndex,
+            busy: _busy,
+            onQuestionChanged: (value) =>
+                setState(() => _questionIndex = value),
+            onModeChanged: (value) {
+              setState(() {
+                _guided = value;
+                _stage = value ? 0 : 1;
+              });
+              unawaited(_saveDraft());
+            },
+            onStartSpeaking: _showSpeaking,
+          ),
+          const SizedBox(height: SpacingTokens.sm),
+          ColoredCard(
+            color: theme.colorScheme.primary,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() => _showHints = !_showHints);
+                    if (_showHints) _useHelp();
+                  },
+                  icon: const Icon(Icons.lightbulb_outline),
+                  label: Text(_showHints ? '收起词句帮手' : '打开词句帮手'),
+                ),
+                if (_showHints)
+                  PictureStoryLanguageHelp(
+                    prompt: prompt,
+                    canViewReference:
+                        (_savedRecord?.segments.isNotEmpty ?? false),
+                    onUsed: _useHelp,
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
       ColoredCard(
+        key: _speakingKey,
         color: theme.colorScheme.primary,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('我的表达', style: titleStyle),
+            if (_retellingDraft != null) ...[
+              const SizedBox(height: SpacingTokens.xs),
+              Text(
+                '第 ${(_parentRecord?.takes.length ?? 1) + 1} 遍，之前的表达已保留。',
+                style: bodyStyle,
+              ),
+            ],
             const SizedBox(height: SpacingTokens.sm),
             if (_segments.isEmpty && !_recording && !_processing)
               Text('录完一段后，识别文字会自动填在这里。你可以修改文字。', style: bodyStyle),
             for (final segment in _segments)
               _segmentTile(theme, segment, bodyStyle),
             if (_recording)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: SpacingTokens.sm),
-                child: Text(
-                  _liveText.isEmpty
-                      ? '正在听你说… $_elapsedSeconds/60 秒'
-                      : _liveText,
-                  style: bodyStyle?.copyWith(color: theme.colorScheme.primary),
+              Semantics(
+                liveRegion: true,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: SpacingTokens.sm,
+                  ),
+                  child: Text(
+                    _liveText.isEmpty
+                        ? '正在听你说… $_elapsedSeconds/60 秒'
+                        : _liveText,
+                    style: bodyStyle?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
                 ),
               ),
             if (_starting || _processing || _finishing || _deleting)
@@ -899,42 +1211,45 @@ class _PictureStoryPracticePageState
                 style: bodyStyle?.copyWith(color: theme.colorScheme.error),
               ),
             ],
-            const SizedBox(height: SpacingTokens.md),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed:
-                        !_foreground ||
-                            _starting ||
-                            _processing ||
-                            _finishing ||
-                            _deleting
-                        ? null
-                        : (_recording ? _finishSegment : _startRecording),
-                    icon: Icon(
-                      _recording ? Icons.stop : Icons.mic_none_outlined,
-                    ),
-                    label: Text(
-                      _starting ? '正在准备…' : (_recording ? '说好了' : '说一说'),
-                    ),
-                  ),
-                ),
-                if (_segments.isNotEmpty) ...[
-                  const SizedBox(width: SpacingTokens.sm),
-                  IconButton(
-                    onPressed: _canComplete ? _complete : null,
-                    icon: const Icon(Icons.done_all_outlined),
-                    tooltip: '完成练习',
-                  ),
-                ],
-              ],
-            ),
+            if (_retellingDraft != null) ...[
+              const SizedBox(height: SpacingTokens.sm),
+              TextButton(
+                onPressed: _busy ? null : _discardRetelling,
+                child: const Text('放弃这一遍重讲'),
+              ),
+            ],
           ],
         ),
       ),
     ];
   }
+
+  Widget _recordingActions() => Row(
+    children: [
+      Expanded(
+        child: FilledButton.icon(
+          onPressed:
+              !_foreground ||
+                  _starting ||
+                  _processing ||
+                  _finishing ||
+                  _deleting
+              ? null
+              : (_recording ? _finishSegment : _startRecording),
+          icon: Icon(_recording ? Icons.stop : Icons.mic_none_outlined),
+          label: Text(_starting ? '正在准备…' : (_recording ? '说好了' : '说一说')),
+        ),
+      ),
+      if (_segments.isNotEmpty) ...[
+        const SizedBox(width: SpacingTokens.sm),
+        IconButton(
+          onPressed: _canComplete ? _complete : null,
+          icon: const Icon(Icons.done_all_outlined),
+          tooltip: '完成练习',
+        ),
+      ],
+    ],
+  );
 
   Widget _segmentTile(
     ThemeData theme,
